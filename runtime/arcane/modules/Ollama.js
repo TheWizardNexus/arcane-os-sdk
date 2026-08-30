@@ -9,12 +9,14 @@ import {
 
 const PUBLISH_OLLAMA_READY=Symbol('publish-ollama-ready');
 
-export const OLLAMA_EVENT_TYPES=Object.freeze({
+const ollamaEventTypes={
     ready:'arcane-ollama-ready'
-});
-export const OLLAMA_REASONS=Object.freeze({
+};
+const ollamaReasons={
     ready:'ollama-module-ready'
-});
+};
+export const OLLAMA_EVENT_TYPES={...ollamaEventTypes};
+export const OLLAMA_REASONS={...ollamaReasons};
 
 function api(){
     const client=globalThis.Arcane?.ollama
@@ -29,7 +31,7 @@ function api(){
 export class Ollama{
     #events=createArcaneEventSource(this,{
         source:'ollama',
-        eventTypes:Object.freeze(Object.values(OLLAMA_EVENT_TYPES))
+        eventTypes:Object.values(ollamaEventTypes)
     })
 
     version(){ return api().version() }
@@ -59,13 +61,13 @@ export class Ollama{
             const version=String(
                 typeof response==='string' ? response : response?.version||''
             ).trim()||null
-            return Object.freeze({ready:true,version,errorCode:null})
+            return {ready:true,version,errorCode:null}
         }catch(error){
-            return Object.freeze({
+            return {
                 ready:false,
                 version:null,
                 errorCode:String(error?.code||'OLLAMA_UNAVAILABLE')
-            })
+            }
         }
     }
 
@@ -84,13 +86,13 @@ export class Ollama{
     }
 
     [PUBLISH_OLLAMA_READY](){
-        const reason=OLLAMA_REASONS.ready;
+        const reason=ollamaReasons.ready;
         const {occurrence}=this.#events.dispatch(
-            OLLAMA_EVENT_TYPES.ready,
-            Object.freeze({ollama:this,reason}),
+            ollamaEventTypes.ready,
+            {ollama:this,reason},
             {
                 operationId:`${this.#events.instanceId}:ready:1`,
-                publicDetail:Object.freeze({ready:true,reason})
+                publicDetail:{ready:true,reason}
             }
         )
         if(typeof globalThis.CustomEvent==='function'
@@ -100,10 +102,10 @@ export class Ollama{
     }
 }
 
-export const ollama=Object.freeze(new Ollama())
+export const ollama=new Ollama()
 export default ollama
 
 if(!Object.prototype.hasOwnProperty.call(globalThis,'arcaneOllama')){
-    Object.defineProperty(globalThis,'arcaneOllama',{ value:ollama,enumerable:true,configurable:false,writable:false })
+    Object.defineProperty(globalThis,'arcaneOllama',{ value:ollama,enumerable:true,configurable:true,writable:true })
 }
 ollama[PUBLISH_OLLAMA_READY]()

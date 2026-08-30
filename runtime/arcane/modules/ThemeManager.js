@@ -7,10 +7,10 @@ import {
     projectArcaneDOMEvent
 } from 'arcane-os/event-manager';
 
-const skinSchema=Object.freeze([
+const skinSchema=[
     {key:'appearance.activeSkin',type:'text',defaultValue:''},
     {key:'appearance.customSkin',type:'text',defaultValue:''}
-]);
+];
 
 export default class ThemeManager{
     #events;
@@ -26,7 +26,7 @@ export default class ThemeManager{
         this.customTheme=null;
         this.#events=createArcaneEventSource(this,{
             source:'theme-manager',
-            eventTypes:Object.freeze(['arcane-theme-change'])
+            eventTypes:['arcane-theme-change']
         });
     }
 
@@ -125,14 +125,14 @@ export default class ThemeManager{
 
     emit(reason='theme-state-applied'){
         const state=this.current();
-        const detail=Object.freeze({...state,reason});
+        const detail={...state,reason};
         this.#operationSequence+=1;
         const {occurrence}=this.#events.dispatch(
             'arcane-theme-change',
             detail,
             {
                 operationId:`theme-manager-${this.#events.instanceId}-${this.#operationSequence}`,
-                publicDetail:Object.freeze({mode:detail.mode,reason})
+                publicDetail:{mode:detail.mode,reason}
             }
         );
         if(typeof globalThis.CustomEvent==='function'

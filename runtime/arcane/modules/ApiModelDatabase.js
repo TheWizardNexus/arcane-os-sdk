@@ -1,26 +1,33 @@
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 import ApiModelRecord from '../entities/ApiModelRecord.js';
 
-export const API_MODEL_EVENTS=Object.freeze({
+const apiModelEvents={
     requestStarted:'api-model-request',
     requestSucceeded:'api-model-success',
     requestFailed:'api-model-error'
-});
+};
 
-const API_MODEL_EVENT_TYPES=Object.freeze(Object.values(API_MODEL_EVENTS));
+export const API_MODEL_EVENTS={...apiModelEvents};
+const API_MODEL_EVENT_TYPES=Object.values(apiModelEvents);
 
-export const API_MODEL_ERRORS=Object.freeze({
-    requestAborted:Object.freeze({code:'ARCANE_API_MODEL_REQUEST_ABORTED',reason:'api-model-request-aborted'}),
-    cacheReadFailed:Object.freeze({code:'ARCANE_API_MODEL_CACHE_READ_FAILED',reason:'api-model-cache-read-rejected'}),
-    cacheWriteFailed:Object.freeze({code:'ARCANE_API_MODEL_CACHE_WRITE_FAILED',reason:'api-model-cache-write-rejected'}),
-    databaseDisposed:Object.freeze({code:'ARCANE_API_MODEL_DATABASE_DISPOSED',reason:'api-model-database-disposed'}),
-    requestFetchFailed:Object.freeze({code:'ARCANE_API_MODEL_REQUEST_FETCH_FAILED',reason:'api-model-request-fetch-rejected'}),
-    requestOptionsInvalid:Object.freeze({code:'ARCANE_API_MODEL_REQUEST_OPTIONS_INVALID',reason:'api-model-request-options-invalid'}),
-    responseContractInvalid:Object.freeze({code:'ARCANE_API_MODEL_RESPONSE_CONTRACT_INVALID',reason:'api-model-response-contract-mismatch'}),
-    responseJSONInvalid:Object.freeze({code:'ARCANE_API_MODEL_RESPONSE_JSON_INVALID',reason:'api-model-response-json-invalid'}),
-    responseParseFailed:Object.freeze({code:'ARCANE_API_MODEL_RESPONSE_PARSE_FAILED',reason:'api-model-response-parse-rejected'}),
-    responseStatusRejected:Object.freeze({code:'ARCANE_API_MODEL_RESPONSE_STATUS_REJECTED',reason:'api-model-response-status-rejected'})
-});
+const apiModelErrors={
+    requestAborted:{code:'ARCANE_API_MODEL_REQUEST_ABORTED',reason:'api-model-request-aborted'},
+    cacheReadFailed:{code:'ARCANE_API_MODEL_CACHE_READ_FAILED',reason:'api-model-cache-read-rejected'},
+    cacheWriteFailed:{code:'ARCANE_API_MODEL_CACHE_WRITE_FAILED',reason:'api-model-cache-write-rejected'},
+    databaseDisposed:{code:'ARCANE_API_MODEL_DATABASE_DISPOSED',reason:'api-model-database-disposed'},
+    requestFetchFailed:{code:'ARCANE_API_MODEL_REQUEST_FETCH_FAILED',reason:'api-model-request-fetch-rejected'},
+    requestOptionsInvalid:{code:'ARCANE_API_MODEL_REQUEST_OPTIONS_INVALID',reason:'api-model-request-options-invalid'},
+    responseContractInvalid:{code:'ARCANE_API_MODEL_RESPONSE_CONTRACT_INVALID',reason:'api-model-response-contract-mismatch'},
+    responseJSONInvalid:{code:'ARCANE_API_MODEL_RESPONSE_JSON_INVALID',reason:'api-model-response-json-invalid'},
+    responseParseFailed:{code:'ARCANE_API_MODEL_RESPONSE_PARSE_FAILED',reason:'api-model-response-parse-rejected'},
+    responseStatusRejected:{code:'ARCANE_API_MODEL_RESPONSE_STATUS_REJECTED',reason:'api-model-response-status-rejected'}
+};
+
+export const API_MODEL_ERRORS=Object.fromEntries(
+    Object.entries(apiModelErrors).map(function copyApiModelError([key,value]){
+        return [key,{...value}];
+    })
+);
 
 function endpoint(value){
     const url=new URL(String(value||''));
@@ -94,24 +101,24 @@ function apiModelError(error,contract,message){
 function disposedError(){
     return apiModelError(
         new Error('The API model database has been disposed.'),
-        API_MODEL_ERRORS.databaseDisposed,
+        apiModelErrors.databaseDisposed,
         'The API model database has been disposed.'
     );
 }
 
 function requestOptions(value){
-    if(value===undefined)return Object.freeze({operationId:null,signal:null});
+    if(value===undefined)return {operationId:null,signal:null};
     if(!value||typeof value!=='object'||Array.isArray(value)){
         throw apiModelError(
             new TypeError('API model request options must be an object.'),
-            API_MODEL_ERRORS.requestOptionsInvalid,
+            apiModelErrors.requestOptionsInvalid,
             'API model request options must be an object.'
         );
     }
     if(!signalLike(value.signal)){
         throw apiModelError(
             new TypeError('API model request signal must be an AbortSignal.'),
-            API_MODEL_ERRORS.requestOptionsInvalid,
+            apiModelErrors.requestOptionsInvalid,
             'API model request signal must be an AbortSignal.'
         );
     }
@@ -120,15 +127,14 @@ function requestOptions(value){
         typeof operationId!=='string'
         ||operationId.trim()!==operationId
         ||operationId.length<1
-        ||operationId.length>256
     )){
         throw apiModelError(
-            new TypeError('API model operationId must contain 1-256 non-edge-whitespace characters.'),
-            API_MODEL_ERRORS.requestOptionsInvalid,
+            new TypeError('API model operationId must contain non-edge-whitespace characters.'),
+            apiModelErrors.requestOptionsInvalid,
             'API model operationId is invalid.'
         );
     }
-    return Object.freeze({operationId,signal:value.signal??null});
+    return {operationId,signal:value.signal??null};
 }
 
 function linkAbortSignal(signal,controller,cleanup){
@@ -155,14 +161,14 @@ function operationError(error,stage,signal){
             &&reason.code
             &&typeof reason.reason==='string'
             &&reason.reason)return reason;
-        return apiModelError(reason??error,API_MODEL_ERRORS.requestAborted,'The API model request was aborted.');
+        return apiModelError(reason??error,apiModelErrors.requestAborted,'The API model request was aborted.');
     }
-    if(stage==='fetch')return apiModelError(error,API_MODEL_ERRORS.requestFetchFailed,'The API model request failed.');
-    if(stage==='response')return apiModelError(error,API_MODEL_ERRORS.responseContractInvalid,'The API model response contract is invalid.');
-    if(stage==='response-json')return apiModelError(error,API_MODEL_ERRORS.responseJSONInvalid,'The API model response body is not valid JSON.');
-    if(stage==='response-status')return apiModelError(error,API_MODEL_ERRORS.responseStatusRejected,'The API model response status rejected the request.');
-    if(stage==='response-parse')return apiModelError(error,API_MODEL_ERRORS.responseParseFailed,'The API model response parser failed.');
-    return apiModelError(error,API_MODEL_ERRORS.cacheWriteFailed,'The API model cache write failed.');
+    if(stage==='fetch')return apiModelError(error,apiModelErrors.requestFetchFailed,'The API model request failed.');
+    if(stage==='response')return apiModelError(error,apiModelErrors.responseContractInvalid,'The API model response contract is invalid.');
+    if(stage==='response-json')return apiModelError(error,apiModelErrors.responseJSONInvalid,'The API model response body is not valid JSON.');
+    if(stage==='response-status')return apiModelError(error,apiModelErrors.responseStatusRejected,'The API model response status rejected the request.');
+    if(stage==='response-parse')return apiModelError(error,apiModelErrors.responseParseFailed,'The API model response parser failed.');
+    return apiModelError(error,apiModelErrors.cacheWriteFailed,'The API model cache write failed.');
 }
 
 export default class ApiModelDatabase extends EventTarget{
@@ -198,16 +204,16 @@ export default class ApiModelDatabase extends EventTarget{
         if(operation.errorPublished||this.#events.disposed)return false;
         operation.errorPublished=true;
         this.#events.dispatch(
-            API_MODEL_EVENTS.requestFailed,
-            Object.freeze({
+            apiModelEvents.requestFailed,
+            {
                 requestId:operation.operationId,
                 endpoint:operation.visibleEndpoint,
                 error,
                 reason:error.reason
-            }),
+            },
             {
                 operationId:operation.operationId,
-                publicDetail:Object.freeze({code:error.code,reason:error.reason})
+                publicDetail:{code:error.code,reason:error.reason}
             }
         );
         return true;
@@ -220,7 +226,7 @@ export default class ApiModelDatabase extends EventTarget{
         if(!signalLike(requestSignal)){
             throw apiModelError(
                 new TypeError('The configured API model request signal must be an AbortSignal.'),
-                API_MODEL_ERRORS.requestOptionsInvalid,
+                apiModelErrors.requestOptionsInvalid,
                 'The configured API model request signal must be an AbortSignal.'
             );
         }
@@ -267,11 +273,11 @@ export default class ApiModelDatabase extends EventTarget{
             }
             started=true;
             this.#events.dispatch(
-                API_MODEL_EVENTS.requestStarted,
-                Object.freeze({requestId:operation.operationId,endpoint:visibleEndpoint}),
+                apiModelEvents.requestStarted,
+                {requestId:operation.operationId,endpoint:visibleEndpoint},
                 {
                     operationId:operation.operationId,
-                    publicDetail:Object.freeze({requestId:operation.operationId})
+                    publicDetail:{requestId:operation.operationId}
                 }
             );
             if(operation.controller.signal.aborted)throw operation.controller.signal.reason;
@@ -317,7 +323,7 @@ export default class ApiModelDatabase extends EventTarget{
                 await this.cache.set(
                     visibleEndpoint,
                     record.toJSON(),
-                    Object.freeze({signal:operation.controller.signal})
+                    {signal:operation.controller.signal}
                 );
             }
             if(operation.controller.signal.aborted)throw operation.controller.signal.reason;
@@ -326,11 +332,11 @@ export default class ApiModelDatabase extends EventTarget{
             this.#operations.delete(operation);
             this.latest=record;
             this.#events.dispatch(
-                API_MODEL_EVENTS.requestSucceeded,
-                Object.freeze({requestId:operation.operationId,record}),
+                apiModelEvents.requestSucceeded,
+                {requestId:operation.operationId,record},
                 {
                     operationId:operation.operationId,
-                    publicDetail:Object.freeze({requestId:operation.operationId})
+                    publicDetail:{requestId:operation.operationId}
                 }
             );
             return record;
@@ -351,12 +357,12 @@ export default class ApiModelDatabase extends EventTarget{
         if(options.operationId!==null){
             throw apiModelError(
                 new TypeError('cached() does not accept operationId.'),
-                API_MODEL_ERRORS.requestOptionsInvalid,
+                apiModelErrors.requestOptionsInvalid,
                 'cached() does not accept operationId.'
             );
         }
         if(options.signal?.aborted){
-            throw apiModelError(options.signal.reason,API_MODEL_ERRORS.requestAborted,'The API model cache read was aborted.');
+            throw apiModelError(options.signal.reason,apiModelErrors.requestAborted,'The API model cache read was aborted.');
         }
         const url=appendParameters(new URL(this.endpoint),parameters);
         if(!this.cache?.get)return null;
@@ -364,17 +370,17 @@ export default class ApiModelDatabase extends EventTarget{
         try{
             value=await this.cache.get(
                 publicEndpoint(url),
-                Object.freeze({signal:options.signal})
+                {signal:options.signal}
             );
         }catch(error){
             if(options.signal?.aborted){
-                throw apiModelError(options.signal.reason??error,API_MODEL_ERRORS.requestAborted,'The API model cache read was aborted.');
+                throw apiModelError(options.signal.reason??error,apiModelErrors.requestAborted,'The API model cache read was aborted.');
             }
-            throw apiModelError(error,API_MODEL_ERRORS.cacheReadFailed,'The API model cache read failed.');
+            throw apiModelError(error,apiModelErrors.cacheReadFailed,'The API model cache read failed.');
         }
         this.#assertOpen();
         if(options.signal?.aborted){
-            throw apiModelError(options.signal.reason,API_MODEL_ERRORS.requestAborted,'The API model cache read was aborted.');
+            throw apiModelError(options.signal.reason,apiModelErrors.requestAborted,'The API model cache read was aborted.');
         }
         return value?new ApiModelRecord(value):null;
     }

@@ -1,4 +1,4 @@
-export const COMPONENT_WAIT_ERROR_CODES=Object.freeze({
+const componentWaitErrorCodes={
     abortSignalInvalid:'ARCANE_COMPONENT_READINESS_ABORT_SIGNAL_INVALID',
     elementRequired:'ARCANE_COMPONENT_READINESS_ELEMENT_REQUIRED',
     errorEventReported:'ARCANE_COMPONENT_READINESS_ERROR_EVENT_REPORTED',
@@ -12,9 +12,9 @@ export const COMPONENT_WAIT_ERROR_CODES=Object.freeze({
     waitAborted:'ARCANE_COMPONENT_READINESS_WAIT_ABORTED',
     waitOptionsInvalid:'ARCANE_COMPONENT_READINESS_WAIT_OPTIONS_INVALID',
     waitTimedOut:'COMPONENT_READY_TIMEOUT'
-});
+};
 
-export const COMPONENT_WAIT_REASONS=Object.freeze({
+const componentWaitReasons={
     abortSignalInvalid:'component-readiness-abort-signal-invalid',
     elementMissing:'component-readiness-element-missing',
     errorEventReported:'component-readiness-error-event-reported',
@@ -28,7 +28,10 @@ export const COMPONENT_WAIT_REASONS=Object.freeze({
     waitAborted:'component-readiness-wait-aborted',
     waitOptionsInvalid:'component-readiness-wait-options-invalid',
     waitTimedOut:'component-readiness-wait-timed-out'
-});
+};
+
+export const COMPONENT_WAIT_ERROR_CODES={...componentWaitErrorCodes};
+export const COMPONENT_WAIT_REASONS={...componentWaitReasons};
 
 function defineComponentWaitError(error,code,reason,cause){
     const priorCode=typeof error?.code==='string'&&error.code
@@ -92,8 +95,8 @@ function componentWaitAbortError(reason){
     }
     return defineComponentWaitError(
         error,
-        COMPONENT_WAIT_ERROR_CODES.waitAborted,
-        COMPONENT_WAIT_REASONS.waitAborted,
+        componentWaitErrorCodes.waitAborted,
+        componentWaitReasons.waitAborted,
         reason
     );
 }
@@ -103,8 +106,8 @@ function waitForComponent(element,options={}){
         return Promise.reject(
             componentWaitError(
                 'Component readiness wait options must be an object.',
-                COMPONENT_WAIT_ERROR_CODES.waitOptionsInvalid,
-                COMPONENT_WAIT_REASONS.waitOptionsInvalid,
+                componentWaitErrorCodes.waitOptionsInvalid,
+                componentWaitReasons.waitOptionsInvalid,
                 TypeError
             )
         );
@@ -128,18 +131,18 @@ function waitForComponent(element,options={}){
         return Promise.reject(
             componentWaitError(
                 'Component readiness event, errorEvent, property, and methods options are invalid.',
-                COMPONENT_WAIT_ERROR_CODES.waitOptionsInvalid,
-                COMPONENT_WAIT_REASONS.waitOptionsInvalid,
+                componentWaitErrorCodes.waitOptionsInvalid,
+                componentWaitReasons.waitOptionsInvalid,
                 TypeError
             )
         );
     }
-    if(!Number.isFinite(timeoutMs)||timeoutMs<0||timeoutMs>60000){
+    if(!Number.isFinite(timeoutMs)||timeoutMs<0){
         return Promise.reject(
             componentWaitError(
-                'timeoutMs must be between 0 and 60000.',
-                COMPONENT_WAIT_ERROR_CODES.waitOptionsInvalid,
-                COMPONENT_WAIT_REASONS.waitOptionsInvalid,
+                'timeoutMs must be a non-negative finite number.',
+                componentWaitErrorCodes.waitOptionsInvalid,
+                componentWaitReasons.waitOptionsInvalid,
                 RangeError
             )
         );
@@ -154,8 +157,8 @@ function waitForComponent(element,options={}){
         return Promise.reject(
             componentWaitError(
                 'signal must be an AbortSignal.',
-                COMPONENT_WAIT_ERROR_CODES.abortSignalInvalid,
-                COMPONENT_WAIT_REASONS.abortSignalInvalid,
+                componentWaitErrorCodes.abortSignalInvalid,
+                componentWaitReasons.abortSignalInvalid,
                 TypeError
             )
         );
@@ -222,8 +225,8 @@ function waitForComponent(element,options={}){
                     reject(
                         componentWaitError(
                             'Component readiness listener cleanup failed.',
-                            COMPONENT_WAIT_ERROR_CODES.listenerCleanupFailed,
-                            COMPONENT_WAIT_REASONS.listenerCleanupFailed,
+                            componentWaitErrorCodes.listenerCleanupFailed,
+                            componentWaitReasons.listenerCleanupFailed,
                             Error,
                             cleanupError
                         )
@@ -271,8 +274,8 @@ function waitForComponent(element,options={}){
                     fail(
                         componentWaitError(
                             'Component readiness state inspection failed.',
-                            COMPONENT_WAIT_ERROR_CODES.stateInspectionFailed,
-                            COMPONENT_WAIT_REASONS.stateInspectionFailed,
+                            componentWaitErrorCodes.stateInspectionFailed,
+                            componentWaitReasons.stateInspectionFailed,
                             Error,
                             error
                         )
@@ -302,8 +305,8 @@ function waitForComponent(element,options={}){
                     fail(
                         defineComponentWaitError(
                             error,
-                            COMPONENT_WAIT_ERROR_CODES.errorEventReported,
-                            COMPONENT_WAIT_REASONS.errorEventReported,
+                            componentWaitErrorCodes.errorEventReported,
+                            componentWaitReasons.errorEventReported,
                             detail?.error
                         )
                     );
@@ -311,8 +314,8 @@ function waitForComponent(element,options={}){
                     fail(
                         componentWaitError(
                             'Component readiness error-event inspection failed.',
-                            COMPONENT_WAIT_ERROR_CODES.errorEventInspectionFailed,
-                            COMPONENT_WAIT_REASONS.errorEventInspectionFailed,
+                            componentWaitErrorCodes.errorEventInspectionFailed,
+                            componentWaitReasons.errorEventInspectionFailed,
                             Error,
                             error
                         )
@@ -324,8 +327,8 @@ function waitForComponent(element,options={}){
                 fail(
                     componentWaitError(
                         'Component element is required.',
-                        COMPONENT_WAIT_ERROR_CODES.elementRequired,
-                        COMPONENT_WAIT_REASONS.elementMissing,
+                        componentWaitErrorCodes.elementRequired,
+                        componentWaitReasons.elementMissing,
                         TypeError
                     )
                 );
@@ -339,8 +342,8 @@ function waitForComponent(element,options={}){
                 fail(
                     componentWaitError(
                         'The component readiness listener target must provide addEventListener() and removeEventListener().',
-                        COMPONENT_WAIT_ERROR_CODES.listenerTargetInvalid,
-                        COMPONENT_WAIT_REASONS.listenerTargetInvalid,
+                        componentWaitErrorCodes.listenerTargetInvalid,
+                        componentWaitReasons.listenerTargetInvalid,
                         TypeError
                     )
                 );
@@ -359,8 +362,8 @@ function waitForComponent(element,options={}){
                     fail(
                         componentWaitError(
                             'Component readiness abort-listener installation failed.',
-                            COMPONENT_WAIT_ERROR_CODES.listenerInstallationFailed,
-                            COMPONENT_WAIT_REASONS.listenerInstallationFailed,
+                            componentWaitErrorCodes.listenerInstallationFailed,
+                            componentWaitReasons.listenerInstallationFailed,
                             Error,
                             error
                         )
@@ -380,8 +383,8 @@ function waitForComponent(element,options={}){
                     fail(
                         componentWaitError(
                             'Component readiness listener installation failed.',
-                            COMPONENT_WAIT_ERROR_CODES.listenerInstallationFailed,
-                            COMPONENT_WAIT_REASONS.listenerInstallationFailed,
+                            componentWaitErrorCodes.listenerInstallationFailed,
+                            componentWaitReasons.listenerInstallationFailed,
                             Error,
                             error
                         )
@@ -395,8 +398,8 @@ function waitForComponent(element,options={}){
                 fail(
                     componentWaitError(
                         'A component readiness event is required.',
-                        COMPONENT_WAIT_ERROR_CODES.readinessEventRequired,
-                        COMPONENT_WAIT_REASONS.readinessEventMissing
+                        componentWaitErrorCodes.readinessEventRequired,
+                        componentWaitReasons.readinessEventMissing
                     )
                 );
                 return;
@@ -413,8 +416,8 @@ function waitForComponent(element,options={}){
                     fail(
                         componentWaitError(
                             'Component readiness error-listener installation failed.',
-                            COMPONENT_WAIT_ERROR_CODES.listenerInstallationFailed,
-                            COMPONENT_WAIT_REASONS.listenerInstallationFailed,
+                            componentWaitErrorCodes.listenerInstallationFailed,
+                            componentWaitReasons.listenerInstallationFailed,
                             Error,
                             error
                         )
@@ -428,8 +431,8 @@ function waitForComponent(element,options={}){
                         fail(
                             componentWaitError(
                                 `Component readiness timed out after ${timeoutMs} ms.`,
-                                COMPONENT_WAIT_ERROR_CODES.waitTimedOut,
-                                COMPONENT_WAIT_REASONS.waitTimedOut
+                                componentWaitErrorCodes.waitTimedOut,
+                                componentWaitReasons.waitTimedOut
                             )
                         );
                     },timeoutMs);
@@ -437,8 +440,8 @@ function waitForComponent(element,options={}){
                     fail(
                         componentWaitError(
                             'Component readiness timeout installation failed.',
-                            COMPONENT_WAIT_ERROR_CODES.timeoutInstallationFailed,
-                            COMPONENT_WAIT_REASONS.timeoutInstallationFailed,
+                            componentWaitErrorCodes.timeoutInstallationFailed,
+                            componentWaitReasons.timeoutInstallationFailed,
                             Error,
                             error
                         )

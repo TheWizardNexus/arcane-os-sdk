@@ -3,24 +3,24 @@ import CommunicationMessage from '../entities/CommunicationMessage.js';
 import CommunicationThread from '../entities/CommunicationThread.js';
 import CommunicationProviderRegistry from './CommunicationProviderRegistry.js?v=2';
 
-export const COMMUNICATION_HUB_EVENTS=Object.freeze({
+const communicationHubEvents={
     refreshCancelled:'communications-refresh-cancelled',
     refreshCompleted:'communications-refresh-completed',
     refreshFailed:'communications-refresh-failed',
     refreshLegacy:'communications-refresh',
     refreshPartiallyCompleted:'communications-refresh-partially-completed',
     refreshStarted:'communications-refresh-started'
-});
+};
 
-export const COMMUNICATION_HUB_REFRESH_STATES=Object.freeze({
+const communicationHubRefreshStates={
     cancelled:'refresh-cancelled',
     completed:'refresh-completed',
     failed:'refresh-failed',
     partiallyCompleted:'refresh-partially-completed',
     started:'refresh-started'
-});
+};
 
-export const COMMUNICATION_HUB_REFRESH_REASONS=Object.freeze({
+const communicationHubRefreshReasons={
     allProviderThreadListsRejected:'all-provider-thread-lists-rejected',
     boundaryThrew:'refresh-boundary-threw',
     hubDisposed:'hub-disposed',
@@ -28,9 +28,9 @@ export const COMMUNICATION_HUB_REFRESH_REASONS=Object.freeze({
     signalAborted:'refresh-signal-aborted',
     startCancelled:'refresh-start-cancelled',
     superseded:'refresh-superseded'
-});
+};
 
-export const COMMUNICATION_HUB_ERROR_CODES=Object.freeze({
+const communicationHubErrorCodes={
     allProviderThreadListsRejected:'ARCANE_COMMUNICATION_PROVIDER_THREAD_LISTS_REJECTED',
     disposed:'ARCANE_COMMUNICATION_HUB_DISPOSED',
     providerThreadListRejected:'ARCANE_COMMUNICATION_PROVIDER_THREAD_LIST_REJECTED',
@@ -38,7 +38,12 @@ export const COMMUNICATION_HUB_ERROR_CODES=Object.freeze({
     refreshFailed:'ARCANE_COMMUNICATION_HUB_REFRESH_FAILED',
     refreshOptionsInvalid:'ARCANE_COMMUNICATION_HUB_REFRESH_OPTIONS_INVALID',
     refreshSuperseded:'ARCANE_COMMUNICATION_HUB_REFRESH_SUPERSEDED'
-});
+};
+
+export const COMMUNICATION_HUB_EVENTS={...communicationHubEvents};
+export const COMMUNICATION_HUB_REFRESH_STATES={...communicationHubRefreshStates};
+export const COMMUNICATION_HUB_REFRESH_REASONS={...communicationHubRefreshReasons};
+export const COMMUNICATION_HUB_ERROR_CODES={...communicationHubErrorCodes};
 
 function codedError(message,code,{cause,name='Error',ErrorType=Error}={}){
     const error=new ErrorType(message);
@@ -53,16 +58,16 @@ function codedError(message,code,{cause,name='Error',ErrorType=Error}={}){
 function disposedError(){
     return codedError(
         'The communication hub has been disposed.',
-        COMMUNICATION_HUB_ERROR_CODES.disposed
+        communicationHubErrorCodes.disposed
     );
 }
 
-function refreshAbortError(reason,code=COMMUNICATION_HUB_ERROR_CODES.refreshAborted){
+function refreshAbortError(reason,code=communicationHubErrorCodes.refreshAborted){
     if(reason instanceof Error&&reason.name==='AbortError'&&reason.code===code){
         return reason;
     }
     return codedError(
-        code===COMMUNICATION_HUB_ERROR_CODES.refreshSuperseded
+        code===communicationHubErrorCodes.refreshSuperseded
             ?'The communication refresh was superseded by a newer refresh.'
             :'The communication refresh was aborted.',
         code,
@@ -74,12 +79,12 @@ function refreshAbortError(reason,code=COMMUNICATION_HUB_ERROR_CODES.refreshAbor
 }
 
 function refreshFailureError(error){
-    if(error instanceof Error&&error.code===COMMUNICATION_HUB_ERROR_CODES.refreshFailed){
+    if(error instanceof Error&&error.code===communicationHubErrorCodes.refreshFailed){
         return error;
     }
     return codedError(
         'The communication refresh boundary failed.',
-        COMMUNICATION_HUB_ERROR_CODES.refreshFailed,
+        communicationHubErrorCodes.refreshFailed,
         {cause:error}
     );
 }
@@ -94,41 +99,24 @@ function isAbortSignal(value){
 
 function normalizeRefreshOptions(value){
     if(value===undefined){
-        return Object.freeze({signal:null});
+        return {signal:null};
     }
     if(!value||typeof value!=='object'||Array.isArray(value)){
         throw codedError(
             'Communication refresh options must be a plain record.',
-            COMMUNICATION_HUB_ERROR_CODES.refreshOptionsInvalid,
+            communicationHubErrorCodes.refreshOptionsInvalid,
             {ErrorType:TypeError}
         );
     }
-    const descriptors=Object.getOwnPropertyDescriptors(value);
-    const unknown=Reflect.ownKeys(descriptors).find(
-        function findUnknownRefreshOption(key){
-            return key!=='signal';
-        }
-    );
-    if(unknown!==undefined||Object.values(descriptors).some(
-        function findRefreshOptionAccessor(descriptor){
-            return !Object.hasOwn(descriptor,'value');
-        }
-    )){
-        throw codedError(
-            'Communication refresh options may contain only a data signal property.',
-            COMMUNICATION_HUB_ERROR_CODES.refreshOptionsInvalid,
-            {ErrorType:TypeError}
-        );
-    }
-    const signal=descriptors.signal?.value??null;
+    const signal=value.signal??null;
     if(signal!==null&&!isAbortSignal(signal)){
         throw codedError(
             'Communication refresh signal must be an AbortSignal.',
-            COMMUNICATION_HUB_ERROR_CODES.refreshOptionsInvalid,
+            communicationHubErrorCodes.refreshOptionsInvalid,
             {ErrorType:TypeError}
         );
     }
-    return Object.freeze({signal});
+    return {signal};
 }
 
 function normalizeProviderThreads(provider,values){
@@ -152,11 +140,15 @@ function compareThreadsByUpdatedAt(left,right){
 }
 
 function providerFailure(provider){
-    return Object.freeze({
-        code:COMMUNICATION_HUB_ERROR_CODES.providerThreadListRejected,
+    return {
+        code:communicationHubErrorCodes.providerThreadListRejected,
         providerId:provider.id,
-        reason:COMMUNICATION_HUB_REFRESH_REASONS.providerThreadListRejected
-    });
+        reason:communicationHubRefreshReasons.providerThreadListRejected
+    };
+}
+
+function copyProviderFailure(failure){
+    return {...failure};
 }
 
 function settleWithAbort(operation,promise){
@@ -215,7 +207,7 @@ export default class CommunicationHub extends EventTarget{
             this,
             {
                 source:'communication-hub',
-                eventTypes:Object.freeze(Object.values(COMMUNICATION_HUB_EVENTS))
+                eventTypes:Object.values(communicationHubEvents)
             }
         );
     }
@@ -264,15 +256,15 @@ export default class CommunicationHub extends EventTarget{
         operation.controller.abort(error);
         if(!this.#events.disposed){
             this.#events.dispatch(
-                COMMUNICATION_HUB_EVENTS.refreshCancelled,
-                Object.freeze({error,reason}),
+                communicationHubEvents.refreshCancelled,
+                {error,reason},
                 {
                     operationId:operation.operationId,
-                    publicDetail:Object.freeze({
+                    publicDetail:{
                         code:error.code,
                         reason,
-                        state:COMMUNICATION_HUB_REFRESH_STATES.cancelled
-                    })
+                        state:communicationHubRefreshStates.cancelled
+                    }
                 }
             );
         }
@@ -312,9 +304,9 @@ export default class CommunicationHub extends EventTarget{
         this.#cancelActiveRefresh(
             refreshAbortError(
                 undefined,
-                COMMUNICATION_HUB_ERROR_CODES.refreshSuperseded
+                communicationHubErrorCodes.refreshSuperseded
             ),
-            COMMUNICATION_HUB_REFRESH_REASONS.superseded
+            communicationHubRefreshReasons.superseded
         );
 
         const providers=this.enabledProviders();
@@ -331,7 +323,7 @@ export default class CommunicationHub extends EventTarget{
             this.#publishCancellation(
                 operation,
                 refreshAbortError(settings.signal.reason),
-                COMMUNICATION_HUB_REFRESH_REASONS.signalAborted
+                communicationHubRefreshReasons.signalAborted
             );
         }.bind(this);
         settings.signal?.addEventListener(
@@ -341,22 +333,22 @@ export default class CommunicationHub extends EventTarget{
         );
         this.#refreshOperation=operation;
 
-        const providerIds=Object.freeze(providers.map(
+        const providerIds=providers.map(
             function communicationProviderId(provider){
                 return provider.id;
             }
-        ));
+        );
         const startPublication=this.#events.dispatch(
-            COMMUNICATION_HUB_EVENTS.refreshStarted,
-            Object.freeze({providerIds}),
+            communicationHubEvents.refreshStarted,
+            {providerIds:[...providerIds]},
             {
                 cancelable:true,
                 operationId:operation.operationId,
-                publicDetail:Object.freeze({
+                publicDetail:{
                     providerCount:providerIds.length,
-                    providerIds,
-                    state:COMMUNICATION_HUB_REFRESH_STATES.started
-                })
+                    providerIds:[...providerIds],
+                    state:communicationHubRefreshStates.started
+                }
             }
         );
         if(operation.terminal){
@@ -367,7 +359,7 @@ export default class CommunicationHub extends EventTarget{
             this.#publishCancellation(
                 operation,
                 error,
-                COMMUNICATION_HUB_REFRESH_REASONS.startCancelled
+                communicationHubRefreshReasons.startCancelled
             );
             throw error;
         }
@@ -375,7 +367,7 @@ export default class CommunicationHub extends EventTarget{
         if(this.#refreshOperation!==operation){
             throw operation.error??refreshAbortError(
                 undefined,
-                COMMUNICATION_HUB_ERROR_CODES.refreshSuperseded
+                communicationHubErrorCodes.refreshSuperseded
             );
         }
 
@@ -411,7 +403,7 @@ export default class CommunicationHub extends EventTarget{
             if(this.#refreshOperation!==operation){
                 throw operation.error??refreshAbortError(
                     undefined,
-                    COMMUNICATION_HUB_ERROR_CODES.refreshSuperseded
+                    communicationHubErrorCodes.refreshSuperseded
                 );
             }
 
@@ -435,45 +427,52 @@ export default class CommunicationHub extends EventTarget{
             if(this.#refreshOperation!==operation){
                 throw operation.error??refreshAbortError(
                     undefined,
-                    COMMUNICATION_HUB_ERROR_CODES.refreshSuperseded
+                    communicationHubErrorCodes.refreshSuperseded
                 );
             }
 
             this.threads=threads;
             const returnedThreads=[...this.threads];
             const returnedErrors=[...errors];
-            const frozenFailures=Object.freeze([...failures]);
             const allProvidersRejected=providers.length>0
                 &&failures.length===providers.length;
             const state=allProvidersRejected
-                ?COMMUNICATION_HUB_REFRESH_STATES.failed
+                ?communicationHubRefreshStates.failed
                 :failures.length
-                    ?COMMUNICATION_HUB_REFRESH_STATES.partiallyCompleted
-                    :COMMUNICATION_HUB_REFRESH_STATES.completed;
+                    ?communicationHubRefreshStates.partiallyCompleted
+                    :communicationHubRefreshStates.completed;
             const terminalType=allProvidersRejected
-                ?COMMUNICATION_HUB_EVENTS.refreshFailed
+                ?communicationHubEvents.refreshFailed
                 :failures.length
-                    ?COMMUNICATION_HUB_EVENTS.refreshPartiallyCompleted
-                    :COMMUNICATION_HUB_EVENTS.refreshCompleted;
-            const compatibilityDetail=Object.freeze({
-                errors:Object.freeze([...returnedErrors]),
-                failures:frozenFailures,
+                    ?communicationHubEvents.refreshPartiallyCompleted
+                    :communicationHubEvents.refreshCompleted;
+            const compatibilityDetail={
+                errors:[...returnedErrors],
+                failures:failures.map(copyProviderFailure),
                 state,
-                threads:Object.freeze([...returnedThreads])
-            });
-            const publicDetail=Object.freeze({
+                threads:[...returnedThreads]
+            };
+            const publicDetail={
                 ...(allProvidersRejected
                     ?{
-                        code:COMMUNICATION_HUB_ERROR_CODES.allProviderThreadListsRejected,
-                        reason:COMMUNICATION_HUB_REFRESH_REASONS.allProviderThreadListsRejected
+                        code:communicationHubErrorCodes.allProviderThreadListsRejected,
+                        reason:communicationHubRefreshReasons.allProviderThreadListsRejected
                     }
                     :{}),
                 failureCount:failures.length,
-                failures:frozenFailures,
+                failures:failures.map(copyProviderFailure),
                 providerCount:providers.length,
                 state,
                 threadCount:threads.length
-            });
+            };
+            const legacyDetail={
+                errors:[...returnedErrors],
+                threads:[...returnedThreads]
+            };
+            const legacyPublicDetail={
+                ...publicDetail,
+                failures:publicDetail.failures.map(copyProviderFailure)
+            };
             operation.terminal=true;
             this.#clearRefreshOperation(operation);
             this.#events.dispatch(
@@ -486,14 +485,11 @@ export default class CommunicationHub extends EventTarget{
             );
             if(!this.#events.disposed){
                 this.#events.dispatch(
-                    COMMUNICATION_HUB_EVENTS.refreshLegacy,
-                    Object.freeze({
-                        errors:compatibilityDetail.errors,
-                        threads:compatibilityDetail.threads
-                    }),
+                    communicationHubEvents.refreshLegacy,
+                    legacyDetail,
                     {
                         operationId:operation.operationId,
-                        publicDetail
+                        publicDetail:legacyPublicDetail
                     }
                 );
             }
@@ -506,9 +502,9 @@ export default class CommunicationHub extends EventTarget{
                 this.#publishCancellation(
                     operation,
                     error,
-                    error.code===COMMUNICATION_HUB_ERROR_CODES.refreshSuperseded
-                        ?COMMUNICATION_HUB_REFRESH_REASONS.superseded
-                        :COMMUNICATION_HUB_REFRESH_REASONS.signalAborted
+                    error.code===communicationHubErrorCodes.refreshSuperseded
+                        ?communicationHubRefreshReasons.superseded
+                        :communicationHubRefreshReasons.signalAborted
                 );
                 throw error;
             }
@@ -518,15 +514,15 @@ export default class CommunicationHub extends EventTarget{
             this.#clearRefreshOperation(operation);
             if(!this.#events.disposed){
                 this.#events.dispatch(
-                    COMMUNICATION_HUB_EVENTS.refreshFailed,
-                    Object.freeze({error:failure}),
+                    communicationHubEvents.refreshFailed,
+                    {error:failure},
                     {
                         operationId:operation.operationId,
-                        publicDetail:Object.freeze({
+                        publicDetail:{
                             code:failure.code,
-                            reason:COMMUNICATION_HUB_REFRESH_REASONS.boundaryThrew,
-                            state:COMMUNICATION_HUB_REFRESH_STATES.failed
-                        })
+                            reason:communicationHubRefreshReasons.boundaryThrew,
+                            state:communicationHubRefreshStates.failed
+                        }
                     }
                 );
             }
@@ -583,9 +579,9 @@ export default class CommunicationHub extends EventTarget{
         this.#cancelActiveRefresh(
             refreshAbortError(
                 disposedError(),
-                COMMUNICATION_HUB_ERROR_CODES.disposed
+                communicationHubErrorCodes.disposed
             ),
-            COMMUNICATION_HUB_REFRESH_REASONS.hubDisposed
+            communicationHubRefreshReasons.hubDisposed
         );
         return this.#events.dispose();
     }

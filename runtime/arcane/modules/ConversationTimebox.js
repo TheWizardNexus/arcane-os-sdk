@@ -4,17 +4,17 @@ const CONVERSATION_TIMEBOX_TOOL_NAME='conversation_timebox';
 const CONVERSATION_TIMEBOX_TICK_MS=1000;
 const MAX_DATE_MILLISECONDS=8_640_000_000_000_000;
 
-export const CONVERSATION_TIMEBOX_EVENT_TYPES=Object.freeze({
+const conversationTimeboxEventTypes={
     change:'conversation-timebox-change'
-});
+};
 
-export const CONVERSATION_TIMEBOX_ERROR_CODES=Object.freeze({
+const conversationTimeboxErrorCodes={
     disposed:'ARCANE_CONVERSATION_TIMEBOX_DISPOSED',
     subscriptionHandlerInvalid:'ARCANE_CONVERSATION_TIMEBOX_SUBSCRIPTION_HANDLER_INVALID',
     subscriptionOptionsInvalid:'ARCANE_CONVERSATION_TIMEBOX_SUBSCRIPTION_OPTIONS_INVALID'
-});
+};
 
-export const CONVERSATION_TIMEBOX_REASONS=Object.freeze({
+const conversationTimeboxReasons={
     deadlineReached:'conversation-timebox-deadline-reached',
     disposed:'conversation-timebox-disposed',
     elapsedTimeAdvanced:'conversation-timebox-elapsed-time-advanced',
@@ -23,47 +23,49 @@ export const CONVERSATION_TIMEBOX_REASONS=Object.freeze({
     limitSet:'conversation-timebox-limit-set',
     snapshotReplayed:'conversation-timebox-snapshot-replayed',
     started:'conversation-timebox-started'
-});
+};
 
-const CONVERSATION_TIMEBOX_OPENING_INSTRUCTION=`Before any other intake question, ask exactly one timing question: "Do you have a limited amount of time to talk right now?" Ask no other question in that opening reply, and wait for the answer before continuing the app's normal intake. The elapsed conversation timer is already visible. A time limit applies only to this conversation. Never infer, round, or invent a duration. The conversation_timebox tool is available on every turn. When the user explicitly sets a duration, call it with action "set" and convert the exact stated duration to whole milliseconds. When the user explicitly adds time, call it with action "adjust" and convert the exact added duration to whole milliseconds. When the user explicitly says there is no limit, asks to remove it, or chooses to continue after a due check without setting another duration, call it with action "clear". Every call must include a nonempty message containing the brief plain-language progress or next-step text shown to the user; do not claim the time check changed before the tool result confirms it. A duration is always sent as duration_milliseconds; for example, 75 seconds is 75000 and 10 minutes is 600000. If the duration is vague or ranged, ask one focused question and do not call the tool yet. The timebox tool must be the sole tool call for its response. Adapt the pace and prioritize the most important next action within an active limit without skipping safety. A message that the agreed time check is due is a check-in, not a request to end: ask whether the user wants to end now or continue, and do not assume their choice.`;
+export const CONVERSATION_TIMEBOX_EVENT_TYPES={...conversationTimeboxEventTypes};
+export const CONVERSATION_TIMEBOX_ERROR_CODES={...conversationTimeboxErrorCodes};
+export const CONVERSATION_TIMEBOX_REASONS={...conversationTimeboxReasons};
+
+const CONVERSATION_TIMEBOX_OPENING_INSTRUCTION=`Before any other intake question, ask exactly one timing question: "Do you have a limited amount of time to talk right now?" Ask no other question in that opening reply, and wait for the answer before continuing the app's normal intake. The elapsed conversation timer is already visible. A time limit applies only to this conversation. Never infer, round, or invent a duration. The conversation_timebox tool is available on every turn. When the user explicitly sets a duration, call it with action "set" and convert the exact stated duration to whole milliseconds. When the user explicitly adds time, call it with action "adjust" and convert the exact added duration to whole milliseconds. When the user explicitly says there is no limit, asks to remove it, or chooses to continue after a due check without setting another duration, call it with action "clear". Every call must include a nonempty message containing the brief plain-language progress or next-step text shown to the user; do not claim the time check changed before the tool result confirms it. A duration is always sent as duration_milliseconds; for example, 75 seconds is 75000 and 10 minutes is 600000. If the duration is vague or ranged, ask one focused question and do not call the tool yet. Adapt the pace and prioritize the most important next action within an active limit without skipping safety. A message that the agreed time check is due is a check-in, not a request to end: ask whether the user wants to end now or continue, and do not assume their choice.`;
 
 const CONVERSATION_TIMEBOX_LIMIT_MESSAGE='The agreed conversation time check is due. Please ask whether I want to end now or continue, and do not assume my choice or set another limit unless I explicitly state one.';
 
-const conversationTimeboxTool=Object.freeze({
+const conversationTimeboxTool={
     type:'function',
-    function:Object.freeze({
+    function:{
         name:CONVERSATION_TIMEBOX_TOOL_NAME,
-        description:'Control the current conversation time check whenever the user explicitly sets, adds, removes, or continues past it. Use this as the sole tool call. Use action "set" to replace the deadline relative to now, "adjust" to add time to the active deadline, and "clear" to remove the deadline, including continuing after a due check without a new duration. Convert exact stated units to whole milliseconds; never infer, round, or choose a default.',
-        parameters:Object.freeze({
+        description:'Control the current conversation time check whenever the user explicitly sets, adds, removes, or continues past it. Use action "set" to replace the deadline relative to now, "adjust" to add time to the active deadline, and "clear" to remove the deadline, including continuing after a due check without a new duration. Convert exact stated units to whole milliseconds; never infer, round, or choose a default.',
+        parameters:{
             type:'object',
-            additionalProperties:false,
-            properties:Object.freeze({
-                action:Object.freeze({
+            properties:{
+                action:{
                     type:'string',
-                    enum:Object.freeze(['set','adjust','clear']),
+                    enum:['set','adjust','clear'],
                     description:'Set a new deadline, add time to the active deadline, or clear the deadline.'
-                }),
+                },
                 message:{
                     type:'string',
                     minLength:1,
                     description:'Brief plain-language progress or next-step text shown to the user for this tool call. Do not claim the time check changed before the tool result confirms it.'
                 },
-                duration_milliseconds:Object.freeze({
+                duration_milliseconds:{
                     type:'integer',
                     minimum:0,
                     description:'The exact positive whole-millisecond duration. Required for "set" and "adjust"; ignored for "clear". Examples: 75 seconds = 75000; 10 minutes = 600000.'
-                })
-            }),
-            required:Object.freeze(['action','message'])
-        })
-    })
-});
+                }
+            },
+            required:['action','message']
+        }
+    }
+};
 
 function isPlainRecord(value){
-    return Boolean(value)
-        &&typeof value==='object'
-        &&!Array.isArray(value)
-        &&Object.getPrototypeOf(value)===Object.prototype;
+    if(!value||typeof value!=='object'||Array.isArray(value))return false;
+    const prototype=Object.getPrototypeOf(value);
+    return prototype===Object.prototype||prototype===null;
 }
 
 function parseToolArguments(value){
@@ -89,14 +91,6 @@ function parseToolArguments(value){
 
 function normalizeConversationTimeboxCommand(value){
     const input=parseToolArguments(value);
-    const allowed=new Set(['action','duration_milliseconds','message']);
-    const unsupported=Object.keys(input).find(function findUnsupportedTimeboxField(key){
-        return !allowed.has(key);
-    });
-
-    if(unsupported){
-        throw new TypeError(`Unsupported conversation timebox field: ${unsupported}`);
-    }
     if(!['set','adjust','clear'].includes(input.action)){
         throw new TypeError('Conversation timebox action must be "set", "adjust", or "clear".');
     }
@@ -104,16 +98,17 @@ function normalizeConversationTimeboxCommand(value){
         throw new TypeError('Conversation timebox message must contain user-facing text.');
     }
     if(input.action==='clear'){
-        return Object.freeze({action:'clear',message:input.message});
+        return {...input,action:'clear',message:input.message};
     }
     if(!Number.isSafeInteger(input.duration_milliseconds)||input.duration_milliseconds<=0){
         throw new TypeError('duration_milliseconds must be an explicit positive whole number.');
     }
-    return Object.freeze({
+    return {
+        ...input,
         action:input.action,
         durationMilliseconds:input.duration_milliseconds,
         message:input.message
-    });
+    };
 }
 
 function appendConversationTimeboxOpeningInstruction(message=''){
@@ -195,16 +190,12 @@ function normalizeSubscriptionOptions(value={}){
     if(!isPlainRecord(value)){
         throw conversationTimeboxError(
             'Conversation timebox subscription options must be a plain object.',
-            CONVERSATION_TIMEBOX_ERROR_CODES.subscriptionOptionsInvalid,
+            conversationTimeboxErrorCodes.subscriptionOptionsInvalid,
             'conversation-timebox-subscription-options-invalid',
             TypeError
         );
     }
-    const unsupported=Reflect.ownKeys(value).find(function findUnsupportedTimeboxSubscriptionOption(key){
-        return key!=='once'&&key!=='signal';
-    });
-    if(unsupported!==undefined||(
-        value.once!==undefined
+    if((value.once!==undefined
         &&typeof value.once!=='boolean'
     )||(
         value.signal!==undefined
@@ -212,13 +203,13 @@ function normalizeSubscriptionOptions(value={}){
         &&!isAbortSignal(value.signal)
     )){
         throw conversationTimeboxError(
-            'Conversation timebox subscriptions support only boolean once and an AbortSignal.',
-            CONVERSATION_TIMEBOX_ERROR_CODES.subscriptionOptionsInvalid,
+            'Conversation timebox subscription once must be boolean and signal must be an AbortSignal.',
+            conversationTimeboxErrorCodes.subscriptionOptionsInvalid,
             'conversation-timebox-subscription-options-invalid',
             TypeError
         );
     }
-    return Object.freeze({once:value.once===true,signal:value.signal??null});
+    return {once:value.once===true,signal:value.signal??null};
 }
 
 function defaultClock(){
@@ -285,14 +276,6 @@ class ConversationTimebox{
         if(!isPlainRecord(options)){
             throw new TypeError('Conversation timebox options must be a plain object.');
         }
-        const allowed=new Set(['cancel','clock','onListenerError','schedule','tickMs']);
-        const unsupported=Object.keys(options).find(function findUnsupportedTimeboxOption(key){
-            return !allowed.has(key);
-        });
-        if(unsupported){
-            throw new TypeError(`Unsupported conversation timebox option: ${unsupported}`);
-        }
-
         this.#clock=options.clock??defaultClock;
         this.#schedule=options.schedule??defaultSchedule;
         this.#cancel=options.cancel??defaultCancel;
@@ -309,12 +292,12 @@ class ConversationTimebox{
                 throw new TypeError(`${name} must be a function.`);
             }
         }
-        if(!Number.isSafeInteger(this.#tickMs)||this.#tickMs<100||this.#tickMs>60_000){
-            throw new RangeError('tickMs must be an integer between 100 and 60000.');
+        if(!Number.isFinite(this.#tickMs)||this.#tickMs<=0){
+            throw new RangeError('tickMs must be a positive finite number.');
         }
         this.#events=createArcaneEventSource(this,{
             source:'conversation-timebox',
-            eventTypes:Object.freeze(Object.values(CONVERSATION_TIMEBOX_EVENT_TYPES)),
+            eventTypes:Object.values(conversationTimeboxEventTypes),
             onListenerError
         });
     }
@@ -333,7 +316,7 @@ class ConversationTimebox{
             return this.snapshot();
         }
         const now=this.#readClock();
-        this.#startAt(now,true,CONVERSATION_TIMEBOX_REASONS.started);
+        this.#startAt(now,true,conversationTimeboxReasons.started);
         return this.snapshot();
     }
 
@@ -352,7 +335,7 @@ class ConversationTimebox{
             throw new RangeError('The requested conversation duration exceeds the supported date range.');
         }
         if(this.#startedAtMs===null){
-            this.#startAt(now,false,CONVERSATION_TIMEBOX_REASONS.started);
+            this.#startAt(now,false,conversationTimeboxReasons.started);
         }
 
         this.#durationMilliseconds=milliseconds;
@@ -361,7 +344,7 @@ class ConversationTimebox{
         this.#dueRevision=null;
         this.#revision++;
         this.#nowMs=now;
-        this.#notify('change',CONVERSATION_TIMEBOX_REASONS.limitSet,commandSource);
+        this.#notify('change',conversationTimeboxReasons.limitSet,commandSource);
         return this.snapshot();
     }
 
@@ -390,7 +373,7 @@ class ConversationTimebox{
         this.#dueRevision=null;
         this.#revision++;
         this.#nowMs=now;
-        this.#notify('change',CONVERSATION_TIMEBOX_REASONS.limitAdjusted,commandSource);
+        this.#notify('change',conversationTimeboxReasons.limitAdjusted,commandSource);
         return this.snapshot();
     }
 
@@ -409,7 +392,7 @@ class ConversationTimebox{
         this.#dueRevision=null;
         this.#revision++;
         this.#nowMs=this.#readClock();
-        this.#notify('change',CONVERSATION_TIMEBOX_REASONS.limitCleared,commandSource);
+        this.#notify('change',conversationTimeboxReasons.limitCleared,commandSource);
         return this.snapshot();
     }
 
@@ -436,7 +419,7 @@ class ConversationTimebox{
         if(typeof listener!=='function'){
             throw conversationTimeboxError(
                 'Conversation timebox listener must be a function.',
-                CONVERSATION_TIMEBOX_ERROR_CODES.subscriptionHandlerInvalid,
+                conversationTimeboxErrorCodes.subscriptionHandlerInvalid,
                 'conversation-timebox-subscription-handler-invalid',
                 TypeError
             );
@@ -447,7 +430,7 @@ class ConversationTimebox{
             listener(event.detail.state,event.detail.event);
         }
         const unsubscribe=this.#events.on(
-            CONVERSATION_TIMEBOX_EVENT_TYPES.change,
+            conversationTimeboxEventTypes.change,
             forwardConversationTimeboxChange,
             normalized
         );
@@ -455,12 +438,12 @@ class ConversationTimebox{
         try{
             listener(
                 this.snapshot(),
-                Object.freeze({
+                {
                     type:'snapshot',
-                    reason:CONVERSATION_TIMEBOX_REASONS.snapshotReplayed,
+                    reason:conversationTimeboxReasons.snapshotReplayed,
                     revision:this.#revision,
                     commandSource:null
-                })
+                }
             );
         }catch(error){
             unsubscribe();
@@ -487,7 +470,7 @@ class ConversationTimebox{
                         ?'armed'
                         :'unlimited';
 
-        return Object.freeze({
+        return {
             status,
             startedAtMs:this.#startedAtMs,
             elapsedMs,
@@ -497,7 +480,7 @@ class ConversationTimebox{
             remainingMs,
             revision:this.#revision,
             dueRevision:this.#dueRevision
-        });
+        };
     }
 
     dispose(){
@@ -509,7 +492,7 @@ class ConversationTimebox{
             this.#intervalHandle=null;
         }
         this.#disposed=true;
-        this.#notify('change',CONVERSATION_TIMEBOX_REASONS.disposed);
+        this.#notify('change',conversationTimeboxReasons.disposed);
         const finalSnapshot=this.snapshot();
         this.#events.dispose();
         return finalSnapshot;
@@ -519,8 +502,8 @@ class ConversationTimebox{
         if(this.#disposed){
             throw conversationTimeboxError(
                 'The conversation timebox has been disposed.',
-                CONVERSATION_TIMEBOX_ERROR_CODES.disposed,
-                CONVERSATION_TIMEBOX_REASONS.disposed
+                conversationTimeboxErrorCodes.disposed,
+                conversationTimeboxReasons.disposed
             );
         }
     }
@@ -563,31 +546,31 @@ class ConversationTimebox{
         this.#notify(
             becameDue?'due':'tick',
             becameDue
-                ?CONVERSATION_TIMEBOX_REASONS.deadlineReached
-                :CONVERSATION_TIMEBOX_REASONS.elapsedTimeAdvanced
+                ?conversationTimeboxReasons.deadlineReached
+                :conversationTimeboxReasons.elapsedTimeAdvanced
         );
     }
 
     #notify(type,reason,commandSource=null){
         const state=this.snapshot();
-        const event=Object.freeze({
+        const event={
             type,
             reason,
             revision:this.#revision,
             commandSource
-        });
+        };
         const operationId=`${this.#events.instanceId}:change:${(++this.#operationSequence).toString(36)}`;
         this.#events.dispatch(
-            CONVERSATION_TIMEBOX_EVENT_TYPES.change,
-            Object.freeze({state,event}),
+            conversationTimeboxEventTypes.change,
+            {state:{...state},event:{...event}},
             {
                 operationId,
-                publicDetail:Object.freeze({
+                publicDetail:{
                     reason,
                     status:state.status,
                     revision:state.revision,
                     commandSource
-                })
+                }
             }
         );
     }
@@ -602,41 +585,30 @@ function consumeConversationTimeboxCall(calls,controller){
     }
     const remainingCalls={...calls};
     if(!Object.hasOwn(remainingCalls,CONVERSATION_TIMEBOX_TOOL_NAME)){
-        return Object.freeze({
+        return {
             handled:false,
-            remainingCalls:Object.freeze(remainingCalls),
+            remainingCalls,
             result:null
-        });
+        };
     }
 
     const argumentsValue=remainingCalls[CONVERSATION_TIMEBOX_TOOL_NAME];
     delete remainingCalls[CONVERSATION_TIMEBOX_TOOL_NAME];
-    if(Object.keys(remainingCalls).length){
-        const reason=new TypeError(
-            'The conversation timebox must be the sole tool call in a response.'
-        );
-        reason.code='CONVERSATION_TIMEBOX_MUST_BE_SOLE_CALL';
-        return Object.freeze({
-            handled:true,
-            remainingCalls:Object.freeze({}),
-            result:Object.freeze({status:'rejected',reason})
-        });
-    }
     try{
-        return Object.freeze({
+        return {
             handled:true,
-            remainingCalls:Object.freeze(remainingCalls),
-            result:Object.freeze({
+            remainingCalls,
+            result:{
                 status:'fulfilled',
                 value:controller.applyCommand(argumentsValue)
-            })
-        });
+            }
+        };
     }catch(reason){
-        return Object.freeze({
+        return {
             handled:true,
-            remainingCalls:Object.freeze(remainingCalls),
-            result:Object.freeze({status:'rejected',reason})
-        });
+            remainingCalls,
+            result:{status:'rejected',reason}
+        };
     }
 }
 

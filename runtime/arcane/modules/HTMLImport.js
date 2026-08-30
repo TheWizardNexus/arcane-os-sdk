@@ -65,6 +65,15 @@ function createComponentFragment(html,resolvedHref){
   return template.content;
 }
 
+function resolveRelativeDynamicImports(source,baseHref){
+  return source.replace(
+    /\bimport\s*\(\s*(['"])(\.{1,2}\/[^'"]+)\1\s*\)/gu,
+    function resolveDynamicImport(_match,_quote,specifier){
+      return `import(${JSON.stringify(new URL(specifier,baseHref).href)})`;
+    }
+  );
+}
+
 function samePropertyDescriptor(left,right){
   if(!left||!right)return left===right;
   return left.configurable===right.configurable
@@ -77,7 +86,7 @@ function samePropertyDescriptor(left,right){
 
 class HTMLImport extends HTMLElement {
   #connectionGeneration=0;
-  #eventOwner=Object.freeze({kind:'html-import-lifecycle-owner'});
+  #eventOwner={kind:'html-import-lifecycle-owner'};
   #events;
   #importedDestroy=null;
   #loadController=null;
@@ -93,10 +102,10 @@ class HTMLImport extends HTMLElement {
   #createEvents(){
       this.#events=createArcaneEventSource(this.#eventOwner,{
         source:'html-import',
-        eventTypes:Object.freeze([
+        eventTypes:[
           'html-import-error',
           'html-import-ready'
-        ])
+        ]
       });
       return this.#events;
   }
@@ -128,17 +137,11 @@ class HTMLImport extends HTMLElement {
     }
 
     try{
-      const baseURL=new URL(document.baseURI);
-      const resolvedURL=new URL(href,baseURL);
+      const resolvedURL=new URL(href,document.baseURI);
       resolvedHref=resolvedURL.href;
-      if(resolvedURL.origin!==baseURL.origin){
-        throw new Error('HTML imports must use a same-origin URL.');
-      }
       const response=await fetch(resolvedURL.href,{
         cache:'default',
-        credentials:'same-origin',
         method:'GET',
-        redirect:'error',
         signal:controller.signal
       });
       if(!this.#isCurrentConnection(generation,controller))return;
@@ -149,19 +152,19 @@ class HTMLImport extends HTMLElement {
         return;
       }
       console.error('Error loading HTML component:',err);
-      const detail=Object.freeze({
+      const detail={
           code:'HTML_IMPORT_FAILED',
           href,
           message:'The component could not be loaded.',
           reason:'component-import-rejected',
           resolvedHref
-      });
+      };
       const {occurrence}=this.#events.dispatch(
         'html-import-error',
         detail,
         {
           operationId,
-          publicDetail:Object.freeze({code:detail.code,reason:detail.reason})
+          publicDetail:{code:detail.code,reason:detail.reason}
         }
       );
       projectArcaneDOMEvent(this,occurrence,{
@@ -200,18 +203,18 @@ class HTMLImport extends HTMLElement {
   #reportImportedDestroyError(error,{events,href,operationId}){
     console.error('Error destroying imported HTML component:',error);
     if(!events||events.disposed)return;
-    const detail=Object.freeze({
+    const detail={
       code:'HTML_IMPORT_IMPORTED_COMPONENT_DESTROY_REJECTED',
       href,
       message:'The imported component could not be destroyed.',
       reason:'imported-component-destroy-rejected'
-    });
+    };
     const {occurrence}=events.dispatch(
       'html-import-error',
       detail,
       {
         operationId,
-        publicDetail:Object.freeze({code:detail.code,reason:detail.reason})
+        publicDetail:{code:detail.code,reason:detail.reason}
       }
     );
     projectArcaneDOMEvent(this,occurrence,{
@@ -272,9 +275,10 @@ class HTMLImport extends HTMLElement {
     if(!this.#isCurrentConnection(generation,controller))return false;
     await this.#destroyImportedHost();
     if(!this.#isCurrentConnection(generation,controller))return false;
-    this.shadowRoot.replaceChildren(createComponentFragment(html,resolvedHref));
+    const contentBaseHref=response.url||resolvedHref;
+    this.shadowRoot.replaceChildren(createComponentFragment(html,contentBaseHref));
 
-    await this.#executeScripts();
+    await this.#executeScripts(contentBaseHref,generation,controller);
     if(!this.#isCurrentConnection(generation,controller)){
       await this.#destroyImportedHost();
       return false;
@@ -283,8 +287,8 @@ class HTMLImport extends HTMLElement {
     this.ready=true;
     const {occurrence}=this.#events.dispatch(
       'html-import-ready',
-      Object.freeze({href,resolvedHref}),
-      {operationId,publicDetail:Object.freeze({ready:true})}
+      {href,resolvedHref},
+      {operationId,publicDetail:{ready:true}}
     );
     projectArcaneDOMEvent(this,occurrence,{
       bubbles:true,
@@ -293,36 +297,49 @@ class HTMLImport extends HTMLElement {
     return true;
   }
 
-  async #executeScripts() {
+  async #executeScripts(contentBaseHref,generation,controller) {
     const scripts = Array.from(this.shadowRoot.querySelectorAll('script'));
     const previousDescriptor=Object.getOwnPropertyDescriptor(this,'destroy')??null;
     const previousDestroy=this.destroy;
     try{
       for(const script of scripts){
-        if (script.src) {
-          console.error('ONLY INLINE SCRIPTS SUPPORTED AT THIS TIME FOR SECURITY REASONS');
-          console.warn('script src path will need to be limited to ./{text}.js, ../{text}.js), or acceptable sub folders. This can be complex.');
-          return;
-          //newScript.src = script.src;
+        if(!this.#isCurrentConnection(generation,controller))return;
+        let source=script.textContent||'';
+        let sourceBaseHref=contentBaseHref;
+        const scriptSource=script.getAttribute('src');
+        if(scriptSource!==null){
+          const requestedScriptHref=new URL(scriptSource,contentBaseHref).href;
+          const response=await fetch(requestedScriptHref,{
+            cache:'default',
+            method:'GET',
+            signal:controller.signal
+          });
+          if(!response.ok){
+            throw new Error(`HTML import script request failed with status ${response.status}.`);
+          }
+          source=await response.text();
+          sourceBaseHref=response.url||requestedScriptHref;
+          if(!this.#isCurrentConnection(generation,controller))return;
         }
 
-        const source=(script.textContent||'').replace(
-          /\bimport\s*\(\s*(['"])(\.{1,2}\/[^'"]+)\1\s*\)/g,
-          (_match,_quote,specifier)=>{
-            return `import(${JSON.stringify(new URL(specifier,import.meta.url).href)})`;
-          }
+        const executableSource=resolveRelativeDynamicImports(
+          source,
+          sourceBaseHref
         );
         const executable=document.createElement('script');
         const hostToken=`html-import-${Date.now()}-${htmlImportScriptId++}`;
 
         executable.dataset.arcaneHostToken=hostToken;
-        executable.textContent=`(()=>{const registry=globalThis[Symbol.for('arcane.html-import.hosts')];const token=document.currentScript&&document.currentScript.dataset.arcaneHostToken;const binding=registry instanceof Map&&token?registry.get(token):null;if(!binding?.host)throw new Error('HTML import host binding is unavailable.');binding.promise=(async function(){${source}}).call(binding.host);})()`;
+        executable.textContent=`(()=>{const registry=globalThis[Symbol.for('arcane.html-import.hosts')];const token=document.currentScript&&document.currentScript.dataset.arcaneHostToken;const binding=registry instanceof Map&&token?registry.get(token):null;if(!binding?.host)throw new Error('HTML import host binding is unavailable.');binding.promise=(async function(){${executableSource}}).call(binding.host);})()`;
         script.parentNode.removeChild(script);
 
         const binding={host:this,promise:null};
         htmlImportHostRegistry.set(hostToken,binding);
         try{
           document.head.appendChild(executable);
+          if(!binding.promise||typeof binding.promise.then!=='function'){
+            throw new Error('The HTML import script did not start.');
+          }
           await binding.promise;
         }finally{
           executable.remove();

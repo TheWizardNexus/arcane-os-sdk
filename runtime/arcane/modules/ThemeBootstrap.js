@@ -3,13 +3,13 @@ import {createArcaneEventSource} from 'arcane-os/event-manager';
 
 const sharedKey='arcaneThemeReady';
 const listenerKey='arcaneThemeAppearanceListener';
-const THEME_BOOTSTRAP_EVENT_OWNER=Object.freeze({});
+const THEME_BOOTSTRAP_EVENT_OWNER={};
 let themeBootstrapOperationSequence=0;
 const themeBootstrapEvents=createArcaneEventSource(
     THEME_BOOTSTRAP_EVENT_OWNER,
     {
         source:'theme-bootstrap',
-        eventTypes:Object.freeze(['appearance.changed'])
+        eventTypes:['appearance.changed']
     }
 );
 
@@ -24,20 +24,20 @@ function installAppearanceListener(ready){
         'appearance.changed',
         function forwardAppearanceChange(detail={}){
             themeBootstrapOperationSequence+=1;
-            const forwarded=Object.freeze({
+            const forwarded={
                 scheme:typeof detail?.scheme==='string'?detail.scheme:null,
                 effectiveScheme:typeof detail?.effectiveScheme==='string'
                     ?detail.effectiveScheme
                     :null,
                 source:typeof detail?.source==='string'?detail.source:null,
                 reason:'host-appearance-changed'
-            });
+            };
             themeBootstrapEvents.dispatch(
                 'appearance.changed',
                 forwarded,
                 {
                     operationId:`theme-bootstrap-${themeBootstrapEvents.instanceId}-${themeBootstrapOperationSequence}`,
-                    publicDetail:forwarded
+                    publicDetail:{...forwarded}
                 }
             );
             Promise.resolve(ready).then(function reloadTheme(result){
@@ -66,8 +66,8 @@ function installAppearanceListener(ready){
     Object.defineProperty(dispose,'dispose',{
         value:dispose,
         enumerable:false,
-        configurable:false,
-        writable:false
+        configurable:true,
+        writable:true
     });
     globalThis[listenerKey]=dispose;
 }

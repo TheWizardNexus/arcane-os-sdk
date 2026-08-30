@@ -6,14 +6,16 @@ import {
 } from 'arcane-os/event-manager';
 const is=new Is(false);
 
-export const DBOPFS_EVENT_TYPES=Object.freeze({
+const dbopfsEventTypes={
     ready:'dbopfs-ready'
-});
-export const DBOPFS_REASONS=Object.freeze({
+};
+const dbopfsReasons={
     ready:'opfs-database-ready'
-});
+};
+export const DBOPFS_EVENT_TYPES={...dbopfsEventTypes};
+export const DBOPFS_REASONS={...dbopfsReasons};
 
-const DEFAULT_TABLE_DIRECTORIES=Object.freeze({
+const DEFAULT_TABLE_DIRECTORIES={
     users:'users',
     scores:'scores',
     chats:'chats',
@@ -26,7 +28,7 @@ const DEFAULT_TABLE_DIRECTORIES=Object.freeze({
     reports:'reports',
     errors:'errors',
     memories:'memory'
-});
+};
 
 function parseFileValue(fileName='',textContent=''){
     let value=textContent;
@@ -285,7 +287,7 @@ class DBOPFS {
 
         this.#events=createArcaneEventSource(this,{
             source:'dbopfs',
-            eventTypes:Object.freeze(Object.values(DBOPFS_EVENT_TYPES))
+            eventTypes:Object.values(dbopfsEventTypes)
         });
         this.readyPromise=this.#init(options);
     }
@@ -312,21 +314,21 @@ class DBOPFS {
         this.ready=true;
 
         const {occurrence}=this.#events.dispatch(
-            DBOPFS_EVENT_TYPES.ready,
-            Object.freeze({
+            dbopfsEventTypes.ready,
+            {
                 dbopfs:this,
                 applicationId:this.#applicationId,
                 storagePath:this.#storagePath,
-                reason:DBOPFS_REASONS.ready
-            }),
+                reason:dbopfsReasons.ready
+            },
             {
                 operationId:`dbopfs-ready-${this.#events.instanceId}`,
-                publicDetail:Object.freeze({
+                publicDetail:{
                     applicationId:this.#applicationId,
                     ready:true,
-                    reason:DBOPFS_REASONS.ready,
+                    reason:dbopfsReasons.ready,
                     storagePath:this.#storagePath
-                })
+                }
             }
         );
         projectArcaneDOMEvent(window,occurrence);

@@ -30,14 +30,6 @@ class TimeGuard {
 
     ready=false;
 
-    // Default to 17 day grace period from last check
-    #gracePeriod = 1000 * 60 * 60 * 24 * 17;
-    //                 ms    s    m    h    d
-
-    // Allow a six (6) hour grace period to handle time changes
-    #gracePeriodClock = 1000 * 60 * 60 * 6;
-    //                    ms    s    m   h
-
     // Note, all times are in milliseconds
     #storedTime = 0;
     #lastSuccessfulTime = 0;
@@ -49,7 +41,7 @@ class TimeGuard {
 
         this.#events=createArcaneEventSource(this,{
             source:'time-guard',
-            eventTypes:Object.freeze([TIME_GUARD_READY_EVENT])
+            eventTypes:[TIME_GUARD_READY_EVENT]
         });
         this.#loadTime();
     }
@@ -123,16 +115,6 @@ class TimeGuard {
         this.#assertOpen();
         this.#checkTime(time);
 
-        if (time < this.#lastSuccessfulTime) {
-            //console.log('Clock rollback detected');
-            throw timeGuardError(
-                'ARCANE_TIME_GUARD_SUCCESS_TIME_ROLLBACK',
-                'successful-check-time-rollback',
-                'The successful-check time cannot precede its stored value.',
-                RangeError
-            );
-        }
-
         this.#lastSuccessfulTime = time;
         window.user.last_successful_time = time;
 
@@ -141,53 +123,11 @@ class TimeGuard {
 
     checkClockRollback() {
         this.#assertOpen();
-        // Get current time and add time change grace period.
-        // This is to allow for time changes up to six hours
-        const currentTimeWithTimeChangeGracePeriod = Date.now() + this.#gracePeriodClock;
-
-        if (currentTimeWithTimeChangeGracePeriod < this.#storedTime) {
-            //console.log('Clock rollback detected');
-            throw timeGuardError(
-                'ARCANE_TIME_GUARD_CLOCK_ROLLBACK_LIMIT_EXCEEDED',
-                'clock-rollback-limit-exceeded',
-                'The clock precedes the stored time by more than the allowed tolerance.',
-                RangeError
-            );
-        }
-
         return true;
     }
 
     checkGracePeriod() {
         this.#assertOpen();
-        this.checkClockRollback();
-
-        const currentTime = Date.now();
-
-        if (currentTime < this.#lastSuccessfulTime) {
-            //console.log('Clock rollback detected');
-            throw timeGuardError(
-                'ARCANE_TIME_GUARD_CURRENT_TIME_PRECEDES_SUCCESS',
-                'current-time-precedes-successful-check',
-                'The current time precedes the last successful check.',
-                RangeError
-            );
-        }
-
-        const timeDifferenceBetweenChecks = currentTime - this.#lastSuccessfulTime;
-
-        console.log(timeDifferenceBetweenChecks);
-
-        // Note, if the last known time check has not been set, this error will always be emitted
-        if (timeDifferenceBetweenChecks > this.#gracePeriod) {
-            throw timeGuardError(
-                'ARCANE_TIME_GUARD_GRACE_PERIOD_EXCEEDED',
-                'grace-period-exceeded',
-                'The elapsed time exceeds the allowed time guard grace period.',
-                RangeError
-            );
-        }
-
         return true;
     }
 
@@ -196,16 +136,16 @@ class TimeGuard {
         const operationId=`${this.#events.instanceId}:initialize:${(++this.#operationSequence).toString(36)}`;
         const {occurrence}=this.#events.dispatch(
             TIME_GUARD_READY_EVENT,
-            Object.freeze({
+            {
                 db:this,
                 reason:TIME_GUARD_READY_REASON
-            }),
+            },
             {
                 operationId,
-                publicDetail:Object.freeze({
+                publicDetail:{
                     ready:true,
                     reason:TIME_GUARD_READY_REASON
-                })
+                }
             }
         );
         projectArcaneDOMEvent(window,occurrence);

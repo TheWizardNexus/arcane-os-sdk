@@ -8,12 +8,14 @@ import {
 } from 'arcane-os/event-manager';
 
 const PUBLISH_DBLS_READY=Symbol('publish-dbls-ready');
-export const DBLS_EVENT_TYPES=Object.freeze({
+const dblsEventTypes={
     ready:'dbls-ready'
-});
-export const DBLS_REASONS=Object.freeze({
+};
+const dblsReasons={
     ready:'local-storage-adapter-ready'
-});
+};
+export const DBLS_EVENT_TYPES={...dblsEventTypes};
+export const DBLS_REASONS={...dblsReasons};
 
 class DBLS {
     #events;
@@ -43,7 +45,7 @@ class DBLS {
         this.storagePrefix=`${APP_LOCAL_STORAGE_PREFIX}${this.applicationId}:`;
         this.#events=createArcaneEventSource(this,{
             source:'dbls',
-            eventTypes:Object.freeze(Object.values(DBLS_EVENT_TYPES))
+            eventTypes:Object.values(dblsEventTypes)
         });
     }
 
@@ -173,21 +175,21 @@ class DBLS {
     }
 
     [PUBLISH_DBLS_READY](){
-        const detail=Object.freeze({
+        const detail={
             dbls:this,
             applicationId:this.applicationId,
-            reason:DBLS_REASONS.ready
-        });
+            reason:dblsReasons.ready
+        };
         const {occurrence}=this.#events.dispatch(
-            DBLS_EVENT_TYPES.ready,
+            dblsEventTypes.ready,
             detail,
             {
                 operationId:`dbls-ready-${this.#events.instanceId}`,
-                publicDetail:Object.freeze({
+                publicDetail:{
                     applicationId:this.applicationId,
                     ready:true,
-                    reason:DBLS_REASONS.ready
-                })
+                    reason:dblsReasons.ready
+                }
             }
         );
         projectArcaneDOMEvent(window,occurrence);

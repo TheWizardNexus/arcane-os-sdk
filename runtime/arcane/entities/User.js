@@ -130,41 +130,39 @@ class UserEntity {
 
     #explicitUpdateQueue = Promise.resolve();
 
-    #schema = Object.freeze(
-        [
-            'username',
-            'email',
-            'phone',
-            'language',
-            'license_key',
-            'subscription_key',
-            'current_time',
-            'last_successful_time',
+    #schema = [
+        'username',
+        'email',
+        'phone',
+        'language',
+        'license_key',
+        'subscription_key',
+        'current_time',
+        'last_successful_time',
 
-            'contact_1',
-            'contact_2',
-            'contact_3',
-            'contact_4',
-            'contact_5',
-            'contact_6',
+        'contact_1',
+        'contact_2',
+        'contact_3',
+        'contact_4',
+        'contact_5',
+        'contact_6',
 
-            'AI_personality',
-            'religion',
-            'AI_voice',
-            'AI_speed',
-            'ai_verbosity',
-            'initialSpeechMuted',
-            'conversationClosingReportEnabled',
-            'conversationActionItemsEnabled',
-            'firstBootUp',
-            'questionnaireShown',
-            'skin',
-            'developer',
-            'prefersLocal',
-            'preferredModels',
-            'dashboard'
-        ]
-    );
+        'AI_personality',
+        'religion',
+        'AI_voice',
+        'AI_speed',
+        'ai_verbosity',
+        'initialSpeechMuted',
+        'conversationClosingReportEnabled',
+        'conversationActionItemsEnabled',
+        'firstBootUp',
+        'questionnaireShown',
+        'skin',
+        'developer',
+        'prefersLocal',
+        'preferredModels',
+        'dashboard'
+    ];
 
 
 
@@ -220,7 +218,7 @@ class UserEntity {
         this.fileName = fileName;
         this.#events=createArcaneEventSource(this,{
             source:'user-entity',
-            eventTypes:Object.freeze([USER_ENTITY_LOADED_EVENT])
+            eventTypes:[USER_ENTITY_LOADED_EVENT]
         });
 
         if(window.dbopfs?.ready){
@@ -497,10 +495,6 @@ class UserEntity {
     set AI_personality(v){
         if(!is.string(v)){
             throw new Error('AI_personality must be string');
-        }
-
-        if(v.length > 1000){
-            throw new Error('AI_personality must be less than 1000 characters');
         }
 
         this.#AI_personality = v;
@@ -1038,16 +1032,16 @@ class UserEntity {
 
         const {occurrence}=this.#events.dispatch(
             USER_ENTITY_LOADED_EVENT,
-            Object.freeze({
+            {
                 reason:USER_ENTITY_LOADED_REASON,
                 user:this
-            }),
+            },
             {
                 operationId,
-                publicDetail:Object.freeze({
+                publicDetail:{
                     ready:true,
                     reason:USER_ENTITY_LOADED_REASON
-                })
+                }
             }
         );
         projectArcaneDOMEvent(window,occurrence);
