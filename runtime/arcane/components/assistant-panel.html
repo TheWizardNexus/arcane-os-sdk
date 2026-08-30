@@ -341,7 +341,8 @@
     }
 
     function compatibilityDetail(input={}){
-        const detail={...input};
+        const callerContext={...input};
+        const detail={...input,callerContext};
         for(const key of reservedProjectionKeys){
             delete detail[key];
         }
