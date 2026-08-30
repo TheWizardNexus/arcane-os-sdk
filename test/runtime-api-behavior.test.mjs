@@ -4753,3 +4753,137 @@ test(
         );
     }
 );
+
+test(
+    'shared chat and speech controls survive persisted BFCache navigation',
+    async function testSharedComponentBFCacheLifecycle() {
+        const components=[
+            {
+                path:'runtime/arcane/components/chat.html',
+                restoredBy:['setAIAvailability']
+            },
+            {
+                path:'runtime/arcane/components/speech.html',
+                restoredBy:[
+                    'synchronizeAIMutedState',
+                    'renderControls',
+                    'renderStatus'
+                ]
+            },
+            {
+                path:'runtime/arcane/components/voice-transcription.html',
+                restoredBy:['renderState']
+            }
+        ];
+
+        for(const component of components){
+            const source=await readFile(
+                new URL(component.path,repositoryRoot),
+                'utf8'
+            );
+            const pageHideStart=source.indexOf('function handlePageHide(event)');
+            const restoreStart=source.indexOf(
+                'function restoreFromPageCache()',
+                pageHideStart
+            );
+            const destroyStart=source.indexOf('function destroy()',restoreStart);
+            assert.notEqual(pageHideStart,-1,`${component.path} must own pagehide`);
+            assert.notEqual(restoreStart,-1,`${component.path} must own pageshow restore`);
+            assert.notEqual(destroyStart,-1,`${component.path} must retain destroy`);
+
+            const handlersSource=source.slice(pageHideStart,restoreStart);
+            const restoreSource=source.slice(restoreStart,destroyStart);
+            for(const call of component.restoredBy){
+                assert.ok(
+                    restoreSource.includes(`${call}();`),
+                    `${component.path} must refresh ${call}()`
+                );
+            }
+            assert.match(
+                source,
+                /'pagehide',\s*handlePageHide,\s*\{[^}]*signal:/u
+            );
+            assert.match(
+                source,
+                /'pageshow',\s*handlePageShow,\s*\{[^}]*signal:/u
+            );
+            assert.doesNotMatch(
+                source,
+                /'pagehide',\s*destroy,/u
+            );
+            assert.doesNotMatch(
+                source,
+                /'(?:pagehide|pageshow)',\s*(?:handlePageHide|handlePageShow),\s*\{[^}]*once\s*:\s*true/u
+            );
+
+            const restoredCalls=Object.fromEntries(
+                component.restoredBy.map(function initializeRestoreCount(name){
+                    return [name,0];
+                })
+            );
+            const restoreStubs=component.restoredBy.map(
+                function createRestoreStub(name){
+                    return `function ${name}(){restoredCalls.${name}+=1;}`;
+                }
+            ).join('\n');
+
+            const createHarness=Function(
+                `'use strict';
+                return function createPageLifecycleHarness(){
+                    let destroyed=false;
+                    let destroyCount=0;
+                    const restoredCalls=${JSON.stringify(restoredCalls)};
+                    function destroy(){
+                        if(destroyed){
+                            return false;
+                        }
+                        destroyed=true;
+                        destroyCount+=1;
+                        return true;
+                    }
+                    ${restoreStubs}
+                    ${restoreSource}
+                    ${handlersSource}
+                    return {
+                        pagehide:handlePageHide,
+                        pageshow:handlePageShow,
+                        snapshot:function snapshotPageLifecycle(){
+                            return {destroyed,destroyCount,restoredCalls:{...restoredCalls}};
+                        }
+                    };
+                };`
+            )();
+            const lifecycle=createHarness();
+            const noRestores={...restoredCalls};
+            const oneRestore=Object.fromEntries(
+                component.restoredBy.map(function expectedSingleRestore(name){
+                    return [name,1];
+                })
+            );
+
+            lifecycle.pagehide({persisted:true});
+            assert.deepEqual(
+                lifecycle.snapshot(),
+                {destroyed:false,destroyCount:0,restoredCalls:noRestores}
+            );
+            lifecycle.pageshow({persisted:true});
+            assert.deepEqual(
+                lifecycle.snapshot(),
+                {destroyed:false,destroyCount:0,restoredCalls:oneRestore}
+            );
+            lifecycle.pageshow({persisted:false});
+            lifecycle.pagehide({persisted:true});
+            assert.deepEqual(
+                lifecycle.snapshot(),
+                {destroyed:false,destroyCount:0,restoredCalls:oneRestore}
+            );
+            lifecycle.pagehide({persisted:false});
+            lifecycle.pagehide({persisted:false});
+            lifecycle.pageshow({persisted:true});
+            assert.deepEqual(
+                lifecycle.snapshot(),
+                {destroyed:true,destroyCount:1,restoredCalls:oneRestore}
+            );
+        }
+    }
+);

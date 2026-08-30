@@ -212,8 +212,13 @@
     completeButton.addEventListener('click',completeStream,lifecycleListenerOptions);
     window.addEventListener(
         'pagehide',
-        destroy,
-        {once:true,signal:runtimeStateAbortController.signal}
+        handlePageHide,
+        {signal:runtimeStateAbortController.signal}
+    );
+    window.addEventListener(
+        'pageshow',
+        handlePageShow,
+        {signal:runtimeStateAbortController.signal}
     );
 
     const sttActivationController=createSTTActivationController(
@@ -982,6 +987,24 @@
         };
     }
 
+    function handlePageHide(event){
+        if(event.persisted===true){
+            return;
+        }
+        destroy();
+    }
+
+    function handlePageShow(event){
+        if(event.persisted!==true||destroyed){
+            return;
+        }
+        restoreFromPageCache();
+    }
+
+    function restoreFromPageCache(){
+        renderState();
+    }
+
     function destroy(){
         if(destroyed){
             return true;
@@ -989,7 +1012,8 @@
         destroyed=true;
         runtimeStateAbortController.abort();
         sttActivationController.destroy();
-        window.removeEventListener('pagehide',destroy);
+        window.removeEventListener('pagehide',handlePageHide);
+        window.removeEventListener('pageshow',handlePageShow);
         if(!cancelSTTOperation('component-destroyed')){
             sessionGeneration++;
         }

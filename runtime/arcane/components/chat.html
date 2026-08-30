@@ -1672,8 +1672,13 @@
     );
     window.addEventListener(
         'pagehide',
-        destroy,
-        {once:true,signal:aiRuntimeStateAbortController.signal}
+        handlePageHide,
+        {signal:aiRuntimeStateAbortController.signal}
+    );
+    window.addEventListener(
+        'pageshow',
+        handlePageShow,
+        {signal:aiRuntimeStateAbortController.signal}
     );
     window.addEventListener(
         AI_TTS_FAILURE_EVENT,
@@ -3333,6 +3338,24 @@
         return false;
     }
 
+    function handlePageHide(event){
+        if(event.persisted===true){
+            return;
+        }
+        destroy();
+    }
+
+    function handlePageShow(event){
+        if(event.persisted!==true||destroyed){
+            return;
+        }
+        restoreFromPageCache();
+    }
+
+    function restoreFromPageCache(){
+        setAIAvailability();
+    }
+
     function destroy(){
         if(destroyed){
             return false;
@@ -3349,7 +3372,8 @@
         }
         aiRuntimeStateAbortController.abort(destroyReason);
         aiActivationController.destroy();
-        window.removeEventListener('pagehide',destroy);
+        window.removeEventListener('pagehide',handlePageHide);
+        window.removeEventListener('pageshow',handlePageShow);
         conversationTimeboxUnsubscribe?.();
         conversationTimeboxUnsubscribe=null;
         conversationTimeboxController=null;

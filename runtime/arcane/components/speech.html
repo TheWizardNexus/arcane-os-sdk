@@ -333,8 +333,13 @@
     muteButton.addEventListener('click', muteToggle, lifecycleListenerOptions);
     window.addEventListener(
         'pagehide',
-        destroy,
-        { once: true, signal: runtimeStateAbortController.signal }
+        handlePageHide,
+        { signal: runtimeStateAbortController.signal }
+    );
+    window.addEventListener(
+        'pageshow',
+        handlePageShow,
+        { signal: runtimeStateAbortController.signal }
     );
 
     subscribeAIRuntimeState(
@@ -1693,6 +1698,26 @@
         keyboardRecording = false;
     }
 
+    function handlePageHide(event) {
+        if (event.persisted === true) {
+            return;
+        }
+        destroy();
+    }
+
+    function handlePageShow(event) {
+        if (event.persisted !== true || destroyed) {
+            return;
+        }
+        restoreFromPageCache();
+    }
+
+    function restoreFromPageCache() {
+        synchronizeAIMutedState();
+        renderControls();
+        renderStatus();
+    }
+
     function destroy() {
         if (destroyed) {
             return;
@@ -1701,7 +1726,8 @@
         destroyed = true;
         runtimeStateAbortController.abort();
         sttActivationController.destroy();
-        window.removeEventListener('pagehide', destroy);
+        window.removeEventListener('pagehide', handlePageHide);
+        window.removeEventListener('pageshow', handlePageShow);
         microphonePermissionStatus?.removeEventListener?.(
             'change',
             microphonePermissionListener
