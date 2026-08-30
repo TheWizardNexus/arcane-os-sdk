@@ -14,7 +14,10 @@ function chatDB(){
         async get(tableName,key){
             const value=table(tableName).get(key)??null;
             if(value===null||!key.endsWith('.jsonl')) return value;
-            return String(value).split('\n').filter(Boolean).map(row=>JSON.parse(row));
+            return String(value).split('\n').filter(row=>row.trim()).map(row=>{
+                try{return JSON.parse(row);}
+                catch{return row;}
+            });
         },
         async getAllKeys(tableName){return [...table(tableName).keys()];},
         failNext(error=new Error('synthetic persistence failure')){nextFailure=error;},
@@ -105,13 +108,15 @@ test('persistent chat binds the SDK AI boundary and falls back from optional str
     );
 });
 
-test('persistent streaming preserves an exact structural call through terminal settlement',async()=>{
+test('persistent streaming accepts terminal-only calls and compares complete structural envelopes',async()=>{
     const structuralCall={
         id:'stream-lookup-1',
         type:'function',
+        provider_extension:{sequence:'complete'},
         function:{
             name:'lookup',
-            arguments:'{"id":"alpha","message":"Looking up Alpha in the local library."}'
+            arguments:'{"id":"alpha","message":"Looking up Alpha in the local library."}',
+            provider_extension:{format:'complete'},
         },
     };
     let streamCount=0;
@@ -121,7 +126,16 @@ test('persistent streaming preserves an exact structural call through terminal s
             streamCount++;
             request.onToolCall(structuredClone(structuralCall),'M-stream-lookup');
             const terminalCall=streamCount===1
-                ?structuredClone(structuralCall)
+                ?{
+                    provider_extension:structuredClone(structuralCall.provider_extension),
+                    function:{
+                        provider_extension:structuredClone(structuralCall.function.provider_extension),
+                        arguments:structuralCall.function.arguments,
+                        name:structuralCall.function.name,
+                    },
+                    type:structuralCall.type,
+                    id:structuralCall.id,
+                }
                 :{
                     ...structuredClone(structuralCall),
                     function:{
@@ -157,6 +171,30 @@ test('persistent streaming preserves an exact structural call through terminal s
         JSON.parse(result.message.tool_calls[0].function.arguments).message,
         'Looking up Alpha in the local library.'
     );
+
+    const terminalOnlyVisibleCalls=[];
+    const terminalOnly=await PersistentAIChatSession.create({
+        ai:{
+            async fetchRequest(){throw new Error('The streaming transport was not selected.');},
+            async streamRequest(request){
+                const terminalCall=structuredClone(structuralCall);
+                await request.onResponse({
+                    message:{role:'assistant',content:'',tool_calls:[terminalCall]},
+                });
+                return [terminalCall];
+            },
+        },
+        memory:false,
+    });
+    const terminalOnlyResult=await terminalOnly.stream(
+        {
+            message:{content:'Use a terminal-only structural call.',persist:false},
+            response:{persist:false},
+        },
+        {onToolCall:call=>terminalOnlyVisibleCalls.push(call)},
+    );
+    assert.deepEqual(terminalOnlyVisibleCalls,[structuralCall]);
+    assert.deepEqual(terminalOnlyResult.message.tool_calls,[structuralCall]);
 
     const mismatchedVisibleCalls=[];
     const mismatched=await PersistentAIChatSession.create({ai,memory:false});
@@ -235,19 +273,105 @@ test('response persistence inherits message persistence and rejects incoherent m
         }),
         /must match/u,
     );
-    assert.throws(
-        ()=>session.chatEntity.addTurn({
-            assistantMessage:{
-                role:'assistant',
-                content:'',
-                tool_calls:[
-                    {id:'one',type:'function',function:{name:'lookup',arguments:'{"message":"Looking up the first record."}'}},
-                    {id:'two',type:'function',function:{name:'lookup',arguments:'{"message":"Looking up the second record."}'}},
-                ],
+});
+
+test('persistent chat preserves ordered parallel calls and settles one exact result batch',async()=>{
+    const chatFileName='parallel-tool-result-batch.jsonl';
+    const calls=[
+        {
+            id:'parallel-lookup-a',
+            type:'function',
+            provider_extension:{sequence:'first'},
+            function:{
+                name:'lookup',
+                arguments:'{"id":"alpha","message":"Looking up Alpha."}',
+                provider_extension:{catalog:'primary'},
             },
-            requestMessage:{role:'user',content:'invoke tools'},
-        }),
-        /exactly one structural tool call/u,
+        },
+        {
+            id:'parallel-lookup-b',
+            type:'function',
+            provider_extension:{sequence:'second'},
+            function:{
+                name:'lookup',
+                arguments:'{"id":"beta","message":"Looking up Beta."}',
+                provider_extension:{catalog:'secondary'},
+            },
+        },
+    ];
+    const requests=[];
+    const session=await PersistentAIChatSession.create({
+        chat:async request=>{
+            requests.push(structuredClone(request));
+            if(requests.length===1){
+                return {message:{
+                    role:'assistant',
+                    content:'',
+                    assistant_extension:{source:'parallel-provider'},
+                    tool_calls:structuredClone(calls),
+                }};
+            }
+            return {message:{
+                role:'assistant',
+                content:'Both lookups are complete.',
+                assistant_extension:{source:'parallel-continuation'},
+            }};
+        },
+        chatFileName,
+        memory:false,
+    });
+
+    const first=await session.send({message:{content:'Look up Alpha and Beta.'}});
+    assert.deepEqual(first.message.tool_calls,calls);
+    assert.deepEqual(first.message.assistant_extension,{source:'parallel-provider'});
+    await assert.rejects(
+        session.send({messages:[{
+            role:'tool',
+            tool_call_id:'parallel-lookup-a',
+            content:'Alpha result.',
+            result_extension:{catalog:'primary'},
+        }]}),
+        error=>error?.code==='AI_CHAT_TOOL_RESULT_REQUIRED',
+    );
+    assert.equal(requests.length,1);
+
+    const toolResults=[
+        {
+            role:'tool',
+            tool_call_id:'parallel-lookup-a',
+            content:'Alpha result.',
+            result_extension:{catalog:'primary'},
+        },
+        {
+            role:'tool',
+            tool_call_id:'parallel-lookup-b',
+            content:'Beta result.',
+            result_extension:{catalog:'secondary'},
+        },
+    ];
+    const continuation=await session.send({messages:toolResults});
+    assert.equal(requests.length,2);
+    assert.deepEqual(requests[1].messages.slice(-2),toolResults);
+    assert.equal(continuation.message.content,'Both lookups are complete.');
+
+    const persisted=String(db.raw('chats',chatFileName))
+        .trim()
+        .split('\n')
+        .map(row=>JSON.parse(row));
+    const persistedCallMessage=persisted.find(message=>message.tool_calls);
+    assert.deepEqual(persistedCallMessage.tool_calls,calls);
+    assert.deepEqual(
+        persistedCallMessage.assistant_extension,
+        {source:'parallel-provider'},
+    );
+    const persistedResults=persisted.filter(message=>message.role==='tool');
+    assert.deepEqual(
+        persistedResults.map(message=>message.tool_call_id),
+        calls.map(call=>call.id),
+    );
+    assert.deepEqual(
+        persistedResults.map(message=>message.result_extension),
+        toolResults.map(message=>message.result_extension),
     );
 });
 
@@ -329,13 +453,14 @@ test('createArcaneAI adapts controller completions and owns serial automatic mem
 });
 
 test('fresh named chat preserves and persists its configured system prompt',async()=>{
-    const chatFileName='fresh-named-chat.jsonl';
+    const chatFileName=`chat folders/Δ complete ${'long session name '.repeat(48)}.jsonl`;
     const session=await PersistentAIChatSession.create({
         chat:async()=>({message:{role:'assistant',content:'named response'}}),
         chatFileName,
         memory:false,
         systemPrompt:'Persist this named chat system prompt.',
     });
+    assert.equal(session.fileName,chatFileName);
     await session.send({message:{content:'first named turn'}});
     const durable=String(db.raw('chats',chatFileName));
     assert.match(durable,/Persist this named chat system prompt\./u);
@@ -473,9 +598,9 @@ test('persistent chat rolls back recurring context on durable failure and retain
     assert.ok(!requests.at(-1).messages.some(message=>message.content==='must roll back'));
 });
 
-test('legacy persisted structural calls fail without inventing user-facing text',async()=>{
+test('legacy persisted structural calls remain readable without invented user-facing text',async()=>{
     const chatFileName='legacy-missing-tool-message.jsonl';
-    const legacyContent=[
+    const legacyRows=[
         {role:'user',content:'Find Alpha.',timestamp:1},
         {
             role:'assistant',
@@ -487,16 +612,19 @@ test('legacy persisted structural calls fail without inventing user-facing text'
                 function:{name:'lookup',arguments:'{"id":"alpha"}'},
             }],
         },
-    ].map(message=>JSON.stringify(message)).join('\n')+'\n';
+    ];
+    const legacyContent=legacyRows.map(message=>JSON.stringify(message)).join('\n')+'\n';
     await db.set('chats',chatFileName,legacyContent);
 
+    const session=await PersistentAIChatSession.create({
+        chat:async()=>({message:{role:'assistant',content:'must not run'}}),
+        chatFileName,
+        loadExisting:true,
+        memory:false,
+    });
+    assert.deepEqual(await session.transcript(),legacyRows);
     await assert.rejects(
-        PersistentAIChatSession.create({
-            chat:async()=>({message:{role:'assistant',content:'must not run'}}),
-            chatFileName,
-            loadExisting:true,
-            memory:false,
-        }),
+        session.history(),
         error=>{
             assert.equal(error?.code,'AI_CHAT_TOOL_MESSAGE_REQUIRED');
             assert.equal(
@@ -506,12 +634,13 @@ test('legacy persisted structural calls fail without inventing user-facing text'
             return true;
         },
     );
+    assert.deepEqual(await session.transcript(),legacyRows);
     assert.equal(db.raw('chats',chatFileName),legacyContent);
 });
 
-test('persisted tool results require nonblank user-facing content',async()=>{
+test('legacy blank tool results remain readable but unavailable to provider history',async()=>{
     const chatFileName='legacy-blank-tool-result.jsonl';
-    const legacyContent=[
+    const legacyRows=[
         {role:'user',content:'Find Alpha.',timestamp:1},
         {
             role:'assistant',
@@ -532,17 +661,43 @@ test('persisted tool results require nonblank user-facing content',async()=>{
             timestamp:3,
             tool_call_id:'legacy-lookup-2',
         },
-    ].map(message=>JSON.stringify(message)).join('\n')+'\n';
+    ];
+    const legacyContent=legacyRows.map(message=>JSON.stringify(message)).join('\n')+'\n';
     await db.set('chats',chatFileName,legacyContent);
 
+    const session=await PersistentAIChatSession.create({
+        chat:async()=>({message:{role:'assistant',content:'must not run'}}),
+        chatFileName,
+        loadExisting:true,
+        memory:false,
+    });
+    assert.deepEqual(await session.transcript(),legacyRows);
     await assert.rejects(
-        PersistentAIChatSession.create({
-            chat:async()=>({message:{role:'assistant',content:'must not run'}}),
-            chatFileName,
-            loadExisting:true,
-            memory:false,
-        }),
+        session.history(),
         error=>error?.code==='AI_CHAT_INCOHERENT_PERSISTENCE',
     );
+    assert.deepEqual(await session.transcript(),legacyRows);
+    assert.equal(db.raw('chats',chatFileName),legacyContent);
+});
+
+test('malformed persisted JSONL rows remain readable and unchanged',async()=>{
+    const chatFileName='legacy-malformed-row.jsonl';
+    const validRow={role:'user',content:'Keep the complete saved conversation.',timestamp:1};
+    const malformedRow='{"role":"assistant","content":"unfinished"';
+    const legacyContent=`${JSON.stringify(validRow)}\n${malformedRow}\n`;
+    await db.set('chats',chatFileName,legacyContent);
+
+    const session=await PersistentAIChatSession.create({
+        chat:async()=>({message:{role:'assistant',content:'must not run'}}),
+        chatFileName,
+        loadExisting:true,
+        memory:false,
+    });
+    assert.deepEqual(await session.transcript(),[validRow,malformedRow]);
+    await assert.rejects(
+        session.history(),
+        error=>error?.code==='AI_CHAT_INCOHERENT_PERSISTENCE',
+    );
+    assert.deepEqual(await session.transcript(),[validRow,malformedRow]);
     assert.equal(db.raw('chats',chatFileName),legacyContent);
 });

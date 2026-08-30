@@ -2601,6 +2601,10 @@ test(
             new URL('runtime/arcane/components/chat.html',repositoryRoot),
             'utf8'
         );
+        const chatEntitySource=await readFile(
+            new URL('runtime/arcane/entities/Chat.js',repositoryRoot),
+            'utf8'
+        );
         const functionStart=source.indexOf('function createAIActivationController(');
         const functionEnd=source.indexOf(
             '\n    function synchronizeAIRuntimeState',
@@ -2884,6 +2888,152 @@ test(
             /time[.]dateTime=value[.]toISOString\(\);[\s\S]*?toLocaleTimeString\(\[\],\{[\s\S]*?hour:'2-digit',[\s\S]*?minute:'2-digit',[\s\S]*?hourCycle:'h23'[\s\S]*?\}\);[\s\S]*?time[.]title=value[.]toLocaleString\(\);/u,
             'Transcript timestamps must preserve ISO metadata, full local titles, and visible local HH:MM text.'
         );
+        const modelMessagesStart=chatEntitySource.indexOf('get messages(){');
+        const transcriptStart=chatEntitySource.indexOf('get transcript(){',modelMessagesStart);
+        const transcriptEnd=chatEntitySource.indexOf('\n    /**',transcriptStart);
+        for(const boundary of [modelMessagesStart,transcriptStart,transcriptEnd]){
+            assert.notEqual(boundary,-1);
+        }
+        const modelMessagesSource=chatEntitySource.slice(modelMessagesStart,transcriptStart);
+        const transcriptSource=chatEntitySource.slice(transcriptStart,transcriptEnd);
+        for(const field of [
+            'memory_excluded',
+            'persistence_excluded',
+            'ui_hidden',
+            'timestamp'
+        ]){
+            assert.ok(
+                modelMessagesSource.includes(`delete copy.${field};`),
+                `Model-facing Chat.messages must mask ${field}.`
+            );
+        }
+        assert.match(
+            modelMessagesSource,
+            /const copy=\{[.][.][.]message\};[\s\S]*?copy[.]tool_calls=copyToolCalls\(copy[.]tool_calls\)[.]map\(call=>\(\{[\s\S]*?[.][.][.]call,[\s\S]*?function:\{[.][.][.]call[.]function\}/u,
+            'The model-facing mask must retain all non-display message and tool-call extension fields.'
+        );
+        assert.match(
+            transcriptSource,
+            /this[.]#messages[.]map\(function publicTranscriptMessage\(message\)\{[\s\S]*?return copyCompleteValue\(message\);/u,
+            'Chat.transcript must retain complete saved records for the UI.'
+        );
+        assert.doesNotMatch(
+            transcriptSource,
+            /ui_hidden|[.]filter\(/u,
+            'Legacy ui_hidden metadata must not suppress records from the complete transcript.'
+        );
+        const chatOutputStyleStart=source.indexOf('.chat_output {');
+        const chatOutputStyleEnd=source.indexOf('\n    .chat_output > li',chatOutputStyleStart);
+        assert.notEqual(chatOutputStyleStart,-1);
+        assert.notEqual(chatOutputStyleEnd,-1);
+        assert.match(
+            source.slice(chatOutputStyleStart,chatOutputStyleEnd),
+            /overflow-x:\s*auto;[\s\S]*?overflow-y:\s*auto;[\s\S]*?overscroll-behavior:\s*contain;/u,
+            'The transcript viewport must mask overflow while retaining complete scrollable content.'
+        );
+        const scrollStart=source.indexOf('function scrollTranscriptToBottom()');
+        const scrollEnd=source.indexOf('\n\n    function transcriptTime',scrollStart);
+        assert.notEqual(scrollStart,-1);
+        assert.notEqual(scrollEnd,-1);
+        const scrollHarness=Function(
+            `'use strict';
+            return function scrollHarness(chatOutput){
+                ${source.slice(scrollStart,scrollEnd)}
+                return scrollTranscriptToBottom();
+            };`
+        )();
+        const transcriptViewport={scrollHeight:947,scrollTop:19};
+        assert.equal(scrollHarness(transcriptViewport),true);
+        assert.equal(
+            transcriptViewport.scrollTop,
+            transcriptViewport.scrollHeight,
+            'The shared scroll helper must target the complete transcript bottom.'
+        );
+        const transcriptMutationContracts=[
+            {
+                start:'function appendVisibleToolCall(',
+                end:'\n\n    function setTranscriptMessageContent',
+                mutation:'toolCalls.append(entry);',
+                scrolls:1
+            },
+            {
+                start:'function setTranscriptMessageContent(',
+                end:'\n\n    function setTranscriptMessageTimestamp',
+                mutation:'markdown.innerHTML=new MD(content).rendered;',
+                scrolls:1
+            },
+            {
+                start:'function setTranscriptMessageTimestamp(',
+                end:'\n\n    function sameTranscriptRequest',
+                mutation:'current.replaceWith(transcriptTime(timestamp));',
+                scrolls:1
+            },
+            {
+                start:'function appendTranscriptMessage(',
+                end:'\n\n    function completeVisibleValue',
+                mutation:'chatOutput.append(item);',
+                scrolls:1
+            },
+            {
+                start:'function renderSessionHistory(',
+                end:'\n\n    async function bindSession',
+                mutation:'chatOutput.replaceChildren(fragment);',
+                scrolls:1
+            },
+            {
+                start:'function setMessageProgress(',
+                end:'\n\n    function setAIAvailability',
+                mutation:"'aria-valuetext',",
+                scrolls:1
+            },
+            {
+                start:"async function streamMessage(text='', id='', isThinking)",
+                end:'\n\n    textArea.addEventListener',
+                mutation:'target.innerHTML=new MD(target.raw).rendered;',
+                scrolls:2
+            },
+            {
+                start:'function renderSessionMessageFailure(',
+                end:'\n\n    function internalStructuralToolFailure',
+                mutation:'markdown.innerHTML=new MD(text).rendered;',
+                scrolls:1
+            },
+            {
+                start:'function restoreRejectedStructuralDraft(',
+                end:'\n\n    async function sendMessageThroughBoundSession',
+                mutation:"textArea.style.height=`${textArea.scrollHeight}px`;",
+                scrolls:1
+            },
+            {
+                start:'async function receivedMessage(',
+                end:'\n\n    function reportTTSError',
+                mutation:"const message=appendTranscriptMessage('assistant',text,name);",
+                scrolls:1
+            }
+        ];
+        for(const contract of transcriptMutationContracts){
+            const start=source.indexOf(contract.start);
+            const end=source.indexOf(contract.end,start);
+            assert.notEqual(start,-1,`${contract.start} must remain present`);
+            assert.notEqual(end,-1,`${contract.start} must retain its source boundary`);
+            const functionSource=source.slice(start,end);
+            const mutationIndex=functionSource.indexOf(contract.mutation);
+            assert.notEqual(
+                mutationIndex,
+                -1,
+                `${contract.start} must retain its transcript mutation`
+            );
+            const scrollIndexes=[...functionSource.matchAll(/scrollTranscriptToBottom\(\);/gu)]
+                .map(match=>match.index);
+            assert.ok(
+                scrollIndexes.length>=contract.scrolls,
+                `${contract.start} must restore true-bottom scrolling after each mutation path`
+            );
+            assert.ok(
+                scrollIndexes.some(index=>index>mutationIndex),
+                `${contract.start} must scroll after its terminal transcript mutation`
+            );
+        }
         assert.match(
             source,
             /[.]chat_output > li \{[\s\S]*?min-inline-size:0;[\s\S]*?max-inline-size:min\(92%,48rem\);[\s\S]*?overflow-x: hidden;[\s\S]*?\}/u,
@@ -2897,21 +3047,21 @@ test(
         assert.match(
             source,
             /const dispositions=new Map\(\[[\s\S]*?\['executed','Executed'\],[\s\S]*?\['declined','Declined'\],[\s\S]*?\['cancelled','Cancelled'\],[\s\S]*?\['not-executed','Not executed'\][\s\S]*?\]\);/u,
-            'Chat.submitToolResult must preserve every public settlement disposition.'
+            'Chat.submitToolResults must preserve every public settlement disposition.'
         );
         assert.match(
             source,
-            /async function submitToolResult\([\s\S]*?const ownership=createChatSubmissionOwnership\(context[.]signal\?\?null\);[\s\S]*?return observeHostSubmission\(result,eventContext,ownership\);/u,
+            /async function submitToolResults\([\s\S]*?const ownership=createChatSubmissionOwnership\(context[.]signal\?\?null\);[\s\S]*?return observeHostSubmission\(result,eventContext,ownership\);/u,
             'Tool-result settlement must remain owned through asynchronous host submission.'
         );
         assert.match(
             source,
-            /const text=`\$\{dispositions[.]get\(disposition\)\} — \$\{options[.]message\}`;[\s\S]*?content:text,[\s\S]*?role:'tool',[\s\S]*?tool_call_id:toolCallId/u,
+            /content:`\$\{dispositions[.]get\(result[.]disposition\)\} — \$\{result[.]message\}`,[\s\S]*?role:'tool',[\s\S]*?tool_call_id:toolCallId/u,
             'Tool-result transcript text must use the caller-provided user-facing settlement message.'
         );
         assert.match(
             source,
-            /if\(message[.]role==='tool'&&!message[.]content[.]trim\(\)\)\{[\s\S]*?'AI_CHAT_INVALID_TOOL_MESSAGE'/u,
+            /if\(message[.]role==='tool'\)\{[\s\S]*?!message[.]content[.]trim\(\)[\s\S]*?'AI_CHAT_INVALID_TOOL_MESSAGE'/u,
             'Restored tool results must contain nonblank user-facing text.'
         );
         assert.match(
@@ -2926,8 +3076,13 @@ test(
         );
         assert.match(
             source,
-            /pendingStructuralToolMessage=structuralToolMessage\(call\);[\s\S]*?userMessage[.]textContent=structuralToolMessage\(call\);[\s\S]*?setSessionStatus\('tool',pendingStructuralToolMessage\);/u,
-            'The structural arguments.message text must drive the pending status and visible tool card.'
+            /pendingStructuralToolMessage=pendingStructuralToolCalls[\s\S]*?[.]map\(structuralToolMessage\)[\s\S]*?[.]join\(' · '\);[\s\S]*?userMessage[.]textContent=structuralToolMessage\(call\);[\s\S]*?setSessionStatus\('tool',pendingStructuralToolMessage\);/u,
+            'Every structural arguments.message value must drive the combined status and its visible card.'
+        );
+        assert.match(
+            source,
+            /host[.]submitToolResults=submitToolResults;[\s\S]*?Object[.]defineProperty\(host,'pendingTools',[\s\S]*?get:pendingStructuralToolSummaries[\s\S]*?Object[.]defineProperty\(host,'pendingToolCalls',[\s\S]*?get:pendingStructuralToolCallsComplete/u,
+            'The public host must expose plural settlement and complete plural pending getters.'
         );
         assert.match(
             source,
@@ -2961,11 +3116,579 @@ test(
             /renderSessionMessageFailure|visibleErrorMessage/u,
             'Internal structural protocol diagnostics must not become assistant transcript errors.'
         );
+        assert.match(
+            structuralFailureSource,
+            /setSessionStatus\(\s*pendingStructuralToolCalls[.]length\?'tool':'ready',[\s\S]*?pendingStructuralToolMessage\|\|'Chat ready[.]'/u,
+            'Internal structural failures must leave only the generic actionable or ready status visible.'
+        );
+
+        const completeChatStart=source.indexOf('function publicErrorFields(');
+        const completeChatEnd=source.indexOf('\n\n    function isAbortSignal(',completeChatStart);
+        const toolSettlementStart=source.indexOf('async function submitToolResults(');
+        const toolSettlementEnd=source.indexOf(
+            '\n\n    function observeHostSubmission',
+            toolSettlementStart
+        );
+        for(const boundary of [
+            completeChatStart,
+            completeChatEnd,
+            toolSettlementStart,
+            toolSettlementEnd
+        ]){
+            assert.notEqual(boundary,-1);
+        }
+        const createCompleteChatHarness=Function(
+            `'use strict';
+            return function createCompleteChatHarness(history){
+                let ownerDocument=null;
+                function classNames(node){
+                    return new Set(node.className.split(/\\s+/u).filter(Boolean));
+                }
+                function attach(parent,value,index=parent.children.length){
+                    const values=value?.fragment===true?[...value.children]:[value];
+                    let offset=0;
+                    for(let child of values){
+                        if(typeof child==='string') child=ownerDocument.createTextNode(child);
+                        child.parentNode=parent;
+                        parent.children.splice(index+offset,0,child);
+                        offset+=1;
+                    }
+                    if(value?.fragment===true) value.children=[];
+                }
+                function matches(node,selector){
+                    if(selector.startsWith('.')){
+                        return classNames(node).has(selector.slice(1));
+                    }
+                    if(selector.startsWith('#')) return node.id===selector.slice(1);
+                    return node.tagName.toLowerCase()===selector.toLowerCase();
+                }
+                function firstMatch(node,selector){
+                    for(const child of node.children){
+                        if(matches(child,selector)) return child;
+                        const nested=firstMatch(child,selector);
+                        if(nested) return nested;
+                    }
+                    return null;
+                }
+                function node(tagName){
+                    const value={
+                        tagName:String(tagName).toUpperCase(),
+                        ownerDocument,
+                        parentNode:null,
+                        fragment:false,
+                        children:[],
+                        dataset:{},
+                        style:{},
+                        attributes:new Map(),
+                        className:'',
+                        id:'',
+                        raw:'',
+                        textContent:'',
+                        innerHTML:'',
+                        append(...children){
+                            for(const child of children) attach(this,child);
+                        },
+                        insertBefore(child,reference){
+                            const index=reference===null?this.children.length:this.children.indexOf(reference);
+                            attach(this,child,index<0?this.children.length:index);
+                        },
+                        replaceChildren(...children){
+                            for(const child of this.children) child.parentNode=null;
+                            this.children=[];
+                            for(const child of children) attach(this,child);
+                        },
+                        replaceWith(replacement){
+                            if(!this.parentNode) return;
+                            const parent=this.parentNode;
+                            const index=parent.children.indexOf(this);
+                            if(index<0) return;
+                            parent.children.splice(index,1);
+                            this.parentNode=null;
+                            attach(parent,replacement,index);
+                        },
+                        remove(){
+                            if(!this.parentNode) return;
+                            const index=this.parentNode.children.indexOf(this);
+                            if(index>=0) this.parentNode.children.splice(index,1);
+                            this.parentNode=null;
+                        },
+                        querySelector(selector){
+                            return firstMatch(this,selector);
+                        },
+                        setAttribute(name,attributeValue){
+                            this.attributes.set(name,String(attributeValue));
+                        },
+                        removeAttribute(name){
+                            this.attributes.delete(name);
+                        },
+                        focus(){},
+                        blur(){}
+                    };
+                    value.classList={
+                        contains(name){return classNames(value).has(name);},
+                        add(...names){
+                            const next=classNames(value);
+                            for(const name of names) next.add(name);
+                            value.className=[...next].join(' ');
+                        },
+                        remove(...names){
+                            const next=classNames(value);
+                            for(const name of names) next.delete(name);
+                            value.className=[...next].join(' ');
+                        },
+                        toggle(name,force){
+                            const next=classNames(value);
+                            const enabled=force===undefined?!next.has(name):Boolean(force);
+                            if(enabled) next.add(name);
+                            else next.delete(name);
+                            value.className=[...next].join(' ');
+                            return enabled;
+                        }
+                    };
+                    return value;
+                }
+                ownerDocument={
+                    createElement:node,
+                    createDocumentFragment(){
+                        const fragment=node('#fragment');
+                        fragment.fragment=true;
+                        return fragment;
+                    },
+                    createTextNode(text){
+                        const textNode=node('#text');
+                        textNode.textContent=String(text);
+                        return textNode;
+                    }
+                };
+                const chatOutput=node('ol');
+                chatOutput.scrollHeight=947;
+                let transcriptScrollTop=0;
+                let transcriptScrollWrites=0;
+                Object.defineProperty(chatOutput,'scrollTop',{
+                    configurable:true,
+                    get(){return transcriptScrollTop;},
+                    set(value){
+                        transcriptScrollTop=value;
+                        transcriptScrollWrites+=1;
+                    }
+                });
+                const textArea=node('textarea');
+                textArea.value='';
+                textArea.scrollHeight=67;
+                const chatSessionStatus=node('output');
+                chatSessionStatus.value='';
+                const host={
+                    name:'User',
+                    aiName:'Assistant',
+                    aiAvailability:{llm:true,stt:false,tts:false},
+                    conversationComplete:false,
+                    session:null
+                };
+                class MD{
+                    constructor(text){this.rendered='rendered:'+text;}
+                }
+                const chatErrorCodes={
+                    destroyed:'ARCANE_CHAT_DESTROYED',
+                    sessionAlreadyBound:'ARCANE_CHAT_SESSION_ALREADY_BOUND',
+                    sessionBindingRejected:'ARCANE_CHAT_SESSION_BINDING_REJECTED'
+                };
+                const chatReasons={
+                    sessionBindingCompleted:'session-binding-completed',
+                    sessionBindingRejected:'session-binding-rejected'
+                };
+                let pendingStructuralToolCalls=[];
+                let pendingStructuralToolMessage='';
+                let sessionHistoryRecoveryMessage='';
+                let destroyed=false;
+                let sessionBindingPending=false;
+                let sessionMessagePending=false;
+                let sessionBindingGeneration=0;
+                let boundChatSession=null;
+                let boundChatAI=null;
+                let operationSequence=0;
+                let releaseCount=0;
+                let transcriptReads=0;
+                let historyReads=0;
+                const events=[];
+                const sends=[];
+                function nextChatOperationId(kind){
+                    operationSequence+=1;
+                    return 'chat-history:'+kind+':'+operationSequence;
+                }
+                async function createPersistentAIChatSession(){
+                    throw new Error('The focused fixture supplies its session.');
+                }
+                function applyAIAvailability(){}
+                function internalStructuralToolFailure(){return false;}
+                function dispatchChatEvent(type,detail,options={}){
+                    events.push({type,detail,options});
+                    return true;
+                }
+                function createChatSubmissionOwnership(signal=null){
+                    const controller=new AbortController();
+                    return {
+                        signal:signal??controller.signal,
+                        release(){releaseCount+=1;}
+                    };
+                }
+                function sendMessageThroughBoundSession(
+                    text,
+                    context,
+                    requestMessages,
+                    perTurnRequest
+                ){
+                    sends.push({text,context,requestMessages,perTurnRequest});
+                    return Promise.resolve({accepted:true});
+                }
+                function observeHostSubmission(result,context,ownership){
+                    return Promise.resolve(result).finally(function releaseSubmission(){
+                        ownership.release();
+                    });
+                }
+                ${source.slice(completeChatStart,completeChatEnd)}
+                ${source.slice(toolSettlementStart,toolSettlementEnd)}
+                const session={
+                    ai:{id:'bound-ai'},
+                    async ready(){},
+                    async transcript(){
+                        transcriptReads+=1;
+                        return history;
+                    },
+                    async history(){
+                        historyReads+=1;
+                        return [];
+                    },
+                    async send(){return {accepted:true};}
+                };
+                function appendRejectedDraftTurn(text,operationId,messageId){
+                    const request=appendTranscriptMessage('user',text,host.name);
+                    request.dataset.operationId=operationId;
+                    const response=appendTranscriptMessage('assistant','',host.aiName);
+                    response.id='message-'+messageId;
+                    return {request,response};
+                }
+                return {
+                    bindSession,
+                    submitToolResult,
+                    submitToolResults,
+                    restoreRejectedStructuralDraft,
+                    appendRejectedDraftTurn,
+                    pendingTool:pendingStructuralToolSummary,
+                    pendingTools:pendingStructuralToolSummaries,
+                    pendingToolCall:pendingStructuralToolCallComplete,
+                    pendingToolCalls:pendingStructuralToolCallsComplete,
+                    chatOutput,
+                    textArea,
+                    session,
+                    events,
+                    sends,
+                    state(){
+                        return {
+                            boundChatSession,
+                            historyReads,
+                            releaseCount,
+                            sessionBindingPending,
+                            status:{...host.sessionStatus},
+                            transcriptReads,
+                            transcriptScrollTop,
+                            transcriptScrollWrites
+                        };
+                    }
+                };
+            };`
+        )();
+
+        const firstParallelCall={
+            id:'tool-one',
+            type:'function',
+            providerExtension:{flags:['complete-first',null]},
+            function:{
+                name:'firstAction',
+                arguments:JSON.stringify({message:'Run the first action?'}),
+                functionExtension:{nested:{preserved:true}}
+            }
+        };
+        const secondParallelCall={
+            id:'tool-two',
+            type:'function',
+            providerExtension:{flags:['complete-second',{ordinal:2}]},
+            function:{
+                name:'secondAction',
+                arguments:JSON.stringify({message:'Run the second action?'}),
+                functionExtension:{nested:{preserved:true}}
+            }
+        };
+        const hiddenSavedRecord={
+            role:'system',
+            content:'Complete saved record marked UI-hidden.',
+            timestamp:'2026-08-29T08:09:10.000Z',
+            ui_hidden:true,
+            savedExtension:{complete:['value',null]}
+        };
+        const parallelHistory=[
+            hiddenSavedRecord,
+            {
+                role:'assistant',
+                content:'Both actions require a decision.',
+                timestamp:'2026-08-29T08:10:11.000Z',
+                tool_calls:[firstParallelCall,secondParallelCall]
+            }
+        ];
+        const parallelChat=createCompleteChatHarness(parallelHistory);
+        assert.equal(
+            await parallelChat.bindSession({session:parallelChat.session}),
+            parallelChat.session
+        );
+        const parallelBoundState=parallelChat.state();
+        assert.equal(parallelBoundState.boundChatSession,parallelChat.session);
+        assert.equal(parallelBoundState.historyReads,0);
+        assert.equal(parallelBoundState.releaseCount,0);
+        assert.equal(parallelBoundState.sessionBindingPending,false);
+        assert.deepEqual(
+            parallelBoundState.status,
+            {state:'tool',message:'Run the first action? · Run the second action?'}
+        );
+        assert.equal(parallelBoundState.transcriptReads,1);
+        assert.equal(
+            parallelBoundState.transcriptScrollTop,
+            parallelChat.chatOutput.scrollHeight
+        );
+        assert.ok(
+            parallelBoundState.transcriptScrollWrites>=3,
+            'Restoring both tool cards and the completed transcript must each reach true bottom.'
+        );
+        assert.equal(
+            parallelChat.chatOutput.children.length,
+            parallelHistory.length,
+            'Saved ui_hidden records remain complete transcript records and must render.'
+        );
+        const hiddenSavedItem=parallelChat.chatOutput.children[0];
+        const hiddenSavedMarkdown=hiddenSavedItem.querySelector('.markdown');
+        const hiddenSavedTime=hiddenSavedItem.querySelector('.message_timestamp');
+        assert.equal(hiddenSavedMarkdown.raw,hiddenSavedRecord.content);
+        assert.equal(hiddenSavedTime.tagName,'TIME');
+        assert.equal(hiddenSavedTime.dateTime,hiddenSavedRecord.timestamp);
+        assert.ok(hiddenSavedTime.textContent);
+        assert.ok(hiddenSavedTime.title);
+        assert.notEqual(hiddenSavedMarkdown,hiddenSavedTime);
+        assert.equal(hiddenSavedMarkdown.raw.includes(hiddenSavedTime.dateTime),false);
+
+        const pendingCards=parallelChat.chatOutput.children[1]
+            .querySelector('.message_tool_calls');
+        assert.deepEqual(
+            pendingCards.children.map(card=>card.dataset.toolCallId),
+            ['tool-one','tool-two']
+        );
+        assert.deepEqual(
+            pendingCards.children.map(card=>JSON.parse(
+                card.querySelector('code').textContent
+            )),
+            [firstParallelCall,secondParallelCall],
+            'Every restored parallel card must expose the complete structural envelope.'
+        );
+        assert.equal(parallelChat.pendingTool(),null);
+        assert.equal(parallelChat.pendingToolCall(),null);
+        assert.deepEqual(
+            parallelChat.pendingTools(),
+            [
+                {id:'tool-one',name:'firstAction',message:'Run the first action?'},
+                {id:'tool-two',name:'secondAction',message:'Run the second action?'}
+            ]
+        );
+        assert.deepEqual(
+            parallelChat.pendingToolCalls(),
+            [firstParallelCall,secondParallelCall]
+        );
+        const pendingCallProjection=parallelChat.pendingToolCalls();
+        pendingCallProjection[0].providerExtension.flags.push('caller-mutation');
+        pendingCallProjection[0].function.functionExtension.nested.preserved=false;
+        assert.deepEqual(
+            parallelChat.pendingToolCalls(),
+            [firstParallelCall,secondParallelCall],
+            'Complete pending getters must return caller-mutable copies without losing fields.'
+        );
+        const boundEvent=parallelChat.events.find(event=>event.type==='chat-session-bound');
+        assert.ok(boundEvent);
+        assert.equal(boundEvent.detail.pendingTool,null);
+        assert.equal(boundEvent.detail.pendingToolCall,null);
+        assert.deepEqual(boundEvent.detail.pendingTools,parallelChat.pendingTools());
+        assert.deepEqual(boundEvent.detail.pendingToolCalls,parallelChat.pendingToolCalls());
+
+        const parallelChildrenBeforeRejection=parallelChat.chatOutput.children.length;
+        await assert.rejects(
+            parallelChat.submitToolResult({
+                disposition:'executed',
+                message:'A singular settlement must not partially commit this batch.',
+                persist:false,
+                toolCallId:'tool-one'
+            }),
+            error=>error?.code==='AI_CHAT_TOOL_RESULT_BATCH_REQUIRED'
+        );
+        await assert.rejects(
+            parallelChat.submitToolResults({
+                results:[{
+                    toolCallId:'tool-one',
+                    disposition:'executed',
+                    message:'First action completed.',
+                    persist:false
+                }]
+            }),
+            error=>error?.code==='AI_CHAT_TOOL_RESULT_REQUIRED'
+        );
+        assert.equal(parallelChat.sends.length,0);
+        assert.equal(parallelChat.chatOutput.children.length,parallelChildrenBeforeRejection);
+        await assert.rejects(
+            parallelChat.submitToolResults({
+                results:[
+                    {
+                        toolCallId:'tool-one',
+                        disposition:'executed',
+                        message:'First action completed.',
+                        persist:true
+                    },
+                    {
+                        toolCallId:'tool-two',
+                        disposition:'declined',
+                        message:'Second action declined.',
+                        persist:false
+                    }
+                ]
+            }),
+            error=>error?.code==='AI_CHAT_INCOHERENT_PERSISTENCE'
+        );
+        assert.equal(parallelChat.sends.length,0);
+        assert.equal(parallelChat.chatOutput.children.length,parallelChildrenBeforeRejection);
+        assert.deepEqual(
+            await parallelChat.submitToolResults(
+                {
+                    results:[
+                        {
+                            toolCallId:'tool-two',
+                            disposition:'declined',
+                            message:'Second action declined.',
+                            persist:false
+                        },
+                        {
+                            toolCallId:'tool-one',
+                            disposition:'executed',
+                            message:'First action completed.',
+                            persist:false
+                        }
+                    ]
+                },
+                {operationId:'parallel-settlement'}
+            ),
+            {accepted:true}
+        );
+        assert.equal(parallelChat.sends.length,1);
+        assert.deepEqual(
+            parallelChat.sends[0].requestMessages,
+            [
+                {
+                    content:'Executed — First action completed.',
+                    persist:false,
+                    role:'tool',
+                    tool_call_id:'tool-one'
+                },
+                {
+                    content:'Declined — Second action declined.',
+                    persist:false,
+                    role:'tool',
+                    tool_call_id:'tool-two'
+                }
+            ],
+            'Plural settlement must atomically submit every result in pending-call order.'
+        );
+        assert.deepEqual(
+            parallelChat.chatOutput.children.slice(-2).map(item=>({
+                content:item.querySelector('.markdown').raw,
+                operationId:item.dataset.operationId,
+                toolCallId:item.dataset.toolCallId
+            })),
+            [
+                {
+                    content:'Executed — First action completed.',
+                    operationId:'parallel-settlement',
+                    toolCallId:'tool-one'
+                },
+                {
+                    content:'Declined — Second action declined.',
+                    operationId:'parallel-settlement',
+                    toolCallId:'tool-two'
+                }
+            ]
+        );
+        assert.equal(parallelChat.state().releaseCount,1);
+        assert.equal(
+            parallelChat.state().transcriptScrollTop,
+            parallelChat.chatOutput.scrollHeight
+        );
+
+        const restoredCall={
+            id:'restored-tool',
+            type:'function',
+            extension:{complete:{value:null}},
+            function:{
+                name:'restoredAction',
+                arguments:JSON.stringify({message:'Resume the restored action?'}),
+                extension:{complete:['yes','']}
+            }
+        };
+        const restoredChat=createCompleteChatHarness([{
+            role:'assistant',
+            content:'A saved action is still pending.',
+            timestamp:'2026-08-29T08:11:12.000Z',
+            tool_calls:[restoredCall]
+        }]);
+        await restoredChat.bindSession({session:restoredChat.session});
+        assert.deepEqual(restoredChat.pendingToolCall(),restoredCall);
+        assert.deepEqual(
+            await restoredChat.submitToolResult({
+                disposition:'not-executed',
+                message:'The restored action remains pending outside this chat.',
+                persist:true
+            }),
+            {accepted:true}
+        );
+        assert.equal(restoredChat.sends.length,1);
+        assert.equal(restoredChat.sends[0].requestMessages.length,1);
+        assert.equal(restoredChat.sends[0].requestMessages[0].tool_call_id,'restored-tool');
+
+        restoredChat.appendRejectedDraftTurn(
+            'Preserve this rejected user request.',
+            'rejected-operation',
+            'rejected-response'
+        );
+        restoredChat.textArea.value='A newer unsent draft.';
+        assert.equal(
+            restoredChat.restoreRejectedStructuralDraft(
+                'rejected-response',
+                'rejected-operation',
+                'Preserve this rejected user request.'
+            ),
+            true
+        );
+        assert.equal(
+            restoredChat.textArea.value,
+            'Preserve this rejected user request.\nA newer unsent draft.'
+        );
+        assert.equal(
+            restoredChat.chatOutput.children.some(
+                item=>item.id==='message-rejected-response'
+                    ||item.dataset.operationId==='rejected-operation'
+            ),
+            false
+        );
+
         const dispatchStart=source.indexOf('function dispatchChatEvent(');
         const dispatchEnd=source.indexOf('\n\n    function publicErrorFields',dispatchStart);
         const ownershipStart=source.indexOf('function isAbortSignal(value)');
         const ownershipEnd=source.indexOf('\n\n    host.sendMessage=',ownershipStart);
         const submissionStart=source.indexOf('function observeHostSubmission(');
+        const submissionObservationEnd=source.indexOf(
+            '\n\n    async function submitMessage',
+            submissionStart
+        );
         const submissionEnd=source.indexOf(
             '\n\n    async function receivedMessage',
             submissionStart
@@ -2976,10 +3699,30 @@ test(
             ownershipStart,
             ownershipEnd,
             submissionStart,
+            submissionObservationEnd,
             submissionEnd
         ]){
             assert.notEqual(boundary,-1);
         }
+        const hostSubmissionObservationSource=source.slice(
+            submissionStart,
+            submissionObservationEnd
+        );
+        assert.match(
+            hostSubmissionObservationSource,
+            /console[.]error\([\s\S]*?internalStructuralToolFailure\(error\)[\s\S]*?'Arcane structural tool protocol failure[.]'[\s\S]*?error[\s\S]*?dispatchChatEvent\([\s\S]*?'chat-send-error'/u,
+            'Raw structural diagnostics must remain available through console and the error event.'
+        );
+        assert.match(
+            hostSubmissionObservationSource,
+            /publicDetail:\{[\s\S]*?publicErrorFields\([\s\S]*?error,[\s\S]*?chatErrorCodes[.]hostMessageSubmissionRejected/u,
+            'The error event must retain the complete underlying structural failure.'
+        );
+        assert.doesNotMatch(
+            hostSubmissionObservationSource,
+            /renderSessionMessageFailure|setSessionStatus|textArea[.]value/u,
+            'Host submission observation must not project raw structural failures into visible chat UI.'
+        );
         const createChatSubmissionHarness=Function(
             'ActivationEvent',
             `'use strict';
@@ -4760,7 +5503,7 @@ test(
         const components=[
             {
                 path:'runtime/arcane/components/chat.html',
-                restoredBy:['setAIAvailability']
+                restoredBy:['setAIAvailability','scrollTranscriptToBottom']
             },
             {
                 path:'runtime/arcane/components/speech.html',

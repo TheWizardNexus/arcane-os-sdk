@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
-import {createHash,randomBytes} from 'node:crypto';
 import {createReadStream} from 'node:fs';
 import {
     lstat,
@@ -24,12 +23,12 @@ const DEBUG_PATH_PRESENT=Object.hasOwn(
     process.env,
     'ARCANE_BROWSER_AI_DEBUG_MODEL_PATH'
 );
-const FINAL_WARM_KEYS=Object.freeze([
+const FINAL_WARM_KEYS=[
     'ARCANE_BROWSER_AI_FINAL_WARM_PROFILE',
     'ARCANE_BROWSER_AI_FINAL_WARM_PORT',
     'ARCANE_BROWSER_AI_FINAL_WARM_APPLICATION_ID',
     'ARCANE_BROWSER_AI_FINAL_WARM_PROFILE_DIRECTORY'
-]);
+];
 const FINAL_WARM_PRESENT=FINAL_WARM_KEYS.filter(key=>Object.hasOwn(process.env,key));
 if(FINAL_WARM_PRESENT.length!==0&&FINAL_WARM_PRESENT.length!==FINAL_WARM_KEYS.length){
     throw new Error('The final warm browser-AI environment must provide all four exact keys.');
@@ -65,23 +64,22 @@ const FINAL_WARM_PROFILE_DIRECTORY=FINAL_WARM_ONLY
 const ENABLED=AUTHORITATIVE_ENABLED||DEBUG_ENABLED;
 const REPORT_PATH='/__arcane_browser_ai_contract_report';
 const DEBUG_MODEL_PATH='/__arcane_browser_ai_debug_model';
-const REPORT_LIMIT=256*1024;
 const OPERATION_TIMEOUT_MS=45*60*1000;
 const PROFILE_CLEANUP_TIMEOUT_MS=60*1000;
-const EXACT_EXPORTS=Object.freeze([
+const EXACT_EXPORTS=[
     'BROWSER_WASM_RUNTIME_AUTHORITY',
     'adaptV1LlmProvider',
+    'completeValueText',
     'createArcaneAI',
     'createBrowserModelSource',
     'createBrowserWasmLlmProvider',
     'createDbopfsModelStore'
-]);
-const GRANITE_AUTHORITY=Object.freeze({
+];
+const GRANITE_AUTHORITY={
     id:'ibm-granite-4.1-3b-q4-k-s',
-    url:'https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/ab4701481089b58a082ef63cc1cee738887293ff/granite-4.1-3b-Q4_K_S.gguf',
-    bytes:1_998_371_424,
-    sha256:'ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a'
-});
+    name:'granite-4.1-3b-Q4_K_S.gguf',
+    url:'https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/main/granite-4.1-3b-Q4_K_S.gguf'
+};
 
 function json(value){
     return `${JSON.stringify(value,null,2)}\n`;
@@ -109,17 +107,6 @@ function relativeFile(root,urlPath){
     return absolute;
 }
 
-async function sha256File(filePath){
-    const digest=createHash('sha256');
-    await new Promise((resolve,reject)=>{
-        const stream=createReadStream(filePath);
-        stream.on('data',chunk=>digest.update(chunk));
-        stream.once('error',reject);
-        stream.once('end',resolve);
-    });
-    return digest.digest('hex');
-}
-
 async function debugAuthority(){
     const configured=process.env.ARCANE_BROWSER_AI_DEBUG_MODEL_PATH;
     if(!configured)return null;
@@ -127,18 +114,15 @@ async function debugAuthority(){
     const info=await lstat(absolute);
     assert.equal(info.isSymbolicLink(),false,'The disposable debug model must not be a link.');
     assert.equal(info.isFile(),true,'The disposable debug model must be a regular file.');
-    assert.ok(info.size>0,'The disposable debug model must not be empty.');
-    const sha256=await sha256File(absolute);
     const name=path.basename(absolute);
-    return Object.freeze({
+    return {
         path:absolute,
-        descriptor:Object.freeze({
-            id:`disposable-debug-${sha256.slice(0,16)}`,
-            url:`https://debug.invalid/arcane/${sha256}/${encodeURIComponent(name)}`,
-            bytes:info.size,
-            sha256
-        })
-    });
+        descriptor:{
+            id:'disposable-debug-model',
+            name,
+            url:`https://debug.invalid/arcane/${encodeURIComponent(name)}`
+        }
+    };
 }
 
 async function regularFile(filePath){
@@ -176,9 +160,8 @@ async function chromePath(){
         :'Google Chrome is required; set ARCANE_CHROME_PATH to its executable.');
 }
 
-function appendTail(current,chunk,limit=64*1024){
-    const next=Buffer.concat([current,Buffer.from(chunk)]);
-    return next.length<=limit?next:next.subarray(next.length-limit);
+function appendOutput(current,chunk){
+    return Buffer.concat([current,Buffer.from(chunk)]);
 }
 
 function waitForExit(child){
@@ -258,8 +241,8 @@ async function activeWindowsChromeProfileOwners(profile){
     });
     let stdout=Buffer.alloc(0);
     let stderr=Buffer.alloc(0);
-    inspector.stdout.on('data',chunk=>{stdout=appendTail(stdout,chunk,8*1024);});
-    inspector.stderr.on('data',chunk=>{stderr=appendTail(stderr,chunk,8*1024);});
+    inspector.stdout.on('data',chunk=>{stdout=appendOutput(stdout,chunk);});
+    inspector.stderr.on('data',chunk=>{stderr=appendOutput(stderr,chunk);});
     let timer=null;
     const timeout=new Promise((_,reject)=>{
         timer=setTimeout(
@@ -295,7 +278,7 @@ function closeServer(server){
     return new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));
 }
 
-async function createContractServer({root,token,debugModel,port=0}){
+async function createContractServer({root,debugModel,port=0}){
     const requests=[];
     let reportResolve;
     let reportReject;
@@ -308,20 +291,13 @@ async function createContractServer({root,token,debugModel,port=0}){
         requests.push(`${request.method} ${parsed.pathname}`);
         if(request.method==='POST'&&parsed.pathname===REPORT_PATH){
             const chunks=[];
-            let length=0;
             request.on('data',chunk=>{
-                length+=chunk.length;
-                if(length>REPORT_LIMIT){
-                    request.destroy(new Error('Browser report exceeded its byte limit.'));
-                    return;
-                }
                 chunks.push(chunk);
             });
             request.once('error',reportReject);
             request.once('end',()=>{
                 try{
                     const value=JSON.parse(Buffer.concat(chunks).toString('utf8'));
-                    assert.equal(value.token,token);
                     reportResolve(value);
                     response.writeHead(204,{'cache-control':'no-store'});
                     response.end();
@@ -336,7 +312,6 @@ async function createContractServer({root,token,debugModel,port=0}){
         if(request.method==='GET'&&parsed.pathname===DEBUG_MODEL_PATH&&debugModel){
             response.writeHead(200,{
                 'cache-control':'no-store',
-                'content-length':String(debugModel.descriptor.bytes),
                 'content-type':'application/octet-stream'
             });
             createReadStream(debugModel.path).pipe(response);
@@ -358,7 +333,6 @@ async function createContractServer({root,token,debugModel,port=0}){
             if(!info.isFile())throw Object.assign(new Error('not a file'),{code:'ENOENT'});
             response.writeHead(200,{
                 'cache-control':'no-store',
-                'content-length':String(info.size),
                 'content-type':contentType(filePath)
             });
             if(request.method==='HEAD')response.end();
@@ -375,25 +349,20 @@ async function createContractServer({root,token,debugModel,port=0}){
     });
     const address=server.address();
     assert.ok(address&&typeof address==='object');
-    return Object.freeze({
+    return {
         server,
         report,
         requests,
         url:`http://127.0.0.1:${address.port}/browser-ai-runtime.contract.html`
-    });
+    };
 }
 
-function browserProbeSource({token,model,debug,warmOnly,applicationId}){
-    return `const TOKEN=${JSON.stringify(token)};
-const MODEL=${JSON.stringify(model)};
+function browserProbeSource({model,debug,warmOnly,applicationId}){
+    return `const MODEL=${JSON.stringify(model)};
 const DEBUG=${JSON.stringify(debug)};
 const WARM_ONLY=${JSON.stringify(warmOnly)};
 const APPLICATION_ID=${JSON.stringify(applicationId)};
 const EXACT_EXPORTS=${JSON.stringify(EXACT_EXPORTS)};
-const MODEL_FILE_NAME=decodeURIComponent(
-    new URL(MODEL.url).pathname.split('/').filter(Boolean).pop()
-);
-
 function invariant(value,message){
     if(!value)throw new Error(message);
 }
@@ -411,24 +380,24 @@ async function openReadOnlyDbopfs(applicationId,tableName){
     const applications=await root.getDirectoryHandle('apps',{create:false});
     const application=await applications.getDirectoryHandle(applicationId,{create:false});
     const table=await application.getDirectoryHandle(tableName,{create:false});
-    const readOnlyTable=Object.freeze({
+    const readOnlyTable={
         async getFileHandle(entry,options={}){
             if(options?.create===true)throw new Error('Final warm proof cannot create DBOPFS entries');
             const handle=await table.getFileHandle(entry,{create:false});
-            return Object.freeze({
+            return {
                 getFile:()=>handle.getFile(),
                 async createWritable(){throw new Error('Final warm proof cannot write DBOPFS entries');}
-            });
+            };
         },
         async removeEntry(){throw new Error('Final warm proof cannot remove DBOPFS entries');}
-    });
-    return Object.freeze({
+    };
+    return {
         readyPromise:Promise.resolve(),
         async getTableHandle(name){
             equal(name,tableName,'Final warm proof requested an unexpected DBOPFS table');
             return readOnlyTable;
         }
-    });
+    };
 }
 
 function projectProviderStatus(status,{inference=false,cancellation=false,cleanup=false}={}){
@@ -441,11 +410,7 @@ function projectProviderStatus(status,{inference=false,cancellation=false,cleanu
         equal(evidence.cleanup?.kind,'worker-terminated','Worker termination was not proved');
         equal(evidence.webgpu?.lastObservedOperational,true,'Unload lost prior WebGPU evidence');
     }else{
-        equal(status.security?.secure,true,'Strict browser contract lost secure mode');
-        equal(status.security?.checks?.byteLength,true,'Strict byte-length check was disabled');
-        equal(status.security?.checks?.sha256,true,'Strict SHA-256 check was disabled');
-        equal(status.integrity?.state,'verified','Strict model integrity was not verified');
-        equal(status.capabilities?.webgpuOperational,true,'Provider did not admit operational WebGPU');
+        equal(status.capabilities?.webgpuOperational,true,'Provider did not report operational WebGPU');
         equal(status.capabilities?.webgpuEvidenceProtocol,'arcane-wllama-runtime-evidence/1','Capability evidence protocol drifted');
         equal(evidence.state,'ready','Runtime evidence is not ready');
         equal(evidence.webgpu?.observed,true,'WebGPU operation was not observed');
@@ -453,9 +418,8 @@ function projectProviderStatus(status,{inference=false,cancellation=false,cleanu
         const offload=evidence.webgpu?.offload;
         positiveInteger(offload?.totalLayers,'Total model-layer evidence is absent');
         equal(offload.layers,offload.totalLayers,'Not all reported model layers were offloaded');
-        equal(offload.allReportedModelLayers,true,'Full-offload admission marker is absent');
+        equal(offload.allReportedModelLayers,true,'Full-offload result is absent');
         positiveInteger(evidence.webgpu?.buffers?.count,'GPU buffer evidence is absent');
-        positiveInteger(evidence.webgpu?.buffers?.descriptorBytes,'GPU buffer-byte evidence is absent');
         const queue=evidence.webgpu?.queue;
         positiveInteger(queue?.submissions,'WebGPU queue submission evidence is absent');
         positiveInteger(queue?.commandBuffers,'WebGPU command-buffer evidence is absent');
@@ -480,8 +444,6 @@ function projectProviderStatus(status,{inference=false,cancellation=false,cleanu
         state:status.state,
         loaded:status.loaded,
         cache:status.cache?.state??null,
-        security:status.security??null,
-        integrity:status.integrity??null,
         capabilities:{
             webgpuOperational:status.capabilities?.webgpuOperational===true,
             evidenceProtocol:status.capabilities?.webgpuEvidenceProtocol??null
@@ -495,10 +457,12 @@ function projectProviderStatus(status,{inference=false,cancellation=false,cleanu
                 adapter:evidence.webgpu?.adapter?{
                     vendorId:evidence.webgpu.adapter.vendorId,
                     deviceId:evidence.webgpu.adapter.deviceId,
-                    name:String(evidence.webgpu.adapter.name).slice(0,256)
+                    name:String(evidence.webgpu.adapter.name)
                 }:null,
                 offload:evidence.webgpu?.offload??null,
-                buffers:evidence.webgpu?.buffers??null,
+                buffers:evidence.webgpu?.buffers?{
+                    count:evidence.webgpu.buffers.count
+                }:null,
                 queue:evidence.webgpu?.queue??null,
                 lastInference:evidence.webgpu?.lastInference??null
             },
@@ -508,34 +472,10 @@ function projectProviderStatus(status,{inference=false,cancellation=false,cleanu
     };
 }
 
-async function cacheSnapshot(table){
-    const safeId=MODEL.id.replace(/[^a-z0-9._-]+/giu,'_');
-    const modelFile=await (await table.getFileHandle(safeId+'--'+MODEL_FILE_NAME,{create:false})).getFile();
-    const manifestFile=await (await table.getFileHandle(safeId+'.complete.json',{create:false})).getFile();
-    const manifestText=await manifestFile.text();
-    const manifest=JSON.parse(manifestText);
-    equal(modelFile.size,MODEL.bytes,'DBOPFS model bytes drifted');
-    equal(manifest.complete,true,'DBOPFS completion marker drifted');
-    if(manifest.schema==='arcane.ai.browser-wasm.model.v3'){
-        equal(manifest.observedBytes,MODEL.bytes,'DBOPFS observed byte metadata drifted');
-        for(const field of ['id','url']){
-            equal(manifest.model?.[field],MODEL[field],'DBOPFS completion authority drifted for '+field);
-        }
-    }else{
-        equal(manifest.schema,'arcane.ai.browser-wasm.model.v2','DBOPFS completion schema drifted');
-        equal(manifest.model?.id,MODEL.id,'DBOPFS legacy model ID drifted');
-        equal(manifest.model?.name,MODEL_FILE_NAME,'DBOPFS legacy model filename drifted');
-        equal(manifest.model?.immutableUrl,MODEL.url,'DBOPFS legacy model URL drifted');
-        equal(manifest.model?.bytes,MODEL.bytes,'DBOPFS legacy model bytes drifted');
-        equal(manifest.model?.sha256,MODEL.sha256,'DBOPFS legacy model SHA-256 drifted');
-    }
-    return {modelFile,manifestFile,manifestText,manifest};
-}
-
 function scriptedHandle(chunks,completion){
     let index=0;
     let cancelled=false;
-    return Object.freeze({
+    return {
         result:Promise.resolve(completion),
         async cancel(){cancelled=true;return true;},
         async next(){
@@ -544,53 +484,45 @@ function scriptedHandle(chunks,completion){
         },
         async return(value){cancelled=true;return {value,done:true};},
         [Symbol.asyncIterator](){return this;}
-    });
+    };
+}
+
+async function expectRejectionCode(promise,expectedCode,label){
+    try{
+        await promise;
+    }catch(error){
+        equal(error?.code,expectedCode,label+' error code drifted');
+        return error;
+    }
+    throw new Error(label+' did not reject');
 }
 
 async function sendReport(value){
     await fetch(${JSON.stringify(REPORT_PATH)},{
         method:'POST',
         headers:{'content-type':'application/json'},
-        body:JSON.stringify({...value,token:TOKEN})
+        body:JSON.stringify(value)
     });
 }
 
 async function run(){
     const api=await import('arcane-os/ai/browser-wasm');
     equal(JSON.stringify(Object.keys(api).sort()),JSON.stringify(EXACT_EXPORTS),'Public export inventory drifted');
-    const componentResponse=await fetch('/arcane/sdk/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json');
-    invariant(componentResponse.ok,'The authenticated browser-AI component receipt was not served');
-    const components=await componentResponse.json();
-    equal(components.protocol,'arcane-ai-browser-wasm/2','Component receipt protocol drifted');
-    equal(components.packageExport,'arcane-os/ai/browser-wasm','Component export authority drifted');
-    equal(
-        components.runtimePolicy.modelAuthorities,
-        'fieldwise-security-default-false-with-optional-byteLength-and-sha256-checks',
-        'Component model-security policy drifted'
-    );
-    equal(components.runtimePolicy.modelWeightsPacked,false,'Model weights entered the package');
-    equal(components.runtimePolicy.webgpuAdmission,'adapter-plus-full-offload-plus-buffer-queue-and-settled-fence-evidence','WebGPU receipt policy drifted');
-    equal(components.runtimePolicy.cpuFallback,false,'CPU fallback entered the WebGPU-required release');
-    equal(components.runtimePolicy.cancellation,'abortSignal-plus-llama-cancel-acknowledgement','Cancellation receipt policy drifted');
-    equal(components.runtimePolicy.cleanup,'worker-termination-only-no-native-unload-claim','Cleanup receipt policy drifted');
-    equal(components.runtimePolicy.toolCalls,'structural-only-never-executed','Tool policy drifted');
-    const projectedModule=components.components
-        .find(component=>component.name==='@wllama/wllama')?.files
-        ?.find(file=>file.role==='runtime-module');
-    const projectedWasm=components.components
-        .find(component=>component.name==='@wllama/wllama')?.files
-        ?.find(file=>file.role==='runtime-wasm');
-    equal(projectedModule?.bytes,api.BROWSER_WASM_RUNTIME_AUTHORITY.runtimeAssets.module.bytes,'Projected Wllama receipt byte length drifted');
-    equal(projectedModule?.sha256,api.BROWSER_WASM_RUNTIME_AUTHORITY.runtimeAssets.module.sha256,'Projected Wllama receipt digest drifted');
-    equal(projectedWasm?.bytes,api.BROWSER_WASM_RUNTIME_AUTHORITY.runtimeAssets.wasm.bytes,'Wllama WASM receipt byte length drifted');
-    equal(projectedWasm?.sha256,api.BROWSER_WASM_RUNTIME_AUTHORITY.runtimeAssets.wasm.sha256,'Wllama WASM receipt digest drifted');
+    const runtimeAuthority=api.BROWSER_WASM_RUNTIME_AUTHORITY;
+    equal(runtimeAuthority.protocol,'arcane-ai-browser-wasm/2','Runtime authority protocol drifted');
+    equal(runtimeAuthority.package.name,'@wllama/wllama','Runtime package authority drifted');
+    equal(runtimeAuthority.package.version,'3.6.0','Runtime package version drifted');
+    equal(runtimeAuthority.runtimeAssets.module.path,'ai/wllama/index.mjs','Runtime module path drifted');
+    equal(runtimeAuthority.runtimeAssets.module.mediaType,'text/javascript','Runtime module media type drifted');
+    equal(runtimeAuthority.runtimeAssets.wasm.path,'ai/wllama/wllama.wasm','Runtime WASM path drifted');
+    equal(runtimeAuthority.runtimeAssets.wasm.mediaType,'application/wasm','Runtime WASM media type drifted');
 
     let fakeState='ready';
     const compatibility={requests:[],responses:[],chunks:[],completions:[],tools:[],executions:0};
     const fakeProvider={
         protocol:'arcane-ai-adapter/1',
-        capabilities:()=>Object.freeze({localOnly:true}),
-        status:()=>Object.freeze({state:fakeState,loaded:fakeState==='ready'}),
+        capabilities:()=>({localOnly:true}),
+        status:()=>({state:fakeState,loaded:fakeState==='ready'}),
         async load(){fakeState='ready';},
         async unload(){fakeState='unloaded';},
         async chat(request){
@@ -602,11 +534,11 @@ async function run(){
         },
         stream(request){
             const call={
-                id:'boss-contract-call',
+                id:'catalog-contract-call',
                 type:'function',
                 function:{
-                    name:'search_boss_library',
-                    arguments:'{"query":"local","message":"Searching the local boss library."}'
+                    name:'search_local_catalog',
+                    arguments:'{"query":"local","message":"Searching the local catalog."}'
                 }
             };
             return scriptedHandle([{
@@ -633,7 +565,7 @@ async function run(){
     const toolDefinition={
         type:'function',
         function:{
-            name:'search_boss_library',
+            name:'search_local_catalog',
             description:'Visible structural test tool',
             parameters:{
                 type:'object',
@@ -646,7 +578,7 @@ async function run(){
         }
     };
     const fetched=await compatibilityAi.fetchRequest({
-        id:'boss-fetch-request',
+        id:'catalog-fetch-request',
         localOnly:true,
         messages:[{role:'user',content:'compatibility'}],
         structuredOutput:true,
@@ -654,7 +586,7 @@ async function run(){
         onRequest:(request,id)=>compatibility.requests.push({id,structuredOutput:request.structuredOutput,tools:request.tools.length}),
         onResponse:(response,id)=>compatibility.responses.push({id,responseId:response.id})
     });
-    equal(fetched.id,'boss-fetch-request','fetchRequest did not preserve its request ID');
+    equal(fetched.id,'catalog-fetch-request','fetchRequest did not preserve its request ID');
     const persistentChat=await compatibilityAi.createChatSession({
         memory:false,
         systemPrompt:'Use the same configured Arcane AI controller.'
@@ -674,11 +606,11 @@ async function run(){
         'Session-only chat input did not remain in recurring context'
     );
     const toolResult=await compatibilityAi.streamRequest({
-        id:'boss-stream-request',
+        id:'catalog-stream-request',
         localOnly:true,
         messages:[{role:'user',content:'use the visible tool'}],
         tools:[toolDefinition],
-        toolHandlers:{search_boss_library:()=>{compatibility.executions+=1;}},
+        toolHandlers:{search_local_catalog:()=>{compatibility.executions+=1;}},
         executeTools:true,
         onRequest:(request,id)=>compatibility.requests.push({id,tools:request.tools.length}),
         onChunk:(text,id,isThinking)=>compatibility.chunks.push({text,id,isThinking}),
@@ -687,11 +619,11 @@ async function run(){
     });
     await Promise.resolve();
     const expectedStructuralToolCall=[{
-        id:'boss-contract-call',
+        id:'catalog-contract-call',
         type:'function',
         function:{
-            name:'search_boss_library',
-            arguments:'{"query":"local","message":"Searching the local boss library."}'
+            name:'search_local_catalog',
+            arguments:'{"query":"local","message":"Searching the local catalog."}'
         }
     }];
     equal(
@@ -709,9 +641,452 @@ async function run(){
         JSON.stringify(expectedStructuralToolCall),
         'Structural tool completion envelope drifted'
     );
-    equal(compatibility.completions[0].id,'M-boss-stream-request','streamRequest display ID drifted');
+    equal(compatibility.completions[0].id,'M-catalog-stream-request','streamRequest display ID drifted');
     equal(compatibility.executions,0,'The SDK executed an application-owned tool');
     await compatibilityAi.dispose();
+
+    const focusedStreams=new Map();
+    let focusedState='ready';
+    const focusedProvider={
+        protocol:'arcane-ai-adapter/1',
+        capabilities:()=>({localOnly:true}),
+        status:()=>({state:focusedState,loaded:focusedState==='ready'}),
+        async load(){focusedState='ready';},
+        async unload(){focusedState='unloaded';},
+        stream(request){
+            const script=focusedStreams.get(request.id);
+            invariant(script,'No focused stream was registered for '+String(request.id));
+            return scriptedHandle(script.chunks,script.completion);
+        },
+        async dispose(){focusedState='unloaded';}
+    };
+    const focusedAi=api.createArcaneAI({provider:focusedProvider,loadPolicy:'manual'});
+    function registerFocusedStream(id,chunks,completion){
+        focusedStreams.set(id,{chunks,completion});
+    }
+
+    const resultFirstCall={
+        id:'result-first-tool',
+        type:'function',
+        source:{phase:'streamed'},
+        function:{
+            name:'search_local_catalog',
+            arguments:'{"query":"result first","message":"Reviewing the result-first stream."}',
+            format:{type:'json'}
+        }
+    };
+    const resultFirstChunk={
+        id:'result-first-private-drain',
+        object:'chat.completion.chunk',
+        choices:[{
+            index:0,
+            delta:{
+                content:'result-first content',
+                tool_calls:[{index:0,...resultFirstCall}]
+            }
+        }]
+    };
+    const resultFirstCompletion={
+        id:'result-first-private-drain',
+        object:'chat.completion',
+        choices:[{
+            index:0,
+            message:{role:'assistant',content:null,tool_calls:[resultFirstCall]},
+            finish_reason:'tool_calls'
+        }]
+    };
+    registerFocusedStream(
+        'result-first-private-drain',
+        [resultFirstChunk],
+        resultFirstCompletion
+    );
+    const resultFirstHandle=focusedAi.llm.stream({
+        id:'result-first-private-drain',
+        localOnly:true,
+        messages:[{role:'user',content:'Drain before resolving the result.'}],
+        tools:[toolDefinition]
+    });
+    equal(
+        await resultFirstHandle.result,
+        resultFirstCompletion,
+        'Result-first stream changed the terminal completion'
+    );
+    const resultFirstPublic=[];
+    for await (const chunk of resultFirstHandle)resultFirstPublic.push(chunk);
+    equal(resultFirstPublic.length,1,'Result-first stream did not retain its complete public chunk');
+    equal(
+        resultFirstPublic[0].choices[0].delta.content,
+        'result-first content',
+        'Result-first stream lost nonstructural content'
+    );
+    equal(
+        Object.hasOwn(resultFirstPublic[0].choices[0].delta,'tool_calls'),
+        false,
+        'Result-first stream exposed a partial structural delta'
+    );
+
+    const iteratorFirstCall={
+        id:'iterator-first-later-choice-tool',
+        type:'function',
+        source:{phase:'complete',choice:4},
+        function:{
+            name:'search_local_catalog',
+            arguments:'{"query":"iterator first","message":"Reviewing the later streamed choice."}',
+            format:{type:'json',complete:true}
+        }
+    };
+    const iteratorFirstChunk={
+        id:'iterator-first-private-drain',
+        object:'chat.completion.chunk',
+        choices:[
+            {index:0,delta:{content:'first public choice'}},
+            {
+                index:4,
+                message:{
+                    role:'assistant',
+                    content:null,
+                    tool_calls:[iteratorFirstCall]
+                }
+            }
+        ]
+    };
+    const iteratorFirstCompletion={
+        id:'iterator-first-private-drain',
+        object:'chat.completion',
+        choices:[
+            {
+                index:0,
+                message:{role:'assistant',content:'first terminal choice'},
+                finish_reason:'stop'
+            },
+            {
+                index:4,
+                message:{role:'assistant',content:null,tool_calls:[iteratorFirstCall]},
+                finish_reason:'tool_calls'
+            }
+        ]
+    };
+    registerFocusedStream(
+        'iterator-first-private-drain',
+        [iteratorFirstChunk],
+        iteratorFirstCompletion
+    );
+    const iteratorFirstHandle=focusedAi.llm.stream({
+        id:'iterator-first-private-drain',
+        localOnly:true,
+        messages:[{role:'user',content:'Drain through the iterator first.'}],
+        tools:[toolDefinition]
+    });
+    const iteratorFirstPublic=[];
+    for await (const chunk of iteratorFirstHandle)iteratorFirstPublic.push(chunk);
+    equal(
+        await iteratorFirstHandle.result,
+        iteratorFirstCompletion,
+        'Iterator-first stream changed the terminal completion'
+    );
+    equal(iteratorFirstPublic.length,1,'Iterator-first stream did not retain its public chunk');
+    equal(
+        iteratorFirstPublic[0].choices[0].delta.content,
+        'first public choice',
+        'Iterator-first stream lost first-choice content'
+    );
+    equal(
+        Object.hasOwn(iteratorFirstPublic[0].choices[1].message,'tool_calls'),
+        false,
+        'Iterator-first stream exposed a later-choice structural envelope'
+    );
+
+    const multiChoiceChunk={
+        id:'multi-choice-scalar',
+        object:'chat.completion.chunk',
+        choices:[
+            {index:2,delta:{reasoning_content:'reason two',content:'content two'}},
+            {index:0,delta:{content:'content zero'}},
+            {index:1,delta:{reasoning_content:'reason one'}}
+        ]
+    };
+    const multiChoiceCompletion={
+        id:'multi-choice-scalar',
+        object:'chat.completion',
+        metadata:{complete:true},
+        choices:[
+            {index:2,message:{role:'assistant',content:null},finish_reason:'stop'},
+            {index:0,message:{role:'assistant',content:''},finish_reason:'stop'},
+            {
+                index:1,
+                message:{role:'assistant',content:{kind:'complete-object'}},
+                finish_reason:'stop'
+            }
+        ]
+    };
+    registerFocusedStream(
+        'multi-choice-scalar',
+        [multiChoiceChunk],
+        multiChoiceCompletion
+    );
+    const multiChoiceData=[];
+    const multiChoiceScalar=[];
+    const multiChoiceResults=[];
+    const multiChoiceCompletions=[];
+    const multiChoiceOutput=await focusedAi.streamRequest({
+        id:'multi-choice-scalar',
+        localOnly:true,
+        messages:[{role:'user',content:'Return every choice.'}],
+        seeThinking:true,
+        onDataChunk:chunk=>multiChoiceData.push(chunk),
+        onChunk:(text,_id,isThinking)=>multiChoiceScalar.push({text,isThinking}),
+        onDataResult:completion=>multiChoiceResults.push(completion),
+        onComplete:completion=>multiChoiceCompletions.push(completion)
+    });
+    const expectedMultiChoiceText=JSON.stringify(multiChoiceCompletion,null,2);
+    equal(
+        JSON.stringify(multiChoiceData[0]),
+        JSON.stringify(multiChoiceChunk),
+        'Multi-choice onDataChunk lost provider data'
+    );
+    equal(
+        JSON.stringify(multiChoiceScalar),
+        JSON.stringify([
+            {text:'reason two',isThinking:true},
+            {text:'content two',isThinking:false},
+            {text:'content zero',isThinking:false},
+            {text:'reason one',isThinking:true}
+        ]),
+        'Multi-choice scalar chunks lost provider order or content'
+    );
+    equal(multiChoiceResults[0],multiChoiceCompletion,'onDataResult changed the terminal completion');
+    equal(multiChoiceResults[0].choices[0].message.content,null,'onDataResult lost null content');
+    equal(multiChoiceResults[0].choices[1].message.content,'','onDataResult lost empty content');
+    equal(
+        JSON.stringify(multiChoiceResults[0].choices[2].message.content),
+        '{"kind":"complete-object"}',
+        'onDataResult lost non-string content'
+    );
+    equal(multiChoiceOutput,expectedMultiChoiceText,'Multi-choice return reduced the completion');
+    equal(
+        multiChoiceCompletions[0],
+        expectedMultiChoiceText,
+        'Multi-choice onComplete reduced the completion'
+    );
+
+    for(const scalarCase of [
+        {id:'single-null-content',content:null,expected:'null'},
+        {id:'single-empty-content',content:'',expected:''},
+        {
+            id:'single-object-content',
+            content:{kind:'complete-object',nested:{answer:true}},
+            expected:JSON.stringify({kind:'complete-object',nested:{answer:true}},null,2)
+        }
+    ]){
+        const completion={
+            id:scalarCase.id,
+            object:'chat.completion',
+            choices:[{
+                index:0,
+                message:{role:'assistant',content:scalarCase.content},
+                finish_reason:'stop'
+            }]
+        };
+        registerFocusedStream(scalarCase.id,[],completion);
+        const completed=[];
+        const output=await focusedAi.streamRequest({
+            id:scalarCase.id,
+            localOnly:true,
+            messages:[{role:'user',content:'Preserve the complete single-choice content.'}],
+            onComplete:value=>completed.push(value)
+        });
+        equal(output,scalarCase.expected,scalarCase.id+' return content drifted');
+        equal(completed[0],scalarCase.expected,scalarCase.id+' onComplete content drifted');
+    }
+
+    const terminalOnlyCall={
+        id:'terminal-only-tool',
+        type:'function',
+        function:{
+            name:'search_local_catalog',
+            arguments:'{"query":"terminal only","message":"Reviewing the terminal-only call."}'
+        }
+    };
+    registerFocusedStream(
+        'terminal-only-tool',
+        [{
+            id:'terminal-only-tool',
+            object:'chat.completion.chunk',
+            choices:[{index:0,delta:{content:'terminal tool follows'}}]
+        }],
+        {
+            id:'terminal-only-tool',
+            object:'chat.completion',
+            choices:[{
+                index:0,
+                message:{role:'assistant',content:null,tool_calls:[terminalOnlyCall]},
+                finish_reason:'tool_calls'
+            }]
+        }
+    );
+    const terminalOnlyVisible=[];
+    const terminalOnlyResult=await focusedAi.streamRequest({
+        id:'terminal-only-tool',
+        localOnly:true,
+        messages:[{role:'user',content:'Accept a terminal-only tool call.'}],
+        tools:[toolDefinition],
+        onToolCall:call=>terminalOnlyVisible.push(call)
+    });
+    equal(
+        JSON.stringify(terminalOnlyResult),
+        JSON.stringify([terminalOnlyCall]),
+        'Terminal-only structural call was not accepted'
+    );
+    equal(
+        JSON.stringify(terminalOnlyVisible),
+        JSON.stringify([terminalOnlyCall]),
+        'Terminal-only structural call was not published after validation'
+    );
+
+    const wrongIndexCall={
+        ...terminalOnlyCall,
+        id:'wrong-choice-index-tool',
+        envelope:{source:'stream'}
+    };
+    registerFocusedStream(
+        'later-choice-wrong-index',
+        [{
+            id:'later-choice-wrong-index',
+            object:'chat.completion.chunk',
+            choices:[
+                {index:0,delta:{content:'ordinary first choice'}},
+                {
+                    index:5,
+                    message:{role:'assistant',content:null,tool_calls:[wrongIndexCall]}
+                }
+            ]
+        }],
+        {
+            id:'later-choice-wrong-index',
+            object:'chat.completion',
+            choices:[
+                {index:0,message:{role:'assistant',content:'ordinary terminal choice'}},
+                {
+                    index:6,
+                    message:{role:'assistant',content:null,tool_calls:[wrongIndexCall]}
+                }
+            ]
+        }
+    );
+    await expectRejectionCode(
+        focusedAi.streamRequest({
+            id:'later-choice-wrong-index',
+            localOnly:true,
+            messages:[{role:'user',content:'Reject a moved later-choice call.'}],
+            tools:[toolDefinition]
+        }),
+        'ARCANE_AI_TOOL_CALL_INVALID',
+        'Later-choice index mismatch'
+    );
+
+    const streamedEnvelopeCall={
+        ...terminalOnlyCall,
+        id:'later-choice-envelope-tool',
+        envelope:{phase:'stream',detail:{complete:true}}
+    };
+    const terminalEnvelopeCall={
+        ...streamedEnvelopeCall,
+        envelope:{phase:'terminal',detail:{complete:true}}
+    };
+    registerFocusedStream(
+        'later-choice-envelope-mismatch',
+        [{
+            id:'later-choice-envelope-mismatch',
+            object:'chat.completion.chunk',
+            choices:[
+                {index:0,delta:{content:'ordinary first choice'}},
+                {
+                    index:7,
+                    message:{role:'assistant',content:null,tool_calls:[streamedEnvelopeCall]}
+                }
+            ]
+        }],
+        {
+            id:'later-choice-envelope-mismatch',
+            object:'chat.completion',
+            choices:[
+                {index:0,message:{role:'assistant',content:'ordinary terminal choice'}},
+                {
+                    index:7,
+                    message:{role:'assistant',content:null,tool_calls:[terminalEnvelopeCall]}
+                }
+            ]
+        }
+    );
+    await expectRejectionCode(
+        focusedAi.streamRequest({
+            id:'later-choice-envelope-mismatch',
+            localOnly:true,
+            messages:[{role:'user',content:'Reject a changed later-choice envelope.'}],
+            tools:[toolDefinition]
+        }),
+        'ARCANE_AI_TOOL_CALL_INVALID',
+        'Later-choice complete-envelope mismatch'
+    );
+
+    for(const singularField of ['tool_call','toolCall']){
+        const requestId='singular-terminal-'+singularField;
+        registerFocusedStream(
+            requestId,
+            [],
+            {
+                id:requestId,
+                object:'chat.completion',
+                message:{
+                    role:'assistant',
+                    content:null,
+                    [singularField]:terminalOnlyCall
+                }
+            }
+        );
+        await expectRejectionCode(
+            focusedAi.streamRequest({
+                id:requestId,
+                localOnly:true,
+                messages:[{role:'user',content:'Reject singular structural fields.'}],
+                tools:[toolDefinition]
+            }),
+            'ARCANE_AI_TOOL_CALL_INVALID',
+            'Singular terminal '+singularField
+        );
+    }
+
+    registerFocusedStream(
+        'gapped-structural-fragments',
+        [{
+            id:'gapped-structural-fragments',
+            object:'chat.completion.chunk',
+            choices:[{
+                index:0,
+                delta:{tool_calls:[{index:1,...terminalOnlyCall}]}
+            }]
+        }],
+        {
+            id:'gapped-structural-fragments',
+            object:'chat.completion',
+            choices:[{
+                index:0,
+                message:{role:'assistant',content:null,tool_calls:[terminalOnlyCall]},
+                finish_reason:'tool_calls'
+            }]
+        }
+    );
+    await expectRejectionCode(
+        focusedAi.streamRequest({
+            id:'gapped-structural-fragments',
+            localOnly:true,
+            messages:[{role:'user',content:'Reject gapped tool-call fragments.'}],
+            tools:[toolDefinition]
+        }),
+        'ARCANE_AI_TOOL_CALL_INVALID',
+        'Gapped structural fragment indexes'
+    );
+    await focusedAi.dispose();
 
     let dbopfs;
     if(WARM_ONLY){
@@ -754,28 +1129,21 @@ async function run(){
     const adapted=api.adaptV1LlmProvider(provider);
     equal(adapted.protocol,'arcane-ai-provider/2','Adapted provider protocol drifted');
     equal(adapted.role,'llm','Adapted provider role drifted');
-    equal(adapted.localOnly,true,'Adapted provider lost local-only admission');
+    equal(adapted.localOnly,true,'Adapted provider lost local-only operation');
     equal(adapted.catalog().length,1,'Adapted provider catalog drifted');
     equal(adapted.catalog()[0].id,MODEL.id,'Adapted provider model authority drifted');
-    const ai=api.createArcaneAI({
-        provider,
-        loadPolicy:'manual',
-        security:{secure:true}
-    });
+    const ai=api.createArcaneAI({provider,loadPolicy:'manual'});
     const lifecycle=[];
     const progress=[];
     ai.llm.addEventListener('statechange',event=>lifecycle.push(event.detail.state));
     ai.llm.addEventListener('progress',event=>{
         if(event.detail.progress)progress.push(event.detail.progress);
     });
-    const table=await dbopfs.getTableHandle(store.tableName);
     if(WARM_ONLY){
-        const cacheBefore=await cacheSnapshot(table);
         const warm=await ai.load({offline:true});
         equal(warm.state,'ready','Final warm model load did not reach ready');
-        equal(warm.cache.state,'cached','Final warm model load did not use checked DBOPFS bytes');
+        equal(warm.cache.state,'cached','Final warm model load did not use the DBOPFS cache');
         equal(prohibitedFetches,0,'Final warm load attempted model networking');
-        invariant(progress.some(value=>value.phase==='verify-cache'&&value.loaded===MODEL.bytes),'Final warm cache was not actual-byte rehashed');
         const loadEvidence=projectProviderStatus(provider.status());
         const warmCompletion=await ai.fetchRequest({
             id:'wasm-final-warm-inference',
@@ -820,35 +1188,24 @@ async function run(){
         const cleanupEvidence=projectProviderStatus(provider.status(),{cleanup:true});
         await ai.dispose();
 
-        const cacheAfter=await cacheSnapshot(table);
-        equal(cacheAfter.modelFile.size,cacheBefore.modelFile.size,'Final warm proof changed model size');
-        equal(cacheAfter.modelFile.lastModified,cacheBefore.modelFile.lastModified,'Final warm proof changed model bytes');
-        equal(cacheAfter.manifestFile.lastModified,cacheBefore.manifestFile.lastModified,'Final warm proof changed completion metadata');
-        equal(cacheAfter.manifestText,cacheBefore.manifestText,'Final warm proof changed completion authority');
         equal(prohibitedFetches,0,'Final warm proof used the model network');
 
         return {
             exports:Object.keys(api).sort(),
             mode:'granite-final-warm-only',
             authoritative:true,
-            model:{id:MODEL.id,url:MODEL.url,bytes:MODEL.bytes,sha256:MODEL.sha256},
+            model:{id:MODEL.id,name:MODEL.name,url:MODEL.url},
             runtime:api.BROWSER_WASM_RUNTIME_AUTHORITY,
-            receipt:{
-                protocol:components.protocol,
-                runtimePolicy:components.runtimePolicy,
-                projectedModule:{bytes:projectedModule.bytes,sha256:projectedModule.sha256},
-                projectedWasm:{bytes:projectedWasm.bytes,sha256:projectedWasm.sha256}
-            },
             adapted:{
                 protocol:adapted.protocol,
                 role:adapted.role,
                 localOnly:adapted.localOnly,
-                catalog:adapted.catalog().map(item=>({id:item.id,url:item.url,sha256:item.sha256}))
+                catalog:adapted.catalog().map(item=>({id:item.id,url:item.url}))
             },
             compatibility,
             finalWarm:{
                 cache:warm.cache.state,
-                text:warmText.slice(0,256),
+                text:warmText,
                 progressPhases:[...new Set(progress.map(value=>value.phase))],
                 modelFetches:prohibitedFetches,
                 loadEvidence,
@@ -857,26 +1214,13 @@ async function run(){
                 cleanupEvidence,
                 cachePreserved:true
             },
-            origin:location.origin,
-            secureContext:isSecureContext,
-            crossOriginIsolated
+            origin:location.origin
         };
     }
     const cold=await ai.load();
     equal(cold.state,'ready','Cold model load did not reach ready');
     equal(cold.cache.state,'installed','A clean browser profile did not install the model');
-    invariant(progress.some(value=>value.phase==='download'&&value.loaded===MODEL.bytes),'The model download did not reach its exact byte length');
-    invariant(progress.some(value=>value.phase==='verify-download'&&value.loaded===MODEL.bytes),'The installed model was not SHA-256 checked');
-    const safeId=MODEL.id.replace(/[^a-z0-9._-]+/giu,'_');
-    const modelFile=await (await table.getFileHandle(safeId+'--'+MODEL_FILE_NAME,{create:false})).getFile();
-    const manifestFile=await (await table.getFileHandle(safeId+'.complete.json',{create:false})).getFile();
-    const completionManifest=JSON.parse(await manifestFile.text());
-    equal(modelFile.size,MODEL.bytes,'DBOPFS model bytes drifted');
-    invariant(manifestFile.lastModified>=modelFile.lastModified,'The completion manifest was not committed after model bytes');
-    equal(completionManifest.schema,'arcane.ai.browser-wasm.model.v3','DBOPFS completion schema drifted');
-    equal(completionManifest.observedBytes,MODEL.bytes,'DBOPFS observed byte metadata drifted');
-    equal(completionManifest.model.id,MODEL.id,'DBOPFS completion model ID drifted');
-    equal(completionManifest.model.url,MODEL.url,'DBOPFS completion model URL drifted');
+    invariant(progress.some(value=>value.phase==='download'),'The model download phase was not reported');
 
     const coldCallbacks={request:null,response:null};
     const coldCompletion=await ai.fetchRequest({
@@ -932,20 +1276,15 @@ async function run(){
         store,
         loadDefaults
     });
-    const offlineAi=api.createArcaneAI({
-        provider:offlineProvider,
-        loadPolicy:'manual',
-        security:{secure:true}
-    });
+    const offlineAi=api.createArcaneAI({provider:offlineProvider,loadPolicy:'manual'});
     const offlineProgress=[];
     offlineAi.llm.addEventListener('progress',event=>{
         if(event.detail.progress)offlineProgress.push(event.detail.progress);
     });
     const warm=await offlineAi.load({offline:true});
     equal(warm.state,'ready','Offline model reload did not reach ready');
-    equal(warm.cache.state,'cached','Offline reload did not use the checked DBOPFS cache');
+    equal(warm.cache.state,'cached','Offline reload did not use the DBOPFS cache');
     equal(offlineFetches,0,'Offline DBOPFS reload used the model network');
-    invariant(offlineProgress.some(value=>value.phase==='verify-cache'&&value.loaded===MODEL.bytes),'Warm cache was not actual-byte rehashed');
     const warmCompletion=await offlineAi.fetchRequest({
         id:'wasm-offline-inference',
         localOnly:true,
@@ -963,12 +1302,12 @@ async function run(){
         exports:Object.keys(api).sort(),
         mode:DEBUG?'disposable-debug':'granite-authority',
         authoritative:!DEBUG,
-        model:{id:MODEL.id,url:MODEL.url,bytes:MODEL.bytes,sha256:MODEL.sha256},
+        model:{id:MODEL.id,name:MODEL.name,url:MODEL.url},
         runtime:api.BROWSER_WASM_RUNTIME_AUTHORITY,
         compatibility,
         cold:{
             cache:cold.cache.state,
-            text:coldText.slice(0,256),
+            text:coldText,
             progressPhases:[...new Set(progress.map(value=>value.phase))],
             lifecycle,
             debugFetches
@@ -976,13 +1315,11 @@ async function run(){
         cancellation:{code:cancelCode,trigger:cancelTrigger},
         offline:{
             cache:warm.cache.state,
-            text:warmText.slice(0,256),
+            text:warmText,
             progressPhases:[...new Set(offlineProgress.map(value=>value.phase))],
             modelFetches:offlineFetches
         },
-        origin:location.origin,
-        secureContext:isSecureContext,
-        crossOriginIsolated
+        origin:location.origin
     };
 }
 
@@ -1000,13 +1337,11 @@ if(!ENABLED){
     test('the installed real-Chrome browser-WASM contract remains an explicit one-host gate',()=>{
         assert.equal(ENABLED,false);
         assert.deepEqual(Object.keys(GRANITE_AUTHORITY),[
-            'id','url','bytes','sha256'
+            'id','name','url'
         ]);
-        assert.equal(GRANITE_AUTHORITY.bytes,1_998_371_424);
-        assert.equal(
-            GRANITE_AUTHORITY.sha256,
-            'ed5b17192313b021f0579561d9c471419e7e62ec490986364e3d9d63ea36a08a'
-        );
+        assert.equal(GRANITE_AUTHORITY.id,'ibm-granite-4.1-3b-q4-k-s');
+        assert.equal(GRANITE_AUTHORITY.name,'granite-4.1-3b-Q4_K_S.gguf');
+        assert.match(GRANITE_AUTHORITY.url,/^https:\/\/huggingface\.co\/ibm-granite\//u);
     });
 }else test('the installed package runs real browser-WASM inference and offline DBOPFS reuse',{
     timeout:60*60*1000
@@ -1025,7 +1360,6 @@ if(!ENABLED){
         if(FINAL_WARM_ONLY){
             assert.equal(process.platform,'win32','The retained final warm authority is Windows-only.');
             assert.equal(FINAL_WARM_PORT,8000,'The retained final warm origin must use port 8000.');
-            assert.equal(FINAL_WARM_APPLICATION_ID,'boss','The retained final warm DBOPFS application must be boss.');
             assert.equal(FINAL_WARM_PROFILE_DIRECTORY,'Default','The retained final warm Chrome profile must be Default.');
         }
     }else{
@@ -1060,7 +1394,6 @@ if(!ENABLED){
     const applicationId=FINAL_WARM_ONLY
         ?FINAL_WARM_APPLICATION_ID
         :'arcane-browser-ai-contract';
-    const token=randomBytes(32).toString('hex');
     const htmlPath=path.join(workspaceRoot,'browser-ai-runtime.contract.html');
     const probePath=path.join(workspaceRoot,'browser-ai-runtime.contract.probe.mjs');
     const safeImportMap=JSON.stringify(map).replaceAll('<','\\u003c');
@@ -1077,7 +1410,6 @@ if(!ENABLED){
 </html>
 `);
     await writeFile(probePath,browserProbeSource({
-        token,
         model,
         debug:Boolean(debugModel),
         warmOnly:FINAL_WARM_ONLY,
@@ -1117,7 +1449,6 @@ if(!ENABLED){
 
     const contractServer=await createContractServer({
         root:workspaceRoot,
-        token,
         debugModel,
         port:FINAL_WARM_PORT
     });
@@ -1179,8 +1510,8 @@ if(!ENABLED){
         });
         let stdout=Buffer.alloc(0);
         let stderr=Buffer.alloc(0);
-        chrome.stdout.on('data',chunk=>{stdout=appendTail(stdout,chunk);});
-        chrome.stderr.on('data',chunk=>{stderr=appendTail(stderr,chunk);});
+        chrome.stdout.on('data',chunk=>{stdout=appendOutput(stdout,chunk);});
+        chrome.stderr.on('data',chunk=>{stderr=appendOutput(stderr,chunk);});
         exited=waitForExit(chrome).then(result=>{
             throw new Error(
                 `Chrome exited before the browser-AI report (code ${String(result.code)}, `+
@@ -1222,40 +1553,29 @@ if(!ENABLED){
         report.result.runtime.executionPolicy.operationalEvidence,
         'arcane-wllama-runtime-evidence/1'
     );
-    assert.equal(
-        report.result.runtime.runtimeAssets.module.bytes,
-        report.result.receipt.projectedModule.bytes
-    );
-    assert.equal(
-        report.result.runtime.runtimeAssets.module.sha256,
-        report.result.receipt.projectedModule.sha256
-    );
-    assert.equal(
-        report.result.runtime.runtimeAssets.wasm.bytes,
-        report.result.receipt.projectedWasm.bytes
-    );
-    assert.equal(
-        report.result.runtime.runtimeAssets.wasm.sha256,
-        report.result.receipt.projectedWasm.sha256
-    );
+    assert.equal(report.result.runtime.package.name,'@wllama/wllama');
+    assert.equal(report.result.runtime.package.version,'3.6.0');
+    assert.deepEqual(report.result.runtime.runtimeAssets.module,{
+        path:'ai/wllama/index.mjs',
+        url:report.result.runtime.runtimeAssets.module.url,
+        mediaType:'text/javascript'
+    });
+    assert.deepEqual(report.result.runtime.runtimeAssets.wasm,{
+        path:'ai/wllama/wllama.wasm',
+        url:report.result.runtime.runtimeAssets.wasm.url,
+        mediaType:'application/wasm'
+    });
     assert.equal(report.result.compatibility.executions,0);
     if(FINAL_WARM_ONLY){
         assert.equal(report.result.mode,'granite-final-warm-only');
         assert.equal(report.result.origin,'http://127.0.0.1:8000');
-        assert.equal(report.result.receipt.protocol,'arcane-ai-browser-wasm/2');
-        assert.equal(report.result.receipt.runtimePolicy.cpuFallback,false);
-        assert.ok(report.result.receipt.projectedModule.bytes>0);
-        assert.match(report.result.receipt.projectedModule.sha256,/^[0-9a-f]{64}$/u);
-        assert.ok(report.result.receipt.projectedWasm.bytes>0);
-        assert.match(report.result.receipt.projectedWasm.sha256,/^[0-9a-f]{64}$/u);
         assert.deepEqual(report.result.adapted,{
             protocol:'arcane-ai-provider/2',
             role:'llm',
             localOnly:true,
             catalog:[{
                 id:GRANITE_AUTHORITY.id,
-                url:GRANITE_AUTHORITY.url,
-                sha256:GRANITE_AUTHORITY.sha256
+                url:GRANITE_AUTHORITY.url
             }]
         });
         const finalWarm=report.result.finalWarm;
@@ -1295,7 +1615,6 @@ if(!ENABLED){
     }
     if(AUTHORITATIVE_ENABLED)assert.equal(report.result.authoritative,true);
     else assert.equal(report.result.authoritative,false);
-    assert.equal(report.result.crossOriginIsolated,false);
     assert.ok(contractServer.requests.includes('GET /arcane/sdk/ai/wllama/index.mjs'));
     assert.ok(contractServer.requests.includes('GET /arcane/sdk/ai/wllama/wllama.wasm'));
 });

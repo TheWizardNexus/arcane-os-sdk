@@ -44,9 +44,12 @@ function parseFileValue(fileName='',textContent=''){
         case 'ndjson':
             value=[];
             for(const row of textContent.split('\n')){
+                if(!row.trim())continue;
                 try{
                     value.push(JSON.parse(row.trim()));
-                }catch{}
+                }catch{
+                    value.push(row);
+                }
             }
             break;
     }
