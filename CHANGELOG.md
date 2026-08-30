@@ -1,6 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
+
+- Preserved complete finite provider progress values and units as
+  informational state, including fractional and out-of-range observations,
+  while keeping the visual percentage bounded and exposing ARIA range values
+  only when the reported range is valid.
+- Preserved complete file selections, timelines, relationship graphs, source
+  content, message advisories, record passages, and date findings without
+  arbitrary count or character clipping, and surfaced malformed stored-review
+  data instead of silently replacing it.
+- Made workspace and scam-policy hardening explicitly opt in, with ordinary
+  complete workspace inputs and `secure:false` scam analysis remaining fully
+  functional without restrictive policy admission or frozen results.
+- Removed the product-owned `CaseEvidenceIndexer.js` module and
+  `TWiNPolicyDecision.js` entity from the shared runtime payload and generated
+  browser import map so application policy remains owned by each consumer.
 
 - Removed the unused `RevocableProjectionLedger.js` runtime artifact and its
   public contract. No authored SDK or Arcane OS application source consumes it,
