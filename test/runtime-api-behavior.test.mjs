@@ -51,6 +51,7 @@ import {
     formatAIRuntimeProgress
 } from '../runtime/arcane/modules/ComponentContracts.js';
 import ConfiguredAIChatSession from '../runtime/arcane/modules/ConfiguredAIChatSession.js';
+import DevelopmentWorkspace,{contextQuery,setupTaskId,workspaceRoot} from '../runtime/arcane/modules/DevelopmentWorkspace.js';
 import {normalizeContentAdvisory} from '../runtime/arcane/modules/MessageAdvisory.js';
 import PreferenceStore from '../runtime/arcane/modules/PreferenceStore.js';
 import {
@@ -59,6 +60,7 @@ import {
     findRulePassages
 } from '../runtime/arcane/modules/RecordPassageIndex.js';
 import RecordReviewStore from '../runtime/arcane/modules/RecordReviewStore.js';
+import {assessScamRisk} from '../runtime/arcane/modules/ScamRiskPolicy.js';
 
 const repositoryRoot=new URL('../',import.meta.url);
 
@@ -154,6 +156,42 @@ test('record review storage reports unreadable records and directory paths remai
         'utf8'
     );
     assert.doesNotMatch(source,/next\.length>4096|bounded plain text/);
+});
+
+test('development inputs remain complete and blocked-domain hardening is explicit',async()=>{
+    const root='C:/workspace/'+'.nested/'.repeat(800);
+    const query='complete context '.repeat(400);
+    const task='Application owned setup task / complete';
+    assert.equal(workspaceRoot(root),root);
+    assert.equal(contextQuery(query),query.trim());
+    assert.equal(setupTaskId(task),task);
+
+    const calls=[];
+    const workspace=new DevelopmentWorkspace({
+        inspect(value){calls.push(value);return value;},
+        context(){},
+        setup(){}
+    });
+    assert.equal(workspace.inspect(root),root);
+    assert.deepEqual(calls,[root]);
+
+    const networkPolicy={
+        schemaVersion:1,
+        generation:1,
+        domainRules:[{
+            id:'test-rule',
+            domain:'example.test',
+            reason:{code:'test',title:'Test',description:'Test policy'},
+            source:{id:'test',label:'Test',reference:null}
+        }],
+        networkRules:[]
+    };
+    const ordinary=assessScamRisk('Visit https://example.test',{networkPolicy});
+    assert.equal(ordinary.matches.some(match=>match.id==='blocked-domain'),false);
+    const selected=assessScamRisk('Visit https://example.test',{networkPolicy,secure:true});
+    assert.equal(selected.matches.some(match=>match.id==='blocked-domain'),true);
+    assert.equal(Object.isFrozen(selected),false);
+    assert.equal(Object.isFrozen(selected.matches),false);
 });
 
 test('preference setAll uses the admitted native atomic batch once',async()=>{

@@ -1,10 +1,6 @@
-const ROOT_MAX_LENGTH=4096;
-const QUERY_MAX_LENGTH=4096;
-const TASK_ID_PATTERN=/^[a-z][a-z0-9-]{0,63}$/;
-
 function workspaceRoot(value){
     const root=String(value??'').trim();
-    if(!root||root.length>ROOT_MAX_LENGTH||/[\u0000-\u001f]/.test(root)){
+    if(!root||/[\u0000-\u001f]/.test(root)){
         throw new TypeError('Choose one existing development workspace directory.');
     }
     return root;
@@ -12,16 +8,16 @@ function workspaceRoot(value){
 
 function contextQuery(value){
     const query=String(value??'').trim();
-    if(query.length>QUERY_MAX_LENGTH||/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(query)){
-        throw new TypeError('Development context queries must be bounded plain text.');
+    if(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(query)){
+        throw new TypeError('Development context queries must be plain text.');
     }
     return query;
 }
 
 function setupTaskId(value){
-    const taskId=String(value??'').trim().toLowerCase();
-    if(!TASK_ID_PATTERN.test(taskId)){
-        throw new TypeError('Choose a registered development setup task.');
+    const taskId=String(value??'').trim();
+    if(!taskId||/[\u0000-\u001f]/.test(taskId)){
+        throw new TypeError('Choose a development setup task.');
     }
     return taskId;
 }

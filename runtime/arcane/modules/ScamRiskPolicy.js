@@ -1,7 +1,7 @@
 import {analyzeRiskSignals} from './RiskSignalAnalyzer.js';
 import {canonicalNetworkHostname,emptyArcaneNetworkPolicy,findDeniedDomainRule,loadArcaneNetworkPolicy} from './ArcaneNetworkPolicy.js?v=3';
 
-export const scamRiskSignals=Object.freeze([
+export const scamRiskSignals=[
     {id:'urgency',label:'Urgency or secrecy pressure',weight:18,pattern:/\b(urgent|immediately|act now|do not tell|keep (?:this|it) secret|stay on the line)\b/i,guidance:'Pause. A legitimate organization will let you verify independently.'},
     {id:'payment',label:'Unusual payment request',weight:32,pattern:/\b(gift cards?|bitcoin|crypto(?:currency)?|wire transfer|cash courier|payment app|prepaid cards?)\b/i,guidance:'Do not pay. Contact the organization using a trusted number.'},
     {id:'credential',label:'Credential or access request',weight:35,pattern:/\b(password|passcode|verification code|one[- ]time code|otp|remote access|screen share)\b/i,guidance:'Never share security codes or grant remote access to an unexpected contact.'},
@@ -9,20 +9,20 @@ export const scamRiskSignals=Object.freeze([
     {id:'threat',label:'Threat or fear tactic',weight:28,pattern:/\b(arrest|warrant|deport|account (?:will be )?closed|service (?:will be )?cut off|in danger|kidnapped)\b/i,guidance:'Threats are designed to prevent careful checking. Stop and contact someone you trust.'},
     {id:'prize',label:'Unexpected prize or refund',weight:20,pattern:/\b(lottery|sweepstakes|prize|inheritance|refund|you(?: have|'ve) won)\b/i,guidance:'Do not pay a fee or disclose information to receive an unexpected benefit.'},
     {id:'link',label:'Pressure to open a link',weight:16,pattern:/\b(click|tap|open|visit|follow)\b.{0,36}\b(link|url|website)\b/i,guidance:'Do not use an unexpected link. Open the official app or type a trusted address yourself.'},
-]);
+];
 
-const blockedDomainSignal=Object.freeze({
+const blockedDomainSignal={
     id:'blocked-domain',
     label:'Domain blocked by Arcane network policy',
     weight:55,
     guidance:'Do not open or contact this domain. Arcane has a system-wide safety rule blocking it.',
-});
+};
 let activeNetworkPolicy=emptyArcaneNetworkPolicy();
 let activeNetworkPolicyLoadSequence=0;
 let nextNetworkPolicyLoadSequence=0;
 
 function candidateHostnames(value){
-    const text=String(value??'').normalize('NFKC').slice(0,20_000),hostnames=new Set();
+    const text=String(value??'').normalize('NFKC'),hostnames=new Set();
     const add=value=>{
         const candidate=String(value).replace(/^[([{<'"]+|[\])}>'",.;!?]+$/g,'');
         try{
@@ -46,13 +46,14 @@ export async function loadScamNetworkPolicy(options){
     return networkPolicy;
 }
 
-export function assessScamRisk(text,{networkPolicy=activeNetworkPolicy}={}){
+export function assessScamRisk(text,{networkPolicy=activeNetworkPolicy,secure=false}={}){
     const result=analyzeRiskSignals(text,{signals:scamRiskSignals});
+    if(secure!==true)return result;
     let blocked=false;
     for(const hostname of candidateHostnames(text)){if(findDeniedDomainRule(networkPolicy,hostname)){blocked=true;break;}}
     if(!blocked)return result;
     const score=Math.min(100,result.score+blockedDomainSignal.weight);
-    return Object.freeze({...result,score,level:levelForScore(score),matches:Object.freeze([...result.matches,blockedDomainSignal])});
+    return {...result,score,level:levelForScore(score),matches:[...result.matches,blockedDomainSignal]};
 }
 
 export function scamSafetyGuidance(result){

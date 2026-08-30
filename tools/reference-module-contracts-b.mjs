@@ -419,7 +419,7 @@ console.log(analyzeRiskSignals('Send a gift card now.', {
         name:'ScamRiskPolicy.js',
         classification:'public-first-party',
         lifecycleSideEffects:'assessScamRisk() and guidance are pure against the selected policy. loadScamNetworkPolicy() fetches/normalizes the static Arcane network policy and updates module-global active policy only when generation/load ordering wins.',
-        paramsResults:'scamRiskSignals; loadScamNetworkPolicy(options) resolves a network policy. assessScamRisk(text,{networkPolicy=active}) returns a frozen risk result and adds a 55-point blocked-domain signal when applicable. scamSafetyGuidance(result) returns an action string.',
+        paramsResults:'scamRiskSignals; loadScamNetworkPolicy(options) resolves a network policy. assessScamRisk(text,{networkPolicy=active,secure=false}) returns a complete mutable risk result; only an explicit secure:true selection applies blocked-domain policy. scamSafetyGuidance(result) returns an action string.',
         events:[],
         errors:['Policy fetch/validation errors propagate from ArcaneNetworkPolicy.','Assessment itself has no coded errors.'],
         capabilitiesCore:'None; the default policy is a bundled read-only JSON fetch, not Core firewall authority.',

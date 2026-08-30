@@ -633,10 +633,10 @@
         "setupTaskId",
         "workspaceRoot"
       ],
-      "summary": "Provides bounded workspace inspection, context, setup task, and Node installer clients without arbitrary command execution.",
+      "summary": "Provides complete workspace inspection, context, setup task, and Node installer clients without arbitrary command execution.",
       "availability": "Native bridge",
       "protocol": "Arcane.development",
-      "normalization": "Inputs normalized; provider result/error preserved.",
+      "normalization": "Complete plain-text inputs and provider result/error preserved.",
       "surface": "default `DevelopmentWorkspace` and input validators; `inspect()`, `context()`, `setup()`, `installNode()`."
     },
     {
@@ -1162,10 +1162,10 @@
         "scamRiskSignals",
         "scamSafetyGuidance"
       ],
-      "summary": "Combines deterministic scam signals with Arcane blocked-domain evidence and safety guidance.",
+      "summary": "Combines deterministic scam signals with optional Arcane blocked-domain evidence and safety guidance.",
       "availability": "Cross-host",
       "protocol": "Arcane network policy fetch",
-      "normalization": "Fully normalized.",
+      "normalization": "Complete mutable results; blocked-domain policy requires secure:true.",
       "surface": "Signals plus load, assess, and guidance helpers."
     },
     {

@@ -577,8 +577,8 @@ console.log(await result);`
         lifecycleSideEffects:'The client itself performs no discovery; inspect, context, setup, and installNode delegate only to an injected or Arcane.development provider.',
         paramsResults:'DevelopmentWorkspace(api) reports available and nodeInstallerAvailable. inspect(root), context(root, query), setup(root, taskId), and installNode() preserve complete provider results.',
         events:[],
-        errors:['TypeError for an invalid root, query, or task id','unavailable capability Error','provider errors preserved'],
-        capabilitiesCore:'Native development-capability wrapper; the provider owns filesystem authorization, canonical paths, filtering, the setup allowlist, and fixed Node installer, with no arbitrary-command API.',
+        errors:['TypeError for missing or malformed-control-character root, query, or task id','unavailable capability Error','provider errors preserved'],
+        capabilitiesCore:'Native development-capability wrapper; the provider owns filesystem authorization, canonical paths, filtering, setup-task interpretation, and the fixed Node installer, with no arbitrary-command API.',
         example:`const workspace=new DevelopmentWorkspace({
     inspect:async root=>({root}),
     context:async(root,query)=>({root,query}),

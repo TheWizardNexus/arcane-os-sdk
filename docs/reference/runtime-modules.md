@@ -75,7 +75,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`DBOPFS.js`](#dbopfsjs) | esm | Provides app-scoped OPFS tables, worker I/O, backup/restore, compression, and CRUD/batch APIs. | Browser / native WebView | App scope and recognized file parsing normalized; nonblank unreadable JSONL rows and DOM/storage errors are preserved. |
 | [`DBOPFSDocumentLibrary.js`](#dbopfsdocumentlibraryjs) | esm | Bootstraps and searches an app-defined DBOPFS corpus and builds complete chat context. | Browser or compatible DBOPFS host | Existing DBOPFS semantics; generation completion and complete search only after the app calls it or wires its context builder. |
 | [`DBOPFSWorker.js`](#dbopfsworkerjs) | worker | Serializes OPFS sync-handle read/write requests from a MessagePort. | Dedicated worker | Responses normalize to `{success,fileData?}` or `{error:{name,message}}`. |
-| [`DevelopmentWorkspace.js`](#developmentworkspacejs) | esm | Provides complete workspace inspection, context, setup task, and Node installer clients without arbitrary command execution. | Native bridge | Inputs normalized; complete provider result/error preserved. |
+| [`DevelopmentWorkspace.js`](#developmentworkspacejs) | esm | Provides complete workspace inspection, context, setup task, and Node installer clients without arbitrary command execution. | Native bridge | Complete plain-text inputs and provider result/error preserved. |
 | [`DirectoryPicker.js`](#directorypickerjs) | esm | Wraps the provider-owned native directory chooser and normalizes selected/cancelled/error results. | Native bridge | Strict normalized selection and coded errors. |
 | [`DocumentLexicalSearch.js`](#documentlexicalsearchjs) | esm | Provides dependency-free deterministic metadata/body ranking and complete excerpts. | Cross-host | Mutable complete results with no storage, provider, or network side effects. |
 | [`DocumentNavigation.js`](#documentnavigationjs) | esm | Binds document navigation, filtering, history, current-item reveal, and load initialization. | Browser / native WebView | Normalized filter/navigation state; DOM effects preserved. |
@@ -107,7 +107,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`RecordReviewStore.js`](#recordreviewstorejs) | esm | Stores normalized record-review decisions through native storage or app-scoped local fallback. | Browser/native hybrid | Complete records preserved; unreadable stored content fails observably. |
 | [`RevocableProjectionLedger.js`](#revocableprojectionledgerjs) | esm | Implements an append-only complete in-memory projection/revocation ledger safe for malformed descriptor inputs. | Cross-host | Strict normalization with stable `ProjectionLedgerError`. |
 | [`RiskSignalAnalyzer.js`](#risksignalanalyzerjs) | esm | Matches configured risk signals and levels against complete text. | Cross-host | Fully normalized. |
-| [`ScamRiskPolicy.js`](#scamriskpolicyjs) | esm | Combines deterministic scam signals with Arcane blocked-domain evidence and safety guidance. | Cross-host | Fully normalized. |
+| [`ScamRiskPolicy.js`](#scamriskpolicyjs) | esm | Combines deterministic scam signals with optional Arcane blocked-domain evidence and safety guidance. | Cross-host | Complete mutable results; blocked-domain policy requires `secure:true`. |
 | [`ScopedOPFSCache.js`](#scopedopfscachejs) | esm | Provides a narrow exact-key JSON cache inside one app-owned OPFS namespace. | Browser / native WebView | Filename-safe keys, complete JSON values, and malformed-cache cleanup normalized; storage errors mixed. |
 | [`ScreenCapture.js`](#screencapturejs) | esm | Captures a display surface as image, video, or GIF with explicit lifecycle events. | Browser / native WebView | State/events normalized; permission and codec errors mixed. |
 | [`SpeechPlayback.js`](#speechplaybackjs) | esm | Preserves exact nonblank text as one speech segment, queues latest-request synthesis, and controls lookahead HTML audio playback. | Browser + native bridge | Exact input text and state normalized; provider/media failures mixed. |
@@ -1644,7 +1644,7 @@ Exact exports: `contextQuery`, `default`, `setupTaskId`, `workspaceRoot`.
 
 ### Availability and normalization
 
-**Native bridge.** Inputs normalized; provider result/error preserved. Transport: Arcane.development. [Deep protocol details](protocols.md).
+**Native bridge.** Complete plain-text roots, queries, and application-owned task identifiers reach the provider without application length or task allowlist gates; provider result/error content is preserved. Transport: Arcane.development. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -2625,7 +2625,7 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Combines deterministic scam signals with Arcane blocked-domain evidence and safety guidance.
+Combines deterministic scam signals with optional Arcane blocked-domain evidence and safety guidance.
 
 ### Public surface
 
@@ -2635,7 +2635,7 @@ Exact exports: `assessScamRisk`, `loadScamNetworkPolicy`, `scamRiskSignals`, `sc
 
 ### Availability and normalization
 
-**Cross-host.** Fully normalized. Transport: Arcane network policy fetch. [Deep protocol details](protocols.md).
+**Cross-host.** Complete mutable signal results are returned. Blocked-domain policy inspection is inactive by default and runs only when the caller explicitly selects `secure:true`. Transport: In-process + optional caller-selected Arcane network policy fetch. [Deep protocol details](protocols.md).
 
 ### Example
 
