@@ -1,12 +1,7 @@
-const TITLE_MAX_LENGTH=160;
-const PATH_MAX_LENGTH=4096;
-const CONTROL_CHARACTERS=/[\u0000-\u001f\u007f]/;
-
-function isPlainRecord(value){
+function isRecord(value){
     return Boolean(value)
         &&typeof value==='object'
-        &&!Array.isArray(value)
-        &&Object.getPrototypeOf(value)===Object.prototype;
+        &&!Array.isArray(value);
 }
 
 function coded(error,code){
@@ -14,37 +9,27 @@ function coded(error,code){
     return error;
 }
 
-function optionalText(value,label,maximum){
-    if(value===undefined||value===null||value==='') return null;
+function optionalText(value,label){
+    if(value===undefined||value===null) return value;
     if(typeof value!=='string') throw new TypeError(`${label} must be a string when provided.`);
-    const normalized=value.trim();
-    if(!normalized) return null;
-    if(normalized.length>maximum) throw new RangeError(`${label} exceeds ${maximum} characters.`);
-    if(CONTROL_CHARACTERS.test(normalized)) throw new TypeError(`${label} cannot contain control characters.`);
-    return normalized;
+    return value;
 }
 
 function normalizeDirectoryPickerOptions(input={}){
-    if(!isPlainRecord(input)) throw new TypeError('Directory picker options must be a plain object.');
-    const allowed=new Set(['initialPath','title']);
-    const unsupported=Object.keys(input).find(key=>!allowed.has(key));
-    if(unsupported) throw new TypeError(`Unsupported directory picker option: ${unsupported}`);
-
-    const title=optionalText(input.title,'title',TITLE_MAX_LENGTH);
-    const initialPath=optionalText(input.initialPath,'initialPath',PATH_MAX_LENGTH);
-    return Object.freeze({
-        ...(title?{title}:{}),
-        ...(initialPath?{initialPath}:{}),
-    });
+    if(!isRecord(input)) throw new TypeError('Directory picker options must be an object.');
+    const normalized={...input};
+    if(Object.prototype.hasOwnProperty.call(input,'title')){
+        normalized.title=optionalText(input.title,'title');
+    }
+    if(Object.prototype.hasOwnProperty.call(input,'initialPath')){
+        normalized.initialPath=optionalText(input.initialPath,'initialPath');
+    }
+    return normalized;
 }
 
 function normalizeDirectorySelection(input){
-    const keys=isPlainRecord(input)?Object.keys(input):[];
     if(
-        !isPlainRecord(input)
-        ||keys.length!==2
-        ||!keys.includes('cancelled')
-        ||!keys.includes('path')
+        !isRecord(input)
         ||typeof input.cancelled!=='boolean'
     ){
         throw coded(
@@ -53,17 +38,15 @@ function normalizeDirectorySelection(input){
         );
     }
     if(input.cancelled){
-        if(input.path!==null){
-            throw coded(
-                new TypeError('A canceled directory selection must return a null path.'),
-                'DIRECTORY_PICKER_INVALID_RESULT',
-            );
-        }
-        return Object.freeze({cancelled:true,path:null});
+        return {
+            ...input,
+            cancelled:true,
+            path:input.path===undefined?null:input.path,
+        };
     }
     let path;
     try{
-        path=optionalText(input.path,'The selected directory path',PATH_MAX_LENGTH);
+        path=optionalText(input.path,'The selected directory path');
     }catch(error){
         throw coded(error,'DIRECTORY_PICKER_INVALID_RESULT');
     }
@@ -73,7 +56,7 @@ function normalizeDirectorySelection(input){
             'DIRECTORY_PICKER_INVALID_RESULT',
         );
     }
-    return Object.freeze({cancelled:false,path});
+    return {...input,cancelled:false,path};
 }
 
 /**
@@ -81,7 +64,8 @@ function normalizeDirectorySelection(input){
  *
  * This wrapper does not enumerate directories, persist a selected path, or use
  * a browser file picker. The injected provider must expose
- * `selectDirectory(options)` and return `{cancelled, path}`.
+ * `selectDirectory(options)` and return a record with `cancelled` and `path`.
+ * Caller options and additional provider result fields pass through unchanged.
  */
 export default class DirectoryPicker{
     constructor(provider=globalThis.Arcane?.filesystem){

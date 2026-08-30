@@ -75,7 +75,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`DBOPFSDocumentLibrary.js`](#dbopfsdocumentlibraryjs) | esm | Bootstraps and searches an app-defined DBOPFS corpus and builds complete chat context. | Browser or compatible DBOPFS host | Existing DBOPFS semantics; generation completion and complete search only after the app calls it or wires its context builder. |
 | [`DBOPFSWorker.js`](#dbopfsworkerjs) | worker | Serializes OPFS sync-handle read/write requests from a MessagePort. | Dedicated worker | Responses normalize to `{success,fileData?}` or `{error:{name,message}}`. |
 | [`DevelopmentWorkspace.js`](#developmentworkspacejs) | esm | Provides complete workspace inspection, context, setup task, and Node installer clients without arbitrary command execution. | Native bridge | Complete plain-text inputs and provider result/error preserved. |
-| [`DirectoryPicker.js`](#directorypickerjs) | esm | Wraps the provider-owned native directory chooser and normalizes selected/cancelled/error results. | Native bridge | Strict normalized selection and coded errors. |
+| [`DirectoryPicker.js`](#directorypickerjs) | esm | Wraps the provider-owned native directory chooser and normalizes selected/cancelled/error results. | Native bridge | Complete mutable caller options and provider result fields; coded cancellation and malformed-result errors. |
 | [`DocumentLexicalSearch.js`](#documentlexicalsearchjs) | esm | Provides dependency-free deterministic metadata/body ranking and complete excerpts. | Cross-host | Mutable complete results with no storage, provider, or network side effects. |
 | [`DocumentNavigation.js`](#documentnavigationjs) | esm | Binds document navigation, filtering, history, current-item reveal, and load initialization. | Browser / native WebView | Normalized filter/navigation state; DOM effects preserved. |
 | [`Errors.js`](#errorsjs) | esm | Normalizes global errors/rejections, fingerprints and deduplicates incidents, persists a complete ledger, and performs complete delivery. | Browser / native WebView hybrid | Incident records normalized; storage/mail failures isolated. |
@@ -1640,7 +1640,12 @@ Exact exports: `default`, `normalizeDirectoryPickerOptions`, `normalizeDirectory
 
 ### Availability and normalization
 
-**Native bridge.** Strict normalized selection and coded errors. Transport: Arcane.filesystem.selectDirectory. [Deep protocol details](protocols.md).
+**Native bridge.** Every caller option and provider result field is preserved.
+`title`, `initialPath`, and a selected `path` remain complete strings without
+trimming or application character gates, and returned records remain mutable.
+The provider or operating system owns any platform-specific path failure.
+Cancellation and malformed provider results retain coded errors. Transport:
+Arcane.filesystem.selectDirectory. [Deep protocol details](protocols.md).
 
 ### Example
 

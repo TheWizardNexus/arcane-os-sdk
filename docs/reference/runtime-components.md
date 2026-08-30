@@ -541,7 +541,12 @@ Shared dependencies: [`DirectoryPicker.js`](runtime-modules.md#directorypickerjs
 
 ### Availability and normalization
 
-**Browser and supported native WebViews.** Complete plain-text directory paths and native selection/error content are preserved without an application character cap; malformed control-character paths still fail honestly. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app's capabilities. [Deep protocol details](protocols.md).
+**Browser and supported native WebViews.** Complete directory paths and native
+selection/error content are preserved without trimming, character caps, or a
+generic control-character gate. The provider or operating system owns any
+platform-specific path failure. HTMLImport + DOM; injected Arcane/provider
+modules where listed. Native methods remain subject to the bound app's
+capabilities. [Deep protocol details](protocols.md).
 
 ### Example
 

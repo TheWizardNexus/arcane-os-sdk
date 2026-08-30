@@ -579,9 +579,9 @@ console.log(await workspace.inspect('C:\\\\Projects\\\\demo'));`
         name:'DirectoryPicker.js',
         classification:'public-first-party',
         lifecycleSideEffects:'select opens one provider-owned operating-system directory chooser; it never enumerates directories, persists paths, or invokes a browser file picker.',
-        paramsResults:'DirectoryPicker(provider).select({title, initialPath}) sends bounded normalized options to selectDirectory and returns exactly frozen {cancelled, path}. normalizeDirectoryPickerOptions and normalizeDirectorySelection are public pure helpers.',
+        paramsResults:'DirectoryPicker(provider).select(options) preserves every caller option, passes complete title and initialPath strings unchanged, and preserves every provider result field while normalizing cancelled and path. Returned option and result records remain mutable. normalizeDirectoryPickerOptions and normalizeDirectorySelection are public pure helpers.',
         events:[],
-        errors:['DIRECTORY_PICKER_UNAVAILABLE','DIRECTORY_PICKER_INVALID_RESULT','TypeError or RangeError for invalid options'],
+        errors:['DIRECTORY_PICKER_UNAVAILABLE','DIRECTORY_PICKER_INVALID_RESULT','TypeError for non-object options or non-string title and initialPath values'],
         capabilitiesCore:'Normalized native Arcane.filesystem.selectDirectory wrapper, not a Core filesystem browser.',
         example:`const picker=new DirectoryPicker({
     selectDirectory:async options=>({cancelled:false,path:'/workspace'})

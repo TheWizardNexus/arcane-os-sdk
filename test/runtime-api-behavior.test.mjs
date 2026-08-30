@@ -52,6 +52,10 @@ import {
 } from '../runtime/arcane/modules/ComponentContracts.js';
 import ConfiguredAIChatSession from '../runtime/arcane/modules/ConfiguredAIChatSession.js';
 import DevelopmentWorkspace,{contextQuery,setupTaskId,workspaceRoot} from '../runtime/arcane/modules/DevelopmentWorkspace.js';
+import {
+    normalizeDirectoryPickerOptions,
+    normalizeDirectorySelection
+} from '../runtime/arcane/modules/DirectoryPicker.js';
 import {normalizeContentAdvisory} from '../runtime/arcane/modules/MessageAdvisory.js';
 import PreferenceStore from '../runtime/arcane/modules/PreferenceStore.js';
 import {
@@ -155,7 +159,48 @@ test('record review storage reports unreadable records and directory paths remai
         new URL('runtime/arcane/components/directory-picker.html',repositoryRoot),
         'utf8'
     );
-    assert.doesNotMatch(source,/next\.length>4096|bounded plain text/);
+    assert.doesNotMatch(source,/next\.length>4096|bounded plain text|control characters/u);
+});
+
+test('directory picker preserves complete options and provider results',async()=>{
+    const path='  /workspace/\u0001/complete path  ';
+    const options={
+        initialPath:path,
+        title:'  Complete picker title  ',
+        providerExtension:{purpose:'complete provider option'}
+    };
+    const normalizedOptions=normalizeDirectoryPickerOptions(options);
+    assert.deepEqual(normalizedOptions,options);
+    assert.equal(Object.isFrozen(normalizedOptions),false);
+    assert.deepEqual(
+        normalizeDirectoryPickerOptions({title:'',initialPath:null}),
+        {title:'',initialPath:null}
+    );
+
+    const selected=normalizeDirectorySelection({
+        cancelled:false,
+        path,
+        providerExtension:{purpose:'complete provider result'}
+    });
+    assert.equal(selected.path,path);
+    assert.deepEqual(
+        selected.providerExtension,
+        {purpose:'complete provider result'}
+    );
+    assert.equal(Object.isFrozen(selected),false);
+
+    const cancelled=normalizeDirectorySelection({
+        cancelled:true,
+        reason:'provider-owned cancellation detail'
+    });
+    assert.deepEqual(
+        cancelled,
+        {
+            cancelled:true,
+            reason:'provider-owned cancellation detail',
+            path:null
+        }
+    );
 });
 
 test('development inputs remain complete and blocked-domain hardening is explicit',async()=>{

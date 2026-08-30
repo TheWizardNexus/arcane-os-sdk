@@ -630,7 +630,7 @@
       "summary": "Wraps the provider-owned native directory chooser and normalizes selected/cancelled/error results.",
       "availability": "Native bridge",
       "protocol": "Arcane.filesystem.selectDirectory",
-      "normalization": "Strict normalized selection and coded errors.",
+      "normalization": "Complete mutable caller options and provider result fields; coded cancellation and malformed-result errors.",
       "surface": "default `DirectoryPicker`, `normalizeDirectoryPickerOptions()`, `normalizeDirectorySelection()`."
     },
     {
