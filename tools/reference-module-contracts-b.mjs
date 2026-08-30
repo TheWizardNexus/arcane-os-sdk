@@ -379,29 +379,6 @@ await store.load();
 console.log(await store.set('A1000',{status:'reviewed',notes:'Checked.'}));`
     },
     {
-        name:'RevocableProjectionLedger.js',
-        classification:'public-first-party',
-        lifecycleSideEffects:'Append-only bounded page-memory ledger; async methods complete in-process. It never persists, communicates, authorizes, or executes payloads. Every accepted projection reserves budget for a later revocation; the port adapter is a frozen validated facade.',
-        paramsResults:'new Ledger({capacity?,maximumStoredCharacters?,maximumStoredUtf8Bytes?,maximumStoredNodes?}); appendProjection(exact {sourceKey,targetKey,identity,payload}) and appendRevocation(exact {projectionId,payload}) return status results. Lookup/list methods return cloned records. Helpers clone values, fingerprint values, and create a port adapter. Statuses: active-target-conflict, already-revoked, capacity-reached, exists, not-found, revoked, source-conflict, source-revoked, stored.',
-        events:[],
-        errors:['ProjectionLedgerError with reasonCode INVALID_INPUT for unsafe, non-JSON-like, unknown, missing, or over-limit boundary input.','Unexpected invariant or native allocation errors are uncoded.'],
-        capabilitiesCore:'None; explicit port transport does not grant Core authority.',
-        example:String.raw`import Ledger from '/arcane/modules/RevocableProjectionLedger.js';
-
-const ledger = new Ledger({capacity:2});
-const stored = await ledger.appendProjection({
-    sourceKey:'record:A1000',
-    targetKey:'view:summary',
-    identity:{recordId:'A1000'},
-    payload:{text:'Summary'}
-});
-const revoked = await ledger.appendRevocation({
-    projectionId:stored.record.id,
-    payload:{reason:'superseded'}
-});
-console.log(stored.status, revoked.status);`
-    },
-    {
         name:'RiskSignalAnalyzer.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure NFKC scan of the complete supplied text; resets each supplied RegExp lastIndex before testing and does not mutate the input.',

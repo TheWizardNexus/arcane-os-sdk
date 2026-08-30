@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Removed the unused `RevocableProjectionLedger.js` runtime artifact and its
+  public contract. No authored SDK or Arcane OS application source consumes it,
+  and its mandatory capacity, character, UTF-8 byte, and node budgets,
+  fingerprinting, freezing, and pristine-descriptor admission conflict with the
+  ordinary functional baseline.
+
 ## 0.3.6
 
 - Replaced coherent selected-but-unregistered STT and TTS placeholders during

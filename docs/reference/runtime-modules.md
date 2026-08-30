@@ -104,7 +104,6 @@ own asynchronous work, cancellation, and backpressure.
 | [`RecordLinkIndex.js`](#recordlinkindexjs) | esm | Parses record links and builds their normalized index. | Cross-host | Fully normalized. |
 | [`RecordPassageIndex.js`](#recordpassageindexjs) | esm | Indexes text lines, page markers, dates, rules, and excerpts for record review. | Cross-host | Fully normalized. |
 | [`RecordReviewStore.js`](#recordreviewstorejs) | esm | Stores normalized record-review decisions through native storage or app-scoped local fallback. | Browser/native hybrid | Complete records preserved; unreadable stored content fails observably. |
-| [`RevocableProjectionLedger.js`](#revocableprojectionledgerjs) | esm | Implements an append-only complete in-memory projection/revocation ledger safe for malformed descriptor inputs. | Cross-host | Strict normalization with stable `ProjectionLedgerError`. |
 | [`RiskSignalAnalyzer.js`](#risksignalanalyzerjs) | esm | Matches configured risk signals and levels against complete text. | Cross-host | Fully normalized. |
 | [`ScamRiskPolicy.js`](#scamriskpolicyjs) | esm | Combines deterministic scam signals with optional Arcane blocked-domain evidence and safety guidance. | Cross-host | Complete mutable results; blocked-domain policy requires `secure:true`. |
 | [`ScopedOPFSCache.js`](#scopedopfscachejs) | esm | Provides a narrow exact-key JSON cache inside one app-owned OPFS namespace. | Browser / native WebView | Filename-safe keys, complete JSON values, and malformed-cache cleanup normalized; storage errors mixed. |
@@ -2541,31 +2540,6 @@ Exact exports: `RECORD_REVIEW_STORE_ERROR_CODES`,
 
 ```javascript
 import * as module from '/arcane/modules/RecordReviewStore.js';
-
-console.log(Object.keys(module));
-```
-
-## RevocableProjectionLedger.js
-
-### Overview
-
-Implements an append-only in-memory projection/revocation ledger for normalized descriptor inputs.
-
-### Public surface
-
-Ledger classes, status/reason constants, clone/fingerprint/port helpers, append/query/list APIs.
-
-Exact exports follow the current runtime module inventory. Legacy limit constants,
-when retained for compatibility, do not cap or truncate stored content.
-
-### Availability and normalization
-
-**Cross-host.** Strict normalization with stable `ProjectionLedgerError`. Transport: In-process or explicit port adapter. [Deep protocol details](protocols.md).
-
-### Example
-
-```javascript
-import * as module from '/arcane/modules/RevocableProjectionLedger.js';
 
 console.log(Object.keys(module));
 ```

@@ -13,9 +13,9 @@
     },
     "protocol": "arcane/1"
   },
-  "artifactCount": 85,
-  "javascriptArtifactCount": 83,
-  "esmExportCount": 370,
+  "artifactCount": 84,
+  "javascriptArtifactCount": 82,
+  "esmExportCount": 352,
   "artifacts": [
     {
       "file": "runtime/arcane/modules/AI.js",
@@ -1086,36 +1086,6 @@
       "protocol": "Arcane.storage or localStorage + per-realm globalThis.arcaneEvents authority",
       "normalization": "Complete records preserved; unreadable stored content fails observably.",
       "surface": "Event/error constants, default store, record/review normalizers; `load()`, `get()`, `set()`, `snapshot()`, state-free EventTarget/on change compatibility, and `dispose()`."
-    },
-    {
-      "file": "runtime/arcane/modules/RevocableProjectionLedger.js",
-      "name": "RevocableProjectionLedger.js",
-      "kind": "esm",
-      "exports": [
-        "DEFAULT_PROJECTION_LEDGER_CAPACITY",
-        "DEFAULT_PROJECTION_LEDGER_STORED_CHARACTERS",
-        "DEFAULT_PROJECTION_LEDGER_STORED_NODES",
-        "DEFAULT_PROJECTION_LEDGER_STORED_UTF8_BYTES",
-        "MAX_PROJECTION_LEDGER_CAPACITY",
-        "MAX_PROJECTION_LEDGER_STORED_CHARACTERS",
-        "MAX_PROJECTION_LEDGER_STORED_NODES",
-        "MAX_PROJECTION_LEDGER_STORED_UTF8_BYTES",
-        "PROJECTION_LEDGER_LIMITS",
-        "PROJECTION_LEDGER_REASON_CODES",
-        "PROJECTION_LEDGER_SCHEMA_VERSION",
-        "PROJECTION_LEDGER_STATUSES",
-        "ProjectionLedgerError",
-        "RevocableProjectionLedger",
-        "cloneProjectionLedgerValue",
-        "createProjectionLedgerFingerprint",
-        "createRevocableProjectionLedgerPortAdapter",
-        "default"
-      ],
-      "summary": "Implements an append-only bounded in-memory projection/revocation ledger safe for hostile descriptor inputs.",
-      "availability": "Cross-host",
-      "protocol": "In-process or explicit port adapter",
-      "normalization": "Strict normalization with stable `ProjectionLedgerError`.",
-      "surface": "Ledger classes, limits/status/reason constants, clone/fingerprint/port helpers, append/query/list APIs."
     },
     {
       "file": "runtime/arcane/modules/RiskSignalAnalyzer.js",
