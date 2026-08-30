@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.1
+
+- Preserved complete DirectoryPicker titles, paths, caller options, and
+  provider result fields without application clipping, trimming, freezing, or
+  generic path-character policy while retaining selected/cancelled semantics
+  and provider-owned path failures.
+
 ## 0.4.0
 
 - Preserved complete finite provider progress values and units as
