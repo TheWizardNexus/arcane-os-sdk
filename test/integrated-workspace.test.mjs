@@ -189,10 +189,14 @@ test('installed SDK materialization copies the complete alias runtime without by
     });
     const installedRoot=await installSdkAliasRuntime(workspaceRoot);
     const legacyRuntimeLock=path.join(workspaceRoot,'arcane.lock.json');
+    const retiredReceipt=path.join(workspaceRoot,'.arcane','installed-sdk-runtime.json');
+    const preservedWorkspaceEntry=path.join(workspaceRoot,'.arcane','preserved.txt');
     await writeJson(legacyRuntimeLock,{
         schemaVersion:1,
         sdk:{name:SDK_NAME,version:'0.2.1'}
     });
+    await writeJson(retiredReceipt,{sdk:{name:SDK_NAME,version:'0.3.1'}});
+    await writeFile(preservedWorkspaceEntry,'preserve this workspace entry\n');
 
     const created=await materializeInstalledSdkRuntime({workspaceRoot});
     assert.equal(created.status,'materialized');
@@ -219,12 +223,23 @@ test('installed SDK materialization copies the complete alias runtime without by
     });
     assert.equal(created.workspaceLock.path,legacyRuntimeLock);
     assert.deepEqual(created.workspaceLock.document,refreshedLock);
+    await assert.rejects(lstat(retiredReceipt),{code:'ENOENT'});
+    assert.equal(
+        await readFile(preservedWorkspaceEntry,'utf8'),
+        'preserve this workspace entry\n'
+    );
 
     const stalePath=path.join(workspaceRoot,'arcane','stale-runtime-file.txt');
     await writeFile(stalePath,'stale\n');
+    await writeJson(retiredReceipt,{sdk:{name:SDK_NAME,version:'0.3.1'}});
     const refreshed=await materializeInstalledSdkRuntime({workspaceRoot});
     assert.equal(refreshed.status,'materialized');
     await assert.rejects(lstat(stalePath),{code:'ENOENT'});
+    await assert.rejects(lstat(retiredReceipt),{code:'ENOENT'});
+    assert.equal(
+        await readFile(preservedWorkspaceEntry,'utf8'),
+        'preserve this workspace entry\n'
+    );
 });
 
 test('application upgrade runs the application npm upgrade without runtime reconciliation',async t=>{

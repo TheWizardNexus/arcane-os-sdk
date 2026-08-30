@@ -1,8 +1,6 @@
-import {createHash} from 'node:crypto';
 import {readdir,readFile,writeFile,mkdir} from 'node:fs/promises';
 import path from 'node:path';
 
-const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 const natural=(a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'});
 const stem=value=>value.replace(/\.[^.]+$/,'');
 const safeName=value=>value.replace(/[<>:"/\\|?*\x00-\x1f]/g,' ').replace(/\s+/g,' ').trim();
@@ -104,8 +102,7 @@ async function indexPairedRecord({
   const markdownByStem=new Map(markdownNames.map(name=>[stem(name).toLowerCase(),name]));
   const records=[]; const evidence=[];
   for(let index=0;index<rawNames.length;index++){
-    const rawName=rawNames[index]; const rawBytes=await readFile(path.join(rawRoot,rawName));
-    const hash=sha256(rawBytes); const markdownName=markdownByStem.get(stem(rawName).toLowerCase())||null;
+    const rawName=rawNames[index]; const markdownName=markdownByStem.get(stem(rawName).toLowerCase())||null;
     const recordEvidence=[]; let signals=[];
     if(markdownName){
       const markdown=await readFile(path.join(markdownRoot,markdownName),'utf8');
@@ -113,22 +110,21 @@ async function indexPairedRecord({
       evidenceBoundary.lastIndex=0;
       const boundaries=[...markdown.matchAll(evidenceBoundary)];
       for(let n=0;n<boundaries.length;n++){
-        const match=boundaries[n]; const body=markdown.slice(match.index,boundaries[n+1]?.index??markdown.length).trim();
-        if(body.length<20) continue;
+        const match=boundaries[n]; const body=markdown.slice(match.index,boundaries[n+1]?.index??markdown.length);
         const id=`${evidenceIdPrefix}${String(evidence.length+1).padStart(4,'0')}`;
         const title=safeName(match[1]); const pageResolution=resolveEvidenceSourcePage(markdown,match.index,title);
         // Keep generated evidence paths stable and short. Descriptive source and
         // exhibit labels remain in the record and Markdown instead of the path.
         const fileName=`${id}.md`;
-        const item={id,title,parentRaw:rawName,markdown:markdownName,...pageResolution,file:`Evidence/MD/${fileName}`,parentSha256:hash,body};
-        const output=buildEvidenceMarkdown?buildEvidenceMarkdown(item):`# ${title}\n\n- Evidence ID: ${id}\n- Parent source: ${rawName}\n- Related Markdown: ${markdownName}\n- Source page: ${item.sourcePage??'not resolved from Markdown'}\n- Source page status: ${item.sourcePageStatus}\n- Source page method: ${item.sourcePageMethod??'none'}\n- Source page marker: ${item.sourcePageMarker??'none'}\n- Source page candidates: ${item.sourcePageCandidates.join(', ')||'none'}\n- Parent SHA-256: ${hash}\n\n${body}\n`;
+        const item={id,title,parentRaw:rawName,markdown:markdownName,...pageResolution,file:`Evidence/MD/${fileName}`,body};
+        const output=buildEvidenceMarkdown?buildEvidenceMarkdown(item):`# ${title}\n\n- Evidence ID: ${id}\n- Parent source: ${rawName}\n- Related Markdown: ${markdownName}\n- Source page: ${item.sourcePage??'not resolved from Markdown'}\n- Source page status: ${item.sourcePageStatus}\n- Source page method: ${item.sourcePageMethod??'none'}\n- Source page marker: ${item.sourcePageMarker??'none'}\n- Source page candidates: ${item.sourcePageCandidates.join(', ')||'none'}\n\n${body}\n`;
         await writeFile(path.join(evidenceOutputRoot,fileName),output,'utf8'); evidence.push(item); recordEvidence.push(id);
       }
     }
-    records.push({id:`${recordIdPrefix}${String(index+1).padStart(4,'0')}`,name:rawName,markdown:markdownName,status:markdownName?'paired':'missing-markdown',sha256:hash,size:rawBytes.length,signals,evidence:recordEvidence,reviewStatus:'not-reviewed'});
+    records.push({id:`${recordIdPrefix}${String(index+1).padStart(4,'0')}`,name:rawName,markdown:markdownName,status:markdownName?'paired':'missing-markdown',signals,evidence:recordEvidence,reviewStatus:'not-reviewed'});
   }
   const rawStems=new Set(rawNames.map(name=>stem(name).toLowerCase()));
   return {records,evidence,markdownNames,orphanMarkdown:markdownNames.filter(name=>!rawStems.has(stem(name).toLowerCase()))};
 }
 
-export {indexPairedRecord,nearestPageMarker,parseStructuredRecordName,renderedPageBlocks,resolveEvidenceSourcePage,safeName,sha256,stem};
+export {indexPairedRecord,nearestPageMarker,parseStructuredRecordName,renderedPageBlocks,resolveEvidenceSourcePage,safeName,stem};

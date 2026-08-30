@@ -1,16 +1,4 @@
-const AGGREGATE_MAXIMUM_BYTES = 64 * 1024;
-const AMBIGUITY_MAXIMUM = 32;
-const CONSTRAINT_MAXIMUM = 64;
-const DESCRIPTION_MAXIMUM_BYTES = 2048;
-const EXPRESSION_MAXIMUM_BYTES = 32 * 1024;
-const GOAL_MAXIMUM_BYTES = 8 * 1024;
 const IDENTIFIER_MAXIMUM_CHARACTERS = 128;
-const LABEL_MAXIMUM_BYTES = 256;
-const OPTION_MAXIMUM = 16;
-const OPTION_MAXIMUM_BYTES = 512;
-const RESOURCE_LOCATOR_MAXIMUM_BYTES = 4096;
-const RESOURCE_MAXIMUM = 64;
-const SENSITIVITY_LABEL_MAXIMUM = 32;
 
 const SCHEMA = 'arcane.intent-envelope';
 const VERSION = 1;
@@ -45,18 +33,18 @@ const RESOURCE_KEY_VALUES = ['id', 'type', 'locator', 'description'];
 const AMBIGUITY_KEY_VALUES = ['id', 'kind', 'description', 'options'];
 const SENSITIVITY_KEY_VALUES = ['level', 'labels'];
 const PROVENANCE_KEY_VALUES = ['source', 'channel', 'actorId', 'applicationId', 'sessionId'];
-const ROOT_KEYS = Object.freeze(ROOT_KEY_VALUES);
-const PAYLOAD_KEYS = Object.freeze(PAYLOAD_KEY_VALUES);
-const TRUSTED_CONTEXT_KEYS = Object.freeze(TRUSTED_CONTEXT_KEY_VALUES);
-const GOAL_KEYS = Object.freeze(GOAL_KEY_VALUES);
-const CONSTRAINT_KEYS = Object.freeze(CONSTRAINT_KEY_VALUES);
-const RESOURCE_KEYS = Object.freeze(RESOURCE_KEY_VALUES);
-const AMBIGUITY_KEYS = Object.freeze(AMBIGUITY_KEY_VALUES);
-const SENSITIVITY_KEYS = Object.freeze(SENSITIVITY_KEY_VALUES);
-const PROVENANCE_KEYS = Object.freeze(PROVENANCE_KEY_VALUES);
+const ROOT_KEYS = ROOT_KEY_VALUES;
+const PAYLOAD_KEYS = PAYLOAD_KEY_VALUES;
+const TRUSTED_CONTEXT_KEYS = TRUSTED_CONTEXT_KEY_VALUES;
+const GOAL_KEYS = GOAL_KEY_VALUES;
+const CONSTRAINT_KEYS = CONSTRAINT_KEY_VALUES;
+const RESOURCE_KEYS = RESOURCE_KEY_VALUES;
+const AMBIGUITY_KEYS = AMBIGUITY_KEY_VALUES;
+const SENSITIVITY_KEYS = SENSITIVITY_KEY_VALUES;
+const PROVENANCE_KEYS = PROVENANCE_KEY_VALUES;
 
-const encoder = new TextEncoder();
 const constructionToken = Symbol('IntentEnvelope construction');
+const intentEnvelopeInstances = new WeakSet();
 
 export class IntentEnvelopeValidationError extends TypeError {
     constructor(code, path, message, options) {
@@ -91,11 +79,7 @@ function validateUnicode(value, path) {
     return value;
 }
 
-function byteLength(value) {
-    return encoder.encode(value).byteLength;
-}
-
-function boundedString(value, path, maximum, options = {}) {
+function normalizedString(value, path, options = {}) {
     const nullable = options.nullable === true;
     const nonempty = options.nonempty !== false;
 
@@ -108,9 +92,6 @@ function boundedString(value, path, maximum, options = {}) {
     validateUnicode(value, path);
     if (nonempty && !value.trim()) {
         fail('INTENT_ENVELOPE_INVALID', path, 'Intent envelope field must contain text.');
-    }
-    if (byteLength(value) > maximum) {
-        fail('INTENT_ENVELOPE_LIMIT_EXCEEDED', path, 'Intent envelope field exceeds its size limit.');
     }
     return value;
 }
@@ -143,7 +124,11 @@ function plainRecord(value, path, allowedKeys, active) {
         fail('INTENT_ENVELOPE_INVALID', path, 'Intent envelope field must be a plain record.');
     }
     const prototype = Object.getPrototypeOf(value);
-    if (prototype !== Object.prototype && prototype !== null) {
+    if (
+        prototype !== Object.prototype
+        && prototype !== null
+        && !intentEnvelopeInstances.has(value)
+    ) {
         fail('INTENT_ENVELOPE_INVALID', path, 'Intent envelope record prototype is invalid.');
     }
     if (active.has(value)) {
@@ -186,15 +171,12 @@ function ownValue(record, key, path, options = {}) {
     return descriptor.value;
 }
 
-function denseArray(value, path, maximum, active) {
+function denseArray(value, path, active) {
     if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
         fail('INTENT_ENVELOPE_INVALID', path, 'Intent envelope field must be an array.');
     }
     if (active.has(value)) {
         fail('INTENT_ENVELOPE_INVALID', path, 'Intent envelope data must not contain cycles.');
-    }
-    if (value.length > maximum) {
-        fail('INTENT_ENVELOPE_LIMIT_EXCEEDED', path, 'Intent envelope array exceeds its item limit.');
     }
     active.add(value);
     const keys = Reflect.ownKeys(value);
@@ -258,7 +240,7 @@ function normalizeGoal(value, path, active) {
     const textValue = ownValue(record, 'text', path);
     const producerValue = ownValue(record, 'producer', path);
     const versionValue = ownValue(record, 'version', path);
-    const text = boundedString(textValue, `${path}.text`, GOAL_MAXIMUM_BYTES);
+    const text = normalizedString(textValue, `${path}.text`);
     const producer = identifier(producerValue, `${path}.producer`);
     const version = identifier(versionValue, `${path}.version`);
     const confidenceValue = ownValue(record, 'confidence', path);
@@ -270,7 +252,7 @@ function normalizeGoal(value, path, active) {
     }
     finishRecord(record, active);
     const goal = { text, producer, version, confidence: confidenceValue };
-    return Object.freeze(goal);
+    return goal;
 }
 
 function normalizeScalar(value, path) {
@@ -298,7 +280,7 @@ function normalizeConstraint(value, index, active) {
     const id = identifier(idValue, `${path}.id`);
     const kind = enumeration(kindValue, `${path}.kind`, CONSTRAINT_KINDS);
     const scalar = normalizeScalar(scalarValue, `${path}.value`);
-    const description = boundedString(
+    const description = normalizedString(
         ownValue(
             record,
             'description',
@@ -309,14 +291,13 @@ function normalizeConstraint(value, index, active) {
             }
         ),
         `${path}.description`,
-        DESCRIPTION_MAXIMUM_BYTES,
         {
             nullable: true
         }
     );
     finishRecord(record, active);
     const constraint = { id, kind, value: scalar, description };
-    return Object.freeze(constraint);
+    return constraint;
 }
 
 function normalizeResource(value, index, active) {
@@ -327,8 +308,8 @@ function normalizeResource(value, index, active) {
     const locatorValue = ownValue(record, 'locator', path);
     const id = identifier(idValue, `${path}.id`);
     const type = enumeration(typeValue, `${path}.type`, RESOURCE_TYPES);
-    const locator = boundedString(locatorValue, `${path}.locator`, RESOURCE_LOCATOR_MAXIMUM_BYTES);
-    const description = boundedString(
+    const locator = normalizedString(locatorValue, `${path}.locator`);
+    const description = normalizedString(
         ownValue(
             record,
             'description',
@@ -339,26 +320,25 @@ function normalizeResource(value, index, active) {
             }
         ),
         `${path}.description`,
-        DESCRIPTION_MAXIMUM_BYTES,
         {
             nullable: true
         }
     );
     finishRecord(record, active);
     const resource = { id, type, locator, description };
-    return Object.freeze(resource);
+    return resource;
 }
 
 function normalizeOptions(value, path, active) {
-    const options = denseArray(value, path, OPTION_MAXIMUM, active);
+    const options = denseArray(value, path, active);
     const normalized = [];
     for (let index = 0; index < options.length; index += 1) {
         const descriptor = Object.getOwnPropertyDescriptor(options, String(index));
-        const normalizedOption = boundedString(descriptor.value, `${path}[${index}]`, OPTION_MAXIMUM_BYTES);
+        const normalizedOption = normalizedString(descriptor.value, `${path}[${index}]`);
         normalized.push(normalizedOption);
     }
     finishArray(options, active);
-    return Object.freeze(normalized);
+    return normalized;
 }
 
 function normalizeAmbiguity(value, index, active) {
@@ -368,10 +348,9 @@ function normalizeAmbiguity(value, index, active) {
     const kindValue = ownValue(record, 'kind', path);
     const id = identifier(idValue, `${path}.id`);
     const kind = enumeration(kindValue, `${path}.kind`, AMBIGUITY_KINDS);
-    const description = boundedString(
+    const description = normalizedString(
         ownValue(record, 'description', path),
         `${path}.description`,
-        DESCRIPTION_MAXIMUM_BYTES,
     );
     const options = normalizeOptions(
         ownValue(
@@ -388,11 +367,11 @@ function normalizeAmbiguity(value, index, active) {
     );
     finishRecord(record, active);
     const ambiguity = { id, kind, description, options };
-    return Object.freeze(ambiguity);
+    return ambiguity;
 }
 
-function normalizeList(value, path, maximum, normalizer, active) {
-    const list = denseArray(value, path, maximum, active);
+function normalizeList(value, path, normalizer, active) {
+    const list = denseArray(value, path, active);
     const normalized = [];
     const ids = new Set();
     for (let index = 0; index < list.length; index += 1) {
@@ -406,7 +385,7 @@ function normalizeList(value, path, maximum, normalizer, active) {
         normalized.push(item);
     }
     finishArray(list, active);
-    return Object.freeze(normalized);
+    return normalized;
 }
 
 function normalizeSensitivity(value, path, active) {
@@ -422,16 +401,15 @@ function normalizeSensitivity(value, path, active) {
             defaultValue: []
         }
     );
-    const labels = denseArray(labelsValue, `${path}.labels`, SENSITIVITY_LABEL_MAXIMUM, active);
+    const labels = denseArray(labelsValue, `${path}.labels`, active);
     const normalized = [];
     const seen = new Set();
     for (let index = 0; index < labels.length; index += 1) {
         const descriptor = Object.getOwnPropertyDescriptor(labels, String(index));
-        const label = boundedString(
+        const label = normalizedString(
             descriptor.value,
             `${path}.labels[${index}]`,
-            LABEL_MAXIMUM_BYTES,
-        ).trim();
+        );
         if (seen.has(label)) {
             finishArray(labels, active);
             finishRecord(record, active);
@@ -445,9 +423,9 @@ function normalizeSensitivity(value, path, active) {
     finishRecord(record, active);
     const sensitivity = {
         level,
-        labels: Object.freeze(normalized)
+        labels: normalized
     };
-    return Object.freeze(sensitivity);
+    return sensitivity;
 }
 
 function normalizeProvenance(value, path, active) {
@@ -467,7 +445,7 @@ function normalizeProvenance(value, path, active) {
     const sessionId = identifier(sessionIdValue, `${path}.sessionId`, nullableIdentifierOptions);
     finishRecord(record, active);
     const provenance = { source, channel, actorId, applicationId, sessionId };
-    return Object.freeze(provenance);
+    return provenance;
 }
 
 function cloneGoal(value) {
@@ -542,14 +520,6 @@ function canonicalRecord(values) {
     };
 }
 
-function validateAggregate(values) {
-    const canonical = canonicalRecord(values);
-    const serialized = JSON.stringify(canonical);
-    if (byteLength(serialized) > AGGREGATE_MAXIMUM_BYTES) {
-        fail('INTENT_ENVELOPE_LIMIT_EXCEEDED', '$', 'Intent envelope exceeds its aggregate size limit.');
-    }
-}
-
 function normalizeValues(input) {
     const active = new WeakSet();
     const record = plainRecord(input, '$', ROOT_KEYS, active);
@@ -571,30 +541,26 @@ function normalizeValues(input) {
     const values = {
         id: identifier(idValue, 'id'),
         createdAt: normalizeTimestamp(createdAtValue, 'createdAt'),
-        originalExpression: boundedString(
+        originalExpression: normalizedString(
             ownValue(record, 'originalExpression', '$'),
             'originalExpression',
-            EXPRESSION_MAXIMUM_BYTES,
         ),
         normalizedGoal: normalizeGoal(normalizedGoalValue, 'normalizedGoal', active),
         constraints: normalizeList(
             ownValue(record, 'constraints', '$'),
             'constraints',
-            CONSTRAINT_MAXIMUM,
             normalizeConstraint,
             active,
         ),
         resources: normalizeList(
             ownValue(record, 'resources', '$'),
             'resources',
-            RESOURCE_MAXIMUM,
             normalizeResource,
             active,
         ),
         ambiguities: normalizeList(
             ownValue(record, 'ambiguities', '$'),
             'ambiguities',
-            AMBIGUITY_MAXIMUM,
             normalizeAmbiguity,
             active,
         ),
@@ -602,7 +568,6 @@ function normalizeValues(input) {
         provenance: normalizeProvenance(provenanceValue, 'provenance', active)
     };
     finishRecord(record, active);
-    validateAggregate(values);
     return values;
 }
 
@@ -720,11 +685,11 @@ class IntentEnvelope {
         this.ambiguities = values.ambiguities;
         this.sensitivity = values.sensitivity;
         this.provenance = values.provenance;
-        Object.freeze(this);
+        intentEnvelopeInstances.add(this);
     }
 
     toJSON() {
-        return canonicalRecord(this);
+        return canonicalRecord(normalizeValues(this));
     }
 }
 
@@ -739,10 +704,6 @@ export function createIntentEnvelope(payload, trustedContext) {
 }
 
 export function rehydrateIntentEnvelope(canonical) {
-    if (canonical instanceof IntentEnvelope) {
-        return canonical;
-    }
-
     if (typeof canonical === 'string') {
         try {
             const parsed = JSON.parse(canonical);
@@ -780,38 +741,11 @@ export function intentEnvelopeAuditProjection(envelope) {
         sensitivity: cloneSensitivity(value.sensitivity),
         provenance: cloneProvenance(value.provenance),
     };
-    const frozenConstraints = projection.constraints.map(Object.freeze);
-    const frozenResources = projection.resources.map(Object.freeze);
-    const frozenAmbiguities = projection.ambiguities.map(Object.freeze);
-    const frozenSensitivity = {
-        ...projection.sensitivity,
-        labels: Object.freeze(projection.sensitivity.labels)
-    };
-    const frozenProjection = {
-        ...projection,
-        constraints: Object.freeze(frozenConstraints),
-        resources: Object.freeze(frozenResources),
-        ambiguities: Object.freeze(frozenAmbiguities),
-        sensitivity: Object.freeze(frozenSensitivity),
-        provenance: Object.freeze(projection.provenance)
-    };
-    return Object.freeze(frozenProjection);
+    return projection;
 }
 
 const intentEnvelopeLimits = {
-    aggregateBytes: AGGREGATE_MAXIMUM_BYTES,
-    ambiguityCount: AMBIGUITY_MAXIMUM,
-    constraintCount: CONSTRAINT_MAXIMUM,
-    descriptionBytes: DESCRIPTION_MAXIMUM_BYTES,
-    expressionBytes: EXPRESSION_MAXIMUM_BYTES,
-    goalBytes: GOAL_MAXIMUM_BYTES,
-    identifierCharacters: IDENTIFIER_MAXIMUM_CHARACTERS,
-    labelBytes: LABEL_MAXIMUM_BYTES,
-    optionBytes: OPTION_MAXIMUM_BYTES,
-    optionCount: OPTION_MAXIMUM,
-    resourceCount: RESOURCE_MAXIMUM,
-    resourceLocatorBytes: RESOURCE_LOCATOR_MAXIMUM_BYTES,
-    sensitivityLabelCount: SENSITIVITY_LABEL_MAXIMUM
+    identifierCharacters: IDENTIFIER_MAXIMUM_CHARACTERS
 };
 const ambiguityKinds = [...AMBIGUITY_KINDS];
 const constraintKinds = [...CONSTRAINT_KINDS];
@@ -822,13 +756,13 @@ const sensitivityLevels = [...SENSITIVITY_LEVELS];
 const intentEnvelopeContractValue = {
     schema: SCHEMA,
     version: VERSION,
-    limits: Object.freeze(intentEnvelopeLimits),
-    ambiguityKinds: Object.freeze(ambiguityKinds),
-    constraintKinds: Object.freeze(constraintKinds),
-    provenanceChannels: Object.freeze(provenanceChannels),
-    provenanceSources: Object.freeze(provenanceSources),
-    resourceTypes: Object.freeze(resourceTypes),
-    sensitivityLevels: Object.freeze(sensitivityLevels)
+    limits: intentEnvelopeLimits,
+    ambiguityKinds,
+    constraintKinds,
+    provenanceChannels,
+    provenanceSources,
+    resourceTypes,
+    sensitivityLevels
 };
 
-export const intentEnvelopeContract = Object.freeze(intentEnvelopeContractValue);
+export const intentEnvelopeContract = intentEnvelopeContractValue;

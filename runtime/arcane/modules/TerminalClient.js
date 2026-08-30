@@ -1,13 +1,13 @@
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 import TerminalSession from '../entities/TerminalSession.js';
 
-export const TERMINAL_CLIENT_EVENT_TYPES=Object.freeze({
+export const TERMINAL_CLIENT_EVENT_TYPES={
     sessionStarted:'terminal-session',
     sessionExited:'terminal-exit',
     sessionError:'terminal-error',
     sessionOutput:'terminal-output'
-});
-export const TERMINAL_CLIENT_ERROR_CODES=Object.freeze({
+};
+export const TERMINAL_CLIENT_ERROR_CODES={
     capabilityUnavailable:'ARCANE_TERMINAL_CAPABILITY_UNAVAILABLE',
     disposed:'ARCANE_TERMINAL_CLIENT_DISPOSED',
     hostEventSubscriptionInvalid:'ARCANE_TERMINAL_HOST_EVENT_SUBSCRIPTION_INVALID',
@@ -15,8 +15,8 @@ export const TERMINAL_CLIENT_ERROR_CODES=Object.freeze({
     eventTypeInvalid:'ARCANE_TERMINAL_CLIENT_EVENT_TYPE_INVALID',
     staleSessionCleanupRejected:'ARCANE_TERMINAL_STALE_SESSION_CLEANUP_REJECTED',
     sessionHostError:'ARCANE_TERMINAL_SESSION_HOST_ERROR'
-});
-export const TERMINAL_CLIENT_REASONS=Object.freeze({
+};
+export const TERMINAL_CLIENT_REASONS={
     capabilityUnavailable:'terminal-capability-unavailable',
     disposed:'terminal-client-disposed',
     hostEventSubscriptionInvalid:'terminal-host-event-subscription-invalid',
@@ -27,7 +27,7 @@ export const TERMINAL_CLIENT_REASONS=Object.freeze({
     sessionExited:'terminal-session-exited',
     sessionHostErrorReceived:'terminal-session-host-error-received',
     sessionOutputReceived:'terminal-session-output-received'
-});
+};
 
 function terminalClientError(code,reason,message,cause){
     const error=cause===undefined
@@ -53,14 +53,14 @@ function terminalPublicDetail(detail,type,reason){
             ?detail.code
             :TERMINAL_CLIENT_ERROR_CODES.sessionHostError
         :null;
-    return Object.freeze({
+    return {
         ...(typeof id==='string'&&id?{id}:{}),
         ...(typeof detail?.stream==='string'?{stream:detail.stream}:{}),
-        ...(output?{byteCount:new TextEncoder().encode(output).byteLength}:{}),
+        ...(typeof detail?.data==='string'?{data:output}:{}),
         ...(typeof detail?.session?.state==='string'?{status:detail.session.state}:{}),
         ...(code?{code}:{}),
         reason
-    });
+    };
 }
 
 export default class TerminalClient extends EventTarget{
@@ -75,9 +75,7 @@ export default class TerminalClient extends EventTarget{
         this.unsubscribe=[];
         this.#events=createArcaneEventSource(this,{
             source:'terminal-client',
-            eventTypes:Object.freeze(
-                Object.values(TERMINAL_CLIENT_EVENT_TYPES)
-            )
+            eventTypes:Object.values(TERMINAL_CLIENT_EVENT_TYPES)
         });
         const events=globalThis.Arcane?.events;
         if(events?.on){
@@ -279,11 +277,11 @@ export default class TerminalClient extends EventTarget{
         const reason=terminalEventReason(type);
         this.#operationSequence+=1;
         const operationId=`${this.#events.instanceId}:${type}:${this.#operationSequence.toString(36)}`;
-        const compatibilityDetail=Object.freeze({
+        const compatibilityDetail={
             ...detail,
             operationId,
             reason
-        });
+        };
         return this.#events.dispatch(
             eventType,
             compatibilityDetail,

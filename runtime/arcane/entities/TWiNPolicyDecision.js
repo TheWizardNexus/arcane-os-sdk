@@ -1,10 +1,4 @@
-const AGGREGATE_MAXIMUM_BYTES = 32 * 1024;
 const IDENTIFIER_MAXIMUM_CHARACTERS = 128;
-const REASON_CODE_MAXIMUM_BYTES = 128;
-const REASON_CODE_MAXIMUM = 16;
-const REQUIREMENT_MAXIMUM = 32;
-const REQUIREMENT_TARGET_MAXIMUM_BYTES = 256;
-const SCALAR_STRING_MAXIMUM_BYTES = 2048;
 
 const SCHEMA = 'arcane.twin-policy-decision';
 const VERSION = 1;
@@ -45,40 +39,14 @@ const RESERVED_KEYS = new Set(RESERVED_KEYS_VALUES);
 const LAYERS = new Set(LAYER_VALUES);
 const OUTCOMES = new Set(OUTCOME_VALUES);
 const REQUIREMENT_OUTCOMES = new Set(REQUIREMENT_OUTCOME_VALUES);
-const ROOT_KEYS = Object.freeze(ROOT_KEY_VALUES);
-const PAYLOAD_KEYS = Object.freeze(PAYLOAD_KEY_VALUES);
-const TRUSTED_CONTEXT_KEYS = Object.freeze(TRUSTED_CONTEXT_KEY_VALUES);
-const POLICY_KEYS = Object.freeze(POLICY_KEY_VALUES);
-const REQUIREMENT_KEYS = Object.freeze(REQUIREMENT_KEY_VALUES);
-const CORE_REASON_CODES = Object.freeze(CORE_REASON_CODE_VALUES);
+const ROOT_KEYS = ROOT_KEY_VALUES;
+const PAYLOAD_KEYS = PAYLOAD_KEY_VALUES;
+const TRUSTED_CONTEXT_KEYS = TRUSTED_CONTEXT_KEY_VALUES;
+const POLICY_KEYS = POLICY_KEY_VALUES;
+const REQUIREMENT_KEYS = REQUIREMENT_KEY_VALUES;
+const CORE_REASON_CODES = CORE_REASON_CODE_VALUES;
 const CORE_REASON_CODE_SET = new Set(Object.values(CORE_REASON_CODES));
 
-function safeJSONIdentity() {
-    return this;
-}
-Object.freeze(safeJSONIdentity);
-
-const SAFE_RECORD_PROTOTYPE = Object.create(Object.prototype);
-Object.defineProperty(
-    SAFE_RECORD_PROTOTYPE,
-    'toJSON',
-    {
-        value: safeJSONIdentity
-    }
-);
-Object.freeze(SAFE_RECORD_PROTOTYPE);
-
-const SAFE_ARRAY_PROTOTYPE = Object.create(Array.prototype);
-Object.defineProperty(
-    SAFE_ARRAY_PROTOTYPE,
-    'toJSON',
-    {
-        value: safeJSONIdentity
-    }
-);
-Object.freeze(SAFE_ARRAY_PROTOTYPE);
-
-const encoder = new TextEncoder();
 const constructionToken = Symbol('TWiNPolicyDecision construction');
 const decisionInstances = new WeakSet();
 const validationFailureTokens = new WeakMap();
@@ -97,7 +65,6 @@ function fail(code, path, message) {
     const error = new TWiNPolicyDecisionValidationError(code, path, message);
 
     validationFailureTokens.set(error, activeValidationToken);
-    Object.freeze(error);
     throw error;
 }
 
@@ -123,7 +90,7 @@ function validationBoundary(operation) {
 }
 
 function safeRecord() {
-    return Object.create(SAFE_RECORD_PROTOTYPE);
+    return {};
 }
 
 function defineDataProperty(target, key, value) {
@@ -153,8 +120,6 @@ function safeArray(values) {
     for (let index = 0; index < values.length; index += 1) {
         appendOwn(array, values[index]);
     }
-    Object.setPrototypeOf(array, SAFE_ARRAY_PROTOTYPE);
-
     return array;
 }
 
@@ -176,10 +141,6 @@ function sortedCopy(values, compare) {
     }
 
     return sorted;
-}
-
-function byteLength(value) {
-    return encoder.encode(value).byteLength;
 }
 
 function validateUnicode(value, path) {
@@ -209,7 +170,7 @@ function validateUnicode(value, path) {
     return value;
 }
 
-function boundedString(value, path, maximum, options = {}) {
+function normalizedString(value, path, options = {}) {
     const nullable = options.nullable === true;
     const nonempty = options.nonempty !== false;
 
@@ -223,13 +184,6 @@ function boundedString(value, path, maximum, options = {}) {
             'TWiN policy decision field has an invalid type.'
         );
     }
-    if (value.length > maximum) {
-        fail(
-            'TWIN_POLICY_DECISION_LIMIT_EXCEEDED',
-            path,
-            'TWiN policy decision field exceeds its size limit.'
-        );
-    }
     validateUnicode(value, path);
     if (nonempty && !value.trim()) {
         fail(
@@ -238,14 +192,6 @@ function boundedString(value, path, maximum, options = {}) {
             'TWiN policy decision field must contain text.'
         );
     }
-    if (byteLength(value) > maximum) {
-        fail(
-            'TWIN_POLICY_DECISION_LIMIT_EXCEEDED',
-            path,
-            'TWiN policy decision field exceeds its size limit.'
-        );
-    }
-
     return value;
 }
 
@@ -298,7 +244,7 @@ function plainRecord(value, path, allowedKeys, active) {
     if (
         prototype !== Object.prototype
         && prototype !== null
-        && prototype !== SAFE_RECORD_PROTOTYPE
+        && !decisionInstances.has(value)
     ) {
         fail(
             'TWIN_POLICY_DECISION_INVALID',
@@ -363,7 +309,7 @@ function ownValue(record, key, path, options = {}) {
     return descriptor.value;
 }
 
-function denseArray(value, path, maximum, active) {
+function denseArray(value, path, active) {
     if (!Array.isArray(value)) {
         fail(
             'TWIN_POLICY_DECISION_INVALID',
@@ -373,7 +319,7 @@ function denseArray(value, path, maximum, active) {
     }
     const prototype = Object.getPrototypeOf(value);
 
-    if (prototype !== Array.prototype && prototype !== SAFE_ARRAY_PROTOTYPE) {
+    if (prototype !== Array.prototype) {
         fail(
             'TWIN_POLICY_DECISION_INVALID',
             path,
@@ -385,13 +331,6 @@ function denseArray(value, path, maximum, active) {
             'TWIN_POLICY_DECISION_INVALID',
             path,
             'TWiN policy decision data must not contain cycles.'
-        );
-    }
-    if (value.length > maximum) {
-        fail(
-            'TWIN_POLICY_DECISION_LIMIT_EXCEEDED',
-            path,
-            'TWiN policy decision array exceeds its item limit.'
         );
     }
     active.add(value);
@@ -558,7 +497,7 @@ function normalizeTrustedTimestamp(value, path) {
 }
 
 function normalizeReasonCode(value, path) {
-    const code = boundedString(value, path, REASON_CODE_MAXIMUM_BYTES);
+    const code = normalizedString(value, path);
 
     if (!REASON_CODE_PATTERN.test(code)) {
         fail(
@@ -580,7 +519,7 @@ function compareStrings(left, right) {
 }
 
 function normalizeReasonCodes(value, outcome, path, active) {
-    const list = denseArray(value, path, REASON_CODE_MAXIMUM, active);
+    const list = denseArray(value, path, active);
 
     if (list.length === 0) {
         finishArray(list, active);
@@ -638,14 +577,13 @@ function normalizeReasonCodes(value, outcome, path, active) {
         appendOwn(canonicalReasons, sortedAdditional[index]);
     }
 
-    return Object.freeze(safeArray(canonicalReasons));
+    return safeArray(canonicalReasons);
 }
 
 function normalizeRequirementTarget(value, path) {
-    const target = boundedString(
+    const target = normalizedString(
         value,
         path,
-        REQUIREMENT_TARGET_MAXIMUM_BYTES,
         {
             nullable: true
         }
@@ -667,10 +605,9 @@ function normalizeScalar(value, path) {
         return value;
     }
     if (typeof value === 'string') {
-        return boundedString(
+        return normalizedString(
             value,
             path,
-            SCALAR_STRING_MAXIMUM_BYTES,
             {
                 nonempty: false
             }
@@ -714,7 +651,7 @@ function normalizeRequirement(value, path, reasonCodes, active) {
         );
     }
 
-    return Object.freeze(requirement);
+    return requirement;
 }
 
 function compareRequirements(left, right) {
@@ -722,7 +659,7 @@ function compareRequirements(left, right) {
 }
 
 function normalizeRequirements(value, outcome, reasonCodes, path, active) {
-    const list = denseArray(value, path, REQUIREMENT_MAXIMUM, active);
+    const list = denseArray(value, path, active);
     const normalized = [];
     const ids = new Set();
 
@@ -762,7 +699,7 @@ function normalizeRequirements(value, outcome, reasonCodes, path, active) {
         );
     }
 
-    return Object.freeze(safeArray(sortedCopy(normalized, compareRequirements)));
+    return safeArray(sortedCopy(normalized, compareRequirements));
 }
 
 function normalizePolicy(value, path, active) {
@@ -773,7 +710,7 @@ function normalizePolicy(value, path, active) {
     };
     finishRecord(record, active);
 
-    return Object.freeze(policy);
+    return policy;
 }
 
 function clonePolicy(value) {
@@ -815,18 +752,6 @@ function canonicalRecord(values) {
     defineDataProperty(canonical, 'requirements', safeArray(requirements));
 
     return canonical;
-}
-
-function validateAggregate(values) {
-    const serialized = JSON.stringify(canonicalRecord(values));
-
-    if (byteLength(serialized) > AGGREGATE_MAXIMUM_BYTES) {
-        fail(
-            'TWIN_POLICY_DECISION_LIMIT_EXCEEDED',
-            '$',
-            'TWiN policy decision exceeds its aggregate size limit.'
-        );
-    }
 }
 
 function normalizeValues(input) {
@@ -890,7 +815,6 @@ function normalizeValues(input) {
         )
     };
     finishRecord(record, active);
-    validateAggregate(values);
 
     return values;
 }
@@ -969,14 +893,12 @@ class TWiNPolicyDecision {
         defineDataProperty(this, 'reasonCodes', values.reasonCodes);
         defineDataProperty(this, 'requirements', values.requirements);
         decisionInstances.add(this);
-        Object.freeze(this);
     }
 
     toJSON() {
-        return canonicalRecord(this);
+        return canonicalRecord(normalizeValues(this));
     }
 }
-Object.freeze(TWiNPolicyDecision.prototype);
 
 function buildDecision(canonical) {
     const values = normalizeValues(canonical);
@@ -993,25 +915,12 @@ export function createTWiNPolicyDecision(payload, trustedContext) {
 }
 
 export function rehydrateTWiNPolicyDecision(canonical) {
-    if (decisionInstances.has(canonical)) {
-        return canonical;
-    }
     return validationBoundary(
         function validateCanonicalInput() {
             let source = canonical;
             let canonicalText = null;
 
             if (typeof source === 'string') {
-                if (
-                    source.length > AGGREGATE_MAXIMUM_BYTES
-                    || byteLength(source) > AGGREGATE_MAXIMUM_BYTES
-                ) {
-                    fail(
-                        'TWIN_POLICY_DECISION_LIMIT_EXCEEDED',
-                        '$',
-                        'TWiN policy decision JSON exceeds its input size limit.'
-                    );
-                }
                 canonicalText = source;
                 source = JSON.parse(source);
             }
@@ -1044,7 +953,7 @@ export function twinPolicyDecisionAuditProjection(decision) {
     for (let index = 0; index < value.requirements.length; index += 1) {
         appendOwn(
             requirements,
-            Object.freeze(auditRequirement(value.requirements[index]))
+            auditRequirement(value.requirements[index])
         );
     }
     const projection = safeRecord();
@@ -1054,39 +963,33 @@ export function twinPolicyDecisionAuditProjection(decision) {
     defineDataProperty(projection, 'id', value.id);
     defineDataProperty(projection, 'evaluatedAt', value.evaluatedAt);
     defineDataProperty(projection, 'layer', value.layer);
-    defineDataProperty(projection, 'policy', Object.freeze(clonePolicy(value.policy)));
+    defineDataProperty(projection, 'policy', clonePolicy(value.policy));
     defineDataProperty(projection, 'outcome', value.outcome);
     defineDataProperty(
         projection,
         'reasonCodes',
-        Object.freeze(safeArray(value.reasonCodes))
+        safeArray(value.reasonCodes)
     );
     defineDataProperty(
         projection,
         'requirements',
-        Object.freeze(safeArray(requirements))
+        safeArray(requirements)
     );
 
-    return Object.freeze(projection);
+    return projection;
 }
 
-const limits = Object.freeze({
-    aggregateBytes: AGGREGATE_MAXIMUM_BYTES,
-    identifierCharacters: IDENTIFIER_MAXIMUM_CHARACTERS,
-    reasonCodeBytes: REASON_CODE_MAXIMUM_BYTES,
-    reasonCodeCount: REASON_CODE_MAXIMUM,
-    requirementCount: REQUIREMENT_MAXIMUM,
-    requirementTargetBytes: REQUIREMENT_TARGET_MAXIMUM_BYTES,
-    scalarStringBytes: SCALAR_STRING_MAXIMUM_BYTES
-});
+const limits = {
+    identifierCharacters: IDENTIFIER_MAXIMUM_CHARACTERS
+};
 const contractValue = {
     schema: SCHEMA,
     version: VERSION,
-    layers: Object.freeze([...LAYERS]),
-    outcomes: Object.freeze([...OUTCOMES]),
-    requirementOutcomes: Object.freeze([...REQUIREMENT_OUTCOMES]),
+    layers: [...LAYERS],
+    outcomes: [...OUTCOMES],
+    requirementOutcomes: [...REQUIREMENT_OUTCOMES],
     coreReasonCodes: CORE_REASON_CODES,
     limits
 };
 
-export const twinPolicyDecisionContract = Object.freeze(contractValue);
+export const twinPolicyDecisionContract = contractValue;

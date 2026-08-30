@@ -1,18 +1,18 @@
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 import {resolveApplicationLocalStorageKey} from './AppDataScope.js';
 
-export const RECORD_REVIEW_STORE_ERROR_CODES=Object.freeze({
+export const RECORD_REVIEW_STORE_ERROR_CODES={
     adapterInvalid:'ARCANE_RECORD_REVIEW_STORE_ADAPTER_INVALID',
     disposed:'ARCANE_RECORD_REVIEW_STORE_DISPOSED',
     operationAborted:'ARCANE_RECORD_REVIEW_STORE_OPERATION_ABORTED',
     operationOptionsInvalid:'ARCANE_RECORD_REVIEW_STORE_OPERATION_OPTIONS_INVALID',
     recordIdInvalid:'ARCANE_RECORD_REVIEW_ID_INVALID',
     storedRecordsInvalid:'ARCANE_RECORD_REVIEW_STORED_RECORDS_INVALID'
-});
+};
 
-export const RECORD_REVIEW_STORE_EVENT_TYPES=Object.freeze({
+export const RECORD_REVIEW_STORE_EVENT_TYPES={
     change:'record-review-change'
-});
+};
 
 function recordReviewStoreError(code,reason,message,ErrorType=Error,cause){
     const error=new ErrorType(message);
@@ -85,7 +85,7 @@ function normalizeOperationOptions(value={}){
             TypeError
         );
     }
-    return Object.freeze({signal});
+    return {signal};
 }
 
 function setDataProperty(target,key,value){
@@ -97,8 +97,8 @@ function setDataProperty(target,key,value){
 }
 
 function normalizeRecordId(value=''){
-    const id=String(value).trim();
-    if(!id||id.length>160||/[\x00-\x1f]/.test(id)){
+    const id=String(value);
+    if(!id.trim()||/[\x00-\x1f]/.test(id)){
         throw recordReviewStoreError(
             RECORD_REVIEW_STORE_ERROR_CODES.recordIdInvalid,
             'record-review-id-invalid',
@@ -113,39 +113,42 @@ function normalizeReview(value={}){
     const source=value&&typeof value==='object'?value:{};
     const attributes={};
     if(source.attributes&&typeof source.attributes==='object'&&!Array.isArray(source.attributes)){
-        for(const [key,value] of Object.entries(source.attributes).slice(0,40)){
-            const normalizedKey=String(key).replace(/[^a-z0-9._-]/gi,'-').slice(0,80);
-            if(!normalizedKey) continue;
+        for(const [key,value] of Object.entries(source.attributes)){
+            const normalizedKey=String(key);
             setDataProperty(
                 attributes,
                 normalizedKey,
                 Array.isArray(value)
-                    ?Object.freeze(value.slice(0,100).map(function normalizeReviewAttributeItem(item){
-                        return String(item).slice(0,500);
-                    }))
-                    :String(value??'').slice(0,10000)
+                    ?value.map(function normalizeReviewAttributeItem(item){
+                        return String(item);
+                    })
+                    :String(value??'')
             );
         }
     }
-    return Object.freeze({
-        status:String(source.status||'not-reviewed').trim().slice(0,80)||'not-reviewed',
-        classification:String(source.classification||'unassigned').trim().slice(0,80)||'unassigned',
-        attributes:Object.freeze(attributes),
-        notes:String(source.notes||'').slice(0,10000),
+    return {
+        status:source.status===undefined||source.status===null||source.status===''
+            ?'not-reviewed'
+            :String(source.status),
+        classification:source.classification===undefined||source.classification===null||source.classification===''
+            ?'unassigned'
+            :String(source.classification),
+        attributes,
+        notes:String(source.notes??''),
         updatedAt:source.updatedAt?String(source.updatedAt):null
-    });
+    };
 }
 
-function frozenRecordMap(records){
+function recordMap(records){
     const copy={};
     for(const [id,review] of Object.entries(records)){
         setDataProperty(copy,id,normalizeReview(review));
     }
-    return Object.freeze(copy);
+    return copy;
 }
 
 function normalizedStoredRecords(value){
-    if(!isPlainRecord(value)) return Object.freeze({});
+    if(!isPlainRecord(value)) return {};
     const records={};
     for(const [recordId,review] of Object.entries(value)){
         let id;
@@ -170,7 +173,7 @@ function normalizedStoredRecords(value){
         }
         setDataProperty(records,id,normalizeReview(review));
     }
-    return Object.freeze(records);
+    return records;
 }
 
 function validateAdapter(adapter){
@@ -229,15 +232,17 @@ class RecordReviewStore extends EventTarget{
 
     constructor({namespace='records',adapter=null}={}){
         super();
-        this.namespace=String(namespace||'records').replace(/[^a-z0-9._-]/gi,'-').slice(0,120);
+        this.namespace=namespace===undefined||namespace===null||namespace===''
+            ?'records'
+            :String(namespace);
         this.adapter=validateAdapter(adapter||nativeAdapter(this.namespace)||localAdapter(this.namespace));
-        this.records=Object.freeze({});
+        this.records={};
         this.loaded=false;
         this.#events=createArcaneEventSource(
             this,
             {
                 source:'record-review-store',
-                eventTypes:Object.freeze(Object.values(RECORD_REVIEW_STORE_EVENT_TYPES))
+                eventTypes:Object.values(RECORD_REVIEW_STORE_EVENT_TYPES)
             }
         );
     }
@@ -254,7 +259,7 @@ class RecordReviewStore extends EventTarget{
         return this.#enqueueOperation(
             async function loadRecordReviews(){
                 const stored=await store.adapter.get(
-                    Object.freeze({operationId,signal:operation.signal})
+                    {operationId,signal:operation.signal}
                 );
                 store.#assertOperationActive(operation.signal);
                 store.records=normalizedStoredRecords(stored);
@@ -282,18 +287,18 @@ class RecordReviewStore extends EventTarget{
                     ...value,
                     updatedAt:new Date().toISOString()
                 });
-                const records=frozenRecordMap({...store.records,[id]:review});
+                const records=recordMap({...store.records,[id]:review});
                 await store.adapter.set(
-                    records,
-                    Object.freeze({operationId,signal:operation.signal})
+                    recordMap(records),
+                    {operationId,signal:operation.signal}
                 );
                 store.#assertOperationActive(operation.signal);
-                store.records=records;
-                const detail=Object.freeze({
+                store.records=recordMap(records);
+                const detail={
                     namespace:store.namespace,
                     recordId:id,
                     review:normalizeReview(review)
-                });
+                };
                 store.#events.dispatch(
                     RECORD_REVIEW_STORE_EVENT_TYPES.change,
                     detail,
@@ -306,7 +311,7 @@ class RecordReviewStore extends EventTarget{
     }
 
     snapshot(){
-        return frozenRecordMap(this.records);
+        return recordMap(this.records);
     }
 
     dispose(){
