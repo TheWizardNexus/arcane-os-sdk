@@ -148,7 +148,14 @@ function recordMap(records){
 }
 
 function normalizedStoredRecords(value){
-    if(!isPlainRecord(value)) return {};
+    if(!isPlainRecord(value)){
+        throw recordReviewStoreError(
+            RECORD_REVIEW_STORE_ERROR_CODES.storedRecordsInvalid,
+            'record-review-stored-records-invalid',
+            'Stored record reviews must be a plain object.',
+            TypeError
+        );
+    }
     const records={};
     for(const [recordId,review] of Object.entries(value)){
         let id;
@@ -196,8 +203,14 @@ function localAdapter(namespace){
             if(!raw) return {};
             try{
                 return JSON.parse(raw);
-            }catch{
-                return {};
+            }catch(error){
+                throw recordReviewStoreError(
+                    RECORD_REVIEW_STORE_ERROR_CODES.storedRecordsInvalid,
+                    'record-review-stored-json-invalid',
+                    'Stored record reviews contain invalid JSON.',
+                    TypeError,
+                    error
+                );
             }
         },
         async set(value){

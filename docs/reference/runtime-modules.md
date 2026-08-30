@@ -104,7 +104,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`Questionnaire.js`](#questionnairejs) | esm | Evaluates whether a one-time questionnaire prompt is due without performing the prompt. | Cross-host | Normalized conservative boolean. |
 | [`RecordLinkIndex.js`](#recordlinkindexjs) | esm | Parses record links and builds their normalized index. | Cross-host | Fully normalized. |
 | [`RecordPassageIndex.js`](#recordpassageindexjs) | esm | Indexes text lines, page markers, dates, rules, and excerpts for record review. | Cross-host | Fully normalized. |
-| [`RecordReviewStore.js`](#recordreviewstorejs) | esm | Stores normalized record-review decisions through native storage or app-scoped local fallback. | Browser/native hybrid | Normalized ids/reviews/snapshots; storage failures mixed. |
+| [`RecordReviewStore.js`](#recordreviewstorejs) | esm | Stores normalized record-review decisions through native storage or app-scoped local fallback. | Browser/native hybrid | Complete records preserved; unreadable stored content fails observably. |
 | [`RevocableProjectionLedger.js`](#revocableprojectionledgerjs) | esm | Implements an append-only complete in-memory projection/revocation ledger safe for malformed descriptor inputs. | Cross-host | Strict normalization with stable `ProjectionLedgerError`. |
 | [`RiskSignalAnalyzer.js`](#risksignalanalyzerjs) | esm | Matches configured risk signals and levels against complete text. | Cross-host | Fully normalized. |
 | [`ScamRiskPolicy.js`](#scamriskpolicyjs) | esm | Combines deterministic scam signals with Arcane blocked-domain evidence and safety guidance. | Cross-host | Fully normalized. |
@@ -2562,7 +2562,7 @@ Exact exports: `RECORD_REVIEW_STORE_ERROR_CODES`,
 
 ### Availability and normalization
 
-**Browser/native hybrid.** Normalized ids/reviews/snapshots; storage failures mixed. Transport: Arcane.storage or localStorage. [Deep protocol details](protocols.md).
+**Browser/native hybrid.** Complete normalized ids, reviews, and snapshots are preserved; unreadable stored records fail with `ARCANE_RECORD_REVIEW_STORED_RECORDS_INVALID` rather than silently becoming an empty store. Transport: Arcane.storage or localStorage. [Deep protocol details](protocols.md).
 
 ### Example
 

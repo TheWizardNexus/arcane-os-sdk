@@ -58,6 +58,7 @@ import {
     extractDateMentions,
     findRulePassages
 } from '../runtime/arcane/modules/RecordPassageIndex.js';
+import RecordReviewStore from '../runtime/arcane/modules/RecordReviewStore.js';
 
 const repositoryRoot=new URL('../',import.meta.url);
 
@@ -135,6 +136,24 @@ test('record components retain every supplied item and complete source content',
     assert.doesNotMatch(sources.timeline,/\.slice\(0,5000\)/);
     assert.doesNotMatch(sources.relationshipBoard,/\.slice\(0,(?:12|1500|6000)\)/);
     assert.doesNotMatch(sources.sourceViewer,/MAXIMUM_(?:CHARACTERS|LINES)|Object\.freeze|\.slice\(0,512\)/);
+});
+
+test('record review storage reports unreadable records and directory paths remain complete',async()=>{
+    const store=new RecordReviewStore({adapter:{
+        async get(){return 'unreadable record review data';},
+        async set(value){return value;}
+    }});
+    await assert.rejects(
+        store.load(),
+        error=>error?.code==='ARCANE_RECORD_REVIEW_STORED_RECORDS_INVALID'
+    );
+    store.dispose();
+
+    const source=await readFile(
+        new URL('runtime/arcane/components/directory-picker.html',repositoryRoot),
+        'utf8'
+    );
+    assert.doesNotMatch(source,/next\.length>4096|bounded plain text/);
 });
 
 test('preference setAll uses the admitted native atomic batch once',async()=>{

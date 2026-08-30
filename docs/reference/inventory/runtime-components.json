@@ -292,7 +292,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "Strict normalized native selection/error"
+      "normalization": "Complete plain-text paths and native selection/error"
     },
     {
       "file": "runtime/arcane/components/document-inspector.html",

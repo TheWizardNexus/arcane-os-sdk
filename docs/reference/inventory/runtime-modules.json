@@ -1105,7 +1105,7 @@
       "summary": "Stores normalized record-review decisions through native storage or app-scoped local fallback.",
       "availability": "Browser/native hybrid",
       "protocol": "Arcane.storage or localStorage + per-realm globalThis.arcaneEvents authority",
-      "normalization": "Normalized ids/reviews/snapshots; storage failures mixed.",
+      "normalization": "Complete records preserved; unreadable stored content fails observably.",
       "surface": "Event/error constants, default store, record/review normalizers; `load()`, `get()`, `set()`, `snapshot()`, state-free EventTarget/on change compatibility, and `dispose()`."
     },
     {

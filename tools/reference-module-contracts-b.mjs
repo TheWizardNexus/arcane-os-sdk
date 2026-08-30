@@ -366,7 +366,7 @@ console.log(findings[0]);`
         lifecycleSideEffects:'Construction initializes memory only. load/set use an injected adapter, Arcane.storage, or app-scoped localStorage; set() persists the whole normalized map and timestamps the changed review.',
         paramsResults:"normalizeRecordId(value) returns a trimmed id. normalizeReview(value) returns {status,classification,attributes,notes,updatedAt}. new Store({namespace='records',adapter?}); load() resolves a snapshot; get(id) returns a normalized review; set(id,patch) resolves the persisted review; snapshot() returns a record-map copy.",
         events:['record-review-change with {recordId,review}'],
-        errors:['TypeError for invalid id.','Native/local/injected storage failures propagate.'],
+        errors:['TypeError for invalid id.','Unreadable stored records fail with ARCANE_RECORD_REVIEW_STORED_RECORDS_INVALID instead of becoming an empty store.','Native/local/injected storage failures propagate.'],
         capabilitiesCore:'Native load uses storage.read; set uses storage.write. localStorage fallback has no Core authority.',
         example:String.raw`import RecordReviewStore from '/arcane/modules/RecordReviewStore.js';
 
