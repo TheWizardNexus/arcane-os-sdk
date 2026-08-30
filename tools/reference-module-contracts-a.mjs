@@ -285,9 +285,9 @@ console.log(engine.calculate('sqrt(81) + 2^3').result);`
         name:'CaseEvidenceIndexer.js',
         classification:'host-internal',
         lifecycleSideEffects:'Pure helpers are side-effect free; indexPairedRecord reads raw and Markdown trees, creates the evidence output directory, and writes extracted evidence Markdown.',
-        paramsResults:'Node-only helpers parse structured names, page markers and blocks, safe names, stems, SHA-256, and source-page provenance. indexPairedRecord(options) returns {records, evidence, markdownNames, orphanMarkdown}.',
+        paramsResults:'Node-only helpers parse structured names, page markers and blocks, safe names, stems, and source-page provenance. indexPairedRecord(options) returns {records, evidence, markdownNames, orphanMarkdown}.',
         events:[],
-        errors:['TypeError when required roots are absent','node:fs, node:crypto, and node:path failures propagate'],
+        errors:['TypeError when required roots are absent','node:fs and node:path failures propagate'],
         capabilitiesCore:'Node-only host-internal evidence indexing utility; not a browser SDK or Arcane Core bridge.',
         example:`const parsed=parseStructuredRecordName('24-08-26 [Court] - Order.pdf');
 console.log(parsed.isoDate,parsed.source,parsed.title);`
@@ -392,11 +392,11 @@ console.log(registry.has('demo'),registry.list());`
     {
         name:'ComponentContracts.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'All exported contracts are pure normalization and formatting functions plus mutable label and format constants.',
-        paramsResults:'Normalizers cover chart options and rows, dashboard definitions, options, and visibility, Markdown formats and options, and voice options. applyMarkdownFormat and appendTranscription return deterministic editor text and selection results.',
-        events:[],
-        errors:['TypeError or RangeError for invalid records, values, callbacks, limits, or chart bounds'],
-        capabilitiesCore:'Shared normalized value layer for browser components with no Core calls.',
+        lifecycleSideEffects:'Normalization and formatting helpers are pure. createSTTActivationController installs one button listener, publishes and projects activation request or error events, invokes the configured host activation callback, reports presentation changes through onChange, and destroy removes the listener and disposes only an event source it created.',
+        paramsResults:'Normalizers cover chart options and rows, dashboard definitions, options, and visibility, Markdown formats and options, and voice options. applyMarkdownFormat and appendTranscription return deterministic editor text and selection results. formatAIRuntimeProgress(progress,fallback) preserves complete finite completed/total measures, including fractional and over-total values, when total is positive and unit is nonempty; otherwise it returns the phase or fallback. createSTTActivationController({host,button,onChange,EventClass,eventSource}) returns mutable action, error, label, pending, selected, status, title, and visible getters plus request(action), synchronize(role), and destroy().',
+        events:['emits speech-stt-activation-request','emits speech-stt-activation-error'],
+        errors:['TypeError or RangeError for invalid normalized records, values, callbacks, or chart bounds','ARCANE_STT_ACTIVATION_BUTTON_INVALID','ARCANE_STT_ACTIVATION_BUTTON_LISTENER_FAILED','ARCANE_STT_ACTIVATION_DOM_PROJECTION_UNAVAILABLE','ARCANE_STT_ACTIVATION_EVENT_CLASS_INVALID','ARCANE_STT_ACTIVATION_EVENT_SOURCE_INVALID','ARCANE_STT_ACTIVATION_HOST_INVALID','ARCANE_STT_ACTIVATION_ON_CHANGE_INVALID','ARCANE_STT_ACTIVATION_PRESENTATION_CALLBACK_FAILED','ARCANE_STT_ACTIVATION_REQUEST_REJECTED'],
+        capabilitiesCore:'Shared normalized value and explicit STT activation presentation layer for browser components. The configured host remains the lifecycle authority; this module implements no privileged Core service.',
         example:`const rows=normalizeChartRows([
     {date:'2026-08-24T00:00:00Z',value:3}
 ]);

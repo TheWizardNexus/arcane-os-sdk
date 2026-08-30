@@ -15,7 +15,7 @@
   },
   "artifactCount": 86,
   "javascriptArtifactCount": 84,
-  "esmExportCount": 384,
+  "esmExportCount": 377,
   "artifacts": [
     {
       "file": "runtime/arcane/modules/AI.js",
@@ -320,14 +320,13 @@
         "renderedPageBlocks",
         "resolveEvidenceSourcePage",
         "safeName",
-        "sha256",
         "stem"
       ],
-      "summary": "Pairs and indexes structured evidence records with rendered-page provenance and SHA-256 identity.",
+      "summary": "Pairs and indexes structured evidence records with rendered-page provenance.",
       "availability": "Node only",
-      "protocol": "node:fs/promises, node:path, node:crypto",
+      "protocol": "node:fs/promises, node:path",
       "normalization": "Normalized naming/page helpers; filesystem errors preserved.",
-      "surface": "Eight exported indexing, page, naming, stem, and digest helpers."
+      "surface": "Seven exported indexing, page, naming, and stem helpers."
     },
     {
       "file": "runtime/arcane/modules/ChartLibrary.js",
@@ -430,6 +429,7 @@
         "applyMarkdownFormat",
         "createSTTActivationController",
         "effectiveDashboardVisibility",
+        "formatAIRuntimeProgress",
         "normalizeChartOptions",
         "normalizeChartRows",
         "normalizeDashboardDefinitions",
@@ -442,8 +442,8 @@
       "summary": "Owns normalized configuration/value contracts and shared explicit STT activation behavior for chart, dashboard, Markdown, and voice components.",
       "availability": "Cross-host with an injected event constructor outside DOM hosts",
       "protocol": "In-process only",
-      "normalization": "Fully normalized labels, rows, definitions, visibility, formats, editor and voice options, plus capability-neutral STT activation intent and presentation state.",
-      "surface": "Constant sets plus normalization, formatting, and explicit STT activation helpers."
+      "normalization": "Fully normalized labels, rows, definitions, visibility, formats, editor and voice options, plus capability-neutral STT activation intent and presentation state. Complete finite progress measures remain visible, including fractional and over-total values.",
+      "surface": "Constant sets plus normalization, complete finite-progress formatting, and explicit STT activation helpers."
     },
     {
       "file": "runtime/arcane/modules/ConfiguredAIChatSession.js",

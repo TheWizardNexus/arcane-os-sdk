@@ -64,7 +64,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`CommunicationHub.js`](#communicationhubjs) | esm | Fans out provider refresh/send operations and aggregates normalized threads/messages. | Cross-host with injected providers | Normalized aggregates; refresh contains per-provider failures. |
 | [`CommunicationPreferences.js`](#communicationpreferencesjs) | esm | Stores app-scoped, non-secret communication provider preferences. | Browser / native WebView hybrid | Normalized preference record; storage failures mixed. |
 | [`CommunicationProviderRegistry.js`](#communicationproviderregistryjs) | esm | Registers and queries validated provider definitions, channels, and required methods. | Cross-host | Strict normalized registry. |
-| [`ComponentContracts.js`](#componentcontractsjs) | esm | Owns normalized configuration/value contracts and shared explicit STT activation behavior for chart, dashboard, Markdown, and voice components. | Cross-host | Fully normalized labels, rows, definitions, visibility, formats, editor and voice options, plus capability-neutral STT activation intent and presentation state. |
+| [`ComponentContracts.js`](#componentcontractsjs) | esm | Owns normalized configuration/value contracts and shared explicit STT activation behavior for chart, dashboard, Markdown, and voice components. | Cross-host | Fully normalized labels, rows, definitions, visibility, formats, editor and voice options, plus capability-neutral STT activation intent and presentation state. Complete finite progress measures remain visible, including fractional and over-total values. |
 | [`ConfiguredAIChatSession.js`](#configuredaichatsessionjs) | esm | Owns complete in-memory AI turns, context construction, provider-response preservation, and atomic history commit. | Native bridge by default; cross-host with injected chat | Normalized session/result; provider rejection preserved. |
 | [`ConversationActionItems.js`](#conversationactionitemsjs) | esm | Normalizes, creates, updates, remembers, selects, and formats complete conversation action items. | Cross-host | Fully normalized status/base/presentation contract. |
 | [`ConversationClosingReport.js`](#conversationclosingreportjs) | esm | Defines the closing-report tool, instruction, result normalizer, call classifier, and formatter. | Cross-host | Fully normalized report contract. |
@@ -1016,18 +1016,17 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Pairs and indexes structured evidence records with rendered-page provenance and SHA-256 identity.
+Pairs and indexes structured evidence records with rendered-page provenance.
 
 ### Public surface
 
-Eight exported indexing, page, naming, and stem helpers. Legacy digest helpers
-remain host-internal compatibility only and are not an ordinary content gate.
+Seven exported indexing, page, naming, and stem helpers.
 
-Exact exports: `indexPairedRecord`, `nearestPageMarker`, `parseStructuredRecordName`, `renderedPageBlocks`, `resolveEvidenceSourcePage`, `safeName`, `sha256`, `stem`.
+Exact exports: `indexPairedRecord`, `nearestPageMarker`, `parseStructuredRecordName`, `renderedPageBlocks`, `resolveEvidenceSourcePage`, `safeName`, `stem`.
 
 ### Availability and normalization
 
-**Node only and host-internal.** Normalized naming/page helpers; filesystem errors preserved. The file imports `node:fs/promises`, `node:path`, and `node:crypto`, so a renderer must not import it from `/arcane/modules/`. This SDK version does not expose it as an npm subpath; the example applies to repository-owned Node tooling. [Deep protocol details](protocols.md).
+**Node only and host-internal.** Normalized naming/page helpers; filesystem errors preserved. The file imports `node:fs/promises` and `node:path`, so a renderer must not import it from `/arcane/modules/`. This SDK version does not expose it as an npm subpath; the example applies to repository-owned Node tooling. [Deep protocol details](protocols.md).
 
 ### Example
 
