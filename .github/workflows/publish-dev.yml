@@ -49,6 +49,14 @@ jobs:
           architecture: x64
           registry-url: https://registry.npmjs.org/
           package-manager-cache: false
+      - name: Verify the selected Check run and artifact
+        shell: bash
+        env:
+          ARCANE_SELECTED_CHECK_RUN_ID: ${{ inputs.check_run_id }}
+          ARCANE_SELECTED_ARTIFACT_ID: ${{ inputs.artifact_id }}
+          ARCANE_SELECTED_VERSION: ${{ inputs.version }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/verify-selected-check-run.mjs --run-id "$ARCANE_SELECTED_CHECK_RUN_ID" --artifact-id "$ARCANE_SELECTED_ARTIFACT_ID" --version "$ARCANE_SELECTED_VERSION"
       - name: Download the selected Check package
         uses: actions/download-artifact@v8
         with:

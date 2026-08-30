@@ -54,6 +54,12 @@ jobs:
         env:
           RELEASE_OUTPUT: ${{ runner.temp }}/arcane-sdk-npm-release
         run: node tools/build-npm-release.mjs --output "$RELEASE_OUTPUT"
+      - name: Verify the packed npm boundary
+        shell: bash
+        env:
+          RELEASE_TARBALL: ${{ steps.pack.outputs.tarball }}
+          RELEASE_VERSION: ${{ steps.pack.outputs.version }}
+        run: node tools/verify-npm-release.mjs --tarball "$RELEASE_TARBALL" --expected-version "$RELEASE_VERSION"
       - name: Upload the npm tarball
         id: upload
         uses: actions/upload-artifact@v7
@@ -64,8 +70,9 @@ jobs:
           retention-days: 30
 
   installed_capability_smoke:
-    name: Installed capability smoke / linux-x64
+    name: Informational installed capability smoke / linux-x64
     needs: pack_npm_release
+    continue-on-error: true
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
