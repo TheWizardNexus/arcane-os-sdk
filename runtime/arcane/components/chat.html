@@ -1877,13 +1877,13 @@
     ){
         const messageId=String(id);
         const normalizedTotal=Number.isFinite(Number(total))
-            ?Math.max(0,Math.floor(Number(total)))
+            ?Number(total)
             :0;
         const normalizedCurrent=Number.isFinite(Number(current))
-            ?Math.min(normalizedTotal,Math.max(0,Math.floor(Number(current))))
+            ?Number(current)
             :0;
         const normalizedFailed=Number.isFinite(Number(failed))
-            ?Math.max(0,Math.floor(Number(failed)))
+            ?Number(failed)
             :0;
         const message=messageId
             ?[...chatOutput.children].find(
@@ -1936,7 +1936,7 @@
             ?`${visibleStatus}${warningLabel}`
             :`${normalizedCurrent} of ${normalizedTotal}${warningLabel}`;
         const percent=normalizedTotal>0
-            ?normalizedCurrent/normalizedTotal*100
+            ?Math.min(100,Math.max(0,normalizedCurrent/normalizedTotal*100))
             :0;
 
         labelElement.textContent=visibleLabel;
@@ -1949,10 +1949,18 @@
             progress.removeAttribute('aria-valuemin');
             progress.removeAttribute('aria-valuemax');
             progress.removeAttribute('aria-valuenow');
-        }else{
+        }else if(
+            normalizedTotal>0
+            &&normalizedCurrent>=0
+            &&normalizedCurrent<=normalizedTotal
+        ){
             progress.setAttribute('aria-valuemin','0');
             progress.setAttribute('aria-valuemax',String(normalizedTotal));
             progress.setAttribute('aria-valuenow',String(normalizedCurrent));
+        }else{
+            progress.removeAttribute('aria-valuemin');
+            progress.removeAttribute('aria-valuemax');
+            progress.removeAttribute('aria-valuenow');
         }
         progress.setAttribute(
             'aria-valuetext',

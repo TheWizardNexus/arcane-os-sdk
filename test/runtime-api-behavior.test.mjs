@@ -69,13 +69,13 @@ test('AI runtime progress preserves complete provider-reported measures',()=>{
         formatAIRuntimeProgress(
             {
                 phase:'fetching',
-                completed:4,
+                completed:10.5,
                 total:10,
                 unit:'octets'
             },
             'loading'
         ),
-        'fetching · 4 of 10 octets'
+        'fetching · 10.5 of 10 octets'
     );
 });
 

@@ -412,11 +412,9 @@ function formatAIRuntimeProgress(progress,fallback){
     const unit=typeof progress?.unit==='string'
         ?progress.unit
         :'';
-    if(!Number.isSafeInteger(completed)
-        ||completed<0
-        ||!Number.isSafeInteger(total)
+    if(!Number.isFinite(completed)
+        ||!Number.isFinite(total)
         ||total<=0
-        ||completed>total
         ||!unit){
         return phase;
     }

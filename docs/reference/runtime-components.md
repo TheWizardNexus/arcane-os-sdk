@@ -294,7 +294,9 @@ transcript; any other nontext chunk fails with
 `ARCANE_CHAT_STREAM_CONTENT_INVALID`. `setMessageProgress()` preserves explicit
 string labels/status, but routes Error objects through the same user-safe copy
 boundary and otherwise displays generic progress text while logging the exact
-diagnostic value.
+diagnostic value. Finite fractional and over-total progress remains visible in
+the status text and accessibility description; only the decorative track width
+is constrained to its visual range.
 
 `pendingTools` is the mutable ordered array of actionable `{id,name,message}`
 summaries and never exposes raw arguments. `pendingTool` is that compatibility

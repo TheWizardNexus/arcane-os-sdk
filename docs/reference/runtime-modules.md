@@ -1230,6 +1230,8 @@ Exact exports: `CHART_LABELS`, `DASHBOARD_LABELS`, `MARKDOWN_FORMATS`,
 normalized labels, rows, definitions, visibility, formats, editor and voice
 options, capability-neutral STT activation intent and presentation state, and
 complete informational provider progress whenever a finite measure is present.
+Fractional and over-total measures remain visible rather than being replaced by
+their phase label.
 Provider authority and lifecycle execution remain with the configured runtime
 owner. Transport: In-process only. [Deep protocol details](protocols.md).
 
