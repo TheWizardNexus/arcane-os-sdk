@@ -403,6 +403,37 @@ function effectiveDashboardVisibility(definitions=[],visibility={}){
     );
 }
 
+function byteProgressUnit(value){
+    const unit=String(value??'')
+        .trim()
+        .toLowerCase()
+        .replace(/[\s_-]+/g,'');
+    return unit.includes('byte')
+        ||unit.includes('octet')
+        ||/^(?:[kmgtpe]?i?b)(?:(?:\/|per)?(?:s|sec|second))?$/u.test(unit);
+}
+
+function formatAIRuntimeProgress(progress,fallback){
+    const phase=typeof progress?.phase==='string'&&progress.phase
+        ?progress.phase
+        :fallback;
+    const completed=progress?.completed;
+    const total=progress?.total;
+    const unit=typeof progress?.unit==='string'
+        ?progress.unit
+        :'';
+    if(!Number.isSafeInteger(completed)
+        ||completed<0
+        ||!Number.isSafeInteger(total)
+        ||total<=0
+        ||completed>total
+        ||!unit
+        ||byteProgressUnit(unit)){
+        return phase;
+    }
+    return `${phase} · ${completed} of ${total} ${unit}`;
+}
+
 function createSTTActivationController({
     host,
     button,
@@ -539,13 +570,6 @@ function createSTTActivationController({
         return 'Start the selected transcription service.';
     }
 
-    function formatProgress(progress,fallback){
-        if(!progress){
-            return fallback;
-        }
-        return progress.phase;
-    }
-
     function status(){
         if(requestError){
             return `Transcription activation error: ${requestError}.`;
@@ -557,10 +581,10 @@ function createSTTActivationController({
             return role.busy?'Transcription busy.':'Transcription ready.';
         }
         if(role?.state==='loading'){
-            return `Transcription ${formatProgress(role.progress,'loading')}; Cancel is available.`;
+            return `Transcription ${formatAIRuntimeProgress(role.progress,'loading')}; Cancel is available.`;
         }
         if(role?.state==='unloading'){
-            return `Transcription ${formatProgress(role.progress,'releasing')}.`;
+            return `Transcription ${formatAIRuntimeProgress(role.progress,'releasing')}.`;
         }
         if(role?.state==='error'){
             return `Transcription error: ${visibleError(role.error,'Unknown error')}.`;
@@ -1043,6 +1067,7 @@ export {
     applyMarkdownFormat,
     createSTTActivationController,
     effectiveDashboardVisibility,
+    formatAIRuntimeProgress,
     normalizeChartOptions,
     normalizeChartRows,
     normalizeDashboardDefinitions,

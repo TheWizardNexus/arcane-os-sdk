@@ -36,13 +36,6 @@ const ROLE_KEYS = completeValue([
     'progress',
     'error'
 ]);
-const PROGRESS_KEYS = completeValue([
-    'phase',
-    'completed',
-    'total',
-    'unit',
-    'heartbeat'
-]);
 const ERROR_KEYS = completeValue([
     'code',
     'message'
@@ -210,37 +203,42 @@ function copyProgress(progress) {
         return null;
     }
 
-    assertClosedRecord(progress, PROGRESS_KEYS, 'progress');
+    const suppliedKeys=Reflect.ownKeys(progress).filter(key=>typeof key==='string');
+    assertClosedOptions(progress, suppliedKeys, 'progress');
     if (typeof progress.phase !== 'string'
         || progress.phase.length < 1
         || progress.phase.trim() !== progress.phase) {
         fail('progress.phase must be a nonempty trimmed string.');
     }
-    if (!Number.isSafeInteger(progress.completed) || progress.completed < 0) {
+    const hasCompleted = Object.hasOwn(progress, 'completed');
+    const hasTotal = Object.hasOwn(progress, 'total');
+    const hasUnit = Object.hasOwn(progress, 'unit');
+    const hasHeartbeat = Object.hasOwn(progress, 'heartbeat');
+    if (hasCompleted
+        && (!Number.isSafeInteger(progress.completed) || progress.completed < 0)) {
         fail('progress.completed must be a nonnegative safe integer.');
     }
-    if (progress.total !== null
+    if (hasTotal
+        && progress.total !== null
         && (!Number.isSafeInteger(progress.total)
-            || progress.total < progress.completed)) {
-        fail('progress.total must be null or a safe integer no smaller than progress.completed.');
+            || progress.total < 0
+            || (hasCompleted && progress.total < progress.completed))) {
+        fail('progress.total must be null or a nonnegative safe integer no smaller than progress.completed when completed is present.');
     }
-    if (typeof progress.unit !== 'string'
-        || progress.unit.length < 1
-        || progress.unit.trim() !== progress.unit) {
+    if (hasUnit
+        && (typeof progress.unit !== 'string'
+            || progress.unit.length < 1
+            || progress.unit.trim() !== progress.unit)) {
         fail('progress.unit must be a nonempty trimmed string.');
     }
-    if (typeof progress.heartbeat !== 'boolean') {
+    if (hasHeartbeat && typeof progress.heartbeat !== 'boolean') {
         fail('progress.heartbeat must be a boolean.');
     }
 
     return completeValue(
-        {
-            phase: progress.phase,
-            completed: progress.completed,
-            total: progress.total,
-            unit: progress.unit,
-            heartbeat: progress.heartbeat
-        }
+        Object.fromEntries(
+            suppliedKeys.map(key=>[key,progress[key]])
+        )
     );
 }
 
