@@ -217,7 +217,6 @@
       "name": "ArcaneCommunicationBridge.js",
       "kind": "esm",
       "exports": [
-        "normalizeStructuralToolCall",
         "default"
       ],
       "summary": "Maps provider HTTP threads/messages/connect/disconnect endpoints to normalized communication entities.",
@@ -335,7 +334,6 @@
       "name": "ChartLibrary.js",
       "kind": "esm",
       "exports": [
-        "normalizeStructuralToolCall",
         "default"
       ],
       "summary": "Loads the bundled uPlot classic script once and returns its global constructor.",
@@ -393,8 +391,7 @@
       "name": "CommunicationPreferences.js",
       "kind": "esm",
       "exports": [
-        "default",
-        "normalizeStructuralToolCall"
+        "default"
       ],
       "summary": "Stores app-scoped, non-secret communication provider preferences.",
       "availability": "Browser / native WebView hybrid",
@@ -453,6 +450,7 @@
       "name": "ConfiguredAIChatSession.js",
       "kind": "esm",
       "exports": [
+        "normalizeStructuralToolCall",
         "default"
       ],
       "summary": "Owns complete in-memory AI turns, context construction, provider response preservation, and atomic history commit.",
