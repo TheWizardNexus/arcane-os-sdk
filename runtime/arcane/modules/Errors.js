@@ -5,31 +5,34 @@ import {
 } from 'arcane-os/event-manager';
 
 const DEFAULT_DELAY_MS=2_000;
-const DEFAULT_MAX_REPORTS_PER_SESSION=10;
-const DEFAULT_MAX_REPORTS_PER_WINDOW=3;
-const DEFAULT_MAX_PENDING_INCIDENTS=25;
-const DEFAULT_RATE_WINDOW_MS=60_000;
 const LEDGER_STORAGE_KEY='arcane-global-errors-v1';
-const MAX_DETAIL_LENGTH=8_000;
 const HANDLER_MARKER=Symbol.for('arcane.global-errors.handler');
 const DEVELOPER_MODAL_HREF=new URL('../components/modal.html?v=13',import.meta.url).href;
-
-export const GLOBAL_ERROR_EVENT_TYPES=Object.freeze({
+const ERROR_EVENT_TYPES={
     browserErrorCaptured:'arcane-error-captured',
     unhandledRejectionCaptured:'arcane-unhandled-rejection-captured'
-});
-export const GLOBAL_ERROR_EVENT_CODES=Object.freeze({
+};
+const ERROR_EVENT_CODES={
     browserErrorCaptured:'ARCANE_BROWSER_ERROR_CAPTURED',
     unhandledRejectionCaptured:'ARCANE_UNHANDLED_REJECTION_CAPTURED'
-});
-export const GLOBAL_ERROR_REASONS=Object.freeze({
+};
+const ERROR_REASONS={
     browserErrorCaptured:'browser-error-captured',
     unhandledRejectionCaptured:'unhandled-promise-rejection-captured'
-});
+};
+const RUNTIME_OCCURRENCE_PREFIX=(
+    typeof globalThis.crypto?.randomUUID==='function'
+        ? globalThis.crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).replace(/^0\./,'')}`
+);
+let runtimeOccurrenceSequence=0;
+
+export const GLOBAL_ERROR_EVENT_TYPES={...ERROR_EVENT_TYPES};
+export const GLOBAL_ERROR_EVENT_CODES={...ERROR_EVENT_CODES};
+export const GLOBAL_ERROR_REASONS={...ERROR_REASONS};
 
 const MESSAGE_STYLE=[
     'Write a simple plain-text email showing the error and, when the available details support it, a possible solution.',
-    'If loop_detected or error_storm_detected is true, put that warning first and clearly state that further notifications have been suppressed.',
     'Do not add facts that are not present in the report data.',
 ].join(' ');
 
@@ -40,7 +43,7 @@ function safeText(value,fallback=''){
 
     try{
         const text=typeof value==='string' ? value:String(value);
-        return text.slice(0,MAX_DETAIL_LENGTH)||fallback;
+        return text||fallback;
     }catch{
         return fallback;
     }
@@ -126,92 +129,17 @@ export function normalizeRejectionEvent(event={},target=globalThis.window){
     };
 }
 
-function normalizeFingerprintPart(value){
-    return safeText(value)
-        .trim()
-        .replace(/\s+/g,' ')
-        .slice(0,2_000);
-}
-
-function normalizeVolatileFingerprintPart(value){
-    return normalizeFingerprintPart(value)
-        .replace(/[?#][^\s)]+/g,'')
-        .replace(/\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/gi,'<uuid>')
-        .replace(/\b[0-9a-f]{16,}\b/gi,'<hex>')
-        .replace(/\b\d+(?:\.\d+)?\b/g,'<number>');
-}
-
-function normalizeStackFingerprint(value,name,message){
-    const stack=safeText(value).trim();
-    if(!stack){
-        return '';
-    }
-
-    const lines=stack.split(/\r?\n/);
-    const firstLine=lines[0].trim();
-    const errorName=safeText(name).trim();
-    const errorMessage=safeText(message).trim();
-    const hasMessageHeader=lines.length>1&&(
-        firstLine===errorMessage
-        || firstLine===`${errorName}: ${errorMessage}`
-        || (errorName&&firstLine.startsWith(`${errorName}:`))
-        || /^(?:Error|[A-Za-z_$][\w.$]*(?:Error|Exception)):(?:\s|$)/.test(firstLine)
-    );
-    const frames=hasMessageHeader ? lines.slice(1):lines;
-
-    return normalizeFingerprintPart(frames.join('\n'))
-        .replace(/[?#][^\s)]+/g,'')
-        .replace(/\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/gi,'<uuid>')
-        .replace(/\b[0-9a-f]{16,}\b/gi,'<hex>');
-}
-
-function hashText(value){
-    let first=0x811c9dc5;
-    let second=0x9e3779b9;
-
-    for(let index=0;index<value.length;index++){
-        const code=value.charCodeAt(index);
-        first=Math.imul(first^code,0x01000193);
-        second=Math.imul(second^code,0x85ebca6b);
-    }
-
-    return [first,second]
-        .map(hash => (hash>>>0).toString(16).padStart(8,'0'))
-        .join('');
-}
-
 /**
- * Build a stable call-site signature. When a precise source location is
- * available, the human-readable message is deliberately excluded so loops
- * with changing counters, names, or timestamps still produce one report.
+ * Return a fresh opaque occurrence identifier for legacy callers of the former
+ * fingerprint helper. The incident is intentionally not read: identifiers do
+ * not group, admit, or derive identity from error content.
  *
  * @param {Object} incident
  * @returns {string}
  */
-export function fingerprintIncident(incident){
-    const stackFingerprint=normalizeStackFingerprint(
-        incident?.stack,
-        incident?.name,
-        incident?.message
-    );
-    const hasPreciseSource=(
-        Number.isFinite(incident?.lineno)
-        || Number.isFinite(incident?.colno)
-        || Boolean(stackFingerprint)
-    );
-    const signature=[
-        normalizeFingerprintPart(incident?.type),
-        normalizeFingerprintPart(incident?.name),
-        hasPreciseSource
-            ? ''
-            : normalizeVolatileFingerprintPart(incident?.message),
-        normalizeFingerprintPart(incident?.filename).replace(/[?#].*$/,''),
-        normalizeFingerprintPart(incident?.lineno),
-        normalizeFingerprintPart(incident?.colno),
-        stackFingerprint,
-    ].join('|');
-
-    return `error-${hashText(signature)}`;
+export function fingerprintIncident(_incident){
+    runtimeOccurrenceSequence+=1;
+    return `error-${RUNTIME_OCCURRENCE_PREFIX}-${runtimeOccurrenceSequence.toString(36)}`;
 }
 
 function defaultStorage(target){
@@ -262,7 +190,7 @@ function appendDeveloperDetail(document,list,label,value){
     list.append(term,description);
 }
 
-function buildDeveloperIncidentContent(document,incident,fingerprint){
+function buildDeveloperIncidentContent(document,incident,occurrenceId){
     const content=document.createElement('section');
     const heading=document.createElement('h2');
     const introduction=document.createElement('p');
@@ -282,7 +210,7 @@ function buildDeveloperIncidentContent(document,incident,fingerprint){
     appendDeveloperDetail(document,details,'Name',incident?.name);
     appendDeveloperDetail(document,details,'Message',incident?.message);
     appendDeveloperDetail(document,details,'Source',source);
-    appendDeveloperDetail(document,details,'Fingerprint',fingerprint);
+    appendDeveloperDetail(document,details,'Occurrence',occurrenceId);
 
     content.append(heading,introduction,details);
 
@@ -324,7 +252,7 @@ async function ensureHTMLImport(target){
     }
 }
 
-async function presentDeveloperIncidentModal(target,incident,fingerprint){
+async function presentDeveloperIncidentModal(target,incident,occurrenceId){
     const document=target?.document;
     const container=document?.body||document?.documentElement;
 
@@ -335,11 +263,11 @@ async function presentDeveloperIncidentModal(target,incident,fingerprint){
     await ensureHTMLImport(target);
 
     const modal=document.createElement('html-import');
-    const content=buildDeveloperIncidentContent(document,incident,fingerprint);
+    const content=buildDeveloperIncidentContent(document,incident,occurrenceId);
 
     modal.className='modal developer-error-modal';
     modal.setAttribute('aria-label','Application error');
-    modal.setAttribute('data-global-error-modal',fingerprint);
+    modal.setAttribute('data-global-error-modal',occurrenceId);
     modal.setAttribute('data-once','');
     modal.setAttribute('href',DEVELOPER_MODAL_HREF);
 
@@ -409,26 +337,14 @@ class Errors {
 
         this.#events=createArcaneEventSource(this,{
             source:'global-error-handler',
-            eventTypes:Object.freeze([
-                GLOBAL_ERROR_EVENT_TYPES.browserErrorCaptured,
-                GLOBAL_ERROR_EVENT_TYPES.unhandledRejectionCaptured
-            ])
+            eventTypes:[
+                ERROR_EVENT_TYPES.browserErrorCaptured,
+                ERROR_EVENT_TYPES.unhandledRejectionCaptured
+            ]
         });
         this[HANDLER_MARKER]=true;
         this.target=target;
         this.delayMs=options.delayMs??DEFAULT_DELAY_MS;
-        this.deliveryTimeoutMs=options.deliveryTimeoutMs??45_000;
-        this.deliverySchedule=options.deliverySchedule
-            || globalThis.setTimeout.bind(globalThis);
-        this.deliveryCancel=options.deliveryCancel
-            || globalThis.clearTimeout.bind(globalThis);
-        this.maxPendingIncidents=options.maxPendingIncidents
-            ?? DEFAULT_MAX_PENDING_INCIDENTS;
-        this.maxReportsPerSession=options.maxReportsPerSession
-            ?? DEFAULT_MAX_REPORTS_PER_SESSION;
-        this.maxReportsPerWindow=options.maxReportsPerWindow
-            ?? DEFAULT_MAX_REPORTS_PER_WINDOW;
-        this.rateWindowMs=options.rateWindowMs??DEFAULT_RATE_WINDOW_MS;
         this.now=options.now||Date.now;
         this.schedule=options.schedule||globalThis.setTimeout.bind(globalThis);
         this.cancel=options.cancel||globalThis.clearTimeout.bind(globalThis);
@@ -452,21 +368,15 @@ class Errors {
         this.pending=new Map();
         this.deliveryQueue=Promise.resolve();
         this.destroyed=false;
-        this.invokingMail=false;
-        this.deferredDeveloperIncident=null;
-        this.developerModalActive=false;
-        this.developerUiDisabled=false;
-        this.developerShownFingerprints=new Set();
+        this.developerIncidentQueue=[];
+        this.developerPresentationActive=false;
         this.waitingForUser=false;
 
         const ledger=this.loadLedger();
-        this.reported=new Set(ledger.fingerprints);
-        this.reportTimestamps=ledger.reportTimestamps;
-        this.circuitOpen=ledger.circuitOpen||!this.storageHealthy;
 
         if(!this.storageHealthy){
             this.warn(
-                'Persistent suppression storage is unavailable; error email notifications are disabled to prevent reload loops.'
+                'Pending error delivery storage is unavailable; delivery will continue in memory.'
             );
         }
 
@@ -498,12 +408,7 @@ class Errors {
     }
 
     loadLedger(){
-        const empty={
-            fingerprints:[],
-            pending:[],
-            reportTimestamps:[],
-            circuitOpen:false,
-        };
+        const empty={ pending:[] };
 
         if(!this.storageHealthy){
             return empty;
@@ -516,25 +421,12 @@ class Errors {
             }
 
             return {
-                fingerprints:Array.isArray(value.fingerprints)
-                    ? value.fingerprints.filter(item => typeof item==='string')
-                    : [],
                 pending:Array.isArray(value.pending)
-                    ? value.pending.filter(record => (
-                        record
-                        && typeof record==='object'
-                        && typeof record.fingerprint==='string'
-                        && record.incident
-                        && typeof record.incident==='object'
-                    ))
-                    : [],
-                reportTimestamps:Array.isArray(value.reportTimestamps)
-                    ? value.reportTimestamps.filter(Number.isFinite)
-                    : [],
-                circuitOpen:value.circuitOpen===true,
+                    ? value.pending
+                    : []
             };
-        }catch{
-            this.storageHealthy=false;
+        }catch(error){
+            this.warn('Unable to restore pending error deliveries.',error);
             return empty;
         }
     }
@@ -545,47 +437,19 @@ class Errors {
         }
 
         try{
-            const serialized=JSON.stringify({
-                fingerprints:[...this.reported],
+            this.storage.setItem(LEDGER_STORAGE_KEY,JSON.stringify({
                 pending:[...this.pending.values()].map(record => ({
-                    count:record.count,
+                    capturedAt:record.capturedAt,
                     dueAt:record.dueAt,
-                    errorStormDetected:record.errorStormDetected,
-                    fingerprint:record.fingerprint,
-                    firstSeen:record.firstSeen,
                     incident:record.incident,
-                    lastSeen:record.lastSeen,
-                    uniqueIncidentCount:record.uniqueIncidentCount,
-                })),
-                reportTimestamps:this.reportTimestamps,
-                circuitOpen:this.circuitOpen,
-            });
-            this.storage.setItem(LEDGER_STORAGE_KEY,serialized);
-            if(this.storage.getItem(LEDGER_STORAGE_KEY)!==serialized){
-                throw new Error('Suppression ledger verification failed');
-            }
+                    occurrenceId:record.occurrenceId,
+                    retryRequired:record.retryRequired===true
+                }))
+            }));
             return true;
         }catch(error){
-            this.disableForStorageFailure(error);
+            this.warn('Unable to persist pending error deliveries.',error);
             return false;
-        }
-    }
-
-    disableForStorageFailure(error){
-        const shouldWarn=this.storageHealthy;
-        this.storageHealthy=false;
-        this.circuitOpen=true;
-
-        for(const record of this.pending.values()){
-            this.cancelTimer(record);
-        }
-        this.pending.clear();
-
-        if(shouldWarn){
-            this.warn(
-                'Suppression storage failed; error email notifications are disabled to prevent reload loops.',
-                error
-            );
         }
     }
 
@@ -608,7 +472,7 @@ class Errors {
             record.timer=this.schedule(
                 () => {
                     try{
-                        this.flushFingerprint(record.fingerprint);
+                        this.flushOccurrence(record.occurrenceId);
                     }catch(error){
                         this.warn('Unable to flush a scheduled error notification.',error);
                     }
@@ -617,45 +481,61 @@ class Errors {
             );
             return true;
         }catch(error){
-            this.pending.delete(record.fingerprint);
             this.warn('Unable to schedule an error notification.',error);
+            record.timer=null;
+            this.flushOccurrence(record.occurrenceId);
             return false;
         }
     }
 
     restorePending(records){
-        if(this.circuitOpen||!Array.isArray(records)){
+        if(!Array.isArray(records)){
             return;
         }
 
         const timestamp=this.now();
-        for(const storedRecord of records.slice(0,this.maxPendingIncidents)){
-            if(this.reported.has(storedRecord.fingerprint)){
+        for(const storedRecord of records){
+            if(
+                !storedRecord
+                || typeof storedRecord!=='object'
+                || !storedRecord.incident
+                || typeof storedRecord.incident!=='object'
+            ){
+                this.warn('A persisted error delivery could not be restored.');
                 continue;
             }
 
-            const firstSeen=Number.isFinite(storedRecord.firstSeen)
-                ? storedRecord.firstSeen:timestamp;
+            const capturedAt=Number.isFinite(storedRecord.capturedAt)
+                ? storedRecord.capturedAt
+                : Number.isFinite(storedRecord.firstSeen)
+                    ? storedRecord.firstSeen
+                    : timestamp;
             const dueAt=Number.isFinite(storedRecord.dueAt)
-                ? storedRecord.dueAt:firstSeen+this.delayMs;
+                ? storedRecord.dueAt:capturedAt+this.delayMs;
+            let occurrenceId=(
+                typeof storedRecord.occurrenceId==='string'
+                && storedRecord.occurrenceId.trim()
+            )
+                ? storedRecord.occurrenceId
+                : fingerprintIncident(storedRecord.incident);
+            while(this.pending.has(occurrenceId)){
+                occurrenceId=fingerprintIncident(storedRecord.incident);
+            }
             const record={
-                count:Number.isFinite(storedRecord.count)
-                    ? Math.max(1,storedRecord.count):1,
+                capturedAt,
+                delivering:false,
                 dueAt,
-                errorStormDetected:storedRecord.errorStormDetected===true,
-                fingerprint:storedRecord.fingerprint,
-                firstSeen,
                 incident:storedRecord.incident,
-                lastSeen:Number.isFinite(storedRecord.lastSeen)
-                    ? storedRecord.lastSeen:firstSeen,
-                timer:null,
-                uniqueIncidentCount:Number.isFinite(storedRecord.uniqueIncidentCount)
-                    ? Math.max(1,storedRecord.uniqueIncidentCount):1,
+                occurrenceId,
+                retryRequired:storedRecord.retryRequired===true,
+                timer:null
             };
 
-            this.pending.set(record.fingerprint,record);
-            this.scheduleRecord(record,dueAt-timestamp);
-            this.offerDeveloperIncident(record.incident,record.fingerprint);
+            this.pending.set(record.occurrenceId,record);
+            if(!record.retryRequired){
+                this.scheduleRecord(record,dueAt-timestamp);
+            }
+            this.offerDeveloperIncident(record.incident,record.occurrenceId);
         }
 
         this.persistLedger();
@@ -690,15 +570,11 @@ class Errors {
             return this.isDeveloperMode();
         }catch(error){
             this.warn('Unable to read the developer-mode preference.',error);
-            return false;
+            return null;
         }
     }
 
-    deferDeveloperIncident(incident,fingerprint){
-        if(!this.deferredDeveloperIncident){
-            this.deferredDeveloperIncident={ fingerprint,incident };
-        }
-
+    waitForDeveloperPreference(){
         if(this.waitingForUser){
             return;
         }
@@ -714,306 +590,191 @@ class Errors {
     onUserLoaded(){
         this.#stopUserLoaded=null;
         this.waitingForUser=false;
-
-        const deferred=this.deferredDeveloperIncident;
-        this.deferredDeveloperIncident=null;
-
-        if(deferred){
-            this.offerDeveloperIncident(
-                deferred.incident,
-                deferred.fingerprint,
-                false
-            );
-        }
+        this.drainDeveloperIncidents();
     }
 
-    offerDeveloperIncident(incident,fingerprint,allowDefer=true){
+    drainDeveloperIncidents(){
         if(
             this.destroyed
-            || this.developerUiDisabled
-            || this.developerModalActive
-            || this.developerShownFingerprints.has(fingerprint)
+            || this.developerPresentationActive
+            || this.developerIncidentQueue.length===0
         ){
             return false;
         }
 
         const developerMode=this.readDeveloperMode();
+        if(developerMode===null||developerMode===undefined){
+            this.waitForDeveloperPreference();
+            return false;
+        }
+
         if(developerMode!==true){
-            if(allowDefer&&(developerMode===null||developerMode===undefined)){
-                this.deferDeveloperIncident(incident,fingerprint);
-            }
+            this.developerIncidentQueue.length=0;
             return false;
         }
 
-        this.developerShownFingerprints.add(fingerprint);
-        this.developerModalActive=true;
-
-        let presentation;
-        try{
-            presentation=this.presentDeveloperIncident(incident,fingerprint);
-        }catch(error){
-            this.developerModalActive=false;
-            this.developerUiDisabled=true;
-            this.warn('Developer error display failed and has been disabled for this session.',error);
-            return false;
-        }
-
-        Promise.resolve(presentation).then(
-            () => {
-                this.developerModalActive=false;
-            },
-            error => {
-                this.developerModalActive=false;
-                this.developerUiDisabled=true;
-                this.warn('Developer error display failed and has been disabled for this session.',error);
-            }
-        );
+        const next=this.developerIncidentQueue.shift();
+        this.developerPresentationActive=true;
+        Promise.resolve()
+            .then(() => this.presentDeveloperIncident(
+                next.incident,
+                next.occurrenceId
+            ))
+            .catch(error => {
+                this.warn('Developer error display failed.',error);
+            })
+            .finally(() => {
+                this.developerPresentationActive=false;
+                this.drainDeveloperIncidents();
+            });
 
         return true;
     }
 
+    offerDeveloperIncident(incident,occurrenceId){
+        if(this.destroyed){
+            return false;
+        }
+
+        const developerMode=this.readDeveloperMode();
+        if(developerMode===false){
+            return false;
+        }
+
+        this.developerIncidentQueue.push({ incident,occurrenceId });
+        if(developerMode===null||developerMode===undefined){
+            this.waitForDeveloperPreference();
+            return true;
+        }
+
+        this.drainDeveloperIncidents();
+        return true;
+    }
+
     capture(incident){
-        if(this.destroyed||this.invokingMail){
+        if(this.destroyed){
             return false;
         }
 
-        const fingerprint=fingerprintIncident(incident);
-        if(this.reported.has(fingerprint)){
-            return false;
+        let occurrenceId=fingerprintIncident(incident);
+        while(this.pending.has(occurrenceId)){
+            occurrenceId=fingerprintIncident(incident);
         }
-
         const incidentKind=incident?.type==='unhandledrejection'
             ?'unhandled-promise-rejection'
             :'browser-error';
         const eventType=incidentKind==='unhandled-promise-rejection'
-            ?GLOBAL_ERROR_EVENT_TYPES.unhandledRejectionCaptured
-            :GLOBAL_ERROR_EVENT_TYPES.browserErrorCaptured;
+            ?ERROR_EVENT_TYPES.unhandledRejectionCaptured
+            :ERROR_EVENT_TYPES.browserErrorCaptured;
         const code=incidentKind==='unhandled-promise-rejection'
-            ?GLOBAL_ERROR_EVENT_CODES.unhandledRejectionCaptured
-            :GLOBAL_ERROR_EVENT_CODES.browserErrorCaptured;
+            ?ERROR_EVENT_CODES.unhandledRejectionCaptured
+            :ERROR_EVENT_CODES.browserErrorCaptured;
         const reason=incidentKind==='unhandled-promise-rejection'
-            ?GLOBAL_ERROR_REASONS.unhandledRejectionCaptured
-            :GLOBAL_ERROR_REASONS.browserErrorCaptured;
+            ?ERROR_REASONS.unhandledRejectionCaptured
+            :ERROR_REASONS.browserErrorCaptured;
         this.#operationSequence+=1;
         this.#events.dispatch(
             eventType,
-            Object.freeze({...incident,code,fingerprint,reason}),
+            {id:occurrenceId,fingerprint:occurrenceId,code,kind:incidentKind,reason},
             {
                 operationId:`global-error-handler-${this.#events.instanceId}-${this.#operationSequence.toString(36)}`,
-                publicDetail:Object.freeze({
-                    id:fingerprint,
+                publicDetail:{
+                    id:occurrenceId,
+                    fingerprint:occurrenceId,
                     code,
                     kind:incidentKind,
                     reason
-                })
+                }
             }
         );
 
-        this.offerDeveloperIncident(incident,fingerprint);
-
-        if(this.circuitOpen){
-            return false;
-        }
+        this.offerDeveloperIncident(incident,occurrenceId);
 
         const timestamp=this.now();
-        const existing=this.pending.get(fingerprint);
-        if(existing){
-            existing.count++;
-            existing.lastSeen=timestamp;
-            if(existing.count===2){
-                return this.persistLedger();
-            }
-            return true;
-        }
-
-        if(this.pending.size>=this.maxPendingIncidents){
-            const stormRecord=this.pending.values().next().value;
-            if(stormRecord){
-                const stormAlreadyDetected=stormRecord.errorStormDetected;
-                stormRecord.errorStormDetected=true;
-                stormRecord.lastSeen=timestamp;
-                stormRecord.uniqueIncidentCount=stormAlreadyDetected
-                    ? stormRecord.uniqueIncidentCount+1
-                    : this.pending.size+1;
-                this.persistLedger();
-            }
-            return false;
-        }
-
         const record={
-            count:1,
+            capturedAt:timestamp,
+            delivering:false,
             dueAt:timestamp+this.delayMs,
-            errorStormDetected:false,
-            fingerprint,
-            firstSeen:timestamp,
             incident,
-            lastSeen:timestamp,
-            timer:null,
-            uniqueIncidentCount:1,
+            occurrenceId,
+            retryRequired:false,
+            timer:null
         };
 
-        this.pending.set(fingerprint,record);
-        // This is intentionally a fixed window from the first occurrence.
-        // Resetting the timer on every repeat could postpone a true loop forever.
-        if(!this.scheduleRecord(record,this.delayMs)){
+        this.pending.set(occurrenceId,record);
+        this.persistLedger();
+        this.scheduleRecord(record,this.delayMs);
+        return true;
+    }
+
+    flushOccurrence(occurrenceId){
+        const record=this.pending.get(occurrenceId);
+        if(!record||record.delivering){
             return false;
         }
 
-        return this.persistLedger();
-    }
-
-    reserveDelivery(timestamp){
-        const cutoff=timestamp-this.rateWindowMs;
-        const recentReportTimestamps=this.reportTimestamps.filter(
-            reportTimestamp => reportTimestamp>=cutoff
-        );
-
-        if(
-            this.reportTimestamps.length>=this.maxReportsPerSession
-            || recentReportTimestamps.length>=this.maxReportsPerWindow
-        ){
-            this.openCircuit();
-            return { allowed:false,circuitOpened:true };
+        this.cancelTimer(record);
+        if(this.destroyed){
+            this.persistLedger();
+            return false;
         }
 
-        this.reportTimestamps.push(timestamp);
-
-        const circuitOpened=(
-            this.reportTimestamps.length>=this.maxReportsPerSession
-            || recentReportTimestamps.length+1>=this.maxReportsPerWindow
-        );
-
-        if(circuitOpened){
-            this.openCircuit();
-        }
-
-        return { allowed:true,circuitOpened };
-    }
-
-    openCircuit(){
-        this.circuitOpen=true;
-
-        for(const record of this.pending.values()){
-            this.cancelTimer(record);
-        }
-
-        this.pending.clear();
-        this.persistLedger();
+        record.delivering=true;
+        this.deliveryQueue=this.deliveryQueue
+            .then(async () => {
+                if(this.destroyed){
+                    record.retryRequired=true;
+                    return false;
+                }
+                await this.deliver(record);
+                return true;
+            })
+            .then(delivered => {
+                if(!delivered){
+                    record.delivering=false;
+                    this.persistLedger();
+                    return;
+                }
+                if(this.pending.get(occurrenceId)===record){
+                    this.pending.delete(occurrenceId);
+                }
+                record.delivering=false;
+                this.persistLedger();
+            })
+            .catch(error => {
+                record.delivering=false;
+                record.retryRequired=true;
+                this.warn('Error notification failed; delivery remains pending for retry.',error);
+                this.persistLedger();
+            });
+        return true;
     }
 
     flushFingerprint(fingerprint){
-        const record=this.pending.get(fingerprint);
-        if(!record){
-            return;
-        }
-
-        this.pending.delete(fingerprint);
-        this.cancelTimer(record);
-
-        if(this.destroyed||this.circuitOpen||this.reported.has(fingerprint)){
-            this.persistLedger();
-            return;
-        }
-
-        // Suppress before performing any fallible notification work. A failed
-        // mail request is an attempted report and must never be retried recursively.
-        this.reported.add(fingerprint);
-        const reservation=this.reserveDelivery(this.now());
-        if(record.errorStormDetected&&reservation.allowed&&!reservation.circuitOpened){
-            reservation.circuitOpened=true;
-            this.openCircuit();
-        }
-        const persisted=this.persistLedger();
-
-        if(!reservation.allowed||!persisted){
-            return;
-        }
-
-        this.deliveryQueue=this.deliveryQueue
-            .then(() => this.deliver(record,reservation))
-            .catch(error => {
-                this.warn('Unexpected notification-queue failure; no retry will be attempted.',error);
-            });
+        return this.flushOccurrence(fingerprint);
     }
 
-    buildNotification(record,reservation){
-        const loopDetected=record.count>1;
-        const errorStormDetected=record.errorStormDetected
-            || reservation.circuitOpened;
-        const baseSubject=record.incident.type==='unhandledrejection'
+    buildNotification(record){
+        const subject=record.incident?.type==='unhandledrejection'
             ? 'ARCANE JS UNHANDLED REJECTION'
             : 'ARCANE JS ERROR';
-
-        let subject=baseSubject;
-        if(errorStormDetected){
-            subject=`${baseSubject} - ERROR STORM DETECTED`;
-        }else if(loopDetected){
-            subject=`${baseSubject} - LOOP DETECTED`;
-        }
-
         const payload={
             ...record.incident,
-            fingerprint:record.fingerprint,
-            occurrence_count:record.count,
-            first_seen_at:safeIso(record.firstSeen),
-            last_seen_at:safeIso(record.lastSeen),
-            observation_window_ms:this.delayMs,
-            loop_detected:loopDetected,
-            error_storm_detected:errorStormDetected,
-            unique_incident_count:record.uniqueIncidentCount,
-            matching_notifications_suppressed:true,
-            loop_notice:loopDetected
-                ? `This error repeated ${record.count} times during the ${this.delayMs}ms observation window. Further matching notifications are suppressed for this browser session.`
-                : 'Further occurrences of this same error are suppressed for this browser session.',
-            circuit_breaker_notice:errorStormDetected
-                ? 'The global notification limit was reached. Further error emails are suppressed for this browser session to stop a possible varying error loop.'
-                : null,
+            captured_at:safeIso(record.capturedAt),
+            occurrence_id:record.occurrenceId
         };
 
         return { payload,subject };
     }
 
-    async deliver(record,reservation){
-        const { payload,subject }=this.buildNotification(record,reservation);
-        let timeout=null;
-        const delivery=Promise.resolve().then(() => {
-            // Only suppress events emitted synchronously by the adapter call.
-            // Its returned promise is observed below, so unrelated errors that
-            // occur while network delivery is pending must still be captured.
-            this.invokingMail=true;
-            try{
-                return this.sendMail([],subject,payload,MESSAGE_STYLE,'error');
-            }finally{
-                this.invokingMail=false;
-            }
-        });
-
-        try{
-            await Promise.race([
-                delivery,
-                new Promise((resolve,reject) => {
-                    timeout=this.deliverySchedule(
-                        () => reject(new Error('Error notification timed out')),
-                        this.deliveryTimeoutMs
-                    );
-                }),
-            ]);
-        }catch(error){
-            this.warn('Error notification failed; no retry will be attempted.',error);
-        }finally{
-            if(timeout!==null){
-                try{
-                    this.deliveryCancel(timeout);
-                }catch(error){
-                    this.warn('Unable to cancel the notification timeout.',error);
-                }
-            }
-        }
+    async deliver(record){
+        const { payload,subject }=this.buildNotification(record);
+        await this.sendMail([],subject,payload,MESSAGE_STYLE,'error');
     }
 
     async flush(){
-        for(const fingerprint of [...this.pending.keys()]){
-            this.flushFingerprint(fingerprint);
+        for(const occurrenceId of [...this.pending.keys()]){
+            this.flushOccurrence(occurrenceId);
         }
 
         await this.whenIdle();
@@ -1034,7 +795,7 @@ class Errors {
         this.#stopUserLoaded?.();
         this.#stopUserLoaded=null;
         this.waitingForUser=false;
-        this.deferredDeveloperIncident=null;
+        this.developerIncidentQueue.length=0;
 
         try{
             const modal=this.target.document?.querySelector?.(
@@ -1061,7 +822,6 @@ class Errors {
             this.cancelTimer(record);
         }
 
-        this.pending.clear();
         this.persistLedger();
 
         if(this.target.errors===this){
