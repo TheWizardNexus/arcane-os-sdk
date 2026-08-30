@@ -237,7 +237,7 @@ Success returns the normal selected-workspace wrapper:
         documentPaths,
         documentCount,
         imports,
-        excludedModules:['modules/CaseEvidenceIndexer.js'],
+        excludedModules:[],
         committed:true
     }
 }

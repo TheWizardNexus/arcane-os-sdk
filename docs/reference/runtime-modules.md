@@ -57,7 +57,6 @@ own asynchronous work, cancellation, and backpressure.
 | [`AsyncBoundary.js`](#asyncboundaryjs) | esm | Runs one asynchronous operation with timeout, abort, result validation, and stable boundary errors. | Cross-host | Fully normalized timeout/abort errors. |
 | [`BrowserTestSuite.js`](#browsertestsuitejs) | esm | Runs a complete sequential browser test list with explicit cancellation and full-detail lifecycle events. | Browser / standard Web APIs | Mutable results and skip/assertion errors normalized without suite-created caps or timers. |
 | [`CalculatorEngine.js`](#calculatorenginejs) | esm | Evaluates arithmetic, powers, constants, and common functions without `eval`. | Cross-host | Normalized `Calculation` result and parser errors. |
-| [`CaseEvidenceIndexer.js`](#caseevidenceindexerjs) | esm | Pairs and indexes structured evidence records with rendered-page references. | Node only | Normalized naming/page helpers; filesystem errors preserved. |
 | [`ChartLibrary.js`](#chartlibraryjs) | esm | Loads the bundled uPlot classic script once and returns its global constructor. | Browser / native WebView | Load state/errors normalized; uPlot result is vendor-native. |
 | [`ChatRecords.js`](#chatrecordsjs) | esm | Detects whether a chat record contains a meaningful user entry. | Cross-host | Boolean normalized result. |
 | [`CommunicationAppController.js`](#communicationappcontrollerjs) | esm | Binds shared inbox, conversation, settings, theme, and provider workflows into one UI controller. | Browser / native WebView hybrid | Controller state normalized; provider/DOM failures mixed. |
@@ -1010,31 +1009,6 @@ domain, and unexpected evaluation boundaries use
 import * as module from '/arcane/modules/CalculatorEngine.js';
 
 console.log(Object.keys(module));
-```
-
-## CaseEvidenceIndexer.js
-
-### Overview
-
-Pairs and indexes structured evidence records with rendered-page provenance.
-
-### Public surface
-
-Seven exported indexing, page, naming, and stem helpers.
-
-Exact exports: `indexPairedRecord`, `nearestPageMarker`, `parseStructuredRecordName`, `renderedPageBlocks`, `resolveEvidenceSourcePage`, `safeName`, `stem`.
-
-### Availability and normalization
-
-**Node only and host-internal.** Normalized naming/page helpers; filesystem errors preserved. The file imports `node:fs/promises` and `node:path`, so a renderer must not import it from `/arcane/modules/`. This SDK version does not expose it as an npm subpath; the example applies to repository-owned Node tooling. [Deep protocol details](protocols.md).
-
-### Example
-
-```javascript
-// From a repository-owned tools/*.mjs file:
-import {safeName, stem} from '../runtime/arcane/modules/CaseEvidenceIndexer.js';
-
-console.log(safeName('Evidence 01.pdf'), stem('Evidence 01.pdf'));
 ```
 
 ## ChartLibrary.js
@@ -3177,6 +3151,6 @@ console.log(Object.keys(module));
 
 ## Entity and component continuations
 
-- [Runtime entity modules](runtime-entities.md) explains all 15 modules, and [shared entity contracts](core/arcane-entities.md) owns all 35 exports.
+- [Runtime entity modules](runtime-entities.md) explains all 14 modules, and [shared entity contracts](core/arcane-entities.md) owns all 29 exports.
 - [Runtime components](runtime-components.md) owns all 39 HTML-import fragments, methods, slots, and events.
 - [Arcane Ollama](arcane-ollama.md) expands the raw-versus-normalized behavior of `Ollama.js`.

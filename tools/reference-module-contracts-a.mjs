@@ -282,17 +282,6 @@ console.log(await suite.run());`
 console.log(engine.calculate('sqrt(81) + 2^3').result);`
     },
     {
-        name:'CaseEvidenceIndexer.js',
-        classification:'host-internal',
-        lifecycleSideEffects:'Pure helpers are side-effect free; indexPairedRecord reads raw and Markdown trees, creates the evidence output directory, and writes extracted evidence Markdown.',
-        paramsResults:'Node-only helpers parse structured names, page markers and blocks, safe names, stems, and source-page provenance. indexPairedRecord(options) returns {records, evidence, markdownNames, orphanMarkdown}.',
-        events:[],
-        errors:['TypeError when required roots are absent','node:fs and node:path failures propagate'],
-        capabilitiesCore:'Node-only host-internal evidence indexing utility; not a browser SDK or Arcane Core bridge.',
-        example:`const parsed=parseStructuredRecordName('24-08-26 [Court] - Order.pdf');
-console.log(parsed.isoDate,parsed.source,parsed.title);`
-    },
-    {
         name:'ChartLibrary.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Returns existing window.uPlot or injects the bundled uPlot.iife.min.js script once and caches the load promise.',

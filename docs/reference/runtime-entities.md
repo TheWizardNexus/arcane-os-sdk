@@ -1,6 +1,6 @@
 # Arcane runtime entity modules
 
-The synchronized runtime ships 15 entity modules with 35 public ESM bindings.
+The synchronized runtime ships 14 entity modules with 29 public ESM bindings.
 This page explains each module's capability and host assumptions. The exact
 constructor/function/value contracts are canonical in the
 [Arcane shared entity inventory](core/arcane-entities.md).
@@ -25,7 +25,6 @@ or native-WebView dependency.
 | `Preference.js` | `default`, `preferenceSchema` | Boolean, number, select, and text preference definitions. | Cross-host; normalized. |
 | `TerminalSession.js` | `default`, `terminalShells` | Frozen terminal session identity, shell, and state. | Cross-host; normalized. |
 | `Theme.js` | five exports | Semantic theme tokens, conversion, serialization, and DOM application. | Values cross-host; apply/clear need DOM; normalized/mixed. |
-| `TWiNPolicyDecision.js` | six named exports | Immutable canonical policy decision, rehydration, serialization, and redacted audit projection. | Cross-host; strict normalized coded errors. |
 | `User.js` | `default` | User preferences/profile state with DBLS/DBOPFS lifecycle. | Browser/native WebView; storage behavior mixed. |
 | `Weather.js` | four classes | Frozen location, observation, day, and snapshot weather entities. | Cross-host; normalized. |
 
@@ -253,29 +252,6 @@ import Theme, {arcaneDarkThemeTokens} from '/arcane/entities/Theme.js';
 
 const theme = new Theme({name: 'example', tokens: arcaneDarkThemeTokens});
 console.log(theme.toJSON());
-```
-
-## TWiNPolicyDecision.js
-
-### Overview
-
-Creates immutable canonical v1 policy decisions with trusted provenance,
-bounded serialization, rehydration, and a target/value-redacted audit view.
-
-### Example
-
-```javascript
-import {
-    createTWiNPolicyDecision,
-    twinPolicyDecisionAuditProjection
-} from '/arcane/entities/TWiNPolicyDecision.js';
-
-const decision = createTWiNPolicyDecision(
-    {layer: 'application', policy: 'example', outcome: 'allow'},
-    {source: 'example'}
-);
-
-console.log(twinPolicyDecisionAuditProjection(decision));
 ```
 
 ## User.js

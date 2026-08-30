@@ -15,7 +15,7 @@ The snapshot contains:
 - 35 namespaces, constructors, and values;
 - 106 application-facing methods;
 - 14 renderer-visible event names;
-- 35 public shared-entity exports;
+- 29 public shared-entity exports;
 - the complete provider-neutral AI and direct Ollama data contracts;
 - 141 MDN-style member guides with exact H2 keys, substantive contract detail,
   and safe JavaScript examples.

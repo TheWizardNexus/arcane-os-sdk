@@ -195,10 +195,10 @@ The focused physical targets remain stable when their bindings are reached:
 | `./node_modules/strong-type/index.js` | `./arcane/dependencies/strong-type/index.js` |
 
 There is no `arcane-os` package-root mapping, bare `strong-type` mapping, or
-catch-all `arcane/` prefix. Host-internal `CaseEvidenceIndexer.js` is explicitly
-excluded; classic scripts, workers, stylesheets, and other non-ESM assets use
-their documented URL or host loading contract rather than invented package
-bindings. Development serves the selected app plus the complete selected tree.
+catch-all `arcane/` prefix. Classic scripts, workers, stylesheets, and other
+non-ESM assets use their documented URL or host loading contract rather than
+invented package bindings. Development serves the selected app plus the
+complete selected tree.
 Packaging copies the same map, app entry, and physical content into `dist/<id>`;
 targets never resolve through the consumer workspace's root `node_modules/`.
 The two lowercase static runtime package specifiers above are also exact npm

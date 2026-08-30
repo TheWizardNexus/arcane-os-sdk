@@ -601,8 +601,8 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
     });
 
     await t.test('all entity modules and exact exports are cataloged',()=>{
-        assert.equal(entityInventory.moduleCount,15);
-        assert.equal(entityInventory.exportCount,35);
+        assert.equal(entityInventory.moduleCount,14);
+        assert.equal(entityInventory.exportCount,29);
         const liveByFile=new Map(live.entities.map(module=>[module.file,module.exports]));
         assert.deepEqual(
             sorted(live.entities.map(module=>module.file)),
@@ -948,8 +948,8 @@ test('the imported Core reference is exhaustive, focused, and mechanically reada
             .map(match=>match[1]);
         assert.equal(eventNames.length,14);
         assert.equal(new Set(eventNames).size,14);
-        assert.equal(entityExports.length,35);
-        assert.equal(new Set(entityExports).size,35);
+        assert.equal(entityExports.length,29);
+        assert.equal(new Set(entityExports).size,29);
     });
 });
 

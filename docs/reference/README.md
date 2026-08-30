@@ -107,10 +107,10 @@ download, install, or self-update.
 
 The synchronized browser payload exposes:
 
-- 84 JavaScript module artifacts under `runtime/arcane/modules/`, including
+- 83 JavaScript module artifacts under `runtime/arcane/modules/`, including
   ESM modules, classic vendor globals, one worker protocol, and one Node-oriented
   mail transport;
-- 15 shared entity modules under `runtime/arcane/entities/`;
+- 14 shared entity modules under `runtime/arcane/entities/`;
 - 39 reusable HTML-import components under `runtime/arcane/components/`;
 - seven shared CSS artifacts, images, optional physical-workspace security
   files where present, and the vendored `strong-type` dependency.

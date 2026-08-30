@@ -10,8 +10,8 @@ export. Import only the exports listed here, and do not depend on unexported
 implementation details.
 
 The `Kind` column describes the exported JavaScript value: `class`, `function`,
-or `constant`. Detailed, versioned rules for intent envelopes and TWiN policy
-decisions remain authoritative in the linked contract documents.
+or `constant`. Detailed, versioned rules for intent envelopes remain
+authoritative in the linked contract document.
 
 ## Export inventory
 
@@ -41,12 +41,6 @@ decisions remain authoritative in the linked contract documents.
 | `arcane/entities/Theme.js#themeTokens` | constant | `themeTokens` | Frozen ordered definitions that map public theme-token keys to CSS custom properties, labels, and defaults. |
 | `arcane/entities/Theme.js#themeColorToHex` | function | `themeColorToHex` | Validates an RGB, RGBA, or six-digit hexadecimal color and returns its RGB channels as a normalized six-digit hexadecimal color. |
 | `arcane/entities/Theme.js#default` | class | `Theme` | Validates and freezes a named light or dark token set and can serialize, restore, apply, or clear that theme on a document root. |
-| `arcane/entities/TWiNPolicyDecision.js#TWiNPolicyDecisionValidationError` | class | `TWiNPolicyDecisionValidationError` | Privacy-safe policy-decision validation error with stable `code` and structural `path` fields; see the [TWiN error contract](https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/docs/twin-policy-decision.md#failure-and-recovery). |
-| `arcane/entities/TWiNPolicyDecision.js#createTWiNPolicyDecision` | function | `createTWiNPolicyDecision` | Validates an evaluator payload separately from trusted decision and policy provenance, then returns an immutable v1 decision; see the [trusted creation boundary](https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/docs/twin-policy-decision.md#trusted-creation-boundary). |
-| `arcane/entities/TWiNPolicyDecision.js#rehydrateTWiNPolicyDecision` | function | `rehydrateTWiNPolicyDecision` | Validates and reconstructs a canonical v1 policy-decision object or exact canonical JSON without asserting authenticity, freshness, or authority. |
-| `arcane/entities/TWiNPolicyDecision.js#serializeTWiNPolicyDecision` | function | `serializeTWiNPolicyDecision` | Produces deterministic canonical JSON for a valid v1 TWiN policy decision. |
-| `arcane/entities/TWiNPolicyDecision.js#twinPolicyDecisionAuditProjection` | function | `twinPolicyDecisionAuditProjection` | Produces a frozen structural audit projection that omits requirement targets and values; see [privacy and audit behavior](https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/docs/twin-policy-decision.md#privacy-and-audit-behavior). |
-| `arcane/entities/TWiNPolicyDecision.js#twinPolicyDecisionContract` | constant | `twinPolicyDecisionContract` | Frozen v1 schema identifier, version, layers, outcomes, core reason codes, and size/count limits. |
 | `arcane/entities/User.js#default` | class | `UserEntity` | Owns the browser user's validated settings and profile record, including DBOPFS load, refresh, serialized updates, and optional persistence. |
 | `arcane/entities/Weather.js#WeatherLocation` | class | `WeatherLocation` | Validates and freezes geographic identity, coordinates, and timezone metadata for a weather location. |
 | `arcane/entities/Weather.js#WeatherObservation` | class | `WeatherObservation` | Validates and freezes one timestamped current-weather observation and its units. |

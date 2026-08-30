@@ -13,9 +13,9 @@
     },
     "protocol": "arcane/1"
   },
-  "artifactCount": 86,
-  "javascriptArtifactCount": 84,
-  "esmExportCount": 377,
+  "artifactCount": 85,
+  "javascriptArtifactCount": 83,
+  "esmExportCount": 370,
   "artifacts": [
     {
       "file": "runtime/arcane/modules/AI.js",
@@ -308,25 +308,6 @@
       "protocol": "arcane-event-source/1 on the per-realm globalThis.arcaneEvents authority",
       "normalization": "Mutable complete canonical result/error details, source-instance operation IDs, exact parser/evaluation error codes, and state-free EventTarget compatibility.",
       "surface": "CALCULATOR_ENGINE_ERROR_CODES; default CalculatorEngine with calculate(), EventTarget/on compatibility, dispose()/destroy(); evaluateExpression()."
-    },
-    {
-      "file": "runtime/arcane/modules/CaseEvidenceIndexer.js",
-      "name": "CaseEvidenceIndexer.js",
-      "kind": "esm",
-      "exports": [
-        "indexPairedRecord",
-        "nearestPageMarker",
-        "parseStructuredRecordName",
-        "renderedPageBlocks",
-        "resolveEvidenceSourcePage",
-        "safeName",
-        "stem"
-      ],
-      "summary": "Pairs and indexes structured evidence records with rendered-page provenance.",
-      "availability": "Node only",
-      "protocol": "node:fs/promises, node:path",
-      "normalization": "Normalized naming/page helpers; filesystem errors preserved.",
-      "surface": "Seven exported indexing, page, naming, and stem helpers."
     },
     {
       "file": "runtime/arcane/modules/ChartLibrary.js",
