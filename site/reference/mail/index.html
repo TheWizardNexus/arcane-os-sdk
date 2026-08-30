@@ -2,23 +2,23 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
-  <meta name="description" content="Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is bounded network and durable-state work, while the Resend credential belongs…">
+  <meta name="description" content="Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is network and durable-state work, while the Resend credential belongs in the local Node gateway rather than in browser or WebAssembly state.">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
   <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/mail/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
-  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Mail gateway and durable outbox · Arcane OS SDK"><meta property="og:description" content="Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is bounded network and durable-state work, while the Resend credential belongs…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/mail/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Mail gateway and durable outbox · Arcane OS SDK"><meta name="twitter:description" content="Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is bounded network and durable-state work, while the Resend credential belongs…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Mail gateway and durable outbox · Arcane OS SDK"><meta property="og:description" content="Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is network and durable-state work, while the Resend credential belongs in the local Node gateway rather than in browser or WebAssembly state."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/mail/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Mail gateway and durable outbox · Arcane OS SDK"><meta name="twitter:description" content="Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is network and durable-state work, while the Resend credential belongs in the local Node gateway rather than in browser or WebAssembly state."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
   <title>Mail gateway and durable outbox | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../sdk-api/">API</a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Mail gateway and durable outbox</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="mail-gateway-and-durable-outbox">Mail gateway and durable outbox</h1><p class="doc-lead">Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is bounded network and durable-state work, while the Resend credential belongs…</p><div class="doc-meta"><span>SDK 0.3.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Mail gateway and durable outbox</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="mail-gateway-and-durable-outbox">Mail gateway and durable outbox</h1><p class="doc-lead">Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is network and durable-state work, while the Resend credential belongs in the local Node gateway rather than in browser or WebAssembly state.</p><div class="doc-meta"><span>SDK 0.3.4</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/mail.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#ownership-and-availability">Ownership and availability</a><a href="#public-npm-import">Public npm import</a><a href="#two-separate-credential-boundaries">Two separate credential boundaries</a><a href="#configure-the-browser-runtime">Configure the browser runtime</a><a href="#durable-send-semantics">Durable send semantics</a><a href="#operate-the-cli-and-local-gateway">Operate the CLI and local gateway</a><a href="#operational-verification">Operational verification</a></nav></details><p>Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is
-bounded network and durable-state work, while the Resend credential belongs in
-the local Node gateway rather than in browser or WASM bytes.</p>
+network and durable-state work, while the Resend credential belongs in the
+local Node gateway rather than in browser or WebAssembly state.</p>
 <h2 id="ownership-and-availability">Ownership and availability</h2>
 <div class="table-wrap" data-columns="3" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
@@ -36,7 +36,7 @@ the local Node gateway rather than in browser or WASM bytes.</p>
 <tr>
 <td><code>MailOutbox.mjs</code></td>
 <td>Browser or compatible injected storage</td>
-<td>Stores immutable requests in the <code>mail_outbox</code> DBOPFS table before delivery and normalizes terminal, retry, and reconciliation states.</td>
+<td>Stores exact requests in the <code>mail_outbox</code> DBOPFS table before delivery and normalizes terminal, retry, and reconciliation states.</td>
 </tr>
 <tr>
 <td><code>MailTransport.mjs</code></td>
@@ -46,26 +46,26 @@ the local Node gateway rather than in browser or WASM bytes.</p>
 <tr>
 <td><code>arcane mail send</code></td>
 <td>Node on the local machine</td>
-<td>Reads one bounded provider-neutral report from redirected stdin and performs one explicit Resend attempt with a caller-owned idempotency key.</td>
+<td>Reads one complete provider-neutral report from redirected stdin and performs one explicit Resend attempt with a caller-owned idempotency key.</td>
 </tr>
 <tr>
 <td><code>arcane mail serve</code></td>
 <td>Node on the local machine</td>
-<td>Authenticates the local caller, enforces the app/Origin/recipient policy, and makes the single server-side Resend request.</td>
+<td>Authenticates the local caller, protects the provider credential, applies any explicitly configured recipient policy, and makes the single server-side Resend request.</td>
 </tr>
 <tr>
 <td><code>arcane mail key ...</code></td>
 <td>Node on Windows</td>
 <td>Stores, inspects, or deletes a Resend API key in Windows Credential Manager.</td>
-</tr>
-</tbody></table>
+</tr></tbody>
+</table>
 </div>
 <p>The browser never receives the Resend API key. The gateway never writes that
 key to source, argv, logs, events, fixtures, browser storage, or its public
-lifecycle result. Non-Windows credential operations fail closed; there is no
-plaintext fallback.</p>
+lifecycle result. Non-Windows hosts report credential operations as unavailable;
+there is no plaintext fallback.</p>
 <h2 id="public-npm-import">Public npm import</h2>
-<p>The 0.3.1 portable programmatic contract is one subpath:</p>
+<p>The portable programmatic contract is one subpath:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import Mail,{
     MailOutbox,
     createMailOutbox,
@@ -76,12 +76,13 @@ plaintext fallback.</p>
 <ul>
 <li>default and named <code>Mail</code>, plus <code>resolveMailConfig</code>;</li>
 <li><code>MailOutbox</code>, <code>createMailOutbox</code>, <code>MAIL_OUTBOX_PROTOCOL</code>,
-<code>MAIL_OUTBOX_TABLE</code>, <code>MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS</code>,
-<code>MAIL_OUTBOX_STATES</code>, and <code>MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES</code>; and</li>
+<code>MAIL_OUTBOX_TABLE</code>, <code>MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS</code>, and
+<code>MAIL_OUTBOX_STATES</code>; and</li>
 <li><code>MailTransportError</code>, <code>normalizeMailEndpoint</code>, <code>serializeMailReport</code>,
-<code>sendMailReport</code>, <code>DEFAULT_MAIL_REQUEST_TIMEOUT_MS</code>, and
-<code>MAX_MAIL_RESPONSE_BYTES</code>.</li>
+<code>sendMailReport</code>, and <code>DEFAULT_MAIL_REQUEST_TIMEOUT_MS</code>.</li>
 </ul>
+<p><code>DEFAULT_MAIL_REQUEST_TIMEOUT_MS</code> is <code>null</code>; it means the ordinary transport
+adds no default deadline.</p>
 <p>This entrypoint contains only the portable browser/WebView runtime, outbox, and
 transport contract. It does not import the Node HTTP gateway or Windows
 Credential Manager adapter. Programmatic developer tooling reaches those
@@ -98,8 +99,8 @@ stores it in Windows Credential Manager. <code>mail send --profile &lt;profile&g
 <li>The <strong>mail app key</strong> authenticates one browser/application caller to the
 loopback gateway. It is supplied to <code>mail serve</code> through hidden terminal
 input, or through redirected input with <code>--app-key-stdin</code>, and must match the
-browser&#39;s <code>arcane.config.mail.appKey</code>. It is a 16–512 character printable
-ASCII bearer-like local admission value, never the Resend API key.</li>
+browser&#39;s <code>arcane.config.mail.appKey</code>. It is a nonempty printable ASCII
+bearer-like local authentication value, never the Resend API key.</li>
 </ul>
 <p>Do not put either secret on the command line. Command-line arguments may be
 recorded by the operating system or shell history. Structured CLI output
@@ -128,11 +129,11 @@ explicit HTTPS endpoint receives the app key as <code>X-Mail-Key</code>, so its 
 and trust must be verified before configuration. A hosted default is derived
 only when the page declares an admitted Arcane mail base domain; otherwise
 configuration fails rather than selecting an arbitrary remote host.</p>
-<p>The browser request timeout must be 1,000–600,000 milliseconds. Its default is
-590,000 milliseconds. If overridden, keep it longer than the gateway&#39;s
-provider timeout plus response margin; equal client/provider deadlines can
-discard the gateway&#39;s normalized result and force an uncertain retry path. The
-transport reads at most 64 KiB of gateway response data.</p>
+<p>The ordinary browser transport has no automatic request deadline and reads the
+complete gateway response. A caller may explicitly supply a positive
+<code>requestTimeout</code> when its own lifecycle requires a deadline; cancellation then
+remains an uncertain delivery outcome because the provider may already have
+accepted the request.</p>
 <h2 id="durable-send-semantics">Durable send semantics</h2>
 <p><code>Mail.send(to, subject, payload, messageStyle, messageType)</code> preserves the
 existing signature. <code>messageType</code> is <code>error</code>, <code>report</code>, or <code>crisis_detected</code>.
@@ -144,8 +145,8 @@ durable lifecycle or outbox has begun; later reconfiguration fails with
 <code>MAIL_CONFIGURATION_LOCKED</code>. <code>dispose()</code> clears the global registration only
 when that exact instance owns it, so a later construction creates a fresh
 instance instead of returning stale disposed state. A truthy <code>window.mail</code>
-owned by another implementation fails closed with <code>MAIL_SINGLETON_CONFLICT</code>;
-the SDK never returns or silently adopts an unverified foreign singleton.</p>
+owned by another implementation reports <code>MAIL_SINGLETON_CONFLICT</code>; the SDK
+never replaces another implementation&#39;s singleton.</p>
 <p>Runtime context enrichment is off by default. With the explicit constructor
 option <code>{includeContext:true}</code>, every message also captures
 <code>location.pathname</code> as <code>source_path</code>; report and crisis messages load the
@@ -156,23 +157,20 @@ recipient scope, retention, and disclosure. Without that option, Mail neither
 loads the User profile nor adds the path/profile fields. The generated
 <code>source_at</code> timestamp, caller-supplied payload, subject, type, and recipients
 remain part of the requested report in either mode.</p>
-<p>The public <code>Mail</code> integration requires its verified DBOPFS adapter. Before the
+<p>The public <code>Mail</code> integration requires its compatible DBOPFS adapter. Before the
 first delivery attempt, it serializes the exact provider-neutral report and
 commits it to DBOPFS table <code>mail_outbox</code>. A generated report key
-contains only time/random identity and never includes the subject or an email
-address. Its random identity requires platform Web Crypto (<code>randomUUID()</code> or
-<code>getRandomValues()</code>); Mail fails with <code>MAIL_CRYPTO_UNAVAILABLE</code> instead of
-falling back to <code>Math.random()</code>. A compatible injected <code>crypto</code> provider is a
-host/test boundary and must supply cryptographically secure randomness.
-Delivery receives the stored serialized bytes and the same report key on every
-safe retry.</p>
+contains only time/process identity and never includes the subject or an email
+address. Mail uses <code>randomUUID()</code> when available and otherwise uses a local
+time/sequence identity without blocking ordinary delivery. Delivery receives
+the complete stored serialized content and the same report key on every retry.</p>
 <p><code>MailTransport.mjs</code> is also a lower-level public transport and does not persist
 raw caller requests by itself. A directly constructed <code>MailOutbox</code> can accept
 another injected storage adapter plus a Web Locks compatible <code>lockManager</code>;
-durable claims then belong to that adapter&#39;s verified <code>get</code>, <code>set</code>,
+durable claims then belong to that adapter&#39;s implemented <code>get</code>, <code>set</code>,
 <code>getAllKeys</code>, and shared-lock semantics rather than to DBOPFS. The browser
-default uses <code>navigator.locks</code>; absence of that cross-context authority fails
-closed with <code>MAIL_OUTBOX_LOCK_UNAVAILABLE</code>.</p>
+default uses <code>navigator.locks</code>; when that cross-context authority is absent,
+the outbox reports <code>MAIL_OUTBOX_LOCK_UNAVAILABLE</code> and does not start the drain.</p>
 <p>Call <code>await mail.start()</code> during application startup so pre-existing records
 are scanned even when the application does not send a new report. The first
 <code>send()</code> also starts the lifecycle if needed.</p>
@@ -189,19 +187,19 @@ are scanned even when the application does not send a new report. The first
 </tr>
 <tr>
 <td><code>send(to, subject, payload, style, type)</code></td>
-<td>Formats, persists, then conditionally attempts one new report and returns a privacy-safe send summary.</td>
+<td>Formats, persists, then conditionally attempts one new report and returns the complete mutable durable record, report, delivery result, and convenience state fields.</td>
 </tr>
 <tr>
 <td><code>drain({reason, signal})</code></td>
-<td>Runs or joins the one bounded FIFO drain.</td>
+<td>Runs or joins one FIFO drain across the complete current inventory.</td>
 </tr>
 <tr>
 <td><code>listOutbox()</code> / <code>getOutboxRecord(reportKey)</code></td>
-<td>Returns valid durable records, including unredacted serialized report content. Invalid files do not hide valid records.</td>
+<td>Returns valid durable records, including complete serialized report content. Invalid files do not hide valid records.</td>
 </tr>
 <tr>
 <td><code>auditOutbox()</code> / <code>invalidOutboxRecords</code></td>
-<td>Returns the bounded valid inventory and filename/code/repairability metadata for invalid files; it never publishes that metadata as a semantic event.</td>
+<td>Returns the complete valid inventory and filename/code/repairability metadata for every invalid file.</td>
 </tr>
 <tr>
 <td><code>repairInvalidOutbox(fileName, record)</code></td>
@@ -209,11 +207,11 @@ are scanned even when the application does not send a new report. The first
 </tr>
 <tr>
 <td><code>deleteInvalidOutbox(fileName)</code></td>
-<td>Explicitly deletes one invalid file after bounded inventory confirmation; it requires a storage adapter with <code>delete</code>.</td>
+<td>Explicitly deletes one invalid file after current inventory confirmation; it requires a storage adapter with <code>delete</code>.</td>
 </tr>
 <tr>
-<td><code>quarantineInvalidOutbox({limit})</code></td>
-<td>Moves at most 64 confirmed invalid files per call into <code>mail_outbox_quarantine</code>; it must retain a bounded serialized snapshot before deleting each original.</td>
+<td><code>quarantineInvalidOutbox()</code></td>
+<td>Moves every confirmed invalid file in the current inventory into <code>mail_outbox_quarantine</code>; it retains the complete JSON-serializable source value before deleting each original.</td>
 </tr>
 <tr>
 <td><code>stop()</code></td>
@@ -225,9 +223,9 @@ are scanned even when the application does not send a new report. The first
 </tr>
 <tr>
 <td><code>events</code></td>
-<td>Read-only event-source handle for <code>mail-outbox-state</code>, <code>mail-outbox-delivery</code>, and <code>mail-outbox-drain</code>.</td>
-</tr>
-</tbody></table>
+<td>Event-source handle for <code>mail-outbox-state</code>, <code>mail-outbox-delivery</code>, and <code>mail-outbox-drain</code>; details contain the complete mutable record, result, failure, inventory, and report content available at that transition.</td>
+</tr></tbody>
+</table>
 </div>
 <p>The returned durable record has one of these states:</p>
 <div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
@@ -251,7 +249,7 @@ are scanned even when the application does not send a new report. The first
 </tr>
 <tr>
 <td><code>accepted</code></td>
-<td>Direct gateway delivery returned both its request id and a Resend provider id, or the exact native <code>mail-send-v1</code> bridge returned accepted under named <code>arcane-core-mail-send-v1</code> authority without fabricating a provider id. This is API acceptance, not an inbox-delivery claim.</td>
+<td>The selected transport returned <code>accepted</code> with a valid request id. A provider id or acceptance authority may be preserved as optional transport metadata, but neither is required by the outbox. This is API acceptance, not an inbox-delivery claim.</td>
 </tr>
 <tr>
 <td><code>failed</code></td>
@@ -260,18 +258,17 @@ are scanned even when the application does not send a new report. The first
 <tr>
 <td><code>reconciliation_required</code></td>
 <td>An ambiguous attempt reached the end of the idempotency window. Automatic retry stops to avoid a duplicate send.</td>
-</tr>
-</tbody></table>
+</tr></tbody>
+</table>
 </div>
-<p>The outbox owns one bounded FIFO drain per instance and attempts at most 16
-records in one default drain. A shared Web Lock extends that single-drain
-authority across MailOutbox instances and browser contexts for the same origin
-and table. Startup, the browser&#39;s <code>online</code> event, and explicit calls can trigger
-a drain; there are no polling/retry timers. A
-future-due <code>retry_wait</code> record and records beyond the per-drain bound therefore
-require a later startup, connectivity transition, or host-owned manual drain.
-Every successful durable write publishes its privacy-safe record transition,
-including transitions produced by startup, manual, and online drains.
+<p>The outbox owns one FIFO drain per instance and processes the complete current
+inventory. A shared Web Lock extends that single-drain authority across
+MailOutbox instances and browser contexts for the same origin and table.
+Startup, the browser&#39;s <code>online</code> event, and explicit calls can trigger a drain;
+there are no polling/retry timers. A future-due <code>retry_wait</code> record requires a
+later startup, connectivity transition, or host-owned manual drain. Every
+successful durable write publishes its complete record transition, including
+transitions produced by startup, manual, and online drains.
 <code>dispose()</code> aborts owned in-flight work, removes the online listener, and
 releases the singleton-event registration. A provider attempt interrupted after
 it began is retained as an uncertain same-key retry rather than being discarded.
@@ -279,48 +276,44 @@ Cancellation that arrives while the durable <code>sending</code> transition is b
 written restores the prior non-attempted state before returning and never calls
 the transport. A restart after <code>stop()</code> waits for the cancelled start generation
 to settle, then begins a distinct lifecycle generation.</p>
-<p>Each durable record contains the exact unredacted serialized message and the
+<p>Each durable record contains the exact complete serialized message and the
 public list/get APIs return that content. Never place credentials in a report.
 Protect the application&#39;s OPFS origin and any code allowed to inspect it. The
-default outbox cap is 512 records, including terminal records, and enqueue fails
-closed at capacity. The outbox exposes no implicit retention/deletion policy;
-the owning application must explicitly remove terminal DBOPFS records under an
-appropriate audited policy.</p>
-<p>Malformed or unreadable files are excluded from that logical 512-record
-capacity, reported through <code>audit()</code> / <code>invalidRecords</code> on <code>MailOutbox</code> and the
-Mail proxies above, and skipped without aborting valid listing or draining.
-Inventory processing is bounded to <code>maxRecords + maxInvalidRecords</code> (512 + 128
-by default). If more physical files exist, audit marks <code>truncated:true</code> and
-enqueue fails with <code>MAIL_OUTBOX_MAINTENANCE_REQUIRED</code> until an operator repairs,
-deletes, or quarantines bounded batches. This prevents corrupted files from
-permanently consuming logical capacity without turning maintenance into
-unbounded background work. Quarantine remains local and may contain unredacted
-message bytes; protect and retain the quarantine table accordingly. Transient
-storage read failures propagate as <code>MAIL_OUTBOX_STORAGE_FAILED</code> and never
-authorize destructive maintenance. Each maintenance target is revalidated and
-serialized against record writes through one origin-wide exclusive table lock;
-a file that became valid in another MailOutbox instance or browser context is
-preserved, and quarantine refuses deletion when it cannot capture the bounded
-source snapshot. Same-key admission, immutable-body comparison, and capacity
-checks execute under that table lock before the queued record is committed.
+outbox applies no record-count ceiling and exposes no implicit
+retention/deletion policy; the owning application explicitly removes terminal
+DBOPFS records when its own lifecycle requires that operation.</p>
+<p>Malformed or unreadable files are reported through <code>audit()</code> /
+<code>invalidRecords</code> on <code>MailOutbox</code> and the Mail proxies above, and skipped without
+aborting valid listing or draining. Inventory and quarantine process every
+physical file in the current inventory in one operation. Quarantine remains
+local and contains the complete serialized
+source value; protect and retain that table according to the application&#39;s own
+data policy. Transient storage read failures propagate as
+<code>MAIL_OUTBOX_STORAGE_FAILED</code> and never authorize destructive maintenance. Each
+maintenance target is revalidated and serialized against record writes through
+one origin-wide exclusive table lock; a file that became valid in another
+MailOutbox instance or browser context is preserved, and quarantine refuses
+deletion when it cannot capture the complete source value. Same-key exact
+serialized-content comparison executes under that table lock before a queued
+record is committed.
 Injected adapters that can share a table must share the same Web Locks
 compatible manager and must not mutate MailOutbox-owned records behind that
 boundary.</p>
-<p>Mail publishes privacy-minimal semantic events through the SDK singleton event
-authority. Public event detail can contain only report identity, state,
-attempt/count information, and normalized code/reason fields. Addresses,
-subject/body content, headers, credentials, attachment bytes, provider error
-text or stacks, provider ids, and private paths are never public event detail.
-Listener exceptions are observational and cannot change a committed mail
+<p>Mail publishes complete semantic events through the SDK singleton event
+authority. Public detail includes the full mutable durable record, serialized
+report, result or failure, provider details, and complete drain inventory
+available at that transition. It never includes the Resend API key or mail app
+key. Listener exceptions are observational and cannot change a committed mail
 operation result.</p>
 <p>When both an explicit endpoint and native <code>Arcane.mail.send</code> exist, Mail uses
 the configured HTTP endpoint so the authenticated SDK gateway can return its
-provider acceptance id. The native bridge remains a fallback when no endpoint
-is configured; its exact Core result is recorded with the named acceptance
-authority above. A malformed or unreadable native response is retained as an
-uncertain same-key retry, while temporary native transport unavailability is a
-non-ambiguous retryable failure. Once a valid accepted result has returned, a
-racing lifecycle cancellation cannot erase that authoritative acceptance.</p>
+complete provider result. The native bridge remains a fallback when no endpoint
+is configured; an accepted Core result keeps its native acceptance-authority
+metadata without an SDK allowlist. A malformed or unreadable native response
+is retained as an uncertain same-key retry, while temporary native transport
+unavailability is a non-ambiguous retryable failure. Once a valid accepted
+result has returned, a racing lifecycle cancellation cannot erase that
+committed acceptance result.</p>
 <h2 id="operate-the-cli-and-local-gateway">Operate the CLI and local gateway</h2>
 <p>Store one Resend key under a local profile:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane mail key set arcane-dev
@@ -332,20 +325,25 @@ non-interactive alternative and rejects a TTY.</p>
 <p>Perform one provider attempt directly from the SDK CLI:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane mail send --profile arcane-dev --from &quot;Arcane &lt;verified@example.com&gt;&quot; --report-key &lt;stable-id&gt; --report-stdin
 </code></pre></div>
-<p>The redirected UTF-8 JSON input is bounded to 52 MiB and uses the exact closed
-report shape admitted by the gateway: <code>type</code>, <code>to</code>, <code>subject</code>, and at least one
-of <code>text</code> or <code>html</code>. Direct CLI sends require one to 50 explicit recipients,
-including for <code>error</code> reports. Message content is not accepted in argv and is
-never copied into progress events, results, or normalized errors.</p>
-<p>The caller must create and retain the 8–128 character <code>--report-key</code> before the
+<p>The redirected UTF-8 JSON input is read completely. A report requires <code>type</code>,
+<code>to</code>, <code>subject</code>, and at least one of <code>text</code> or <code>html</code>; additional
+JSON-compatible provider fields are preserved. Direct CLI sends require at
+least one explicit recipient, including for <code>error</code> reports. Message content is
+not accepted in argv. Programmatic results and observer events preserve the
+complete report, provider request, provider response, and error detail while
+never exposing either credential.</p>
+<p>The caller must create and retain a safe-character <code>--report-key</code> before the
 attempt. It is the Resend idempotency key and may be reused only with the same
-byte-equivalent logical report for an intentional retry or reconciliation. The
+serialized report content for an intentional retry or reconciliation. The
 CLI performs exactly one attempt and never retries automatically. Exit zero
 requires a successful Resend response containing a valid provider id; that is
 provider acceptance, not an inbox-delivery claim. Timeout, connection loss, or
 cancellation after the provider attempt begins is returned as an ambiguous
 nonzero outcome because the provider may already have accepted the request.
-Cancellation before the attempt exits 130 without sending.</p>
+Cancellation before the attempt exits 130 without sending.
+For both CLI mail operations, <code>--request-timeout</code> accepts 1 through 2147483647
+milliseconds, the Node timer range. When omitted, the SDK adds no provider
+deadline.</p>
 <p>Start the authenticated gateway:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane mail serve --profile arcane-dev --from &quot;Arcane &lt;verified@example.com&gt;&quot; --app arcane-dev --origin http://127.0.0.1:8000 --allow-to recipient@example.com
 </code></pre></div>
@@ -353,25 +351,22 @@ Cancellation before the attempt exits 130 without sending.</p>
 Non-interactive structured output requires <code>--app-key-stdin</code> and redirected
 stdin. The server binds numeric loopback only; the default is
 <code>127.0.0.1:8025/v1/mail</code>.</p>
-<p>The gateway admits only:</p>
+<p>The gateway protects the provider credential by requiring:</p>
 <ul>
 <li>its exact numeric-loopback <code>Host</code> authority and <code>/v1/mail</code> route;</li>
 <li>an exact configured <code>Origin</code>, app id, and constant-time app-key match;</li>
-<li>JSON requests within the configured byte limit;</li>
-<li>one to 50 allowlisted recipients, with server-owned fallback recipients for
-error reports (the CLI default sends a recipientless error to every address
-in <code>--allow-to</code>);</li>
-<li>bounded request-body, send-count, aggregate send-byte, and provider-response
-work; and</li>
+<li>complete JSON requests with at least one recipient, or configured fallback
+recipients for an <code>error</code> report;</li>
+<li>an optional explicit recipient allowlist when one is configured; and</li>
 <li>one fixed Resend endpoint with the stable Arcane report key forwarded as
 <code>Idempotency-Key</code>.</li>
 </ul>
 <p>The gateway returns <code>202</code> only after Resend returns a valid provider id.
-Transport loss, timeout, an invalid success body, or an unreadable/oversized
-provider response returns an explicit uncertain result and never claims
+Transport loss, an explicit caller-selected timeout, an invalid success body,
+or an unreadable provider response returns an explicit uncertain result and never claims
 delivery. Rate limits, concurrent idempotency requests, permanent validation
 failures, and provider failures are mapped to structured retryable/permanent
-results without returning provider message text.</p>
+results with the complete available provider response or error detail.</p>
 <h2 id="operational-verification">Operational verification</h2>
 <p>The focused SDK tests use only synthetic keys, addresses, responses, storage,
 and loopback requests. They do not contact Resend or send email. A live
@@ -382,6 +377,6 @@ gateway&#39;s provider-acceptance id and the intended inbox outcome.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#ownership-and-availability">Ownership and availability</a><a href="#public-npm-import">Public npm import</a><a href="#two-separate-credential-boundaries">Two separate credential boundaries</a><a href="#configure-the-browser-runtime">Configure the browser runtime</a><a href="#durable-send-semantics">Durable send semantics</a><a href="#operate-the-cli-and-local-gateway">Operate the CLI and local gateway</a><a href="#operational-verification">Operational verification</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.3.1, runtime bundle 0.8.12, and protocol arcane/1; the latest verified published package is 0.3.1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.3.4, runtime bundle 0.8.12, and protocol arcane/1; the latest published package is 0.3.4.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>

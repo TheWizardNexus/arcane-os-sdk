@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../sdk-api/">API</a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Availability and normalization</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="availability-and-normalization">Availability and normalization</h1><p class="doc-lead">Use this page to choose an API by capability. The compact labels tell you where it runs; the protocol guide contains the implementation detail.</p><div class="doc-meta"><span>SDK 0.3.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Availability and normalization</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="availability-and-normalization">Availability and normalization</h1><p class="doc-lead">Use this page to choose an API by capability. The compact labels tell you where it runs; the protocol guide contains the implementation detail.</p><div class="doc-meta"><span>SDK 0.3.4</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="./" aria-current="page">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/availability-and-normalization.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#availability-labels">Availability labels</a><a href="#capability-first-matrix">Capability-first matrix</a><a href="#the-normalized-application-path">The normalized application path</a><a href="#normalization-levels">Normalization levels</a><a href="#no-implicit-protocol-or-provider-fallback">No implicit protocol or provider fallback</a></nav></details><aside class="callout callout-info"><strong>Normalized AI comes first.</strong> Ordinary applications start with <a href="../ai/"><code>AI.js</code> or <code>globalThis.Arcane.ai</code></a>. Use Ollama APIs only when provider-native fields or an admitted provider-specific operation is intentional.</aside><p>Use this page to choose an API by capability. The compact labels tell you where
@@ -48,9 +48,9 @@ it runs; the <a href="../protocols/">protocol guide</a> contains the implementat
 </tr>
 <tr>
 <td><strong>Provider-native</strong></td>
-<td>Intentionally returns the underlying provider&#39;s bounded envelope instead of an Arcane-normalized entity.</td>
-</tr>
-</tbody></table>
+<td>Intentionally returns the underlying provider&#39;s complete envelope instead of an Arcane-normalized entity.</td>
+</tr></tbody>
+</table>
 </div>
 <p>“Available” never means “authorized.” App grants, method allowlists, host
 policy, package-owned model policy, platform support, and dependency readiness
@@ -72,13 +72,13 @@ version; WebKitGTK availability must not be generalized to macOS.</p>
 <td>Scaffold, inspect, test, package, bundle, build, verify, or run an app</td>
 <td><code>arcane</code> CLI or <code>arcane-os</code> package functions</td>
 <td><strong>Node</strong>; native targets invoke one explicit provider</td>
-<td>CLI events and SDK errors/results are normalized by versioned SDK contracts. Native artifact receipts remain target-specific inside a common receipt lifecycle.</td>
+<td>CLI events and SDK errors/results are normalized by versioned SDK contracts. Tests and checks run only when explicitly selected; verification is separate and selected-output-specific.</td>
 </tr>
 <tr>
-<td>Publish application events or review a bounded event history</td>
+<td>Publish application events or review a complete event history</td>
 <td><code>arcane-os/event-manager</code></td>
 <td><strong>Node</strong> and <strong>Browser</strong>; optional DOM capture needs a browser DOM or compatible host</td>
-<td>Live listeners receive original arguments. Recorded payloads and metadata become bounded, redacted, deeply frozen <code>arcane-event-stack/1</code> snapshots. The stack format is local diagnostic data, not a host transport.</td>
+<td>Live listeners receive original arguments. Ordinary <code>secure:false</code> recording preserves complete URLs, public details, and captured stack text in deeply frozen <code>arcane-event-stack/1</code> snapshots while credential-named fields remain redacted. The stack format is local diagnostic data, not a host transport.</td>
 </tr>
 <tr>
 <td>Build browser UI and app-local behavior</td>
@@ -90,31 +90,31 @@ version; WebKitGTK availability must not be generalized to macOS.</p>
 <td>Select and observe independent LLM/STT/TTS roles</td>
 <td><code>/arcane/modules/AIProviderRuntime.js</code> and <code>AIRuntimeState.js</code></td>
 <td><strong>Cross-host</strong> controller/state; registered providers retain their own host requirements</td>
-<td>Required/projected provider members, closed route/configuration records, and validated authority/status fields; per-role lifecycle, cancellation, stream cleanup, sticky state, and startup barriers are normalized. <code>localOnly</code> fails closed and creates no fallback.</td>
+<td>Required/projected provider members, route/configuration records, and status fields; per-role lifecycle, cancellation, stream cleanup, sticky state, and startup barriers are normalized. <code>localOnly</code> creates no fallback.</td>
 </tr>
 <tr>
 <td>Run a caller-selected local LLM entirely in a browser renderer</td>
 <td><code>arcane-os/ai/browser-wasm</code> through <code>createArcaneAI()</code></td>
-<td><strong>Browser</strong> only; secure context, WebAssembly, OPFS/DBOPFS, WebGPU, requested full offload, and admitted adapter/buffer/queue/fence evidence are required; no CPU fallback</td>
-<td>The facade normalizes multi-model lifecycle, status, security precedence, effective-check disclosure, streaming, cancellation, and structural tool-call visibility. Model sources are canonical ordered file descriptors; licenses and model choice remain application policy.</td>
+<td><strong>Browser</strong> only; secure context, WebAssembly, OPFS/DBOPFS, WebGPU, and requested full offload are required; no CPU fallback</td>
+<td>The public AI API module normalizes multi-model lifecycle, status, complete all-choice streaming, cancellation, exact ordered structural tool-call visibility, and session persistence. Model sources are canonical ordered file descriptors; licenses and model choice remain application policy.</td>
 </tr>
 <tr>
 <td>Run caller-selected Whisper or Kokoro in a browser renderer</td>
 <td><code>arcane-os/ai/browser-speech</code> registered with <code>AIProviderRuntime</code></td>
 <td><strong>Browser</strong> only; DBOPFS, Web Locks, Workers, Fetch/object URLs, and a caller-supplied self-contained runtime/model closure are required</td>
-<td>STT/TTS use independent provider/2 lifecycle and status. Immutable artifact authority, manifest-last cache, strict offline admission, cancellation, Worker teardown, and request/result shapes are normalized. No runtime/model bytes or cloud fallback are supplied.</td>
+<td>STT/TTS use independent provider/2 lifecycle and status. Complete model/runtime selection, offline behavior, cancellation, Worker teardown, and request/result shapes are normalized. No runtime/model content or cloud fallback is supplied.</td>
 </tr>
 <tr>
-<td>Preserve bounded chat history and memory</td>
+<td>Preserve complete chat history and memory</td>
 <td><code>/arcane/modules/PersistentAIChatSession.js</code></td>
 <td><strong>Browser / native WebView</strong> with ChatEntity/DBOPFS and a configured chat function</td>
-<td>Existing DBOPFS names and memory semantics are preserved. Live-context commit is atomic; durable persistence is explicit and coherent across user/assistant/tool turns.</td>
+<td>Existing DBOPFS names and memory semantics are preserved. Live-context commit is atomic; durable persistence is explicit and coherent across user/assistant turns and atomic all-ID tool-result batches.</td>
 </tr>
 <tr>
 <td>Search an app-owned document corpus for explicit chat context</td>
 <td><code>/arcane/modules/DBOPFSDocumentLibrary.js</code></td>
 <td><strong>Browser</strong> or compatible injected DBOPFS adapter</td>
-<td>Generation/manifest completion, bounded lexical search, partial read failures, and untrusted context labels are normalized. Construction does not search; an explicitly wired context builder performs bounded retrieval for each prepared chat send.</td>
+<td>Generation/manifest completion, complete lexical search, partial read failures, and untrusted context labels are normalized. Construction does not search; an explicitly wired context builder performs retrieval for each prepared chat send.</td>
 </tr>
 <tr>
 <td>Read host identity, capabilities, storage, preferences, appearance, or platform state</td>
@@ -151,8 +151,8 @@ version; WebKitGTK availability must not be generalized to macOS.</p>
 <td>matching <code>Arcane.*</code> namespace</td>
 <td><strong>Native</strong> and app/capability restricted</td>
 <td>Calls and errors use the common bridge contract. Platform results can be host-specific and are marked in the method guide.</td>
-</tr>
-</tbody></table>
+</tr></tbody>
+</table>
 </div>
 <h2 id="the-normalized-application-path">The normalized application path</h2>
 <p>For ordinary cross-platform application code:</p>
@@ -177,13 +177,14 @@ application identity and method policy.</p>
 <h2 id="normalization-levels">Normalization levels</h2>
 <h3 id="fully-sdk-normalized">Fully SDK-normalized</h3>
 <p>The Node toolchain uses <code>ArcaneError</code>, stable SDK error codes, structured
-<code>arcane-cli-events/1</code> records, normalized target descriptors, and authenticated
-receipt objects. Platform providers can add bounded target detail but cannot
+<code>arcane-cli-events/1</code> records, and normalized target descriptors. Platform
+providers can add complete target detail but cannot
 silently substitute a different target or artifact kind.</p>
 <p>The central EventManager is also host-neutral JavaScript. Its synchronous live
 bus preserves listener argument identity, while its optional history owns a
-separate diagnostic normalization boundary: snapshots are bounded, redacted,
-deeply frozen, and strictly importable as <code>arcane-event-stack/1</code>. DOM
+separate diagnostic normalization boundary: snapshots are complete, redact
+credentials and explicitly protected private fields, and are importable as
+<code>arcane-event-stack/1</code>. DOM
 instrumentation adds browser diagnostics only; it does not replay browser
 state. See <a href="../event-manager/">EventManager and time-travel review</a>.</p>
 <h3 id="browser-local-provider-adapter">Browser-local provider adapter</h3>
@@ -193,42 +194,54 @@ Wllama engine and caller-supplied model run inside the browser. This
 surface does not require an Arcane Core method grant because it does not call a
 Core host. Browser Fetch, CORS, storage policy, secure-context behavior, and
 resource limits still apply.</p>
-<p>The shipped <code>0.3.1</code> runtime requires WebGPU and has no CPU fallback. A successful
-load requests full GPU offload (<code>gpuLayers: 99999</code>) and admits actual adapter,
-full-offload, buffer, queue, and settled-fence evidence. <code>navigator.gpu</code>
-presence by itself is not readiness. The provider emits the instrumented
-<code>arcane.ai.browser-wasm.webgpu.adapter.selected</code> capability event only after
-admitted adapter selection evidence.</p>
+<p>The current browser runtime requires WebGPU and has no CPU fallback. A successful
+load requests full GPU offload (<code>gpuLayers: 99999</code>). <code>navigator.gpu</code> presence by
+itself is not readiness. The provider emits the instrumented
+<code>arcane.ai.browser-wasm.webgpu.adapter.selected</code> capability event after adapter
+selection.</p>
 <p><code>localOnly:true</code> describes inference after load; it does not promise that load
 is offline. A normal cache miss downloads from the exact caller-supplied HTTPS
-URL. App, provider/model-binding, and load-operation options use
-<code>{security:{secure?:boolean, checks?:{byteLength?:boolean, sha256?:boolean}}}</code>.
-Fields resolve independently from load operation to provider/model binding to
-app configuration to the SDK default <code>secure:false</code>; omitted fields inherit.
-The resolved <code>secure</code> value supplies the default for both checks, and an
-explicit per-check boolean overrides that default.</p>
-<p>An enabled check requires and verifies its matching descriptor field. A
-disabled byte-length check permits <code>bytes</code> to be absent and never compares an
-expected size, although the actual downloaded or cached byte count is always
-recorded for storage and progress metadata. A disabled SHA-256 check permits
-<code>sha256</code> to be absent and performs no hash or digest-only reread. Status reports
-the effective checks and distinguishes unchecked integrity from successful
-verification of the enabled checks. Only enabled checks fail closed, while
-successful Wllama model loading remains mandatory. <code>load({offline:true})</code> permits only a compatible
+URL. App, provider/model-binding, and load-operation options may use
+<code>{security:{secure?:boolean}}</code>. The SDK default is <code>secure:false</code>, and omitted
+security leaves ordinary model loading fully functional. The ordinary path
+does not count, limit, hash, or identify model content by bytes. Optional
+<code>secure:true</code> records intent only; historical checking remains disabled until a
+separately authorized user review. Successful
+Wllama model loading remains mandatory. <code>load({offline:true})</code> permits only a compatible
 cache entry and otherwise rejects with <code>ARCANE_AI_MODEL_OFFLINE_MISS</code>. Tool
-calls are result data for application review and dispatch; the SDK never
-executes them.</p>
+calls are result data for application review and dispatch; every declaration
+and emitted call requires nonempty user-facing <code>arguments.message</code>, and the SDK
+never executes them. An ordered assistant call array remains pending until the
+application records exactly one matching executed, declined, cancelled, or
+not-executed <code>role:&#39;tool&#39;</code> result with nonblank user-facing content for every
+pending ID in one atomic batch. The direct browser provider and its
+v1-to-provider/2 adapter validate the same request history, declarations, and
+terminal structural-call contract. Structured completions contain exactly one
+top-level <code>message</code> or <code>choices</code> envelope, every choice is validated, and the
+ordinary stream iterator exposes complete content and reasoning projections
+from every choice in provider order while its private pump continues even when
+the terminal result is awaited first. Structural deltas remain private until
+validation; terminal-only calls are valid, while observed calls must preserve
+their choice, order, identity, exact arguments, and extension fields at
+settlement. Complete provider chunks and terminal envelopes remain available
+through explicit data, response, or inspection surfaces.</p>
 <p><a href="../ai/browser-speech/"><code>arcane-os/ai/browser-speech</code></a> implements the sibling
-<code>stt</code> and <code>tts</code> provider/2 roles. Each caller-authenticated Whisper or Kokoro
+<code>stt</code> and <code>tts</code> provider/2 roles. Each caller-selected Whisper or Kokoro
 provider has its own load, use, cancellation, unload, dispose, cache, Worker,
-status, and error state. The SDK supplies neither speech adapter runtime bytes
-nor model/voice bytes; every immutable file is application-owned and admitted
-through an SDK-created authority and DBOPFS artifact store.</p>
+status, and error state. The SDK supplies neither speech adapter runtime nor
+model/voice content; every selected file is application-owned and stored
+through the SDK-created DBOPFS adapter.</p>
+<p>Materialized speech graphs use their file inventory as a routing table, not an
+admission policy. Known downloaded imports, fetches, Workers, and cache reads
+route to their materialized URLs; unmapped operations fall through to the
+native browser API with caller options preserved. Edge, transform,
+negative-route, and security records retained for compatibility do not gate the
+ordinary path, and native cache writes are not disabled.</p>
 <p>The projected <a href="../runtime-modules/#aiproviderruntimejs"><code>AIProviderRuntime</code></a>
 normalizes those browser providers and can admit an externally supplied native
 or cloud provider/2 adapter. <code>AI.js</code> also supplies compatibility adapters for
 an already-selected legacy OpenAI route, Ollama route, or admitted Core speech
-route. SDK <code>0.3.1</code> publishes no privileged Core implementation, credential,
+route. The SDK publishes no privileged Core implementation, credential,
 model, or speech-runtime authority, and those adapters never probe, select,
 download, or fall back. The sticky
 <a href="../runtime-modules/#airuntimestatejs"><code>AIRuntimeState</code></a> surface keeps
@@ -248,8 +261,8 @@ envelope. <code>ollama.readiness()</code> returns a frozen <code>{ready, version
 snapshot.</p>
 <h3 id="provider-native-within-an-arcane-boundary">Provider-native within an Arcane boundary</h3>
 <p>Direct <code>Arcane.ollama.chat()</code>, <code>generate()</code>, <code>show()</code>, <code>embed()</code>, and lifecycle
-methods return bounded Ollama-compatible envelopes. Arcane still owns admission,
-limits, error normalization, chunk correlation, and host transport, but it does
+methods return complete Ollama-compatible envelopes. Arcane still owns error
+normalization, chunk correlation, and host transport, but it does
 not rename every provider response field. Feature-detect optional Ollama fields
 and use the high-level helpers when an application needs a smaller common
 contract.</p>
@@ -272,6 +285,6 @@ native host.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#availability-labels">Availability labels</a><a href="#capability-first-matrix">Capability-first matrix</a><a href="#the-normalized-application-path">The normalized application path</a><a href="#normalization-levels">Normalization levels</a><a href="#no-implicit-protocol-or-provider-fallback">No implicit protocol or provider fallback</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.3.1, runtime bundle 0.8.12, and protocol arcane/1; the latest verified published package is 0.3.1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.3.4, runtime bundle 0.8.12, and protocol arcane/1; the latest published package is 0.3.4.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>

@@ -2,18 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
-  <meta name="description" content="arcaneEvents gives Arcane SDK publishers one canonical synchronous event authority per JavaScript realm. EventManager remains the constructor for an isolate…">
+  <meta name="description" content="arcaneEvents gives Arcane SDK publishers one canonical synchronous event authority per JavaScript realm. EventManager remains the constructor for an isolated strict pub/sub bus and optional bounded diagnostic timeline. Use source handles for SDK semantic events; use isolated managers for local diagnostics, DOM capture, export, and review.">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
   <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/event-manager/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
-  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="EventManager and time-travel diagnostics · Arcane OS SDK"><meta property="og:description" content="arcaneEvents gives Arcane SDK publishers one canonical synchronous event authority per JavaScript realm. EventManager remains the constructor for an isolate…"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/event-manager/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="EventManager and time-travel diagnostics · Arcane OS SDK"><meta name="twitter:description" content="arcaneEvents gives Arcane SDK publishers one canonical synchronous event authority per JavaScript realm. EventManager remains the constructor for an isolate…"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="EventManager and time-travel diagnostics · Arcane OS SDK"><meta property="og:description" content="arcaneEvents gives Arcane SDK publishers one canonical synchronous event authority per JavaScript realm. EventManager remains the constructor for an isolated strict pub/sub bus and optional bounded diagnostic timeline. Use source handles for SDK semantic events; use isolated managers for local diagnostics, DOM capture, export, and review."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/event-manager/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="EventManager and time-travel diagnostics · Arcane OS SDK"><meta name="twitter:description" content="arcaneEvents gives Arcane SDK publishers one canonical synchronous event authority per JavaScript realm. EventManager remains the constructor for an isolated strict pub/sub bus and optional bounded diagnostic timeline. Use source handles for SDK semantic events; use isolated managers for local diagnostics, DOM capture, export, and review."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
   <title>EventManager and time-travel diagnostics | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../sdk-api/">API</a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">EventManager and time-travel diagnostics</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="eventmanager-and-time-travel-diagnostics">EventManager and time-travel diagnostics</h1><p class="doc-lead">arcaneEvents gives Arcane SDK publishers one canonical synchronous event authority per JavaScript realm. EventManager remains the constructor for an isolate…</p><div class="doc-meta"><span>SDK 0.3.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">EventManager and time-travel diagnostics</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="eventmanager-and-time-travel-diagnostics">EventManager and time-travel diagnostics</h1><p class="doc-lead">arcaneEvents gives Arcane SDK publishers one canonical synchronous event authority per JavaScript realm. EventManager remains the constructor for an isolated strict pub/sub bus and optional bounded diagnostic timeline. Use source handles for SDK semantic events; use isolated managers for local diagnostics, DOM capture, export, and review.</p><div class="doc-meta"><span>SDK 0.3.4</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="./" aria-current="page">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/event-manager.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#quick-start">Quick start</a><a href="#availability-and-normalization">Availability and normalization</a><a href="#export-summary">Export summary</a><a href="#eventmanager">EventManager</a><a href="#createeventmanager">createEventManager()</a><a href="#arcaneevents">arcaneEvents</a><a href="#createarcaneeventsource">createArcaneEventSource()</a><a href="#projectarcanedomevent">projectArcaneDOMEvent()</a><a href="#isarcaneeventoccurrence">isArcaneEventOccurrence()</a><a href="#arcaneeventauthoritybrand">ARCANEEVENTAUTHORITYBRAND</a><a href="#arcaneeventauthoritykind">ARCANEEVENTAUTHORITYKIND</a><a href="#arcaneeventauthorityprotocol">ARCANEEVENTAUTHORITYPROTOCOL</a><a href="#arcaneeventerrorcodes">ARCANEEVENTERRORCODES</a><a href="#arcaneeventlistenererrorevent">ARCANEEVENTLISTENERERROREVENT</a><a href="#arcaneeventoccurrenceprotocol">ARCANEEVENTOCCURRENCEPROTOCOL</a><a href="#arcaneeventsourcedisposedevent">ARCANEEVENTSOURCEDISPOSEDEVENT</a><a href="#arcaneeventsourcekind">ARCANEEVENTSOURCEKIND</a><a href="#arcaneeventsourceprotocol">ARCANEEVENTSOURCEPROTOCOL</a><a href="#parseeventstack">parseEventStack()</a><a href="#createdominstrumentation">createDOMInstrumentation()</a><a href="#domselector">domSelector()</a><a href="#describedomtarget">describeDOMTarget()</a><a href="#defaultdomeventtypes">DEFAULTDOMEVENTTYPES</a><a href="#arcaneeventstackprotocol">ARCANEEVENTSTACKPROTOCOL</a><a href="#timetravelseekevent">TIMETRAVELSEEKEVENT</a><a href="#playbackstartedevent">PLAYBACKSTARTEDEVENT</a><a href="#playbackrecordevent">PLAYBACKRECORDEVENT</a><a href="#playbackcompletedevent">PLAYBACKCOMPLETEDEVENT</a><a href="#playbackcancelledevent">PLAYBACKCANCELLEDEVENT</a><a href="#playbackfailedevent">PLAYBACKFAILEDEVENT</a><a href="#timetraveloverflowevent">TIMETRAVELOVERFLOWEVENT</a><a href="#dominteractionevent">DOMINTERACTIONEVENT</a><a href="#dommutationevent">DOMMUTATIONEVENT</a><a href="#domobservationstartedevent">DOMOBSERVATIONSTARTEDEVENT</a><a href="#domobservationstoppedevent">DOMOBSERVATIONSTOPPEDEVENT</a><a href="#event-stack-document-and-record-shapes">Event-stack document and record shapes</a><a href="#errors-and-recovery">Errors and recovery</a><a href="#behavioral-tests">Behavioral tests</a></nav></details><p><code>arcaneEvents</code> gives Arcane SDK publishers one canonical synchronous event
@@ -123,8 +123,8 @@ export intentionally, then call <code>clearHistory()</code>.</p>
 <td>Data contract only</td>
 <td>Can be transported explicitly by the developer</td>
 <td><code>arcane-event-stack/1</code></td>
-</tr>
-</tbody></table>
+</tr></tbody>
+</table>
 </div>
 <p>In an external or physical-v1 integrated workspace, the managed browser map
 resolves <code>arcane-os/event-manager</code> to
@@ -132,7 +132,7 @@ resolves <code>arcane-os/event-manager</code> to
 <code>event-pubsub</code> to
 <code>./arcane/sdk/dependencies/event-pubsub/index.js</code>. The canonical
 integrated-legacy workspace retains its older physical routes instead. The
-hash-pinned Arcane browser runtime does not inject this SDK-authored module into
+selected Arcane browser runtime does not inject this SDK-authored module into
 Shell, Provisioner, Core, or built-in apps. There is no transparent fallback to
 the Node package root, <code>arcane/1</code>, HTTP, WebSocket, Ollama, or a cloud event
 service.</p>
@@ -304,8 +304,8 @@ service.</p>
 <td><code>isArcaneEventOccurrence()</code></td>
 <td>Function</td>
 <td>Recognize authority-created occurrences and views</td>
-</tr>
-</tbody></table>
+</tr></tbody>
+</table>
 </div>
 <h2 id="eventmanager"><code>EventManager</code></h2>
 <h3 id="overview">Overview</h3>
@@ -379,8 +379,8 @@ least 64; the other numeric retention limits must be positive safe integers.</p>
 <tr>
 <td><code>domInstrumentation</code></td>
 <td>Attached DOM controller or <code>null</code></td>
-</tr>
-</tbody></table>
+</tr></tbody>
+</table>
 </div>
 <h3 id="methods">Methods</h3>
 <h4 id="ontype-handler-oncefalse"><code>on(type, handler, once=false)</code></h4>
@@ -478,8 +478,8 @@ playback.</p>
 <td><code>none</code></td>
 <td>Emits no per-record bus event; only invokes <code>onRecord</code></td>
 <td>Useful for controlled analysis</td>
-</tr>
-</tbody></table>
+</tr></tbody>
+</table>
 </div>
 <p><code>speed:0</code> delivers immediately. A positive speed preserves recorded monotonic
 delays, divided by the multiplier. <code>onRecord(record)</code> may be async and is awaited.
@@ -1422,8 +1422,8 @@ kernel/application snapshot.</p>
 <td>DOM manager/root/options invalid or MutationObserver unavailable</td>
 <td><code>TypeError</code>/<code>RangeError</code></td>
 <td>Correct capability/options or set <code>captureMutations:false</code></td>
-</tr>
-</tbody></table>
+</tr></tbody>
+</table>
 </div>
 <h2 id="behavioral-tests">Behavioral tests</h2>
 <p>The executable contract is covered by:</p>
@@ -1453,6 +1453,6 @@ strictly importable bounded export.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#quick-start">Quick start</a><a href="#availability-and-normalization">Availability and normalization</a><a href="#export-summary">Export summary</a><a href="#eventmanager">EventManager</a><a href="#createeventmanager">createEventManager()</a><a href="#arcaneevents">arcaneEvents</a><a href="#createarcaneeventsource">createArcaneEventSource()</a><a href="#projectarcanedomevent">projectArcaneDOMEvent()</a><a href="#isarcaneeventoccurrence">isArcaneEventOccurrence()</a><a href="#arcaneeventauthoritybrand">ARCANEEVENTAUTHORITYBRAND</a><a href="#arcaneeventauthoritykind">ARCANEEVENTAUTHORITYKIND</a><a href="#arcaneeventauthorityprotocol">ARCANEEVENTAUTHORITYPROTOCOL</a><a href="#arcaneeventerrorcodes">ARCANEEVENTERRORCODES</a><a href="#arcaneeventlistenererrorevent">ARCANEEVENTLISTENERERROREVENT</a><a href="#arcaneeventoccurrenceprotocol">ARCANEEVENTOCCURRENCEPROTOCOL</a><a href="#arcaneeventsourcedisposedevent">ARCANEEVENTSOURCEDISPOSEDEVENT</a><a href="#arcaneeventsourcekind">ARCANEEVENTSOURCEKIND</a><a href="#arcaneeventsourceprotocol">ARCANEEVENTSOURCEPROTOCOL</a><a href="#parseeventstack">parseEventStack()</a><a href="#createdominstrumentation">createDOMInstrumentation()</a><a href="#domselector">domSelector()</a><a href="#describedomtarget">describeDOMTarget()</a><a href="#defaultdomeventtypes">DEFAULTDOMEVENTTYPES</a><a href="#arcaneeventstackprotocol">ARCANEEVENTSTACKPROTOCOL</a><a href="#timetravelseekevent">TIMETRAVELSEEKEVENT</a><a href="#playbackstartedevent">PLAYBACKSTARTEDEVENT</a><a href="#playbackrecordevent">PLAYBACKRECORDEVENT</a><a href="#playbackcompletedevent">PLAYBACKCOMPLETEDEVENT</a><a href="#playbackcancelledevent">PLAYBACKCANCELLEDEVENT</a><a href="#playbackfailedevent">PLAYBACKFAILEDEVENT</a><a href="#timetraveloverflowevent">TIMETRAVELOVERFLOWEVENT</a><a href="#dominteractionevent">DOMINTERACTIONEVENT</a><a href="#dommutationevent">DOMMUTATIONEVENT</a><a href="#domobservationstartedevent">DOMOBSERVATIONSTARTEDEVENT</a><a href="#domobservationstoppedevent">DOMOBSERVATIONSTOPPEDEVENT</a><a href="#event-stack-document-and-record-shapes">Event-stack document and record shapes</a><a href="#errors-and-recovery">Errors and recovery</a><a href="#behavioral-tests">Behavioral tests</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.3.1, runtime bundle 0.8.12, and protocol arcane/1; the latest verified published package is 0.3.1.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.3.4, runtime bundle 0.8.12, and protocol arcane/1; the latest published package is 0.3.4.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
 </body>
 </html>

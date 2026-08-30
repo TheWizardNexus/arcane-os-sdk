@@ -3,9 +3,9 @@
   "source": {
     "authority": "sdk-canonical",
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
-    "commit": "9c4ec2213af98cbc53fca073a799435a89c6650f",
+    "commit": "9e657b31f758a2c7943446533fe87afda206ac49",
     "path": "runtime/arcane",
-    "sdkVersion": "0.3.1",
+    "sdkVersion": "0.3.4",
     "legacyProjection": {
       "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
       "commit": "c540014afe69f14cf5ae60493b7295f36dbcec64",
@@ -13,9 +13,9 @@
     },
     "protocol": "arcane/1"
   },
-  "artifactCount": 86,
-  "javascriptArtifactCount": 84,
-  "esmExportCount": 384,
+  "artifactCount": 84,
+  "javascriptArtifactCount": 82,
+  "esmExportCount": 351,
   "artifacts": [
     {
       "file": "runtime/arcane/modules/AI.js",
@@ -34,8 +34,8 @@
       "summary": "Owns provider-selectable chat and the one-time caller-authority browser STT/TTS configuration, lifecycle, synthesis, transcription, and playback boundary.",
       "availability": "Browser + native bridge + cloud",
       "protocol": "arcane-ai-browser-speech-configuration/1, AIProviderRuntime arcane-ai-provider/2 routes, globalThis.arcaneEvents, OpenAI HTTPS, Arcane.ollama, Arcane.speech, Android WebView bridge",
-      "normalization": "Frozen caller-owned browser speech authority, SDK-owned provider registration/replacement/disposal, explicit STT/TTS activation, sticky readiness, Blob/File transcription, playable audio, mute, cancellation, and supersession are normalized; provider/model/runtime/voice policy remains caller-owned.",
-      "surface": "Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; `configureBrowserSpeech(configuration,{signal})`, `disposeBrowserSpeech({signal})`, route configuration/transition/start/mute methods, chat methods, `streamTTS(text,end)`, `finishTTS()`, `fetchTTS({model,voice,input,responseFormat,speed},signal)`, `fetchSTT(audioFile,responseHandler,signal)`, and playback controls; installs `window.ai` and projects `ai-ready`."
+      "normalization": "Complete mutable caller-owned browser speech authority, SDK-owned provider registration/replacement/disposal, explicit STT/TTS activation, sticky readiness, canonical window.user readiness without compatibility-event object-identity admission or polling, exact ordered structural calls with required arguments.message, atomic nonblank all-ID tool-result sequencing, complete all-choice streaming/data validation, native Ollama structural adaptation, complete-response then all validated tool callbacks then completion ordering, observed async callbacks, Blob/File transcription, playable audio, active-generation TTS operation-failure routing, mute, and cancellation are normalized; provider/model/runtime/voice policy remains caller-owned.",
+      "surface": "Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; configure/dispose speech, route lifecycle, declaration-validated chat/stream requests with exact ordered calls, synthesis/transcription, and playback controls; initializes from current canonical user readiness, installs `window.ai`, and projects `ai-ready` plus active-generation `ai-tts-failure`."
     },
     {
       "file": "runtime/arcane/modules/AIPreferenceRuntime.js",
@@ -81,7 +81,7 @@
       "summary": "Provider-neutral selection, lifecycle, routing, startup, request, streaming, cancellation, and independent LLM/STT/TTS state.",
       "availability": "Cross-host in-process runtime; registered providers remain browser, native, or cloud specific",
       "protocol": "arcane-ai-runtime/2, arcane-ai-provider/2, arcane-ai-model-authority/1",
-      "normalization": "Normalizes immutable per-role routes, lifecycle/status, cancellation, streaming cleanup, and local-only selection without creating a fallback.",
+      "normalization": "Normalizes mutable complete per-role routes, lifecycle/status, cancellation, streaming cleanup, uncapped FIFO request lanes, local-only selection, direct LLM history/declaration/terminal structural contracts, complete all-choice content/reasoning FIFO iteration, private automatic provider draining with result-first buffering, terminal-only structural calls, exact per-choice observed/terminal correlation, and a separate complete validated terminal result without creating a fallback.",
       "surface": "Protocol constants; singleton-only `AIProviderRuntime`; `aiProviderRuntime`; `getAIProviderRuntime()`; provider registration/identity/selection, closed three-role and STT/TTS-only validation/configuration/replacement, status/catalog/inspection, startup, per-role load/unload/dispose/cancel, dispose-all, request/stream/speech aliases, and mute controls."
     },
     {
@@ -95,11 +95,11 @@
         "applyAIResponseLength",
         "normalizeAIResponseLength"
       ],
-      "summary": "Normalizes concise/short/medium/long response preferences and applies the matching system instruction.",
+      "summary": "Preserves legacy low/medium/high preference selectors as inert compatibility metadata while leaving complete prompts unchanged.",
       "availability": "Cross-host",
       "protocol": "In-process only",
-      "normalization": "Fully normalized string/instruction contract.",
-      "surface": "Response-length constants plus `normalizeAIResponseLength()`, `aiResponseLengthInstruction()`, and `applyAIResponseLength()`."
+      "normalization": "Legacy selectors normalize to low, medium, or high; every label is Complete, the instruction is empty, and prompt content remains unchanged.",
+      "surface": "Inert compatibility constants plus `normalizeAIResponseLength()`, `aiResponseLengthInstruction()`, and `applyAIResponseLength()`."
     },
     {
       "file": "runtime/arcane/modules/AIResponseURLPolicy.js",
@@ -137,7 +137,7 @@
         "subscribeAIRuntimeIntents",
         "subscribeAIRuntimeState"
       ],
-      "summary": "Sticky immutable LLM, speech-to-text, and text-to-speech lifecycle snapshots, intents, subscriptions, and startup-settlement barriers.",
+      "summary": "Sticky mutable LLM, speech-to-text, and text-to-speech lifecycle snapshots, intents, subscriptions, and startup-settlement barriers.",
       "availability": "Cross-host in-process state contract; actual role readiness remains provider specific",
       "protocol": "arcane-ai-runtime-state/1 over the per-realm globalThis.arcaneEvents authority; deprecated state-free EventTarget compatibility view",
       "normalization": "Closed monotonic sticky role snapshots, transient lifecycle intents, synchronous current-state replay, AbortSignal cleanup, and startup settlement are normalized; events report state but grant no authority.",
@@ -232,11 +232,11 @@
       "exports": [
         "createArcaneNavigationGuard"
       ],
-      "summary": "Creates a fail-closed HTTP(S) navigation guard with domain and CIDR policy decisions.",
+      "summary": "Creates an HTTP(S) navigation guard with explicit secure-mode domain and CIDR policy decisions.",
       "availability": "Cross-host",
       "protocol": "Arcane network-policy document",
-      "normalization": "Normalized frozen allow/block decision.",
-      "surface": "`createArcaneNavigationGuard()`."
+      "normalization": "Complete mutable allow/block decision; ordinary mode warns and continues, while explicitly selected secure:true fails closed.",
+      "surface": "`createArcaneNavigationGuard({ secure })`."
     },
     {
       "file": "runtime/arcane/modules/ArcaneNetworkPolicy.js",
@@ -288,10 +288,10 @@
         "default",
         "skipError"
       ],
-      "summary": "Runs a fixed sequential browser test list with cooperative abort, per-test timeout, and lifecycle events.",
+      "summary": "Runs a complete sequential browser test list with explicit cancellation and full-detail lifecycle events.",
       "availability": "Browser / standard Web APIs",
-      "protocol": "Timers + per-realm globalThis.arcaneEvents authority",
-      "normalization": "Normalized result and skip/assertion errors.",
+      "protocol": "Explicit AbortSignal cancellation + per-realm globalThis.arcaneEvents authority",
+      "normalization": "Complete mutable descriptors, results, lifecycle events, and context; malformed result and skip/assertion errors remain normalized.",
       "surface": "Event/error/reason constants; default `BrowserTestSuite`; `list()`, `run()`, and `dispose()`; state-free EventTarget/on compatibility for suite/test lifecycle occurrences."
     },
     {
@@ -303,31 +303,11 @@
         "default",
         "evaluateExpression"
       ],
-      "summary": "Evaluates bounded arithmetic, powers, constants, and common functions without `eval`.",
+      "summary": "Evaluates complete arithmetic expressions, powers, constants, and common functions without `eval`.",
       "availability": "Cross-host",
       "protocol": "arcane-event-source/1 on the per-realm globalThis.arcaneEvents authority",
-      "normalization": "Frozen canonical result/error details, source-instance operation IDs, exact parser/evaluation error codes, and state-free EventTarget compatibility.",
+      "normalization": "Mutable complete canonical result/error details, source-instance operation IDs, exact parser/evaluation error codes, and state-free EventTarget compatibility.",
       "surface": "CALCULATOR_ENGINE_ERROR_CODES; default CalculatorEngine with calculate(), EventTarget/on compatibility, dispose()/destroy(); evaluateExpression()."
-    },
-    {
-      "file": "runtime/arcane/modules/CaseEvidenceIndexer.js",
-      "name": "CaseEvidenceIndexer.js",
-      "kind": "esm",
-      "exports": [
-        "indexPairedRecord",
-        "nearestPageMarker",
-        "parseStructuredRecordName",
-        "renderedPageBlocks",
-        "resolveEvidenceSourcePage",
-        "safeName",
-        "sha256",
-        "stem"
-      ],
-      "summary": "Pairs and indexes structured evidence records with rendered-page provenance and SHA-256 identity.",
-      "availability": "Node only",
-      "protocol": "node:fs/promises, node:path, node:crypto",
-      "normalization": "Normalized naming/page helpers; filesystem errors preserved.",
-      "surface": "Eight exported indexing, page, naming, stem, and digest helpers."
     },
     {
       "file": "runtime/arcane/modules/ChartLibrary.js",
@@ -430,6 +410,7 @@
         "applyMarkdownFormat",
         "createSTTActivationController",
         "effectiveDashboardVisibility",
+        "formatAIRuntimeProgress",
         "normalizeChartOptions",
         "normalizeChartRows",
         "normalizeDashboardDefinitions",
@@ -442,21 +423,22 @@
       "summary": "Owns normalized configuration/value contracts and shared explicit STT activation behavior for chart, dashboard, Markdown, and voice components.",
       "availability": "Cross-host with an injected event constructor outside DOM hosts",
       "protocol": "In-process only",
-      "normalization": "Fully normalized labels, rows, definitions, visibility, formats, editor and voice options, plus capability-neutral STT activation intent and presentation state.",
-      "surface": "Constant sets plus normalization, formatting, and explicit STT activation helpers."
+      "normalization": "Fully normalized labels, rows, definitions, visibility, formats, editor and voice options, plus capability-neutral STT activation intent and presentation state. Complete finite progress measures remain visible, including fractional and over-total values.",
+      "surface": "Constant sets plus normalization, complete finite-progress formatting, and explicit STT activation helpers."
     },
     {
       "file": "runtime/arcane/modules/ConfiguredAIChatSession.js",
       "name": "ConfiguredAIChatSession.js",
       "kind": "esm",
       "exports": [
+        "normalizeStructuralToolCall",
         "default"
       ],
-      "summary": "Owns bounded in-memory AI turns, context construction, response-length instruction, and atomic history commit.",
+      "summary": "Owns complete in-memory AI turns, context construction, provider response preservation, and atomic history commit.",
       "availability": "Native bridge by default; cross-host with injected chat",
       "protocol": "Arcane.ai.chat or injected provider",
-      "normalization": "Normalized session/result; provider rejection preserved.",
-      "surface": "default `ConfiguredAIChatSession`; constructor accepts bounded coherent `initialMessages` plus configuration; `history()`, `clear()`, `prepare()`, `send()`; prior normalized and exactly-one-choice OpenAI-compatible responses normalize to one frozen session result."
+      "normalization": "Complete mutable session/result; declarations and emitted calls require nonempty user-facing arguments.message; ordered parallel calls, exact IDs/names/arguments, and extension fields are preserved; one atomic result batch must settle every pending ID; per-turn request options cannot replace session-owned messages or signal; persisted sequencing has stable coded failures; and provider rejection remains visible.",
+      "surface": "default `ConfiguredAIChatSession`, named `normalizeStructuralToolCall`; constructor accepts complete initial messages and ordered structural tool-call arrays; history/clear/prepare/send; per-turn request overrides preserve session-owned messages/signal; every pending ID requires exactly one matching nonblank role=tool result in the same request batch."
     },
     {
       "file": "runtime/arcane/modules/ConversationActionItems.js",
@@ -466,9 +448,6 @@
         "CONVERSATION_ACTION_ITEM_BASES",
         "CONVERSATION_ACTION_ITEM_PRESENTATION_COOLDOWN_MS",
         "CONVERSATION_ACTION_ITEM_STATUSES",
-        "MAX_CONVERSATION_ACTION_ITEMS",
-        "MAX_CONVERSATION_ACTION_ITEM_CHARACTERS",
-        "MAX_CONVERSATION_REMEMBERED_ACTIONS",
         "conversationActionItemsInstruction",
         "createConversationActionItem",
         "formatConversationActionItemCheckIn",
@@ -482,7 +461,7 @@
         "selectConversationActionItemsForPresentation",
         "updateConversationActionItem"
       ],
-      "summary": "Normalizes, creates, updates, remembers, selects, and formats bounded conversation action items.",
+      "summary": "Normalizes, creates, updates, remembers, selects, and formats complete conversation action items.",
       "availability": "Cross-host",
       "protocol": "In-process only",
       "normalization": "Fully normalized status/base/presentation contract.",
@@ -503,8 +482,8 @@
       "summary": "Defines the closing-report tool, instruction, result normalizer, call classifier, and formatter.",
       "availability": "Cross-host",
       "protocol": "In-process only",
-      "normalization": "Fully normalized report contract.",
-      "surface": "Six constants/helpers for closing reports."
+      "normalization": "Required user-facing message remains distinct from the complete final_message; normalized results expose message, finalMessage, and rememberedActions.",
+      "surface": "Six constants/helpers for closing reports; the sole-call schema requires message and final_message."
     },
     {
       "file": "runtime/arcane/modules/ConversationTimebox.js",
@@ -531,8 +510,8 @@
       "summary": "Owns conversation limits, control messages, submission barriers, elapsed formatting, and delivery proof.",
       "availability": "Cross-host",
       "protocol": "Clock/timers, callbacks, and per-realm globalThis.arcaneEvents authority",
-      "normalization": "Fully normalized state/command/delivery errors.",
-      "surface": "Event/error/reason constants; default `ConversationTimebox`, `ConversationSubmissionBarrier`, control constants/helpers, state-free on/addEventListener compatibility, and `dispose()`."
+      "normalization": "State/command/delivery errors plus exact required user-facing message are normalized.",
+      "surface": "Event/error/reason constants; default `ConversationTimebox`, `ConversationSubmissionBarrier`, control constants/helpers, required message tool schema, state-free on/addEventListener compatibility, and `dispose()`."
     },
     {
       "file": "runtime/arcane/modules/CoreLocalModelCatalog.js",
@@ -593,7 +572,7 @@
       "summary": "Provides app-scoped OPFS tables, worker I/O, backup/restore, compression, and CRUD/batch APIs.",
       "availability": "Browser / native WebView",
       "protocol": "OPFS, DBOPFSWorker, Compression Streams, and per-realm globalThis.arcaneEvents authority",
-      "normalization": "App scope normalized; DOM/storage errors preserved.",
+      "normalization": "App scope and recognized file parsing are normalized; nonblank unreadable JSONL rows remain complete raw strings, and DOM/storage errors are preserved.",
       "surface": "default `DBOPFS`; installs `window.dbopfs`, emits `dbopfs-ready`; table/file/backup APIs."
     },
     {
@@ -606,10 +585,10 @@
         "default",
         "normalizeDBOPFSDocumentSchema"
       ],
-      "summary": "Application-defined document corpus bootstrap, caller-source evaluation, atomic DBOPFS generations, bounded lexical search, and untrusted request-context construction.",
+      "summary": "Application-defined complete document corpus bootstrap, caller-source evaluation, atomic DBOPFS generations, lexical search, and request-context construction.",
       "availability": "Browser or compatible host with an existing DBOPFS-style database adapter",
       "protocol": "Existing DBOPFS get/set/getAllKeys/delete methods; no new storage protocol",
-      "normalization": "Preserves DBOPFS method semantics, commits a completion manifest last, validates every stored generation, exposes explicit reject or preserve-readable read-failure policy, and labels retrieved context as untrusted data.",
+      "normalization": "Preserves DBOPFS method semantics, commits a completion manifest last, rejects malformed stored generations, exposes explicit reject or default preserve-readable read-failure policy, and returns complete mutable context.",
       "surface": "`DBOPFSDocumentLibrary`, `createDBOPFSDocumentLibrary()`, `normalizeDBOPFSDocumentSchema()`; `schema`, `bootstrap()`, `search()`, `evaluate()`, `buildContext()`, and `createContextBuilder()`."
     },
     {
@@ -633,10 +612,10 @@
         "setupTaskId",
         "workspaceRoot"
       ],
-      "summary": "Provides bounded workspace inspection, context, setup task, and Node installer clients without arbitrary command execution.",
+      "summary": "Provides complete workspace inspection, context, setup task, and Node installer clients without arbitrary command execution.",
       "availability": "Native bridge",
       "protocol": "Arcane.development",
-      "normalization": "Inputs normalized; provider result/error preserved.",
+      "normalization": "Complete plain-text inputs and provider result/error preserved.",
       "surface": "default `DevelopmentWorkspace` and input validators; `inspect()`, `context()`, `setup()`, `installNode()`."
     },
     {
@@ -669,11 +648,11 @@
         "scoreDocumentBody",
         "scoreDocumentLexicalIndex"
       ],
-      "summary": "Dependency-free deterministic document indexing, ranked metadata/body search, bounded excerpts, and stable tie-breaking.",
+      "summary": "Dependency-free deterministic document indexing, complete ranked metadata/body search, complete excerpts, and stable tie-breaking.",
       "availability": "Cross-host in-process only",
-      "protocol": "In-process immutable record contract",
-      "normalization": "Normalizes text and filters, preserves deterministic field priority, and returns frozen results without network, storage, or provider side effects.",
-      "surface": "Search-field constant; `DocumentLexicalSearch`; index/token/score/excerpt helpers; `rank()` and bounded `search()`."
+      "protocol": "In-process mutable record contract",
+      "normalization": "Normalizes text and filters, preserves deterministic field priority, and returns complete mutable results without network, storage, or provider side effects.",
+      "surface": "Search-field constant; `DocumentLexicalSearch`; index/token/score/excerpt helpers; complete `rank()` and `search()`."
     },
     {
       "file": "runtime/arcane/modules/DocumentNavigation.js",
@@ -761,10 +740,10 @@
         "countSentences",
         "default"
       ],
-      "summary": "Inspects one exact model and runs one isolated question with proof validation.",
+      "summary": "Inspects one exact model and runs one isolated question while preserving complete results.",
       "availability": "Native bridge or injected provider",
       "protocol": "localAI isolated-model methods",
-      "normalization": "Strict normalized proof/coded errors.",
+      "normalization": "Complete inspection/question forwarding, complete provider results, informative sentence counts, and coded malformed-result errors are normalized.",
       "surface": "default/named runner, `countSentences()`, `inspectModel()`, `runQuestion()`."
     },
     {
@@ -777,9 +756,9 @@
         "deriveLocalAIRequirements",
         "evaluateLocalSpeechHealth"
       ],
-      "summary": "Derives selected AI requirements and returns a frozen readiness/recovery report across browser, desktop, and Android modes.",
+      "summary": "Derives selected AI requirements and returns a complete readiness/recovery report across browser, desktop, and Android modes.",
       "availability": "Browser/native hybrid",
-      "protocol": "Arcane.localAI, Arcane.speech, bounded browser speech health",
+      "protocol": "Arcane.localAI, Arcane.speech, complete browser speech health",
       "normalization": "Fully normalized report and stable error codes; browsers never probe Ollama.",
       "surface": "Endpoint constant plus requirements, speech-health, and readiness helpers."
     },
@@ -808,7 +787,7 @@
         "default",
         "resolveMailConfig"
       ],
-      "summary": "Builds bounded reports and prefers the native mail capability with an explicit HTTP transport fallback.",
+      "summary": "Builds complete reports and prefers the native mail capability with an explicit HTTP transport fallback.",
       "availability": "Browser/native hybrid + cloud",
       "protocol": "Arcane.mail.send or MailTransport HTTP(S)",
       "normalization": "Mail inputs/results normalized; transport failures mixed.",
@@ -819,7 +798,6 @@
       "name": "MailOutbox.mjs",
       "kind": "esm",
       "exports": [
-        "MAIL_OUTBOX_ACCEPTANCE_AUTHORITIES",
         "MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS",
         "MAIL_OUTBOX_PROTOCOL",
         "MAIL_OUTBOX_STATES",
@@ -828,11 +806,11 @@
         "createMailOutbox",
         "default"
       ],
-      "summary": "Persists bounded mail reports before delivery and normalizes idempotent enqueue, retry, reconciliation, and invalid-record maintenance.",
+      "summary": "Persists complete mail reports before delivery and normalizes idempotent enqueue, retry, reconciliation, and invalid-record maintenance.",
       "availability": "Browser/native WebView or compatible injected host with durable storage, Web Locks, and a delivery function",
       "protocol": "arcane-mail-outbox/1 + injected durable storage + Web Locks + AbortSignal + online EventTarget",
-      "normalization": "Frozen records, idempotency and retry/reconciliation state, bounded drains/inventory, cancellation, and invalid-record maintenance are normalized; storage, lock, and delivery failures are coded.",
-      "surface": "Protocol/table/window/state/acceptance constants; `MailOutbox`, factory/default; read-only lifecycle diagnostics; record inspection and maintenance; enqueue, drain, start, and stop."
+      "normalization": "Complete records, idempotency and retry/reconciliation state, full drains/inventory, cancellation, and invalid-record maintenance are normalized; storage, lock, and delivery failures are coded.",
+      "surface": "Protocol/table/window/state constants; `MailOutbox`, factory/default; read-only lifecycle diagnostics; record inspection and maintenance; enqueue, drain, start, and stop."
     },
     {
       "file": "runtime/arcane/modules/MailTransport.mjs",
@@ -840,17 +818,16 @@
       "kind": "esm",
       "exports": [
         "DEFAULT_MAIL_REQUEST_TIMEOUT_MS",
-        "MAX_MAIL_RESPONSE_BYTES",
         "MailTransportError",
         "normalizeMailEndpoint",
         "serializeMailReport",
         "sendMailReport"
       ],
-      "summary": "Sends one bounded mail report to a normalized HTTP(S) endpoint with timeout and response-size limits.",
+      "summary": "Sends one complete mail report to a normalized HTTP(S) endpoint with timeout and complete response handling.",
       "availability": "Browser/server with fetch + cloud",
       "protocol": "HTTP(S) fetch + AbortController",
-      "normalization": "Normalized endpoint/timeout/size errors; remote detail bounded.",
-      "surface": "Timeout/size constants, `MailTransportError`, `normalizeMailEndpoint()`, `serializeMailReport()`, and `sendMailReport()`."
+      "normalization": "Endpoint, timeout, cancellation, network, HTTP, and response-contract errors are normalized.",
+      "surface": "Timeout constant, `MailTransportError`, `normalizeMailEndpoint()`, `serializeMailReport()`, and `sendMailReport()`."
     },
     {
       "file": "runtime/arcane/modules/Marked.min.js",
@@ -889,10 +866,10 @@
       "exports": [
         "default"
       ],
-      "summary": "Renders Markdown with Marked and exposes a DOM-sanitized projection.",
+      "summary": "Renders complete Markdown with Marked and exposes the complete rendered markup.",
       "availability": "Browser / native WebView",
-      "protocol": "Marked + DOM template sanitization",
-      "normalization": "Raw Marked behavior plus Arcane sanitization; parse errors vendor-native.",
+      "protocol": "Marked",
+      "normalization": "Complete raw and rendered Marked values; parse errors remain vendor-native.",
       "surface": "default `MD`; `raw`, `rendered`, `safeRendered`, `append()`."
     },
     {
@@ -921,7 +898,7 @@
       "summary": "Normalizes message content advisories and contains per-message inspection failures.",
       "availability": "Cross-host",
       "protocol": "Injected inspector",
-      "normalization": "Normalized advisory records; inspector failures converted to unavailable results.",
+      "normalization": "Complete mutable advisory records preserve all supplied text and signals; inspector failures become unavailable results.",
       "surface": "Three advisory/inspection helpers."
     },
     {
@@ -934,8 +911,8 @@
       ],
       "summary": "Parses the deterministic packaged Modelfile subset and extracts the SYSTEM prompt.",
       "availability": "Cross-host",
-      "protocol": "Optional same-origin read-only fetch",
-      "normalization": "Strict normalized definition with coded syntax errors.",
+      "protocol": "Optional ordinary read-only fetch",
+      "normalization": "Complete mutable definition data with coded syntax errors for malformed input.",
       "surface": "`parseModelDefinition()`, `loadModelDefinitionSystemPrompt()`."
     },
     {
@@ -995,7 +972,7 @@
         "default",
         "mapForecast"
       ],
-      "summary": "Searches and loads Open-Meteo data into frozen Arcane weather entities.",
+      "summary": "Searches and loads Open-Meteo data into complete mutable Arcane weather entities.",
       "availability": "Browser / native WebView / server with fetch + cloud",
       "protocol": "Open-Meteo HTTPS + per-realm globalThis.arcaneEvents authority",
       "normalization": "Provider data normalized to entities; transport errors mixed.",
@@ -1010,11 +987,11 @@
         "createPersistentAIChatSession",
         "default"
       ],
-      "summary": "Composes bounded configured chat with an existing ChatEntity so each user, assistant, and structural tool turn has an explicit persistence policy.",
+      "summary": "Composes complete configured chat with an existing ChatEntity so each user, assistant, and structural tool turn has an explicit persistence and transport policy.",
       "availability": "Browser or native WebView with the projected ChatEntity, DBOPFS, and a configured chat function or normalized Arcane.ai surface",
       "protocol": "Existing ChatEntity/DBOPFS methods plus provider-neutral chat request/result records",
-      "normalization": "Preserves existing chat/history/memory semantics, commits live context atomically, and keeps durable persistence coherent across structural tool-call/result pairs.",
-      "surface": "Default/named `PersistentAIChatSession`, `createPersistentAIChatSession()`; `create()`, `chatEntity`, `fileName`, `ready()`, `history()`, `settleMemory()`, and `send()`."
+      "normalization": "Preserves provider-safe history, complete optional assistant reasoning, every timestamped UI transcript record including legacy ui_hidden metadata, and arbitrary nonempty caller-owned chat file names; commits live context atomically; falls back from optional streaming to configured non-stream transport; carries per-turn generation options while owning lifecycle callbacks; exposes complete data callbacks; accepts terminal-only structural calls; correlates every observed per-choice call against the exact validated terminal envelope before callback/persistence; atomically settles every pending ID once; and keeps malformed legacy records readable without inventing or rewriting messages.",
+      "surface": "Default/named `PersistentAIChatSession`, `createPersistentAIChatSession()`; `create()`, `ai`, `chatEntity`, `fileName`, `ready()`, `history()`, `transcript()`, `settleMemory()`, `send()`, and `stream()`."
     },
     {
       "file": "runtime/arcane/modules/PreferenceStore.js",
@@ -1030,8 +1007,8 @@
       "summary": "Loads and updates schema-defined app preferences through native storage with a narrow browser fallback.",
       "availability": "Browser/native hybrid",
       "protocol": "Arcane.preferences or app-scoped localStorage + per-realm globalThis.arcaneEvents authority",
-      "normalization": "Values normalized; only exact unsupported capability falls back.",
-      "surface": "Event/error constants, default `PreferenceStore`, re-exported `Preference`/schema; load/set/reset APIs, state-free EventTarget/on compatibility, and `dispose()`."
+      "normalization": "Complete ordinary values remain mutable; setAll uses one optional atomic adapter batch for every selected value when advertised, otherwise retains complete serial per-key compatibility, never retries a rejected dispatched batch serially, and only exact unsupported native capability changes future operations to the browser fallback.",
+      "surface": "Event/error constants, default `PreferenceStore`, re-exported `Preference`/schema; load/set/setAll/reset APIs, required adapter get/set/delete plus optional setMany, state-free EventTarget/on compatibility, and `dispose()`."
     },
     {
       "file": "runtime/arcane/modules/QRCode.min.js",
@@ -1069,7 +1046,7 @@
       "summary": "Parses record links and builds their normalized index.",
       "availability": "Cross-host",
       "protocol": "In-process only",
-      "normalization": "Fully normalized.",
+      "normalization": "Supported URLs and bare video IDs normalize to mutable locators; ordinary hosting is the default and privacy enhancement is opt-in.",
       "surface": "`parseRecordLinks()`, `buildRecordLinkIndex()`."
     },
     {
@@ -1089,7 +1066,7 @@
       "summary": "Indexes text lines, page markers, dates, rules, and excerpts for record review.",
       "availability": "Cross-host",
       "protocol": "In-process only",
-      "normalization": "Fully normalized.",
+      "normalization": "Complete selected excerpts and every unique date/rule finding are preserved without character or result-count caps.",
       "surface": "Eight text/page/date/rule helper exports."
     },
     {
@@ -1106,38 +1083,8 @@
       "summary": "Stores normalized record-review decisions through native storage or app-scoped local fallback.",
       "availability": "Browser/native hybrid",
       "protocol": "Arcane.storage or localStorage + per-realm globalThis.arcaneEvents authority",
-      "normalization": "Normalized ids/reviews/snapshots; storage failures mixed.",
+      "normalization": "Complete records preserved; unreadable stored content fails observably.",
       "surface": "Event/error constants, default store, record/review normalizers; `load()`, `get()`, `set()`, `snapshot()`, state-free EventTarget/on change compatibility, and `dispose()`."
-    },
-    {
-      "file": "runtime/arcane/modules/RevocableProjectionLedger.js",
-      "name": "RevocableProjectionLedger.js",
-      "kind": "esm",
-      "exports": [
-        "DEFAULT_PROJECTION_LEDGER_CAPACITY",
-        "DEFAULT_PROJECTION_LEDGER_STORED_CHARACTERS",
-        "DEFAULT_PROJECTION_LEDGER_STORED_NODES",
-        "DEFAULT_PROJECTION_LEDGER_STORED_UTF8_BYTES",
-        "MAX_PROJECTION_LEDGER_CAPACITY",
-        "MAX_PROJECTION_LEDGER_STORED_CHARACTERS",
-        "MAX_PROJECTION_LEDGER_STORED_NODES",
-        "MAX_PROJECTION_LEDGER_STORED_UTF8_BYTES",
-        "PROJECTION_LEDGER_LIMITS",
-        "PROJECTION_LEDGER_REASON_CODES",
-        "PROJECTION_LEDGER_SCHEMA_VERSION",
-        "PROJECTION_LEDGER_STATUSES",
-        "ProjectionLedgerError",
-        "RevocableProjectionLedger",
-        "cloneProjectionLedgerValue",
-        "createProjectionLedgerFingerprint",
-        "createRevocableProjectionLedgerPortAdapter",
-        "default"
-      ],
-      "summary": "Implements an append-only bounded in-memory projection/revocation ledger safe for hostile descriptor inputs.",
-      "availability": "Cross-host",
-      "protocol": "In-process or explicit port adapter",
-      "normalization": "Strict normalization with stable `ProjectionLedgerError`.",
-      "surface": "Ledger classes, limits/status/reason constants, clone/fingerprint/port helpers, append/query/list APIs."
     },
     {
       "file": "runtime/arcane/modules/RiskSignalAnalyzer.js",
@@ -1147,7 +1094,7 @@
         "DEFAULT_LEVELS",
         "analyzeRiskSignals"
       ],
-      "summary": "Matches configured risk signals and levels against bounded text.",
+      "summary": "Matches configured risk signals and levels against complete text.",
       "availability": "Cross-host",
       "protocol": "In-process only",
       "normalization": "Fully normalized.",
@@ -1163,10 +1110,10 @@
         "scamRiskSignals",
         "scamSafetyGuidance"
       ],
-      "summary": "Combines deterministic scam signals with Arcane blocked-domain evidence and safety guidance.",
+      "summary": "Combines deterministic scam signals with optional Arcane blocked-domain evidence and safety guidance.",
       "availability": "Cross-host",
       "protocol": "Arcane network policy fetch",
-      "normalization": "Fully normalized.",
+      "normalization": "Complete mutable results; blocked-domain policy requires secure:true.",
       "surface": "Signals plus load, assess, and guidance helpers."
     },
     {
@@ -1179,7 +1126,7 @@
       "summary": "Provides a narrow exact-key JSON cache inside one app-owned OPFS namespace.",
       "availability": "Browser / native WebView",
       "protocol": "OPFS + AppDataScope",
-      "normalization": "Keys/limits/corruption handling normalized; storage errors mixed.",
+      "normalization": "Filename-safe scope and key segments, complete JSON values, and malformed-cache cleanup are normalized; storage errors remain mixed.",
       "surface": "default `ScopedOPFSCache`; support check and get/set/delete APIs."
     },
     {
@@ -1206,10 +1153,6 @@
       "name": "SpeechPlayback.js",
       "kind": "esm",
       "exports": [
-        "MAX_SPEECH_CHARACTERS",
-        "MAX_SPEECH_CHUNKS",
-        "MAX_SPEECH_INPUT",
-        "PREFERRED_STREAM_SEGMENT",
         "SPEECH_PLAYBACK_STATE_EVENT",
         "SPEECH_VOICE_ALIASES",
         "SPEECH_VOICE_OPTIONS",
@@ -1217,11 +1160,11 @@
         "default",
         "splitSpeechText"
       ],
-      "summary": "Segments bounded text, queues latest-request speech synthesis, and controls lookahead HTML audio playback.",
-      "availability": "Browser + admitted AI/native bridge",
+      "summary": "Preserves exact nonblank text as one segment without trimming, splitting, or freezing it; queues latest-request synthesis and controls lookahead HTML audio playback.",
+      "availability": "Browser + compatible AI/native bridge",
       "protocol": "AI.fetchTTS or compatible Arcane.speech.synthesize, globalThis.arcaneEvents, Blob URLs, audio element",
-      "normalization": "Caller-owned model/voice/format policy, owned cancellation, playable Blob results, lifecycle state, and limits are normalized; provider admission remains external.",
-      "surface": "SpeechPlayback class/default, `SPEECH_PLAYBACK_STATE_EVENT`, compatibility voice/limit constants, `splitSpeechText()`, caller-configured playback lifecycle, cancellation, and destroy APIs."
+      "normalization": "Exact nonblank split/part input strings are preserved in mutable records while playback policy, cancellation, Blob results, and lifecycle state are normalized; provider failures remain external.",
+      "surface": "SpeechPlayback class/default, `SPEECH_PLAYBACK_STATE_EVENT`, voice aliases/options, `splitSpeechText()`, caller-configured playback lifecycle, cancellation, and destroy APIs."
     },
     {
       "file": "runtime/arcane/modules/StaticDocumentCatalog.js",
@@ -1233,10 +1176,10 @@
         "normalizeStaticDocumentCatalog",
         "staticDocumentCacheKey"
       ],
-      "summary": "Loads a positive static document inventory with byte/hash verification, cache, search, and bounded context.",
+      "summary": "Loads a positive static document inventory with complete cache, search, hydration, and context content.",
       "availability": "Browser / native WebView / server with fetch",
-      "protocol": "HTTP(S), crypto.subtle, optional cache",
-      "normalization": "Strict catalog/content normalization; transport failures mixed.",
+      "protocol": "HTTP(S), optional cache",
+      "normalization": "Complete mutable catalog, hydration, search, and context content; malformed catalog/cache data and transport failures remain visible.",
       "surface": "default catalog, schema constant, catalog normalizer/cache-key; list/get/search/hydrate/context APIs."
     },
     {
@@ -1362,8 +1305,8 @@
       "summary": "Parses OpenAI-style tool calls and dispatches complete or streamed calls to injected handlers.",
       "availability": "Cross-host",
       "protocol": "Injected handlers",
-      "normalization": "Arguments/routing normalized; handler results returned or all-settled.",
-      "surface": "`parseArguments()`, `handleResponse()`, `handleStreamedCalls()`."
+      "normalization": "Object.prototype or null-prototype argument records require a nonempty user-facing message and retain every field unchanged; handler results are returned or all-settled.",
+      "surface": "`parseArguments()`, `handleResponse()`, `handleStreamedCalls()`; invalid or missing message fails `AI_TOOL_MESSAGE_REQUIRED`."
     },
     {
       "file": "runtime/arcane/modules/uPlot.iife.min.js",
@@ -1421,7 +1364,7 @@
         "parseYouTubeMedia",
         "youtubeEmbedUrl"
       ],
-      "summary": "Validates YouTube video/playlist locators and constructs privacy-enhanced embed URLs.",
+      "summary": "Parses YouTube video/playlist locators and constructs ordinary embed URLs with opt-in privacy enhancement.",
       "availability": "Cross-host",
       "protocol": "URL construction only",
       "normalization": "Fully normalized.",

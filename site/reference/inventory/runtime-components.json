@@ -3,9 +3,9 @@
   "source": {
     "authority": "sdk-canonical",
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
-    "commit": "75b01e7ddcd751f7970d8c1aaf18bfff05b706b7",
+    "commit": "9e657b31f758a2c7943446533fe87afda206ac49",
     "path": "runtime/arcane/components",
-    "sdkVersion": "0.3.1",
+    "sdkVersion": "0.3.4",
     "legacyProjection": {
       "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
       "commit": "c540014afe69f14cf5ae60493b7295f36dbcec64",
@@ -130,7 +130,7 @@
     {
       "file": "runtime/arcane/components/chat.html",
       "name": "chat.html",
-      "purpose": "Shared chat, visible selected-model activation request, file upload, streaming, speech, language, availability, and conversation-timebox surface.",
+      "purpose": "Shared chat, visible selected-model activation/progress, masked auto-scrolling transcript, structural tool inspection/settlement, speech, language, and conversation-timebox surface.",
       "methods": [
         "streamMessage()",
         "setMessageProgress()",
@@ -138,7 +138,14 @@
         "setInitialSpeechMuted()",
         "setConversationComplete()",
         "bindConversationTimebox()",
+        "bindSession()",
         "submitMessage()",
+        "submitToolResult()",
+        "submitToolResults()",
+        "pendingTool",
+        "pendingTools",
+        "pendingToolCall",
+        "pendingToolCalls",
         "sendMessage()",
         "languageChanged()",
         "requestAIActivation()",
@@ -146,6 +153,9 @@
       ],
       "events": [
         "chat-ready",
+        "chat-session-bound",
+        "chat-session-message",
+        "chat-session-error",
         "chat-send-message",
         "chat-send-error",
         "chat-file-uploaded",
@@ -166,7 +176,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "UI/runtime state and explicit user activation intent/request normalized; destroy aborts state/activation observation, releases page/speech listeners, clears ready, returns undefined, and does not initiate provider lifecycle; the provider/runtime owner executes any load; AI/storage/media behavior mixed"
+      "normalization": "UI/runtime state, honest model progress, complete timestamped transcript including ui_hidden legacy records, user-facing structural arguments.message, nonblank all-ID tool-result restoration, collapsed complete raw inspection, ordered parallel-call replay validation, per-choice streamed/terminal complete-envelope correlation, complete nonstructural stream rendering, generic visible failure outcomes with complete console diagnostics, atomic executed/declined/cancelled/not-executed result batches with one continuation, plural pending-call reload recovery, reentrant terminal-event ownership, and BFCache-preserving page lifecycle are normalized; destroy aborts observation and returns true once/false thereafter; AI/storage/media behavior remains mixed"
     },
     {
       "file": "runtime/arcane/components/conversation-view.html",
@@ -282,7 +292,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "Strict normalized native selection/error"
+      "normalization": "Complete plain-text paths and native selection/error"
     },
     {
       "file": "runtime/arcane/components/document-inspector.html",
@@ -309,7 +319,7 @@
     {
       "file": "runtime/arcane/components/file-drop.html",
       "name": "file-drop.html",
-      "purpose": "Acquires files by drag/drop or picker and presents busy, progress, error, and cleared state.",
+      "purpose": "Acquires complete file selections by drag/drop or picker and presents busy, progress, error, and cleared state.",
       "methods": [
         "configure()",
         "openPicker()",
@@ -330,7 +340,7 @@
       "dependencies": [],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "State normalized; browser File/drop errors mixed"
+      "normalization": "Complete selections preserved; browser File/drop errors mixed"
     },
     {
       "file": "runtime/arcane/components/file-inspector.html",
@@ -619,7 +629,7 @@
     {
       "file": "runtime/arcane/components/record-timeline.html",
       "name": "record-timeline.html",
-      "purpose": "Displays chronological records/evidence and emits open actions.",
+      "purpose": "Displays complete chronological records/evidence and emits open actions.",
       "methods": [
         "setItems()",
         "populate()",
@@ -633,12 +643,12 @@
       "dependencies": [],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "DOM-normalized"
+      "normalization": "Complete item fields and inventories preserved"
     },
     {
       "file": "runtime/arcane/components/relationship-board.html",
       "name": "relationship-board.html",
-      "purpose": "Displays normalized relationship nodes/edges in graph and list forms.",
+      "purpose": "Displays complete normalized relationship nodes/edges in graph and list forms.",
       "methods": [
         "setGraph()",
         "populate()",
@@ -653,7 +663,7 @@
       "dependencies": [],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "DOM-normalized"
+      "normalization": "Complete graph inventories and fields preserved"
     },
     {
       "file": "runtime/arcane/components/screen-capture.html",
@@ -678,7 +688,7 @@
     {
       "file": "runtime/arcane/components/source-code-viewer.html",
       "name": "source-code-viewer.html",
-      "purpose": "Renders line-addressable source code with load, error, focus, and state behavior.",
+      "purpose": "Renders complete line-addressable source code with load, error, focus, and state behavior.",
       "methods": [
         "configure()",
         "load()",
@@ -701,7 +711,7 @@
       "dependencies": [],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "Normalized source/state"
+      "normalization": "Complete mutable source/state"
     },
     {
       "file": "runtime/arcane/components/source-explanation.html",
@@ -761,7 +771,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "UI/runtime state, explicit STT activation intent, and request-owned cancellation are normalized; positive compatibility booleans cannot manufacture provider readiness; provider/model authority and media behavior remain external"
+      "normalization": "UI/runtime state, explicit STT activation intent, request-owned cancellation, capture generation/operation correlation, and BFCache-preserving page lifecycle are normalized; pending release retires only its generation and stale permission settlement cannot clear a newer retry; persisted pageshow resynchronizes mute state and rerenders retained controls/status, while nonpersisted pagehide destroys; positive compatibility booleans cannot manufacture provider readiness; provider/model authority and media behavior remain external"
     },
     {
       "file": "runtime/arcane/components/summary-strip.html",
@@ -964,7 +974,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "Sticky runtime STT readiness, explicit activation, request cancellation, and state/text are normalized; media/provider behavior remains external"
+      "normalization": "Sticky runtime STT readiness, explicit activation, request cancellation, state/text, and BFCache-preserving page lifecycle are normalized; persisted pageshow rerenders retained state without restarting work, while nonpersisted pagehide destroys; media/provider behavior remains external"
     },
     {
       "file": "runtime/arcane/components/weather-widget.html",

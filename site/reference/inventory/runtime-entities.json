@@ -4,12 +4,12 @@
     "commit": "567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e",
     "bundleVersion": "0.8.12"
   },
-  "moduleCount": 15,
-  "exportCount": 35,
+  "moduleCount": 14,
+  "exportCount": 29,
   "modules": [
     {"file":"runtime/arcane/entities/ApiModelRecord.js","exports":["default"],"availability":"cross-host","normalization":"normalized"},
     {"file":"runtime/arcane/entities/Calculation.js","exports":["default"],"availability":"cross-host","normalization":"normalized"},
-    {"file":"runtime/arcane/entities/Chat.js","exports":["default"],"availability":"browser/native-webview","normalization":"mixed"},
+    {"file":"runtime/arcane/entities/Chat.js","exports":["default"],"availability":"browser/native-webview","normalization":"Provider-facing messages omit only persistence, memory, legacy UI, and timestamp metadata; complete transcript records remain readable, including ui_hidden legacy rows; ordered parallel structural calls require one exact nonblank result for every pending ID in one atomic turn, with complete extension fields and rollback-safe persistence."},
     {"file":"runtime/arcane/entities/CommunicationMessage.js","exports":["communicationChannels","default"],"availability":"cross-host","normalization":"normalized"},
     {"file":"runtime/arcane/entities/CommunicationThread.js","exports":["default"],"availability":"cross-host","normalization":"normalized"},
     {"file":"runtime/arcane/entities/Document.js","exports":["default"],"availability":"browser/native-webview","normalization":"mixed"},
@@ -19,7 +19,6 @@
     {"file":"runtime/arcane/entities/Preference.js","exports":["default","preferenceSchema"],"availability":"cross-host","normalization":"normalized"},
     {"file":"runtime/arcane/entities/TerminalSession.js","exports":["default","terminalShells"],"availability":"cross-host","normalization":"normalized"},
     {"file":"runtime/arcane/entities/Theme.js","exports":["arcaneDarkThemeTokens","arcaneLightThemeTokens","default","themeColorToHex","themeTokens"],"availability":"cross-host/dom-when-applied","normalization":"normalized/mixed"},
-    {"file":"runtime/arcane/entities/TWiNPolicyDecision.js","exports":["TWiNPolicyDecisionValidationError","createTWiNPolicyDecision","rehydrateTWiNPolicyDecision","serializeTWiNPolicyDecision","twinPolicyDecisionAuditProjection","twinPolicyDecisionContract"],"availability":"cross-host","normalization":"strict"},
     {"file":"runtime/arcane/entities/User.js","exports":["default"],"availability":"browser/native-webview","normalization":"mixed"},
     {"file":"runtime/arcane/entities/Weather.js","exports":["WeatherDay","WeatherLocation","WeatherObservation","WeatherSnapshot"],"availability":"cross-host","normalization":"normalized"}
   ]
