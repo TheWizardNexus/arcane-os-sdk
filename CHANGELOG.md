@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.5
+
+- Preserved complete AI and chat runtime content across multi-choice streaming,
+  parallel tool calls, terminal values, transcripts, progress, incidents, and
+  saved JSONL records without ordinary truncation, freezing, or silent loss.
+- Initialized AI from the canonical ready user even when a compatibility event
+  carries a different user projection, including an immediate readiness recheck
+  after listener registration.
+- Preserved shared chat, speech, and voice-transcription lifecycle across
+  persisted page-cache navigation, including transcript restoration, retry and
+  cancellation ownership, and terminal cleanup on ordinary unload.
+
 ## 0.3.4
 
 - Allowed external and integrated physical SDK workspaces to omit the optional
