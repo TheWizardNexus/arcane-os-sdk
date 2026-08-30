@@ -6526,11 +6526,10 @@ function installAIUserReadyRegistration(){
     });
     unsubscribe=arcaneEvents.subscribe(
         'user-entity-loaded',
-        function initializeAIFromCanonicalUser(event){
-            if(event?.detail?.user&&event.detail.user!==window.user)return;
+        function initializeAIFromCanonicalUser(){
             if(!window.user?.ready)return;
             registration.dispose();
-            instantiateAI(event);
+            instantiateAI();
         }
     );
     Object.defineProperty(
@@ -6543,17 +6542,15 @@ function installAIUserReadyRegistration(){
             writable:true
         }
     );
+    if(window.user?.ready){
+        registration.dispose();
+        instantiateAI();
+        return null;
+    }
     return registration;
 }
 
-function instantiateAI(event) {
-    if(
-        event?.detail?.user
-        &&event.detail.user!==window.user
-    ){
-        return;
-    }
-
+function instantiateAI() {
     if(!window.user?.ready){
         return;
     }
