@@ -7,10 +7,9 @@ import {normalizeMemoryContent} from '../modules/MemoryRecords.js';
 const is = new Is(false);
 
 function plainRecord(value){
-    return Boolean(value)
-        &&typeof value==='object'
-        &&!Array.isArray(value)
-        &&Object.getPrototypeOf(value)===Object.prototype;
+    if(!value||typeof value!=='object'||Array.isArray(value))return false;
+    const prototype=Object.getPrototypeOf(value);
+    return prototype===Object.prototype||prototype===null;
 }
 
 function coded(error,code){
@@ -18,15 +17,32 @@ function coded(error,code){
     return error;
 }
 
+function copyCompleteValue(value,seen=new Map()){
+    if(value===null||typeof value!=='object')return value;
+    if(seen.has(value))return seen.get(value);
+    if(Array.isArray(value)){
+        const result=[];
+        seen.set(value,result);
+        for(const item of value)result.push(copyCompleteValue(item,seen));
+        return result;
+    }
+    const result={};
+    seen.set(value,result);
+    for(const [key,descriptor] of Object.entries(
+        Object.getOwnPropertyDescriptors(value)
+    )){
+        if(Object.hasOwn(descriptor,'value')){
+            result[key]=copyCompleteValue(descriptor.value,seen);
+        }
+    }
+    return result;
+}
+
 function copyToolCalls(value){
     if(value===undefined) return null;
-    if(!Array.isArray(value)||value.length!==1){
-        const error=new TypeError(
-            'assistantMessage.tool_calls must contain exactly one structural tool call.'
-        );
-        error.code=Array.isArray(value)&&value.length>1
-            ?'AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED'
-            :'AI_CHAT_INVALID_TOOL_CALL';
+    if(!Array.isArray(value)){
+        const error=new TypeError('assistantMessage.tool_calls must be an array.');
+        error.code='AI_CHAT_INVALID_TOOL_CALL';
         throw error;
     }
     const ids=new Set();
@@ -78,7 +94,8 @@ function copyToolCalls(value){
         }
         ids.add(id);
         return {
-            function:{arguments:argumentValue,name},
+            ...call,
+            function:{...call.function},
             id,
             type:'function'
         };
@@ -103,13 +120,18 @@ function turnMessage(value,label){
                 'AI_CHAT_INVALID_TOOL_MESSAGE'
             );
         }
-        return {content:value.content,role:'tool',tool_call_id:toolCallId};
+        return {
+            ...value,
+            content:value.content,
+            role:'tool',
+            tool_call_id:toolCallId
+        };
     }
-    return {content:value.content,role:'user'};
+    return {...value,content:value.content,role:'user'};
 }
 
-function pendingToolCallId(messages){
-    let pending=null;
+function pendingToolCalls(messages){
+    const pending=new Map();
     for(const [index,message] of messages.entries()){
         if(!plainRecord(message)||!['assistant','system','tool','user'].includes(message.role)){
             throw coded(
@@ -129,28 +151,30 @@ function pendingToolCallId(messages){
                 'AI_CHAT_INCOHERENT_PERSISTENCE'
             );
         }
-        if(message.role==='system'&&pending){
+        if(message.role==='system'&&pending.size){
             throw coded(
-                new TypeError(`Chat message ${index+1} precedes the pending tool result.`),
+                new TypeError(`Chat message ${index+1} precedes the pending tool results.`),
                 'AI_CHAT_INCOHERENT_PERSISTENCE'
             );
         }
-        if(message.role==='user'&&pending){
+        if(message.role==='user'&&pending.size){
             throw coded(
-                new TypeError(`Chat message ${index+1} starts a user turn before the pending tool result.`),
+                new TypeError(`Chat message ${index+1} starts a user turn before the pending tool results.`),
                 'AI_CHAT_INCOHERENT_PERSISTENCE'
             );
         }
         if(message.role==='assistant'){
-            if(pending){
+            if(pending.size){
                 throw coded(
-                    new TypeError(`Chat message ${index+1} precedes the pending tool result.`),
+                    new TypeError(`Chat message ${index+1} precedes the pending tool results.`),
                     'AI_CHAT_INCOHERENT_PERSISTENCE'
                 );
             }
             if(message.tool_calls){
                 const calls=copyToolCalls(message.tool_calls);
-                pending=calls[0].id;
+                for(const call of calls){
+                    pending.set(call.id,call);
+                }
             }
         }
         if(message.role==='tool'){
@@ -167,16 +191,35 @@ function pendingToolCallId(messages){
                     'AI_CHAT_INCOHERENT_PERSISTENCE'
                 );
             }
-            if(!pending||pending!==toolCallId){
+            if(!pending.has(toolCallId)){
                 throw coded(
-                    new TypeError(`Chat message ${index+1} does not match the pending tool call.`),
+                    new TypeError(`Chat message ${index+1} does not match a pending tool call.`),
                     'AI_CHAT_INCOHERENT_PERSISTENCE'
                 );
             }
-            pending=null;
+            pending.delete(toolCallId);
         }
     }
     return pending;
+}
+
+function turnMessages(requestMessage,requestMessages){
+    const hasMessage=requestMessage!==undefined;
+    const hasMessages=requestMessages!==undefined;
+    if(hasMessage===hasMessages){
+        throw new TypeError('Provide exactly one of requestMessage or requestMessages.');
+    }
+    const values=hasMessages?requestMessages:[requestMessage];
+    if(!Array.isArray(values)||values.length===0){
+        throw new TypeError('requestMessages must be a nonempty array.');
+    }
+    const records=values.map((value,index)=>
+        turnMessage(value,hasMessages?`requestMessages[${index}]`:'requestMessage')
+    );
+    if(records.length>1&&records.some(message=>message.role!=='tool')){
+        throw new TypeError('A multi-message request may contain only tool results.');
+    }
+    return records;
 }
 
 /**
@@ -191,7 +234,7 @@ function pendingToolCallId(messages){
  * @property {boolean} [memory_excluded]
  * Internal persistence marker omitted from model-facing messages.
  * @property {boolean} [ui_hidden]
- * Internal persistence marker for messages intentionally omitted from chat UI.
+ * Legacy persistence metadata retained without suppressing the public transcript.
  * @property {boolean} [persistence_excluded]
  * Internal marker for session-only messages omitted from durable chat and memory.
  * @property {Array<Object>} [tool_calls]
@@ -329,16 +372,16 @@ class ChatEntity{
      * This is intended to be passed directly into
      * the AI request pipeline.
      *
-     * @returns {ChatMessage[]}
+     * @returns {Array<*>}
      */
     get messages(){
+        pendingToolCalls(this.#messages);
         return this.#messages.map(function publicChatMessage(message){
             const copy={...message};
             if(copy.tool_calls){
                 copy.tool_calls=copyToolCalls(copy.tool_calls).map(call=>({
-                    function:{...call.function},
-                    id:call.id,
-                    type:call.type,
+                    ...call,
+                    function:{...call.function}
                 }));
             }
             delete copy.memory_excluded;
@@ -354,41 +397,28 @@ class ChatEntity{
      * Model-facing callers should continue to use `messages`, which intentionally
      * omits display metadata.
      *
-     * @returns {ChatMessage[]}
+     * @returns {Array<*>}
      */
     get transcript(){
-        return this.#messages
-            .filter(message=>message.ui_hidden!==true)
-            .map(function publicTranscriptMessage(message){
-                const copy={...message};
-                if(copy.tool_calls){
-                    copy.tool_calls=copyToolCalls(copy.tool_calls).map(call=>({
-                        function:{...call.function},
-                        id:call.id,
-                        type:call.type,
-                    }));
-                }
-                delete copy.memory_excluded;
-                delete copy.persistence_excluded;
-                delete copy.ui_hidden;
-                return copy;
-            });
+        return this.#messages.map(function publicTranscriptMessage(message){
+            return copyCompleteValue(message);
+        });
     }
 
     /**
-     * Setter exists only to prevent external mutation.
+     * Replaces the current in-memory transcript with complete copied records.
      *
-     * Messages should be modified using the helper
-     * methods such as `addUserMessage` and `addAIMessage`.
-     *
-     * @param {ChatMessage[]} v
-     * Ignored value.
-     *
-     * @returns {ChatMessage[]}
+     * @param {Array<*>} v
+     * @returns {Array<*>}
      */
     set messages(v){
-        console.trace('Direct mutation of messages is not allowed. Use addUserMessage or addAIMessage methods.');
-        return this.messages;
+        if(!Array.isArray(v)){
+            throw new TypeError('messages must be an array.');
+        }
+        this.#messages=v.map(message=>copyCompleteValue(message));
+        this.#persistedMessageCount=0;
+        this.#saved=false;
+        return this.transcript;
     }
 
     /**
@@ -401,13 +431,15 @@ class ChatEntity{
     }
 
     /**
-     * Setter exists only to prevent external mutation.
-     * Saved status is managed internally.
+     * Replaces the current saved-status flag.
      *
      * @returns {boolean}
      */
     set saved(v){
-        console.trace('Direct mutation of saved status is not allowed. If you want to save the chat, call the save() method.');
+        if(typeof v!=='boolean'){
+            throw new TypeError('saved must be a boolean.');
+        }
+        this.#saved=v;
         return this.#saved;
     }
 
@@ -420,7 +452,8 @@ class ChatEntity{
      * @param {string} text
      * Message content from the user.
      * @param {{hidden?:boolean,persist?:boolean}} options
-     * Hidden messages remain in the saved/model context but are not user-authored UI turns.
+     * The legacy hidden option excludes the message from memory extraction without
+     * removing it from the complete saved or UI transcript.
      */
     addUserMessage(text='',{hidden=false,persist=true}={}){
         if(!is.string(text)){
@@ -432,9 +465,9 @@ class ChatEntity{
         if(!is.boolean(persist)){
             throw new Error('persist must be boolean');
         }
-        if(pendingToolCallId(this.#messages)){
+        if(pendingToolCalls(this.#messages).size){
             throw coded(
-                new TypeError('The pending structural tool result must be supplied before a new user turn.'),
+                new TypeError('The pending structural tool results must be supplied before a new user turn.'),
                 'AI_CHAT_TOOL_RESULT_REQUIRED'
             );
         }
@@ -445,7 +478,6 @@ class ChatEntity{
             timestamp:Date.now()
         };
         if(hidden){
-            message.ui_hidden=true;
             message.memory_excluded=true;
         }
 
@@ -477,9 +509,9 @@ class ChatEntity{
         if(!is.boolean(persist)){
             throw new Error('persist must be boolean');
         }
-        if(pendingToolCallId(this.#messages)){
+        if(pendingToolCalls(this.#messages).size){
             throw coded(
-                new TypeError('The pending structural tool result must be supplied before another assistant turn.'),
+                new TypeError('The pending structural tool results must be supplied before another assistant turn.'),
                 'AI_CHAT_TOOL_RESULT_REQUIRED'
             );
         }
@@ -521,9 +553,9 @@ class ChatEntity{
         if(!is.boolean(persist)){
             throw new TypeError('persist must be boolean.');
         }
-        if(pendingToolCallId(this.#messages)){
+        if(pendingToolCalls(this.#messages).size){
             throw coded(
-                new TypeError('The pending structural tool result must be supplied before another tool exchange.'),
+                new TypeError('The pending structural tool results must be supplied before another tool exchange.'),
                 'AI_CHAT_TOOL_RESULT_REQUIRED'
             );
         }
@@ -578,9 +610,10 @@ class ChatEntity{
         memoryRequest=messages=>ai.fetch(messages),
         messagePersist=true,
         requestMessage,
+        requestMessages,
         responsePersist=messagePersist,
     }={}){
-        const request=turnMessage(requestMessage,'requestMessage');
+        const requests=turnMessages(requestMessage,requestMessages);
         if(!plainRecord(assistantMessage)||assistantMessage.role!=='assistant'){
             throw new TypeError('assistantMessage must be an assistant message.');
         }
@@ -596,18 +629,32 @@ class ChatEntity{
                 'AI_CHAT_INCOHERENT_PERSISTENCE'
             );
         }
-        const pendingTool=pendingToolCallId(this.#messages);
-        if(request.role==='user'&&pendingTool){
+        const pendingTools=pendingToolCalls(this.#messages);
+        const userRequest=requests.find(message=>message.role==='user');
+        const toolRequests=requests.filter(message=>message.role==='tool');
+        if(userRequest&&pendingTools.size){
             throw coded(
-                new TypeError('The pending structural tool result must be supplied before a new user turn.'),
+                new TypeError('The pending structural tool results must be supplied before a new user turn.'),
                 'AI_CHAT_TOOL_RESULT_REQUIRED'
             );
         }
-        if(request.role==='tool'&&pendingTool!==request.tool_call_id){
-            throw coded(
-                new TypeError('requestMessage does not match the pending structural tool call.'),
-                'AI_CHAT_INVALID_TOOL_MESSAGE'
-            );
+        if(toolRequests.length){
+            const suppliedIds=new Set();
+            for(const request of toolRequests){
+                if(suppliedIds.has(request.tool_call_id)||!pendingTools.has(request.tool_call_id)){
+                    throw coded(
+                        new TypeError('The request tool results do not match the pending structural tool calls.'),
+                        'AI_CHAT_INVALID_TOOL_MESSAGE'
+                    );
+                }
+                suppliedIds.add(request.tool_call_id);
+            }
+            if(suppliedIds.size!==pendingTools.size){
+                throw coded(
+                    new TypeError('Every pending structural tool call must receive one matching result.'),
+                    'AI_CHAT_TOOL_RESULT_REQUIRED'
+                );
+            }
         }
         const toolCalls=copyToolCalls(assistantMessage.tool_calls);
         const assistantContent=assistantMessage.content??'';
@@ -619,7 +666,7 @@ class ChatEntity{
             !is.union(assistantContent,'string','number')
             ||(
                 !String(assistantContent)
-                &&!toolCalls
+                &&!toolCalls?.length
                 &&!(typeof assistantReasoning==='string'&&assistantReasoning.length)
             )
         ){
@@ -628,21 +675,31 @@ class ChatEntity{
             );
         }
         const timestamp=Date.now();
-        const requestRecord={...request,timestamp};
+        const requestRecords=requests.map(request=>({
+            ...request,
+            timestamp,
+            ...(request.role==='tool'?{memory_excluded:true}:{})
+        }));
         const assistantRecord={
+            ...copyCompleteValue(assistantMessage),
             content:assistantContent,
             role:'assistant',
             timestamp,
             ...(assistantReasoning!==undefined?{reasoning_content:assistantReasoning}:{}),
             ...(toolCalls?{tool_calls:toolCalls}:{})
         };
-        if(request.role==='tool') requestRecord.memory_excluded=true;
-        if(!extractMemory||toolCalls) assistantRecord.memory_excluded=true;
-        if(!messagePersist) requestRecord.persistence_excluded=true;
+        if(!extractMemory||toolCalls?.length) assistantRecord.memory_excluded=true;
+        else delete assistantRecord.memory_excluded;
+        if(!messagePersist){
+            for(const requestRecord of requestRecords){
+                requestRecord.persistence_excluded=true;
+            }
+        }
         if(!responsePersist) assistantRecord.persistence_excluded=true;
+        else delete assistantRecord.persistence_excluded;
 
-        const appended=this.#appendMessages([requestRecord,assistantRecord],{prepared:true});
-        if(extractMemory&&messagePersist&&responsePersist&&!toolCalls&&this.persist){
+        const appended=this.#appendMessages([...requestRecords,assistantRecord],{prepared:true});
+        if(extractMemory&&messagePersist&&responsePersist&&!toolCalls?.length&&this.persist){
             return Promise.resolve(appended).then(result=>{
                 this.#queueMemoryUpdate(memoryRequest);
                 return result;
@@ -657,7 +714,7 @@ class ChatEntity{
      * If the file exists it replaces the current
      * in-memory message list.
      *
-     * @returns {Promise<ChatMessage[]>}
+     * @returns {Promise<Array<*>>}
      */
     async load(){
 
@@ -673,22 +730,31 @@ class ChatEntity{
             this.#messages=systemMessage?[systemMessage]:[];
             this.#persistedMessageCount=0;
             this.#saved=true;
-            return this.messages;
+            return this.transcript;
         }
 
         const loadedMessages=Array.isArray(content)
-            ?content
+            ?content.map(message=>copyCompleteValue(message))
             :String(content)
                 .split('\n')
-                .map(row=>row.trim())
-                .filter(Boolean)
-                .map(row=>JSON.parse(row));
-        pendingToolCallId(loadedMessages);
+                .filter(row=>row.trim())
+                .map((row,index)=>{
+                    try{
+                        return JSON.parse(row);
+                    }catch(error){
+                        console.error(
+                            `Arcane saved chat row ${index+1} could not be parsed.`,
+                            error,
+                            row
+                        );
+                        return row;
+                    }
+                });
         this.#messages=loadedMessages;
         this.#persistedMessageCount=this.#durableMessages().length;
         this.#saved=true;
 
-        return this.messages;
+        return this.transcript;
     }
 
     async getMemoriesAboutUser({request=messages=>ai.fetch(messages)}={}){
@@ -769,7 +835,7 @@ ${JSON.stringify(transcript)}`
             return false;
         }
 
-        const snapshot=this.#durableMessages().map(message=>({...message}));
+        const snapshot=this.#durableMessages().map(message=>copyCompleteValue(message));
         this.#saved=false;
 
         return this.#queuePersistence(
@@ -778,7 +844,7 @@ ${JSON.stringify(transcript)}`
     }
 
     #queueMemoryUpdate(request){
-        const snapshot=this.#durableMessages().map(message=>({...message}));
+        const snapshot=this.#durableMessages().map(message=>copyCompleteValue(message));
         const queued=this.#memoryQueue.then(()=>this.#writeMemory(snapshot,request));
         this.#memoryQueue=queued.catch(()=>{
             console.warn('Unable to update chat memory.');
@@ -882,7 +948,9 @@ ${JSON.stringify(transcript)}`
     }
 
     #durableMessages(){
-        return this.#messages.filter(message=>message.persistence_excluded!==true);
+        return this.#messages.filter(
+            message=>!message||typeof message!=='object'||message.persistence_excluded!==true
+        );
     }
 
     async #appendMessages(messages,{persist=true,prepared=false}={}){
@@ -948,7 +1016,7 @@ ${JSON.stringify(transcript)}`
                 }else{
                     const snapshot=durableSnapshot
                         .slice(0,lastDurableIndex+1)
-                        .map(entry=>({...entry}));
+                        .map(entry=>copyCompleteValue(entry));
                     await this.#writeSnapshot(snapshot);
                 }
                 this.#saved=this.#persistedMessageCount===this.#durableMessages().length;

@@ -339,10 +339,8 @@ export function createBrowserModelSource(descriptor, {
     open,
   };
   if (metadata.legacy) {
-    Object.defineProperties(sourceRecord, {
-      name: { value: metadata.files[0].name, enumerable: false },
-      immutableUrl: { value: metadata.files[0].url, enumerable: false },
-    });
+    sourceRecord.name = metadata.files[0].name;
+    sourceRecord.immutableUrl = metadata.files[0].url;
   }
   const source = completeValue(sourceRecord);
   BROWSER_MODEL_SOURCES.add(source);
@@ -799,7 +797,7 @@ function validateToolMessageSchemas(value) {
 }
 
 function validateRequestMessages(messages) {
-  let pendingToolCallId = null;
+  const pendingToolCallIds = new Set();
   for (const [messageIndex, message] of messages.entries()) {
     if (!plainStructuralRecord(message)) {
       throw new TypeError(`messages[${String(messageIndex)}] must be a plain object.`);
@@ -814,14 +812,14 @@ function validateRequestMessages(messages) {
           `messages[${String(messageIndex)}].tool_calls is supported only for assistant messages.`,
         );
       }
-      if (pendingToolCallId !== null && calls.length) {
+      if (pendingToolCallIds.size && calls.length) {
         throw fail(
-          "ARCANE_AI_PARALLEL_TOOLS_UNSUPPORTED",
-          "The Arcane chat session accepts one structural tool call at a time.",
+          "ARCANE_AI_TOOL_RESULT_REQUIRED",
+          "Every pending structural tool result must be supplied before another assistant tool-call sequence.",
         );
       }
       if (calls.length) {
-        pendingToolCallId = calls[0].id;
+        for (const call of calls) pendingToolCallIds.add(call.id);
         openedToolCall = true;
       }
     }
@@ -833,16 +831,16 @@ function validateRequestMessages(messages) {
         );
       }
       if (
-        pendingToolCallId === null
+        !pendingToolCallIds.size
         || typeof message.tool_call_id !== "string"
-        || message.tool_call_id !== pendingToolCallId
+        || !pendingToolCallIds.has(message.tool_call_id)
       ) {
         throw fail(
           "ARCANE_AI_INVALID_TOOL_MESSAGE",
           `messages[${String(messageIndex)}] does not settle the pending structural tool call.`,
         );
       }
-      pendingToolCallId = null;
+      pendingToolCallIds.delete(message.tool_call_id);
     } else {
       if (Object.hasOwn(message, "tool_call_id")) {
         throw fail(
@@ -850,7 +848,7 @@ function validateRequestMessages(messages) {
           `messages[${String(messageIndex)}].tool_call_id is valid only for a tool result.`,
         );
       }
-      if (pendingToolCallId !== null && !openedToolCall) {
+      if (pendingToolCallIds.size && !openedToolCall) {
         throw fail(
           "ARCANE_AI_TOOL_RESULT_REQUIRED",
           `messages[${String(messageIndex)}] precedes the pending structural tool result.`,
@@ -858,7 +856,7 @@ function validateRequestMessages(messages) {
       }
     }
   }
-  if (pendingToolCallId !== null) {
+  if (pendingToolCallIds.size) {
     throw fail(
       "ARCANE_AI_TOOL_RESULT_REQUIRED",
       "The pending structural tool call must be settled before requesting another response.",
@@ -874,13 +872,10 @@ function validateStructuralRequest(request) {
   validateRequestMessages(request.messages);
   validateToolMessageSchemas(request.tools);
   const parallelValues = [request.parallelToolCalls, request.parallel_tool_calls];
-  if (parallelValues.some(function enablesParallelBrowserWasmTools(value) {
-    return value !== undefined && value !== false;
+  if (parallelValues.some(function invalidParallelBrowserWasmPreference(value) {
+    return value !== undefined && typeof value !== "boolean";
   })) {
-    throw fail(
-      "ARCANE_AI_PARALLEL_TOOLS_UNSUPPORTED",
-      "The Arcane chat session accepts one structural tool call at a time.",
-    );
+    throw new TypeError("parallelToolCalls must be a boolean when provided.");
   }
 }
 
@@ -926,11 +921,6 @@ function completionOptions(request, abortSignal, stream) {
   if (request.tool_choice !== undefined) options.tool_choice = request.tool_choice;
   if (request.parallelToolCalls !== undefined) options.parallel_tool_calls = request.parallelToolCalls;
   if (request.parallel_tool_calls !== undefined) options.parallel_tool_calls = request.parallel_tool_calls;
-  if (
-    request.tools?.length
-    && request.parallelToolCalls === undefined
-    && request.parallel_tool_calls === undefined
-  ) options.parallel_tool_calls = false;
   const format = responseFormat(request.structuredOutput);
   if (format) options.response_format = format;
   return options;
@@ -942,6 +932,8 @@ function validateToolCalls(message, location = "The model response") {
   }
   if (
     Object.hasOwn(message, "toolCalls")
+    || Object.hasOwn(message, "tool_call")
+    || Object.hasOwn(message, "toolCall")
     || Object.hasOwn(message, "function_call")
     || Object.hasOwn(message, "functionCall")
   ) {
@@ -953,12 +945,6 @@ function validateToolCalls(message, location = "The model response") {
     throw fail("ARCANE_AI_TOOL_CALL_INVALID", `${location} contains malformed tool calls.`);
   }
   const calls = descriptor.value;
-  if (calls.length > 1) {
-    throw fail(
-      "ARCANE_AI_PARALLEL_TOOLS_UNSUPPORTED",
-      "The Arcane chat session accepts one structural tool call at a time.",
-    );
-  }
   const ids = new Set();
   for (const call of calls) {
     if (
@@ -1039,7 +1025,6 @@ function validateCompletion(value, requestId) {
   }
   const choices = choicesDescriptor.value;
   const indexes = new Set();
-  let toolCallCount = 0;
   for (let choicePosition = 0; choicePosition < choices.length; choicePosition += 1) {
     const choice = choices[choicePosition];
     const messageDescriptor = plainStructuralRecord(choice)
@@ -1058,75 +1043,123 @@ function validateCompletion(value, requestId) {
       throw fail("ARCANE_AI_INVALID_PROVIDER_RESULT", "The model returned an invalid choice index.");
     }
     indexes.add(choice.index);
-    const choiceToolCallCount = validateToolCalls(
+    validateToolCalls(
       messageDescriptor.value,
       `The model response choice ${String(choicePosition)}`,
-    ).length;
-    if (choicePosition > 0 && choiceToolCallCount) {
-      throw fail(
-        "ARCANE_AI_INVALID_PROVIDER_RESULT",
-        "The model placed a structural tool call outside the selected first choice.",
-      );
-    }
-    toolCallCount += choiceToolCallCount;
-    if (toolCallCount > 1) {
-      throw fail(
-        "ARCANE_AI_PARALLEL_TOOLS_UNSUPPORTED",
-        "The Arcane chat session accepts one structural tool call at a time.",
-      );
-    }
+    );
   }
   return requestId === undefined ? value : completeValue({ ...value, id: requestId });
 }
 
-function isPublicStreamContentKey(key) {
-  return key === "content"
-    || key === "text"
-    || key === "thinking"
-    || key === "reasoning"
-    || key === "reasoning_content";
+function selectedCompletionToolCalls(completion) {
+  const message = Object.hasOwn(completion ?? {}, "message")
+    ? completion.message
+    : completion?.choices?.[0]?.message;
+  return Array.isArray(message?.tool_calls) ? message.tool_calls : [];
 }
 
-function projectPublicStreamContent(value, seen = new WeakSet()) {
-  if (!value || typeof value !== "object" || seen.has(value)) return null;
-  seen.add(value);
+function sameCanonicalToolCalls(left, right) {
+  return left.length === right.length && left.every((call, index) => {
+    const other = right[index];
+    return call?.id === other?.id
+      && call?.type === other?.type
+      && call?.function?.name === other?.function?.name
+      && call?.function?.arguments === other?.function?.arguments;
+  });
+}
+
+function sameCompleteStreamValue(left, right, leftToRight = new Map(), rightToLeft = new Map()) {
+  if (Object.is(left, right)) return true;
+  if (
+    !left
+    || !right
+    || typeof left !== "object"
+    || typeof right !== "object"
+    || Array.isArray(left) !== Array.isArray(right)
+  ) return false;
+  if (leftToRight.has(left) || rightToLeft.has(right)) {
+    return leftToRight.get(left) === right && rightToLeft.get(right) === left;
+  }
+  leftToRight.set(left, right);
+  rightToLeft.set(right, left);
+  const leftKeys = Reflect.ownKeys(left);
+  const rightKeys = Reflect.ownKeys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (const key of leftKeys) {
+    if (!Object.hasOwn(right, key)) return false;
+    const leftDescriptor = Object.getOwnPropertyDescriptor(left, key);
+    const rightDescriptor = Object.getOwnPropertyDescriptor(right, key);
+    const leftIsData = Boolean(leftDescriptor && Object.hasOwn(leftDescriptor, "value"));
+    const rightIsData = Boolean(rightDescriptor && Object.hasOwn(rightDescriptor, "value"));
+    if (leftIsData !== rightIsData) return false;
+    if (leftIsData) {
+      if (!sameCompleteStreamValue(
+        leftDescriptor.value,
+        rightDescriptor.value,
+        leftToRight,
+        rightToLeft,
+      )) return false;
+    } else if (
+      leftDescriptor?.get !== rightDescriptor?.get
+      || leftDescriptor?.set !== rightDescriptor?.set
+    ) return false;
+  }
+  return true;
+}
+
+function completionToolCallsAt(completion, choiceIndex) {
+  if (Object.hasOwn(completion ?? {}, "message")) {
+    if (choiceIndex !== 0 || !Object.hasOwn(completion.message, "tool_calls")) return null;
+    return completion.message.tool_calls;
+  }
+  const choice = completion?.choices?.find((item) => item?.index === choiceIndex);
+  if (!choice || !Object.hasOwn(choice.message, "tool_calls")) return null;
+  return choice.message.tool_calls;
+}
+
+function isPublicStreamStructuralKey(key) {
+  return key === "tool_calls"
+    || key === "toolCalls"
+    || key === "tool_call"
+    || key === "toolCall"
+    || key === "function_call"
+    || key === "functionCall";
+}
+
+const OMITTED_PUBLIC_STREAM_DATA = Symbol("omitted-public-stream-data");
+
+function projectPublicStreamData(value, seen = new Map()) {
+  if (value === null || value === undefined || typeof value !== "object") return value;
+  if (seen.has(value)) return seen.get(value);
   if (Array.isArray(value)) {
     const result = [];
+    seen.set(value, result);
     for (const item of value) {
-      const projected = projectPublicStreamContent(item, seen);
-      if (projected !== null) result.push(projected);
+      const projected = projectPublicStreamData(item, seen);
+      if (projected !== OMITTED_PUBLIC_STREAM_DATA) result.push(projected);
     }
-    seen.delete(value);
-    return result.length ? result : null;
-  }
-  if (!plainStructuralRecord(value)) {
-    seen.delete(value);
-    return null;
+    return result.length || value.length === 0 ? result : OMITTED_PUBLIC_STREAM_DATA;
   }
   const result = {};
+  seen.set(value, result);
+  let sourceDataFields = 0;
   const descriptors = Object.getOwnPropertyDescriptors(value);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key === "symbol") continue;
     const descriptor = descriptors[key];
     if (!Object.hasOwn(descriptor, "value")) continue;
-    if (
-      isPublicStreamContentKey(key)
-      && descriptor.value !== null
-      && descriptor.value !== undefined
-    ) {
-      result[key] = descriptor.value;
-      continue;
-    }
-    const projected = projectPublicStreamContent(descriptor.value, seen);
-    if (projected !== null) result[key] = projected;
+    sourceDataFields += 1;
+    if (isPublicStreamStructuralKey(key)) continue;
+    const projected = projectPublicStreamData(descriptor.value, seen);
+    if (projected !== OMITTED_PUBLIC_STREAM_DATA) result[key] = projected;
   }
-  seen.delete(value);
-  return Object.keys(result).length ? result : null;
+  return Object.keys(result).length || sourceDataFields === 0
+    ? result
+    : OMITTED_PUBLIC_STREAM_DATA;
 }
 
 function projectPublicStreamChunk(value) {
-  if (typeof value === "string") return value;
-  return projectPublicStreamContent(value);
+  return projectPublicStreamData(value);
 }
 
 function createCompletionAccumulator(modelId, requestId) {
@@ -1146,7 +1179,12 @@ function createCompletionAccumulator(modelId, requestId) {
         sawContent: false,
         reasoning: "",
         sawReasoning: false,
+        reasoningText: "",
+        sawReasoningText: false,
         finish_reason: null,
+        choiceMetadata: {},
+        messageMetadata: {},
+        completeToolCalls: null,
         tools: new Map(),
       });
     }
@@ -1158,15 +1196,54 @@ function createCompletionAccumulator(modelId, requestId) {
     base = { ...base, ...value, id: requestId ?? value.id ?? base.id, choices: [] };
     for (const item of Array.isArray(value.choices) ? value.choices : []) {
       const record = choice(item.index);
-      const delta = item.delta ?? {};
-      if (typeof delta.role === "string") record.role = delta.role;
-      if (typeof delta.content === "string") {
-        record.content += delta.content;
-        record.sawContent = true;
+      for (const [key, fieldValue] of Object.entries(item)) {
+        if (key !== "delta" && key !== "message") record.choiceMetadata[key] = fieldValue;
       }
-      if (typeof delta.reasoning_content === "string") {
-        record.reasoning += delta.reasoning_content;
-        record.sawReasoning = true;
+      const delta = plainStructuralRecord(item.delta) ? item.delta : {};
+      const completeMessage = plainStructuralRecord(item.message) ? item.message : null;
+      for (const [source, replaceText] of [[delta, false], [completeMessage, true]]) {
+        if (!source) continue;
+        for (const [key, fieldValue] of Object.entries(source)) {
+          if (isPublicStreamStructuralKey(key)) continue;
+          if (key === "role" && typeof fieldValue === "string") {
+            record.role = fieldValue;
+          } else if (key === "content") {
+            if (
+              !replaceText
+              && record.sawContent
+              && typeof record.content === "string"
+              && typeof fieldValue === "string"
+            ) record.content += fieldValue;
+            else record.content = fieldValue;
+            record.sawContent = true;
+          } else if (key === "reasoning_content") {
+            if (
+              !replaceText
+              && record.sawReasoning
+              && typeof record.reasoning === "string"
+              && typeof fieldValue === "string"
+            ) record.reasoning += fieldValue;
+            else record.reasoning = fieldValue;
+            record.sawReasoning = true;
+          } else if (key === "reasoning") {
+            if (
+              !replaceText
+              && record.sawReasoningText
+              && typeof record.reasoningText === "string"
+              && typeof fieldValue === "string"
+            ) record.reasoningText += fieldValue;
+            else record.reasoningText = fieldValue;
+            record.sawReasoningText = true;
+          } else {
+            record.messageMetadata[key] = fieldValue;
+          }
+        }
+      }
+      if (completeMessage && Object.hasOwn(completeMessage, "tool_calls")) {
+        record.completeToolCalls = validateToolCalls(
+          completeMessage,
+          `The model response choice ${String(item.index)} streamed message`,
+        );
       }
       if (item.finish_reason !== undefined) record.finish_reason = item.finish_reason;
       if (delta.tool_calls !== undefined && !Array.isArray(delta.tool_calls)) {
@@ -1212,40 +1289,104 @@ function createCompletionAccumulator(modelId, requestId) {
     }
   }
 
+  function fragmentToolCalls(record) {
+    if (!record.tools.size) return null;
+    const tools = [...record.tools.values()].sort((a, b) => a.index - b.index);
+    for (let index = 0; index < tools.length; index += 1) {
+      if (tools[index].index !== index) {
+        throw fail(
+          "ARCANE_AI_TOOL_CALL_INVALID",
+          "The streamed structural tool calls omitted an ordered call index.",
+        );
+      }
+    }
+    return tools.map((tool) => {
+      if (tool.invalidArguments || tool.invalidIdentity) {
+        throw fail(
+          "ARCANE_AI_TOOL_CALL_INVALID",
+          "A streamed structural tool call changed or omitted an exact field.",
+        );
+      }
+      return {
+        id: tool.id,
+        type: tool.type,
+        function: { name: tool.name, arguments: tool.arguments },
+      };
+    });
+  }
+
   function result() {
     const completion = {
       ...base,
       object: "chat.completion",
       choices: [...choices.values()].sort((a, b) => a.index - b.index).map((record) => {
         const message = {
+          ...record.messageMetadata,
           role: record.role,
           content: record.sawContent ? record.content : null,
         };
         if (record.sawReasoning) message.reasoning_content = record.reasoning;
-        if (record.tools.size) {
-          message.tool_calls = [...record.tools.values()]
-            .sort((a, b) => a.index - b.index)
-            .map((tool) => {
-              if (tool.invalidArguments || tool.invalidIdentity) {
-                throw fail(
-                  "ARCANE_AI_TOOL_CALL_INVALID",
-                  "A streamed structural tool call changed or omitted an exact field.",
-                );
-              }
-              return {
-                id: tool.id,
-                type: tool.type,
-                function: { name: tool.name, arguments: tool.arguments },
-              };
-            });
+        if (record.sawReasoningText) message.reasoning = record.reasoningText;
+        const fragmentCalls = fragmentToolCalls(record);
+        if (
+          record.completeToolCalls
+          && fragmentCalls
+          && !sameCanonicalToolCalls(fragmentCalls, record.completeToolCalls)
+        ) {
+          throw fail(
+            "ARCANE_AI_TOOL_CALL_INVALID",
+            "The streamed structural tool calls do not match the terminal message.",
+          );
         }
-        return { index: record.index, message, finish_reason: record.finish_reason };
+        if (record.completeToolCalls) {
+          message.tool_calls = record.completeToolCalls;
+        } else if (fragmentCalls) {
+          message.tool_calls = fragmentCalls;
+        }
+        return {
+          ...record.choiceMetadata,
+          index: record.index,
+          message,
+          finish_reason: record.finish_reason,
+        };
       }),
     };
     return validateCompletion(completion, requestId);
   }
 
-  return completeValue({ push, result });
+  function hasToolCalls() {
+    return [...choices.values()].some(
+      (record) => record.completeToolCalls !== null || record.tools.size > 0,
+    );
+  }
+
+  function correlateToolCalls(completion) {
+    for (const record of choices.values()) {
+      const fragmentCalls = fragmentToolCalls(record);
+      if (record.completeToolCalls === null && fragmentCalls === null) continue;
+      const terminalCalls = completionToolCallsAt(completion, record.index);
+      if (
+        record.completeToolCalls !== null
+        && !sameCompleteStreamValue(record.completeToolCalls, terminalCalls)
+      ) {
+        throw fail(
+          "ARCANE_AI_TOOL_CALL_INVALID",
+          "The v1 provider stream changed or omitted its terminal structural tool calls.",
+        );
+      }
+      if (
+        fragmentCalls !== null
+        && (!Array.isArray(terminalCalls) || !sameCanonicalToolCalls(fragmentCalls, terminalCalls))
+      ) {
+        throw fail(
+          "ARCANE_AI_TOOL_CALL_INVALID",
+          "The v1 provider stream changed or omitted its terminal structural tool calls.",
+        );
+      }
+    }
+  }
+
+  return completeValue({ push, result, hasToolCalls, correlateToolCalls });
 }
 
 function callbackStreamHandle({ runtime, request, signal, onSettled }) {
@@ -1260,10 +1401,12 @@ function callbackStreamHandle({ runtime, request, signal, onSettled }) {
     // This gate prevents delivery after public cancellation. It is not proof
     // that the underlying request stopped; the runtime records that separately.
     if (ended || linked.controller.signal.aborted) return;
-    const chunk = request.id === undefined ? value : { ...value, id: request.id };
+    const chunk = request.id === undefined || !plainStructuralRecord(value)
+      ? value
+      : { ...value, id: request.id };
     accumulator.push(chunk);
     const publicChunk = projectPublicStreamChunk(chunk);
-    if (publicChunk === null) return;
+    if (publicChunk === OMITTED_PUBLIC_STREAM_DATA) return;
     const waiter = waiters.shift();
     if (waiter) waiter.resolve({ value: publicChunk, done: false });
     else chunks.push(publicChunk);
@@ -1272,7 +1415,9 @@ function callbackStreamHandle({ runtime, request, signal, onSettled }) {
   function finish(error = null) {
     ended = true;
     terminalError = error;
-    if (error) chunks.length = 0;
+    while (waiters.length && chunks.length) {
+      waiters.shift().resolve({ value: chunks.shift(), done: false });
+    }
     while (waiters.length) {
       const waiter = waiters.shift();
       if (error) waiter.reject(error);
@@ -1328,9 +1473,9 @@ function callbackStreamHandle({ runtime, request, signal, onSettled }) {
       return cancelPromise;
     },
     async next() {
+      if (chunks.length) return { value: chunks.shift(), done: false };
       if (terminalError) throw terminalError;
       throwIfAborted(linked.controller.signal);
-      if (chunks.length) return { value: chunks.shift(), done: false };
       if (ended) return { value: undefined, done: true };
       return new Promise((resolve, reject) => waiters.push({ resolve, reject }));
     },
@@ -1396,9 +1541,62 @@ function validatedV1StreamHandle(opened, request) {
       "The browser-WASM adapter stream iterator has no next() method.",
     );
   }
-  const result = Promise.resolve(opened.result).then(
+  const accumulator = createCompletionAccumulator(request.model ?? null, request.id);
+  const publicChunks = [];
+  const publicChunkWaiters = [];
+  let publicStreamSettled = false;
+  let publicStreamError = null;
+
+  function publishPublicChunk(value) {
+    if (publicStreamSettled) return;
+    const waiter = publicChunkWaiters.shift();
+    if (waiter) waiter.resolve({ value, done: false });
+    else publicChunks.push(value);
+  }
+
+  function settlePublicStream(error = null) {
+    if (publicStreamSettled) return;
+    publicStreamSettled = true;
+    publicStreamError = error;
+    while (publicChunkWaiters.length && publicChunks.length) {
+      publicChunkWaiters.shift().resolve({ value: publicChunks.shift(), done: false });
+    }
+    while (publicChunkWaiters.length) {
+      const waiter = publicChunkWaiters.shift();
+      if (error) waiter.reject(error);
+      else waiter.resolve({ value: undefined, done: true });
+    }
+  }
+
+  const privateStreamPump = (async function pumpValidatedV1Stream() {
+    try {
+      while (true) {
+        const next = await iterator.next();
+        if (next.done) {
+          settlePublicStream();
+          return true;
+        }
+        accumulator.push(next.value);
+        const projected = projectPublicStreamChunk(next.value);
+        if (projected !== OMITTED_PUBLIC_STREAM_DATA) publishPublicChunk(projected);
+      }
+    } catch (error) {
+      settlePublicStream(error);
+      throw error;
+    }
+  })();
+  privateStreamPump.catch(function retainV1PrivateStreamRejection() {});
+
+  const terminalResult = Promise.resolve(opened.result).then(
     function validateV1StreamTerminal(value) {
       return validateCompletion(value, request.id);
+    },
+  );
+  terminalResult.catch(function retainV1StreamTerminalRejection() {});
+  const result = Promise.all([terminalResult, privateStreamPump]).then(
+    function correlateV1StreamTerminal([terminal]) {
+      accumulator.correlateToolCalls(terminal);
+      return terminal;
     },
   );
   result.catch(function retainV1StreamTerminalRejection() {});
@@ -1407,15 +1605,13 @@ function validatedV1StreamHandle(opened, request) {
     cancel: function cancelValidatedV1Stream(reason) {
       return opened.cancel(reason);
     },
-    async next(value) {
-      let nextValue = value;
-      while (true) {
-        const next = await iterator.next(nextValue);
-        nextValue = undefined;
-        if (next.done) return { value: undefined, done: true };
-        const projected = projectPublicStreamChunk(next.value);
-        if (projected !== null) return { value: projected, done: false };
-      }
+    async next() {
+      if (publicChunks.length) return { value: publicChunks.shift(), done: false };
+      if (publicStreamError) throw publicStreamError;
+      if (publicStreamSettled) return { value: undefined, done: true };
+      return new Promise(function waitForProjectedV1StreamChunk(resolve, reject) {
+        publicChunkWaiters.push({ resolve, reject });
+      });
     },
     async return(value) {
       if (typeof iterator.return === "function") {

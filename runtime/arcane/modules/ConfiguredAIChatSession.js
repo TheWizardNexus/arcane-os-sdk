@@ -1,6 +1,8 @@
 const FORBIDDEN_REQUEST_FIELDS=new Set([
     'messages',
     'onChunk',
+    'onDataChunk',
+    'onDataResult',
     'onResponse',
     'onToolCall',
     'signal',
@@ -8,10 +10,9 @@ const FORBIDDEN_REQUEST_FIELDS=new Set([
 ]);
 
 function isPlainRecord(value){
-    return Boolean(value)
-        &&typeof value==='object'
-        &&!Array.isArray(value)
-        &&Object.getPrototypeOf(value)===Object.prototype;
+    if(!value||typeof value!=='object'||Array.isArray(value))return false;
+    const prototype=Object.getPrototypeOf(value);
+    return prototype===Object.prototype||prototype===null;
 }
 
 function coded(error,code){
@@ -137,11 +138,10 @@ function normalizeRequestOptions(value,label){
     const forbidden=Object.keys(value).find(key=>FORBIDDEN_REQUEST_FIELDS.has(key));
     if(forbidden) throw new TypeError(`${label}.${forbidden} is managed by the chat session.`);
     requireToolMessageSchemas(value.tools,`${label}.tools`);
-    if(value.parallelToolCalls===true||value.parallel_tool_calls===true){
-        throw coded(
-            new TypeError(`${label} cannot enable parallel structural tool calls.`),
-            'AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED',
-        );
+    for(const key of ['parallelToolCalls','parallel_tool_calls']){
+        if(Object.hasOwn(value,key)&&typeof value[key]!=='boolean'){
+            throw new TypeError(`${label}.${key} must be a boolean when provided.`);
+        }
     }
     return {...value};
 }
@@ -149,13 +149,11 @@ function normalizeRequestOptions(value,label){
 export function normalizeStructuralToolCall(call,label='Structural tool call'){
     try{
         if(!isPlainRecord(call)) throw new TypeError(`${label} must be a plain object.`);
-        assertMessageKeys(call,new Set(['function','id','type']),label);
         if(typeof call.id!=='string'||!call.id.trim()){
             throw new TypeError(`${label}.id must contain text.`);
         }
         if(call.type!=='function') throw new TypeError(`${label}.type must be function.`);
         if(!isPlainRecord(call.function)) throw new TypeError(`${label}.function must be a plain object.`);
-        assertMessageKeys(call.function,new Set(['arguments','name']),`${label}.function`);
         if(typeof call.function.name!=='string'||!call.function.name.trim()){
             throw new TypeError(`${label}.function.name must contain text.`);
         }
@@ -164,7 +162,9 @@ export function normalizeStructuralToolCall(call,label='Structural tool call'){
         throw coded(error,'AI_CHAT_INVALID_TOOL_CALL');
     }
     return {
+        ...call,
         function:{
+            ...call.function,
             arguments:call.function.arguments,
             name:call.function.name,
         },
@@ -177,12 +177,6 @@ function normalizeToolCalls(value,label){
     if(value===undefined) return null;
     if(!Array.isArray(value)){
         throw new TypeError(`${label} must be an array of structural tool calls.`);
-    }
-    if(value.length>1){
-        throw coded(
-            new TypeError(`${label} must contain at most one structural tool call.`),
-            'AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED',
-        );
     }
     const ids=new Set();
     return value.map((call,index)=>{
@@ -202,13 +196,6 @@ function normalizeMessage(value,label,allowedRoles){
     if(!isPlainRecord(value)||!allowedRoles.has(value.role)){
         throw new TypeError(`${label} has an unsupported role.`);
     }
-    const allowed=new Set(['content','role']);
-    if(value.role==='assistant'){
-        allowed.add('reasoning_content');
-        allowed.add('tool_calls');
-    }
-    if(value.role==='tool') allowed.add('tool_call_id');
-    assertMessageKeys(value,allowed,label);
     const toolCalls=value.role==='assistant'
         ?normalizeToolCalls(value.tool_calls,`${label}.tool_calls`)
         :null;
@@ -225,7 +212,7 @@ function normalizeMessage(value,label,allowedRoles){
         &&value.reasoning_content.length
     );
     let content;
-    if(value.role==='assistant'&&(toolCalls||hasReasoning)){
+    if(value.role==='assistant'&&(toolCalls?.length||hasReasoning)){
         if(value.content===undefined||value.content===null||value.content==='') content='';
         else content=contentText(value.content,`${label}.content`);
     }else{
@@ -236,6 +223,7 @@ function normalizeMessage(value,label,allowedRoles){
         toolCallId=contentText(value.tool_call_id,`${label}.tool_call_id`);
     }
     const normalized={
+        ...value,
         role:value.role,
         content,
         ...(value.role==='assistant'&&Object.hasOwn(value,'reasoning_content')
@@ -249,6 +237,7 @@ function normalizeMessage(value,label,allowedRoles){
 
 function cloneMessage(value){
     return {
+        ...value,
         role:value.role,
         content:value.content,
         ...(Object.hasOwn(value,'reasoning_content')
@@ -256,9 +245,8 @@ function cloneMessage(value){
             :{}),
         ...(value.tool_calls?{
             tool_calls:value.tool_calls.map(call=>({
+                ...call,
                 function:{...call.function},
-                id:call.id,
-                type:call.type,
             }))
         }:{}),
         ...(value.tool_call_id?{tool_call_id:value.tool_call_id}:{}),
@@ -267,15 +255,15 @@ function cloneMessage(value){
 
 function publicMessage(value){
     return {
+        ...value,
         role:value.role,
         content:value.content,
         ...(Object.hasOwn(value,'reasoning_content')
             ?{reasoning_content:value.reasoning_content}
             :{}),
         ...(value.tool_calls?{tool_calls:value.tool_calls.map(call=>({
+            ...call,
             function:{...call.function},
-            id:call.id,
-            type:call.type,
         }))}:{}),
         ...(value.tool_call_id?{tool_call_id:value.tool_call_id}:{}),
     };
@@ -291,6 +279,31 @@ function normalizeInitialMessages(value){
     ));
     pendingToolCallIds(messages,true);
     return messages;
+}
+
+function normalizeInputMessages(value){
+    if(typeof value==='string'){
+        return [normalizeMessage(
+            {role:'user',content:value},
+            'The user message',
+            new Set(['user']),
+        )];
+    }
+    if(Array.isArray(value)){
+        if(!value.length){
+            throw new TypeError('The request tool-result batch must not be empty.');
+        }
+        return value.map((item,index)=>normalizeMessage(
+            item,
+            `The request tool-result batch[${index}]`,
+            new Set(['tool']),
+        ));
+    }
+    return [normalizeMessage(
+        value,
+        'The request message',
+        new Set(['tool','user']),
+    )];
 }
 
 function message(role,content){
@@ -334,10 +347,18 @@ function pendingToolCallIds(messages,validate=false){
             );
         }
         if(item.role==='assistant'&&item.tool_calls){
-            pending.add(item.tool_calls[0].id);
+            for(const call of item.tool_calls){
+                if(pending.has(call.id)&&validate){
+                    throw coded(
+                        new TypeError(`Message ${index+1} repeats a pending assistant tool-call ID.`),
+                        'AI_CHAT_INCOHERENT_PERSISTENCE',
+                    );
+                }
+                pending.add(call.id);
+            }
         }
         if(item.role==='tool'){
-            if((pending.size!==1||!pending.has(item.tool_call_id))&&validate){
+            if(!pending.has(item.tool_call_id)&&validate){
                 throw coded(
                     new TypeError(`Message ${index+1} does not match the pending assistant tool call.`),
                     'AI_CHAT_INCOHERENT_PERSISTENCE',
@@ -410,7 +431,6 @@ function normalizeOpenAICompatibleResponse(response){
         );
     }
     let responseMessage=null;
-    let toolCallCount=0;
     for(let index=0;index<response.choices.length;index++){
         const candidate=response.choices[index];
         if(!isPlainRecord(candidate)){
@@ -423,21 +443,6 @@ function normalizeOpenAICompatibleResponse(response){
             candidate.message,
             {requireRole:true},
         );
-        toolCallCount+=candidateMessage.tool_calls?.length??0;
-        if(toolCallCount>1){
-            throw coded(
-                new TypeError('The chat provider completion contains parallel structural tool calls.'),
-                'AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED',
-            );
-        }
-        if(index>0&&candidateMessage.tool_calls?.length){
-            throw coded(
-                new TypeError(
-                    'The chat provider completion placed a structural tool call outside the selected choice.'
-                ),
-                'AI_CHAT_INVALID_RESPONSE',
-            );
-        }
         if(index===0) responseMessage=candidateMessage;
     }
     const choice=response.choices[0];
@@ -586,17 +591,8 @@ export default class ConfiguredAIChatSession{
         if(!signalLike(options.signal)) throw new TypeError('signal must be an AbortSignal.');
         if(options.signal?.aborted) throw abortError();
         const turnRequest=normalizeRequestOptions(options.request,'request');
-        const inputMessage=typeof input==='string'
-            ?normalizeMessage(
-                {role:'user',content:input},
-                'The user message',
-                new Set(['user']),
-            )
-            :normalizeMessage(
-                input,
-                'The request message',
-                new Set(['tool','user']),
-            );
+        const inputMessages=normalizeInputMessages(input);
+        const inputMessage=inputMessages[0];
         if(this.#pending){
             throw coded(new Error('A chat request is already active for this session.'),'AI_CHAT_BUSY');
         }
@@ -609,18 +605,27 @@ export default class ConfiguredAIChatSession{
                     'AI_CHAT_TOOL_RESULT_REQUIRED',
                 );
             }
-            const toolCallIndex=inputMessage.role==='tool'
-                ?matchingToolCallIndex(this.#conversation,inputMessage.tool_call_id)
-                :-1;
-            if(inputMessage.role==='tool'&&(
-                pendingTools.size!==1
-                ||!pendingTools.has(inputMessage.tool_call_id)
-                ||toolCallIndex<0
-            )){
-                throw coded(
-                    new TypeError('The tool message does not match an assistant tool call in this session.'),
-                    'AI_CHAT_INVALID_TOOL_MESSAGE',
-                );
+            if(inputMessage.role==='tool'){
+                const submittedIds=new Set();
+                for(const item of inputMessages){
+                    if(
+                        submittedIds.has(item.tool_call_id)
+                        ||!pendingTools.has(item.tool_call_id)
+                        ||matchingToolCallIndex(this.#conversation,item.tool_call_id)<0
+                    ){
+                        throw coded(
+                            new TypeError('A tool message does not match a pending assistant tool call in this session.'),
+                            'AI_CHAT_INVALID_TOOL_MESSAGE',
+                        );
+                    }
+                    submittedIds.add(item.tool_call_id);
+                }
+                if(submittedIds.size!==pendingTools.size){
+                    throw coded(
+                        new TypeError('Every pending structural tool result must be supplied before provider continuation.'),
+                        'AI_CHAT_TOOL_RESULT_REQUIRED',
+                    );
+                }
             }
             const context=inputMessage.role==='user'
                 ?await this.#contextFor(inputMessage.content,options.signal)
@@ -629,7 +634,7 @@ export default class ConfiguredAIChatSession{
             const transientContext=context
                 ?message('user',context)
                 :null;
-            const transientMessages=[...(transientContext?[transientContext]:[]),inputMessage];
+            const transientMessages=[...(transientContext?[transientContext]:[]),...inputMessages];
             const requestMessages=completeHistory(
                 this.#systemPrompt,
                 [...this.#conversation,...transientMessages],
@@ -642,11 +647,6 @@ export default class ConfiguredAIChatSession{
                     ...(options.signal?{signal:options.signal}:{}),
                     messages:requestMessages.map(publicMessage),
                 };
-                if(
-                    providerRequest.tools?.length
-                    &&providerRequest.parallelToolCalls===undefined
-                    &&providerRequest.parallel_tool_calls===undefined
-                ) providerRequest.parallelToolCalls=false;
                 providerResponse=await this.#chat(providerRequest);
             }catch(error){
                 if(options.signal?.aborted) throw abortError();
@@ -657,7 +657,7 @@ export default class ConfiguredAIChatSession{
             const retainedConversation=this.#conversation.map(cloneMessage);
             const committed=completeHistory(
                 this.#systemPrompt,
-                [...retainedConversation,inputMessage,response.message],
+                [...retainedConversation,...inputMessages,response.message],
             );
             const nextConversation=committed.filter(item=>item.role!=='system');
             let settled=false;

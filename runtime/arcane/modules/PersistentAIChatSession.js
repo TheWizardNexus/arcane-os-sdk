@@ -6,12 +6,20 @@ import ConfiguredAIChatSession,{
 const SESSION_MANAGED_REQUEST_FIELDS=new Set([
     'messages',
     'onChunk',
+    'onDataChunk',
+    'onDataResult',
     'onResponse',
     'onToolCall',
     'signal',
     'stream',
 ]);
-const PROVIDER_LIFECYCLE_FIELDS=new Set(['onChunk','onResponse','onToolCall']);
+const PROVIDER_LIFECYCLE_FIELDS=new Set([
+    'onChunk',
+    'onDataChunk',
+    'onDataResult',
+    'onResponse',
+    'onToolCall'
+]);
 
 function coded(error,code){
     if(!error.code) error.code=code;
@@ -19,10 +27,9 @@ function coded(error,code){
 }
 
 function isPlainRecord(value){
-    return Boolean(value)
-        &&typeof value==='object'
-        &&!Array.isArray(value)
-        &&Object.getPrototypeOf(value)===Object.prototype;
+    if(!value||typeof value!=='object'||Array.isArray(value))return false;
+    const prototype=Object.getPrototypeOf(value);
+    return prototype===Object.prototype||prototype===null;
 }
 
 function assertKnownKeys(value,allowed,label){
@@ -71,14 +78,20 @@ function configuredAIChat(ai){
 function normalizeStreamHandlers(value){
     if(value===undefined) return {};
     if(!isPlainRecord(value)) throw new TypeError('Persistent chat stream handlers must be a plain object.');
-    assertKnownKeys(value,new Set(['onChunk','onToolCall']),'Persistent chat stream handlers');
-    for(const key of ['onChunk','onToolCall']){
+    assertKnownKeys(
+        value,
+        new Set(['onChunk','onDataChunk','onDataResult','onToolCall']),
+        'Persistent chat stream handlers',
+    );
+    for(const key of ['onChunk','onDataChunk','onDataResult','onToolCall']){
         if(value[key]!==undefined&&typeof value[key]!=='function'){
             throw new TypeError(`${key} must be a function when provided.`);
         }
     }
     return {
         onChunk:value.onChunk??function ignorePersistentChatChunk(){},
+        onDataChunk:value.onDataChunk??function ignorePersistentChatDataChunk(){},
+        onDataResult:value.onDataResult??function ignorePersistentChatDataResult(){},
         onToolCall:value.onToolCall??function ignorePersistentChatToolCall(){},
     };
 }
@@ -95,7 +108,7 @@ function normalizeStreamResponse(terminal,output){
     );
 }
 
-function terminalStructuralToolCall(response){
+function terminalStructuralToolCalls(response){
     const hasMessage=Object.hasOwn(response,'message');
     const hasChoices=Object.hasOwn(response,'choices');
     if(hasMessage&&hasChoices){
@@ -120,49 +133,97 @@ function terminalStructuralToolCall(response){
             );
         }
         for(let callIndex=0;callIndex<value.length;callIndex++){
-            calls.push(normalizeStructuralToolCall(
+            const normalized=normalizeStructuralToolCall(
                 value[callIndex],
                 `The terminal structural tool call ${messageIndex+1}.${callIndex+1}`,
-            ));
+            );
+            if(messageIndex===0) calls.push(normalized);
         }
     }
-    if(calls.length>1){
-        throw coded(
-            new TypeError('The AI stream terminal response contains parallel structural tool calls.'),
-            'AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED',
-        );
+    return calls;
+}
+
+function sameDataValue(left,right,seen=new Map()){
+    if(Object.is(left,right)) return true;
+    if(!left||!right||typeof left!=='object'||typeof right!=='object') return false;
+    if(Array.isArray(left)!==Array.isArray(right)) return false;
+    const matched=seen.get(left);
+    if(matched!==undefined) return matched===right;
+    seen.set(left,right);
+    if(Array.isArray(left)){
+        return left.length===right.length
+            &&left.every((value,index)=>sameDataValue(value,right[index],seen));
     }
-    return calls[0]??null;
+    if(!isPlainRecord(left)||!isPlainRecord(right)) return false;
+    const leftKeys=Reflect.ownKeys(left).filter(key=>Object.prototype.propertyIsEnumerable.call(left,key));
+    const rightKeys=Reflect.ownKeys(right).filter(key=>Object.prototype.propertyIsEnumerable.call(right,key));
+    return leftKeys.length===rightKeys.length
+        &&leftKeys.every(key=>Object.prototype.propertyIsEnumerable.call(right,key)
+            &&sameDataValue(left[key],right[key],seen));
 }
 
 function sameStructuralToolCall(left,right){
-    return Boolean(left&&right)
-        &&left.id===right.id
-        &&left.type===right.type
-        &&left.function.name===right.function.name
-        &&left.function.arguments===right.function.arguments;
+    return sameDataValue(left,right);
+}
+
+function sameStructuralToolCalls(left,right){
+    return Array.isArray(left)
+        &&Array.isArray(right)
+        &&left.length===right.length
+        &&left.every((call,index)=>sameStructuralToolCall(call,right[index]));
 }
 
 function normalizeSend(input){
     if(!isPlainRecord(input)) throw new TypeError('Persistent chat input must be a plain object.');
-    assertKnownKeys(input,new Set(['message','request','response','signal']),'Persistent chat input');
-    if(!isPlainRecord(input.message)) throw new TypeError('message must be a plain object.');
-    assertKnownKeys(input.message,new Set(['content','persist','role','tool_call_id']),'message');
-    if(typeof input.message.content!=='string'||!input.message.content.trim()){
-        throw new TypeError('message.content must contain text.');
+    assertKnownKeys(input,new Set(['message','messages','request','response','signal']),'Persistent chat input');
+    const hasMessage=Object.hasOwn(input,'message');
+    const hasMessages=Object.hasOwn(input,'messages');
+    if(hasMessage===hasMessages){
+        throw new TypeError('Persistent chat input must contain exactly one message or messages field.');
     }
-    const role=input.message.role??'user';
-    if(!['tool','user'].includes(role)) throw new TypeError('message.role must be user or tool.');
-    let toolCallId=null;
-    if(role==='tool'){
-        if(typeof input.message.tool_call_id!=='string'||!input.message.tool_call_id.trim()){
-            throw new TypeError('message.tool_call_id is required for tool messages.');
+    const sourceMessages=hasMessages?input.messages:[input.message];
+    if(!Array.isArray(sourceMessages)||!sourceMessages.length){
+        throw new TypeError('messages must be a nonempty array of tool-result messages.');
+    }
+    const normalizedMessages=sourceMessages.map((value,index)=>{
+        const label=hasMessages?`messages[${index}]`:'message';
+        if(!isPlainRecord(value)) throw new TypeError(`${label} must be a plain object.`);
+        if(typeof value.content!=='string'||!value.content.trim()){
+            throw new TypeError(`${label}.content must contain text.`);
         }
-        toolCallId=input.message.tool_call_id;
-    }else if(input.message.tool_call_id!==undefined){
-        throw new TypeError('message.tool_call_id is supported only for tool messages.');
+        const role=value.role??'user';
+        if(!['tool','user'].includes(role)) throw new TypeError(`${label}.role must be user or tool.`);
+        if(hasMessages&&role!=='tool'){
+            throw new TypeError('messages accepts only tool-result messages.');
+        }
+        let toolCallId=null;
+        if(role==='tool'){
+            if(typeof value.tool_call_id!=='string'||!value.tool_call_id.trim()){
+                throw new TypeError(`${label}.tool_call_id is required for tool messages.`);
+            }
+            toolCallId=value.tool_call_id;
+        }else if(value.tool_call_id!==undefined){
+            throw new TypeError(`${label}.tool_call_id is supported only for tool messages.`);
+        }
+        const completeMessage={...value};
+        delete completeMessage.persist;
+        return {
+            persist:boolean(value.persist,`${label}.persist`,true),
+            message:{
+                ...completeMessage,
+                content:value.content,
+                role,
+                ...(toolCallId?{tool_call_id:toolCallId}:{})
+            }
+        };
+    });
+    const messagePersist=normalizedMessages[0].persist;
+    if(normalizedMessages.some(item=>item.persist!==messagePersist)){
+        throw coded(
+            new TypeError('Every message in one tool-result batch must use the same persistence choice.'),
+            'AI_CHAT_INCOHERENT_PERSISTENCE',
+        );
     }
-    const messagePersist=boolean(input.message.persist,'message.persist',true);
     const response=input.response??{};
     if(!isPlainRecord(response)) throw new TypeError('response must be a plain object.');
     assertKnownKeys(response,new Set(['persist']),'response');
@@ -184,11 +245,7 @@ function normalizeSend(input){
     if(!signalLike(input.signal)) throw new TypeError('signal must be an AbortSignal.');
     return {
         messagePersist,
-        requestMessage:{
-            content:input.message.content,
-            role,
-            ...(toolCallId?{tool_call_id:toolCallId}:{}),
-        },
+        requestMessages:normalizedMessages.map(item=>item.message),
         responsePersist,
         request:{...request},
         signal:input.signal??null,
@@ -196,14 +253,14 @@ function normalizeSend(input){
 }
 
 function fileName(value){
-    if(typeof value!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._-]{0,255}\.jsonl$/.test(value)){
-        throw new TypeError('chatFileName must be a safe .jsonl file name.');
+    if(typeof value!=='string'||value.length===0){
+        throw new TypeError('chatFileName must be a nonempty string.');
     }
     return value;
 }
 
 /**
- * Composes the bounded configured chat session with one automatically selected
+ * Composes the configured chat session with one automatically selected
  * ChatEntity. Request-only context is delegated to ConfiguredAIChatSession;
  * per-turn persistence affects DBOPFS and memory, never the live model context.
  */
@@ -212,6 +269,7 @@ class PersistentAIChatSession{
     #configured=null;
     #entity;
     #fetchChat;
+    #historyError=null;
     #memory;
     #options;
     #pending=false;
@@ -258,20 +316,10 @@ class PersistentAIChatSession{
         if(managedRequestField){
             throw new TypeError(`request.${managedRequestField} is managed by the chat session.`);
         }
-        if(
-            request.parallelToolCalls===true
-            ||request.parallel_tool_calls===true
-        ){
-            throw coded(
-                new TypeError('Persistent chat supports one structural tool call at a time.'),
-                'AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED',
-            );
-        }
-        if(
-            request.parallelToolCalls===undefined
-            &&request.parallel_tool_calls===undefined
-        ){
-            request.parallelToolCalls=false;
+        for(const key of ['parallelToolCalls','parallel_tool_calls']){
+            if(Object.hasOwn(request,key)&&typeof request[key]!=='boolean'){
+                throw new TypeError(`request.${key} must be a boolean when provided.`);
+            }
         }
         const systemPrompt=options.systemPrompt??'';
         if(typeof systemPrompt!=='string') throw new TypeError('systemPrompt must be a string.');
@@ -307,56 +355,70 @@ class PersistentAIChatSession{
         const providerRequest=providerRequestWithoutLifecycleCallbacks(request);
         if(!this.#activeStream) return this.#fetchChat(providerRequest);
         if(typeof this.#options.ai?.streamRequest!=='function'){
-            return this.#fetchChat(providerRequest);
+            const response=await this.#fetchChat(providerRequest);
+            await this.#activeStream.onDataResult(response,providerRequest.id??null);
+            return response;
         }
         const activeStream=this.#activeStream;
         let terminal=null;
-        let streamedToolCall=null;
-        let streamedToolDetails=[];
+        const streamedToolCalls=[];
+        const streamedToolDetails=[];
         const output=await this.#options.ai.streamRequest({
             ...providerRequest,
             onChunk:activeStream.onChunk,
+            onDataChunk:activeStream.onDataChunk,
+            onDataResult:activeStream.onDataResult,
             onToolCall:function retainStructuralToolCall(call,...details){
                 const normalized=normalizeStructuralToolCall(
                     call,
                     'The streamed structural tool call',
                 );
-                if(streamedToolCall&&!sameStructuralToolCall(streamedToolCall,normalized)){
+                if(streamedToolCalls.some(call=>call.id===normalized.id)){
                     throw coded(
-                        new TypeError('The AI stream emitted divergent structural tool calls.'),
+                        new TypeError('The AI stream emitted a duplicate structural tool call.'),
                         'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
                     );
                 }
-                streamedToolCall=normalized;
-                streamedToolDetails=details;
+                streamedToolCalls.push(normalized);
+                streamedToolDetails.push(details);
             },
             onResponse:async function retainPersistentChatTerminal(response){
                 terminal=response;
             },
         });
         const response=normalizeStreamResponse(terminal,output);
-        const terminalToolCall=terminalStructuralToolCall(response);
-        if(streamedToolCall&&!sameStructuralToolCall(streamedToolCall,terminalToolCall)){
+        const terminalToolCalls=terminalStructuralToolCalls(response);
+        if(streamedToolCalls.length&&!sameStructuralToolCalls(streamedToolCalls,terminalToolCalls)){
             throw coded(
                 new TypeError(
-                    'The AI stream terminal response omitted or changed its structural tool call.'
+                    'The AI stream terminal response omitted, reordered, or changed its structural tool calls.'
                 ),
                 'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
             );
         }
-        activeStream.streamedToolCall=streamedToolCall;
+        activeStream.streamedToolCalls=streamedToolCalls;
         activeStream.streamedToolDetails=streamedToolDetails;
-        activeStream.terminalToolCall=terminalToolCall;
+        activeStream.terminalToolCalls=terminalToolCalls;
         return response;
     }
 
     async #initialize(){
-        if(this.#options.loadExisting) await this.#entity.load();
-        const storedMessages=this.#entity.messages;
+        let storedMessages=[];
+        try{
+            if(this.#options.loadExisting) await this.#entity.load();
+            storedMessages=this.#entity.messages;
+        }catch(error){
+            this.#historyError=coded(
+                error instanceof Error?error:new Error('The saved chat history is invalid.'),
+                'AI_CHAT_INCOHERENT_PERSISTENCE',
+            );
+            console.error('Arcane saved chat history is readable but not actionable.',error);
+        }
         const storedSystem=storedMessages.find(message=>message.role==='system');
         const initialMessages=storedMessages
             .filter(message=>['user','assistant','tool'].includes(message.role))
             .map(message=>({
+                ...message,
                 role:message.role,
                 content:String(message.content??''),
                 ...(message.role==='assistant'&&Object.hasOwn(message,'reasoning_content')
@@ -396,6 +458,7 @@ class PersistentAIChatSession{
 
     async history(){
         await this.ready();
+        if(this.#historyError)throw this.#historyError;
         return this.#configured.history();
     }
 
@@ -418,35 +481,49 @@ class PersistentAIChatSession{
         let prepared=null;
         try{
             await this.ready();
+            if(this.#historyError)throw this.#historyError;
             await this.#entity.settleMemory();
-            if(settings.requestMessage.role==='user'&&this.#toolCallPersistence.size){
+            const requestMessage=settings.requestMessages[0];
+            if(requestMessage.role==='user'&&this.#toolCallPersistence.size){
                 throw coded(
                     new TypeError('The pending structural tool result must be supplied before a new user turn.'),
                     'AI_CHAT_TOOL_RESULT_REQUIRED',
                 );
             }
-            if(settings.requestMessage.role==='tool'){
-                const persistence=this.#toolCallPersistence.get(settings.requestMessage.tool_call_id);
-                if(persistence===undefined){
-                    throw coded(new TypeError('The tool message has no pending structural tool call.'),'AI_CHAT_INVALID_TOOL_MESSAGE');
+            if(requestMessage.role==='tool'){
+                const submittedIds=new Set();
+                for(const message of settings.requestMessages){
+                    const persistence=this.#toolCallPersistence.get(message.tool_call_id);
+                    if(persistence===undefined||submittedIds.has(message.tool_call_id)){
+                        throw coded(new TypeError('A tool message has no unique pending structural tool call.'),'AI_CHAT_INVALID_TOOL_MESSAGE');
+                    }
+                    if(persistence!==settings.messagePersist){
+                        throw coded(
+                            new TypeError('A tool result must use the persistence of its assistant tool call.'),
+                            'AI_CHAT_INCOHERENT_PERSISTENCE',
+                        );
+                    }
+                    submittedIds.add(message.tool_call_id);
                 }
-                if(persistence!==settings.messagePersist){
+                if(submittedIds.size!==this.#toolCallPersistence.size){
                     throw coded(
-                        new TypeError('A tool result must use the persistence of its assistant tool call.'),
-                        'AI_CHAT_INCOHERENT_PERSISTENCE',
+                        new TypeError('Every pending structural tool result must be supplied before provider continuation.'),
+                        'AI_CHAT_TOOL_RESULT_REQUIRED',
                     );
                 }
             }
             const streamState=streamHandlers?{
                 ...streamHandlers,
-                streamedToolCall:null,
+                streamedToolCalls:[],
                 streamedToolDetails:[],
-                terminalToolCall:null,
+                terminalToolCalls:[],
             }:null;
             if(streamState) this.#activeStream=streamState;
             try{
                 prepared=await this.#configured.prepare(
-                    settings.requestMessage,
+                    settings.requestMessages.length===1
+                        ?settings.requestMessages[0]
+                        :settings.requestMessages,
                     {request:settings.request,signal:settings.signal},
                 );
             }finally{
@@ -454,22 +531,22 @@ class PersistentAIChatSession{
             }
             const result=prepared.response;
             if(streamState){
-                const validatedToolCall=result.message.tool_calls?.[0]??null;
+                const validatedToolCalls=result.message.tool_calls??[];
                 if(
-                    streamState.terminalToolCall
-                    &&!sameStructuralToolCall(streamState.terminalToolCall,validatedToolCall)
+                    streamState.terminalToolCalls.length
+                    &&!sameStructuralToolCalls(streamState.terminalToolCalls,validatedToolCalls)
                 ){
                     throw coded(
                         new TypeError(
-                            'The validated AI response changed its terminal structural tool call.'
+                            'The validated AI response changed its terminal structural tool calls.'
                         ),
                         'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
                     );
                 }
-                if(validatedToolCall){
+                for(let index=0;index<validatedToolCalls.length;index++){
                     await streamState.onToolCall(
-                        validatedToolCall,
-                        ...streamState.streamedToolDetails,
+                        validatedToolCalls[index],
+                        ...(streamState.streamedToolDetails[index]??[]),
                     );
                 }
             }
@@ -483,12 +560,16 @@ class PersistentAIChatSession{
                     })
                 ),
                 messagePersist:settings.messagePersist,
-                requestMessage:settings.requestMessage,
+                ...(settings.requestMessages.length===1
+                    ?{requestMessage:settings.requestMessages[0]}
+                    :{requestMessages:settings.requestMessages}),
                 responsePersist:settings.responsePersist,
             });
             const committed=prepared.commit();
-            if(settings.requestMessage.role==='tool'){
-                this.#toolCallPersistence.delete(settings.requestMessage.tool_call_id);
+            if(requestMessage.role==='tool'){
+                for(const message of settings.requestMessages){
+                    this.#toolCallPersistence.delete(message.tool_call_id);
+                }
             }
             for(const call of result.message.tool_calls??[]){
                 this.#toolCallPersistence.set(call.id,settings.responsePersist);

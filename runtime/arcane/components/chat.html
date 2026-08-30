@@ -159,7 +159,7 @@
         margin: 0;
         padding: clamp(1rem, 2vw, 1.5rem);
         list-style: none;
-        overflow-x: hidden;
+        overflow-x: auto;
         overflow-y: auto;
         overscroll-behavior: contain;
         scrollbar-gutter: stable;
@@ -181,7 +181,7 @@
         clear: both;
         border: 1px solid var(--arcane-border, var(--border-color));
         border-radius: calc(var(--arcane-chat-radius) - .1rem);
-        overflow-x: hidden;
+        overflow-x: auto;
         overflow-wrap: anywhere;
     }
 
@@ -238,7 +238,7 @@
         padding:.65rem;
         border:1px solid currentColor;
         border-radius:var(--arcane-radius-small,.3rem);
-        overflow-x:hidden;
+        overflow-x:auto;
         overflow-wrap:anywhere;
     }
 
@@ -256,7 +256,7 @@
         max-inline-size:100%;
         max-width:100%;
         margin-top:.55rem;
-        overflow-x:hidden;
+        overflow-x:auto;
     }
 
     .message_tool_details summary{
@@ -930,8 +930,9 @@
     let activeSessionMessageToken=null;
     let sessionBindingGeneration=0;
     let sessionMessageSequence=0;
-    let pendingStructuralToolCall=null;
+    let pendingStructuralToolCalls=[];
     let pendingStructuralToolMessage='';
+    let sessionHistoryRecoveryMessage='';
     const activeSubmissionOwnerships=new Set();
     const conversationTimeboxRetryDelays=[0,500,1_500];
     const chatReasons={
@@ -1032,10 +1033,9 @@
     }
 
     function isPlainRecord(value){
-        return Boolean(value)
-            &&typeof value==='object'
-            &&!Array.isArray(value)
-            &&Object.getPrototypeOf(value)===Object.prototype;
+        if(!value||typeof value!=='object'||Array.isArray(value))return false;
+        const prototype=Object.getPrototypeOf(value);
+        return prototype===Object.prototype||prototype===null;
     }
 
     function visibleErrorMessage(error,fallback){
@@ -1122,6 +1122,7 @@
             failure.code='AI_CHAT_INVALID_TOOL_CALL';
             throw failure;
         }
+        const ids=new Set();
         return value.map((call,index)=>{
             if(
                 !call
@@ -1133,6 +1134,7 @@
                 ||Array.isArray(call.function)
                 ||typeof call.id!=='string'
                 ||!call.id.trim()
+                ||ids.has(call.id)
                 ||typeof call.function.name!=='string'
                 ||!call.function.name.trim()
                 ||typeof call.function.arguments!=='string'
@@ -1142,8 +1144,55 @@
                 throw failure;
             }
             structuralToolMessage(call);
-            return call;
+            ids.add(call.id);
+            return {
+                ...call,
+                function:{...call.function},
+                id:call.id,
+                type:'function'
+            };
         });
+    }
+
+    function copyCompleteChatData(value,seen=new Map()){
+        if(value===null||typeof value!=='object') return value;
+        if(seen.has(value)) return seen.get(value);
+        if(Array.isArray(value)){
+            const result=[];
+            seen.set(value,result);
+            for(const item of value) result.push(copyCompleteChatData(item,seen));
+            return result;
+        }
+        const result={};
+        seen.set(value,result);
+        for(const [key,descriptor] of Object.entries(Object.getOwnPropertyDescriptors(value))){
+            if(Object.hasOwn(descriptor,'value')){
+                result[key]=copyCompleteChatData(descriptor.value,seen);
+            }
+        }
+        return result;
+    }
+
+    function sameCompleteChatData(left,right,seen=new Map()){
+        if(Object.is(left,right)) return true;
+        if(!left||!right||typeof left!=='object'||typeof right!=='object') return false;
+        if(Array.isArray(left)!==Array.isArray(right)) return false;
+        const matched=seen.get(left);
+        if(matched!==undefined) return matched===right;
+        seen.set(left,right);
+        if(Array.isArray(left)){
+            return left.length===right.length
+                &&left.every((value,index)=>sameCompleteChatData(value,right[index],seen));
+        }
+        const leftKeys=Reflect.ownKeys(left).filter(
+            key=>Object.prototype.propertyIsEnumerable.call(left,key)
+        );
+        const rightKeys=Reflect.ownKeys(right).filter(
+            key=>Object.prototype.propertyIsEnumerable.call(right,key)
+        );
+        return leftKeys.length===rightKeys.length
+            &&leftKeys.every(key=>Object.prototype.propertyIsEnumerable.call(right,key)
+                &&sameCompleteChatData(left[key],right[key],seen));
     }
 
     function structuralToolMessage(call){
@@ -1175,40 +1224,50 @@
         return argumentsRecord.message;
     }
 
-    function setPendingStructuralToolCall(call=null){
-        if(call===null){
-            pendingStructuralToolCall=null;
+    function setPendingStructuralToolCalls(calls=[]){
+        if(!Array.isArray(calls)||calls.length===0){
+            pendingStructuralToolCalls=[];
             pendingStructuralToolMessage='';
-            return null;
+            return [];
         }
-        pendingStructuralToolMessage=structuralToolMessage(call);
-        pendingStructuralToolCall={
-            id:call.id,
-            type:'function',
-            function:{
-                name:call.function.name,
-                arguments:call.function.arguments
-            }
-        };
-        return pendingStructuralToolCall;
+        pendingStructuralToolCalls=normalizeVisibleToolCalls(calls);
+        pendingStructuralToolMessage=pendingStructuralToolCalls
+            .map(structuralToolMessage)
+            .join(' · ');
+        return pendingStructuralToolCalls;
     }
 
     function sameStructuralToolCall(left,right){
-        return Boolean(left&&right)
-            &&left.id===right.id
-            &&left.type===right.type
-            &&left.function?.name===right.function?.name
-            &&left.function?.arguments===right.function?.arguments;
+        return sameCompleteChatData(left,right);
+    }
+
+    function sameStructuralToolCalls(left,right){
+        return Array.isArray(left)
+            &&Array.isArray(right)
+            &&left.length===right.length
+            &&left.every((call,index)=>sameStructuralToolCall(call,right[index]));
+    }
+
+    function pendingStructuralToolSummaries(){
+        return pendingStructuralToolCalls.map(call=>({
+            id:call.id,
+            name:call.function.name,
+            message:structuralToolMessage(call)
+        }));
     }
 
     function pendingStructuralToolSummary(){
-        return pendingStructuralToolCall
-            ?{
-                id:pendingStructuralToolCall.id,
-                name:pendingStructuralToolCall.function.name,
-                message:pendingStructuralToolMessage
-            }
-            :null;
+        const summaries=pendingStructuralToolSummaries();
+        return summaries.length===1?summaries[0]:null;
+    }
+
+    function pendingStructuralToolCallsComplete(){
+        return pendingStructuralToolCalls.map(call=>copyCompleteChatData(call));
+    }
+
+    function pendingStructuralToolCallComplete(){
+        const calls=pendingStructuralToolCallsComplete();
+        return calls.length===1?calls[0]:null;
     }
 
     function appendVisibleToolCall(item,call){
@@ -1237,7 +1296,7 @@
         summary.textContent='Tool call details';
         const argumentsBlock=item.ownerDocument.createElement('pre');
         const code=item.ownerDocument.createElement('code');
-        code.textContent=call.function.arguments;
+        code.textContent=completeVisibleValue(call);
         argumentsBlock.append(code);
         details.append(summary,argumentsBlock);
         entry.append(heading,userMessage,details);
@@ -1273,23 +1332,27 @@
         return true;
     }
 
-    function latestCommittedTranscriptTurn(transcript,requestMessage){
+    function sameTranscriptRequest(actual,expected){
+        return actual?.role===expected?.role
+            &&actual.content===expected.content
+            &&(
+                expected.role!=='tool'
+                ||actual.tool_call_id===expected.tool_call_id
+            );
+    }
+
+    function latestCommittedTranscriptTurn(transcript,requestMessages){
         if(!Array.isArray(transcript)) return null;
-        const requestRole=requestMessage?.role??'user';
-        const requestContent=requestMessage?.content;
-        for(let index=transcript.length-1;index>0;index--){
+        const expected=Array.isArray(requestMessages)
+            ?requestMessages
+            :[requestMessages];
+        if(!expected.length) return null;
+        for(let index=transcript.length-1;index>=expected.length;index--){
             const response=transcript[index];
-            const request=transcript[index-1];
-            if(
-                response?.role==='assistant'
-                &&request?.role===requestRole
-                &&request.content===requestContent
-                &&(
-                    requestRole!=='tool'
-                    ||request.tool_call_id===requestMessage.tool_call_id
-                )
-            ){
-                return {request,response};
+            if(response?.role!=='assistant') continue;
+            const requests=transcript.slice(index-expected.length,index);
+            if(requests.every((request,offset)=>sameTranscriptRequest(request,expected[offset]))){
+                return {request:requests.at(-1),requests,response};
             }
         }
         return null;
@@ -1325,87 +1388,131 @@
         return item;
     }
 
+    function completeVisibleValue(value){
+        try{
+            const serialized=JSON.stringify(value,null,2);
+            if(serialized!==undefined) return serialized;
+        }catch(error){
+            console.error('Arcane saved chat record could not be serialized as JSON.',error);
+        }
+        return String(value);
+    }
+
+    function createSavedRecordFallback(message,index){
+        const content=isPlainRecord(message)&&typeof message.content==='string'
+            ?message.content
+            :'Saved record content is available in details.';
+        const item=createTranscriptMessage(
+            'assistant',
+            content,
+            `Saved record ${index+1}`,
+            {timestamp:isPlainRecord(message)?message.timestamp:undefined}
+        );
+        const details=item.ownerDocument.createElement('details');
+        details.className='message_tool_details';
+        const summary=item.ownerDocument.createElement('summary');
+        summary.textContent='Saved record details';
+        const block=item.ownerDocument.createElement('pre');
+        const code=item.ownerDocument.createElement('code');
+        code.textContent=completeVisibleValue(message);
+        block.append(code);
+        details.append(summary,block);
+        item.insertBefore(details,item.querySelector('.message_timestamp'));
+        return item;
+    }
+
     function renderSessionHistory(history){
         if(!Array.isArray(history)){
             throw new TypeError('Chat session history must be an array.');
         }
         const fragment=chatOutput.ownerDocument.createDocumentFragment();
         const rendered=[];
-        let restoredPendingToolCall=null;
-        for(const message of history){
-            if(!message||typeof message!=='object'||Array.isArray(message)){
-                throw new TypeError('Chat session history contains an invalid message.');
-            }
-            if(message.role==='system'){
-                if(restoredPendingToolCall){
+        const restoredPendingToolCalls=new Map();
+        let actionable=true;
+        let recoveryNeeded=false;
+        for(const [index,message] of history.entries()){
+            let item;
+            try{
+                if(!isPlainRecord(message)||!['assistant','system','tool','user'].includes(message.role)){
                     throw chatError(
-                        'Saved chat contains a system record before its pending structural tool result.',
+                        'Saved chat contains an unsupported record.',
                         'AI_CHAT_INCOHERENT_PERSISTENCE'
                     );
                 }
-                continue;
-            }
-            if(!['assistant','tool','user'].includes(message.role)){
-                throw new TypeError(`Chat session history contains an unsupported role: ${message.role}.`);
-            }
-            if(typeof message.content!=='string'){
-                throw new TypeError('Chat session history message content must be a string.');
-            }
-            if(message.role==='tool'&&!message.content.trim()){
-                throw chatError(
-                    'Saved chat contains a blank structural tool result.',
-                    'AI_CHAT_INVALID_TOOL_MESSAGE'
-                );
-            }
-            const calls=normalizeVisibleToolCalls(message.tool_calls);
-            if(calls.length>1){
-                throw chatError(
-                    'Saved chat contains parallel structural tool calls.',
-                    'AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED'
-                );
-            }
-            if(message.role!=='assistant'&&calls.length){
-                throw chatError(
-                    'Only assistant records may contain structural tool calls.',
-                    'AI_CHAT_INVALID_TOOL_CALL'
-                );
-            }
-            if(message.role==='tool'){
-                if(
-                    !restoredPendingToolCall
-                    ||typeof message.tool_call_id!=='string'
-                    ||message.tool_call_id!==restoredPendingToolCall.id
-                ){
+                if(typeof message.content!=='string'){
                     throw chatError(
-                        'Saved chat contains a tool result that does not match its pending structural tool call.',
+                        'Saved chat contains a record without text content.',
+                        'AI_CHAT_INCOHERENT_PERSISTENCE'
+                    );
+                }
+                const calls=normalizeVisibleToolCalls(message.tool_calls);
+                if(message.role!=='assistant'&&calls.length){
+                    throw chatError(
+                        'Only assistant records may contain structural tool calls.',
+                        'AI_CHAT_INVALID_TOOL_CALL'
+                    );
+                }
+                if(message.role!=='tool'&&message.tool_call_id!==undefined){
+                    throw chatError(
+                        'Only tool records may contain a structural tool-call ID.',
                         'AI_CHAT_INVALID_TOOL_MESSAGE'
                     );
                 }
-                restoredPendingToolCall=null;
-            }else{
-                if(restoredPendingToolCall){
-                    throw chatError(
-                        'Saved chat continues before its pending structural tool result.',
-                        'AI_CHAT_TOOL_RESULT_REQUIRED'
-                    );
+                if(actionable){
+                    if(message.role==='tool'){
+                        if(
+                            typeof message.tool_call_id!=='string'
+                            ||!message.tool_call_id.trim()
+                            ||!message.content.trim()
+                            ||!restoredPendingToolCalls.has(message.tool_call_id)
+                        ){
+                            throw chatError(
+                                'Saved chat contains a tool result that does not match a pending structural tool call.',
+                                'AI_CHAT_INVALID_TOOL_MESSAGE'
+                            );
+                        }
+                        restoredPendingToolCalls.delete(message.tool_call_id);
+                    }else{
+                        if(restoredPendingToolCalls.size){
+                            throw chatError(
+                                'Saved chat continues before all pending structural tool results.',
+                                'AI_CHAT_TOOL_RESULT_REQUIRED'
+                            );
+                        }
+                        if(calls.length){
+                            for(const call of calls){
+                                restoredPendingToolCalls.set(call.id,call);
+                            }
+                        }
+                    }
                 }
-                if(calls.length){
-                    restoredPendingToolCall=calls[0];
-                }
+                const name=message.role==='user'
+                    ?host.name
+                    :message.role==='tool'
+                    ?'Tool'
+                    :message.role==='system'
+                    ?'System'
+                    :host.aiName;
+                item=createTranscriptMessage(message.role,message.content,name,{
+                    timestamp:message.timestamp,
+                    toolCalls:calls,
+                });
+            }catch(error){
+                recoveryNeeded=true;
+                actionable=false;
+                restoredPendingToolCalls.clear();
+                console.error(`Arcane saved chat record ${index+1} is not actionable.`,error);
+                item=createSavedRecordFallback(message,index);
             }
-            const name=message.role==='user'
-                ?host.name
-                :message.role==='tool'
-                ?'Tool'
-                :host.aiName;
-            const item=createTranscriptMessage(message.role,message.content,name,{
-                timestamp:message.timestamp,
-                toolCalls:calls,
-            });
             fragment.append(item);
             rendered.push(item);
         }
-        setPendingStructuralToolCall(restoredPendingToolCall);
+        sessionHistoryRecoveryMessage=recoveryNeeded
+            ?'This saved chat is readable, but some saved actions cannot be resumed.'
+            :'';
+        setPendingStructuralToolCalls(
+            actionable?[...restoredPendingToolCalls.values()]:[]
+        );
         chatOutput.replaceChildren(fragment);
         scrollTranscriptToBottom();
         return rendered;
@@ -1474,7 +1581,7 @@
             host.session=session;
             setSessionStatus(
                 pendingStructuralToolMessage?'tool':'ready',
-                pendingStructuralToolMessage||'Chat ready.'
+                pendingStructuralToolMessage||sessionHistoryRecoveryMessage||'Chat ready.'
             );
             applyAIAvailability(host.aiAvailability);
             sessionBindingPending=false;
@@ -1483,7 +1590,10 @@
                 session,
                 ai:boundChatAI,
                 history,
-                pendingTool:pendingStructuralToolSummary()
+                pendingTool:pendingStructuralToolSummary(),
+                pendingTools:pendingStructuralToolSummaries(),
+                pendingToolCall:pendingStructuralToolCallComplete(),
+                pendingToolCalls:pendingStructuralToolCallsComplete()
             };
             dispatchChatEvent(
                 'chat-session-bound',
@@ -1652,10 +1762,26 @@
     host.bindSession=bindSession;
     host.submitMessage=submitMessage;
     host.submitToolResult=submitToolResult;
+    host.submitToolResults=submitToolResults;
     Object.defineProperty(host,'pendingTool',{
         configurable:true,
         enumerable:true,
         get:pendingStructuralToolSummary
+    });
+    Object.defineProperty(host,'pendingTools',{
+        configurable:true,
+        enumerable:true,
+        get:pendingStructuralToolSummaries
+    });
+    Object.defineProperty(host,'pendingToolCall',{
+        configurable:true,
+        enumerable:true,
+        get:pendingStructuralToolCallComplete
+    });
+    Object.defineProperty(host,'pendingToolCalls',{
+        configurable:true,
+        enumerable:true,
+        get:pendingStructuralToolCallsComplete
     });
     host.destroy=destroy;
     host.session=null;
@@ -1868,9 +1994,12 @@
         send.disabled=host.conversationComplete
             ||!availability.llm
             ||sessionMessagePending
-            ||Boolean(pendingStructuralToolMessage);
+            ||Boolean(pendingStructuralToolMessage)
+            ||Boolean(sessionHistoryRecoveryMessage);
         send.title=pendingStructuralToolMessage
             ?pendingStructuralToolMessage
+            :sessionHistoryRecoveryMessage
+            ?'This saved chat is readable but cannot continue.'
             :availability.llm
             ?'Send message'
             :'The selected language model service is unavailable.';
@@ -2732,6 +2861,7 @@
             'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
             'AI_CHAT_TOOL_MESSAGE_REQUIRED',
             'AI_CHAT_TOOL_RESULT_NOT_PENDING',
+            'AI_CHAT_TOOL_RESULT_BATCH_REQUIRED',
             'AI_CHAT_TOOL_RESULT_REQUIRED',
             'AI_CHAT_TRANSACTION_SETTLED'
         ].includes(error?.code);
@@ -2761,7 +2891,7 @@
     async function sendMessageThroughBoundSession(
         text,
         context,
-        sessionRequestMessage={content:text,role:'user'},
+        sessionRequest={content:text,role:'user'},
         perTurnRequest=null
     ){
         const session=boundChatSession;
@@ -2779,13 +2909,21 @@
             );
         }
 
+        const sessionRequestMessages=Array.isArray(sessionRequest)
+            ?sessionRequest
+            :[sessionRequest];
+        if(!sessionRequestMessages.length){
+            throw new TypeError('A chat session request must contain at least one message.');
+        }
         const request={
-            message:sessionRequestMessage,
+            ...(sessionRequestMessages.length===1
+                ?{message:sessionRequestMessages[0]}
+                :{messages:sessionRequestMessages}),
             signal:context.signal,
             ...(perTurnRequest===null?{}:{request:perTurnRequest})
         };
-        const previousPendingToolCall=pendingStructuralToolCall;
-        let streamedStructuralToolCall=null;
+        const previousPendingToolCalls=[...pendingStructuralToolCalls];
+        const streamedStructuralToolCalls=[];
         const messageId=`session-${++sessionMessageSequence}`;
         const sessionMessageToken=Symbol(messageId);
         activeSessionMessageToken=sessionMessageToken;
@@ -2826,20 +2964,20 @@
                             )||null;
                             if(!message) return false;
                             const normalized=normalizeVisibleToolCalls([call])[0];
-                            if(
-                                streamedStructuralToolCall
-                                &&!sameStructuralToolCall(streamedStructuralToolCall,normalized)
-                            ){
+                            const existing=streamedStructuralToolCalls.find(
+                                candidate=>candidate.id===normalized.id
+                            );
+                            if(existing&&!sameStructuralToolCall(existing,normalized)){
                                 throw chatError(
                                     'The streamed structural tool call changed before completion.',
                                     'AI_CHAT_STREAM_TOOL_CALL_MISMATCH'
                                 );
                             }
-                            if(streamedStructuralToolCall){
+                            if(existing){
                                 return true;
                             }
-                            streamedStructuralToolCall=normalized;
-                            setPendingStructuralToolCall(normalized);
+                            streamedStructuralToolCalls.push(normalized);
+                            setPendingStructuralToolCalls(streamedStructuralToolCalls);
                             appendVisibleToolCall(message,normalized);
                             setSessionStatus('tool',pendingStructuralToolMessage);
                             return true;
@@ -2863,7 +3001,7 @@
             const committedTurn=typeof session.transcript==='function'
                 ?latestCommittedTranscriptTurn(
                     await session.transcript(),
-                    sessionRequestMessage
+                    sessionRequestMessages
                 )
                 :null;
             const message=[...chatOutput.children].find(
@@ -2877,41 +3015,32 @@
                 result.message.content,
                 committedTurn?.response?.timestamp??result.message.timestamp
             );
-            const requestMessage=[...chatOutput.children].find(
+            const requestMessages=[...chatOutput.children].filter(
                 candidate=>candidate.dataset.operationId===context.operationId
-            )||null;
-            setTranscriptMessageTimestamp(
-                requestMessage,
-                committedTurn?.request?.timestamp
             );
-            const terminalToolCalls=normalizeVisibleToolCalls(result.message.tool_calls);
-            if(terminalToolCalls.length>1){
-                throw chatError(
-                    'The chat session returned parallel structural tool calls.',
-                    'AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED'
+            for(const [index,requestMessage] of requestMessages.entries()){
+                setTranscriptMessageTimestamp(
+                    requestMessage,
+                    committedTurn?.requests?.[index]?.timestamp
+                        ??committedTurn?.request?.timestamp
                 );
             }
+            const terminalToolCalls=normalizeVisibleToolCalls(result.message.tool_calls);
             if(
-                streamedStructuralToolCall
-                &&(
-                    terminalToolCalls.length!==1
-                    ||!sameStructuralToolCall(
-                        streamedStructuralToolCall,
-                        terminalToolCalls[0]
-                    )
-                )
+                streamedStructuralToolCalls.length
+                &&!sameStructuralToolCalls(streamedStructuralToolCalls,terminalToolCalls)
             ){
                 throw chatError(
-                    'The terminal structural tool call does not match the streamed call.',
+                    'The terminal structural tool calls do not match the streamed calls.',
                     'AI_CHAT_STREAM_TOOL_CALL_MISMATCH'
                 );
             }
-            if(!streamedStructuralToolCall&&terminalToolCalls.length){
-                appendVisibleToolCall(message,terminalToolCalls[0]);
+            if(!streamedStructuralToolCalls.length){
+                for(const call of terminalToolCalls){
+                    appendVisibleToolCall(message,call);
+                }
             }
-            setPendingStructuralToolCall(
-                terminalToolCalls.length?terminalToolCalls.at(-1):null
-            );
+            setPendingStructuralToolCalls(terminalToolCalls);
             setSessionStatus(
                 pendingStructuralToolMessage?'tool':'ready',
                 pendingStructuralToolMessage||'Chat ready.'
@@ -2921,7 +3050,11 @@
                 request,
                 result,
                 message:result.message,
-                context
+                context,
+                pendingTool:pendingStructuralToolSummary(),
+                pendingTools:pendingStructuralToolSummaries(),
+                pendingToolCall:pendingStructuralToolCallComplete(),
+                pendingToolCalls:pendingStructuralToolCallsComplete()
             };
             if(activeSessionMessageToken===sessionMessageToken){
                 activeSessionMessageToken=null;
@@ -2944,38 +3077,42 @@
             return result;
         }catch(error){
             if(!destroyed&&bindingGeneration===sessionBindingGeneration){
-                setPendingStructuralToolCall(previousPendingToolCall);
+                setPendingStructuralToolCalls(previousPendingToolCalls);
             }
             if(
                 !destroyed
                 &&bindingGeneration===sessionBindingGeneration
                 &&internalStructuralToolFailure(error)
             ){
-                if(sessionRequestMessage.role==='tool'){
+                if(sessionRequestMessages.every(message=>message.role==='tool')){
                     const response=[...chatOutput.children].find(
                         candidate=>candidate.id===`message-${messageId}`
                     )||null;
-                    const requestMessage=[...chatOutput.children].find(
+                    const requestMessages=[...chatOutput.children].filter(
                         candidate=>candidate.dataset.operationId===context.operationId
-                    )||null;
+                    );
                     response?.remove();
-                    requestMessage?.remove();
+                    for(const requestMessage of requestMessages){
+                        requestMessage.remove();
+                    }
                     scrollTranscriptToBottom();
                 }else{
                     restoreRejectedStructuralDraft(messageId,context.operationId,text);
                 }
                 console.error('Arcane structural tool protocol failure.',error);
                 setSessionStatus(
-                    pendingStructuralToolCall?'tool':'ready',
+                    pendingStructuralToolCalls.length?'tool':'ready',
                     pendingStructuralToolMessage||'Chat ready.'
                 );
             }else if(!destroyed&&bindingGeneration===sessionBindingGeneration){
                 console.error('Arcane chat request failed.',error);
-                if(sessionRequestMessage.role==='tool'){
-                    const requestMessage=[...chatOutput.children].find(
+                if(sessionRequestMessages.every(message=>message.role==='tool')){
+                    const requestMessages=[...chatOutput.children].filter(
                         candidate=>candidate.dataset.operationId===context.operationId
-                    )||null;
-                    requestMessage?.remove();
+                    );
+                    for(const requestMessage of requestMessages){
+                        requestMessage.remove();
+                    }
                 }
                 renderSessionMessageFailure(messageId,error);
                 setSessionStatus(
@@ -3015,18 +3152,18 @@
         }
     }
 
-    async function submitToolResult(options={},context={}){
+    async function submitToolResults(options={},context={}){
         if(destroyed||host.conversationComplete){
             return false;
         }
         if(!isPlainRecord(options)||!isPlainRecord(context)){
-            throw new TypeError('Tool-result options and context must be plain objects.');
+            throw new TypeError('Tool-results options and context must be plain objects.');
         }
         const unsupportedOption=Object.keys(options).find(
-            key=>!['disposition','message','persist','request','toolCallId'].includes(key)
+            key=>!['request','results'].includes(key)
         );
         if(unsupportedOption){
-            throw new TypeError(`Unsupported tool-result option: ${unsupportedOption}.`);
+            throw new TypeError(`Unsupported tool-results option: ${unsupportedOption}.`);
         }
         const unsupportedContext=Object.keys(context).find(
             key=>!['operationId','signal'].includes(key)
@@ -3040,53 +3177,102 @@
         if(!host.aiAvailability.llm){
             return false;
         }
-        if(!pendingStructuralToolCall){
-            const error=new TypeError('There is no pending structural tool call to settle.');
+        if(!pendingStructuralToolCalls.length){
+            const error=new TypeError('There are no pending structural tool calls to settle.');
             error.code='AI_CHAT_TOOL_RESULT_NOT_PENDING';
             throw error;
         }
-        const disposition=options.disposition;
+        if(!Array.isArray(options.results)||options.results.length===0){
+            throw new TypeError('Tool results must be a nonempty array.');
+        }
         const dispositions=new Map([
             ['executed','Executed'],
             ['declined','Declined'],
             ['cancelled','Cancelled'],
             ['not-executed','Not executed']
         ]);
-        if(!dispositions.has(disposition)){
-            throw new TypeError(
-                'Tool-result disposition must be executed, declined, cancelled, or not-executed.'
-            );
-        }
-        if(typeof options.message!=='string'||!options.message.trim()){
-            throw new TypeError('Tool-result message must contain user-facing text.');
-        }
         const perTurnRequest=options.request??null;
         if(perTurnRequest!==null&&!isPlainRecord(perTurnRequest)){
             throw new TypeError('Tool-result request options must be a plain object.');
         }
         const managedRequestField=perTurnRequest&&Object.keys(perTurnRequest).find(
-            key=>['messages','onChunk','onResponse','onToolCall','signal','stream'].includes(key)
+            key=>[
+                'message','messages','onChunk','onComplete','onDataChunk','onDataResult',
+                'onResponse','onToolCall','signal','stream'
+            ].includes(key)
         );
         if(managedRequestField){
             throw new TypeError(
                 `Tool-result request.${managedRequestField} is managed by the chat session.`
             );
         }
-        const toolCallId=options.toolCallId??pendingStructuralToolCall.id;
-        if(typeof toolCallId!=='string'||toolCallId!==pendingStructuralToolCall.id){
-            const error=new TypeError('Tool-result ID does not match the pending structural tool call.');
-            error.code='AI_CHAT_INVALID_TOOL_MESSAGE';
+        const pendingById=new Map(
+            pendingStructuralToolCalls.map(call=>[call.id,call])
+        );
+        const resultsById=new Map();
+        for(const [index,result] of options.results.entries()){
+            if(!isPlainRecord(result)){
+                throw new TypeError(`Tool result ${index+1} must be a plain object.`);
+            }
+            const unsupportedResultField=Object.keys(result).find(
+                key=>!['disposition','message','persist','toolCallId'].includes(key)
+            );
+            if(unsupportedResultField){
+                throw new TypeError(
+                    `Unsupported tool result ${index+1} field: ${unsupportedResultField}.`
+                );
+            }
+            const toolCallId=result.toolCallId;
+            if(
+                typeof toolCallId!=='string'
+                ||!pendingById.has(toolCallId)
+                ||resultsById.has(toolCallId)
+            ){
+                const error=new TypeError(
+                    `Tool result ${index+1} does not match a pending structural tool call.`
+                );
+                error.code='AI_CHAT_INVALID_TOOL_MESSAGE';
+                throw error;
+            }
+            if(!dispositions.has(result.disposition)){
+                throw new TypeError(
+                    'Tool-result disposition must be executed, declined, cancelled, or not-executed.'
+                );
+            }
+            if(typeof result.message!=='string'||!result.message.trim()){
+                throw new TypeError('Tool-result message must contain user-facing text.');
+            }
+            const persist=result.persist??true;
+            if(typeof persist!=='boolean'){
+                throw new TypeError('Tool-result persist must be boolean.');
+            }
+            resultsById.set(toolCallId,{
+                content:`${dispositions.get(result.disposition)} — ${result.message}`,
+                persist,
+                role:'tool',
+                tool_call_id:toolCallId
+            });
+        }
+        if(resultsById.size!==pendingById.size){
+            const error=new TypeError(
+                'Every pending structural tool call must receive one matching result.'
+            );
+            error.code='AI_CHAT_TOOL_RESULT_REQUIRED';
             throw error;
         }
-        const persist=options.persist??true;
-        if(typeof persist!=='boolean'){
-            throw new TypeError('Tool-result persist must be boolean.');
+        const orderedResults=pendingStructuralToolCalls.map(
+            call=>resultsById.get(call.id)
+        );
+        if(new Set(orderedResults.map(result=>result.persist)).size>1){
+            const error=new TypeError(
+                'All tool results in one atomic settlement must use the same persistence choice.'
+            );
+            error.code='AI_CHAT_INCOHERENT_PERSISTENCE';
+            throw error;
         }
-
-        const text=`${dispositions.get(disposition)} — ${options.message}`;
         const operationId=typeof context.operationId==='string'&&context.operationId
             ?context.operationId
-            :nextChatOperationId('tool-result');
+            :nextChatOperationId('tool-results');
         const ownership=createChatSubmissionOwnership(context.signal??null);
         const eventContext={
             source:'tool',
@@ -3099,17 +3285,15 @@
             return false;
         }
         try{
-            const visibleMessage=appendTranscriptMessage('tool',text,'Tool');
-            visibleMessage.dataset.operationId=operationId;
+            for(const result of orderedResults){
+                const visibleMessage=appendTranscriptMessage('tool',result.content,'Tool');
+                visibleMessage.dataset.operationId=operationId;
+                visibleMessage.dataset.toolCallId=result.tool_call_id;
+            }
             const result=sendMessageThroughBoundSession(
-                text,
+                orderedResults.map(message=>message.content).join('\n'),
                 eventContext,
-                {
-                    content:text,
-                    persist,
-                    role:'tool',
-                    tool_call_id:toolCallId
-                },
+                orderedResults,
                 perTurnRequest
             );
             return observeHostSubmission(result,eventContext,ownership);
@@ -3117,6 +3301,50 @@
             ownership.release();
             throw error;
         }
+    }
+
+    async function submitToolResult(options={},context={}){
+        if(
+            destroyed
+            ||host.conversationComplete
+            ||!boundChatSession
+            ||sessionBindingPending
+            ||sessionMessagePending
+            ||!host.aiAvailability.llm
+        ){
+            return false;
+        }
+        if(!isPlainRecord(options)){
+            throw new TypeError('Tool-result options must be a plain object.');
+        }
+        const unsupportedOption=Object.keys(options).find(
+            key=>!['disposition','message','persist','request','toolCallId'].includes(key)
+        );
+        if(unsupportedOption){
+            throw new TypeError(`Unsupported tool-result option: ${unsupportedOption}.`);
+        }
+        if(pendingStructuralToolCalls.length!==1){
+            const error=new TypeError(
+                pendingStructuralToolCalls.length
+                    ?'Parallel structural tool calls must be settled together with submitToolResults().'
+                    :'There is no pending structural tool call to settle.'
+            );
+            error.code=pendingStructuralToolCalls.length
+                ?'AI_CHAT_TOOL_RESULT_BATCH_REQUIRED'
+                :'AI_CHAT_TOOL_RESULT_NOT_PENDING';
+            throw error;
+        }
+        const {request,...result}=options;
+        return submitToolResults(
+            {
+                results:[{
+                    ...result,
+                    toolCallId:result.toolCallId??pendingStructuralToolCalls[0].id
+                }],
+                ...(request===undefined?{}:{request})
+            },
+            context
+        );
     }
 
     function observeHostSubmission(result,context,ownership){
@@ -3131,9 +3359,12 @@
                 if(destroyed||context.signal.aborted){
                     return false;
                 }
-                if(internalStructuralToolFailure(error)){
-                    return false;
-                }
+                console.error(
+                    internalStructuralToolFailure(error)
+                        ?'Arcane structural tool protocol failure.'
+                        :'The chat message could not be submitted.',
+                    error
+                );
                 dispatchChatEvent(
                     'chat-send-error',
                     {error,context:{...context}},
@@ -3151,7 +3382,6 @@
                         }
                     }
                 );
-                console.error('The chat message could not be submitted.',error);
                 return false;
             }
         ).finally(
@@ -3178,7 +3408,12 @@
         if(!host.aiAvailability.llm){
             return false;
         }
-        if(sessionBindingPending||sessionMessagePending||pendingStructuralToolMessage){
+        if(
+            sessionBindingPending
+            ||sessionMessagePending
+            ||pendingStructuralToolMessage
+            ||sessionHistoryRecoveryMessage
+        ){
             return false;
         }
         const submissionContext={
@@ -3381,7 +3616,7 @@
         sessionBindingPending=false;
         sessionMessagePending=false;
         activeSessionMessageToken=null;
-        setPendingStructuralToolCall();
+        setPendingStructuralToolCalls();
         boundChatSession=null;
         boundChatAI=null;
         host.session=null;

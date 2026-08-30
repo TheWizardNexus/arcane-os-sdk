@@ -214,9 +214,11 @@ function normalizeAIStructuralToolCall(call,label='Structural tool call'){
         );
     }
     return {
+        ...call,
         id:call.id,
         type:'function',
         function:{
+            ...call.function,
             name:call.function.name,
             arguments:call.function.arguments
         }
@@ -227,7 +229,7 @@ function validateAIRequestMessages(messages=[]){
     if(!Array.isArray(messages)){
         throw new TypeError('AI messages must be an array.');
     }
-    let pendingToolCallId=null;
+    const pendingToolCallIds=new Set();
     for(let messageIndex=0;messageIndex<messages.length;messageIndex+=1){
         const message=messages[messageIndex];
         const calls=message?.tool_calls;
@@ -239,17 +241,26 @@ function validateAIRequestMessages(messages=[]){
                     `AI messages[${messageIndex}].tool_calls is invalid.`
                 );
             }
-            if(calls.length>1||(pendingToolCallId!==null&&calls.length)){
+            if(pendingToolCallIds.size&&calls.length){
                 throw aiStructuralError(
-                    'AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED',
-                    'The Arcane chat session accepts one structural tool call at a time.'
+                    'AI_CHAT_TOOL_RESULT_REQUIRED',
+                    'Every pending structural tool result must be supplied before another assistant tool-call sequence.'
                 );
             }
             if(calls.length){
-                pendingToolCallId=normalizeAIStructuralToolCall(
-                    calls[0],
-                    `AI messages[${messageIndex}].tool_calls[0]`
-                ).id;
+                for(let callIndex=0;callIndex<calls.length;callIndex+=1){
+                    const normalized=normalizeAIStructuralToolCall(
+                        calls[callIndex],
+                        `AI messages[${messageIndex}].tool_calls[${callIndex}]`
+                    );
+                    if(pendingToolCallIds.has(normalized.id)){
+                        throw aiStructuralError(
+                            'AI_CHAT_INVALID_TOOL_CALL',
+                            `AI messages[${messageIndex}].tool_calls contains a duplicate ID.`
+                        );
+                    }
+                    pendingToolCallIds.add(normalized.id);
+                }
                 openedToolCall=true;
             }
         }
@@ -261,24 +272,24 @@ function validateAIRequestMessages(messages=[]){
                 );
             }
             if(
-                pendingToolCallId===null
+                !pendingToolCallIds.size
                 ||typeof message.tool_call_id!=='string'
-                ||message.tool_call_id!==pendingToolCallId
+                ||!pendingToolCallIds.has(message.tool_call_id)
             ){
                 throw aiStructuralError(
                     'AI_CHAT_INVALID_TOOL_MESSAGE',
                     `AI messages[${messageIndex}] does not settle the pending structural tool call.`
                 );
             }
-            pendingToolCallId=null;
-        }else if(pendingToolCallId!==null&&!openedToolCall){
+            pendingToolCallIds.delete(message.tool_call_id);
+        }else if(pendingToolCallIds.size&&!openedToolCall){
             throw aiStructuralError(
                 'AI_CHAT_TOOL_RESULT_REQUIRED',
                 `AI messages[${messageIndex}] precedes the pending structural tool result.`
             );
         }
     }
-    if(pendingToolCallId!==null){
+    if(pendingToolCallIds.size){
         throw aiStructuralError(
             'AI_CHAT_TOOL_RESULT_REQUIRED',
             'The pending structural tool call must be settled before requesting another response.'
@@ -289,11 +300,8 @@ function validateAIRequestMessages(messages=[]){
 function validateAIStructuralRequest(messages,tools,parallelToolCalls){
     validateAIRequestMessages(messages);
     requireAIToolMessageSchemas(tools);
-    if(parallelToolCalls===true){
-        throw aiStructuralError(
-            'AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED',
-            'The Arcane chat session accepts one structural tool call at a time.'
-        );
+    if(parallelToolCalls!==undefined&&typeof parallelToolCalls!=='boolean'){
+        throw new TypeError('AI parallelToolCalls must be a boolean when provided.');
     }
 }
 
@@ -334,29 +342,49 @@ function normalizeAICompletionToolCalls(completion){
                 `AI response message ${messageIndex+1} contains invalid structural tool calls.`
             );
         }
-        if(calls.length+(toolCalls?.length??0)>1){
-            throw aiStructuralError(
-                'AI_CHAT_PARALLEL_TOOLS_UNSUPPORTED',
-                'The Arcane chat session accepts one structural tool call at a time.'
-            );
-        }
-        if(messageIndex>0&&toolCalls?.length){
-            throw aiStructuralError(
-                'AI_CHAT_INVALID_RESPONSE',
-                'The AI completion placed a structural tool call outside the selected choice.'
-            );
-        }
+        const messageIds=new Set();
         for(let callIndex=0;callIndex<(toolCalls??[]).length;callIndex+=1){
-            calls.push(normalizeAIStructuralToolCall(
+            const normalized=normalizeAIStructuralToolCall(
                 toolCalls[callIndex],
                 `AI response structural tool call ${messageIndex+1}.${callIndex+1}`
-            ));
+            );
+            if(messageIds.has(normalized.id)){
+                throw aiStructuralError(
+                    'AI_CHAT_INVALID_TOOL_CALL',
+                    `AI response message ${messageIndex+1} contains a duplicate structural tool-call ID.`
+                );
+            }
+            messageIds.add(normalized.id);
+            if(messageIndex===0)calls.push(normalized);
         }
     }
     return calls;
 }
 
+function sameAIDataValue(left,right,seen=new Map()){
+    if(Object.is(left,right))return true;
+    if(!left||!right||typeof left!=='object'||typeof right!=='object')return false;
+    if(Array.isArray(left)!==Array.isArray(right))return false;
+    const matched=seen.get(left);
+    if(matched!==undefined)return matched===right;
+    seen.set(left,right);
+    if(Array.isArray(left)){
+        return left.length===right.length
+            &&left.every((value,index)=>sameAIDataValue(value,right[index],seen));
+    }
+    if(!isPlainAIRecord(left)||!isPlainAIRecord(right))return false;
+    const leftKeys=Reflect.ownKeys(left).filter(key=>Object.prototype.propertyIsEnumerable.call(left,key));
+    const rightKeys=Reflect.ownKeys(right).filter(key=>Object.prototype.propertyIsEnumerable.call(right,key));
+    return leftKeys.length===rightKeys.length
+        &&leftKeys.every(key=>Object.prototype.propertyIsEnumerable.call(right,key)
+            &&sameAIDataValue(left[key],right[key],seen));
+}
+
 function sameAIStructuralToolCall(left,right){
+    return sameAIDataValue(left,right);
+}
+
+function sameAICanonicalToolCall(left,right){
     return left?.id===right?.id
         &&left?.type===right?.type
         &&left?.function?.name===right?.function?.name
@@ -400,6 +428,54 @@ function normalizeAIStreamToolCallObservation(completion,label){
         }
         throw cause;
     }
+}
+
+function isAIStreamStructuralKey(key){
+    return key==='tool_calls'
+        ||key==='toolCalls'
+        ||key==='tool_call'
+        ||key==='toolCall'
+        ||key==='function_call'
+        ||key==='functionCall';
+}
+
+const OMITTED_AI_STREAM_DATA=Symbol('omitted-ai-stream-data');
+
+function projectAIStreamData(value,seen=new Map()){
+    if(value===null||value===undefined||typeof value!=='object'){
+        return value;
+    }
+    if(seen.has(value)) return seen.get(value);
+    if(Array.isArray(value)){
+        const result=[];
+        seen.set(value,result);
+        for(const item of value){
+            const projected=projectAIStreamData(item,seen);
+            if(projected!==OMITTED_AI_STREAM_DATA)result.push(projected);
+        }
+        return result.length||value.length===0?result:OMITTED_AI_STREAM_DATA;
+    }
+    const result={};
+    seen.set(value,result);
+    let sourceDataFields=0;
+    for(const [key,descriptor] of Object.entries(
+        Object.getOwnPropertyDescriptors(value)
+    )){
+        if(!Object.hasOwn(descriptor,'value')){
+            continue;
+        }
+        sourceDataFields+=1;
+        if(isAIStreamStructuralKey(key))continue;
+        const projected=projectAIStreamData(descriptor.value,seen);
+        if(projected!==OMITTED_AI_STREAM_DATA)result[key]=projected;
+    }
+    return Object.keys(result).length||sourceDataFields===0
+        ?result
+        :OMITTED_AI_STREAM_DATA;
+}
+
+function projectAIStreamChunk(value){
+    return projectAIStreamData(value);
 }
 
 function createLegacyAIStreamBridge(execute,sourceSignal){
@@ -3930,13 +4006,21 @@ class AI {
 
     #providerStreamEmissions(chunk,seeThinking){
         const chunks=[];
+        if(typeof chunk==='string'){
+            if(chunk) chunks.push({text:chunk,thinking:false});
+            return {chunks};
+        }
         const choices=Array.isArray(chunk?.choices)?chunk.choices:[];
         for(const choice of choices){
             const delta=choice?.delta||{};
-            if(seeThinking&&typeof delta.reasoning_content==='string'){
+            if(
+                seeThinking
+                &&typeof delta.reasoning_content==='string'
+                &&delta.reasoning_content
+            ){
                 chunks.push({text:delta.reasoning_content,thinking:true});
             }
-            if(typeof delta.content==='string'){
+            if(typeof delta.content==='string'&&delta.content){
                 chunks.push({text:delta.content,thinking:false});
             }
         }
@@ -3960,34 +4044,26 @@ class AI {
         if(typeof completion==='string'){
             return completion;
         }
-        const toolRecord={};
-        let toolCount=0;
-        for(const choice of Array.isArray(completion?.choices)?completion.choices:[]){
-            for(const call of Array.isArray(choice?.message?.tool_calls)
-                ?choice.message.tool_calls
-                :[]){
-                const name=call?.function?.name;
-                if(typeof name==='string'&&name){
-                    toolRecord[name]=call.function.arguments;
-                    toolCount+=1;
-                }
-            }
+        if(Array.isArray(completion?.choices)&&completion.choices.length>1){
+            return completion;
         }
-        if(toolCount){
-            return toolRecord;
-        }
+        const structuralToolCalls=normalizeAICompletionToolCalls(completion);
+        if(structuralToolCalls.length)return structuralToolCalls;
         const content=completion?.choices?.[0]?.message?.content;
         return typeof content==='string'?content:completion;
     }
 
     #requestLegacyLLMChat(payload={},signal=null){
+        const parallelToolCalls=payload.parallelToolCalls!==undefined
+            ?payload.parallelToolCalls
+            :payload.parallel_tool_calls;
         return this.#fetchLegacy(
             payload.messages??[],
             function ignoreLegacyLLMProviderResponse(){},
             payload.structuredOutput??false,
             payload.tools??[],
             payload.toolChoice??'auto',
-            payload.parallelToolCalls??false,
+            parallelToolCalls,
             payload.id??Date.now(),
             function ignoreLegacyLLMProviderRequest(){},
             signal
@@ -3995,32 +4071,29 @@ class AI {
     }
 
     #requestLegacyLLMStream(payload={},bridge){
-        function emitLegacyLLMStreamText(text,id,thinking){
-            if(typeof text!=='string'||!text){
-                return;
-            }
-            bridge.emit(
-                thinking
-                    ?{thinking:text}
-                    :{content:text}
-            );
+        const parallelToolCalls=payload.parallelToolCalls!==undefined
+            ?payload.parallelToolCalls
+            :payload.parallel_tool_calls;
+        function emitLegacyLLMStreamData(chunk){
+            bridge.emit(chunk);
         }
 
         return this.#streamLegacyMessage(
             payload.messages??[],
-            emitLegacyLLMStreamText,
+            function ignoreLegacyLLMScalarStream(){},
             function ignoreLegacyLLMProviderCompletion(){},
             payload.tools??[],
             payload.toolChoice??'auto',
             function retainLegacyLLMStreamToolUntilCompletion(){},
-            payload.parallelToolCalls??false,
+            parallelToolCalls,
             payload.id??Date.now(),
             payload.seeThinking??false,
             bridge.signal,
             function ignoreLegacyLLMProviderRequest(){},
             payload.structuredOutput??false,
             false,
-            true
+            true,
+            emitLegacyLLMStreamData
         );
     }
 
@@ -4087,11 +4160,13 @@ class AI {
                 }
             }
             return {
+                ...call,
                 id:call.id===undefined
                     ?`ollama-${id}-tool-${index+1}`
                     :call.id,
                 type:call.type===undefined?'function':call.type,
                 function:{
+                    ...nativeFunction,
                     name:nativeFunction.name,
                     arguments:encodedArguments
                 }
@@ -4100,7 +4175,12 @@ class AI {
     }
 
     #openAICompatibleOllamaResponse(response={},id=Date.now()){
-        const message=response?.message||{};
+        const responseRecord=isPlainAIRecord(response)?response:{};
+        const message=isPlainAIRecord(responseRecord.message)
+            ?responseRecord.message
+            :{};
+        const responseFields={...responseRecord};
+        delete responseFields.message;
         const responseId=typeof response?.id==='string'&&response.id
             ?response.id
             :`ollama-${id}`;
@@ -4111,25 +4191,43 @@ class AI {
         const toolCalls=normalizeAICompletionToolCalls({
             message:{tool_calls:adaptedToolCalls}
         });
+        const messageRecord={
+            ...message,
+            role:typeof message.role==='string'&&message.role
+                ?message.role
+                :'assistant',
+            content:Object.hasOwn(message,'content')?message.content:'',
+            ...(Object.hasOwn(message,'tool_calls')||toolCalls.length
+                ?{tool_calls:toolCalls}
+                :{})
+        };
+        const usage=isPlainAIRecord(responseRecord.usage)
+            ?responseRecord.usage
+            :{};
 
         return {
+            ...responseFields,
             id:responseId,
-            object:'chat.completion',
-            created:Math.floor(Date.now()/1000),
-            model:response?.model||this.model,
+            object:Object.hasOwn(responseRecord,'object')
+                ?responseRecord.object
+                :'chat.completion',
+            created:Object.hasOwn(responseRecord,'created')
+                ?responseRecord.created
+                :Math.floor(Date.now()/1000),
+            model:Object.hasOwn(responseRecord,'model')
+                ?responseRecord.model
+                :this.model,
             choices:[
                 {
                     index:0,
-                    message:{
-                        role:message.role||'assistant',
-                        content:message.content||'',
-                        ...(toolCalls.length?{tool_calls:toolCalls}:{})
-                    },
-                    finish_reason:response?.done_reason
-                        ||(toolCalls.length?'tool_calls':'stop')
+                    message:messageRecord,
+                    finish_reason:Object.hasOwn(responseRecord,'done_reason')
+                        ?responseRecord.done_reason
+                        :toolCalls.length?'tool_calls':'stop'
                 }
             ],
             usage:{
+                ...usage,
                 prompt_tokens:Number(response?.prompt_eval_count)||0,
                 completion_tokens:Number(response?.eval_count)||0,
                 total_tokens:(Number(response?.prompt_eval_count)||0)
@@ -4145,12 +4243,14 @@ class AI {
         localOnly=false,
         onChunk=function ignoreStreamChunk(){},
         onComplete=function finishIgnoredStream(){},
+        onDataChunk=function ignoreStreamDataChunk(){},
+        onDataResult=function ignoreStreamDataResult(){},
         onResponse=function ignoreStreamResponse(){},
         tools=[],
         toolChoice='auto',
         onToolCall=function ignoreEarlyFunction(){},
         onRequest=function ignoreStreamRequest(){},
-        parallelToolCalls=false,
+        parallelToolCalls,
         id=Date.now(),
         seeThinking=false,
         signal=null,
@@ -4182,7 +4282,7 @@ class AI {
                 structuredOutput,
                 tools,
                 toolChoice,
-                parallelToolCalls,
+                ...(parallelToolCalls!==undefined?{parallelToolCalls}:{}),
                 id,
                 seeThinking,
                 ...(maxOutputTokens!==undefined
@@ -4220,6 +4320,10 @@ class AI {
                     if(signal?.aborted){
                         throw normalizeAIRequestAbort();
                     }
+                    await onDataChunk(chunk,id);
+                    if(signal?.aborted){
+                        throw normalizeAIRequestAbort();
+                    }
                     const emissions=this.#providerStreamEmissions(chunk,seeThinking);
                     for(const emission of emissions.chunks){
                         if(signal?.aborted){
@@ -4242,6 +4346,10 @@ class AI {
                 const structuralToolCalls=normalizeAICompletionToolCalls(
                     completion
                 );
+                await onDataResult(completion,id);
+                if(signal?.aborted){
+                    throw normalizeAIRequestAbort();
+                }
                 await onResponse(completion,id,false);
                 for(const call of structuralToolCalls){
                     if(signal?.aborted){
@@ -4287,7 +4395,9 @@ class AI {
                 onRequest,
                 structuredOutput,
                 false,
-                true
+                true,
+                onDataChunk,
+                onDataResult
             );
             const structuralToolCalls=normalizeAICompletionToolCalls(
                 completion
@@ -4327,13 +4437,15 @@ class AI {
         tools=[],
         tool_choice='auto',
         earlyFunctionTrigger=function ignoreEarlyFunction(){},
-        parallel_tool_calls=false,
+        parallel_tool_calls,
         id=Date.now(),
         seeThinking=false,
         signal=null,
         requestHandler=function ignoreStreamRequest(){},
         structuredOutput=false,
-        returnCompletion=false
+        returnCompletion=false,
+        onDataChunk=function ignoreStreamDataChunk(){},
+        onDataResult=function ignoreStreamDataResult(){}
     ){
         if(this.#shouldUseProviderRuntime('llm',this.llmService,false)){
             return this.streamRequest({
@@ -4342,6 +4454,8 @@ class AI {
                 localOnly:false,
                 onChunk:streamHandler,
                 onComplete:streamComplete,
+                onDataChunk,
+                onDataResult,
                 tools,
                 toolChoice:tool_choice,
                 onToolCall:earlyFunctionTrigger,
@@ -4367,7 +4481,9 @@ class AI {
             requestHandler,
             structuredOutput,
             true,
-            returnCompletion
+            returnCompletion,
+            onDataChunk,
+            onDataResult
         );
     }
 
@@ -4378,14 +4494,16 @@ class AI {
         tools=[],
         tool_choice='auto',
         earlyFunctionTrigger=function ignoreEarlyFunction(){},
-        parallel_tool_calls=false,
+        parallel_tool_calls,
         id=Date.now(),
         seeThinking=false,
         signal=null,
         requestHandler=function ignoreStreamRequest(){},
         structuredOutput=false,
         finishSpeech=true,
-        returnCompletion=false
+        returnCompletion=false,
+        dataChunkHandler=function ignoreLegacyStreamDataChunk(){},
+        dataResultHandler=function ignoreLegacyStreamDataResult(){}
     ){
         let speechTurnCompleted=false;
 
@@ -4420,7 +4538,9 @@ class AI {
         if(tools.length){
             request.tools=tools;
             request.tool_choice=tool_choice;
-            request.parallel_tool_calls=parallel_tool_calls;
+            if(parallel_tool_calls!==undefined){
+                request.parallel_tool_calls=parallel_tool_calls;
+            }
         }
 
         if(this.llmService==='OLLAMA'&&this.reasoningEffort){
@@ -4443,9 +4563,10 @@ class AI {
 
         if(nativeOllama){
             let nativeContent='';
-            const nativeStreamedToolCallFrames=[];
+            let streamedNativeToolCalls=null;
             const ollamaTools=this.#ollamaTools(tools,tool_choice);
             const ollamaMessages=this.#ollamaMessages(messages,tool_choice);
+            const adaptNativeToolCalls=value=>this.#openAICompatibleOllamaToolCalls(value,id);
             const ollamaRequest={
                 model:this.model,
                 messages:ollamaMessages,
@@ -4455,15 +4576,6 @@ class AI {
                 ...(ollamaTools.length?{tools:ollamaTools}:{})
             };
 
-            function receiveNativeToolCalls(message={}){
-                const calls=Array.isArray(message.tool_calls)?message.tool_calls:[];
-
-                if(calls.length){
-                    isThinking=false;
-                    nativeStreamedToolCallFrames.push(calls.slice());
-                }
-            }
-
             let nativeChunkPipeline=Promise.resolve();
             function queueNativeOllamaChunk(chunk){
                 nativeChunkPipeline=nativeChunkPipeline.then(
@@ -4471,7 +4583,35 @@ class AI {
                         if(signal?.aborted){
                             return;
                         }
+                        const dataChunk=projectAIStreamChunk(chunk);
+                        if(dataChunk!==OMITTED_AI_STREAM_DATA){
+                            await dataChunkHandler(dataChunk,id);
+                        }
+                        if(signal?.aborted){
+                            return;
+                        }
                         const message=chunk?.message||{};
+                        if(isPlainAIRecord(message)&&Object.hasOwn(message,'tool_calls')){
+                            const observed=normalizeAIStreamToolCallObservation(
+                                {message:{tool_calls:adaptNativeToolCalls(message.tool_calls)}},
+                                'The native Ollama stream'
+                            );
+                            if(
+                                streamedNativeToolCalls
+                                &&(
+                                    streamedNativeToolCalls.length!==observed.length
+                                    ||streamedNativeToolCalls.some(
+                                        (call,index)=>!sameAIStructuralToolCall(call,observed[index])
+                                    )
+                                )
+                            ){
+                                throw aiStructuralError(
+                                    'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
+                                    'The native Ollama stream changed its complete structural tool calls.'
+                                );
+                            }
+                            streamedNativeToolCalls=observed;
+                        }
                         const thinking=seeThinking
                             ?String(message.thinking||'')
                             :'';
@@ -4486,8 +4626,6 @@ class AI {
                             nativeContent+=content;
                             await streamHandler(content,`M-${id}`,false);
                         }
-
-                        receiveNativeToolCalls(message);
                     }
                 );
                 return nativeChunkPipeline;
@@ -4519,14 +4657,16 @@ class AI {
             if(signal?.aborted){
                 throw normalizeAIRequestAbort();
             }
+            const nativeMessage=isPlainAIRecord(nativeResponse?.message)
+                ?nativeResponse.message
+                :{};
             const nativeCompletion=this.#openAICompatibleOllamaResponse(
                 {
                     ...nativeResponse,
                     message:{
-                        ...(nativeResponse?.message??{}),
-                        content:typeof nativeResponse?.message?.content==='string'
-                            &&nativeResponse.message.content
-                            ?nativeResponse.message.content
+                        ...nativeMessage,
+                        content:Object.hasOwn(nativeMessage,'content')
+                            ?nativeMessage.content
                             :nativeContent
                     }
                 },
@@ -4535,31 +4675,16 @@ class AI {
             const structuralToolCalls=normalizeAICompletionToolCalls(
                 nativeCompletion
             );
-            for(let frameIndex=0;
-                frameIndex<nativeStreamedToolCallFrames.length;
-                frameIndex+=1
-            ){
-                const streamedToolCalls=normalizeAIStreamToolCallObservation(
-                    {
-                        message:{
-                            tool_calls:this.#openAICompatibleOllamaToolCalls(
-                                nativeStreamedToolCallFrames[frameIndex],
-                                id
-                            )
-                        }
-                    },
-                    `The native Ollama stream frame ${frameIndex+1}`
-                );
-                assertAIStreamToolCallCorrelation(
-                    streamedToolCalls,
-                    structuralToolCalls,
-                    'The native Ollama stream'
-                );
-            }
+            assertAIStreamToolCallCorrelation(
+                streamedNativeToolCalls??[],
+                structuralToolCalls,
+                'The native Ollama stream'
+            );
             this.#assertRequiredOllamaToolCall(
                 structuralToolCalls,
                 tool_choice
             );
+            await dataResultHandler(nativeCompletion,id);
             for(const call of structuralToolCalls){
                 if(signal?.aborted){
                     throw normalizeAIRequestAbort();
@@ -4568,9 +4693,6 @@ class AI {
             }
 
             const nativeResult=this.#providerCompletionOutput(nativeCompletion);
-            if(structuralToolCalls.length&&!nativeContent){
-                await streamHandler('',`M-${id}`,false);
-            }
             if(finishSpeech){
                 this.finishTTS();
             }
@@ -4615,15 +4737,14 @@ class AI {
 
         await this.#assertResponseOK(response);
 
-        let chunkString='';
-        let chunkCache='';
+        let sseBuffer='';
+        const completeToolCallsByChoice=new Map();
         const streamedToolCallsByChoice=new Map();
-        let streamCreated=null;
-        let streamFinishReason=null;
-        let streamId=null;
-        let streamModel=null;
-        let streamObject=null;
-        let streamUsage=null;
+        const streamedChoicesByIndex=new Map();
+        const streamedChoiceOrder=[];
+        let selectedChoiceIndex=null;
+        const streamMetadata={};
+        let receivedSseDone=false;
         const decoder = new TextDecoder('utf-8');
         //alert(1)
         const reader=response.body?.getReader?.();
@@ -4632,23 +4753,30 @@ class AI {
             throw new TypeError('Streaming response body is not readable');
         }
 
-        function receiveStreamedToolCalls(toolCalls=[],choicePosition=0){
-            const streamedToolCalls=streamedToolCallsByChoice.get(choicePosition)
+        function receiveStreamedToolCalls(toolCalls=[],choiceIndex=0){
+            const streamedToolCalls=streamedToolCallsByChoice.get(choiceIndex)
                 ||new Map();
             for(let position=0;position<toolCalls.length;position++){
                 const toolCall=toolCalls[position]||{};
                 const toolFunction=toolCall.function||{};
-                const key=`position:${Number.isInteger(toolCall.index)
-                    ?toolCall.index
-                    :position}`;
-                const record=streamedToolCalls.get(key)||{
+                if(
+                    toolCall.index!==undefined
+                    &&(!Number.isSafeInteger(toolCall.index)||toolCall.index<0)
+                ){
+                    throw aiStructuralError(
+                        'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
+                        `AI stream choice ${choiceIndex} contains an invalid structural tool-call index.`
+                    );
+                }
+                const toolIndex=toolCall.index??position;
+                const record=streamedToolCalls.get(toolIndex)||{
                     arguments:'',
                     id:'',
+                    index:toolIndex,
                     invalidArguments:false,
                     invalidIdentity:false,
                     invalidName:false,
                     name:'',
-                    order:streamedToolCalls.size,
                     type:''
                 };
 
@@ -4686,13 +4814,205 @@ class AI {
                     record.invalidArguments=true;
                 }
 
-                streamedToolCalls.set(key,record);
+                streamedToolCalls.set(toolIndex,record);
             }
-            streamedToolCallsByChoice.set(choicePosition,streamedToolCalls);
+            streamedToolCallsByChoice.set(choiceIndex,streamedToolCalls);
+        }
+
+        function receiveStreamedChoice(choice={},choicePosition=0){
+            if(
+                choice.index!==undefined
+                &&(!Number.isSafeInteger(choice.index)||choice.index<0)
+            ){
+                throw aiStructuralError(
+                    'AI_CHAT_INVALID_RESPONSE',
+                    `AI stream choice ${choicePosition+1} has an invalid index.`
+                );
+            }
+            const choiceIndex=choice.index??choicePosition;
+            if(!streamedChoicesByIndex.has(choiceIndex)){
+                streamedChoiceOrder.push(choiceIndex);
+                if(selectedChoiceIndex===null) selectedChoiceIndex=choiceIndex;
+            }
+            const record=streamedChoicesByIndex.get(choiceIndex)||{
+                choice:{index:choiceIndex},
+                message:{role:'assistant'}
+            };
+            for(const [key,value] of Object.entries(choice)){
+                if(key!=='delta'&&key!=='message') record.choice[key]=value;
+            }
+            record.choice.index=choiceIndex;
+            const delta=isPlainAIRecord(choice.delta)?choice.delta:null;
+            const completeMessage=isPlainAIRecord(choice.message)?choice.message:null;
+            for(const [source,replaceText] of [
+                [delta,false],
+                [completeMessage,true]
+            ]){
+                if(!source) continue;
+                for(const [key,value] of Object.entries(source)){
+                    if(isAIStreamStructuralKey(key)) continue;
+                    if(key==='content'||key==='reasoning'||key==='reasoning_content'){
+                        if(
+                            !replaceText
+                            &&typeof value==='string'
+                            &&typeof record.message[key]==='string'
+                        ){
+                            record.message[key]+=value;
+                        }else{
+                            record.message[key]=value;
+                        }
+                        continue;
+                    }
+                    record.message[key]=value;
+                }
+            }
+            if(typeof record.message.role!=='string'||!record.message.role){
+                record.message.role='assistant';
+            }
+            if(!Object.hasOwn(record.message,'content')) record.message.content='';
+            streamedChoicesByIndex.set(choiceIndex,record);
+            return choiceIndex;
+        }
+
+        async function receiveStreamedResponse(streamedResponse){
+            if(!isPlainAIRecord(streamedResponse)){
+                throw aiStructuralError(
+                    'AI_CHAT_INVALID_RESPONSE',
+                    'The AI stream returned a non-object event payload.'
+                );
+            }
+            const dataChunk=projectAIStreamChunk(streamedResponse);
+            if(dataChunk!==OMITTED_AI_STREAM_DATA){
+                await dataChunkHandler(dataChunk,id);
+            }
+            for(const [key,value] of Object.entries(streamedResponse)){
+                if(key!=='choices') streamMetadata[key]=value;
+            }
+            const choices=Array.isArray(streamedResponse.choices)
+                ?streamedResponse.choices
+                :[];
+            for(let choicePosition=0;choicePosition<choices.length;choicePosition+=1){
+                const choice=choices[choicePosition];
+                if(!isPlainAIRecord(choice)){
+                    throw aiStructuralError(
+                        'AI_CHAT_INVALID_RESPONSE',
+                        `AI stream choice ${choicePosition+1} is not an object.`
+                    );
+                }
+                const choiceIndex=receiveStreamedChoice(choice,choicePosition);
+                if(choice.delta!==undefined&&!isPlainAIRecord(choice.delta)){
+                    throw aiStructuralError(
+                        'AI_CHAT_INVALID_RESPONSE',
+                        `AI stream choice ${choicePosition+1} contains an invalid delta.`
+                    );
+                }
+                if(choice.message!==undefined&&!isPlainAIRecord(choice.message)){
+                    throw aiStructuralError(
+                        'AI_CHAT_INVALID_RESPONSE',
+                        `AI stream choice ${choicePosition+1} contains an invalid terminal message.`
+                    );
+                }
+                const choiceDelta=choice.delta??{};
+                const choiceMessage=choice.message??null;
+                if(Object.hasOwn(choiceDelta,'tool_calls')){
+                    if(!Array.isArray(choiceDelta.tool_calls)){
+                        throw aiStructuralError(
+                            'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
+                            `AI stream choice ${choicePosition+1} contains invalid structural tool-call data.`
+                        );
+                    }
+                    receiveStreamedToolCalls(choiceDelta.tool_calls,choiceIndex);
+                }
+                if(choiceMessage&&Object.hasOwn(choiceMessage,'tool_calls')){
+                    if(!Array.isArray(choiceMessage.tool_calls)){
+                        throw aiStructuralError(
+                            'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
+                            `AI stream choice ${choicePosition+1} contains invalid terminal structural tool-call data.`
+                        );
+                    }
+                    completeToolCallsByChoice.set(
+                        choiceIndex,
+                        normalizeAIStreamToolCallObservation(
+                            {message:{tool_calls:choiceMessage.tool_calls}},
+                            `AI stream choice ${choicePosition+1} terminal message`
+                        )
+                    );
+                }
+                const content=typeof choiceDelta.content==='string'
+                    ?choiceDelta.content
+                    :'';
+                let value=content;
+                let reasoning='';
+                if(seeThinking){
+                    reasoning=typeof choiceDelta.reasoning_content==='string'
+                        ?choiceDelta.reasoning_content
+                        :typeof choiceDelta.reasoning==='string'
+                            ?choiceDelta.reasoning
+                            :'';
+                }
+                isThinking=Boolean(reasoning);
+                if(reasoning) value=reasoning;
+                if(value) await streamHandler(value,`M-${id}`,isThinking);
+            }
+        }
+
+        function sseDataText(eventText){
+            const values=[];
+            for(const line of eventText.split(/\r\n|\r|\n/)){
+                if(!line||line.startsWith(':')) continue;
+                const separator=line.indexOf(':');
+                const field=separator<0?line:line.slice(0,separator);
+                if(field!=='data') continue;
+                let value=separator<0?'':line.slice(separator+1);
+                if(value.startsWith(' ')) value=value.slice(1);
+                values.push(value);
+            }
+            return values.length?values.join('\n'):null;
+        }
+
+        async function receiveSseEvent(eventText){
+            const eventData=sseDataText(eventText);
+            if(eventData===null) return false;
+            if(eventData==='[DONE]'){
+                receivedSseDone=true;
+                return true;
+            }
+            if(receivedSseDone) return true;
+            let streamedResponse;
+            try{
+                streamedResponse=JSON.parse(eventData);
+            }catch(cause){
+                throw aiStructuralError(
+                    'AI_CHAT_INVALID_RESPONSE',
+                    'The AI stream returned malformed JSON event data.',
+                    cause
+                );
+            }
+            await receiveStreamedResponse(streamedResponse);
+            return false;
+        }
+
+        async function drainSseBuffer(final=false){
+            while(true){
+                const separator=sseBuffer.match(/(?:\r\n|\r|\n){2}/);
+                if(!separator) break;
+                const eventText=sseBuffer.slice(0,separator.index);
+                sseBuffer=sseBuffer.slice(separator.index+separator[0].length);
+                if(await receiveSseEvent(eventText)){
+                    sseBuffer='';
+                    return true;
+                }
+            }
+            if(final&&sseBuffer.length){
+                const eventText=sseBuffer;
+                sseBuffer='';
+                return receiveSseEvent(eventText);
+            }
+            return receivedSseDone;
         }
 
         try{
-            while(true){
+            while(!receivedSseDone){
                 const {done,value:chunk}=await reader.read();
 
                 if(signal?.aborted){
@@ -4702,95 +5022,16 @@ class AI {
                 if(done){
                     break;
                 }
-
-                //alert(2)    //const data=String.fromCharCode.apply(null, chunk).trim().replaceAll('data: ','');
-                const data = decoder.decode(chunk, { stream: true})?.trim()?.replaceAll('data: ','');
-                const lines=data.split('\n\n');
-                //alert(3)
-                //console.log(lines);
-
-                for(const eventData of lines){
-                    chunkCache+=eventData;
-
-                    if(chunkCache.trim()==='[DONE]'){
-                        chunkCache='';
-                        continue;
-                    }
-
-                    let streamedResponse;
-                    try{
-                        streamedResponse=JSON.parse(chunkCache)||{};
-                    }catch{
-                        continue;
-                    }
-                    chunkCache='';
-                    if(streamedResponse.id!==undefined){
-                        streamId=streamedResponse.id;
-                    }
-                    if(streamedResponse.object!==undefined){
-                        streamObject=streamedResponse.object;
-                    }
-                    if(streamedResponse.created!==undefined){
-                        streamCreated=streamedResponse.created;
-                    }
-                    if(streamedResponse.model!==undefined){
-                        streamModel=streamedResponse.model;
-                    }
-                    if(streamedResponse.usage!==undefined){
-                        streamUsage=streamedResponse.usage;
-                    }
-
-                    const choices=Array.isArray(streamedResponse.choices)
-                        ?streamedResponse.choices
-                        :[];
-                    for(let choicePosition=0;
-                        choicePosition<choices.length;
-                        choicePosition+=1
-                    ){
-                        const choice=choices[choicePosition]||{};
-                        const choiceDelta=choice.delta||{};
-                        const toolCalls=choiceDelta.tool_calls;
-                        if(toolCalls!==undefined&&!Array.isArray(toolCalls)){
-                            throw aiStructuralError(
-                                'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
-                                `AI stream choice ${choicePosition+1} contains invalid structural tool-call data.`
-                            );
-                        }
-                        if(toolCalls?.length){
-                            receiveStreamedToolCalls(
-                                toolCalls,
-                                choicePosition
-                            );
-                        }
-                        if(choicePosition!==0){
-                            continue;
-                        }
-                        if(choice.finish_reason!==undefined){
-                            streamFinishReason=choice.finish_reason;
-                        }
-
-                        const content=choiceDelta.content||'';
-                        let value=content;
-                        let reasoning='';
-                        if(seeThinking){
-                            reasoning=choiceDelta.reasoning||'';
-                        }
-                        if(reasoning){
-                            isThinking=true;
-                            value=reasoning;
-                        }
-                        if(!reasoning&&isThinking){
-                            chunkString='';
-                        }
-                        if(!reasoning){
-                            isThinking=false;
-                        }
-                        if(value){
-                            await streamHandler(value,`M-${id}`,isThinking);
-                            chunkString+=value;
-                        }
-                    }
-                }
+                sseBuffer+=decoder.decode(chunk,{stream:true});
+                if(await drainSseBuffer()) break;
+            }
+            if(receivedSseDone){
+                await reader.cancel('[DONE]').catch(
+                    error=>console.error('Arcane SSE reader cleanup failed.',error)
+                );
+            }else{
+                sseBuffer+=decoder.decode();
+                await drainSseBuffer(true);
             }
         }catch(error){
             if(isAIRequestAbort(error,signal)){
@@ -4802,17 +5043,25 @@ class AI {
         }
 
         const structuralToolCallsByChoice=new Map();
-        const orderedStreamChoices=[...streamedToolCallsByChoice.entries()].sort(
-            function sortStreamChoices(a,b){
-                return a[0]-b[0];
-            }
-        );
-        for(const [choicePosition,toolCallRecords] of orderedStreamChoices){
+        const toolChoiceIndexes=new Set([
+            ...streamedToolCallsByChoice.keys(),
+            ...completeToolCallsByChoice.keys()
+        ]);
+        for(const choiceIndex of [...toolChoiceIndexes].sort((left,right)=>left-right)){
+            const toolCallRecords=streamedToolCallsByChoice.get(choiceIndex)??new Map();
             const orderedToolCalls=[...toolCallRecords.values()].sort(
                 function sortStreamedToolCalls(a,b){
-                    return a.order-b.order;
+                    return a.index-b.index;
                 }
             );
+            for(let index=0;index<orderedToolCalls.length;index+=1){
+                if(orderedToolCalls[index].index!==index){
+                    throw aiStructuralError(
+                        'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
+                        `AI stream choice ${choiceIndex} omitted an ordered structural tool-call index.`
+                    );
+                }
+            }
             const rawToolCalls=orderedToolCalls.map(
                 function completeStreamedToolCall(toolCall,index){
                     if(
@@ -4822,7 +5071,7 @@ class AI {
                     ){
                         throw aiStructuralError(
                             'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
-                            `AI stream choice ${choicePosition+1} structural tool call ${index+1} changed an exact field.`
+                            `AI stream choice ${choiceIndex} structural tool call ${index+1} changed an exact field.`
                         );
                     }
                     return {
@@ -4835,58 +5084,79 @@ class AI {
                     };
                 }
             );
-            structuralToolCallsByChoice.set(
-                choicePosition,
-                normalizeAIStreamToolCallObservation(
+            const streamedCalls=normalizeAIStreamToolCallObservation(
                     {message:{tool_calls:rawToolCalls}},
-                    `AI stream choice ${choicePosition+1}`
-                )
-            );
+                    `AI stream choice ${choiceIndex}`
+                );
+            const completeCalls=completeToolCallsByChoice.get(choiceIndex);
+            if(completeCalls!==undefined){
+                if(
+                    streamedCalls.length
+                    &&(
+                        streamedCalls.length!==completeCalls.length
+                        ||streamedCalls.some(
+                            (call,index)=>!sameAICanonicalToolCall(call,completeCalls[index])
+                        )
+                    )
+                ){
+                    throw aiStructuralError(
+                        'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
+                        `AI stream choice ${choiceIndex} changed or omitted its terminal structural tool calls.`
+                    );
+                }
+                structuralToolCallsByChoice.set(choiceIndex,completeCalls);
+            }else{
+                structuralToolCallsByChoice.set(choiceIndex,streamedCalls);
+            }
         }
-        const structuralToolCalls=structuralToolCallsByChoice.get(0)||[];
-        const completionChoices=[
-            {
-                index:0,
-                message:{
-                    role:'assistant',
-                    content:chunkString,
-                    ...(structuralToolCalls.length
-                        ?{tool_calls:structuralToolCalls}
-                        :{})
-                },
-                finish_reason:typeof streamFinishReason==='string'
-                    &&streamFinishReason
-                    ?streamFinishReason
-                    :structuralToolCalls.length?'tool_calls':'stop'
+        const completionChoiceIndexes=[...streamedChoiceOrder];
+        for(const choiceIndex of structuralToolCallsByChoice.keys()){
+            if(!completionChoiceIndexes.includes(choiceIndex)){
+                completionChoiceIndexes.push(choiceIndex);
             }
-        ];
-        for(const [choicePosition,toolCalls] of structuralToolCallsByChoice){
-            if(choicePosition===0){
-                continue;
-            }
-            completionChoices.push({
-                index:choicePosition,
-                message:{
-                    role:'assistant',
-                    content:'',
-                    ...(toolCalls.length?{tool_calls:toolCalls}:{})
-                },
-                finish_reason:toolCalls.length?'tool_calls':'stop'
+        }
+        if(!completionChoiceIndexes.length) completionChoiceIndexes.push(0);
+        const selectedTerminalChoiceIndex=selectedChoiceIndex??completionChoiceIndexes[0];
+        const structuralToolCalls=structuralToolCallsByChoice.get(selectedTerminalChoiceIndex)||[];
+        const completionChoices=completionChoiceIndexes
+            .map(function completeLegacyStreamChoice(choicePosition){
+                const retained=streamedChoicesByIndex.get(choicePosition)||{
+                    choice:{index:choicePosition},
+                    message:{role:'assistant'}
+                };
+                const toolCalls=structuralToolCallsByChoice.get(choicePosition)||[];
+                const finishReason=retained.choice.finish_reason;
+                const hasToolCalls=structuralToolCallsByChoice.has(choicePosition);
+                return {
+                    ...retained.choice,
+                    index:Number.isSafeInteger(retained.choice.index)
+                        &&retained.choice.index>=0
+                        ?retained.choice.index
+                        :choicePosition,
+                    message:{
+                        ...retained.message,
+                        role:'assistant',
+                        content:Object.hasOwn(retained.message,'content')
+                            ?retained.message.content
+                            :'',
+                        ...(hasToolCalls?{tool_calls:toolCalls}:{})
+                    },
+                    finish_reason:Object.hasOwn(retained.choice,'finish_reason')
+                        ?finishReason
+                        :toolCalls.length?'tool_calls':'stop'
+                };
             });
-        }
         const completion={
-            id:typeof streamId==='string'&&streamId?streamId:`legacy-${id}`,
-            object:typeof streamObject==='string'&&streamObject
-                ?streamObject
+            ...streamMetadata,
+            id:Object.hasOwn(streamMetadata,'id')?streamMetadata.id:`legacy-${id}`,
+            object:Object.hasOwn(streamMetadata,'object')
+                ?streamMetadata.object
                 :'chat.completion',
-            created:Number.isSafeInteger(streamCreated)
-                ?streamCreated
+            created:Object.hasOwn(streamMetadata,'created')
+                ?streamMetadata.created
                 :Math.floor(Date.now()/1000),
-            model:typeof streamModel==='string'&&streamModel
-                ?streamModel
-                :this.model,
-            choices:completionChoices,
-            ...(isPlainAIRecord(streamUsage)?{usage:streamUsage}:{})
+            model:Object.hasOwn(streamMetadata,'model')?streamMetadata.model:this.model,
+            choices:completionChoices
         };
         const terminalToolCalls=normalizeAICompletionToolCalls(completion);
         assertAIStreamToolCallCorrelation(
@@ -4894,6 +5164,7 @@ class AI {
             terminalToolCalls,
             'The legacy HTTP stream'
         );
+        await dataResultHandler(completion,id);
         for(const call of terminalToolCalls){
             if(signal?.aborted){
                 throw normalizeAIRequestAbort();
@@ -4901,9 +5172,6 @@ class AI {
             await earlyFunctionTrigger(call,`M-${id}`);
         }
         const streamResult=this.#providerCompletionOutput(completion);
-        if(structuralToolCalls.length&&!chunkString){
-            await streamHandler('',`M-${id}`,false);
-        }
         if(finishSpeech){
             this.finishTTS();
         }
@@ -4930,7 +5198,7 @@ class AI {
         localOnly=false,
         tools=[],
         toolChoice='auto',
-        parallelToolCalls=false,
+        parallelToolCalls,
         id=Date.now(),
         signal=null,
         onRequest=function ignoreFetchRequest(){},
@@ -4966,7 +5234,7 @@ class AI {
                 structuredOutput,
                 tools,
                 toolChoice,
-                parallelToolCalls,
+                ...(parallelToolCalls!==undefined?{parallelToolCalls}:{}),
                 id,
                 ...(maxOutputTokens!==undefined
                     ?{maxTokens:maxOutputTokens}
@@ -5023,7 +5291,7 @@ class AI {
         structuredOutput=false,
         tools=[],
         tool_choice='auto',
-        parallel_tool_calls=false,
+        parallel_tool_calls,
         id=Date.now(),
         requestHandler=function ignoreFetchRequest(){},
         signal=null,
@@ -5062,7 +5330,7 @@ class AI {
         structuredOutput=false,
         tools=[],
         tool_choice='auto',
-        parallel_tool_calls=false,
+        parallel_tool_calls,
         id=Date.now(),
         requestHandler=function ignoreFetchRequest(){},
         signal=null,
@@ -5095,7 +5363,9 @@ class AI {
         if(tools.length){
             request.tools=tools;
             request.tool_choice=tool_choice;
-            request.parallel_tool_calls=parallel_tool_calls;
+            if(parallel_tool_calls!==undefined){
+                request.parallel_tool_calls=parallel_tool_calls;
+            }
         }
 
         if(this.llmService==='OLLAMA'&&this.reasoningEffort){
@@ -6270,7 +6540,7 @@ function installAIUserReadyRegistration(){
             value:registration,
             configurable:true,
             enumerable:false,
-            writable:false
+            writable:true
         }
     );
     return registration;

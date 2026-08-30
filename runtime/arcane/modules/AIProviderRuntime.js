@@ -236,6 +236,8 @@ function validateLLMMessageToolCalls(message, label) {
         );
     }
     if (Object.hasOwn(message, 'toolCalls')
+        || Object.hasOwn(message, 'tool_call')
+        || Object.hasOwn(message, 'toolCall')
         || Object.hasOwn(message, 'function_call')
         || Object.hasOwn(message, 'functionCall')) {
         fail(
@@ -254,17 +256,19 @@ function validateLLMMessageToolCalls(message, label) {
             'ARCANE_AI_TOOL_CALL_INVALID'
         );
     }
-    if (descriptor.value.length > 1) {
-        fail(
-            'The Arcane AI runtime accepts one structural tool call at a time.',
-            'ARCANE_AI_PARALLEL_TOOLS_UNSUPPORTED'
-        );
-    }
+    const ids = new Set();
     for (let index = 0; index < descriptor.value.length; index += 1) {
-        validateLLMToolCall(
+        const id = validateLLMToolCall(
             descriptor.value[index],
             `${label}.tool_calls[${index}]`
         );
+        if (ids.has(id)) {
+            fail(
+                `${label}.tool_calls contains a duplicate structural tool-call ID.`,
+                'ARCANE_AI_TOOL_CALL_INVALID'
+            );
+        }
+        ids.add(id);
     }
     return descriptor.value;
 }
@@ -274,7 +278,7 @@ function validateLLMRequestPayload(payload) {
     if (!Array.isArray(payload.messages)) {
         fail('AI LLM request payload.messages must be an array.');
     }
-    let pendingToolCallId = null;
+    const pendingToolCallIds = new Set();
     for (let index = 0; index < payload.messages.length; index += 1) {
         const message = payload.messages[index];
         if (!isPlainRecord(message)) {
@@ -293,13 +297,21 @@ function validateLLMRequestPayload(payload) {
         );
         let openedToolCall = false;
         if (calls.length) {
-            if (pendingToolCallId !== null) {
+            if (pendingToolCallIds.size) {
                 fail(
-                    'The Arcane AI runtime accepts one structural tool call at a time.',
-                    'ARCANE_AI_PARALLEL_TOOLS_UNSUPPORTED'
+                    'Every pending structural tool result must be supplied before another assistant tool-call sequence.',
+                    'ARCANE_AI_TOOL_RESULT_REQUIRED'
                 );
             }
-            pendingToolCallId = calls[0].id;
+            for (const call of calls) {
+                if (pendingToolCallIds.has(call.id)) {
+                    fail(
+                        'An assistant structural tool-call sequence contains a duplicate ID.',
+                        'ARCANE_AI_TOOL_CALL_INVALID'
+                    );
+                }
+                pendingToolCallIds.add(call.id);
+            }
             openedToolCall = true;
         }
         if (message.role === 'tool') {
@@ -310,15 +322,15 @@ function validateLLMRequestPayload(payload) {
                     'ARCANE_AI_INVALID_TOOL_MESSAGE'
                 );
             }
-            if (pendingToolCallId === null
+            if (!pendingToolCallIds.size
                 || typeof message.tool_call_id !== 'string'
-                || message.tool_call_id !== pendingToolCallId) {
+                || !pendingToolCallIds.has(message.tool_call_id)) {
                 fail(
                     `AI LLM request payload.messages[${index}] does not settle the pending structural tool call.`,
                     'ARCANE_AI_INVALID_TOOL_MESSAGE'
                 );
             }
-            pendingToolCallId = null;
+            pendingToolCallIds.delete(message.tool_call_id);
         } else {
             if (Object.hasOwn(message, 'tool_call_id')) {
                 fail(
@@ -326,7 +338,7 @@ function validateLLMRequestPayload(payload) {
                     'ARCANE_AI_INVALID_TOOL_MESSAGE'
                 );
             }
-            if (pendingToolCallId !== null && !openedToolCall) {
+            if (pendingToolCallIds.size && !openedToolCall) {
                 fail(
                     `AI LLM request payload.messages[${index}] precedes the pending structural tool result.`,
                     'ARCANE_AI_TOOL_RESULT_REQUIRED'
@@ -334,7 +346,7 @@ function validateLLMRequestPayload(payload) {
             }
         }
     }
-    if (pendingToolCallId !== null) {
+    if (pendingToolCallIds.size) {
         fail(
             'The pending structural tool call must be settled before requesting another response.',
             'ARCANE_AI_TOOL_RESULT_REQUIRED'
@@ -345,13 +357,10 @@ function validateLLMRequestPayload(payload) {
         payload.parallelToolCalls,
         payload.parallel_tool_calls
     ];
-    if (parallelValues.some(function enablesParallelLLMTools(value) {
-        return value !== undefined && value !== false;
+    if (parallelValues.some(function invalidParallelLLMToolPreference(value) {
+        return value !== undefined && typeof value !== 'boolean';
     })) {
-        fail(
-            'The Arcane AI runtime accepts one structural tool call at a time.',
-            'ARCANE_AI_PARALLEL_TOOLS_UNSUPPORTED'
-        );
+        fail('AI LLM parallel tool-call preferences must be boolean when provided.');
     }
 }
 
@@ -404,7 +413,6 @@ function validateLLMTerminalResult(value, label) {
         );
     }
     const indexes = new Set();
-    let totalToolCalls = 0;
     for (let position = 0; position < choicesDescriptor.value.length; position += 1) {
         const choice = choicesDescriptor.value[position];
         if (!isPlainRecord(choice)
@@ -424,56 +432,601 @@ function validateLLMTerminalResult(value, label) {
                 'ARCANE_AI_INVALID_PROVIDER_RESULT'
             );
         }
-        const calls = validateLLMTerminalMessage(
+        validateLLMTerminalMessage(
             messageDescriptor.value,
             `${label}.choices[${position}].message`
         );
-        if (position > 0 && calls.length) {
-            fail(
-                `${label} placed a structural tool call outside the selected first choice.`,
-                'ARCANE_AI_INVALID_PROVIDER_RESULT'
-            );
-        }
-        totalToolCalls += calls.length;
-        if (totalToolCalls > 1) {
-            fail(
-                'The Arcane AI runtime accepts one structural tool call at a time.',
-                'ARCANE_AI_PARALLEL_TOOLS_UNSUPPORTED'
-            );
-        }
     }
     return value;
 }
 
-function isLLMStreamContentKey(key) {
-    return key === 'content'
-        || key === 'text'
-        || key === 'thinking'
-        || key === 'reasoning'
-        || key === 'reasoning_content';
+function llmStreamToolCallMismatch(message, cause) {
+    return operationError(
+        message,
+        'ARCANE_AI_STREAM_TOOL_CALL_MISMATCH',
+        cause
+    );
 }
 
-function projectLLMStreamContent(value, seen = new WeakSet()) {
-    if (!value || typeof value !== 'object' || seen.has(value)) {
-        return null;
+function canonicalLLMToolCall(call) {
+    return {
+        id: call.id,
+        type: call.type,
+        function: {
+            name: call.function.name,
+            arguments: call.function.arguments
+        }
+    };
+}
+
+function copyLLMDataValue(value, seen = new Map()) {
+    if (!value || typeof value !== 'object') {
+        return value;
     }
-    seen.add(value);
-    if (Array.isArray(value)) {
-        const result = [];
-        for (const item of value) {
-            const projected = projectLLMStreamContent(item, seen);
-            if (projected !== null) {
-                result.push(projected);
+    if (seen.has(value)) {
+        return seen.get(value);
+    }
+    if (!Array.isArray(value) && !isPlainRecord(value)) {
+        return value;
+    }
+    const result = Array.isArray(value)
+        ? new Array(value.length)
+        : Object.create(Object.getPrototypeOf(value));
+    seen.set(value, result);
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    for (const key of Reflect.ownKeys(descriptors)) {
+        if (Array.isArray(value) && key === 'length') {
+            continue;
+        }
+        const descriptor = descriptors[key];
+        if (Object.hasOwn(descriptor, 'value')) {
+            descriptor.value = copyLLMDataValue(descriptor.value, seen);
+        }
+        Object.defineProperty(result, key, descriptor);
+    }
+    return result;
+}
+
+function sameLLMDataValue(left, right, seen = new Map()) {
+    if (Object.is(left, right)) {
+        return true;
+    }
+    if (!left || !right
+        || typeof left !== 'object'
+        || typeof right !== 'object'
+        || Array.isArray(left) !== Array.isArray(right)) {
+        return false;
+    }
+    if (!Array.isArray(left)
+        && (!isPlainRecord(left) || !isPlainRecord(right))) {
+        return false;
+    }
+    const matched = seen.get(left);
+    if (matched !== undefined) {
+        return matched === right;
+    }
+    seen.set(left, right);
+    const leftDescriptors = Object.getOwnPropertyDescriptors(left);
+    const rightDescriptors = Object.getOwnPropertyDescriptors(right);
+    const leftKeys = Reflect.ownKeys(leftDescriptors);
+    const rightKeys = Reflect.ownKeys(rightDescriptors);
+    if (leftKeys.length !== rightKeys.length) {
+        return false;
+    }
+    for (const key of leftKeys) {
+        if (!Object.hasOwn(rightDescriptors, key)) {
+            return false;
+        }
+        const leftDescriptor = leftDescriptors[key];
+        const rightDescriptor = rightDescriptors[key];
+        const leftIsData = Object.hasOwn(leftDescriptor, 'value');
+        const rightIsData = Object.hasOwn(rightDescriptor, 'value');
+        if (leftIsData !== rightIsData) {
+            return false;
+        }
+        if (leftIsData) {
+            if (!sameLLMDataValue(
+                leftDescriptor.value,
+                rightDescriptor.value,
+                seen
+            )) {
+                return false;
+            }
+        } else if (leftDescriptor.get !== rightDescriptor.get
+            || leftDescriptor.set !== rightDescriptor.set) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function sameCanonicalLLMToolCalls(left, right) {
+    return left.length === right.length
+        && left.every(function sameCanonicalLLMToolCall(call, index) {
+            const other = right[index];
+            return call.id === other?.id
+                && call.type === other?.type
+                && call.function.name === other?.function?.name
+                && call.function.arguments === other?.function?.arguments;
+        });
+}
+
+function terminalLLMToolCallRecord(choiceIndex, completeCalls) {
+    return {
+        choiceIndex,
+        completeCalls,
+        canonicalCalls: completeCalls.map(canonicalLLMToolCall)
+    };
+}
+
+function terminalLLMToolCalls(value) {
+    if (typeof value === 'string') {
+        return {direct: terminalLLMToolCallRecord(null, []), choices: []};
+    }
+    if (Object.hasOwn(value, 'message')) {
+        const completeCalls = Array.isArray(value.message?.tool_calls)
+            ? value.message.tool_calls
+            : [];
+        return {
+            direct: terminalLLMToolCallRecord(null, completeCalls),
+            choices: []
+        };
+    }
+    return {
+        direct: null,
+        choices: value.choices.map(function retainTerminalLLMChoice(choice) {
+            const completeCalls = Array.isArray(choice.message?.tool_calls)
+                ? choice.message.tool_calls
+                : [];
+            return terminalLLMToolCallRecord(choice.index, completeCalls);
+        })
+    };
+}
+
+function createLLMStreamToolCallCorrelation() {
+    const choices = new Map();
+    const choiceOrder = [];
+    let direct = null;
+
+    function createRecord(choiceIndex = null) {
+        return {
+            choiceIndex,
+            completeCalls: null,
+            fragments: new Map(),
+            seen: false,
+            observed: false
+        };
+    }
+
+    function directRecord() {
+        if (!direct) {
+            direct = createRecord();
+        }
+        return direct;
+    }
+
+    function choiceRecord(index, hasExplicitIndex) {
+        const key = hasExplicitIndex
+            ? `index:${index}`
+            : `position:${index}`;
+        if (!choices.has(key)) {
+            const record = createRecord(hasExplicitIndex ? index : null);
+            choices.set(key, record);
+            choiceOrder.push(record);
+        }
+        return choices.get(key);
+    }
+
+    function structuralToolCalls(source, label) {
+        if (!isPlainRecord(source)) {
+            return null;
+        }
+        if (Object.hasOwn(source, 'toolCalls')
+            || Object.hasOwn(source, 'tool_call')
+            || Object.hasOwn(source, 'toolCall')
+            || Object.hasOwn(source, 'function_call')
+            || Object.hasOwn(source, 'functionCall')) {
+            throw llmStreamToolCallMismatch(
+                `${label} contains noncanonical structural tool-call data.`
+            );
+        }
+        if (!Object.hasOwn(source, 'tool_calls')) {
+            return null;
+        }
+        const descriptor = Object.getOwnPropertyDescriptor(source, 'tool_calls');
+        if (!descriptor || !Object.hasOwn(descriptor, 'value')
+            || !Array.isArray(descriptor.value)) {
+            throw llmStreamToolCallMismatch(
+                `${label}.tool_calls must be an array data property.`
+            );
+        }
+        return descriptor.value;
+    }
+
+    function observeCompleteMessage(message, record, label) {
+        const calls = structuralToolCalls(message, label);
+        if (!calls?.length) {
+            return;
+        }
+        let completeCalls;
+        try {
+            completeCalls = validateLLMMessageToolCalls(message, label)
+                .map(function retainCompleteLLMStreamToolCall(call) {
+                    return copyLLMDataValue(call);
+                });
+        } catch (cause) {
+            throw llmStreamToolCallMismatch(
+                `${label} did not contain complete structural tool calls.`,
+                cause
+            );
+        }
+        if (record.completeCalls
+            && !sameLLMDataValue(record.completeCalls, completeCalls)) {
+            throw llmStreamToolCallMismatch(
+                `${label} changed its complete structural tool calls during streaming.`
+            );
+        }
+        record.completeCalls = completeCalls;
+        record.observed = true;
+    }
+
+    function observeFragments(source, record, label) {
+        const calls = structuralToolCalls(source, label);
+        if (!calls?.length) {
+            return;
+        }
+        record.observed = true;
+        for (let position = 0; position < calls.length; position += 1) {
+            const fragment = calls[position];
+            if (!isPlainRecord(fragment)) {
+                throw llmStreamToolCallMismatch(
+                    `${label}.tool_calls[${position}] must be a structural fragment object.`
+                );
+            }
+            if (fragment.index !== undefined
+                && (!Number.isSafeInteger(fragment.index) || fragment.index < 0)) {
+                throw llmStreamToolCallMismatch(
+                    `${label}.tool_calls[${position}] has an invalid structural call index.`
+                );
+            }
+            const toolIndex = fragment.index ?? position;
+            const retained = record.fragments.get(toolIndex) ?? {
+                index: toolIndex,
+                id: '',
+                type: '',
+                name: '',
+                arguments: '',
+                invalid: false
+            };
+            if (fragment.id !== undefined) {
+                if (typeof fragment.id !== 'string'
+                    || !fragment.id
+                    || (retained.id && retained.id !== fragment.id)) {
+                    retained.invalid = true;
+                } else {
+                    retained.id = fragment.id;
+                }
+            }
+            if (fragment.type !== undefined) {
+                if (typeof fragment.type !== 'string'
+                    || !fragment.type
+                    || (retained.type && retained.type !== fragment.type)) {
+                    retained.invalid = true;
+                } else {
+                    retained.type = fragment.type;
+                }
+            }
+            if (fragment.function !== undefined
+                && !isPlainRecord(fragment.function)) {
+                retained.invalid = true;
+            }
+            const functionFragment = isPlainRecord(fragment.function)
+                ? fragment.function
+                : {};
+            if (functionFragment.name !== undefined) {
+                if (typeof functionFragment.name !== 'string') {
+                    retained.invalid = true;
+                } else {
+                    retained.name += functionFragment.name;
+                }
+            }
+            if (functionFragment.arguments !== undefined) {
+                if (typeof functionFragment.arguments !== 'string') {
+                    retained.invalid = true;
+                } else {
+                    retained.arguments += functionFragment.arguments;
+                }
+            }
+            record.fragments.set(toolIndex, retained);
+        }
+    }
+
+    function observeChoice(choice, position) {
+        if (!isPlainRecord(choice)) {
+            return;
+        }
+        const delta = isPlainRecord(choice.delta) ? choice.delta : null;
+        const message = isPlainRecord(choice.message) ? choice.message : null;
+        const hasStructuralData = [choice, delta, message].some(
+            function hasChoiceStructuralData(source) {
+                return source && (
+                    Object.hasOwn(source, 'tool_calls')
+                    || Object.hasOwn(source, 'toolCalls')
+                    || Object.hasOwn(source, 'tool_call')
+                    || Object.hasOwn(source, 'toolCall')
+                    || Object.hasOwn(source, 'function_call')
+                    || Object.hasOwn(source, 'functionCall')
+                );
+            }
+        );
+        if (choice.index !== undefined
+            && (!Number.isSafeInteger(choice.index) || choice.index < 0)) {
+            throw llmStreamToolCallMismatch(
+                `AI provider stream choice ${position} has an invalid index.`
+            );
+        }
+        const hasExplicitIndex = choice.index !== undefined;
+        const index = choice.index ?? position;
+        const record = choiceRecord(index, hasExplicitIndex);
+        record.seen = true;
+        if (!hasStructuralData) {
+            return;
+        }
+        observeFragments(choice, record, `AI provider stream choice ${position}`);
+        if (delta) {
+            observeFragments(
+                delta,
+                record,
+                `AI provider stream choice ${position}.delta`
+            );
+        }
+        if (message) {
+            observeCompleteMessage(
+                message,
+                record,
+                `AI provider stream choice ${position}.message`
+            );
+        }
+    }
+
+    function observe(chunk) {
+        if (!isPlainRecord(chunk)) {
+            return;
+        }
+        const record = directRecord();
+        observeFragments(chunk, record, 'AI provider stream chunk');
+        if (isPlainRecord(chunk.delta)) {
+            observeFragments(
+                chunk.delta,
+                record,
+                'AI provider stream chunk.delta'
+            );
+        }
+        if (isPlainRecord(chunk.message)) {
+            observeCompleteMessage(
+                chunk.message,
+                record,
+                'AI provider stream chunk.message'
+            );
+        }
+        if (Array.isArray(chunk.choices)) {
+            for (let position = 0; position < chunk.choices.length; position += 1) {
+                observeChoice(chunk.choices[position], position);
             }
         }
-        seen.delete(value);
-        return result.length ? result : null;
     }
-    if (!isPlainRecord(value)) {
-        seen.delete(value);
-        return null;
+
+    function completedCalls(record, label) {
+        if (!record?.observed) {
+            return null;
+        }
+        let fragmentCalls = null;
+        if (record.fragments.size) {
+            const orderedFragments = [...record.fragments.values()]
+                .sort(function orderLLMStreamToolCalls(left, right) {
+                    return left.index - right.index;
+                });
+            for (let index = 0; index < orderedFragments.length; index += 1) {
+                if (orderedFragments[index].index !== index) {
+                    throw llmStreamToolCallMismatch(
+                        `${label} omitted an ordered structural tool-call index.`
+                    );
+                }
+            }
+            fragmentCalls = orderedFragments.map(
+                function completeLLMStreamToolCall(fragment, index) {
+                    if (fragment.invalid) {
+                        throw llmStreamToolCallMismatch(
+                            `${label} structural tool call ${index} changed an exact field.`
+                        );
+                    }
+                    const call = {
+                        id: fragment.id,
+                        type: fragment.type,
+                        function: {
+                            name: fragment.name,
+                            arguments: fragment.arguments
+                        }
+                    };
+                    try {
+                        validateLLMToolCall(
+                            call,
+                            `${label} structural tool call ${index}`
+                        );
+                    } catch (cause) {
+                        throw llmStreamToolCallMismatch(
+                            `${label} did not retain a complete structural tool call.`,
+                            cause
+                        );
+                    }
+                    return call;
+                }
+            );
+        }
+        if (record.completeCalls
+            && fragmentCalls
+            && !sameCanonicalLLMToolCalls(record.completeCalls, fragmentCalls)) {
+            throw llmStreamToolCallMismatch(
+                `${label} complete and fragmented structural tool calls do not match.`
+            );
+        }
+        return {
+            completeCalls: record.completeCalls,
+            fragmentCalls
+        };
+    }
+
+    function assertRecordMatchesTerminal(record, terminal, label) {
+        const streamedCalls = completedCalls(record, label);
+        if (!streamedCalls) {
+            return;
+        }
+        if (streamedCalls.completeCalls
+            && !sameLLMDataValue(
+                streamedCalls.completeCalls,
+                terminal.completeCalls
+            )) {
+            throw llmStreamToolCallMismatch(
+                `${label} complete tool-call envelopes do not match its terminal result.`
+            );
+        }
+        if (streamedCalls.fragmentCalls
+            && !sameCanonicalLLMToolCalls(
+                streamedCalls.fragmentCalls,
+                terminal.canonicalCalls
+            )) {
+            throw llmStreamToolCallMismatch(
+                `${label} structural tool-call fragments do not match its terminal result.`
+            );
+        }
+    }
+
+    function assertTerminal(value) {
+        const terminal = terminalLLMToolCalls(value);
+        const streamedChoices = choiceOrder.filter(
+            function retainSeenLLMStreamChoice(record) {
+                return record.seen;
+            }
+        );
+        const observedDirect = direct?.observed ? direct : null;
+        if (terminal.direct) {
+            if (observedDirect) {
+                assertRecordMatchesTerminal(
+                    observedDirect,
+                    terminal.direct,
+                    'AI provider direct stream result'
+                );
+            }
+            if (streamedChoices.length > 1) {
+                throw llmStreamToolCallMismatch(
+                    'The AI provider stream observed choices that are omitted from its direct terminal result.'
+                );
+            }
+            if (streamedChoices.length === 1) {
+                assertRecordMatchesTerminal(
+                    streamedChoices[0],
+                    terminal.direct,
+                    'AI provider first-seen stream choice'
+                );
+            }
+            return;
+        }
+
+        const terminalByIndex = new Map(
+            terminal.choices.map(function indexTerminalLLMChoice(choice) {
+                return [choice.choiceIndex, choice];
+            })
+        );
+        const matchedTerminalIndexes = new Set();
+        for (const record of streamedChoices) {
+            if (record.choiceIndex === null) {
+                continue;
+            }
+            const terminalChoice = terminalByIndex.get(record.choiceIndex);
+            if (!terminalChoice) {
+                throw llmStreamToolCallMismatch(
+                    `The AI provider stream observed choice ${record.choiceIndex}, which is omitted from its terminal result.`
+                );
+            }
+            assertRecordMatchesTerminal(
+                record,
+                terminalChoice,
+                `AI provider stream choice ${record.choiceIndex}`
+            );
+            matchedTerminalIndexes.add(record.choiceIndex);
+        }
+
+        if (observedDirect) {
+            const firstTerminalChoice = terminal.choices[0];
+            assertRecordMatchesTerminal(
+                observedDirect,
+                firstTerminalChoice,
+                `AI provider first terminal choice ${firstTerminalChoice.choiceIndex}`
+            );
+            matchedTerminalIndexes.add(firstTerminalChoice.choiceIndex);
+        }
+
+        for (const record of streamedChoices) {
+            if (record.choiceIndex !== null) {
+                continue;
+            }
+            const terminalChoice = terminal.choices.find(
+                function findFirstUnmatchedTerminalLLMChoice(choice) {
+                    return !matchedTerminalIndexes.has(choice.choiceIndex);
+                }
+            );
+            if (!terminalChoice) {
+                throw llmStreamToolCallMismatch(
+                    'The AI provider stream observed a first-seen choice that is omitted from its terminal result.'
+                );
+            }
+            assertRecordMatchesTerminal(
+                record,
+                terminalChoice,
+                `AI provider first-seen stream choice for terminal choice ${terminalChoice.choiceIndex}`
+            );
+            matchedTerminalIndexes.add(terminalChoice.choiceIndex);
+        }
+    }
+
+    return {observe, assertTerminal};
+}
+
+function isLLMStreamStructuralKey(key) {
+    return key === 'tool_calls'
+        || key === 'toolCalls'
+        || key === 'tool_call'
+        || key === 'toolCall'
+        || key === 'function_call'
+        || key === 'functionCall';
+}
+
+const OMITTED_LLM_STREAM_DATA = Symbol('omitted-llm-stream-data');
+
+function projectLLMStreamData(value, seen = new Map()) {
+    if (value === null || value === undefined) {
+        return value;
+    }
+    if (typeof value !== 'object') {
+        return value;
+    }
+    if (seen.has(value)) {
+        return seen.get(value);
+    }
+    if (Array.isArray(value)) {
+        const result = [];
+        seen.set(value, result);
+        for (const item of value) {
+            const projected = projectLLMStreamData(item, seen);
+            if (projected !== OMITTED_LLM_STREAM_DATA) result.push(projected);
+        }
+        return result.length || value.length === 0
+            ? result
+            : OMITTED_LLM_STREAM_DATA;
     }
     const result = {};
+    seen.set(value, result);
+    let sourceDataFields = 0;
     const descriptors = Object.getOwnPropertyDescriptors(value);
     for (const key of Reflect.ownKeys(descriptors)) {
         if (typeof key === 'symbol') {
@@ -483,26 +1036,20 @@ function projectLLMStreamContent(value, seen = new WeakSet()) {
         if (!Object.hasOwn(descriptor, 'value')) {
             continue;
         }
-        if (isLLMStreamContentKey(key)
-            && descriptor.value !== null
-            && descriptor.value !== undefined) {
-            result[key] = descriptor.value;
+        sourceDataFields += 1;
+        if (isLLMStreamStructuralKey(key)) {
             continue;
         }
-        const projected = projectLLMStreamContent(descriptor.value, seen);
-        if (projected !== null) {
-            result[key] = projected;
-        }
+        const projected = projectLLMStreamData(descriptor.value, seen);
+        if (projected !== OMITTED_LLM_STREAM_DATA) result[key] = projected;
     }
-    seen.delete(value);
-    return Object.keys(result).length ? result : null;
+    return Object.keys(result).length || sourceDataFields === 0
+        ? result
+        : OMITTED_LLM_STREAM_DATA;
 }
 
 function projectLLMStreamChunk(value) {
-    if (typeof value === 'string') {
-        return value;
-    }
-    return projectLLMStreamContent(value);
+    return projectLLMStreamData(value);
 }
 
 function assertCallbackFreeProviderValue(value, seen = new WeakSet()) {
@@ -715,21 +1262,20 @@ function nullableTupleIdentifier(value) {
         : null;
 }
 
-function immutableProgress(value) {
-    assertClosedRecord(
-        value,
-        ['phase', 'completed', 'total', 'unit', 'heartbeat'],
-        'AI provider progress'
-    );
-    return completeValue(
-        {
-            phase: value.phase,
-            completed: value.completed,
-            total: value.total,
-            unit: value.unit,
-            heartbeat: value.heartbeat
+function completeProgress(value) {
+    if (!isPlainRecord(value)) {
+        fail('AI provider progress must be a plain object.');
+    }
+    const result = {};
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    for (const key of Reflect.ownKeys(descriptors)) {
+        const descriptor = descriptors[key];
+        if (typeof key === 'symbol' || !Object.hasOwn(descriptor, 'value')) {
+            fail('AI provider progress must contain string-keyed data properties only.');
         }
-    );
+        result[key] = descriptor.value;
+    }
+    return completeValue(result);
 }
 
 function stateError(error, fallbackCode) {
@@ -2774,6 +3320,14 @@ export class AIProviderRuntime {
             let providerOpenPromise = null;
             let iterator = null;
             let cleanupPromise = null;
+            const llmToolCallCorrelation = role === 'llm'
+                ? createLLMStreamToolCallCorrelation()
+                : null;
+            let privateStreamObservation = null;
+            const projectedStreamChunks = [];
+            const projectedStreamReaders = [];
+            let projectedStreamClosed = false;
+            let projectedStreamError = null;
             let terminalSettled = false;
             let resolveTerminal;
             let rejectTerminal;
@@ -2783,6 +3337,61 @@ export class AIProviderRuntime {
             });
             terminal.catch(function retainAIProviderStreamTerminalRejection() {});
             requestRecord.promise = terminal;
+
+            function drainProjectedAIProviderStreamReaders() {
+                while (projectedStreamReaders.length
+                    && projectedStreamChunks.length) {
+                    const reader = projectedStreamReaders.shift();
+                    reader.resolve({
+                        value: projectedStreamChunks.shift(),
+                        done: false
+                    });
+                }
+                if (!projectedStreamClosed || projectedStreamChunks.length) {
+                    return;
+                }
+                while (projectedStreamReaders.length) {
+                    const reader = projectedStreamReaders.shift();
+                    if (projectedStreamError) {
+                        reader.reject(projectedStreamError);
+                    } else {
+                        reader.resolve({value: undefined, done: true});
+                    }
+                }
+            }
+
+            function publishProjectedAIProviderStreamChunk(value) {
+                projectedStreamChunks.push(value);
+                drainProjectedAIProviderStreamReaders();
+            }
+
+            function closeProjectedAIProviderStream(error = null) {
+                if (projectedStreamClosed) {
+                    return;
+                }
+                projectedStreamClosed = true;
+                projectedStreamError = error;
+                drainProjectedAIProviderStreamReaders();
+            }
+
+            function readProjectedAIProviderStreamChunk() {
+                if (projectedStreamChunks.length) {
+                    return Promise.resolve({
+                        value: projectedStreamChunks.shift(),
+                        done: false
+                    });
+                }
+                if (projectedStreamClosed) {
+                    return projectedStreamError
+                        ? Promise.reject(projectedStreamError)
+                        : Promise.resolve({value: undefined, done: true});
+                }
+                return new Promise(
+                    function awaitProjectedAIProviderStreamChunk(resolve, reject) {
+                        projectedStreamReaders.push({resolve, reject});
+                    }
+                );
+            }
 
             function settleAIProviderStream(error, value) {
                 if (terminalSettled) {
@@ -2799,9 +3408,11 @@ export class AIProviderRuntime {
                 }
                 runtime.#drainRoleRequestQueue(slot);
                 if (error) {
+                    closeProjectedAIProviderStream(error);
                     restoreAIProviderRoleAfterRequest(error);
                     rejectTerminal(error);
                 } else {
+                    closeProjectedAIProviderStream();
                     restoreAIProviderRoleAfterRequest(null);
                     resolveTerminal(value);
                 }
@@ -2875,6 +3486,15 @@ export class AIProviderRuntime {
             }
 
             async function cancelAIProviderStream(reason, terminalError = null) {
+                const terminalOutcome = terminalError ?? normalizedAbort(
+                    reason instanceof Error
+                        ? reason
+                        : operationError(
+                            'The AI stream was cancelled.',
+                            'ARCANE_AI_REQUEST_ABORTED'
+                        )
+                );
+                closeProjectedAIProviderStream(terminalOutcome);
                 if (cleanupPromise) {
                     return cleanupPromise;
                 }
@@ -2888,14 +3508,6 @@ export class AIProviderRuntime {
                 );
                 controller.abort(reason);
                 (async function closeAIProviderStream() {
-                    const terminalOutcome = terminalError ?? normalizedAbort(
-                        reason instanceof Error
-                            ? reason
-                            : operationError(
-                                'The AI stream was cancelled.',
-                                'ARCANE_AI_REQUEST_ABORTED'
-                            )
-                    );
                     try {
                         const cleanupOutcome = await cleanupOwnedAIProviderStream(reason);
                         assertStreamCleanupComplete(cleanupOutcome);
@@ -2987,9 +3599,51 @@ export class AIProviderRuntime {
                         requestSequence,
                         controller.signal
                     );
-                    Promise.resolve(opened.result).then(
-                        function acceptAIProviderStreamResult(value) {
+                    privateStreamObservation = (
+                        async function observePrivateAIProviderStream() {
                             try {
+                                while (true) {
+                                    const result = await iterator.next();
+                                    runtime.#assertCurrentRequest(
+                                        slot,
+                                        generation,
+                                        requestSequence,
+                                        controller.signal
+                                    );
+                                    if (result.done) {
+                                        return;
+                                    }
+                                    if (role !== 'llm') {
+                                        publishProjectedAIProviderStreamChunk(result.value);
+                                        continue;
+                                    }
+                                    llmToolCallCorrelation.observe(result.value);
+                                    const projected = projectLLMStreamChunk(result.value);
+                                    if (projected !== OMITTED_LLM_STREAM_DATA) {
+                                        publishProjectedAIProviderStreamChunk(projected);
+                                    }
+                                }
+                            } catch (error) {
+                                const normalized = isAbort(error, controller.signal)
+                                    ? normalizedAbort(error)
+                                    : error;
+                                closeProjectedAIProviderStream(normalized);
+                                try {
+                                    await cancelAIProviderStream(normalized, normalized);
+                                } catch {
+                                    // Cancellation owns any cleanup failure.
+                                }
+                                throw normalized;
+                            }
+                        }
+                    )();
+                    privateStreamObservation.catch(
+                        function retainPrivateAIProviderStreamRejection() {}
+                    );
+                    Promise.resolve(opened.result).then(
+                        async function acceptAIProviderStreamResult(value) {
+                            try {
+                                await privateStreamObservation;
                                 runtime.#assertCurrentRequest(
                                     slot,
                                     generation,
@@ -3002,8 +3656,17 @@ export class AIProviderRuntime {
                                         'AI provider stream result'
                                     )
                                     : value;
+                                llmToolCallCorrelation?.assertTerminal(terminalValue);
                                 settleAIProviderStream(null, terminalValue);
                             } catch (error) {
+                                if (cleanupPromise) {
+                                    try {
+                                        await cleanupPromise;
+                                    } catch {
+                                        // Stream cancellation owns terminal cleanup failure.
+                                    }
+                                    return;
+                                }
                                 const normalized = isAbort(error, controller.signal)
                                     ? normalizedAbort(error)
                                     : error;
@@ -3025,49 +3688,15 @@ export class AIProviderRuntime {
                     const handle = {
                         result: terminal,
                         cancel: cancelAIProviderStream,
-                        async next(value) {
-                            try {
-                                let nextValue = value;
-                                while (true) {
-                                    const result = await iterator.next(nextValue);
-                                    nextValue = undefined;
-                                    runtime.#assertCurrentRequest(
-                                        slot,
-                                        generation,
-                                        requestSequence,
-                                        controller.signal
-                                    );
-                                    if (role !== 'llm') {
-                                        return result;
-                                    }
-                                    if (result.done) {
-                                        return {value: undefined, done: true};
-                                    }
-                                    const projected = projectLLMStreamChunk(result.value);
-                                    if (projected !== null) {
-                                        return {
-                                            value: projected,
-                                            done: false
-                                        };
-                                    }
-                                }
-                            } catch (error) {
-                                await cancelAIProviderStream(error);
-                                throw isAbort(error, controller.signal)
-                                    ? normalizedAbort(error)
-                                    : error;
-                            }
+                        next() {
+                            return readProjectedAIProviderStreamChunk();
                         },
                         async return(value) {
-                            Promise.resolve().then(
-                                function beginReturnedAIProviderStreamCancellation() {
-                                    return cancelAIProviderStream(
-                                        operationError(
-                                            'The AI stream consumer stopped before completion.',
-                                            'ARCANE_AI_REQUEST_ABORTED'
-                                        )
-                                    );
-                                }
+                            cancelAIProviderStream(
+                                operationError(
+                                    'The AI stream consumer stopped before completion.',
+                                    'ARCANE_AI_REQUEST_ABORTED'
+                                )
                             ).catch(
                                 function reportReturnedAIProviderStreamCancellationFailure(error) {
                                     console.error(
@@ -3079,7 +3708,7 @@ export class AIProviderRuntime {
                             return {value, done: true};
                         },
                         async throw(error) {
-                            await cancelAIProviderStream(error);
+                            await cancelAIProviderStream(error, error);
                             throw error;
                         },
                         [Symbol.asyncIterator]() {
@@ -3091,6 +3720,7 @@ export class AIProviderRuntime {
                     const normalized = isAbort(error, controller.signal)
                         ? normalizedAbort(error)
                         : error;
+                    closeProjectedAIProviderStream(normalized);
                     if (cleanupPromise) {
                         try {
                             await cleanupPromise;
@@ -3500,7 +4130,7 @@ export class AIProviderRuntime {
                 {
                     state: 'loading',
                     operationId,
-                    progress: immutableProgress(progress)
+                    progress: completeProgress(progress)
                 }
             )
         );
