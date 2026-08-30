@@ -2044,16 +2044,6 @@
             return configured||role?.modelId||'the selected language model';
         }
 
-    function byteProgressUnit(value){
-        const unit=String(value??'')
-            .trim()
-            .toLowerCase()
-            .replace(/[\s_-]+/g,'');
-        return unit.includes('byte')
-            ||unit.includes('octet')
-            ||/^(?:[kmgtpe]?i?b)(?:(?:\/|per)?(?:s|sec|second))?$/u.test(unit);
-        }
-
         function determinateProgress(){
             const total=Number(role?.progress?.total);
             const completed=Number(role?.progress?.completed);
@@ -2061,15 +2051,14 @@
                 ?role.progress.unit
                 :'items';
             if(
-                byteProgressUnit(unit)
-                ||!Number.isFinite(total)
+                !Number.isFinite(total)
                 ||total<=0
                 ||!Number.isFinite(completed)
             ){
                 return null;
             }
             return {
-                completed:Math.max(0,completed),
+                completed,
                 total,
                 unit
             };
@@ -2106,7 +2095,7 @@
                 return;
             }
             progress.max=measured.total;
-            progress.value=Math.min(measured.completed,measured.total);
+            progress.value=measured.completed;
         }
 
         function render(){

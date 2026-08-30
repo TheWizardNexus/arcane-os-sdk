@@ -47,7 +47,8 @@ import {
 } from '../runtime/arcane/modules/LocalAIReadinessController.js';
 import {
     appendTranscription,
-    createSTTActivationController
+    createSTTActivationController,
+    formatAIRuntimeProgress
 } from '../runtime/arcane/modules/ComponentContracts.js';
 import ConfiguredAIChatSession from '../runtime/arcane/modules/ConfiguredAIChatSession.js';
 import PreferenceStore from '../runtime/arcane/modules/PreferenceStore.js';
@@ -61,6 +62,21 @@ test('transcription assembly preserves complete whitespace and content',()=>{
         '  first  \n--\n  second  '
     );
     assert.equal(appendTranscription('existing', ''), 'existing');
+});
+
+test('AI runtime progress preserves complete provider-reported measures',()=>{
+    assert.equal(
+        formatAIRuntimeProgress(
+            {
+                phase:'fetching',
+                completed:4,
+                total:10,
+                unit:'octets'
+            },
+            'loading'
+        ),
+        'fetching · 4 of 10 octets'
+    );
 });
 
 test('preference setAll uses the admitted native atomic batch once',async()=>{
@@ -2629,6 +2645,10 @@ test(
                 setAttribute(name,value) {
                     this.attributes.set(name,String(value));
                 },
+                removeAttribute(name) {
+                    this.attributes.delete(name);
+                    delete this[name];
+                },
                 addEventListener(name,listener) {
                     listeners.set(name,listener);
                 },
@@ -2643,6 +2663,7 @@ test(
         const panel=element();
         const title=element();
         const status=element();
+        const progress=element();
         const button=element();
         const events=[];
         const intents=[];
@@ -2696,6 +2717,7 @@ test(
             panel,
             title,
             status,
+            progress,
             button,
             publish:publishActivation,
             createOperationId(){
@@ -2767,15 +2789,20 @@ test(
                 phase:'download',
                 completed:4,
                 total:10,
-                unit:'items',
+                unit:'octets',
                 heartbeat:true
             }
         };
         controller.synchronize(loading);
         assert.equal(panel.attributes.get('aria-busy'),'true');
-        assert.equal(title.textContent,'Starting language model');
-        assert.equal(status.textContent,'download');
-        assert.equal(button.textContent,'Cancel loading');
+        assert.equal(title.textContent,'Loading selected-model');
+        assert.equal(
+            status.textContent,
+            'Loading selected-model through the Arcane SDK · download · 4 of 10 octets · The first activation can take several minutes; keep this tab open'
+        );
+        assert.equal(progress.max,10);
+        assert.equal(progress.value,4);
+        assert.equal(button.textContent,'Cancel activation');
         assert.equal(await controller.request('unload'),true);
         assert.deepEqual(intents.at(-1),{role:'llm',action:'unload',reason:'user'});
 

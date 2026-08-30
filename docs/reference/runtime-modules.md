@@ -1218,6 +1218,7 @@ Exact exports: `CHART_LABELS`, `DASHBOARD_LABELS`, `MARKDOWN_FORMATS`,
 `STT_ACTIVATION_EVENT_TYPES`, `STT_ACTIVATION_REASONS`, `VOICE_LABELS`,
 `VOICE_MESSAGES`, `appendTranscription`, `applyMarkdownFormat`,
 `createSTTActivationController`, `effectiveDashboardVisibility`,
+`formatAIRuntimeProgress`,
 `normalizeChartOptions`, `normalizeChartRows`, `normalizeDashboardDefinitions`,
 `normalizeDashboardOptions`, `normalizeDashboardVisibility`,
 `normalizeMarkdownFormats`, `normalizeMarkdownOptions`, and
@@ -1227,7 +1228,8 @@ Exact exports: `CHART_LABELS`, `DASHBOARD_LABELS`, `MARKDOWN_FORMATS`,
 
 **Cross-host with an injected event constructor outside DOM hosts.** Fully
 normalized labels, rows, definitions, visibility, formats, editor and voice
-options, plus capability-neutral STT activation intent and presentation state.
+options, capability-neutral STT activation intent and presentation state, and
+complete informational provider progress whenever a finite measure is present.
 Provider authority and lifecycle execution remain with the configured runtime
 owner. Transport: In-process only. [Deep protocol details](protocols.md).
 

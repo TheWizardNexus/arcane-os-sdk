@@ -403,16 +403,6 @@ function effectiveDashboardVisibility(definitions=[],visibility={}){
     );
 }
 
-function byteProgressUnit(value){
-    const unit=String(value??'')
-        .trim()
-        .toLowerCase()
-        .replace(/[\s_-]+/g,'');
-    return unit.includes('byte')
-        ||unit.includes('octet')
-        ||/^(?:[kmgtpe]?i?b)(?:(?:\/|per)?(?:s|sec|second))?$/u.test(unit);
-}
-
 function formatAIRuntimeProgress(progress,fallback){
     const phase=typeof progress?.phase==='string'&&progress.phase
         ?progress.phase
@@ -427,8 +417,7 @@ function formatAIRuntimeProgress(progress,fallback){
         ||!Number.isSafeInteger(total)
         ||total<=0
         ||completed>total
-        ||!unit
-        ||byteProgressUnit(unit)){
+        ||!unit){
         return phase;
     }
     return `${phase} · ${completed} of ${total} ${unit}`;

@@ -330,7 +330,8 @@ When a selected LLM route is `unloaded` or in `error`, the component exposes a
 keyboard-operable Start/Try again control while Send stays disabled. During
 `loading`, the control becomes Cancel loading and reflects sticky progress
 inside the same activation area. Progress is indeterminate until a real finite
-positive total exists; byte-based units never produce a numeric progress label.
+positive total exists. A complete provider-reported `completed`, `total`, and
+`unit` measure is informational and remains visible without gating activation.
 `modelName` supplies the application-owned display label without moving model
 policy into the component.
 The default `requestAIActivation(intent)` forwards mutable
