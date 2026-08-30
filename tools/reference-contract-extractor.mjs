@@ -67,7 +67,9 @@ export const RUNTIME_DOCUMENTED_CALLABLE_MEMBERS={
     'CommunicationProviderRegistry.js':[
         'register','get','has','list'
     ],
-    'ConfiguredAIChatSession.js':['history','clear','prepare','send'],
+    'ConfiguredAIChatSession.js':[
+        'normalizeStructuralToolCall','history','clear','prepare','send'
+    ],
     'DataMaintenance.js':['clearEmptyChatsAndMemories'],
     'DBOPFSDocumentLibrary.js':[
         'createDBOPFSDocumentLibrary','normalizeDBOPFSDocumentSchema',
@@ -108,8 +110,8 @@ export const RUNTIME_DOCUMENTED_CALLABLE_MEMBERS={
     'OllamaSettings.js':['arcaneBrainModelName'],
     'OpenMeteoWeatherProvider.js':['mapForecast'],
     'PersistentAIChatSession.js':[
-        'createPersistentAIChatSession','create','ready','history',
-        'settleMemory','send'
+        'createPersistentAIChatSession','create','ready','history','transcript',
+        'settleMemory','send','stream'
     ],
     'RecordLinkIndex.js':['parseRecordLinks','buildRecordLinkIndex'],
     'RecordReviewStore.js':['load','get','set','snapshot'],

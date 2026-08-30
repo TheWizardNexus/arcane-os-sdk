@@ -927,7 +927,7 @@ test('generated runtime reference contracts are exhaustive and reader-first',asy
         const providerRuntimeHtml=moduleHtml('AIProviderRuntime.js');
         assert.match(providerRuntimeHtml,/start\(\{startMuted=true,signal=null\}=\{\}\)[\s\S]*\{barrier,settled,cancel\}/u);
         const configuredHtml=moduleHtml('ConfiguredAIChatSession.js');
-        assert.match(configuredHtml,/initialMessages[\s\S]*contextBuilder\(\{input,history,signal\}\)[\s\S]*tool_calls[\s\S]*exactly one/u);
+        assert.match(configuredHtml,/initialMessages[\s\S]*ordered structural function-call arrays[\s\S]*exactly one nonblank role=tool message for every pending ID/u);
         const documentLibraryHtml=moduleHtml('DBOPFSDocumentLibrary.js');
         assert.match(documentLibraryHtml,/preserve-readable[\s\S]*partial failures and coverage/u);
         assert.match(documentLibraryHtml,/DBOPFS_DOCUMENT_INVALID[\s\S]*DBOPFS_DOCUMENT_INVALID_LIMIT[\s\S]*DBOPFS_DOCUMENT_ERROR/u);

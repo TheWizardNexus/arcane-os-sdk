@@ -736,7 +736,7 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
         assert.ok(chat.events.includes('chat-ai-activation-error'));
         const source=await readFile(path.join(repositoryRoot,chat.file),'utf8');
         for(const value of [
-            "Object.freeze({role:'llm',action,reason:'user'})",
+            "const intent={role:'llm',action,reason:'user'}",
             "'chat-ai-activation-request'",
             "'chat-ai-activation-error'"
         ])assert.match(source,new RegExp(escapeRegExp(value),'u'),value);
@@ -746,8 +746,9 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
         assert.match(componentGuide,/preventDefault\(\)` suppresses the callback/u);
         assert.match(componentGuide,/emits no\s+activation request on import or startup/u);
         assert.match(componentGuide,/provider\/runtime owner decides whether and\s+how to execute/u);
-        assert.match(componentGuide,/destroy\(\)[\s\S]*aborts the component's AI-runtime-state subscription[\s\S]*sets `ready` to `false`[\s\S]*returns\s+`undefined`/u);
-        assert.match(chat.normalization,/destroy aborts state\/activation observation[\s\S]*returns undefined/u);
+        assert.match(componentGuide,/BFCache-persisted page retains the component[\s\S]*persisted `pageshow`[\s\S]*Nonpersisted `pagehide`[\s\S]*destroy\(\)/u);
+        assert.match(componentGuide,/destroy\(\)[\s\S]*returns `true`[\s\S]*later calls return `false`/u);
+        assert.match(chat.normalization,/BFCache-preserving page lifecycle[\s\S]*returns true once\/false thereafter/u);
     });
 
     await t.test('speech components document one shared selected-STT activation contract',async()=>{
@@ -873,7 +874,7 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
             ['Overview','Public surface','Availability and normalization','Example']
         );
         assert.match(providerRuntime,/start\(options\)[\s\S]*\{startMuted=true,startTranscription=false,signal=null\}[\s\S]*\{barrier,settled,cancel\}/u);
-        assert.match(providerRuntime,/latest-request-wins[\s\S]*waits for its provider promise\s+to settle/u);
+        assert.match(providerRuntime,/uncapped FIFO lane per role[\s\S]*does not abort or discard the active request[\s\S]*each request starts after earlier work settles/u);
         assert.match(providerRuntime,/AI_LOCAL_MODEL_REQUIRED/u);
 
         const configuredSession=requireGuideSection(
@@ -884,10 +885,12 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
         for(const value of [
             'initialMessages',
             'contextBuilder({input,history,signal})',
-            'must contain exactly one',
+            'ordered array of calls with unique IDs',
+            "exactly one `role:'tool'` message with nonempty content for every pending ID",
             'AI_CHAT_INVALID_TOOL_MESSAGE',
             'AI_CHAT_TOOL_RESULT_REQUIRED',
-            'AI_CHAT_TRANSACTION_SETTLED'
+            'AI_CHAT_TRANSACTION_SETTLED',
+            'AI_CHAT_INCOHERENT_PERSISTENCE'
         ])assert.match(configuredSession,new RegExp(escapeRegExp(value),'u'),value);
     });
 });
