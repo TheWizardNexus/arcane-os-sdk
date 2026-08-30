@@ -920,7 +920,7 @@
       "summary": "Normalizes message content advisories and contains per-message inspection failures.",
       "availability": "Cross-host",
       "protocol": "Injected inspector",
-      "normalization": "Normalized advisory records; inspector failures converted to unavailable results.",
+      "normalization": "Complete mutable advisory records preserve all supplied text and signals; inspector failures become unavailable results.",
       "surface": "Three advisory/inspection helpers."
     },
     {
@@ -1088,7 +1088,7 @@
       "summary": "Indexes text lines, page markers, dates, rules, and excerpts for record review.",
       "availability": "Cross-host",
       "protocol": "In-process only",
-      "normalization": "Fully normalized.",
+      "normalization": "Complete selected excerpts and every unique date/rule finding are preserved without character or result-count caps.",
       "surface": "Eight text/page/date/rule helper exports."
     },
     {

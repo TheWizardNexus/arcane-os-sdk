@@ -156,7 +156,7 @@ console.log(
         name:'MessageAdvisory.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure normalization except for awaiting injected prepare/inspector callbacks. Callback failures are contained as unavailable advisories; inputs are not mutated.',
-        paramsResults:'normalizeContentAdvisory(value) returns a frozen advisory or null. unavailableMessageInspection(messages) returns {advisories:Map,failures}. inspectMessageRecords(messages,inspector,{prepare?}) resolves the same shape with bounded levels/text/signals.',
+        paramsResults:'normalizeContentAdvisory(value) returns a complete mutable advisory or null. unavailableMessageInspection(messages) returns {advisories:Map,failures}. inspectMessageRecords(messages,inspector,{prepare?}) resolves the same shape without clipping text or signals.',
         events:[],
         errors:['prepare/inspector rejections become unavailable results.','Iterable/runtime errors outside those callbacks can propagate.'],
         capabilitiesCore:'None; the injected inspector owns authority.',
@@ -346,10 +346,10 @@ console.log(buildRecordLinkIndex(records));`
     {
         name:'RecordPassageIndex.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Pure bounded text/page/date/rule analysis. Supplied accept callbacks run synchronously; inputs are not mutated.',
-        paramsResults:'textLines(text); cleanExcerpt(lines,start,end,{maximumLength?}); pageMarkers(lines); pageAtLine(markers,line); validIsoDate(y,m,d); parseDateMention(text); extractDateMentions(text,options) returns sorted findings; findRulePassages(text,rules,options) returns bounded findings.',
+        lifecycleSideEffects:'Pure complete text/page/date/rule analysis. Supplied accept callbacks run synchronously; inputs are not mutated.',
+        paramsResults:'textLines(text); cleanExcerpt(lines,start,end) preserves the complete selected excerpt; pageMarkers(lines); pageAtLine(markers,line); validIsoDate(y,m,d); parseDateMention(text); extractDateMentions(text,options) returns all sorted findings; findRulePassages(text,rules,options) returns all unique findings.',
         events:[],
-        errors:['Invalid caller RegExp/pattern or accept callback errors propagate; numeric limits otherwise normalize to bounded fallbacks.'],
+        errors:['Invalid caller RegExp/pattern or accept callback errors propagate.'],
         capabilitiesCore:'None.',
         example:String.raw`import {findRulePassages} from '/arcane/modules/RecordPassageIndex.js';
 

@@ -202,26 +202,24 @@
     const sourceScroll=host.shadowRoot.querySelector('#sourceScroll');
     const sourceLines=host.shadowRoot.querySelector('#sourceLines');
 
-    const MAXIMUM_CHARACTERS=1048576;
-    const MAXIMUM_LINES=20000;
-    const defaultOptions=Object.freeze({
-        labels:Object.freeze({
+    const defaultOptions={
+        labels:{
             content:'Source code',
             empty:'Choose a source file from the catalog.',
             error:'This source file could not be displayed.',
-            loading:'Loading and verifying source code…',
+            loading:'Loading source code…',
             repository:'View repository source'
-        })
-    });
+        }
+    };
 
-    let current=Object.freeze({
+    let current={
         language:'text',
         lineCount:0,
         repositoryURL:'',
         sourcePath:'',
         text:'',
         title:''
-    });
+    };
     let destroyed=false;
     let eventOperationSequence=0;
     let loadSequence=0;
@@ -244,17 +242,17 @@
         value:{get:()=>current.text,set:value=>render(value)}
     });
 
-    function boundedText(value,label,maximum,{optional=false}={}){
+    function normalizedText(value,label,{optional=false}={}){
         if(optional&&(value===undefined||value===null||value===''))return '';
-        if(typeof value!=='string'||!value.trim()||value.length>maximum||/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(value)){
-            throw new TypeError(`${label} must be bounded text.`);
+        if(typeof value!=='string'||!value.trim()||/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(value)){
+            throw new TypeError(`${label} must be text.`);
         }
         return value.trim();
     }
 
     function safeRepositoryURL(value=''){
         if(value===undefined||value===null||value==='')return '';
-        const input=boundedText(value,'Source repositoryURL',2048);
+        const input=normalizedText(value,'Source repositoryURL');
         try{
             const url=new URL(input,document.baseURI);
             if(!['http:','https:'].includes(url.protocol)||url.username||url.password){
@@ -278,22 +276,22 @@
         const labels={...previous.labels};
         for(const name of ['content','empty','error','loading','repository']){
             if(labelInput[name]!==undefined){
-                labels[name]=boundedText(labelInput[name],`Source viewer labels.${name}`,160);
+                labels[name]=normalizedText(labelInput[name],`Source viewer labels.${name}`);
             }
         }
-        return Object.freeze({labels:Object.freeze(labels)});
+        return {labels};
     }
 
     function normalizeRenderOptions(input={}){
         if(!input||typeof input!=='object'||Array.isArray(input)){
             throw new TypeError('Source render options must be an object.');
         }
-        return Object.freeze({
-            language:boundedText(input.language||'text','Source language',64).toLowerCase(),
+        return {
+            language:normalizedText(input.language||'text','Source language').toLowerCase(),
             repositoryURL:safeRepositoryURL(input.repositoryURL),
-            sourcePath:boundedText(input.sourcePath||'Source file','Source path',1024),
-            title:boundedText(input.title||input.sourcePath||'Source file','Source title',256)
-        });
+            sourcePath:normalizedText(input.sourcePath||'Source file','Source path'),
+            title:normalizedText(input.title||input.sourcePath||'Source file','Source title')
+        };
     }
 
     function configure(input={}){
@@ -337,14 +335,12 @@
 
     function renderSource(text='',renderOptions={}){
         if(typeof text!=='string')throw new TypeError('Source content must be a string.');
-        if(text.length>MAXIMUM_CHARACTERS)throw new RangeError('Source content exceeds the viewer character limit.');
         const metadata=normalizeRenderOptions(renderOptions);
         const lines=text.replace(/\r\n?/g,'\n').split('\n');
-        if(lines.length>MAXIMUM_LINES)throw new RangeError('Source content exceeds the viewer line limit.');
 
         sourceLines.replaceChildren();
         if(!text){
-            current=Object.freeze({...metadata,lineCount:0,text:''});
+            current={...metadata,lineCount:0,text:''};
             transition('empty');
             return true;
         }
@@ -363,7 +359,7 @@
             fragment.append(item);
         });
         sourceLines.replaceChildren(fragment);
-        current=Object.freeze({...metadata,lineCount:lines.length,text});
+        current={...metadata,lineCount:lines.length,text};
         transition('ready');
         return true;
     }
@@ -371,14 +367,14 @@
     function clear(){
         ++loadSequence;
         sourceLines.replaceChildren();
-        current=Object.freeze({
+        current={
             language:'text',
             lineCount:0,
             repositoryURL:'',
             sourcePath:'',
             text:'',
             title:''
-        });
+        };
         transition('empty');
         return true;
     }
@@ -423,7 +419,7 @@
             sourcePath:current.sourcePath,
             state
         };
-        if(error)detail.message=String(error?.message||'Source rendering failed.').slice(0,512);
+        if(error)detail.message=String(error?.message||'Source rendering failed.');
         const reason={
             empty:'source-code-viewer-cleared',
             error:'source-code-viewer-render-rejected',

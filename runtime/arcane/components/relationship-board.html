@@ -66,21 +66,21 @@
   function normalizeNode(value,index){
     const item=value&&typeof value==='object'?value:{};
     if(!item.id) return null;
-    return {...item,id:String(item.id).slice(0,180),label:String(item.label||item.title||item.id).slice(0,500),summary:String(item.summary||'').slice(0,1800),lane:String(item.lane||item.kind||'Other').slice(0,100),order:Number.isFinite(Number(item.order))?Number(item.order):index};
+    return {...item,id:String(item.id),label:String(item.label||item.title||item.id),summary:String(item.summary||''),lane:String(item.lane||item.kind||'Other'),order:Number.isFinite(Number(item.order))?Number(item.order):index};
   }
   function normalizeEdge(value,index,known){
     const item=value&&typeof value==='object'?value:{};
-    const from=String(item.from||'').slice(0,180); const to=String(item.to||'').slice(0,180);
+    const from=String(item.from||''); const to=String(item.to||'');
     if(!from||!to||!known.has(from)||!known.has(to)) return null;
-    return {...item,id:String(item.id||`edge-${index+1}`).slice(0,180),from,to,label:String(item.label||'related to').slice(0,300),summary:String(item.summary||'').slice(0,1200)};
+    return {...item,id:String(item.id||`edge-${index+1}`),from,to,label:String(item.label||'related to'),summary:String(item.summary||'')};
   }
 
   function setGraph(graph={},options={}){
-    nodes=(Array.isArray(graph.nodes)?graph.nodes:[]).slice(0,1500).map(normalizeNode).filter(Boolean);
+    nodes=(Array.isArray(graph.nodes)?graph.nodes:[]).map(normalizeNode).filter(Boolean);
     const known=new Set(nodes.map(item=>item.id));
-    edges=(Array.isArray(graph.edges)?graph.edges:[]).slice(0,6000).map((item,index)=>normalizeEdge(item,index,known)).filter(Boolean);
+    edges=(Array.isArray(graph.edges)?graph.edges:[]).map((item,index)=>normalizeEdge(item,index,known)).filter(Boolean);
     const supplied=Array.isArray(options.lanes)?options.lanes:Array.isArray(graph.lanes)?graph.lanes:[];
-    lanes=[...new Set([...supplied.map(String),...nodes.map(item=>item.lane)])].slice(0,12);
+    lanes=[...new Set([...supplied.map(String),...nodes.map(item=>item.lane)])];
     board.style.setProperty('--lane-count',String(Math.max(1,Math.min(6,lanes.length))));
     if(selectedId&&!known.has(selectedId)) selectedId='';
     render();

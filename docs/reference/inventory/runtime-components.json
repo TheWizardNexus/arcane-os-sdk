@@ -319,7 +319,7 @@
     {
       "file": "runtime/arcane/components/file-drop.html",
       "name": "file-drop.html",
-      "purpose": "Acquires files by drag/drop or picker and presents busy, progress, error, and cleared state.",
+      "purpose": "Acquires complete file selections by drag/drop or picker and presents busy, progress, error, and cleared state.",
       "methods": [
         "configure()",
         "openPicker()",
@@ -340,7 +340,7 @@
       "dependencies": [],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "State normalized; browser File/drop errors mixed"
+      "normalization": "Complete selections preserved; browser File/drop errors mixed"
     },
     {
       "file": "runtime/arcane/components/file-inspector.html",
@@ -629,7 +629,7 @@
     {
       "file": "runtime/arcane/components/record-timeline.html",
       "name": "record-timeline.html",
-      "purpose": "Displays chronological records/evidence and emits open actions.",
+      "purpose": "Displays complete chronological records/evidence and emits open actions.",
       "methods": [
         "setItems()",
         "populate()",
@@ -643,12 +643,12 @@
       "dependencies": [],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "DOM-normalized"
+      "normalization": "Complete item fields and inventories preserved"
     },
     {
       "file": "runtime/arcane/components/relationship-board.html",
       "name": "relationship-board.html",
-      "purpose": "Displays normalized relationship nodes/edges in graph and list forms.",
+      "purpose": "Displays complete normalized relationship nodes/edges in graph and list forms.",
       "methods": [
         "setGraph()",
         "populate()",
@@ -663,7 +663,7 @@
       "dependencies": [],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "DOM-normalized"
+      "normalization": "Complete graph inventories and fields preserved"
     },
     {
       "file": "runtime/arcane/components/screen-capture.html",
@@ -688,7 +688,7 @@
     {
       "file": "runtime/arcane/components/source-code-viewer.html",
       "name": "source-code-viewer.html",
-      "purpose": "Renders line-addressable source code with load, error, focus, and state behavior.",
+      "purpose": "Renders complete line-addressable source code with load, error, focus, and state behavior.",
       "methods": [
         "configure()",
         "load()",
@@ -711,7 +711,7 @@
       "dependencies": [],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "Normalized source/state"
+      "normalization": "Complete mutable source/state"
     },
     {
       "file": "runtime/arcane/components/source-explanation.html",

@@ -50,27 +50,29 @@
 
   function normalizeItem(item,index){
     const source=item&&typeof item==='object'?item:{};
-    const date=String(source.date||source.isoDate||'').slice(0,32);
+    const date=String(source.date||source.isoDate||'');
     if(!source.id||!date) return null;
     return {
       ...source,
-      id:String(source.id).slice(0,180),
+      id:String(source.id),
       date,
-      title:String(source.title||'Dated event').slice(0,500),
-      summary:String(source.summary||'').slice(0,2400),
-      category:String(source.category||source.kind||'Event').slice(0,100),
-      actor:String(source.actor||'Actor not assigned').slice(0,180),
-      sourceLabel:String(source.sourceLabel||'').slice(0,240),
-      status:String(source.status||'').slice(0,120),
-      factualPosture:String(source.factualPosture||'').slice(0,160),
-      sourceCount:Math.max(0,Math.min(9999,Number(source.sourceCount)||0)),
+      title:String(source.title||'Dated event'),
+      summary:String(source.summary||''),
+      category:String(source.category||source.kind||'Event'),
+      actor:String(source.actor||'Actor not assigned'),
+      sourceLabel:String(source.sourceLabel||''),
+      status:String(source.status||''),
+      factualPosture:String(source.factualPosture||''),
+      sourceCount:Number.isFinite(Number(source.sourceCount))&&Number(source.sourceCount)>=0
+        ?Number(source.sourceCount)
+        :0,
       order:index
     };
   }
 
   function setItems(value=[],input={}){
     options={...options,...(input&&typeof input==='object'?input:{})};
-    items=(Array.isArray(value)?value:[]).slice(0,5000).map(normalizeItem).filter(Boolean)
+    items=(Array.isArray(value)?value:[]).map(normalizeItem).filter(Boolean)
       .sort((left,right)=>left.date.localeCompare(right.date)||left.order-right.order);
     render();
     return items.map(item=>({...item}));

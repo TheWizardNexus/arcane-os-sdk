@@ -5,9 +5,9 @@ const MONTH_NUMBER={
 
 const MONTH_TOKEN='January|February|March|April|May|June|July|August|September|October|November|December';
 
-function boundedInteger(value,{minimum=0,maximum=10000,fallback=0}={}){
+function normalizedInteger(value,{minimum=0,fallback=0}={}){
   const number=Number(value);
-  return Number.isInteger(number)&&number>=minimum&&number<=maximum?number:fallback;
+  return Number.isInteger(number)&&number>=minimum?number:fallback;
 }
 
 function textLines(value=''){
@@ -35,16 +35,14 @@ function lineAtOffset(offsets=[],index=0){
   return Math.max(0,high);
 }
 
-function cleanExcerpt(lines=[],start=0,end=start,{maximumLength=1200}={}){
-  const maximum=boundedInteger(maximumLength,{minimum:80,maximum:10000,fallback:1200});
-  const value=lines.slice(start,end+1)
+function cleanExcerpt(lines=[],start=0,end=start){
+  return lines.slice(start,end+1)
     .filter(line=>!/^\s*(?:```|---)\s*$/.test(line))
     .map(line=>line.replace(/^\s{0,4}(?:[-*+]\s+|>\s*)?/,'').trim())
     .filter(Boolean)
     .join(' ')
     .replace(/\s+/g,' ')
     .trim();
-  return value.length>maximum?`${value.slice(0,maximum-1).trimEnd()}…`:value;
 }
 
 function pageMarkers(lines=[]){
@@ -73,23 +71,18 @@ function globalPattern(pattern){
 }
 
 function passageKey(item={}){
-  return `${item.ruleId}|${item.page??''}|${item.lineStart}|${item.excerpt.toLocaleLowerCase().replace(/\W+/g,' ').slice(0,180)}`;
+  return `${item.ruleId}|${item.page??''}|${item.lineStart}|${item.excerpt.toLocaleLowerCase().replace(/\W+/g,' ')}`;
 }
 
 function findRulePassages(text='',rules=[],{
   recordId='',
-  contextLines=2,
-  maximumExcerptLength=1200,
-  maximumPerRule=40,
-  maximumResults=1200
+  contextLines=2
 }={}){
   const source=String(text??'').replace(/\r\n?/g,'\n');
   const lines=textLines(source);
   const offsets=lineOffsets(lines);
   const markers=pageMarkers(lines);
-  const defaultContext=boundedInteger(contextLines,{minimum:0,maximum:20,fallback:2});
-  const perRule=boundedInteger(maximumPerRule,{minimum:1,maximum:500,fallback:40});
-  const totalLimit=boundedInteger(maximumResults,{minimum:1,maximum:10000,fallback:1200});
+  const defaultContext=normalizedInteger(contextLines,{minimum:0,fallback:2});
   const findings=[];
   const seen=new Set();
 
@@ -100,13 +93,12 @@ function findRulePassages(text='',rules=[],{
     for(const supplied of patterns.filter(Boolean)){
       const pattern=globalPattern(supplied);
       for(const match of source.matchAll(pattern)){
-        if(ruleCount>=perRule||findings.length>=totalLimit) break;
         const matchIndex=match.index??0;
         const line=lineAtOffset(offsets,matchIndex);
-        const localContext=boundedInteger(definition.contextLines,{minimum:0,maximum:20,fallback:defaultContext});
+        const localContext=normalizedInteger(definition.contextLines,{minimum:0,fallback:defaultContext});
         const lineStart=Math.max(0,line-localContext);
         const lineEnd=Math.min(lines.length-1,line+localContext);
-        const excerpt=cleanExcerpt(lines,lineStart,lineEnd,{maximumLength:definition.maximumExcerptLength||maximumExcerptLength});
+        const excerpt=cleanExcerpt(lines,lineStart,lineEnd);
         if(!excerpt) continue;
         const candidate={
           id:`${String(recordId||'record')}:${String(definition.id)}:${line+1}:${ruleCount+1}`,
@@ -129,7 +121,6 @@ function findRulePassages(text='',rules=[],{
         ruleCount++;
       }
     }
-    if(findings.length>=totalLimit) break;
   }
   return findings;
 }
@@ -162,16 +153,13 @@ function parseDateMention(value=''){
 
 function extractDateMentions(text='',{
   recordId='',
-  contextLines=1,
-  maximumExcerptLength=900,
-  maximumResults=2000
+  contextLines=1
 }={}){
   const source=String(text??'').replace(/\r\n?/g,'\n');
   const lines=textLines(source);
   const offsets=lineOffsets(lines);
   const markers=pageMarkers(lines);
-  const context=boundedInteger(contextLines,{minimum:0,maximum:20,fallback:1});
-  const limit=boundedInteger(maximumResults,{minimum:1,maximum:20000,fallback:2000});
+  const context=normalizedInteger(contextLines,{minimum:0,fallback:1});
   const patterns=[
     new RegExp(`\\b(?:${MONTH_TOKEN})\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+\\d{4}\\b`,'gi'),
     /\b\d{4}-\d{1,2}-\d{1,2}\b/g,
@@ -183,7 +171,6 @@ function extractDateMentions(text='',{
   const results=[];
   for(const pattern of patterns){
     for(const match of source.matchAll(pattern)){
-      if(results.length>=limit) break;
       const start=match.index??0; const end=start+match[0].length;
       if(occupied.some(range=>start<range.end&&end>range.start)) continue;
       const parsed=parseDateMention(match[0]);
@@ -202,10 +189,9 @@ function extractDateMentions(text='',{
         lineStart:lineStart+1,
         lineEnd:lineEnd+1,
         page:pageAtLine(markers,line),
-        excerpt:cleanExcerpt(lines,lineStart,lineEnd,{maximumLength:maximumExcerptLength})
+        excerpt:cleanExcerpt(lines,lineStart,lineEnd)
       });
     }
-    if(results.length>=limit) break;
   }
   return results.sort((left,right)=>left.isoDate.localeCompare(right.isoDate)||left.lineStart-right.lineStart);
 }

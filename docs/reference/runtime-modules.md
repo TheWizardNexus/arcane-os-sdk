@@ -2175,7 +2175,7 @@ Exact exports: `inspectMessageRecords`, `normalizeContentAdvisory`, `unavailable
 
 ### Availability and normalization
 
-**Cross-host.** Normalized advisory records; inspector failures converted to unavailable results. Transport: Injected inspector. [Deep protocol details](protocols.md).
+**Cross-host.** Complete mutable advisory records preserve all supplied text and signals; inspector failures are converted to unavailable results. Transport: Injected inspector. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -2536,7 +2536,7 @@ Exact exports: `cleanExcerpt`, `extractDateMentions`, `findRulePassages`, `pageA
 
 ### Availability and normalization
 
-**Cross-host.** Fully normalized. Transport: In-process only. [Deep protocol details](protocols.md).
+**Cross-host.** Complete selected excerpts and every unique date/rule finding are preserved without character or result-count caps. Transport: In-process only. [Deep protocol details](protocols.md).
 
 ### Example
 

@@ -1,25 +1,27 @@
-function bounded(value,maximum){return String(value??'').trim().slice(0,maximum);}
+function completeText(value){return String(value??'');}
 
 export function normalizeContentAdvisory(value){
     if(!value||typeof value!=='object')return null;
-    return Object.freeze({
+    return {
         level:['critical','high','caution','low','unavailable'].includes(value.level)?value.level:'caution',
-        title:bounded(value.title||'Content advisory',120),
-        summary:bounded(value.summary||'Review this message carefully.',500),
-        signals:Object.freeze(Array.from(value.signals||[],item=>bounded(item,120)).filter(Boolean).slice(0,8)),
-        actionLabel:bounded(value.actionLabel,80),
+        title:completeText(value.title??'Content advisory'),
+        summary:completeText(value.summary??'Review this message carefully.'),
+        signals:Array.from(value.signals||[],completeText),
+        actionLabel:completeText(value.actionLabel),
+    };
+}
+
+function unavailableAdvisory(){
+    return normalizeContentAdvisory({
+        level:'unavailable',
+        title:'Safety check unavailable',
+        summary:'No safety conclusion was made for this message. Pause and review it manually before replying.',
     });
 }
 
-const unavailableAdvisory=normalizeContentAdvisory({
-    level:'unavailable',
-    title:'Safety check unavailable',
-    summary:'No safety conclusion was made for this message. Pause and review it manually before replying.',
-});
-
 export function unavailableMessageInspection(messages){
     const advisories=new Map();
-    for(const message of Array.from(messages||[]))advisories.set(message,unavailableAdvisory);
+    for(const message of Array.from(messages||[]))advisories.set(message,unavailableAdvisory());
     return {advisories,failures:advisories.size};
 }
 
@@ -32,7 +34,7 @@ export async function inspectMessageRecords(messages,inspector,{prepare}={}){
     catch{return unavailableMessageInspection(records);}
     for(const message of records){
         try{const advisory=normalizeContentAdvisory(await inspector(message,context));if(advisory){if(advisory.level==='unavailable')failures+=1;advisories.set(message,advisory);}}
-        catch{failures+=1;advisories.set(message,unavailableAdvisory);}
+        catch{failures+=1;advisories.set(message,unavailableAdvisory());}
     }
     return {advisories,failures};
 }

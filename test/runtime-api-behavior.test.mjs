@@ -51,7 +51,13 @@ import {
     formatAIRuntimeProgress
 } from '../runtime/arcane/modules/ComponentContracts.js';
 import ConfiguredAIChatSession from '../runtime/arcane/modules/ConfiguredAIChatSession.js';
+import {normalizeContentAdvisory} from '../runtime/arcane/modules/MessageAdvisory.js';
 import PreferenceStore from '../runtime/arcane/modules/PreferenceStore.js';
+import {
+    cleanExcerpt,
+    extractDateMentions,
+    findRulePassages
+} from '../runtime/arcane/modules/RecordPassageIndex.js';
 
 const repositoryRoot=new URL('../',import.meta.url);
 
@@ -77,6 +83,58 @@ test('AI runtime progress preserves complete provider-reported measures',()=>{
         ),
         'fetching · 10.5 of 10 octets'
     );
+});
+
+test('message advisories and record passages preserve complete content',()=>{
+    const summary='Complete advisory content '.repeat(80);
+    const signals=Array.from({length:12},(_,index)=>`signal ${index+1} ${'detail '.repeat(30)}`);
+    const advisory=normalizeContentAdvisory({summary,signals});
+    assert.equal(advisory.summary,summary);
+    assert.deepEqual(advisory.signals,signals);
+    assert.equal(Object.isFrozen(advisory),false);
+    assert.equal(Object.isFrozen(advisory.signals),false);
+
+    const excerpt='first complete line second complete line';
+    assert.equal(
+        cleanExcerpt(['first complete line','second complete line'],0,1,{maximumLength:3}),
+        excerpt
+    );
+    assert.equal(
+        findRulePassages(
+            'payment first\npayment second',
+            [{id:'payment',patterns:[/payment/gi]}],
+            {contextLines:0,maximumPerRule:1,maximumResults:1}
+        ).length,
+        2
+    );
+    assert.equal(
+        extractDateMentions(
+            'January 1, 2025\nFebruary 2, 2025',
+            {contextLines:0,maximumResults:1}
+        ).length,
+        2
+    );
+});
+
+test('record components retain every supplied item and complete source content',async()=>{
+    const paths={
+        fileDrop:'runtime/arcane/components/file-drop.html',
+        relationshipBoard:'runtime/arcane/components/relationship-board.html',
+        sourceViewer:'runtime/arcane/components/source-code-viewer.html',
+        timeline:'runtime/arcane/components/record-timeline.html'
+    };
+    const sources=Object.fromEntries(await Promise.all(
+        Object.entries(paths).map(async([name,path])=>[
+            name,
+            await readFile(new URL(path,repositoryRoot),'utf8')
+        ])
+    ));
+
+    assert.match(sources.fileDrop,/currentFiles=files;/);
+    assert.doesNotMatch(sources.fileDrop,/ARCANE_FILE_DROP_FILE_COUNT_LIMIT_EXCEEDED/);
+    assert.doesNotMatch(sources.timeline,/\.slice\(0,5000\)/);
+    assert.doesNotMatch(sources.relationshipBoard,/\.slice\(0,(?:12|1500|6000)\)/);
+    assert.doesNotMatch(sources.sourceViewer,/MAXIMUM_(?:CHARACTERS|LINES)|Object\.freeze|\.slice\(0,512\)/);
 });
 
 test('preference setAll uses the admitted native atomic batch once',async()=>{

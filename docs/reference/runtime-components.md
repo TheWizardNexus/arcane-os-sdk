@@ -69,7 +69,7 @@ appropriate.
 | [`data-view.html`](#data-viewhtml) | Opens a generic modal-style data view around an injected provider. | `beforeOpen()`<br>`open()`<br>`destroy()` | `data-view-ready` | DOM-native result |
 | [`directory-picker.html`](#directory-pickerhtml) | Presents the provider-owned OS directory chooser with change/cancel/error states. | `configure()`<br>`focus()`<br>`select()`<br>`destroy()` | `directory-picker-ready`<br>`directory-picker-change`<br>`directory-picker-cancel`<br>`directory-picker-error` | Strict normalized native selection/error |
 | [`document-inspector.html`](#document-inspectorhtml) | Inspects PDF, text, or source documents and records review state. | `loadDocument()`<br>`selectView()`<br>`markSaved()`<br>`destroy()` | `document-inspector-ready`<br>`document-review-change` | Document state normalized; browser document APIs mixed |
-| [`file-drop.html`](#file-drophtml) | Acquires files by drag/drop or picker and presents busy, progress, error, and cleared state. | `configure()`<br>`openPicker()`<br>`clear()`<br>`setBusy()`<br>`setError()`<br>`setProgress()`<br>`destroy()` | `file-drop-ready`<br>`file-drop-selected`<br>`file-drop-progress`<br>`file-drop-state`<br>`file-drop-error` | State normalized; browser File/drop errors mixed |
+| [`file-drop.html`](#file-drophtml) | Acquires complete file selections by drag/drop or picker and presents busy, progress, error, and cleared state. | `configure()`<br>`openPicker()`<br>`clear()`<br>`setBusy()`<br>`setError()`<br>`setProgress()`<br>`destroy()` | `file-drop-ready`<br>`file-drop-selected`<br>`file-drop-progress`<br>`file-drop-state`<br>`file-drop-error` | Complete selections preserved; browser File/drop errors mixed |
 | [`file-inspector.html`](#file-inspectorhtml) | Displays file metadata, preview, busy/error state, and caller-defined actions. | `configure()`<br>`show()`<br>`clear()`<br>`setActions()`<br>`setBusy()`<br>`setError()`<br>`setPreview()`<br>`destroy()` | `file-inspector-ready`<br>`file-inspector-action`<br>`file-inspector-change`<br>`file-inspector-cleared`<br>`file-inspector-error` | State normalized; preview/provider behavior mixed |
 | [`file-manager.html`](#file-managerhtml) | Browses, filters, selects, opens, and acts on app-scoped files. | `setProvider()`<br>`loadAll()`<br>`setFilter()`<br>`select()`<br>`clearSelection()`<br>`destroy()` | `file-manager-ready`<br>`file-manager-select`<br>`file-manager-open`<br>`file-manager-action` | Selection/filter state normalized; storage/provider behavior mixed |
 | [`header.html`](#headerhtml) | Legacy title bar with history, reload, online marker, presentation labels, and 988 link. | None | No component-specific event | Browser/platform-native behavior; no component-ready contract |
@@ -81,10 +81,10 @@ appropriate.
 | [`modal.html`](#modalhtml) | Generic modal with population, open/close, actions, and sequential task execution. | `populate()`<br>`open()`<br>`close()`<br>`runTasks()`<br>`destroy()` | `modal-ready`<br>`modal-opened`<br>`modal-closed`<br>`modal-action` | Modal state normalized; injected task results mixed |
 | [`output-panel.html`](#output-panelhtml) | Presents status, output, body, coverage, actions, pending, error, and cleared states. | `configure()`<br>`setOutput()`<br>`setBody()`<br>`setCoverage()`<br>`setActions()`<br>`setPending()`<br>`setStatus()`<br>`setError()`<br>`clear()`<br>`destroy()` | `output-panel-ready`<br>`output-panel-state`<br>`output-panel-change`<br>`output-panel-action`<br>`output-panel-error`<br>`output-panel-cleared` | DOM-normalized |
 | [`preferences-form.html`](#preferences-formhtml) | Builds a schema-driven preferences form with submit, reset, busy, and status behavior. | `configure()`<br>`getValues()`<br>`setValues()`<br>`setBusy()`<br>`setStatus()`<br>`destroy()` | `preferences-form-ready`<br>`preferences-change`<br>`preferences-submit`<br>`preferences-reset` | Normalized form values |
-| [`record-timeline.html`](#record-timelinehtml) | Displays chronological records/evidence and emits open actions. | `setItems()`<br>`populate()`<br>`destroy()` | `record-timeline-ready`<br>`record-timeline-open` | DOM-normalized |
-| [`relationship-board.html`](#relationship-boardhtml) | Displays normalized relationship nodes/edges in graph and list forms. | `setGraph()`<br>`populate()`<br>`destroy()` | `relationship-board-ready`<br>`relationship-node-open`<br>`relationship-edge-open` | DOM-normalized |
+| [`record-timeline.html`](#record-timelinehtml) | Displays complete chronological records/evidence and emits open actions. | `setItems()`<br>`populate()`<br>`destroy()` | `record-timeline-ready`<br>`record-timeline-open` | Complete item fields and inventories preserved |
+| [`relationship-board.html`](#relationship-boardhtml) | Displays complete normalized relationship nodes/edges in graph and list forms. | `setGraph()`<br>`populate()`<br>`destroy()` | `relationship-board-ready`<br>`relationship-node-open`<br>`relationship-edge-open` | Complete graph inventories and fields preserved |
 | [`screen-capture.html`](#screen-capturehtml) | Presents image, video, or GIF display-capture workflow. | `capture` (`ScreenCapture` instance)<br>`destroy()` | `screen-capture-ready`<br>`screen-capture-result` | State/result normalized; media permission/codec failures mixed |
-| [`source-code-viewer.html`](#source-code-viewerhtml) | Renders line-addressable source code with load, error, focus, and state behavior. | `configure()`<br>`load()`<br>`render()`<br>`clear()`<br>`fail()`<br>`focus()`<br>`focusLine()`<br>`destroy()` | `source-code-viewer-ready`<br>`source-code-viewer-state`<br>`source-code-viewer-state-loading`<br>`source-code-viewer-state-ready`<br>`source-code-viewer-state-empty`<br>`source-code-viewer-state-error` | Normalized source/state |
+| [`source-code-viewer.html`](#source-code-viewerhtml) | Renders complete line-addressable source code with load, error, focus, and state behavior. | `configure()`<br>`load()`<br>`render()`<br>`clear()`<br>`fail()`<br>`focus()`<br>`focusLine()`<br>`destroy()` | `source-code-viewer-ready`<br>`source-code-viewer-state`<br>`source-code-viewer-state-loading`<br>`source-code-viewer-state-ready`<br>`source-code-viewer-state-empty`<br>`source-code-viewer-state-error` | Complete mutable source/state |
 | [`source-explanation.html`](#source-explanationhtml) | Presents an evidence finding, source selection, explanation, and save state. | `showFinding()`<br>`populate()`<br>`selectSource()`<br>`markSaved()`<br>`destroy()` | `source-explanation-ready`<br>`source-explanation-save`<br>`source-explanation-source-selected` | DOM-normalized |
 | [`speech.html`](#speechhtml) | Coordinates explicit STT activation, speech controls, transcription completion, mute state, and microphone availability. | `configure()`<br>`setAvailability()`<br>`setMuted()`<br>`reportTTSError()`<br>`requestSTTActivation()`<br>`destroy()`<br>`availability`<br>`muted`<br>`initialMuted`<br>`componentReady` | `speech-ready`<br>`speech-transcription-complete`<br>`speech-transcription-error`<br>`speech-transcription-cancelled`<br>`speech-microphone-unavailable`<br>`speech-stt-activation-request`<br>`speech-stt-activation-error`<br>`speech-tts-lifecycle-error`<br>`speech-synthesis-error` | Sticky runtime speech readiness, explicit STT activation, request cancellation, TTS mute lifecycle intent, and exact TTS operation failures normalized; provider/model authority remains external |
 | [`summary-strip.html`](#summary-striphtml) | Displays compact selectable KPI or summary items. | `configure()`<br>`setItems()`<br>`updateItem()`<br>`clear()`<br>`destroy()` | `summary-strip-ready`<br>`summary-strip-change`<br>`summary-strip-select` | DOM-normalized |
@@ -593,7 +593,7 @@ Events: `file-drop-ready`, `file-drop-selected`, `file-drop-progress`, `file-dro
 
 ### Availability and normalization
 
-**Browser and supported native WebViews.** State normalized; browser File/drop errors mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app's capabilities. [Deep protocol details](protocols.md).
+**Browser and supported native WebViews.** Complete picker, drop, and API selections are preserved; `multiple` remains a picker hint and `maxFiles` remains compatible configuration rather than a rejection or discard gate. Browser File/drop errors are mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app's capabilities. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -917,7 +917,7 @@ Events: `record-timeline-ready`, `record-timeline-open`.
 
 ### Availability and normalization
 
-**Browser and supported native WebViews.** DOM-normalized. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app's capabilities. [Deep protocol details](protocols.md).
+**Browser and supported native WebViews.** Complete item inventories and fields are preserved while missing identity/date records remain non-renderable. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app's capabilities. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -942,7 +942,7 @@ Events: `relationship-board-ready`, `relationship-node-open`, `relationship-edge
 
 ### Availability and normalization
 
-**Browser and supported native WebViews.** DOM-normalized. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app's capabilities. [Deep protocol details](protocols.md).
+**Browser and supported native WebViews.** Complete node, edge, lane, label, and summary inventories are preserved; edges still require existing endpoints. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app's capabilities. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -1002,7 +1002,7 @@ Events: `source-code-viewer-ready`, `source-code-viewer-state`,
 
 ### Availability and normalization
 
-**Browser and supported native WebViews.** Normalized source/state. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app's capabilities. [Deep protocol details](protocols.md).
+**Browser and supported native WebViews.** Complete mutable source/state is rendered without character or line caps; malformed control-character metadata still fails honestly. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app's capabilities. [Deep protocol details](protocols.md).
 
 ### Example
 
