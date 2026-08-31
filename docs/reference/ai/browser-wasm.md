@@ -90,6 +90,13 @@ active, the provider repeats its current record every five seconds with
 owned operation is still active; it does not invent additional completion or
 an ETA.
 
+The DBOPFS store uses one bounded transfer axis. Ordered multi-file GGUF sets
+download several files concurrently. A one-file source instead probes HTTP
+Range support and, when the server exposes exact `Content-Range` framing,
+fetches several contiguous ranges concurrently into one positioned OPFS
+writer. It never multiplies file workers by range workers. Range offsets remain
+transport-local; public progress stays in complete files.
+
 ## Model selection, optional hardening, and cache
 
 The canonical model descriptor is `{id, files:[{name?,url},...]}`. The ordered
@@ -382,7 +389,8 @@ createBrowserModelSource(descriptor, { fetchImpl=null }={})
 The mutable source includes `kind`, the canonical descriptor fields,
 `descriptor`, and `open(memberIndex,{signal})`. `open()` requires a member
 index for multi-file sources and returns the complete readable response body,
-requested/final URLs, and `cancel()`; caching remains store-owned.
+requested/final URLs, and `cancel()`; caching and the store's private one-file
+Range negotiation remain store-owned.
 
 ### Availability and normalization
 
@@ -454,17 +462,26 @@ methods. The adapter owns model-file, cache, and completion behavior.
 ### Signature and result
 
 ```text
-createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models', estimateStorage=null }={})
+createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models', estimateStorage=null, downloadConcurrency=4 }={})
 ```
 
 The optional `estimateStorage()` function supplies browser storage availability
 when the default estimator is unavailable or an application owns a more precise
-quota view. The mutable result contains `kind`, `tableName`, the original
-`adapter`, and `ready`, `install`, `ensure`, and `remove`. `ensure()` preserves
-the complete ordered model set and reports whether it was cached or installed.
+quota view. `downloadConcurrency` must be a positive safe integer and bounds
+the selected file or Range worker pool; the default is four. The mutable result
+contains `kind`, `tableName`, `downloadConcurrency`, the original `adapter`,
+and `ready`, `install`, `ensure`, and `remove`. `ensure()` preserves the complete
+ordered model set and reports whether it was cached or installed.
 `install(source,{signal,onProgress})` and
 `ensure(source,{signal,onProgress,offline})` publish `cache-check` and
 `download` records using ordered file counts when `onProgress` is supplied.
+Multi-file sources use up to that many concurrent full-file fetches while
+retaining descriptor order. One-file sources first request `bytes=0-0`; an
+ignored Range response is reused as the complete download, an unavailable or
+unreadable `Content-Range` falls back to one full fetch, and confirmed support
+uses concurrent contiguous ranges with serialized positioned OPFS writes.
+Failure or cancellation aborts peer transfers, waits for them to settle, and
+then removes the partial model entry.
 
 ### Availability and normalization
 

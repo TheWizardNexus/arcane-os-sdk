@@ -404,7 +404,7 @@ test('ordered model files preserve legacy descriptors and reject ambiguous membe
     }),/Unicode NFC normalization/u);
 });
 
-test('ordered model files admit serially and commit their complete set manifest last',async()=>{
+test('ordered model files retain descriptor order and commit their complete set manifest last',async()=>{
     const directory=observedDirectory();
     const downloads=[];
     let estimates=0;

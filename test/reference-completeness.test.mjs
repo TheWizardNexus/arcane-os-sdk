@@ -298,7 +298,7 @@ test('the public package API inventory matches every JavaScript export and MDN e
             ['createArcaneAI',"createArcaneAI({ llm=null, provider=null, loadPolicy='on-demand', security }={})"],
             ['createBrowserModelSource','createBrowserModelSource(descriptor, { fetchImpl=null }={})'],
             ['createBrowserWasmLlmProvider','createBrowserWasmLlmProvider({ source, sources, store, loadDefaults={}, security, logger=console }={})'],
-            ['createDbopfsModelStore',"createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models', estimateStorage=null }={})"]
+            ['createDbopfsModelStore',"createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models', estimateStorage=null, downloadConcurrency=4 }={})"]
         ]);
         const browserWasmMembers=inventory.members.filter(member=>
             member.entrypoints.includes('arcane-os/ai/browser-wasm')

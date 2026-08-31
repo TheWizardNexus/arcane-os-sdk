@@ -6049,12 +6049,16 @@ cache hit.
 ### Signature and result
 
 ```text
-createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models', estimateStorage=null }={})
+createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models', estimateStorage=null, downloadConcurrency=4 }={})
 ```
 
-The mutable result contains `kind`, `tableName`, the original `adapter`, and
-`ready`, `install`, `ensure`, and `remove`. `ensure()` returns `files`, the
-one-file compatibility `file` or `null`, the manifest, and
+`downloadConcurrency` must be a positive safe integer and defaults to four.
+It bounds exactly one transfer axis: ordered multi-file GGUF sources use that
+many concurrent file workers, while a one-file source uses that many HTTP
+Range workers only when an exact `Content-Range` probe succeeds. The mutable
+result contains `kind`, `tableName`, `downloadConcurrency`, the original
+`adapter`, and `ready`, `install`, `ensure`, and `remove`. `ensure()` returns
+`files`, the one-file compatibility `file` or `null`, the manifest, and
 `cache:'cached'|'installed'`. It preserves the complete model content.
 `offline:true` never downloads and rejects a miss with
 `ARCANE_AI_MODEL_OFFLINE_MISS`. Version-2/3 compatibility is internal; every
@@ -6065,6 +6069,11 @@ new successful completion is recorded as version 4.
 **Browser with a ready DBOPFS instance and OPFS.** Cache metadata is not a
 transferable capability or license proof. Provider unload/dispose keeps all cached files;
 `store.remove(source)` explicitly deletes that source's files and manifest.
+For a one-file source, a server that ignores the `bytes=0-0` probe supplies the
+ordinary full response directly. A missing or unreadable `Content-Range`
+causes a full-fetch fallback. Confirmed ranges are read concurrently and
+written through one positioned OPFS writable, with file-count progress only.
+On failure or cancellation, peers settle before the partial entry is removed.
 
 ### Example
 

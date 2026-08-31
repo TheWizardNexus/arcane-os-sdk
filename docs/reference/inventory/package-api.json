@@ -2997,16 +2997,16 @@
       "name": "createDbopfsModelStore",
       "displayName": "createDbopfsModelStore()",
       "kind": "function",
-      "signature": "createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models', estimateStorage=null }={})",
+      "signature": "createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models', estimateStorage=null, downloadConcurrency=4 }={})",
       "entrypoints": [
         "arcane-os/ai/browser-wasm"
       ],
       "primaryImport": "arcane-os/ai/browser-wasm",
       "group": "Browser-WASM local AI",
-      "summary": "Adapts an existing DBOPFS instance into a complete model cache and commits its metadata after the selected content.",
+      "summary": "Adapts an existing DBOPFS instance into a complete model cache with bounded parallel shard or monolithic Range transfer.",
       "availability": "Browser with a ready DBOPFS instance and OPFS support",
       "protocol": "arcane.ai.browser-wasm.model.v4 completion manifests over existing DBOPFS method semantics",
-      "normalization": "Returns complete cached or installed model records after the selected content and completion metadata are committed"
+      "normalization": "Uses one bounded transfer axis, preserves ordered complete model files, and settles failed or cancelled peers before partial cleanup"
     },
     {
       "id": "browser-speech:BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL",

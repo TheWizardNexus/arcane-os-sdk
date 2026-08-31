@@ -15,6 +15,7 @@ const completeValue = (value) => value;
 const MODEL_MANIFEST_SCHEMA = "arcane.ai.browser-wasm.model.v4";
 const BROWSER_MODEL_SOURCES = new WeakSet();
 const BROWSER_MODEL_SOURCE_METADATA = new WeakMap();
+const BROWSER_MODEL_SOURCE_TRANSPORTS = new WeakMap();
 const MODEL_DESCRIPTOR_METADATA = new WeakMap();
 const DBOPFS_MODEL_STORES = new WeakSet();
 const V1_LLM_PROVIDER_ADAPTERS = new WeakMap();
@@ -25,6 +26,7 @@ const WEBGPU_ADAPTER_SELECTION_PROTOCOL = "arcane-ai-webgpu-adapter-selection/1"
 const CHROME_HIGH_PERFORMANCE_GPU_FLAG_URL =
   "chrome://flags/#force-high-performance-gpu";
 const MODEL_LOAD_HEARTBEAT_MS = 5_000;
+const DEFAULT_MODEL_DOWNLOAD_CONCURRENCY = 4;
 const INTEL_VENDOR_ID = 0x8086;
 const CAPABILITY_POLICY_PROTOCOL = "arcane-ai-browser-capability-policy/1";
 let highPerformanceGpuNoticeShown = false;
@@ -48,6 +50,63 @@ function throwIfAborted(signal, operation = "request") {
 
 function normalizationSignal(error, signal) {
   return error?.code === "ARCANE_AI_WORKER_TERMINATION_UNCONFIRMED" ? null : signal;
+}
+
+async function cancelReadableBody(body, reason) {
+  try {
+    await body?.cancel?.(reason);
+  } catch {
+    // Cancellation is cleanup; preserve the transfer failure that prompted it.
+  }
+}
+
+async function cancelOpenedDownload(opened, reason) {
+  try {
+    await opened?.cancel?.(reason);
+  } catch {
+    // Cancellation is cleanup; preserve the transfer failure that prompted it.
+  }
+}
+
+function httpContentRange(value) {
+  const match = /^bytes ([0-9]+)-([0-9]+)\/([0-9]+)$/iu.exec(
+    String(value ?? "").trim(),
+  );
+  if (!match) return null;
+  const start = Number(match[1]);
+  const end = Number(match[2]);
+  const total = Number(match[3]);
+  if (
+    !Number.isSafeInteger(start)
+    || !Number.isSafeInteger(end)
+    || !Number.isSafeInteger(total)
+    || start < 0
+    || end < start
+    || total <= end
+  ) return null;
+  return completeValue({ start, end, total });
+}
+
+function downloadConcurrencyValue(value) {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new RangeError("Model downloadConcurrency must be a positive safe integer.");
+  }
+  return value;
+}
+
+function parallelHttpRanges(total, concurrency) {
+  const count = Math.min(concurrency, total);
+  const width = Math.floor(total / count);
+  const remainder = total % count;
+  const ranges = [];
+  let start = 0;
+  for (let index = 0; index < count; index += 1) {
+    const length = width + (index < remainder ? 1 : 0);
+    const end = start + length - 1;
+    ranges.push(completeValue({ start, end, total }));
+    start = end + 1;
+  }
+  return completeValue(ranges);
 }
 
 function modelSourceUrl(value) {
@@ -277,6 +336,71 @@ export function createBrowserModelSource(descriptor, {
   const model = modelDescriptor(descriptor);
   const metadata = MODEL_DESCRIPTOR_METADATA.get(model);
 
+  function selectedMember(memberIndex) {
+    if (!Number.isSafeInteger(memberIndex)) {
+      throw new TypeError("A browser model file index must be a safe integer.");
+    }
+    if (memberIndex < 0 || memberIndex >= metadata.files.length) {
+      throw new RangeError("Browser model file index is out of range.");
+    }
+    return metadata.files[memberIndex];
+  }
+
+  async function request(memberIndex, { signal, range = null } = {}) {
+    const member = selectedMember(memberIndex);
+    throwIfAborted(signal, "install");
+    const fetchFunction = fetchImpl ?? globalThis.fetch?.bind(globalThis);
+    if (typeof fetchFunction !== "function") {
+      throw fail("ARCANE_AI_MODEL_SOURCE_UNAVAILABLE", "Browser fetch is unavailable.");
+    }
+    const requestOptions = {
+      cache: "no-store",
+      redirect: "follow",
+      signal,
+    };
+    if (range) requestOptions.headers = { Range: `bytes=${range.start}-${range.end}` };
+
+    let response;
+    try {
+      response = await fetchFunction(member.url, requestOptions);
+    } catch (error) {
+      if (signal?.aborted || error?.name === "AbortError") throwIfAborted(signal, "install");
+      throw fail("ARCANE_AI_MODEL_DOWNLOAD_FAILED", "The model download failed.", error);
+    }
+    let finalUrl;
+    try {
+      finalUrl = new URL(response?.url || member.url);
+    } catch {
+      finalUrl = null;
+    }
+    finalUrl ??= new URL(member.url);
+    return completeValue({ member, response, finalUrl: finalUrl.href });
+  }
+
+  async function rejectHttpResponse(download) {
+    await cancelReadableBody(download.response?.body);
+    throw fail(
+      "ARCANE_AI_MODEL_DOWNLOAD_FAILED",
+      `The model server returned HTTP ${download.response?.status ?? "unknown"}.`,
+    );
+  }
+
+  function openedDownload(download) {
+    const { member, response, finalUrl } = download;
+    if (!response.body || typeof response.body.getReader !== "function") {
+      throw fail("ARCANE_AI_MODEL_SOURCE_INVALID", "The model response did not provide a byte stream.");
+    }
+    async function cancel(reason) {
+      await response.body.cancel(reason);
+    }
+    return completeValue({
+      body: response.body,
+      requestedUrl: member.url,
+      finalUrl,
+      cancel,
+    });
+  }
+
   async function open(memberOrOptions = 0, options = {}) {
     let memberIndex = memberOrOptions;
     if (!Number.isSafeInteger(memberOrOptions)) {
@@ -286,51 +410,56 @@ export function createBrowserModelSource(descriptor, {
       memberIndex = 0;
       options = memberOrOptions ?? {};
     }
-    if (memberIndex < 0 || memberIndex >= metadata.files.length) {
-      throw new RangeError("Browser model file index is out of range.");
-    }
-    const member = metadata.files[memberIndex];
     const { signal } = options;
-    throwIfAborted(signal, "install");
-    const fetchFunction = fetchImpl ?? globalThis.fetch?.bind(globalThis);
-    if (typeof fetchFunction !== "function") {
-      throw fail("ARCANE_AI_MODEL_SOURCE_UNAVAILABLE", "Browser fetch is unavailable.");
-    }
+    const download = await request(memberIndex, { signal });
+    if (!download.response?.ok) await rejectHttpResponse(download);
+    return openedDownload(download);
+  }
 
-    let response;
-    try {
-      response = await fetchFunction(member.url, {
-        cache: "no-store",
-        redirect: "follow",
-        signal,
-      });
-    } catch (error) {
-      if (signal?.aborted || error?.name === "AbortError") throwIfAborted(signal, "install");
-      throw fail("ARCANE_AI_MODEL_DOWNLOAD_FAILED", "The model download failed.", error);
+  async function probeRange(memberIndex, { signal } = {}) {
+    const download = await request(memberIndex, {
+      signal,
+      range: { start: 0, end: 0 },
+    });
+    if (download.response?.status === 200) {
+      return completeValue({ kind: "complete", opened: openedDownload(download) });
     }
-    if (!response?.ok) {
-      await response?.body?.cancel?.().catch(() => undefined);
+    if (download.response?.status !== 206) await rejectHttpResponse(download);
+    const observed = httpContentRange(download.response.headers?.get?.("content-range"));
+    await cancelReadableBody(download.response.body);
+    if (!observed || observed.start !== 0 || observed.end !== 0) {
+      return completeValue({ kind: "unsupported" });
+    }
+    return completeValue({ kind: "supported", total: observed.total });
+  }
+
+  async function openRange(memberIndex, { signal, start, end, total } = {}) {
+    if (
+      !Number.isSafeInteger(start)
+      || !Number.isSafeInteger(end)
+      || !Number.isSafeInteger(total)
+      || start < 0
+      || end < start
+      || end >= total
+    ) {
+      throw new RangeError("Browser model HTTP range framing is invalid.");
+    }
+    const download = await request(memberIndex, { signal, range: { start, end } });
+    const observed = httpContentRange(download.response?.headers?.get?.("content-range"));
+    if (
+      download.response?.status !== 206
+      || !observed
+      || observed.start !== start
+      || observed.end !== end
+      || observed.total !== total
+    ) {
+      await cancelReadableBody(download.response?.body);
       throw fail(
         "ARCANE_AI_MODEL_DOWNLOAD_FAILED",
-        `The model server returned HTTP ${response?.status ?? "unknown"}.`,
+        "The model server did not preserve the requested HTTP byte range.",
       );
     }
-    let finalUrl;
-    try {
-      finalUrl = new URL(response.url || member.url);
-    } catch {
-      finalUrl = null;
-    }
-    finalUrl ??= new URL(member.url);
-    if (!response.body || typeof response.body.getReader !== "function") {
-      throw fail("ARCANE_AI_MODEL_SOURCE_INVALID", "The model response did not provide a byte stream.");
-    }
-    return completeValue({
-      body: response.body,
-      requestedUrl: member.url,
-      finalUrl: finalUrl.href,
-      cancel: (reason) => response.body.cancel(reason),
-    });
+    return openedDownload(download);
   }
 
   const sourceRecord = {
@@ -346,6 +475,7 @@ export function createBrowserModelSource(descriptor, {
   const source = completeValue(sourceRecord);
   BROWSER_MODEL_SOURCES.add(source);
   BROWSER_MODEL_SOURCE_METADATA.set(source, metadata);
+  BROWSER_MODEL_SOURCE_TRANSPORTS.set(source, completeValue({ probeRange, openRange }));
   return source;
 }
 
@@ -433,6 +563,7 @@ export function createDbopfsModelStore({
   dbopfs,
   tableName = "arcane_ai_browser_models",
   estimateStorage = null,
+  downloadConcurrency = DEFAULT_MODEL_DOWNLOAD_CONCURRENCY,
 } = {}) {
   if (!dbopfs || (typeof dbopfs !== "object" && typeof dbopfs !== "function")) {
     throw new TypeError("createDbopfsModelStore requires an existing DBOPFS instance.");
@@ -446,6 +577,7 @@ export function createDbopfsModelStore({
   if (estimateStorage !== null && typeof estimateStorage !== "function") {
     throw new TypeError("estimateStorage must be a function or null.");
   }
+  const workerLimit = downloadConcurrencyValue(downloadConcurrency);
   let tablePromise = null;
 
   async function table() {
@@ -494,6 +626,140 @@ export function createDbopfsModelStore({
       await directory.removeEntry(name).catch(() => undefined);
       throw error;
     }
+  }
+
+  async function storedModelFile(name) {
+    const modelFile = await file(name);
+    if (!modelFile) {
+      throw fail(
+        "ARCANE_AI_MODEL_CACHE_REJECTED",
+        "A stored model file could not be reopened.",
+      );
+    }
+    return modelFile;
+  }
+
+  async function writeOpenedModel(name, opened, { signal } = {}) {
+    try {
+      await write(name, opened.body, { signal });
+      return await storedModelFile(name);
+    } catch (error) {
+      await cancelOpenedDownload(opened, error);
+      throw error;
+    }
+  }
+
+  async function writeParallelRanges(source, memberIndex, name, total, { signal } = {}) {
+    const transport = BROWSER_MODEL_SOURCE_TRANSPORTS.get(source);
+    const ranges = parallelHttpRanges(total, workerLimit);
+    const directory = await table();
+    const handle = await directory.getFileHandle(name, { create: true });
+    const writable = await handle.createWritable();
+    const linked = linkAbortSignal(signal);
+    const downloadSignal = linked.controller.signal;
+    let nextRangeIndex = 0;
+    let failure = null;
+    let writeQueue = Promise.resolve();
+
+    function retainFailure(error) {
+      if (failure === null) failure = error;
+      if (!downloadSignal.aborted) linked.controller.abort(error);
+    }
+
+    function enqueuePositionedWrite(position, data) {
+      async function writePositionedChunk() {
+        await writable.write(completeValue({ type: "write", position, data }));
+      }
+      writeQueue = writeQueue.then(writePositionedChunk);
+      return writeQueue;
+    }
+
+    async function transferRangeWorker() {
+      while (true) {
+        const rangeIndex = nextRangeIndex;
+        nextRangeIndex += 1;
+        if (rangeIndex >= ranges.length) return;
+        const range = ranges[rangeIndex];
+        let opened = null;
+        try {
+          opened = await transport.openRange(memberIndex, {
+            signal: downloadSignal,
+            start: range.start,
+            end: range.end,
+            total: range.total,
+          });
+          let position = range.start;
+          for await (const chunk of byteChunks(opened.body, downloadSignal)) {
+            const nextPosition = position + chunk.byteLength;
+            if (!Number.isSafeInteger(nextPosition) || nextPosition > range.end + 1) {
+              throw fail(
+                "ARCANE_AI_MODEL_DOWNLOAD_FAILED",
+                "The model server returned more content than the requested HTTP byte range.",
+              );
+            }
+            await enqueuePositionedWrite(position, chunk);
+            position = nextPosition;
+          }
+          if (position !== range.end + 1) {
+            throw fail(
+              "ARCANE_AI_MODEL_DOWNLOAD_FAILED",
+              "The model server returned less content than the requested HTTP byte range.",
+            );
+          }
+        } catch (error) {
+          retainFailure(error);
+          await cancelOpenedDownload(opened, error);
+          throw error;
+        }
+      }
+    }
+
+    const workers = [];
+    for (let index = 0; index < ranges.length; index += 1) {
+      workers.push(transferRangeWorker());
+    }
+    try {
+      const results = await Promise.allSettled(workers);
+      if (failure === null) {
+        for (const result of results) {
+          if (result.status === "rejected") {
+            failure = result.reason;
+            break;
+          }
+        }
+      }
+      if (failure !== null) throw failure;
+      await writeQueue;
+      throwIfAborted(downloadSignal, "install");
+      await writable.close();
+      return await storedModelFile(name);
+    } catch (error) {
+      retainFailure(error);
+      try {
+        await writable.abort?.(error);
+      } catch {
+        // The file entry is removed below even if the writable already closed.
+      }
+      try {
+        await directory.removeEntry(name);
+      } catch {
+        // The caller removes the complete model set after all workers settle.
+      }
+      throw failure;
+    } finally {
+      linked.release();
+    }
+  }
+
+  async function installOneFile(source, memberIndex, name, { signal } = {}) {
+    const transport = BROWSER_MODEL_SOURCE_TRANSPORTS.get(source);
+    if (!transport) return null;
+    const probe = await transport.probeRange(memberIndex, { signal });
+    if (probe.kind === "complete") {
+      return writeOpenedModel(name, probe.opened, { signal });
+    }
+    if (probe.kind !== "supported") return null;
+    return writeParallelRanges(source, memberIndex, name, probe.total, { signal });
   }
 
   async function removeNames(names) {
@@ -569,47 +835,97 @@ export function createDbopfsModelStore({
     const names = storageName(source);
     const members = sourceMetadata(source).files;
     await remove(source);
-    const modelFiles = [];
-    try {
-      for (let index = 0; index < members.length; index += 1) {
-        const member = members[index];
-        onProgress?.(completeValue({
-          phase: "download",
-          completed: index,
-          total: members.length,
-          unit: "files",
-          heartbeat: false,
-        }));
-        const opened = await source.open(index, { signal });
-        try {
-          await write(names.models[index].name, opened.body, { signal });
-          const modelFile = await file(names.models[index].name);
-          if (!modelFile) {
-            throw fail(
-              "ARCANE_AI_MODEL_CACHE_REJECTED",
-              "A stored model file could not be reopened.",
-            );
-          }
-          modelFiles.push(modelFile);
-        } catch (error) {
-          await opened.cancel?.(error).catch(() => undefined);
-          throw error;
-        }
-      }
+    const modelFiles = new Array(members.length);
+    const linked = linkAbortSignal(signal);
+    const downloadSignal = linked.controller.signal;
+    let nextMemberIndex = 0;
+    let completed = 0;
+    let failure = null;
+
+    function retainFailure(error) {
+      if (failure === null) failure = error;
+      if (!downloadSignal.aborted) linked.controller.abort(error);
+    }
+
+    function publishDownloadProgress() {
       onProgress?.(completeValue({
         phase: "download",
-        completed: members.length,
+        completed,
         total: members.length,
         unit: "files",
         heartbeat: false,
       }));
+    }
+
+    async function installMember(memberIndex) {
+      let modelFile = null;
+      if (members.length === 1) {
+        modelFile = await installOneFile(
+          source,
+          memberIndex,
+          names.models[memberIndex].name,
+          { signal: downloadSignal },
+        );
+      }
+      if (!modelFile) {
+        const opened = await source.open(memberIndex, { signal: downloadSignal });
+        modelFile = await writeOpenedModel(
+          names.models[memberIndex].name,
+          opened,
+          { signal: downloadSignal },
+        );
+      }
+      throwIfAborted(downloadSignal, "install");
+      modelFiles[memberIndex] = modelFile;
+      completed += 1;
+      publishDownloadProgress();
+    }
+
+    async function installWorker() {
+      while (true) {
+        const memberIndex = nextMemberIndex;
+        nextMemberIndex += 1;
+        if (memberIndex >= members.length) return;
+        try {
+          await installMember(memberIndex);
+        } catch (error) {
+          retainFailure(error);
+          throw error;
+        }
+      }
+    }
+
+    try {
+      publishDownloadProgress();
+      const workers = [];
+      const workerCount = Math.min(workerLimit, members.length);
+      for (let index = 0; index < workerCount; index += 1) {
+        workers.push(installWorker());
+      }
+      const results = await Promise.allSettled(workers);
+      if (failure === null) {
+        for (const result of results) {
+          if (result.status === "rejected") {
+            failure = result.reason;
+            break;
+          }
+        }
+      }
+      if (failure !== null) throw failure;
       return completeValue({
         files: completeValue(modelFiles),
         file: modelFiles.length === 1 ? modelFiles[0] : null,
       });
     } catch (error) {
-      await remove(source).catch(() => undefined);
-      throw error;
+      retainFailure(error);
+      try {
+        await remove(source);
+      } catch {
+        // Preserve the download failure after the settled workers release storage.
+      }
+      throw failure;
+    } finally {
+      linked.release();
     }
   }
 
@@ -650,6 +966,7 @@ export function createDbopfsModelStore({
   const store = completeValue({
     kind: "arcane-dbopfs-model-store",
     tableName,
+    downloadConcurrency: workerLimit,
     adapter: dbopfs,
     ready: () => table().then(() => undefined),
     install,
