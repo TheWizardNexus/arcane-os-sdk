@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.2
+
+- Added transparent Browser-WASM model loading status across cache checks,
+  ordered model-file downloads, and WebGPU initialization, including file
+  counts, elapsed time, and five-second heartbeats so long downloads remain
+  visibly active without byte-based progress.
+
 ## 0.4.1
 
 - Preserved complete DirectoryPicker titles, paths, caller options, and
