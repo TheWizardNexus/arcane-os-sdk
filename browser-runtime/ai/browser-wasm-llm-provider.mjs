@@ -24,6 +24,7 @@ const WEBGPU_ADAPTER_SELECTED_EVENT = "arcane.ai.browser-wasm.webgpu.adapter.sel
 const WEBGPU_ADAPTER_SELECTION_PROTOCOL = "arcane-ai-webgpu-adapter-selection/1";
 const CHROME_HIGH_PERFORMANCE_GPU_FLAG_URL =
   "chrome://flags/#force-high-performance-gpu";
+const MODEL_LOAD_HEARTBEAT_MS = 5_000;
 const INTEL_VENDOR_ID = 0x8086;
 const CAPABILITY_POLICY_PROTOCOL = "arcane-ai-browser-capability-policy/1";
 let highPerformanceGpuNoticeShown = false;
@@ -561,7 +562,10 @@ export function createDbopfsModelStore({
     }
   }
 
-  async function install(source, { signal } = {}) {
+  async function install(source, { signal, onProgress = null } = {}) {
+    if (onProgress !== null && typeof onProgress !== "function") {
+      throw new TypeError("Model store onProgress must be a function or null.");
+    }
     const names = storageName(source);
     const members = sourceMetadata(source).files;
     await remove(source);
@@ -569,6 +573,13 @@ export function createDbopfsModelStore({
     try {
       for (let index = 0; index < members.length; index += 1) {
         const member = members[index];
+        onProgress?.(completeValue({
+          phase: "download",
+          completed: index,
+          total: members.length,
+          unit: "files",
+          heartbeat: false,
+        }));
         const opened = await source.open(index, { signal });
         try {
           await write(names.models[index].name, opened.body, { signal });
@@ -585,6 +596,13 @@ export function createDbopfsModelStore({
           throw error;
         }
       }
+      onProgress?.(completeValue({
+        phase: "download",
+        completed: members.length,
+        total: members.length,
+        unit: "files",
+        heartbeat: false,
+      }));
       return completeValue({
         files: completeValue(modelFiles),
         file: modelFiles.length === 1 ? modelFiles[0] : null,
@@ -598,8 +616,20 @@ export function createDbopfsModelStore({
   async function ensure(source, {
     signal,
     onCapabilityPolicy,
+    onProgress = null,
     offline = false,
   } = {}) {
+    if (onProgress !== null && typeof onProgress !== "function") {
+      throw new TypeError("Model store onProgress must be a function or null.");
+    }
+    const total = sourceMetadata(source).files.length;
+    onProgress?.(completeValue({
+      phase: "cache-check",
+      completed: 0,
+      total,
+      unit: "files",
+      heartbeat: false,
+    }));
     const cached = await openCached(source, { signal });
     if (cached) {
       const storage = await storagePolicy({ cached: true });
@@ -611,7 +641,7 @@ export function createDbopfsModelStore({
     }
     const storage = await storagePolicy();
     onCapabilityPolicy?.(storage);
-    const installed = await install(source, { signal });
+    const installed = await install(source, { signal, onProgress });
     const admittedStorage = await storagePolicy({ cached: true });
     onCapabilityPolicy?.(admittedStorage);
     return completeValue({ ...installed, cache: "installed", storage: admittedStorage });
@@ -2068,16 +2098,54 @@ export function createBrowserWasmLlmProvider({
       activeSecurity = effectiveSecurity;
       return loadPromise;
     }
+    if (
+      options.onProgress !== undefined
+      && options.onProgress !== null
+      && typeof options.onProgress !== "function"
+    ) {
+      throw new TypeError("Browser-WASM load onProgress must be a function or null.");
+    }
     const externalSignal = options.signal ?? context.signal ?? null;
     const linked = linkAbortSignal(externalSignal);
     const signal = linked.controller.signal;
     const generation = ++lifecycleGeneration;
+    const reportProgress = typeof context.reportProgress === "function"
+      ? context.reportProgress
+      : options.onProgress ?? null;
+    const progressStartedAt = Date.now();
+    let currentProgress = null;
+    let progressHeartbeat = null;
+
+    function publishModelLoadProgress(progress) {
+      if (!reportProgress) return;
+      currentProgress = { ...progress, heartbeat: false };
+      reportProgress(completeValue({
+        ...currentProgress,
+        elapsedMs: Math.max(0, Date.now() - progressStartedAt),
+      }));
+    }
+
+    function publishModelLoadHeartbeat() {
+      if (!reportProgress || !currentProgress) return;
+      reportProgress(completeValue({
+        ...currentProgress,
+        heartbeat: true,
+        elapsedMs: Math.max(0, Date.now() - progressStartedAt),
+      }));
+    }
+
     loadAbort = linked.controller;
     activeSource = requestedSource;
     activeSecurity = effectiveSecurity;
     activeLoadPlan = requestedLoadPlan;
     state = "loading";
     errorState = null;
+    if (reportProgress) {
+      progressHeartbeat = globalThis.setInterval(
+        publishModelLoadHeartbeat,
+        MODEL_LOAD_HEARTBEAT_MS,
+      );
+    }
     loadPromise = (async () => {
       try {
         throwIfAborted(signal, "load");
@@ -2085,6 +2153,7 @@ export function createBrowserWasmLlmProvider({
           signal,
           offline: options.offline === true,
           onCapabilityPolicy: (value) => { storagePolicies.set(activeSource.id, value); },
+          onProgress: publishModelLoadProgress,
         });
         cacheState = admitted.cache;
         throwIfAborted(signal, "load");
@@ -2096,6 +2165,13 @@ export function createBrowserWasmLlmProvider({
           throw fail("ARCANE_AI_OPERATION_SUPERSEDED", "The model load was superseded by unload.");
         }
         const members = sourceMetadata(activeSource).files;
+        publishModelLoadProgress({
+          phase: "initialize",
+          completed: members.length,
+          total: members.length,
+          unit: "files",
+          heartbeat: false,
+        });
         const modelFiles = admitted.files.map((file, index) => (
           typeof globalThis.File === "function"
             ? new File([file], members[index].name, { type: "application/octet-stream" })
@@ -2148,6 +2224,10 @@ export function createBrowserWasmLlmProvider({
         }
         throw normalized;
       } finally {
+        if (progressHeartbeat !== null) {
+          globalThis.clearInterval(progressHeartbeat);
+          progressHeartbeat = null;
+        }
         if (loadAbort === linked.controller) loadAbort = null;
         linked.release();
         loadPromise = null;
@@ -2478,6 +2558,7 @@ export function adaptV1LlmProvider(provider) {
         ...loadOptions,
         modelId: selection.modelId,
         signal,
+        onProgress: progress,
         ...(security?.secure===true?{security:{secure:true}}:{}),
       });
       return status();

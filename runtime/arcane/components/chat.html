@@ -2072,17 +2072,51 @@
             };
         }
 
+        function progressElapsedText(){
+            const elapsedMilliseconds=Number(role?.progress?.elapsedMs);
+            if(!Number.isFinite(elapsedMilliseconds)||elapsedMilliseconds<0){
+                return '';
+            }
+            const elapsedSeconds=Math.floor(elapsedMilliseconds/1000);
+            const hours=Math.floor(elapsedSeconds/3600);
+            const minutes=Math.floor(elapsedSeconds%3600/60);
+            const seconds=elapsedSeconds%60;
+            if(hours>0){
+                return `${hours}h ${minutes}m elapsed`;
+            }
+            if(minutes>0){
+                return `${minutes}m ${String(seconds).padStart(2,'0')}s elapsed`;
+            }
+            return `${seconds}s elapsed`;
+        }
+
         function progressMessage(){
             const measured=determinateProgress();
-            const phase=typeof role?.progress?.phase==='string'&&role.progress.phase
+            const phaseValue=typeof role?.progress?.phase==='string'&&role.progress.phase
                 ?role.progress.phase
                 :'loading';
+            const phase=phaseValue.replaceAll('-',' ');
             const parts=[
                 `Loading ${modelDisplayName()} through the Arcane SDK`,
                 phase
             ];
             if(measured){
-                parts.push(`${measured.completed} of ${measured.total} ${measured.unit}`);
+                if(
+                    phaseValue==='download'
+                    &&measured.unit==='files'
+                    &&measured.completed<measured.total
+                ){
+                    parts.push(`part ${measured.completed+1} of ${measured.total}`);
+                }else{
+                    parts.push(`${measured.completed} of ${measured.total} ${measured.unit}`);
+                }
+            }
+            const elapsed=progressElapsedText();
+            if(elapsed){
+                parts.push(elapsed);
+                if(role?.progress?.heartbeat===true){
+                    parts.push('Still working');
+                }
             }
             parts.push('The first activation can take several minutes; keep this tab open');
             return parts.join(' · ');

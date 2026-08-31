@@ -165,6 +165,48 @@ function setPageStatus(state, text) {
   statusText.textContent = text;
 }
 
+function formatModelLoadElapsed(value) {
+  const elapsedMilliseconds = Number(value);
+  if (!Number.isFinite(elapsedMilliseconds) || elapsedMilliseconds < 0) return "";
+  const elapsedSeconds = Math.floor(elapsedMilliseconds / 1000);
+  const hours = Math.floor(elapsedSeconds / 3600);
+  const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+  const seconds = elapsedSeconds % 60;
+  if (hours > 0) return `${hours}h ${minutes}m elapsed`;
+  if (minutes > 0) return `${minutes}m ${String(seconds).padStart(2, "0")}s elapsed`;
+  return `${seconds}s elapsed`;
+}
+
+function modelLoadStatus(progress = {}) {
+  const phase = typeof progress.phase === "string" ? progress.phase : "loading";
+  let activity = `Starting ${selectedModel.shortLabel}`;
+  if (phase === "cache-check") {
+    activity = `Checking the local ${selectedModel.shortLabel} cache`;
+  } else if (phase === "download") {
+    activity = `Downloading ${selectedModel.shortLabel}`;
+  } else if (phase === "initialize") {
+    activity = `Loading ${selectedModel.shortLabel} into memory`;
+  }
+  const parts = [activity];
+  const completed = Number(progress.completed);
+  const total = Number(progress.total);
+  if (Number.isSafeInteger(total) && total > 0 && progress.unit === "files") {
+    if (phase === "download" && Number.isSafeInteger(completed) && completed < total) {
+      parts.push(`part ${completed + 1} of ${total}`);
+    } else if (phase === "initialize") {
+      parts.push(`${total} model parts ready`);
+    } else if (phase === "cache-check") {
+      parts.push(`${total} model parts`);
+    }
+  }
+  const elapsed = formatModelLoadElapsed(progress.elapsedMs);
+  if (elapsed) {
+    parts.push(elapsed);
+    if (progress.heartbeat === true) parts.push("Still working");
+  }
+  return parts.join(" · ");
+}
+
 function generalSystemPrompt() {
   return `You are ${selectedModel.label}, a ${selectedModel.parameterWords} parameter model running locally in this browser. Be concise, helpful, and direct. Accurately identify yourself as ${selectedModel.label}; do not claim to be a hosted service.`;
 }
@@ -342,7 +384,7 @@ function synchronizeRuntime(snapshot) {
       retryDisplayedToolCallAfterStateChange();
     });
   } else if (llm.state === "loading") {
-    setPageStatus("loading", `Starting ${selectedModel.shortLabel}…`);
+    setPageStatus("loading", modelLoadStatus(llm.progress));
   } else if (llm.state === "error") {
     setPageStatus("error", llm.error?.message || "Language model failed");
   } else if (llm.state === "unloading") {

@@ -82,6 +82,14 @@ The controller emits `statechange` and `progress` through
 current mutable status snapshot. Provider states are `unloaded`, `loading`, `ready`,
 `unloading`, and `error`.
 
+Browser-WASM model loads report `cache-check`, `download`, and `initialize`
+phases. Download records use ordered model-file counts with `completed`, `total`,
+and `unit:'files'`; they never derive progress from bytes. While a load remains
+active, the provider repeats its current record every five seconds with
+`heartbeat:true` and an updated `elapsedMs`. A heartbeat confirms that the
+owned operation is still active; it does not invent additional completion or
+an ETA.
+
 ## Model selection, optional hardening, and cache
 
 The canonical model descriptor is `{id, files:[{name?,url},...]}`. The ordered
@@ -410,6 +418,8 @@ result exposes protocol and provider identity, default model metadata,
 `streamChat`, `use`, `probe`, and `dispose`. Direct provider `load()` selects a
 catalog model and returns `{model,status}`;
 the public AI API module's `ai.load()` returns the flat controller status.
+Direct `load({onProgress})` forwards the same file-based progress records used
+by the controller and provider/2 adapter.
 Provider `security` carries the provider/model-binding `secure` intent. Direct
 `provider.load({security})` and `ai.load({security})` supply the operation
 intent. They do not activate checking in the ordinary development contract.
@@ -452,6 +462,9 @@ when the default estimator is unavailable or an application owns a more precise
 quota view. The mutable result contains `kind`, `tableName`, the original
 `adapter`, and `ready`, `install`, `ensure`, and `remove`. `ensure()` preserves
 the complete ordered model set and reports whether it was cached or installed.
+`install(source,{signal,onProgress})` and
+`ensure(source,{signal,onProgress,offline})` publish `cache-check` and
+`download` records using ordered file counts when `onProgress` is supplied.
 
 ### Availability and normalization
 
