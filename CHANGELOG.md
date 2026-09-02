@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.3
+
+- Preserved every independently completed Browser-WASM HTTP Range part and
+  split GGUF member when a sibling transfer fails, so a retry restores prior
+  progress and requests only the missing work instead of restarting all active
+  transfers.
+
 ## 0.5.2
 
 - Forwarded each application's existing managed browser import map into

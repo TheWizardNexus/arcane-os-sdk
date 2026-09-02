@@ -926,7 +926,6 @@ export function createDbopfsModelStore({
     {
       signal,
       progress,
-      retainInstallFailure = null,
       rangeWorkerLimit = workerLimit,
     } = {},
   ) {
@@ -955,7 +954,6 @@ export function createDbopfsModelStore({
 
     function retainFailure(error) {
       if (failure === null) failure = error;
-      if (!downloadSignal.aborted) linked.controller.abort(error);
     }
 
     async function transferRangeWorker() {
@@ -1005,7 +1003,6 @@ export function createDbopfsModelStore({
           writable = null;
           partFiles[rangeIndex] = await storedModelFile(partName);
         } catch (error) {
-          retainInstallFailure?.(error);
           retainFailure(error);
           await cancelOpenedDownload(opened, error);
           try {
@@ -1100,7 +1097,6 @@ export function createDbopfsModelStore({
       signal,
       progress,
       rangeWorkerLimit,
-      retainInstallFailure: retainFailure,
     });
   }
 
@@ -1485,7 +1481,6 @@ export function createDbopfsModelStore({
 
     function retainFailure(error) {
       if (failure === null) failure = error;
-      if (!downloadSignal.aborted) linked.controller.abort(error);
     }
 
     const progress = createDownloadProgressReporter(members, onProgress, retainFailure);
