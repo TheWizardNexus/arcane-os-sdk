@@ -718,12 +718,18 @@ function guidance(mode,slots){
 
     const services=recoveryServices(slots);
     const profileSettings=affectedSlots.map(slot=>slot+'Provider');
+    const twinCloudOption=affectedSlots.includes('llm')
+        ?' Alternatively, switch the Profile language-model setting to TWiN Cloud and enter a TWiN access key.'
+        :'';
     const message=mode==='browser'
         ?browserManualInstruction(services)
-            +' Alternatively, switch the affected Profile setting to OpenAI and enter an OpenAI API/license key. Arcane will not switch providers automatically.'
+            +twinCloudOption
+            +' Arcane will not switch providers automatically.'
         :mode===USER_MANAGED_LOOPBACK_PROVIDER_MODE
             ?userManagedLoopbackInstruction(services)
-                +' Arcane does not install, start, repair, pull, or otherwise manage this service or its models. Alternatively, switch the affected Profile setting to OpenAI. Arcane will not switch providers automatically.'
+                +' Arcane does not install, start, repair, pull, or otherwise manage this service or its models.'
+                +twinCloudOption
+                +' Arcane will not switch providers automatically.'
             :'Arcane could not recover the selected local AI service. Retry or review Local AI in Arcane Settings. Arcane will not switch providers automatically.';
 
     return completeResult({

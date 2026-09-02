@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.0
+
+- Added bounded parallel Browser-WASM model downloads across split GGUF
+  members and resumable HTTP Range parts while preserving descriptor order and
+  the configured transfer limit.
+- Added retry pickup for completed shards and Range parts, with transparent
+  fallback to one full fetch when a source does not support usable ranges.
+- Added determinate aggregate download progress with transferred and remaining
+  data, live speed, approximate time remaining, active transfers, and transfer
+  mode.
+- Reused complete same-model legacy cache entries in preference to incomplete
+  replacements and removed redundant legacy files and completed fragments when
+  cleanup succeeds.
+- Replaced the default remote LLM destination and model with TWiN Cloud at the
+  OpenAI-compatible DigitalOcean inference endpoint, added the TWiN access-key
+  configuration surface, and retained the prior route and credential names as
+  compatibility aliases.
+
 ## 0.4.2
 
 - Added transparent Browser-WASM model loading status across cache checks,

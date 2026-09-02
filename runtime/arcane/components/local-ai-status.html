@@ -278,9 +278,9 @@
         summary.setAttribute('role','alert');
         summary.textContent=userManaged
             ?guidanceMessage
-                ||'Review the unavailable user-managed Android service, then Retry or open Profile and switch the affected option to OpenAI.'
+                ||'Review the unavailable user-managed Android service, then Retry or open Profile and switch the language-model option to TWiN Cloud.'
             :browser
-            ?'Start the unavailable local service yourself and Retry, or open Profile, switch each affected option to OpenAI, and enter your OpenAI API key.'
+            ?'Start the unavailable local service yourself and Retry, or open Profile, switch the language-model option to TWiN Cloud, and enter your TWiN access key.'
             :'Arcane could not recover every selected managed local service. Retry or open Arcane Settings > Local AI.';
         return report;
     }

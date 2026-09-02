@@ -917,7 +917,9 @@ class AI {
     // This is the enum section for inference configuration
     #service = {
         baseURL: {
-            OPENAI: 'https://api.openai.com/v1'
+            // OPENAI remains the legacy route identifier for compatibility;
+            // remote LLM chat is provided by TWiN Cloud.
+            OPENAI: 'https://inference.do-ai.run/v1'
         },
         sttURL: {
             LOCAL_SPEACH: 'http://127.0.0.1:8011/v1',
@@ -944,7 +946,7 @@ class AI {
     }
 
     #models = {
-        OPENAI:'gpt-4o'
+        OPENAI:'openai-gpt-oss-120b'
     }
 
     #sttModels = {
@@ -1155,11 +1157,14 @@ class AI {
 
     // Browser-delivered framework code must not contain provider credentials.
     // The selected host, application, or user profile supplies one at runtime.
-    get license(){
-        return this.#license || globalThis.arcane?.config?.openAI?.apiKey || '';
+    get twinKey(){
+        return this.#license
+            ||globalThis.arcane?.config?.twinCloud?.accessKey
+            ||globalThis.arcane?.config?.openAI?.apiKey
+            ||'';
     }
-    
-    set license(value){
+
+    set twinKey(value){
         this.#license=typeof value==='string' ? value.trim():'';
         this.#retainLegacyLLMReadiness(
             this.#reconcileLegacyLLMReadiness()
@@ -1167,6 +1172,17 @@ class AI {
         this.#retainLegacySpeechReadiness(
             this.#reconcileLegacySpeechReadiness()
         );
+        return this.#license;
+    }
+
+    // Retain the established credential property while consumers move their
+    // user-facing profile field to the TWiN key name.
+    get license(){
+        return this.twinKey;
+    }
+
+    set license(value){
+        this.twinKey=value;
         return this.#license;
     }
 
