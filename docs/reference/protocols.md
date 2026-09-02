@@ -298,7 +298,7 @@ Application code should select a normalized role, not an internal protocol.
 The exported
 [`getAIProviderRuntime()` singleton](runtime-modules.md#aiproviderruntimejs)
 comes from the selected runtime and owns independent `llm`, `stt`, and
-`tts` selections. SDK `0.3.4` ships browser-WASM LLM and browser
+`tts` selections. SDK `0.5.4` ships browser-WASM LLM and browser
 speech provider/2 adapters and also adapts selected TWiN Cloud LLM,
 Core-backed Ollama LLM, on-device Whisper STT, and on-device Kokoro TTS routes
 into provider/2. There is no cloud speech route;
