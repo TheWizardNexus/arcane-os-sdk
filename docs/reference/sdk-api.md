@@ -5893,7 +5893,15 @@ as `this`, `target`, and `currentTarget`. Canonical `statechange` and `progress`
 occurrences use source `ai-model-controller`; every load or unload owns one
 non-null operation ID shared by its state and progress occurrences. Public
 progress retains the exact selected `modelId`, `phase`, state, and nested
-file-progress field names without byte totals. Accessor-bearing provider status
+file-progress field names. Browser-WASM download progress preserves
+`completed`, `total`, and `unit:'files'` and adds `loadedBytes`, `totalBytes`,
+`remainingBytes`, `bytesPerSecond`, `etaSeconds`, `activeTransfers`,
+`transferLimit`, and `transferMode`. Unknown totals, rates, remaining values,
+and ETAs are `null`; applications format the raw byte and second measures for
+display. Chunk-driven transfer changes are coalesced on a 250 ms cadence, while
+plan, active-worker, and completion boundaries publish immediately and the existing five-second
+heartbeat repeats the latest record.
+Accessor-bearing provider status
 and malformed progress reject with `ARCANE_AI_PROVIDER_STATUS_INVALID` and
 `ARCANE_AI_PROVIDER_PROGRESS_INVALID`. After disposal, lifecycle operations fail with
 `ARCANE_AI_DISPOSED`.
@@ -5922,9 +5930,12 @@ async function openLocalReviewAfterUserChoice() {
 
 Validates a caller-owned ordered model-file descriptor and creates the
 cancellable HTTPS source accepted by the browser-WASM store/provider. The
-canonical descriptor is `{id,files:[{name?,url},...]}`. The nonempty file array
-has unique normalized names and URLs. The one-file `{id,url,name?}` shape also
-normalizes to one ordered member.
+canonical descriptor is `{id,files:[{name?,url,bytes?},...]}`. The nonempty file
+array has unique normalized names and URLs. A positive safe-integer `bytes`
+value supplies observational progress and HTTP Range planning only; missing or
+unusable metadata is treated as unavailable and never blocks the download. It
+is never a content-validation, admission, identity, or cache-reuse rule. The
+one-file `{id,url,name?,bytes?}` shape also normalizes to one ordered member.
 
 ### Signature and result
 
@@ -5937,9 +5948,10 @@ caller-selected version-pinned URL when reproducibility matters. The mutable
 source exposes `kind`, the canonical descriptor fields, `descriptor`, and
 `open(memberIndex,{signal})`.
 For a one-file source, `open({signal})` remains accepted. The result is
-`{body,requestedUrl,finalUrl,cancel}`. Every direct `open()` performs the
-configured fetch and preserves the complete response body subject only to
-unavoidable HTTP framing.
+`{body,requestedUrl,finalUrl,contentLength,cancel}`; `contentLength` is the
+positive observed HTTP response length or `null`. Every direct `open()`
+performs the configured fetch and preserves the complete response body subject
+only to unavoidable HTTP framing.
 
 Legacy `immutableUrl` remains an input alias for `url`; both must match when
 supplied together. Legacy `licenseSpdx` and `sourceRevision` properties are not
@@ -5949,9 +5961,10 @@ ordinary runtime gates or proof of license rights.
 
 **Browser Fetch with CORS and a readable response body.** Downloads omit
 credentials/referrer, disable HTTP caching, follow redirects, require a final
-HTTPS URL, and honor `AbortSignal`. The DBOPFS store preserves complete model
-content without counting, limiting, hashing, digesting, or byte-identifying it
-in the ordinary path.
+HTTPS URL, and honor `AbortSignal`. Declared and observed byte measures feed
+only progress and transfer planning. The DBOPFS store does not use them to
+limit, hash, digest, identify, admit, validate, or decide cache reuse for model
+content.
 
 ### Example
 
@@ -6042,9 +6055,10 @@ console.log(provider.status().state); // unloaded
 ### Overview
 
 Adapts an existing DBOPFS instance into a complete multi-model, ordered
-multi-file cache without renaming its public methods. The adapter commits every
-selected model file before the completion manifest. A partial file set is not a
-cache hit.
+multi-file cache without renaming its public methods. Each completed whole
+member or Range part is committed independently. An interrupted set
+is not a cache hit, but its completed members remain available to the next
+install so only missing work is fetched.
 
 ### Signature and result
 
@@ -6054,26 +6068,58 @@ createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models', estimateS
 
 `downloadConcurrency` must be a positive safe integer and defaults to four.
 It bounds exactly one transfer axis: ordered multi-file GGUF sources use that
-many concurrent file workers, while a one-file source uses that many HTTP
-Range workers only when an exact `Content-Range` probe succeeds. The mutable
+many concurrent member workers, with at most one Range worker inside each
+member, while a one-file source can use the whole bound for HTTP Range workers
+when the probe returns a usable total from exposed `Content-Range` or optional
+descriptor `bytes`. The mutable
 result contains `kind`, `tableName`, `downloadConcurrency`, the original
 `adapter`, and `ready`, `install`, `ensure`, and `remove`. `ensure()` returns
-`files`, the one-file compatibility `file` or `null`, the manifest, and
+`files`, the one-file compatibility `file` or `null`, and
 `cache:'cached'|'installed'`. It preserves the complete model content.
 `offline:true` never downloads and rejects a miss with
-`ARCANE_AI_MODEL_OFFLINE_MISS`. Version-2/3 compatibility is internal; every
-new successful completion is recorded as version 4.
+`ARCANE_AI_MODEL_OFFLINE_MISS`. Existing legacy one-file caches remain readable.
+
+When supplied, `onProgress` receives existing ordered file progress plus
+`loadedBytes`, `totalBytes`, `remainingBytes`, `bytesPerSecond`, `etaSeconds`,
+`activeTransfers`, `transferLimit`, and `transferMode`. `activeTransfers` is the
+current transfer-worker count. Transfer mode is
+`probing`, `files`, `ranges`, or `single`. Unknown aggregate totals, remaining
+values, rates, and ETAs are `null`. Chunk-driven changes are coalesced on a
+250 ms cadence, with immediate records at download start, plan or total
+discovery, active-worker changes, and completion. `loadedBytes` includes current staged writes and
+restored completed members or Range parts; bytes from a failed partial write
+are removed from the total when that entry is discarded. A complete set of
+declared member `bytes` values
+makes split-model total and remaining progress available from the start;
+otherwise aggregate-dependent fields remain `null` until they are honestly
+known.
 
 ### Availability and normalization
 
 **Browser with a ready DBOPFS instance and OPFS.** Cache metadata is not a
 transferable capability or license proof. Provider unload/dispose keeps all cached files;
-`store.remove(source)` explicitly deletes that source's files and manifest.
-For a one-file source, a server that ignores the `bytes=0-0` probe supplies the
-ordinary full response directly. A missing or unreadable `Content-Range`
-causes a full-fetch fallback. Confirmed ranges are read concurrently and
-written through one positioned OPFS writable, with file-count progress only.
-On failure or cancellation, peers settle before the partial entry is removed.
+`store.remove(source)` explicitly deletes that source's files, resumable Range
+parts, and any legacy manifest. For any source member, a followed redirect that
+turns the first `bytes=0-0` probe into `200` triggers one direct probe of the
+final URL. Confirmed support cancels the original body and starts the Range
+pool; refusal keeps the original response as the ordinary single-fetch path,
+with readable `Content-Length` used for progress. A missing `Content-Range` can
+use optional descriptor `bytes` for Range planning; without either total, the
+store falls back to one full fetch. A confirmed source member is divided into
+up to 16 deterministic OPFS Range parts. A monolithic source may use at most
+`downloadConcurrency` Range workers; split sources keep one Range worker per
+active member. Exact completed parts resume after interruption and are exposed
+in order as one logical Blob. A later non-206, contradictory exposed Range
+response, or incorrectly framed body fails rather than assembling partial
+content. On failure or cancellation, peers settle while completed shards and
+Range parts remain available for retry. A persisted Range part whose length
+does not match its requested HTTP frame is discarded and fetched again. A
+zero-length current whole entry or incomplete current Range set cannot shadow a
+complete legacy cache; once a current replacement completes, the store attempts
+to remove its exact legacy duplicate. A complete whole member similarly
+supersedes its redundant Range fragments. Cleanup failure is warned without
+hiding the usable model. Wllama requires every selected model Blob or File to
+be non-empty.
 
 ### Example
 

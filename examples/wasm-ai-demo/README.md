@@ -25,6 +25,8 @@ Chat uses `PersistentAIChatSession`'s SDK-owned streaming seam, which composes l
 
 Model weights are deliberately excluded from Git. Place the maintained GGUF shards in `examples/wasm-ai-demo/models/`, or set `ARCANE_WASM_MODEL_ROOT` to an existing local model directory before starting the server.
 
+The maintained model descriptors include each shard's known byte length as progress metadata. During a cold install, the SDK reports aggregate loaded and remaining bytes, transfer speed, estimated time, and active file or Range transfers while Chat presents the existing activation progress bar. Completed shards and completed Range parts within a shard remain available after interruption, so retry downloads only missing work.
+
 The app gives the SDK browser-speech owner the existing Whisper tiny.en FP32 and Kokoro 82M Q8 descriptors. The app does not import those runtimes or create a speech worker itself.
 
 ## Local retrieval

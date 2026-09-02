@@ -20,6 +20,16 @@ import {
 } from "./rag.js";
 import { toolsForProfile } from "./profile-tools.js";
 
+function ggufShards(basename, byteLengths) {
+  const total = String(byteLengths.length).padStart(5, "0");
+  return byteLengths.map(function ggufShard(bytes, index) {
+    return {
+      name: `${basename}-${String(index + 1).padStart(5, "0")}-of-${total}.gguf`,
+      bytes,
+    };
+  });
+}
+
 const MODELS = {
   "granite-3b": {
     id: "granite-3b",
@@ -29,12 +39,13 @@ const MODELS = {
     quantization: "Q4_K_M",
     desktopContextTokens: 4_096,
     mobileContextTokens: 2_048,
-    files: Array.from(
-      { length: 5 },
-      function granite3bFileName(_value, index) {
-        return `granite-4.1-3b-Q4_K_M-${String(index + 1).padStart(5, "0")}-of-00005.gguf`;
-      },
-    ),
+    files: ggufShards("granite-4.1-3b-Q4_K_M", [
+      513_000_480,
+      509_814_656,
+      508_831_744,
+      506_056_224,
+      61_799_104,
+    ]),
   },
   "granite-8b": {
     id: "granite-8b",
@@ -44,12 +55,19 @@ const MODELS = {
     quantization: "Q4_K_M",
     desktopContextTokens: 32_768,
     mobileContextTokens: 2_048,
-    files: Array.from(
-      { length: 11 },
-      function granite8bFileName(_value, index) {
-        return `granite-4.1-8b-Q4_K_M-${String(index + 1).padStart(5, "0")}-of-00011.gguf`;
-      },
-    ),
+    files: ggufShards("granite-4.1-8b-Q4_K_M", [
+      340_745_984,
+      509_298_176,
+      491_112_640,
+      507_087_104,
+      492_505_440,
+      504_302_048,
+      489_392_480,
+      492_488_992,
+      507_103_584,
+      509_462_944,
+      504_416_352,
+    ]),
   },
   "gpt-oss-20b": {
     id: "gpt-oss-20b",
@@ -59,12 +77,28 @@ const MODELS = {
     quantization: "MXFP4",
     desktopOnly: true,
     desktopContextTokens: 32_768,
-    files: Array.from(
-      { length: 20 },
-      function gptOssFileName(_value, index) {
-        return `gpt-oss-20b-MXFP4-${String(index + 1).padStart(5, "0")}-of-00020.gguf`;
-      },
-    ),
+    files: ggufShards("gpt-oss-20b-MXFP4", [
+      628_321_344,
+      629_471_744,
+      608_591_904,
+      594_489_088,
+      622_377_056,
+      594_120_192,
+      594_489_088,
+      622_377_056,
+      594_120_192,
+      594_489_088,
+      622_377_088,
+      594_120_224,
+      594_489_088,
+      622_377_088,
+      594_120_224,
+      594_489_088,
+      622_377_088,
+      594_120_224,
+      594_489_088,
+      593_763_072,
+    ]),
   },
 };
 
@@ -177,6 +211,49 @@ function formatModelLoadElapsed(value) {
   return `${seconds}s elapsed`;
 }
 
+function telemetryNumber(value) {
+  return value === null || value === undefined ? Number.NaN : Number(value);
+}
+
+function formatBytes(value) {
+  const bytes = telemetryNumber(value);
+  if (!Number.isFinite(bytes) || bytes < 0) return "";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let amount = bytes;
+  let unitIndex = 0;
+  while (amount >= 1_000 && unitIndex < units.length - 1) {
+    amount /= 1_000;
+    unitIndex += 1;
+  }
+  const fractionDigits = unitIndex === 0 || amount >= 100 ? 0 : (amount >= 10 ? 1 : 2);
+  return `${amount.toFixed(fractionDigits)} ${units[unitIndex]}`;
+}
+
+function formatEta(value) {
+  const seconds = Math.ceil(telemetryNumber(value));
+  if (!Number.isFinite(seconds) || seconds < 0) return "";
+  const hours = Math.floor(seconds / 3_600);
+  const minutes = Math.floor((seconds % 3_600) / 60);
+  const remainder = seconds % 60;
+  if (hours > 0) return `about ${hours}h ${minutes}m left`;
+  if (minutes > 0) return `about ${minutes}m ${remainder}s left`;
+  return `about ${remainder}s left`;
+}
+
+function transferStatus(progress) {
+  const active = telemetryNumber(progress.activeTransfers);
+  const limit = telemetryNumber(progress.transferLimit);
+  if (!Number.isSafeInteger(active) || active < 0 || !Number.isSafeInteger(limit) || limit < 1) {
+    return "";
+  }
+  const mode = typeof progress.transferMode === "string" && progress.transferMode.trim()
+    ? progress.transferMode.trim().toLowerCase()
+    : "";
+  if (mode === "single") return active > 0 ? "single transfer active" : "single transfer idle";
+  if (mode === "probing") return "checking parallel Range support";
+  return `${active}/${limit} transfer workers active${mode ? ` (${mode.replaceAll("-", " ")})` : ""}`;
+}
+
 function modelLoadStatus(progress = {}) {
   const phase = typeof progress.phase === "string" ? progress.phase : "loading";
   let activity = `Starting ${selectedModel.shortLabel}`;
@@ -188,17 +265,40 @@ function modelLoadStatus(progress = {}) {
     activity = `Loading ${selectedModel.shortLabel} into memory`;
   }
   const parts = [activity];
-  const completed = Number(progress.completed);
-  const total = Number(progress.total);
-  if (Number.isSafeInteger(total) && total > 0 && progress.unit === "files") {
-    if (phase === "download" && Number.isSafeInteger(completed) && completed < total) {
-      parts.push(`part ${completed + 1} of ${total}`);
-    } else if (phase === "initialize") {
-      parts.push(`${total} model parts ready`);
-    } else if (phase === "cache-check") {
-      parts.push(`${total} model parts`);
+  const loadedBytes = telemetryNumber(progress.loadedBytes);
+  const totalBytes = telemetryNumber(progress.totalBytes);
+  const remainingBytes = telemetryNumber(progress.remainingBytes);
+  const bytesPerSecond = telemetryNumber(progress.bytesPerSecond);
+  const hasByteProgress = phase === "download"
+    && Number.isSafeInteger(loadedBytes)
+    && loadedBytes >= 0
+    && Number.isSafeInteger(totalBytes)
+    && totalBytes > 0;
+  if (hasByteProgress) {
+    parts.push(`${formatBytes(loadedBytes)} / ${formatBytes(totalBytes)}`);
+    if (Number.isSafeInteger(remainingBytes) && remainingBytes >= 0) {
+      parts.push(`${formatBytes(remainingBytes)} remaining`);
+    }
+    if (Number.isFinite(bytesPerSecond) && bytesPerSecond >= 0) {
+      parts.push(`${formatBytes(bytesPerSecond)}/s`);
+    }
+    const eta = formatEta(progress.etaSeconds);
+    if (eta) parts.push(eta);
+  } else {
+    const completed = Number(progress.completed);
+    const total = Number(progress.total);
+    if (Number.isSafeInteger(total) && total > 0 && progress.unit === "files") {
+      if (phase === "download" && Number.isSafeInteger(completed) && completed < total) {
+        parts.push(`${completed} of ${total} files complete`);
+      } else if (phase === "initialize") {
+        parts.push(`${total} model parts ready`);
+      } else if (phase === "cache-check") {
+        parts.push(`${total} model parts`);
+      }
     }
   }
+  const transfers = transferStatus(progress);
+  if (transfers) parts.push(transfers);
   const elapsed = formatModelLoadElapsed(progress.elapsedMs);
   if (elapsed) {
     parts.push(elapsed);
@@ -289,10 +389,11 @@ async function loadRag() {
 function localModelDescriptor(model) {
   return {
     id: model.id,
-    files: model.files.map(function localModelFile(name) {
+    files: model.files.map(function localModelFile(file) {
       return {
-        name,
-        url: new URL(`./models/${name}`, window.location.href).href,
+        name: file.name,
+        url: new URL(`./models/${file.name}`, window.location.href).href,
+        bytes: file.bytes,
       };
     }),
   };

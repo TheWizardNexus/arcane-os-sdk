@@ -96,11 +96,36 @@ const source=createBrowserModelSource({
 });
 ```
 
-Model members require only their names and URLs. The ordinary path does not
-count, limit, hash, or identify model content by its byte representation.
+Model members require only their names and URLs. A member may also declare a
+positive safe-integer `bytes` value so the application can present determinate
+progress and the transport can plan parallel HTTP ranges. An unusable value is
+treated as unavailable and never blocks the ordinary download. That value is observational
+transfer metadata: it never validates, admits, identifies, or decides cache
+reuse for model content. During a cache miss, the store reports live aggregate
+`loadedBytes`, `totalBytes`, `remainingBytes`, `bytesPerSecond`, `etaSeconds`,
+`activeTransfers`, `transferLimit`, and `transferMode` alongside the existing
+completed-file counts. Chunk-driven updates are coalesced on a 250 ms cadence;
+transfer-plan, active-worker, and completion boundaries publish immediately.
 Optional hardening is inactive unless the caller explicitly selects
-`secure:true`. The DBOPFS store processes all members in order and commits its
-completion record last. Capability reports evaluate each
+`secure:true`. The DBOPFS store downloads ordered members with one bounded
+parallel transfer pool and returns them in descriptor order. Completed shards
+survive an interrupted attempt and only missing shard or Range-part work is
+fetched on retry. A
+monolithic file uses up to `downloadConcurrency` active workers (four by
+default) over up to 16 deterministic, resumable HTTP range parts when the server
+confirms `206` responses and the total comes from `Content-Range` or, when that
+header is not exposed, optional declared `bytes`.
+When a followed redirect turns the first Range probe into `200`, the SDK probes
+the final URL directly before reusing that original response as the single-fetch
+fallback. Completed range parts survive restart and are presented to Wllama as
+one logical model. Split members use the same Range negotiation with one active
+Range worker per member, so completed parts within a shard can also resume
+without multiplying the configured transfer bound. A probe without an
+observable or declared total falls back to one full fetch. Once a complete
+whole file or Range set is available, the store removes superseded fragments
+and the exact legacy duplicate for that model when DBOPFS deletion succeeds;
+cleanup failure is warned without hiding the usable model.
+Capability reports evaluate each
 app-supplied model as `compatible`, `incompatible`, or `unknown`; the app can
 render that result without the SDK inventing or filtering its catalog.
 

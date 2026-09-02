@@ -325,15 +325,33 @@ weights, default model catalog, CDN fallback, native provider, speech model, or
 application profile. The caller supplies each model as a source with
 a nonempty ordered file list, so monolithic and split GGUF models use the same
 contract. HTTPS redirects are followed and the final HTTPS URL is recorded.
-The ordinary path does not count, limit, hash, or identify model content by
-bytes.
+Each member may optionally declare positive `bytes` for progress reporting and
+HTTP Range planning. Declared and observed byte measures remain transfer-local
+telemetry; they never validate, admit, identify, hash, or decide cache reuse for
+model content.
 
-On load, the DBOPFS store processes all ordered members and commits the
-completion record last. A normal cache miss may fetch only the caller-supplied
-HTTPS sources; `offline:true` performs no model request and uses only a
-compatible completed cache, otherwise it rejects with
+On load, the DBOPFS store preserves descriptor order while one bounded worker
+pool fetches split members or ranges within the selected member. A split member
+may use one Range worker, allowing an interrupted shard to resume without
+multiplying the configured concurrency. Download progress
+retains its existing completed-file fields and adds raw aggregate bytes,
+remaining bytes, rolling bytes per second, ETA seconds, active transfer
+workers, the transfer limit, and the active transfer mode. Chunk-driven changes
+are coalesced on a 250 ms cadence; start, plan/total, active-worker, and
+completion boundaries may publish immediately. A source member that receives a redirected `200` probes the final URL
+directly before reusing the original response as its single-fetch fallback.
+Confirmed support uses up to 16 deterministic OPFS Range parts per member with
+bounded active workers; completed parts and split-model members survive
+interruption so a retry fetches only missing work. Without usable range support
+or an observable or declared total it falls back to one full fetch. A normal
+cache miss may fetch only the
+caller-supplied HTTPS sources; `offline:true` performs no model request and uses
+only a compatible completed cache, otherwise it rejects with
 `ARCANE_AI_MODEL_OFFLINE_MISS`. Unload releases the active Wllama session but
-does not silently delete the app-owned cache.
+does not silently delete the app-owned cache. When a complete current model
+replaces the exact legacy cache entry, the store attempts to remove the legacy
+duplicate; a complete whole member likewise supersedes its resumable fragments.
+Cleanup failure is warned without hiding the usable model.
 
 SDK `0.3.4` requires WebGPU. Load requests full offload and waits for the runtime
 to report a loaded model. `navigator.gpu` presence alone is

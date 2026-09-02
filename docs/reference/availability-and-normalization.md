@@ -102,8 +102,19 @@ selection.
 is offline. A normal cache miss downloads from the exact caller-supplied HTTPS
 URL. App, provider/model-binding, and load-operation options may use
 `{security:{secure?:boolean}}`. The SDK default is `secure:false`, and omitted
-security leaves ordinary model loading fully functional. The ordinary path
-does not count, limit, hash, or identify model content by bytes. Optional
+security leaves ordinary model loading fully functional. Download byte counts,
+remaining bytes, rate, and ETA are observational progress only. Optional member
+`bytes` values may initialize progress and HTTP Range planning, but neither
+declared nor observed byte measures validate, admit, identify, hash, or decide
+cache reuse for model content. Completed split members and deterministic Range
+parts within any member are retained across an interrupted install so retry
+fetches only missing work. Exact part length is used only to recognize a
+completed HTTP transport frame. Zero-length whole entries and incomplete Range
+sets cannot become cache hits; failed or incorrectly framed active parts are
+removed. After a
+complete current representation exists, the store attempts to remove its exact
+legacy duplicate and redundant Range fragments; cleanup failure is warned
+without hiding the usable model. Optional
 `secure:true` records intent only; historical checking remains disabled until a
 separately authorized user review. Successful
 Wllama model loading remains mandatory. `load({offline:true})` permits only a compatible

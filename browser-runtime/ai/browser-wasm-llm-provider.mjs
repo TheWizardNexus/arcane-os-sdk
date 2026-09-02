@@ -27,6 +27,10 @@ const CHROME_HIGH_PERFORMANCE_GPU_FLAG_URL =
   "chrome://flags/#force-high-performance-gpu";
 const MODEL_LOAD_HEARTBEAT_MS = 5_000;
 const DEFAULT_MODEL_DOWNLOAD_CONCURRENCY = 4;
+const MODEL_DOWNLOAD_PROGRESS_INTERVAL_MS = 250;
+const MODEL_DOWNLOAD_SPEED_WINDOW_MS = 5_000;
+const MODEL_DOWNLOAD_MAX_RANGE_PARTS = 16;
+const MODEL_DOWNLOAD_TARGET_RANGE_BYTES = 128_000_000;
 const INTEL_VENDOR_ID = 0x8086;
 const CAPABILITY_POLICY_PROTOCOL = "arcane-ai-browser-capability-policy/1";
 let highPerformanceGpuNoticeShown = false;
@@ -87,6 +91,11 @@ function httpContentRange(value) {
   return completeValue({ start, end, total });
 }
 
+function httpContentLength(value) {
+  const length = Number(String(value ?? "").trim());
+  return Number.isSafeInteger(length) && length > 0 ? length : null;
+}
+
 function downloadConcurrencyValue(value) {
   if (!Number.isSafeInteger(value) || value < 1) {
     throw new RangeError("Model downloadConcurrency must be a positive safe integer.");
@@ -94,8 +103,12 @@ function downloadConcurrencyValue(value) {
   return value;
 }
 
-function parallelHttpRanges(total, concurrency) {
-  const count = Math.min(concurrency, total);
+function modelHttpRanges(total) {
+  const count = Math.min(
+    MODEL_DOWNLOAD_MAX_RANGE_PARTS,
+    Math.ceil(total / MODEL_DOWNLOAD_TARGET_RANGE_BYTES),
+    total,
+  );
   const width = Math.floor(total / count);
   const remainder = total % count;
   const ranges = [];
@@ -107,6 +120,12 @@ function parallelHttpRanges(total, concurrency) {
     start = end + 1;
   }
   return completeValue(ranges);
+}
+
+function progressClock() {
+  return typeof globalThis.performance?.now === "function"
+    ? globalThis.performance.now()
+    : Date.now();
 }
 
 function modelSourceUrl(value) {
@@ -193,6 +212,9 @@ function descriptorFile(value, { fallbackName = null } = {}) {
     name: descriptorFileName(value, url, fallbackName),
     url: url.href,
   };
+  if (Number.isSafeInteger(value.bytes) && value.bytes > 0) {
+    file.bytes = value.bytes;
+  }
   return completeValue(file);
 }
 
@@ -236,11 +258,13 @@ function modelDescriptor(value) {
   const publicFiles = completeValue(files.map((file) => completeValue({
     name: file.name,
     url: file.url,
+    ...(file.bytes === undefined ? {} : { bytes: file.bytes }),
   })));
   let descriptor;
   if (legacy) {
     const [file] = files;
     descriptor = { id, url: file.url };
+    if (file.bytes !== undefined) descriptor.bytes = file.bytes;
   } else {
     descriptor = { id, files: publicFiles };
   }
@@ -335,6 +359,7 @@ export function createBrowserModelSource(descriptor, {
 } = {}) {
   const model = modelDescriptor(descriptor);
   const metadata = MODEL_DESCRIPTOR_METADATA.get(model);
+  const rangeRequestUrls = new Array(metadata.files.length).fill(null);
 
   function selectedMember(memberIndex) {
     if (!Number.isSafeInteger(memberIndex)) {
@@ -346,7 +371,7 @@ export function createBrowserModelSource(descriptor, {
     return metadata.files[memberIndex];
   }
 
-  async function request(memberIndex, { signal, range = null } = {}) {
+  async function request(memberIndex, { signal, range = null, url = null } = {}) {
     const member = selectedMember(memberIndex);
     throwIfAborted(signal, "install");
     const fetchFunction = fetchImpl ?? globalThis.fetch?.bind(globalThis);
@@ -362,18 +387,18 @@ export function createBrowserModelSource(descriptor, {
 
     let response;
     try {
-      response = await fetchFunction(member.url, requestOptions);
+      response = await fetchFunction(url ?? member.url, requestOptions);
     } catch (error) {
       if (signal?.aborted || error?.name === "AbortError") throwIfAborted(signal, "install");
       throw fail("ARCANE_AI_MODEL_DOWNLOAD_FAILED", "The model download failed.", error);
     }
     let finalUrl;
     try {
-      finalUrl = new URL(response?.url || member.url);
+      finalUrl = new URL(response?.url || url || member.url);
     } catch {
       finalUrl = null;
     }
-    finalUrl ??= new URL(member.url);
+    finalUrl ??= new URL(url ?? member.url);
     return completeValue({ member, response, finalUrl: finalUrl.href });
   }
 
@@ -397,6 +422,7 @@ export function createBrowserModelSource(descriptor, {
       body: response.body,
       requestedUrl: member.url,
       finalUrl,
+      contentLength: httpContentLength(response.headers?.get?.("content-length")),
       cancel,
     });
   }
@@ -422,15 +448,58 @@ export function createBrowserModelSource(descriptor, {
       range: { start: 0, end: 0 },
     });
     if (download.response?.status === 200) {
+      if (download.finalUrl !== download.member.url) {
+        let redirectedProbe = null;
+        try {
+          redirectedProbe = await request(memberIndex, {
+            signal,
+            range: { start: 0, end: 0 },
+            url: download.finalUrl,
+          });
+          if (redirectedProbe.response?.status === 206) {
+            const header = redirectedProbe.response.headers?.get?.("content-range");
+            const observed = httpContentRange(header);
+            const total = observed?.total
+              ?? httpContentLength(download.response.headers?.get?.("content-length"))
+              ?? selectedMember(memberIndex).bytes
+              ?? null;
+            if (
+              (!header || observed)
+              && (!observed || (observed.start === 0 && observed.end === 0))
+              && Number.isSafeInteger(total)
+              && total > 0
+            ) {
+              await cancelReadableBody(download.response.body);
+              await cancelReadableBody(redirectedProbe.response.body);
+              rangeRequestUrls[memberIndex] = redirectedProbe.finalUrl;
+              return completeValue({ kind: "supported", total });
+            }
+          }
+          await cancelReadableBody(redirectedProbe.response?.body);
+        } catch (error) {
+          if (signal?.aborted) {
+            await cancelReadableBody(download.response.body, signal.reason);
+            throw error;
+          }
+          await cancelReadableBody(redirectedProbe?.response?.body, error);
+        }
+      }
       return completeValue({ kind: "complete", opened: openedDownload(download) });
     }
     if (download.response?.status !== 206) await rejectHttpResponse(download);
-    const observed = httpContentRange(download.response.headers?.get?.("content-range"));
+    const header = download.response.headers?.get?.("content-range");
+    const observed = httpContentRange(header);
     await cancelReadableBody(download.response.body);
-    if (!observed || observed.start !== 0 || observed.end !== 0) {
+    if (
+      (header && !observed)
+      || (observed && (observed.start !== 0 || observed.end !== 0))
+    ) {
       return completeValue({ kind: "unsupported" });
     }
-    return completeValue({ kind: "supported", total: observed.total });
+    const total = observed?.total ?? selectedMember(memberIndex).bytes ?? null;
+    if (total === null) return completeValue({ kind: "unsupported" });
+    rangeRequestUrls[memberIndex] = download.finalUrl;
+    return completeValue({ kind: "supported", total });
   }
 
   async function openRange(memberIndex, { signal, start, end, total } = {}) {
@@ -444,14 +513,21 @@ export function createBrowserModelSource(descriptor, {
     ) {
       throw new RangeError("Browser model HTTP range framing is invalid.");
     }
-    const download = await request(memberIndex, { signal, range: { start, end } });
-    const observed = httpContentRange(download.response?.headers?.get?.("content-range"));
+    const download = await request(memberIndex, {
+      signal,
+      range: { start, end },
+      url: rangeRequestUrls[memberIndex],
+    });
+    const header = download.response?.headers?.get?.("content-range");
+    const observed = httpContentRange(header);
     if (
       download.response?.status !== 206
-      || !observed
-      || observed.start !== start
-      || observed.end !== end
-      || observed.total !== total
+      || (header && !observed)
+      || (observed && (
+        observed.start !== start
+        || observed.end !== end
+        || observed.total !== total
+      ))
     ) {
       await cancelReadableBody(download.response?.body);
       throw fail(
@@ -550,6 +626,34 @@ function storageName(source, { legacy = false } = {}) {
   });
 }
 
+function rangePartName(modelName, range) {
+  return `${modelName}.range-${range.start}-${range.end}-of-${range.total}.part`;
+}
+
+function rangePartPrefix(modelName) {
+  return `${modelName}.range-`;
+}
+
+function rangePartDetails(modelName, name) {
+  const prefix = rangePartPrefix(modelName);
+  if (!name.startsWith(prefix)) return null;
+  const match = /^([0-9]+)-([0-9]+)-of-([0-9]+)\.part$/u.exec(name.slice(prefix.length));
+  if (!match) return null;
+  const start = Number(match[1]);
+  const end = Number(match[2]);
+  const total = Number(match[3]);
+  if (
+    !Number.isSafeInteger(start)
+    || !Number.isSafeInteger(end)
+    || !Number.isSafeInteger(total)
+    || start < 0
+    || end < start
+    || total <= end
+  ) return null;
+  const range = completeValue({ start, end, total });
+  return rangePartName(modelName, range) === name ? range : null;
+}
+
 function securitySnapshot(security) {
   return security?.secure === true ? { secure: true } : undefined;
 }
@@ -610,77 +714,262 @@ export function createDbopfsModelStore({
     }
   }
 
-  async function write(name, body, { signal } = {}) {
+  function createDownloadProgressReporter(members, onProgress, retainFailure) {
+    const memberTotals = members.map((member) => member.bytes ?? null);
+    let loadedBytes = 0;
+    let completed = 0;
+    let activeTransfers = 0;
+    let transferMode = members.length === 1 ? "probing" : "files";
+    let timer = null;
+    let lastPublishedAt = 0;
+    let samples = [];
+
+    function totalBytesValue() {
+      if (memberTotals.some((value) => value === null)) return null;
+      const totalBytes = memberTotals.reduce((sum, value) => sum + value, 0);
+      return Number.isSafeInteger(totalBytes) ? totalBytes : null;
+    }
+
+    function progressRecord(now) {
+      samples.push(completeValue({ at: now, loadedBytes }));
+      const oldestUsefulTime = now - MODEL_DOWNLOAD_SPEED_WINDOW_MS;
+      while (samples.length > 1 && samples[1].at <= oldestUsefulTime) samples.shift();
+      const firstSample = samples[0];
+      const elapsedSeconds = (now - firstSample.at) / 1_000;
+      const sampledBytes = loadedBytes - firstSample.loadedBytes;
+      const bytesPerSecond = sampledBytes > 0 && elapsedSeconds > 0
+        ? Math.round(sampledBytes / elapsedSeconds)
+        : null;
+      const totalBytes = totalBytesValue();
+      const remainingBytes = totalBytes === null
+        ? null
+        : Math.max(0, totalBytes - loadedBytes);
+      const etaSeconds = remainingBytes === 0
+        ? 0
+        : bytesPerSecond === null || remainingBytes === null
+          ? null
+          : Math.ceil(remainingBytes / bytesPerSecond);
+      return completeValue({
+        phase: "download",
+        completed,
+        total: members.length,
+        unit: "files",
+        heartbeat: false,
+        loadedBytes,
+        totalBytes,
+        remainingBytes,
+        bytesPerSecond,
+        etaSeconds,
+        activeTransfers,
+        transferLimit: workerLimit,
+        transferMode,
+      });
+    }
+
+    function stopTimer() {
+      if (timer === null) return;
+      clearInterval(timer);
+      timer = null;
+    }
+
+    function publish({ force = false } = {}) {
+      if (onProgress === null) return;
+      const now = progressClock();
+      if (!force && now - lastPublishedAt < MODEL_DOWNLOAD_PROGRESS_INTERVAL_MS) return;
+      onProgress(progressRecord(now));
+      lastPublishedAt = now;
+    }
+
+    function publishSafely(options) {
+      try {
+        publish(options);
+        return true;
+      } catch (error) {
+        stopTimer();
+        retainFailure(error);
+        return false;
+      }
+    }
+
+    function setMemberTotal(memberIndex, totalBytes) {
+      if (!Number.isSafeInteger(totalBytes) || totalBytes <= 0) return;
+      if (memberTotals[memberIndex] === totalBytes) return;
+      memberTotals[memberIndex] = totalBytes;
+      publishSafely({ force: true });
+    }
+
+    function addBytes(value) {
+      if (!Number.isSafeInteger(value) || value <= 0) return;
+      loadedBytes += value;
+      publishSafely();
+    }
+
+    function discardBytes(value) {
+      if (!Number.isSafeInteger(value) || value <= 0) return;
+      loadedBytes = Math.max(0, loadedBytes - value);
+      samples = [];
+      publishSafely({ force: true });
+    }
+
+    return completeValue({
+      addBytes,
+      beginTransfer() {
+        activeTransfers += 1;
+        publishSafely({ force: true });
+      },
+      completeMember(memberIndex, totalBytes) {
+        if (Number.isSafeInteger(totalBytes) && totalBytes > 0) {
+          memberTotals[memberIndex] = totalBytes;
+        }
+        completed += 1;
+        publishSafely({ force: true });
+      },
+      discardBytes,
+      dispose: stopTimer,
+      endTransfer({ publishProgress = true } = {}) {
+        activeTransfers = Math.max(0, activeTransfers - 1);
+        if (publishProgress) publishSafely({ force: true });
+      },
+      finish() {
+        publishSafely({ force: true });
+      },
+      setMemberTotal,
+      setMode(value) {
+        if (transferMode === value) return;
+        transferMode = value;
+        publishSafely({ force: true });
+      },
+      restoreBytes(value) {
+        if (!Number.isSafeInteger(value) || value <= 0) return;
+        loadedBytes += value;
+        samples = [];
+        publishSafely({ force: true });
+      },
+      restoreMember(memberIndex, totalBytes) {
+        if (!Number.isSafeInteger(totalBytes) || totalBytes <= 0) return;
+        memberTotals[memberIndex] = totalBytes;
+        loadedBytes += totalBytes;
+        completed += 1;
+        samples = [];
+        publishSafely({ force: true });
+      },
+      start() {
+        if (!publishSafely({ force: true })) return;
+        if (onProgress !== null && timer === null) {
+          timer = setInterval(function publishDownloadProgressTick() {
+            publishSafely();
+          }, MODEL_DOWNLOAD_PROGRESS_INTERVAL_MS);
+        }
+      },
+    });
+  }
+
+  async function write(name, body, {
+    signal,
+    onChunk = null,
+    onDiscard = null,
+  } = {}) {
     const directory = await table();
     const handle = await directory.getFileHandle(name, { create: true });
     const writable = await handle.createWritable();
+    let written = 0;
     try {
       for await (const chunk of byteChunks(body, signal)) {
         await writable.write(chunk);
+        written += chunk.byteLength;
+        onChunk?.(chunk.byteLength);
+        throwIfAborted(signal, "install");
       }
       throwIfAborted(signal, "install");
       await writable.close();
-      return undefined;
+      return written;
     } catch (error) {
       await writable.abort?.(error).catch(() => undefined);
       await directory.removeEntry(name).catch(() => undefined);
+      onDiscard?.(written);
       throw error;
     }
   }
 
   async function storedModelFile(name) {
     const modelFile = await file(name);
-    if (!modelFile) {
+    if (!modelFile || modelFile.size === 0) {
       throw fail(
         "ARCANE_AI_MODEL_CACHE_REJECTED",
-        "A stored model file could not be reopened.",
+        "A stored model file could not be reopened as a non-empty model.",
       );
     }
     return modelFile;
   }
 
-  async function writeOpenedModel(name, opened, { signal } = {}) {
+  async function writeOpenedModel(name, opened, {
+    signal,
+    onChunk = null,
+    onDiscard = null,
+  } = {}) {
+    let written = 0;
     try {
-      await write(name, opened.body, { signal });
+      written = await write(name, opened.body, { signal, onChunk, onDiscard });
       return await storedModelFile(name);
     } catch (error) {
+      if (written > 0) onDiscard?.(written);
       await cancelOpenedDownload(opened, error);
       throw error;
     }
   }
 
-  async function writeParallelRanges(source, memberIndex, name, total, { signal } = {}) {
+  async function writeParallelRanges(
+    source,
+    memberIndex,
+    name,
+    total,
+    {
+      signal,
+      progress,
+      retainInstallFailure = null,
+      rangeWorkerLimit = workerLimit,
+    } = {},
+  ) {
     const transport = BROWSER_MODEL_SOURCE_TRANSPORTS.get(source);
-    const ranges = parallelHttpRanges(total, workerLimit);
-    const directory = await table();
-    const handle = await directory.getFileHandle(name, { create: true });
-    const writable = await handle.createWritable();
+    const ranges = modelHttpRanges(total);
+    const partFiles = new Array(ranges.length);
+    const pendingRangeIndexes = [];
+    for (let rangeIndex = 0; rangeIndex < ranges.length; rangeIndex += 1) {
+      throwIfAborted(signal, "install");
+      const range = ranges[rangeIndex];
+      const partName = rangePartName(name, range);
+      const partFile = await file(partName);
+      const expected = range.end - range.start + 1;
+      if (partFile?.size === expected) {
+        partFiles[rangeIndex] = partFile;
+        progress?.restoreBytes(expected);
+      } else {
+        if (partFile) await removeEntry(partName);
+        pendingRangeIndexes.push(rangeIndex);
+      }
+    }
     const linked = linkAbortSignal(signal);
     const downloadSignal = linked.controller.signal;
-    let nextRangeIndex = 0;
+    let nextPendingIndex = 0;
     let failure = null;
-    let writeQueue = Promise.resolve();
 
     function retainFailure(error) {
       if (failure === null) failure = error;
       if (!downloadSignal.aborted) linked.controller.abort(error);
     }
 
-    function enqueuePositionedWrite(position, data) {
-      async function writePositionedChunk() {
-        await writable.write(completeValue({ type: "write", position, data }));
-      }
-      writeQueue = writeQueue.then(writePositionedChunk);
-      return writeQueue;
-    }
-
     async function transferRangeWorker() {
       while (true) {
-        const rangeIndex = nextRangeIndex;
-        nextRangeIndex += 1;
-        if (rangeIndex >= ranges.length) return;
+        const pendingIndex = nextPendingIndex;
+        nextPendingIndex += 1;
+        if (pendingIndex >= pendingRangeIndexes.length) return;
+        const rangeIndex = pendingRangeIndexes[pendingIndex];
         const range = ranges[rangeIndex];
+        const partName = rangePartName(name, range);
         let opened = null;
+        let writable = null;
+        let received = 0;
+        progress?.beginTransfer();
         try {
           opened = await transport.openRange(memberIndex, {
             signal: downloadSignal,
@@ -688,34 +977,54 @@ export function createDbopfsModelStore({
             end: range.end,
             total: range.total,
           });
-          let position = range.start;
+          const directory = await table();
+          const handle = await directory.getFileHandle(partName, { create: true });
+          writable = await handle.createWritable();
+          const expected = range.end - range.start + 1;
           for await (const chunk of byteChunks(opened.body, downloadSignal)) {
-            const nextPosition = position + chunk.byteLength;
-            if (!Number.isSafeInteger(nextPosition) || nextPosition > range.end + 1) {
+            const nextReceived = received + chunk.byteLength;
+            if (!Number.isSafeInteger(nextReceived) || nextReceived > expected) {
               throw fail(
                 "ARCANE_AI_MODEL_DOWNLOAD_FAILED",
                 "The model server returned more content than the requested HTTP byte range.",
               );
             }
-            await enqueuePositionedWrite(position, chunk);
-            position = nextPosition;
+            await writable.write(chunk);
+            received = nextReceived;
+            progress?.addBytes(chunk.byteLength);
+            throwIfAborted(downloadSignal, "install");
           }
-          if (position !== range.end + 1) {
+          if (received !== expected) {
             throw fail(
               "ARCANE_AI_MODEL_DOWNLOAD_FAILED",
               "The model server returned less content than the requested HTTP byte range.",
             );
           }
+          throwIfAborted(downloadSignal, "install");
+          await writable.close();
+          writable = null;
+          partFiles[rangeIndex] = await storedModelFile(partName);
         } catch (error) {
+          retainInstallFailure?.(error);
           retainFailure(error);
           await cancelOpenedDownload(opened, error);
+          try {
+            await writable?.abort?.(error);
+          } catch {
+            // The range part is removed below even if its writable already closed.
+          }
+          await removeEntry(partName).catch(() => undefined);
+          progress?.discardBytes(received);
           throw error;
+        } finally {
+          progress?.endTransfer({ publishProgress: failure === null });
         }
       }
     }
 
     const workers = [];
-    for (let index = 0; index < ranges.length; index += 1) {
+    const workerCount = Math.min(rangeWorkerLimit, pendingRangeIndexes.length);
+    for (let index = 0; index < workerCount; index += 1) {
       workers.push(transferRangeWorker());
     }
     try {
@@ -729,51 +1038,304 @@ export function createDbopfsModelStore({
         }
       }
       if (failure !== null) throw failure;
-      await writeQueue;
       throwIfAborted(downloadSignal, "install");
-      await writable.close();
-      return await storedModelFile(name);
+      const modelFile = new Blob(partFiles, { type: "application/octet-stream" });
+      await removeStaleRangePartsAfterCompletion(name, ranges);
+      return modelFile;
     } catch (error) {
       retainFailure(error);
-      try {
-        await writable.abort?.(error);
-      } catch {
-        // The file entry is removed below even if the writable already closed.
-      }
-      try {
-        await directory.removeEntry(name);
-      } catch {
-        // The caller removes the complete model set after all workers settle.
-      }
       throw failure;
     } finally {
       linked.release();
     }
   }
 
-  async function installOneFile(source, memberIndex, name, { signal } = {}) {
+  async function installOneFile(
+    source,
+    memberIndex,
+    name,
+    {
+      signal,
+      progress,
+      retainFailure = null,
+      multiFile = false,
+      rangeWorkerLimit = workerLimit,
+    } = {},
+  ) {
     const transport = BROWSER_MODEL_SOURCE_TRANSPORTS.get(source);
     if (!transport) return null;
-    const probe = await transport.probeRange(memberIndex, { signal });
-    if (probe.kind === "complete") {
-      return writeOpenedModel(name, probe.opened, { signal });
+    if (!multiFile) progress?.setMode("probing");
+    progress?.beginTransfer();
+    let probe;
+    try {
+      probe = await transport.probeRange(memberIndex, { signal });
+    } catch (error) {
+      retainFailure?.(error);
+      progress?.endTransfer({ publishProgress: false });
+      throw error;
     }
+    if (probe.kind === "complete") {
+      if (!multiFile) progress?.setMode("single");
+      progress?.setMemberTotal(memberIndex, probe.opened.contentLength);
+      try {
+        const modelFile = await writeOpenedModel(name, probe.opened, {
+          signal,
+          onChunk: progress?.addBytes,
+          onDiscard: progress?.discardBytes,
+        });
+        await removeRangePartsAfterWholeFile(name, probe.opened.contentLength);
+        return modelFile;
+      } catch (error) {
+        retainFailure?.(error);
+        throw error;
+      } finally {
+        progress?.endTransfer({ publishProgress: false });
+      }
+    }
+    progress?.endTransfer({ publishProgress: false });
     if (probe.kind !== "supported") return null;
-    return writeParallelRanges(source, memberIndex, name, probe.total, { signal });
+    if (!multiFile) progress?.setMode("ranges");
+    progress?.setMemberTotal(memberIndex, probe.total);
+    return writeParallelRanges(source, memberIndex, name, probe.total, {
+      signal,
+      progress,
+      rangeWorkerLimit,
+      retainInstallFailure: retainFailure,
+    });
   }
 
   async function removeNames(names) {
-    const removed = [await removeEntry(names.manifest)];
+    const removed = [];
     for (const entry of names.models) removed.push(await removeEntry(entry.name));
+    removed.push(await removeEntry(names.manifest));
+    return removed.some(Boolean);
+  }
+
+  async function memberRangePartNames(modelName) {
+    const directory = await table();
+    if (typeof directory.entries !== "function") return null;
+    const prefix = rangePartPrefix(modelName);
+    const names = [];
+    for await (const [name] of directory.entries()) {
+      if (name.startsWith(prefix)) names.push(name);
+    }
+    return names;
+  }
+
+  async function removeMemberRangeParts(modelName, {
+    except = null,
+    total = null,
+  } = {}) {
+    const existingNames = await memberRangePartNames(modelName);
+    const names = existingNames ?? (
+      Number.isSafeInteger(total) && total > 0
+        ? modelHttpRanges(total).map((range) => rangePartName(modelName, range))
+        : []
+    );
+    const removed = [];
+    for (const name of names) {
+      if (except?.has(name)) continue;
+      removed.push(await removeEntry(name));
+    }
+    return removed.some(Boolean);
+  }
+
+  async function removeRangePartsAfterWholeFile(modelName, total) {
+    try {
+      await removeMemberRangeParts(modelName, { total });
+    } catch (error) {
+      globalThis.console?.warn?.(
+        "Arcane could not remove superseded browser model range parts.",
+        error,
+      );
+    }
+  }
+
+  async function removeStaleRangePartsAfterCompletion(modelName, ranges) {
+    const keep = new Set(ranges.map((range) => rangePartName(modelName, range)));
+    try {
+      await removeMemberRangeParts(modelName, {
+        except: keep,
+        total: ranges[0]?.total ?? null,
+      });
+    } catch (error) {
+      globalThis.console?.warn?.(
+        "Arcane could not remove superseded browser model range parts.",
+        error,
+      );
+    }
+  }
+
+  async function removeRangePartsBehindWholeFiles(members, names, modelFiles) {
+    const completeMembers = [];
+    for (let memberIndex = 0; memberIndex < modelFiles.length; memberIndex += 1) {
+      if (!modelFiles[memberIndex]) continue;
+      completeMembers.push(completeValue({
+        modelName: names.models[memberIndex].name,
+        total: members[memberIndex].bytes,
+      }));
+    }
+    if (completeMembers.length === 0) return;
+    try {
+      const directory = await table();
+      if (typeof directory.entries === "function") {
+        const prefixes = completeMembers.map(({ modelName }) => rangePartPrefix(modelName));
+        const entries = [];
+        for await (const [name] of directory.entries()) {
+          if (prefixes.some((prefix) => name.startsWith(prefix))) entries.push(name);
+        }
+        for (const name of entries) await removeEntry(name);
+        return;
+      }
+      for (const { modelName, total } of completeMembers) {
+        await removeMemberRangeParts(modelName, { total });
+      }
+    } catch (error) {
+      globalThis.console?.warn?.(
+        "Arcane could not remove superseded browser model range parts.",
+        error,
+      );
+    }
+  }
+
+  async function removeRangeParts(source, names) {
+    const members = sourceMetadata(source).files;
+    const directory = await table();
+    if (typeof directory.entries === "function") {
+      const prefixes = names.models.map((entry) => rangePartPrefix(entry.name));
+      const entries = [];
+      for await (const [name] of directory.entries()) {
+        if (prefixes.some((prefix) => name.startsWith(prefix))) entries.push(name);
+      }
+      const removed = [];
+      for (const name of entries) removed.push(await removeEntry(name));
+      return removed.some(Boolean);
+    }
+    const removed = [];
+    for (let memberIndex = 0; memberIndex < members.length; memberIndex += 1) {
+      const total = members[memberIndex].bytes;
+      if (!Number.isSafeInteger(total) || total <= 0) continue;
+      for (const range of modelHttpRanges(total)) {
+        removed.push(await removeEntry(rangePartName(names.models[memberIndex].name, range)));
+      }
+    }
     return removed.some(Boolean);
   }
 
   async function remove(source) {
-    let removed = await removeNames(storageName(source));
-    if (sourceMetadata(source).legacy) {
-      removed = await removeNames(storageName(source, { legacy: true })) || removed;
+    const names = storageName(source);
+    const legacyNames = storageName(source, { legacy: true });
+    let legacyManifest = null;
+    let removeLegacy = sourceMetadata(source).legacy;
+    try {
+      legacyManifest = await legacyManifestForSource(source, legacyNames);
+      removeLegacy ||= Boolean(legacyManifest);
+    } catch (error) {
+      globalThis.console?.warn?.(
+        "Arcane could not inspect the legacy browser model cache during removal.",
+        error,
+      );
+    }
+    let removed = await removeNames(names);
+    removed = await removeRangeParts(source, names) || removed;
+    if (removeLegacy) {
+      removed = await removeNames(
+        legacyStorageNames(source, legacyNames, legacyManifest),
+      ) || removed;
     }
     return removed;
+  }
+
+  async function legacyManifestForSource(source, legacyNames) {
+    const manifestFile = await file(legacyNames.manifest);
+    if (!manifestFile) return null;
+    let manifest;
+    try {
+      manifest = JSON.parse(await manifestFile.text());
+    } catch {
+      return null;
+    }
+    const model = manifest?.model;
+    return manifest?.complete === true && model?.id === source.id ? manifest : null;
+  }
+
+  function legacyStorageNames(source, names, manifest) {
+    if (!manifest) return names;
+    const safeId = source.id.replace(/[^a-z0-9._-]+/giu, "_");
+    const storedNames = new Set(names.models.map((entry) => entry.name));
+    const candidates = [];
+    if (Array.isArray(manifest.model?.files)) candidates.push(...manifest.model.files);
+    if (manifest.model && typeof manifest.model === "object") candidates.push(manifest.model);
+    if (Array.isArray(manifest.files)) candidates.push(...manifest.files);
+    for (const candidate of candidates) {
+      if (!candidate || typeof candidate !== "object") continue;
+      if (
+        candidate.name === undefined
+        && candidate.url === undefined
+        && candidate.immutableUrl === undefined
+      ) continue;
+      try {
+        const url = modelSourceUrl(candidate.url ?? candidate.immutableUrl)
+          ?? new URL("https://arcane.invalid/model.gguf");
+        const name = descriptorFileName(candidate, url);
+        storedNames.add(`${safeId}--${name}`);
+      } catch {
+        // Keep cleanup limited to valid filenames attributable to this manifest.
+      }
+    }
+    return completeValue({
+      ...names,
+      models: completeValue([...storedNames].map((name) => completeValue({ name }))),
+    });
+  }
+
+  async function legacyNamespaceMatchesSource(source, legacyNames) {
+    const metadata = sourceMetadata(source);
+    if (metadata.legacy) return true;
+    if (metadata.files.length !== 1) return false;
+    const manifest = await legacyManifestForSource(source, legacyNames);
+    if (!manifest) return false;
+    const model = manifest.model;
+    const [member] = metadata.files;
+    if (model.url === member.url) return true;
+    if (model.name === member.name && model.immutableUrl === member.url) return true;
+    return Array.isArray(model.files)
+      && model.files.length === 1
+      && model.files[0]?.name === member.name
+      && model.files[0]?.url === member.url;
+  }
+
+  async function legacyCacheForSource(source, signal) {
+    const names = storageName(source, { legacy: true });
+    if (!await legacyNamespaceMatchesSource(source, names)) return null;
+    const files = await storedModelFiles(names, signal);
+    return files ? completeValue({ files, names }) : null;
+  }
+
+  async function removeLegacyCacheAfterReplacement(source) {
+    try {
+      const names = storageName(source, { legacy: true });
+      const manifest = await legacyManifestForSource(source, names);
+      if (!sourceMetadata(source).legacy && !manifest) return;
+      await removeNames(legacyStorageNames(source, names, manifest));
+    } catch (error) {
+      globalThis.console?.warn?.(
+        "Arcane could not remove the superseded legacy browser model cache.",
+        error,
+      );
+    }
+  }
+
+  async function removeIncompleteReplacement(source, names) {
+    try {
+      await removeNames(names);
+      await removeRangeParts(source, names);
+    } catch (error) {
+      globalThis.console?.warn?.(
+        "Arcane could not remove an incomplete duplicate browser model cache.",
+        error,
+      );
+    }
   }
 
   async function storagePolicy({ cached = false } = {}) {
@@ -786,13 +1348,104 @@ export function createDbopfsModelStore({
     });
   }
 
-  async function storedModelFiles(names, signal) {
+  async function availableModelFiles(names, signal) {
     const modelFiles = [];
     for (const entry of names.models) {
       throwIfAborted(signal, "install");
       const modelFile = await file(entry.name);
-      if (!modelFile) return null;
-      modelFiles.push(modelFile);
+      if (modelFile?.size === 0) {
+        await removeEntry(entry.name);
+        modelFiles.push(null);
+      } else {
+        modelFiles.push(modelFile);
+      }
+    }
+    return modelFiles;
+  }
+
+  async function storedModelFiles(names, signal) {
+    const modelFiles = await availableModelFiles(names, signal);
+    return modelFiles.every(Boolean) ? modelFiles : null;
+  }
+
+  async function storedRangeCandidate(modelName, total, signal) {
+    const partFiles = [];
+    let lastModified = 0;
+    for (const range of modelHttpRanges(total)) {
+      throwIfAborted(signal, "install");
+      const partName = rangePartName(modelName, range);
+      const partFile = await file(partName);
+      if (!partFile) return null;
+      const expected = range.end - range.start + 1;
+      if (partFile.size !== expected) {
+        await removeEntry(partName);
+        return null;
+      }
+      partFiles.push(partFile);
+      if (Number.isFinite(partFile.lastModified)) {
+        lastModified = Math.max(lastModified, partFile.lastModified);
+      }
+    }
+    return completeValue({
+      file: new Blob(partFiles, { type: "application/octet-stream" }),
+      lastModified,
+      total,
+    });
+  }
+
+  async function storedRangeMember(member, modelName, signal) {
+    const declaredTotal = Number.isSafeInteger(member.bytes) && member.bytes > 0
+      ? member.bytes
+      : null;
+    if (declaredTotal !== null) {
+      const declared = await storedRangeCandidate(modelName, declaredTotal, signal);
+      if (declared) {
+        await removeStaleRangePartsAfterCompletion(
+          modelName,
+          modelHttpRanges(declaredTotal),
+        );
+        return declared.file;
+      }
+    }
+
+    const names = await memberRangePartNames(modelName);
+    if (names === null) return null;
+    const discoveredTotals = new Set();
+    for (const name of names) {
+      const details = rangePartDetails(modelName, name);
+      if (details && details.total !== declaredTotal) discoveredTotals.add(details.total);
+    }
+    let selected = null;
+    const totals = [...discoveredTotals].sort((left, right) => right - left);
+    for (const total of totals) {
+      const candidate = await storedRangeCandidate(modelName, total, signal);
+      if (
+        candidate
+        && (
+          selected === null
+          || candidate.lastModified > selected.lastModified
+        )
+      ) selected = candidate;
+    }
+    if (selected === null) return null;
+    await removeStaleRangePartsAfterCompletion(
+      modelName,
+      modelHttpRanges(selected.total),
+    );
+    return selected.file;
+  }
+
+  async function availableResumableModelFiles(source, names, signal) {
+    const members = sourceMetadata(source).files;
+    const modelFiles = await availableModelFiles(names, signal);
+    await removeRangePartsBehindWholeFiles(members, names, modelFiles);
+    for (let memberIndex = 0; memberIndex < modelFiles.length; memberIndex += 1) {
+      if (modelFiles[memberIndex]) continue;
+      modelFiles[memberIndex] = await storedRangeMember(
+        members[memberIndex],
+        names.models[memberIndex].name,
+        signal,
+      );
     }
     return modelFiles;
   }
@@ -800,32 +1453,22 @@ export function createDbopfsModelStore({
   async function openCached(source, {
     signal,
   } = {}) {
-    let names = storageName(source);
-    let modelFiles = await storedModelFiles(names, signal);
-    if (!modelFiles && sourceMetadata(source).legacy) {
-      await removeNames(names);
-      const legacyNames = storageName(source, { legacy: true });
-      const legacyFiles = await storedModelFiles(legacyNames, signal);
-      if (legacyFiles) {
-        names = legacyNames;
-        modelFiles = legacyFiles;
-      } else {
-        await removeNames(legacyNames);
+    const names = storageName(source);
+    let modelFiles = await availableResumableModelFiles(source, names, signal);
+    if (modelFiles.every(Boolean)) {
+      await removeLegacyCacheAfterReplacement(source);
+    } else {
+      const legacyCache = await legacyCacheForSource(source, signal);
+      if (legacyCache) {
+        await removeIncompleteReplacement(source, names);
+        modelFiles = legacyCache.files;
       }
     }
-    if (!modelFiles) {
-      await removeNames(names);
-      return null;
-    }
-    try {
-      return completeValue({
-        files: completeValue(modelFiles),
-        file: modelFiles.length === 1 ? modelFiles[0] : null,
-      });
-    } catch (error) {
-      if (!signal?.aborted) await removeNames(names);
-      throw error;
-    }
+    if (!modelFiles.every(Boolean)) return null;
+    return completeValue({
+      files: completeValue(modelFiles),
+      file: modelFiles.length === 1 ? modelFiles[0] : null,
+    });
   }
 
   async function install(source, { signal, onProgress = null } = {}) {
@@ -834,12 +1477,10 @@ export function createDbopfsModelStore({
     }
     const names = storageName(source);
     const members = sourceMetadata(source).files;
-    await remove(source);
-    const modelFiles = new Array(members.length);
+    const modelFiles = await availableResumableModelFiles(source, names, signal);
     const linked = linkAbortSignal(signal);
     const downloadSignal = linked.controller.signal;
     let nextMemberIndex = 0;
-    let completed = 0;
     let failure = null;
 
     function retainFailure(error) {
@@ -847,38 +1488,52 @@ export function createDbopfsModelStore({
       if (!downloadSignal.aborted) linked.controller.abort(error);
     }
 
-    function publishDownloadProgress() {
-      onProgress?.(completeValue({
-        phase: "download",
-        completed,
-        total: members.length,
-        unit: "files",
-        heartbeat: false,
-      }));
-    }
+    const progress = createDownloadProgressReporter(members, onProgress, retainFailure);
 
     async function installMember(memberIndex) {
       let modelFile = null;
-      if (members.length === 1) {
-        modelFile = await installOneFile(
-          source,
-          memberIndex,
-          names.models[memberIndex].name,
-          { signal: downloadSignal },
-        );
-      }
+      modelFile = await installOneFile(
+        source,
+        memberIndex,
+        names.models[memberIndex].name,
+        {
+          signal: downloadSignal,
+          progress,
+          retainFailure,
+          multiFile: members.length > 1,
+          rangeWorkerLimit: members.length === 1 ? workerLimit : 1,
+        },
+      );
       if (!modelFile) {
-        const opened = await source.open(memberIndex, { signal: downloadSignal });
-        modelFile = await writeOpenedModel(
-          names.models[memberIndex].name,
-          opened,
-          { signal: downloadSignal },
-        );
+        progress.setMode(members.length === 1 ? "single" : "files");
+        progress.beginTransfer();
+        let opened = null;
+        try {
+          opened = await source.open(memberIndex, { signal: downloadSignal });
+          progress.setMemberTotal(memberIndex, opened.contentLength);
+          modelFile = await writeOpenedModel(
+            names.models[memberIndex].name,
+            opened,
+            {
+              signal: downloadSignal,
+              onChunk: progress.addBytes,
+              onDiscard: progress.discardBytes,
+            },
+          );
+          await removeRangePartsAfterWholeFile(
+            names.models[memberIndex].name,
+            opened.contentLength,
+          );
+        } catch (error) {
+          retainFailure(error);
+          throw error;
+        } finally {
+          progress.endTransfer({ publishProgress: false });
+        }
       }
       throwIfAborted(downloadSignal, "install");
       modelFiles[memberIndex] = modelFile;
-      completed += 1;
-      publishDownloadProgress();
+      progress.completeMember(memberIndex, modelFile.size);
     }
 
     async function installWorker() {
@@ -886,6 +1541,7 @@ export function createDbopfsModelStore({
         const memberIndex = nextMemberIndex;
         nextMemberIndex += 1;
         if (memberIndex >= members.length) return;
+        if (modelFiles[memberIndex]) continue;
         try {
           await installMember(memberIndex);
         } catch (error) {
@@ -896,9 +1552,16 @@ export function createDbopfsModelStore({
     }
 
     try {
-      publishDownloadProgress();
+      progress.start();
+      let pendingMembers = members.length;
+      for (let memberIndex = 0; memberIndex < modelFiles.length; memberIndex += 1) {
+        const modelFile = modelFiles[memberIndex];
+        if (!modelFile) continue;
+        pendingMembers -= 1;
+        progress.restoreMember(memberIndex, modelFile.size);
+      }
       const workers = [];
-      const workerCount = Math.min(workerLimit, members.length);
+      const workerCount = Math.min(workerLimit, pendingMembers);
       for (let index = 0; index < workerCount; index += 1) {
         workers.push(installWorker());
       }
@@ -912,19 +1575,19 @@ export function createDbopfsModelStore({
         }
       }
       if (failure !== null) throw failure;
+      await removeLegacyCacheAfterReplacement(source);
+      progress.finish();
+      if (failure !== null) throw failure;
+      throwIfAborted(downloadSignal, "install");
       return completeValue({
         files: completeValue(modelFiles),
         file: modelFiles.length === 1 ? modelFiles[0] : null,
       });
     } catch (error) {
       retainFailure(error);
-      try {
-        await remove(source);
-      } catch {
-        // Preserve the download failure after the settled workers release storage.
-      }
       throw failure;
     } finally {
+      progress.dispose();
       linked.release();
     }
   }
