@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1
+
+- Separated the TWiN Cloud LLM access key from the legacy OpenAI speech
+  credential so neither provider's key is sent to the other's endpoint while
+  retaining the established `ai.license` alias for TWiN Cloud chat.
+
 ## 0.5.0
 
 - Added bounded parallel Browser-WASM model downloads across split GGUF

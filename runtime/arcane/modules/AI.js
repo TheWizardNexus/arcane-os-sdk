@@ -969,16 +969,21 @@ class AI {
         return {
             OPENAI: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${this.license}`
+                'Authorization': `Bearer ${this.twinKey}`
             }
         };
+    }
+
+    get #legacyOpenAISpeechKey(){
+        const value=globalThis.arcane?.config?.openAI?.apiKey;
+        return typeof value==='string'?value:'';
     }
 
     get #ttsHeaders(){
         return {
             OPENAI: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${this.license}`
+                'Authorization': `Bearer ${this.#legacyOpenAISpeechKey}`
             },
             LOCAL_SPEACH: {
                 'Content-Type': 'application/json',
@@ -989,7 +994,7 @@ class AI {
     get #sttHeaders(){
         return {
             OPENAI: {
-                'Authorization': `Bearer ${this.license}`,
+                'Authorization': `Bearer ${this.#legacyOpenAISpeechKey}`,
             },
             LOCAL_SPEACH: {}
         };
@@ -1160,7 +1165,6 @@ class AI {
     get twinKey(){
         return this.#license
             ||globalThis.arcane?.config?.twinCloud?.accessKey
-            ||globalThis.arcane?.config?.openAI?.apiKey
             ||'';
     }
 
@@ -1442,7 +1446,8 @@ class AI {
             return false;
         }
         if(providerId==='OPENAI'){
-            return Boolean(this.license)&&typeof globalThis.fetch==='function';
+            return Boolean(this.#legacyOpenAISpeechKey)
+                &&typeof globalThis.fetch==='function';
         }
         if(providerId==='LOCAL_SPEACH'){
             return Boolean(this.#nativeSpeech(service,role));
@@ -1870,7 +1875,11 @@ class AI {
             throw error;
         }
 
-        if(service==='OPENAI'&&this.license){
+        if(service==='OPENAI'&&(
+            role==='llm'
+                ?Boolean(this.twinKey)
+                :Boolean(this.#legacyOpenAISpeechKey)
+        )){
             return true;
         }
 
