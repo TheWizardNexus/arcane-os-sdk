@@ -10,7 +10,7 @@ import {
 } from './workspace.mjs';
 import {loadArcaneIntegratedProvider} from './integrated-provider-loader.mjs';
 import {startDevServer} from './dev-server.mjs';
-import {generateImportMap} from './import-map.mjs';
+import {generateImportMap,readApplicationTestImportMapContext} from './import-map.mjs';
 import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
 import {
     inspectApp as inspectPackagedApp,
@@ -389,11 +389,21 @@ export async function doctorApplication(options={}){
 
 async function runPreparedApplicationTests(prepared,options={}){
     throwIfAborted(options.signal);
+    const integratedLegacy=prepared.workspaceMode==='integrated'
+        &&prepared.validation.config.browserRuntimeLayout==='integrated-legacy';
+    const managedImportMapContext=integratedLegacy
+        ?null
+        :await readApplicationTestImportMapContext({
+            workspaceRoot:prepared.workspaceRoot,
+            applicationRoot:prepared.appRoot,
+            signal:options.signal
+        });
     return runApplicationTests({
         workspaceRoot:prepared.workspaceRoot,
         workspaceMode:prepared.workspaceMode,
         appId:prepared.appId,
         appRoot:prepared.appRoot,
+        managedImportMapContext,
         signal:options.signal,
         onEvent:options.onEvent
     });

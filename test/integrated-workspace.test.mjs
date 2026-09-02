@@ -294,6 +294,9 @@ test('unchanged two-route integrated Arcane workspace keeps legacy dev and packa
     );
     const validation=await validateWorkspace({workspaceRoot,appId});
     assert.equal(validation.config.browserRuntimeLayout,'integrated-legacy');
+    const tested=await testApplication({workspaceRoot,appId});
+    assert.equal(tested.passed,true);
+    assert.equal(tested.skipped,false);
 
     const development=await developApplication({workspaceRoot,appId,host:'127.0.0.1',port:0});
     t.after(()=>development.close());
@@ -361,9 +364,9 @@ test('integrated Arcane workspace supports the complete browser app workflow',as
         await writeFile(
             path.join(workspaceRoot,'apps',appId,'test','managed-runtime.test.mjs'),
             `import assert from 'node:assert/strict';
-import SpeechPlayback,{splitSpeechText} from 'arcane-os/speech-playback';
+import SpeechPlayback,{splitSpeechText} from 'arcane/SpeechPlayback';
 import test from 'arcane-os/testing';
-test('selected source app tests consume public Node package entrypoints',()=>{
+test('selected source app tests consume the managed browser runtime map',()=>{
     assert.equal(typeof SpeechPlayback,'function');
     assert.deepEqual(splitSpeechText('complete source content'),['complete source content']);
 });

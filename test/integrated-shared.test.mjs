@@ -190,6 +190,17 @@ test('external app scope preserves workspace-root and selected-app tests',async 
         path.join(workspaceRoot,'test','workspace-root.test.mjs'),
         "import test from 'arcane-os/testing';\ntest('external root test remains selected',()=>{});\n"
     );
+    await writeFile(
+        path.join(workspaceRoot,'apps','external-app','test','app.test.mjs'),
+        `import assert from 'node:assert/strict';
+import SpeechPlayback,{splitSpeechText} from 'arcane/SpeechPlayback';
+import test from 'arcane-os/testing';
+test('external app test consumes its existing managed browser map',()=>{
+    assert.equal(typeof SpeechPlayback,'function');
+    assert.deepEqual(splitSpeechText('external source content'),['external source content']);
+});
+`
+    );
 
     const result=await testApplication({
         workspaceRoot,

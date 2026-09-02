@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.2
+
+- Forwarded each application's existing managed browser import map into
+  isolated `arcane test` and `arcane check` files so valid `arcane/*` imports
+  resolve from the selected workspace runtime while integrated-legacy apps
+  retain their established no-map path.
+
 ## 0.5.1
 
 - Separated the TWiN Cloud LLM access key from the legacy OpenAI speech

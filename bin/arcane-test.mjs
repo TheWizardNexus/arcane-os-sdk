@@ -81,18 +81,30 @@ async function readManagedImportMapContext(source,signal,testFile){
         :context.boundary==='test'
             ?testCodeRoot
             :path.join(applicationRoot,'dist');
-    let baseInfo;
-    let canonicalBase;
-    try{
-        baseInfo=await lstat(expectedBase);
-        canonicalBase=await realpath(expectedBase);
-    }catch(error){
-        importMapFailure(`Selected ${context.boundary} application directory is unavailable: ${error.message}`);
+    const workspaceRoot=path.resolve(process.cwd());
+    const requestedBases=context.boundary==='source'&&pathInside(workspaceRoot,applicationRoot)
+        ?[expectedBase,workspaceRoot]
+        :[expectedBase];
+    let canonicalBase=null;
+    for(const requestedBase of requestedBases){
+        let baseInfo;
+        let candidate;
+        try{
+            baseInfo=await lstat(requestedBase);
+            candidate=await realpath(requestedBase);
+        }catch{
+            continue;
+        }
+        if(!baseInfo.isSymbolicLink()&&baseInfo.isDirectory()
+            &&samePath(requestedBase,candidate)&&samePath(suppliedBase,candidate)){
+            canonicalBase=candidate;
+            break;
+        }
     }
-    if(baseInfo.isSymbolicLink()||!baseInfo.isDirectory()
-        ||!samePath(expectedBase,canonicalBase)||!samePath(suppliedBase,canonicalBase)){
+    if(canonicalBase===null){
         importMapFailure(
-            `Managed import-map base URL must select this application's physical ${context.boundary} directory.`
+            `Managed import-map base URL must select this application's physical ${context.boundary} directory`
+            +(context.boundary==='source'?' or its physical workspace source directory.':'.')
         );
     }
     throwIfCancelled(signal);

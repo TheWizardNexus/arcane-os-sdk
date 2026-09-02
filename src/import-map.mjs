@@ -1602,6 +1602,55 @@ export async function createApplicationTestImportMapContext({
     };
 }
 
+export async function readApplicationTestImportMapContext({
+    workspaceRoot,
+    applicationRoot,
+    signal
+}={}){
+    if(typeof workspaceRoot!=='string'||workspaceRoot.trim()===''){
+        throw new TypeError('workspaceRoot must be a nonempty string.');
+    }
+    if(typeof applicationRoot!=='string'||applicationRoot.trim()===''){
+        throw new TypeError('applicationRoot must be a nonempty string.');
+    }
+    throwIfAborted(signal);
+    const resolvedWorkspaceRoot=path.resolve(workspaceRoot);
+    const resolvedApplicationRoot=path.resolve(applicationRoot);
+    await physicalDirectory(resolvedWorkspaceRoot,resolvedApplicationRoot);
+    const artifactPath=path.join(
+        resolvedApplicationRoot,
+        ...IMPORT_MAP_RELATIVE_PATH.split('/')
+    );
+    let source;
+    try{
+        source=await readPhysicalTextFile(
+            resolvedApplicationRoot,
+            artifactPath,
+            'Application test import-map artifact'
+        );
+    }catch(error){
+        if(error?.code==='ENOENT')return null;
+        throw error;
+    }
+    throwIfAborted(signal);
+    let document;
+    try{document=JSON.parse(source);}
+    catch(error){
+        fail(`Application test import-map artifact is not valid JSON: ${error.message}`);
+    }
+    if(document===null||typeof document!=='object'||Array.isArray(document)
+        ||document.imports===null||typeof document.imports!=='object'
+        ||Array.isArray(document.imports)){
+        fail('Application test import-map artifact must contain an imports object.');
+    }
+    return createApplicationTestImportMapContext({
+        applicationRoot:resolvedWorkspaceRoot,
+        boundary:'source',
+        imports:document.imports,
+        signal
+    });
+}
+
 async function generateImportMapUnlocked({
     workspaceRoot,
     appId,

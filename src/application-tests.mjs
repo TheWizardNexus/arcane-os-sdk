@@ -5,6 +5,7 @@ import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
 import {runProcess} from './process.mjs';
 
 const TEST_RUNNER_PATH=fileURLToPath(new URL('../bin/arcane-test.mjs',import.meta.url));
+const MANAGED_IMPORT_MAP_ENV='ARCANE_TEST_IMPORT_MAP_CONTEXT';
 
 function normalizedTestOutput(value){
     return typeof value==='string'?value:'';
@@ -129,6 +130,7 @@ export async function runApplicationTests({
     workspaceMode='packager',
     appId,
     appRoot,
+    managedImportMapContext=null,
     signal,
     onEvent
 }={}){
@@ -160,6 +162,11 @@ export async function runApplicationTests({
             [TEST_RUNNER_PATH,testFile],
             {
                 cwd:workspaceRoot,
+                env:{
+                    [MANAGED_IMPORT_MAP_ENV]:managedImportMapContext===null
+                        ?''
+                        :JSON.stringify(managedImportMapContext)
+                },
                 signal,
                 onEvent,
                 allowNonzero:true

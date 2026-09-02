@@ -8,12 +8,14 @@ import {
     writeFile
 } from 'node:fs/promises';
 import path from 'node:path';
+import {pathToFileURL} from 'node:url';
 import test from '../src/testing.mjs';
 import {
     buildImportMap,
     createApplicationTestImportMapContext,
     generateImportMap,
     inspectImportMapHtml,
+    readApplicationTestImportMapContext,
     scanModuleImports
 } from '../src/import-map.mjs';
 import {temporaryDirectory} from './helpers.mjs';
@@ -380,5 +382,24 @@ test('application test maps stay inside the selected physical source, dist, or t
             imports:{fixture:'./source.js'}
         }),
         /physical source directory/u
+    );
+});
+
+test('application tests read the existing managed browser map from the workspace source',async t=>{
+    const workspaceRoot=await temporaryDirectory(t);
+    await writeRuntimeFixture(workspaceRoot);
+    const {appRoot}=await createApplication(workspaceRoot,'managed-test-map');
+    const generated=await generateImportMap({workspaceRoot,appId:'managed-test-map'});
+
+    const context=await readApplicationTestImportMapContext({
+        workspaceRoot,
+        applicationRoot:appRoot
+    });
+    assert.equal(context.boundary,'source');
+    assert.equal(context.baseURL,pathToFileURL(`${workspaceRoot}${path.sep}`).href);
+    assert.deepEqual(context.imports,generated.imports);
+    assert.equal(
+        context.imports['arcane/ThemeBootstrap'],
+        './arcane/modules/ThemeBootstrap.js'
     );
 });
