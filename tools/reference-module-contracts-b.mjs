@@ -46,7 +46,10 @@ async function ask({model, expectedModel, prompt, onPhase}) {
         example:String.raw`import {checkLocalAIReadiness} from '/arcane/modules/LocalAIReadiness.js';
 
 const report = await checkLocalAIReadiness({
-    preferences:['OPENAI','OPENAI','OPENAI','gpt-4o-mini','tts-1','whisper-1'],
+    preferences:[
+        'OPENAI','LOCAL_SPEACH','LOCAL_SPEACH','openai-gpt-oss-120b',
+        'kokoro','whisper-small'
+    ],
     runtime:'browser'
 });
 console.log(report.ready, report.slots);`
@@ -65,7 +68,10 @@ const chat = new EventTarget();
 chat.setAIAvailability = value => console.log(value);
 const controller = createLocalAIReadinessController({
     chat,
-    preferences:['OPENAI','OPENAI','OPENAI','gpt-4o-mini','tts-1','whisper-1'],
+    preferences:[
+        'OPENAI','LOCAL_SPEACH','LOCAL_SPEACH','openai-gpt-oss-120b',
+        'kokoro','whisper-small'
+    ],
     runtime:'browser'
 });
 await controller.check();

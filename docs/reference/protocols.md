@@ -299,8 +299,9 @@ The exported
 [`getAIProviderRuntime()` singleton](runtime-modules.md#aiproviderruntimejs)
 comes from the selected runtime and owns independent `llm`, `stt`, and
 `tts` selections. SDK `0.3.4` ships browser-WASM LLM and browser
-speech provider/2 adapters and also adapts selected legacy OpenAI LLM/STT/TTS,
-Core-backed Ollama LLM, and available Core speech STT/TTS routes into provider/2;
+speech provider/2 adapters and also adapts selected TWiN Cloud LLM,
+Core-backed Ollama LLM, on-device Whisper STT, and on-device Kokoro TTS routes
+into provider/2. There is no cloud speech route;
 other native, Core, or cloud routes require an externally supplied compatible
 adapter. The singleton itself is not an authentication or capability token. It
 normalizes inspection, model authority,
@@ -340,9 +341,12 @@ workers, the transfer limit, and the active transfer mode. Chunk-driven changes
 are coalesced on a 250 ms cadence; start, plan/total, active-worker, and
 completion boundaries may publish immediately. A source member that receives a redirected `200` probes the final URL
 directly before reusing the original response as its single-fetch fallback.
-Confirmed support uses up to 16 deterministic OPFS Range parts per member with
-bounded active workers; completed parts and split-model members survive
-interruption so a retry fetches only missing work. Without usable range support
+Confirmed support uses deterministic OPFS Range parts of roughly 4 MB each, up
+to 4,096 parts per member, with bounded active workers; completed parts and
+split-model members survive interruption so a retry fetches only missing work.
+An incomplete 0.5.3 cache keeps its completed coarse parts and subdivides only
+the missing intervals into current small parts. Only unfinished active parts
+restart after refresh. Without usable range support
 or an observable or declared total it falls back to one full fetch. A normal
 cache miss may fetch only the
 caller-supplied HTTPS sources; `offline:true` performs no model request and uses
@@ -510,8 +514,8 @@ or with its load intent so the runtime records the unmuted lifecycle preference;
 an `initialMuted:false` component configuration preserves that intent across an
 unselected or loading TTS route and exposes unmuted state only after readiness;
 mute calls `AI.setSpeechMuted(true)`, cancels active synthesis, and unloads TTS.
-The selected TTS model catalog owns `defaultVoice`. AI.js uses a saved OpenAI
-voice only for the OpenAI route and never forwards it to Core or browser Kokoro.
+The selected local TTS model catalog owns `defaultVoice`. AI.js never forwards
+a retired OpenAI voice to Core or browser Kokoro.
 
 LLM tool calls are structural result data only. The SDK never executes a
 handler. The application owns schema validation, authorization, side-effect

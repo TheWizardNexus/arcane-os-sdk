@@ -69,8 +69,9 @@ packages no model weights, default model catalog, CDN fallback, native
 provider, speech synthesis, or transcription. The sibling
 <a href="../browser-speech/"><code>arcane-os/ai/browser-speech</code></a> entrypoint supplies speech
 provider mechanisms but still no runtime/model content. Callers supply every
-model source. Each file needs only a name and HTTPS URL. The ordinary path does
-not count, limit, hash, or identify model content by bytes.</p>
+model source. Each file needs only a name and HTTPS URL. A positive optional
+<code>bytes</code> value supplies observational progress and transport-planning metadata;
+it never validates, admits, identifies, or decides cache reuse for content.</p>
 <h2 id="lifecycle-at-a-glance">Lifecycle at a glance</h2>
 <p><code>createArcaneAI()</code> owns one LLM controller. Its default <code>loadPolicy</code> is
 <code>on-demand</code>; the first request may download and initialize the model. Use
@@ -120,11 +121,51 @@ not count, limit, hash, or identify model content by bytes.</p>
 <code>addEventListener()</code>, <code>removeEventListener()</code>, or <code>on()</code>. Event <code>detail</code> is the
 current mutable status snapshot. Provider states are <code>unloaded</code>, <code>loading</code>, <code>ready</code>,
 <code>unloading</code>, and <code>error</code>.</p>
+<p>Browser-WASM model loads report <code>cache-check</code>, <code>download</code>, and <code>initialize</code>
+phases. Download records preserve the ordered model-file fields <code>completed</code>,
+<code>total</code>, and <code>unit:&#39;files&#39;</code>. They add <code>loadedBytes</code>, <code>totalBytes</code>,
+<code>remainingBytes</code>, <code>bytesPerSecond</code>, <code>etaSeconds</code>, <code>activeTransfers</code>,
+<code>transferLimit</code>, and <code>transferMode</code>. <code>loadedBytes</code> is aggregate downloaded or
+restored progress for the current install. Active partial writes count while
+they are staged, then are removed from that total if their transfer fails;
+completed shards or Range parts reused from an interrupted attempt remain
+counted. Unknown totals, remaining counts, rates, and ETAs are <code>null</code>;
+once known, byte values and seconds are nonnegative numbers. <code>activeTransfers</code>
+is the current transfer-worker count, <code>transferLimit</code> is the selected concurrency
+bound, and <code>transferMode</code> identifies <code>probing</code>, <code>files</code>, <code>ranges</code>, or <code>single</code>.
+The store coalesces chunk-driven changes on a 250 ms cadence and publishes
+immediately when download starts, the transfer plan or total becomes known,
+active-worker count changes, and the download completes. At known completion, remaining bytes and ETA are zero
+and active transfers are zero. Applications format the raw measures into B,
+KB, MB, GB, transfer-rate, and duration labels.</p>
+<p>While a load remains active, the provider also repeats its current record every
+five seconds with <code>heartbeat:true</code> and an updated <code>elapsedMs</code>. A heartbeat
+confirms that the owned operation is still active; it does not invent
+additional transferred content.</p>
+<p>The DBOPFS store uses one bounded transfer axis. Ordered multi-file GGUF sets
+download several members concurrently and preserve completed shards across a
+retry. Each active member negotiates HTTP Range support. A split member uses at
+most one Range worker while a one-file source may use up to
+<code>downloadConcurrency</code> Range workers (four by default), so file and Range
+workers are never multiplied. A usable total from <code>Content-Range</code> or the
+optional descriptor <code>bytes</code> divides that member into deterministic contiguous
+parts of roughly 4 MB each, up to 4,096 parts. Each exact completed part is
+committed separately in OPFS, so retry or refresh fetches only the small
+in-flight parts plus any other missing parts; the ordered parts are exposed to
+Wllama as one logical model Blob. Range offsets remain transport-local; only
+aggregate transfer telemetry is public.
+An incomplete cache written by 0.5.3 keeps each completed legacy part and
+subdivides only its missing legacy intervals into current small parts. The
+result preserves existing progress and limits loss on later refreshes.</p>
 <h2 id="model-selection-optional-hardening-and-cache">Model selection, optional hardening, and cache</h2>
-<p>The canonical model descriptor is <code>{id, files:[{name?,url},...]}</code>. The ordered
-<code>files</code> array is nonempty; names and URLs are unique. Each URL must be absolute
-HTTPS without credentials or a fragment. The legacy one-file <code>{id,url}</code> shape
-remains accepted and normalizes to one ordered member.</p>
+<p>The canonical model descriptor is
+<code>{id, files:[{name?,url,bytes?},...]}</code>. The ordered <code>files</code> array is nonempty;
+names and URLs are unique. Each URL must be absolute HTTPS without credentials
+or a fragment. An optional positive safe-integer <code>bytes</code> value is used only for
+progress and HTTP Range planning. Missing or unusable metadata never blocks a
+download, and a declared value is not a content-length check. The legacy
+one-file <code>{id,url,bytes?}</code> shape remains accepted and normalizes to one ordered
+member.</p>
 <p>Fetch follows HTTPS redirects and records the requested and final HTTPS URL. A
 redirect that leaves HTTPS is rejected as an unavoidable transport-safety
 boundary.</p>
@@ -137,12 +178,14 @@ loading fully functional. <code>secure:true</code> records only an
 application-selected hardening intent in this development contract. It does
 not activate the historical checking machinery; that implementation remains
 disabled and requires a separate review with the user before it can run.
-Neither path performs byte-count, byte-limit, hash, digest, content-identity,
-freeze, or admission work. A load succeeds only after Wllama reports that the
-model is loaded.</p>
-<p>The DBOPFS adapter commits its completion record only after every ordered file
-succeeds. <code>load({offline:true})</code> never performs a model request; it uses a
-compatible cached entry or rejects with <code>ARCANE_AI_MODEL_OFFLINE_MISS</code>.</p>
+Neither path performs byte-limit, hash, digest, content-identity, freeze, or
+admission work. Observational byte counting and exact HTTP Range framing remain
+transport-local. A load succeeds only after Wllama reports that the model is
+loaded.</p>
+<p>The DBOPFS adapter commits each complete member or Range part independently and
+exposes only a complete ordered model set as a cache hit.
+<code>load({offline:true})</code> never performs a model request; it uses a compatible
+cached entry or rejects with <code>ARCANE_AI_MODEL_OFFLINE_MISS</code>.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const {security, cache} = ai.status().llm;
 console.log(security.secure); // false unless explicitly selected
 console.log(cache);
@@ -398,11 +441,13 @@ one-file descriptor normalizes to one ordered member.</p>
 <p>The mutable source includes <code>kind</code>, the canonical descriptor fields,
 <code>descriptor</code>, and <code>open(memberIndex,{signal})</code>. <code>open()</code> requires a member
 index for multi-file sources and returns the complete readable response body,
-requested/final URLs, and <code>cancel()</code>; caching remains store-owned.</p>
+requested/final URLs, nullable observed <code>contentLength</code>, and <code>cancel()</code>; caching
+and the store&#39;s private per-member Range negotiation remain store-owned.</p>
 <h3 id="availability-and-normalization-3">Availability and normalization</h3>
 <p><strong>Browser Fetch with CORS.</strong> URL and optional metadata syntax are normalized.
-Ordinary source loading performs no expected-length, byte-count, hash, digest,
-receipt, freeze, or content-identity checks.</p>
+Declared and observed lengths feed only progress and transport planning.
+Ordinary source loading performs no expected-length, hash, digest, receipt,
+freeze, content-identity, admission, or cache-reuse checks.</p>
 <h3 id="example-3">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const source = createBrowserModelSource(MODEL);
 console.log(source.id, source.files);
@@ -422,6 +467,8 @@ result exposes protocol and provider identity, default model metadata,
 <code>streamChat</code>, <code>use</code>, <code>probe</code>, and <code>dispose</code>. Direct provider <code>load()</code> selects a
 catalog model and returns <code>{model,status}</code>;
 the public AI API module&#39;s <code>ai.load()</code> returns the flat controller status.
+Direct <code>load({onProgress})</code> forwards the same additive file and byte progress
+records used by the controller and provider/2 adapter.
 Provider <code>security</code> carries the provider/model-binding <code>secure</code> intent. Direct
 <code>provider.load({security})</code> and <code>ai.load({security})</code> supply the operation
 intent. They do not activate checking in the ordinary development contract.</p>
@@ -445,13 +492,47 @@ console.log(provider.status().state); // unloaded
 <p>Adapts an existing DBOPFS instance without renaming or replacing its public
 methods. The adapter owns model-file, cache, and completion behavior.</p>
 <h3 id="signature-and-result-4">Signature and result</h3>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createDbopfsModelStore({ dbopfs, tableName=&#39;arcane_ai_browser_models&#39;, estimateStorage=null }={})
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createDbopfsModelStore({ dbopfs, tableName=&#39;arcane_ai_browser_models&#39;, estimateStorage=null, downloadConcurrency=4 }={})
 </code></pre></div>
 <p>The optional <code>estimateStorage()</code> function supplies browser storage availability
 when the default estimator is unavailable or an application owns a more precise
-quota view. The mutable result contains <code>kind</code>, <code>tableName</code>, the original
-<code>adapter</code>, and <code>ready</code>, <code>install</code>, <code>ensure</code>, and <code>remove</code>. <code>ensure()</code> preserves
-the complete ordered model set and reports whether it was cached or installed.</p>
+quota view. <code>downloadConcurrency</code> must be a positive safe integer and bounds
+the selected file or Range worker pool; the default is four. The mutable result
+contains <code>kind</code>, <code>tableName</code>, <code>downloadConcurrency</code>, the original <code>adapter</code>,
+and <code>ready</code>, <code>install</code>, <code>ensure</code>, and <code>remove</code>. <code>ensure()</code> preserves the complete
+ordered model set and reports whether it was cached or installed.
+<code>install(source,{signal,onProgress})</code> and
+<code>ensure(source,{signal,onProgress,offline})</code> publish <code>cache-check</code> and
+<code>download</code> records using ordered file counts plus aggregate transfer telemetry
+when <code>onProgress</code> is supplied. Chunk-driven changes are coalesced on a 250 ms
+cadence, with immediate boundary records at start, plan/total discovery,
+active-worker changes, and completion. Multi-file sources use up to that many concurrent member workers
+while retaining descriptor order, preserve completed members and completed
+Range parts within members across an interrupted attempt, and fetch only
+missing work on retry. A complete set of optional member
+<code>bytes</code> values makes aggregate total and remaining progress available from the
+start; otherwise those fields remain <code>null</code> until an honest aggregate total is
+known. Each missing source member first requests <code>bytes=0-0</code>. If a followed
+redirect turns that probe into a full <code>200</code>, the source probes the final URL directly;
+confirmed support cancels the original body and starts parallel Range workers,
+while refusal keeps the original full response as the single-fetch fallback. A
+valid <code>Content-Range</code>, or optional descriptor <code>bytes</code> when that header is not
+exposed, supplies the total for deterministic resumable Range parts of roughly
+4 MB each, up to 4,096 parts. Without an observable or declared total, the store falls back to one full fetch and
+uses its readable <code>Content-Length</code> when available. A later non-206,
+contradictory exposed Range response, or incorrectly framed Range body fails
+rather than silently assembling a partial model. A transfer failure lets peer
+transfers settle; explicit cancellation stops active transfers. Both preserve
+completed members and exact Range parts for retry, while unfinished active
+parts restart after refresh. Completed 0.5.3 Range parts remain in the active
+plan, while only missing legacy intervals are subdivided. A zero-length current whole
+entry or incomplete current Range set cannot shadow a complete legacy cache;
+the complete legacy file is reused and the store attempts to remove abandoned
+replacement fragments. After
+a replacement completes, the store attempts to remove its exact legacy
+duplicate. A complete whole member similarly supersedes its Range fragments.
+Cleanup failure is warned without replacing a usable model. Zero-length abandoned entries are removed
+because Wllama cannot consume an empty model Blob or File.</p>
 <h3 id="availability-and-normalization-5">Availability and normalization</h3>
 <p><strong>Browser with a ready DBOPFS instance and OPFS.</strong> Cache metadata is not a
 transferable capability token or proof of model license rights.</p>

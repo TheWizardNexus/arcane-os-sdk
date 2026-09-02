@@ -22,7 +22,7 @@ records; this contract does not freeze them or shorten their content.
 | Browser | Shipped | Requires Workers, Fetch, Blob/File, object URLs, DBOPFS/OPFS, and Web Locks. Blob/File STT requests also require the browser audio decoder. |
 | Native WebView | Conditional | Available when the WebView exposes the browser APIs above. It does not invoke Core speech. |
 | Node | Importable, execution unavailable | The ESM subpath imports, but the SDK supplies no Node speech storage, Worker, or audio-decoder host. |
-| Cloud | Not provided | A cloud speech adapter may separately implement `arcane-ai-provider/2`; this package never selects one. |
+| Cloud | Not offered | The SDK's built-in speech profile is device-only: Whisper owns STT and Kokoro owns TTS. |
 
 STT and TTS own independent provider lifecycles. A failure or cancellation in
 one role does not disable the other role or authorize a fallback provider.

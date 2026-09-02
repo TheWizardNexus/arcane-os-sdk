@@ -153,9 +153,9 @@ observation emit no lifecycle intent, and default
 automatic model download. It does not unload a role started independently.
 Compatibility availability never creates ready STT/TTS state without an
 admitted, loaded provider. Shared STT cancel/destroy propagates an owned signal,
-and TTS Mute/Unmute updates the shared lifecycle owner. The selected TTS
-provider/model catalog owns its default voice; a saved OpenAI voice is not
-forwarded to another provider route.
+and TTS Mute/Unmute updates the shared lifecycle owner. The selected local TTS
+provider/model catalog owns its default voice; a retired OpenAI voice is not
+forwarded to Core or browser speech.
 
 ## Authority and feature detection
 

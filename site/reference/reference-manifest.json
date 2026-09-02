@@ -295,9 +295,9 @@
       "contractCounts": {
         "exports": 8,
         "reviewedCallables": 16,
-        "publicMembers": 35,
+        "publicMembers": 37,
         "literalCustomEvents": 0,
-        "directCodedFailures": 34,
+        "directCodedFailures": 36,
         "exportedErrorSubclasses": 0
       }
     },

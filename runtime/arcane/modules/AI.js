@@ -922,12 +922,10 @@ class AI {
             OPENAI: 'https://inference.do-ai.run/v1'
         },
         sttURL: {
-            LOCAL_SPEACH: 'http://127.0.0.1:8011/v1',
-            OPENAI:       'https://api.openai.com/v1'
+            LOCAL_SPEACH: 'http://127.0.0.1:8011/v1'
         },
         ttsURL: {
-            LOCAL_SPEACH: 'http://127.0.0.1:8011/v1',
-            OPENAI:       'https://api.openai.com/v1'
+            LOCAL_SPEACH: 'http://127.0.0.1:8011/v1'
         },
     }
 
@@ -936,12 +934,10 @@ class AI {
             OPENAI: '/chat/completions'
         },
         stt: {
-            LOCAL_SPEACH: '/audio/transcriptions',
-            OPENAI:       '/audio/transcriptions'
+            LOCAL_SPEACH: '/audio/transcriptions'
         },
         tts: {
-            LOCAL_SPEACH: '/audio/speech',
-            OPENAI:       '/audio/speech'
+            LOCAL_SPEACH: '/audio/speech'
         }
     }
 
@@ -950,12 +946,10 @@ class AI {
     }
 
     #sttModels = {
-        OPENAI:       'whisper-1',
         LOCAL_SPEACH: 'whisper-small'
     }
 
     #ttsModels = {
-        OPENAI:       'gpt-4o-mini-tts',
         LOCAL_SPEACH: 'kokoro'
     }
 
@@ -974,17 +968,8 @@ class AI {
         };
     }
 
-    get #legacyOpenAISpeechKey(){
-        const value=globalThis.arcane?.config?.openAI?.apiKey;
-        return typeof value==='string'?value:'';
-    }
-
     get #ttsHeaders(){
         return {
-            OPENAI: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${this.#legacyOpenAISpeechKey}`
-            },
             LOCAL_SPEACH: {
                 'Content-Type': 'application/json',
             }
@@ -993,9 +978,6 @@ class AI {
 
     get #sttHeaders(){
         return {
-            OPENAI: {
-                'Authorization': `Bearer ${this.#legacyOpenAISpeechKey}`,
-            },
             LOCAL_SPEACH: {}
         };
     }
@@ -1048,11 +1030,11 @@ class AI {
 
         const preferences=[
             llmService||'OPENAI',
-            sttService||'OPENAI',
-            ttsService||'OPENAI',
+            sttService||'LOCAL_SPEACH',
+            ttsService||'LOCAL_SPEACH',
             model||'OPENAI',
-            modelTTS||'OPENAI',
-            modelSTT||'OPENAI'
+            modelTTS||'LOCAL_SPEACH',
+            modelSTT||'LOCAL_SPEACH'
         ];
         this.setAI(
             ...preferences
@@ -1089,11 +1071,11 @@ class AI {
     #stopOllamaReady=null;
     #preferenceTuple=completeValue([
         'OPENAI',
+        'LOCAL_SPEACH',
+        'LOCAL_SPEACH',
         'OPENAI',
-        'OPENAI',
-        'OPENAI',
-        'OPENAI',
-        'OPENAI'
+        'LOCAL_SPEACH',
+        'LOCAL_SPEACH'
     ]);
 
     get providerRuntime(){
@@ -1172,9 +1154,6 @@ class AI {
         this.#license=typeof value==='string' ? value.trim():'';
         this.#retainLegacyLLMReadiness(
             this.#reconcileLegacyLLMReadiness()
-        );
-        this.#retainLegacySpeechReadiness(
-            this.#reconcileLegacySpeechReadiness()
         );
         return this.#license;
     }
@@ -1427,12 +1406,6 @@ class AI {
         if(role!=='tts'){
             return null;
         }
-        if(providerId==='OPENAI'){
-            const selected=typeof globalThis.window?.user?.AI_voice==='string'
-                ?globalThis.window.user.AI_voice.trim()
-                :'';
-            return selected||'alloy';
-        }
         if(providerId==='LOCAL_SPEACH'){
             return 'af_heart';
         }
@@ -1444,10 +1417,6 @@ class AI {
         const model=this.#legacySpeechModel(role);
         if(service!==providerId||!model){
             return false;
-        }
-        if(providerId==='OPENAI'){
-            return Boolean(this.#legacyOpenAISpeechKey)
-                &&typeof globalThis.fetch==='function';
         }
         if(providerId==='LOCAL_SPEACH'){
             return Boolean(this.#nativeSpeech(service,role));
@@ -1685,8 +1654,7 @@ class AI {
     }
 
     #ensureLegacySpeechProvider(role,providerId){
-        if(!['stt','tts'].includes(role)
-            ||!['OPENAI','LOCAL_SPEACH'].includes(providerId)){
+        if(!['stt','tts'].includes(role)||providerId!=='LOCAL_SPEACH'){
             return false;
         }
         if(this.#providerRuntime.hasProvider(role,providerId)){
@@ -1875,11 +1843,7 @@ class AI {
             throw error;
         }
 
-        if(service==='OPENAI'&&(
-            role==='llm'
-                ?Boolean(this.twinKey)
-                :Boolean(this.#legacyOpenAISpeechKey)
-        )){
+        if(service==='OPENAI'&&role==='llm'&&Boolean(this.twinKey)){
             return true;
         }
 
@@ -1947,6 +1911,10 @@ class AI {
             }
             return value;
         });
+        next[1]='LOCAL_SPEACH';
+        next[2]='LOCAL_SPEACH';
+        next[4]='LOCAL_SPEACH';
+        next[5]='LOCAL_SPEACH';
         return completeValue(next);
     }
 
@@ -1957,6 +1925,26 @@ class AI {
                 const error=new TypeError('The Ollama model preference is invalid.');
                 error.code='AI_MODEL_INVALID';
                 throw error;
+            }
+        }
+    }
+
+    #assertDeviceSpeechConfiguration(configuration){
+        for(const role of ['stt','tts']){
+            for(const routeName of ['default','localOnly']){
+                const selection=configuration?.[role]?.[routeName];
+                if(selection&&selection.localOnly!==true){
+                    const operation=role==='stt'
+                        ?'Speech recognition'
+                        :'Speech synthesis';
+                    const error=new TypeError(
+                        `${operation} supports on-device providers only.`
+                    );
+                    error.code=role==='stt'
+                        ?'AI_STT_DEVICE_ONLY'
+                        :'AI_TTS_DEVICE_ONLY';
+                    throw error;
+                }
             }
         }
     }
@@ -2187,6 +2175,7 @@ class AI {
 
     configureProviders(selections){
         const prepared=this.#providerRuntime.validateConfiguration(selections);
+        this.#assertDeviceSpeechConfiguration(prepared);
         this.#assertSynchronousBrowserSpeechSupersession('AI.configureProviders');
         this.#ensureLegacyLLMProvider(
             prepared.llm.default?.providerId
@@ -2221,6 +2210,7 @@ class AI {
 
     configureSpeechProviders(selections){
         const prepared=this.#providerRuntime.validateSpeechConfiguration(selections);
+        this.#assertDeviceSpeechConfiguration(prepared);
         this.#assertSynchronousBrowserSpeechSupersession(
             'AI.configureSpeechProviders'
         );
@@ -2287,6 +2277,7 @@ class AI {
 
     async transitionProviders(selections){
         const prepared=this.#providerRuntime.validateConfiguration(selections);
+        this.#assertDeviceSpeechConfiguration(prepared);
         await this.#supersedeBrowserSpeechForRouteChange();
         this.#ensureLegacyLLMProvider(
             prepared.llm.default?.providerId
@@ -2318,6 +2309,7 @@ class AI {
 
     async transitionSpeechProviders(selections){
         const prepared=this.#providerRuntime.validateSpeechConfiguration(selections);
+        this.#assertDeviceSpeechConfiguration(prepared);
         await this.#supersedeBrowserSpeechForRouteChange();
         this.#invalidateSpeechControl();
         await this.#unloadSpeechProviderRolesForTransition();

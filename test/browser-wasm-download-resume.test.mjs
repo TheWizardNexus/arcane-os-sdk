@@ -6,8 +6,11 @@ import {
     createDbopfsModelStore
 } from '../browser-runtime/ai/browser-wasm-llm-provider.mjs';
 
-const RANGE_TOTAL = 400_000_000;
-const FAILED_RANGE = 'bytes=300000000-399999999';
+const RANGE_TOTAL = 40_000_000;
+const RANGE_PART_LENGTH = 4_000_000;
+const FAILED_RANGE = 'bytes=12000000-15999999';
+const LEGACY_RANGE_TOTAL = 400_000_000;
+const LEGACY_RANGE_PART_LENGTH = 100_000_000;
 
 function missingEntry(name) {
     const error = new Error(`Missing ${name}.`);
@@ -49,6 +52,20 @@ function logicalBlob(logicalByteLength) {
         }
     );
     return blob;
+}
+
+function persistedModelName(modelId, fileName) {
+    const encoded = Array.from(
+        new TextEncoder().encode(modelId),
+        function encodeStorageByte(value) {
+            return value.toString(16).padStart(2, '0');
+        }
+    ).join('');
+    return `id-${encoded}--${fileName}`;
+}
+
+function persistedRangeName(modelName, start, end, total) {
+    return `${modelName}.range-${String(start)}-${String(end)}-of-${String(total)}.part`;
 }
 
 function memoryDirectory() {
@@ -106,6 +123,9 @@ function memoryDirectory() {
                     return entry[0];
                 });
         },
+        put(name, logicalByteLength) {
+            entries.set(name, logicalBlob(logicalByteLength));
+        },
         table
     };
 }
@@ -161,6 +181,44 @@ function readableBody(logicalByteLength, waitForRelease = null) {
     };
 }
 
+function partiallyFailingBody(logicalByteLength, onFailure) {
+    let cancelled = false;
+    let delivered = false;
+
+    const reader = {
+        async cancel() {
+            cancelled = true;
+        },
+        async read() {
+            if (cancelled) {
+                return {
+                    done: true,
+                    value: undefined
+                };
+            }
+            if (!delivered) {
+                delivered = true;
+                return {
+                    done: false,
+                    value: new LogicalChunk(logicalByteLength)
+                };
+            }
+            onFailure();
+            throw new TypeError('Synthetic partial range network failure.');
+        },
+        releaseLock() {}
+    };
+
+    return {
+        async cancel(reason) {
+            await reader.cancel(reason);
+        },
+        getReader() {
+            return reader;
+        }
+    };
+}
+
 function responseHeaders(values) {
     return {
         get(name) {
@@ -169,7 +227,7 @@ function responseHeaders(values) {
     };
 }
 
-function rangeResponse(url, range, body) {
+function rangeResponse(url, range, body, total = RANGE_TOTAL) {
     const match = /^bytes=([0-9]+)-([0-9]+)$/u.exec(range);
     const start = Number(match[1]);
     const end = Number(match[2]);
@@ -177,7 +235,7 @@ function rangeResponse(url, range, body) {
         body,
         headers: responseHeaders(
             {
-                'content-range': `bytes ${String(start)}-${String(end)}/${String(RANGE_TOTAL)}`
+                'content-range': `bytes ${String(start)}-${String(end)}/${String(total)}`
             }
         ),
         ok: true,
@@ -224,6 +282,7 @@ test(
         const releaseFirstPeers = deferred();
         const requests = [];
         let injectFailure = true;
+        let partialFailureWasRead = false;
         const url = 'https://example.invalid/models/resumable/model.gguf';
         const source = createBrowserModelSource(
             {
@@ -245,8 +304,17 @@ test(
                     }
                     if (range === FAILED_RANGE && injectFailure) {
                         injectFailure = false;
-                        scheduleRelease(releaseFirstPeers.resolve);
-                        throw new TypeError('Synthetic range network failure.');
+                        return rangeResponse(
+                            requestUrl,
+                            range,
+                            partiallyFailingBody(
+                                RANGE_PART_LENGTH / 2,
+                                function failPartialRangeBody() {
+                                    partialFailureWasRead = true;
+                                    scheduleRelease(releaseFirstPeers.resolve);
+                                }
+                            )
+                        );
                     }
                     const match = /^bytes=([0-9]+)-([0-9]+)$/u.exec(range);
                     const logicalByteLength = Number(match[2]) - Number(match[1]) + 1;
@@ -269,16 +337,21 @@ test(
                 return error?.code === 'ARCANE_AI_MODEL_DOWNLOAD_FAILED';
             }
         );
+        assert.equal(partialFailureWasRead, true);
 
         const firstRangeRequests = requests.filter(function retainDataRange(range) {
             return range !== 'bytes=0-0';
         });
-        assert.equal(firstRangeRequests.length, 4);
+        assert.equal(firstRangeRequests.length, 10);
+        assert.ok(firstRangeRequests.every(function usesSmallRestartUnit(range) {
+            const match = /^bytes=([0-9]+)-([0-9]+)$/u.exec(range);
+            return Number(match[2]) - Number(match[1]) + 1 <= RANGE_PART_LENGTH;
+        }));
         assert.equal(
             directory.names().filter(function retainRangePart(name) {
                 return name.endsWith('.part');
             }).length,
-            3
+            9
         );
 
         const retryProgress = [];
@@ -306,9 +379,9 @@ test(
         assert.equal(
             retryProgress.some(function observedRestoredRangeProgress(progress) {
                 return progress.phase === 'download'
-                    && progress.loadedBytes === 300_000_000
+                    && progress.loadedBytes === 36_000_000
                     && progress.totalBytes === RANGE_TOTAL
-                    && progress.remainingBytes === 100_000_000
+                    && progress.remainingBytes === 4_000_000
                     && progress.transferLimit === 4
                     && progress.transferMode === 'ranges';
             }),
@@ -322,6 +395,107 @@ test(
             }
         );
         assert.equal(cached.cache, 'cached');
+    }
+);
+
+test(
+    'browser-WASM keeps completed legacy ranges and splits only their missing gaps',
+    async function resumeLegacyRangesWithSmallRestartUnits() {
+        const directory = memoryDirectory();
+        const requests = [];
+        const modelId = 'legacy-range-model';
+        const fileName = 'legacy-model.gguf';
+        const modelName = persistedModelName(modelId, fileName);
+        for (const start of [0, 100_000_000, 200_000_000]) {
+            const end = start + LEGACY_RANGE_PART_LENGTH - 1;
+            directory.put(
+                persistedRangeName(
+                    modelName,
+                    start,
+                    end,
+                    LEGACY_RANGE_TOTAL
+                ),
+                LEGACY_RANGE_PART_LENGTH
+            );
+        }
+        const url = 'https://example.invalid/models/resumable/legacy-model.gguf';
+        const source = createBrowserModelSource(
+            {
+                bytes: LEGACY_RANGE_TOTAL,
+                id: modelId,
+                name: fileName,
+                url
+            },
+            {
+                async fetchImpl(requestUrl, options = {}) {
+                    const range = options.headers?.Range ?? null;
+                    requests.push(range);
+                    if (range === 'bytes=0-0') {
+                        return rangeResponse(
+                            requestUrl,
+                            range,
+                            readableBody(1),
+                            LEGACY_RANGE_TOTAL
+                        );
+                    }
+                    const match = /^bytes=([0-9]+)-([0-9]+)$/u.exec(range);
+                    const logicalByteLength = Number(match[2]) - Number(match[1]) + 1;
+                    return rangeResponse(
+                        requestUrl,
+                        range,
+                        readableBody(logicalByteLength),
+                        LEGACY_RANGE_TOTAL
+                    );
+                }
+            }
+        );
+        const store = storeFor(directory);
+        const progressEvents = [];
+
+        const installed = await store.ensure(
+            source,
+            {
+                onProgress(progress) {
+                    progressEvents.push(progress);
+                }
+            }
+        );
+        assert.equal(installed.cache, 'installed');
+        const dataRequests = requests.filter(function retainDataRange(range) {
+            return range !== 'bytes=0-0';
+        });
+        assert.equal(dataRequests.length, 25);
+        assert.ok(dataRequests.every(function requestsOnlySmallMissingRanges(range) {
+            const match = /^bytes=([0-9]+)-([0-9]+)$/u.exec(range);
+            const start = Number(match[1]);
+            const end = Number(match[2]);
+            return start >= 300_000_000
+                && end < LEGACY_RANGE_TOTAL
+                && end - start + 1 <= RANGE_PART_LENGTH;
+        }));
+        assert.equal(
+            dataRequests.includes('bytes=300000000-399999999'),
+            false
+        );
+        assert.equal(
+            progressEvents.some(function observedLegacyProgress(progress) {
+                return progress.phase === 'download'
+                    && progress.loadedBytes === 300_000_000
+                    && progress.totalBytes === LEGACY_RANGE_TOTAL
+                    && progress.remainingBytes === 100_000_000;
+            }),
+            true
+        );
+
+        const requestCount = requests.length;
+        const cached = await store.ensure(
+            source,
+            {
+                offline: true
+            }
+        );
+        assert.equal(cached.cache, 'cached');
+        assert.equal(requests.length, requestCount);
     }
 );
 

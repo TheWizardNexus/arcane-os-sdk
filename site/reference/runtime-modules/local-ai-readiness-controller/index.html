@@ -51,7 +51,10 @@ const chat = new EventTarget();
 chat.setAIAvailability = value =&gt; console.log(value);
 const controller = createLocalAIReadinessController({
     chat,
-    preferences:[&#39;OPENAI&#39;,&#39;OPENAI&#39;,&#39;OPENAI&#39;,&#39;gpt-4o-mini&#39;,&#39;tts-1&#39;,&#39;whisper-1&#39;],
+    preferences:[
+        &#39;OPENAI&#39;,&#39;LOCAL_SPEACH&#39;,&#39;LOCAL_SPEACH&#39;,&#39;openai-gpt-oss-120b&#39;,
+        &#39;kokoro&#39;,&#39;whisper-small&#39;
+    ],
     runtime:&#39;browser&#39;
 });
 await controller.check();

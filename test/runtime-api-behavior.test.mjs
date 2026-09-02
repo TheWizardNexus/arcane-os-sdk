@@ -2136,8 +2136,8 @@ test(
 );
 
 test(
-    'legacy Cloud and available Core routes publish truthful provider-v2 readiness',
-    async function testLegacyLLMProviderAdapters() {
+    'TWiN Cloud LLM and on-device Core speech routes publish truthful provider-v2 readiness',
+    async function testTWiNCloudAndDeviceSpeechAdapters() {
         const previousWindow=globalThis.window;
         const previousArcane=globalThis.Arcane;
         const previousFetch=globalThis.fetch;
@@ -2168,20 +2168,11 @@ test(
         globalThis.localStorage=localStorage;
         globalThis.document=documentObject;
         const requests=[];
-        globalThis.fetch=async function answerLegacyCloudRequest(url,options) {
+        globalThis.fetch=async function answerTWiNCloudRequest(url,options) {
             requests.push({url:String(url),options});
-            if(String(url).endsWith('/audio/transcriptions')){
-                return new Response('cloud transcript',{status:200});
-            }
-            if(String(url).endsWith('/audio/speech')){
-                return new Response(new Uint8Array([1,2,3,4]),{
-                    status:200,
-                    headers:{'content-type':'audio/ogg'}
-                });
-            }
             return new Response(JSON.stringify({
                 id:'cloud-response',
-                model:'gpt-5-mini',
+                model:'openai-gpt-oss-120b',
                 choices:[{
                     index:0,
                     message:{role:'assistant',content:'cloud response'},
@@ -2195,44 +2186,59 @@ test(
         };
         try{
             const {default:AI}=await import(
-                '../runtime/arcane/modules/AI.js?legacy-provider-v2-readiness'
+                '../runtime/arcane/modules/AI.js?twin-cloud-device-speech-readiness'
             );
-            const ai=new AI('OPENAI','OPENAI','OPENAI','OPENAI','OPENAI','OPENAI');
+            const ai=new AI(
+                'OPENAI','OPENAI','OPENAI',
+                'OPENAI','OPENAI','OPENAI'
+            );
             const runtime=ai.providerRuntime;
+            assert.equal(ai.llmService,'OPENAI');
+            assert.equal(ai.sttService,'LOCAL_SPEACH');
+            assert.equal(ai.ttsService,'LOCAL_SPEACH');
+            assert.equal(ai.model,'openai-gpt-oss-120b');
+            assert.equal(ai.modelSTT,'whisper-small');
+            assert.equal(ai.modelTTS,'kokoro');
             assert.deepEqual(runtime.providerIdentity('llm','OPENAI'),{
                 protocol:AI_PROVIDER_PROTOCOL,
                 role:'llm',
                 id:'OPENAI',
                 localOnly:false
             });
+            assert.deepEqual(runtime.providerIdentity('stt','LOCAL_SPEACH'),{
+                protocol:AI_PROVIDER_PROTOCOL,
+                role:'stt',
+                id:'LOCAL_SPEACH',
+                localOnly:true
+            });
+            assert.deepEqual(runtime.providerIdentity('tts','LOCAL_SPEACH'),{
+                protocol:AI_PROVIDER_PROTOCOL,
+                role:'tts',
+                id:'LOCAL_SPEACH',
+                localOnly:true
+            });
+            assert.equal(runtime.providerIdentity('stt','OPENAI'),null);
+            assert.equal(runtime.providerIdentity('tts','OPENAI'),null);
             assert.equal(runtime.status('llm').state,'unloaded');
             assert.equal(runtime.status('stt').state,'unloaded');
             assert.equal(runtime.status('tts').state,'unloaded');
-            assert.deepEqual(runtime.providerIdentity('stt','OPENAI'),{
-                protocol:AI_PROVIDER_PROTOCOL,
-                role:'stt',
-                id:'OPENAI',
-                localOnly:false
-            });
-            assert.deepEqual(runtime.providerIdentity('tts','OPENAI'),{
-                protocol:AI_PROVIDER_PROTOCOL,
-                role:'tts',
-                id:'OPENAI',
-                localOnly:false
-            });
             assert.equal(ai.configured,false);
             await assert.rejects(
-                runtime.load('stt'),
-                error=>error?.code==='AI_PROVIDER_NOT_CONFIGURED'
+                runtime.load('stt',{localOnly:true}),
+                error=>error?.code==='AI_NATIVE_LOCAL_REQUIRED'
             );
+            await runtime.unload('stt');
+            await assert.rejects(
+                ai.setSpeechMuted(false),
+                error=>error?.code==='AI_NATIVE_LOCAL_REQUIRED'
+            );
+            await ai.setSpeechMuted(true);
 
             ai.license='test-credential';
             await runtime.load('llm');
-            await runtime.load('stt');
-            await ai.setSpeechMuted(false);
             assert.equal(runtime.status('llm').state,'ready');
-            assert.equal(runtime.status('stt').state,'ready');
-            assert.equal(runtime.status('tts').state,'ready');
+            assert.equal(runtime.status('stt').state,'unloaded');
+            assert.equal(runtime.status('tts').state,'unloaded');
             assert.equal(runtime.status('llm').loaded,true);
             assert.equal(ai.configured,true);
             assert.equal(requests.length,0,'Cloud readiness must not probe or download');
@@ -2254,22 +2260,36 @@ test(
             });
             assert.equal(publicCloud.choices[0].message.content,'cloud response');
             assert.equal(requests.length,2);
-            const cloudTranscript=await ai.fetchSTT(
-                new Blob([new Uint8Array([1,2,3])],{type:'audio/webm'})
-            );
-            assert.equal(cloudTranscript,'cloud transcript');
-            const cloudSpeech=await ai.fetchTTS({
-                model:ai.modelTTS,
-                voice:'alloy',
-                input:'Cloud voice.',
-                responseFormat:'opus',
-                speed:1
-            });
-            assert.ok(cloudSpeech instanceof Blob);
-            assert.equal(requests.length,4);
+            assert.ok(requests.every(request=>
+                request.url==='https://inference.do-ai.run/v1/chat/completions'
+            ));
+            assert.ok(requests.every(request=>
+                request.options.headers.Authorization==='Bearer test-credential'
+            ));
+            assert.ok(requests.every(request=>
+                JSON.parse(request.options.body).model==='openai-gpt-oss-120b'
+            ));
 
-            await ai.setSpeechMuted(true);
-            await runtime.unload('stt');
+            const remoteSelection={
+                providerId:'remote-audio',
+                modelId:'remote-audio-model',
+                localOnly:false
+            };
+            assert.throws(
+                ()=>ai.configureSpeechProviders({
+                    stt:{default:remoteSelection,localOnly:null},
+                    tts:{default:null,localOnly:null}
+                }),
+                error=>error?.code==='AI_STT_DEVICE_ONLY'
+            );
+            assert.throws(
+                ()=>ai.configureSpeechProviders({
+                    stt:{default:null,localOnly:null},
+                    tts:{default:remoteSelection,localOnly:null}
+                }),
+                error=>error?.code==='AI_TTS_DEVICE_ONLY'
+            );
+
             ai.license='';
             await runtime.unload('llm');
             assert.equal(runtime.status('llm').state,'unloaded');
@@ -2353,6 +2373,7 @@ test(
             assert.equal(nativeSpeechCalls[0].operation,'transcribe');
             assert.equal(nativeSpeechCalls[1].operation,'synthesize');
             assert.equal(nativeSpeechCalls[1].request.voice,'af_heart');
+            assert.equal(requests.length,2,'On-device audio must not use remote fetch');
 
             await ai.setSpeechMuted(true);
             await runtime.unload('stt');
@@ -2590,7 +2611,7 @@ test(
             }=await import('../runtime/arcane/modules/AI.js?browser-speech-role-contract');
             ai=new AI('OPENAI','OPENAI','OPENAI','OPENAI','OPENAI','OPENAI');
             const runtime=ai.providerRuntime;
-            const initialExternalTTSSelection=runtime.selection('tts');
+            const initialLocalTTSSelection=runtime.selection('tts');
             const pendingSTTSelection={
                 providerId:'saved-stt-route',
                 modelId:'saved-stt-model',
@@ -2602,13 +2623,15 @@ test(
                     localOnly:null
                 },
                 tts:{
-                    default:initialExternalTTSSelection,
+                    default:initialLocalTTSSelection,
                     localOnly:null
                 }
             });
-            const externalTTSIdentity=runtime.providerIdentity('tts','OPENAI');
-            const externalTTSSelection=runtime.selection('tts');
-            const externalTTSStatus=runtime.status('tts');
+            const localTTSIdentity=runtime.providerIdentity(
+                'tts','LOCAL_SPEACH'
+            );
+            const localTTSSelection=runtime.selection('tts');
+            const localTTSStatus=runtime.status('tts');
             const hydrationProviderIds=[];
             const unsubscribeHydration=subscribeAIRuntimeState(
                 function observePendingSpeechHydration(snapshot){
@@ -2647,15 +2670,15 @@ test(
             assert.equal(runtime.status('stt').state,'unloaded');
             assert.deepEqual(dbopfsReads,[]);
             assert.deepEqual(
-                runtime.providerIdentity('tts','OPENAI'),
-                externalTTSIdentity
+                runtime.providerIdentity('tts','LOCAL_SPEACH'),
+                localTTSIdentity
             );
-            assert.equal(runtime.selection('tts'),externalTTSSelection);
-            assert.equal(runtime.status('tts'),externalTTSStatus);
+            assert.equal(runtime.selection('tts'),localTTSSelection);
+            assert.equal(runtime.status('tts'),localTTSStatus);
             assert.equal(await ai.disposeBrowserSpeech(),true);
             assert.equal(runtime.selection('stt'),null);
-            assert.equal(runtime.selection('tts'),externalTTSSelection);
-            assert.equal(runtime.status('tts'),externalTTSStatus);
+            assert.equal(runtime.selection('tts'),localTTSSelection);
+            assert.equal(runtime.status('tts'),localTTSStatus);
 
             const initial={
                 protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,

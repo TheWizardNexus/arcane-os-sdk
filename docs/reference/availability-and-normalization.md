@@ -36,8 +36,8 @@ version; WebKitGTK availability must not be generalized to macOS.
 | Search an app-owned document corpus for explicit chat context | `/arcane/modules/DBOPFSDocumentLibrary.js` | **Browser** or compatible injected DBOPFS adapter | Generation/manifest completion, complete lexical search, partial read failures, and untrusted context labels are normalized. Construction does not search; an explicitly wired context builder performs retrieval for each prepared chat send. |
 | Read host identity, capabilities, storage, preferences, appearance, or platform state | `globalThis.Arcane` | **Cross-host** where the method is implemented and admitted | Promise behavior and `Arcane.Error` are normalized. Result fields are normalized unless the method explicitly documents a platform-dependent snapshot. |
 | Use local AI without coupling app code to Ollama HTTP | `Arcane.localAI`, `Arcane.ai`, or `/arcane/modules/Ollama.js` | Primarily **Native**; Android exposes a narrower admitted inference projection | Admission, errors, and managed-operation events are normalized. Direct Ollama response envelopes remain **Provider-native**. |
-| Use OpenAI from the renderer profile | `/arcane/modules/AI.js` | **Cloud** from an allowed browser/native renderer | High-level AI chat/text behavior is normalized by the module; raw provider diagnostics and some response detail remain provider-specific. No automatic cloud fallback is inferred from local failure. |
-| Use local or cloud speech through one application helper | `/arcane/modules/AI.js` and `Arcane.speech` | **Browser**, **Native**, or **Cloud**, depending on the selected speech profile | The helper normalizes application-facing audio/text behavior; native and cloud request/response plumbing differs below that boundary. |
+| Use TWiN Cloud from the renderer profile | `/arcane/modules/AI.js` | **Cloud** from an allowed browser/native renderer | High-level chat behavior is normalized by the module. The TWiN access key authenticates remote LLM chat; raw provider diagnostics remain provider-specific. No automatic cloud fallback is inferred from local failure. |
+| Use speech through one application helper | `/arcane/modules/AI.js` and `Arcane.speech` | **Browser** or **Native** | The helper keeps audio on device: Whisper owns STT and Kokoro owns TTS. It normalizes application-facing audio/text behavior while browser and native request/response plumbing differs below that boundary. |
 | Inspect or manage raw Ollama models | `Arcane.ollama` or `/arcane/modules/Ollama.js` | **Native** desktop Core for management; narrower Android inference only | Wrapper method names, errors, streaming correlation, and admission are Arcane-controlled. Direct Ollama success envelopes are intentionally provider-native. |
 | Use native terminal, installation, user, provisioning, or machine controls | matching `Arcane.*` namespace | **Native** and app/capability restricted | Calls and errors use the common bridge contract. Platform results can be host-specific and are marked in the method guide. |
 
@@ -153,8 +153,11 @@ ordinary path, and native cache writes are not disabled.
 The projected [`AIProviderRuntime`](runtime-modules.md#aiproviderruntimejs)
 normalizes those browser providers and can admit an externally supplied native
 or cloud provider/2 adapter. `AI.js` also supplies compatibility adapters for
-an already-selected legacy OpenAI route, Ollama route, or admitted Core speech
-route. The SDK publishes no privileged Core implementation, credential,
+an already-selected TWiN Cloud LLM route, Ollama route, or admitted local Core
+speech route. Its built-in audio selections are on-device only: saved `OPENAI`
+speech selections migrate to `LOCAL_SPEACH` with `whisper-small` for STT and
+`kokoro` for TTS. The SDK publishes no privileged Core implementation,
+credential,
 model, or speech-runtime authority, and those adapters never probe, select,
 download, or fall back. The sticky
 [`AIRuntimeState`](runtime-modules.md#airuntimestatejs) surface keeps

@@ -157,23 +157,26 @@ provider. `transitionAI()` and `transitionProviders()` are deliberate
 cross-role transitions: each stops queued audio, unloads the current LLM, STT,
 and TTS roles, then applies the replacement configuration. `transitionAI()`
 returns aggregate runtime status; `transitionProviders()` returns the configured
-three-role route configuration. Selected `OPENAI` LLM/STT/TTS, `OLLAMA` LLM,
-and Core `LOCAL_SPEACH` STT/TTS legacy routes expose truthful
-capability-only readiness through internal provider/2 adapters without probing,
-downloading, or hiding a load. Cloud speech availability requires the selected
-route, its model, a credential, and `fetch`; Core speech availability requires the
-exact selected `Arcane.speech.transcribe` or `synthesize` method. `fetchRequest()`
+three-role route configuration. Selected TWiN Cloud `OPENAI` LLM, `OLLAMA` LLM,
+and Core `LOCAL_SPEACH` STT/TTS legacy routes expose truthful capability-only
+readiness through internal provider/2 adapters without probing, downloading, or
+hiding a load. Legacy `OPENAI` speech preferences migrate to on-device
+`LOCAL_SPEACH`, with Whisper for STT and Kokoro for TTS. TWiN Cloud availability
+requires the selected LLM route, its model, a credential, and `fetch`; Core speech
+availability requires the exact selected `Arcane.speech.transcribe` or
+`synthesize` method. `fetchRequest()`
 keeps the selected provider's public response shape. Browser speech routes
 translate the existing AI.js STT `{audio:Blob|File,mimeType,model}` and TTS
 `{model,input,responseFormat,voice?,speed?}` requests at the provider boundary;
 only WAV is accepted for the shared TTS result. TTS voice selection comes from
-the exact selected provider/model catalog `defaultVoice`; a saved OpenAI voice
-is used only by the selected OpenAI adapter and is never forwarded to another
-provider route.
+the exact selected local provider/model catalog `defaultVoice`; a retired
+OpenAI voice is never forwarded to another provider route.
 
 `configureSpeechProviders({stt,tts})` commits only the two speech routes and
 leaves the current LLM route and sticky lifecycle record unchanged. Both speech
-roles must be unloaded and own no request, load, unload, or dispose operation.
+roles must be unloaded, use local-only selections, and own no request, load,
+unload, or dispose operation. Non-local STT and TTS selections reject with
+`AI_STT_DEVICE_ONLY` and `AI_TTS_DEVICE_ONLY`, respectively.
 `transitionSpeechProviders({stt,tts})` stops queued audio, explicitly unloads
 only STT and TTS, then commits that same closed speech route record. Neither
 method loads a model, selects a fallback, or changes caller-owned model or voice
@@ -310,7 +313,7 @@ sample rate, and TTS default voice. `configureBrowserSpeech()` imports the share
 browser-speech module, creates one DBOPFS store, constructs and registers the
 supplied Whisper and/or Kokoro provider/2 instances, atomically replaces only
 the supplied STT/TTS routes, and returns a mutable descriptor. An initial or
-later call may supply only `stt` or only `tts`; the omitted external Cloud/Core
+later call may supply only `stt` or only `tts`; the omitted unmanaged or Core
 role remains unchanged and is not claimed as SDK browser-provider ownership.
 A partial replacement of an existing browser-managed record retains the same
 `dbopfs` and `tableName`, carries every omitted managed browser provider and
@@ -330,7 +333,8 @@ managed role, it returns a mutable merged record with the replacement call's
 SDK still owns every represented browser provider and route;
 `browserSpeechDescriptor` returns that descriptor on the same condition.
 Configuration never loads a role, auto-downloads, selects an alternative
-provider/model/runtime/voice, or falls back to cloud/browser speech.
+provider/model/runtime/voice, or falls back to an unmanaged or alternative
+browser-speech route.
 
 Calling `configureBrowserSpeech()` again with the same active record for every
 supplied role is an idempotent descriptor read. A different call is serialized,
@@ -412,9 +416,9 @@ Exact exports: `AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL`,
 
 ### Availability and normalization
 
-**Browser + native bridge + cloud.** High-level chat/speech behavior is
+**Browser + native bridge + TWiN Cloud.** High-level chat/speech behavior is
 normalized; provider diagnostics and media errors remain mixed. Transport:
-AIProviderRuntime `arcane-ai-provider/2` routes, OpenAI HTTPS, Arcane.ollama,
+AIProviderRuntime `arcane-ai-provider/2` routes, TWiN Cloud HTTPS, Arcane.ollama,
 Arcane.speech, and the Android WebView bridge. [Deep protocol details](protocols.md).
 
 ### Example
@@ -595,8 +599,8 @@ diagnostics rather than blocking iterator return.
 
 **Cross-host runtime with provider-specific execution.** The SDK source ships
 the browser-WASM LLM and browser Whisper/Kokoro adapters and supplies the
-narrow AI.js legacy OpenAI/Ollama/Core-speech adapters; other native, Core, or
-cloud adapters may be supplied externally only when they implement the same
+narrow AI.js TWiN Cloud LLM, Ollama, and local Core-speech adapters; other
+native, Core, or cloud adapters may be supplied externally only when they implement the same
 `arcane-ai-provider/2` boundary. A
 provider must prove a matching `arcane-ai-model-authority/1` inspection before load.
 `localOnly` routing fails closed; it never selects a cloud or non-local route as

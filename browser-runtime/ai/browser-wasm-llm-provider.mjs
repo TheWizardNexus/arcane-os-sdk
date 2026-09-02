@@ -29,8 +29,10 @@ const MODEL_LOAD_HEARTBEAT_MS = 5_000;
 const DEFAULT_MODEL_DOWNLOAD_CONCURRENCY = 4;
 const MODEL_DOWNLOAD_PROGRESS_INTERVAL_MS = 250;
 const MODEL_DOWNLOAD_SPEED_WINDOW_MS = 5_000;
-const MODEL_DOWNLOAD_MAX_RANGE_PARTS = 16;
-const MODEL_DOWNLOAD_TARGET_RANGE_BYTES = 128_000_000;
+const MODEL_DOWNLOAD_MAX_RANGE_PARTS = 4_096;
+const MODEL_DOWNLOAD_TARGET_RANGE_BYTES = 4_000_000;
+const LEGACY_MODEL_DOWNLOAD_MAX_RANGE_PARTS = 16;
+const LEGACY_MODEL_DOWNLOAD_TARGET_RANGE_BYTES = 128_000_000;
 const INTEL_VENDOR_ID = 0x8086;
 const CAPABILITY_POLICY_PROTOCOL = "arcane-ai-browser-capability-policy/1";
 let highPerformanceGpuNoticeShown = false;
@@ -103,10 +105,10 @@ function downloadConcurrencyValue(value) {
   return value;
 }
 
-function modelHttpRanges(total) {
+function modelHttpRangesFor(total, maximumParts, targetPartBytes) {
   const count = Math.min(
-    MODEL_DOWNLOAD_MAX_RANGE_PARTS,
-    Math.ceil(total / MODEL_DOWNLOAD_TARGET_RANGE_BYTES),
+    maximumParts,
+    Math.ceil(total / targetPartBytes),
     total,
   );
   const width = Math.floor(total / count);
@@ -120,6 +122,47 @@ function modelHttpRanges(total) {
     start = end + 1;
   }
   return completeValue(ranges);
+}
+
+function modelHttpRanges(total) {
+  return modelHttpRangesFor(
+    total,
+    MODEL_DOWNLOAD_MAX_RANGE_PARTS,
+    MODEL_DOWNLOAD_TARGET_RANGE_BYTES,
+  );
+}
+
+function modelHttpSubranges(range) {
+  const length = range.end - range.start + 1;
+  const maximumParts = Math.floor(
+    MODEL_DOWNLOAD_MAX_RANGE_PARTS / LEGACY_MODEL_DOWNLOAD_MAX_RANGE_PARTS,
+  );
+  return completeValue(modelHttpRangesFor(
+    length,
+    maximumParts,
+    MODEL_DOWNLOAD_TARGET_RANGE_BYTES,
+  ).map((part) => completeValue({
+    start: range.start + part.start,
+    end: range.start + part.end,
+    total: range.total,
+  })));
+}
+
+function modelHttpRangePlans(total) {
+  const current = modelHttpRanges(total);
+  const legacy = modelHttpRangesFor(
+    total,
+    LEGACY_MODEL_DOWNLOAD_MAX_RANGE_PARTS,
+    LEGACY_MODEL_DOWNLOAD_TARGET_RANGE_BYTES,
+  );
+  if (
+    current.length === legacy.length
+    && current.every((range, index) => (
+      range.start === legacy[index].start
+      && range.end === legacy[index].end
+    ))
+  ) return completeValue([current]);
+  return completeValue([current, legacy]);
 }
 
 function progressClock() {
@@ -930,7 +973,7 @@ export function createDbopfsModelStore({
     } = {},
   ) {
     const transport = BROWSER_MODEL_SOURCE_TRANSPORTS.get(source);
-    const ranges = modelHttpRanges(total);
+    const ranges = await rangePlanForInstall(name, total, signal);
     const partFiles = new Array(ranges.length);
     const pendingRangeIndexes = [];
     for (let rangeIndex = 0; rangeIndex < ranges.length; rangeIndex += 1) {
@@ -1003,16 +1046,31 @@ export function createDbopfsModelStore({
           writable = null;
           partFiles[rangeIndex] = await storedModelFile(partName);
         } catch (error) {
-          retainFailure(error);
-          await cancelOpenedDownload(opened, error);
+          let transferError = error;
+          if (downloadSignal.aborted
+            && error?.code !== "ARCANE_AI_REQUEST_ABORTED") {
+            try {
+              throwIfAborted(downloadSignal, "install");
+            } catch (abortError) {
+              transferError = abortError;
+            }
+          } else if (!error?.code) {
+            transferError = fail(
+              "ARCANE_AI_MODEL_DOWNLOAD_FAILED",
+              "The model download failed while reading an HTTP byte range.",
+              error,
+            );
+          }
+          retainFailure(transferError);
+          await cancelOpenedDownload(opened, transferError);
           try {
-            await writable?.abort?.(error);
+            await writable?.abort?.(transferError);
           } catch {
             // The range part is removed below even if its writable already closed.
           }
           await removeEntry(partName).catch(() => undefined);
           progress?.discardBytes(received);
-          throw error;
+          throw transferError;
         } finally {
           progress?.endTransfer({ publishProgress: failure === null });
         }
@@ -1118,16 +1176,93 @@ export function createDbopfsModelStore({
     return names;
   }
 
+  async function rangePlanForInstall(
+    modelName,
+    total,
+    signal,
+    knownNames = undefined,
+  ) {
+    const plans = modelHttpRangePlans(total);
+    const existingNames = knownNames === undefined
+      ? await memberRangePartNames(modelName)
+      : knownNames;
+    const available = existingNames === null
+      ? null
+      : existingNames instanceof Set
+        ? existingNames
+        : new Set(existingNames);
+    if (available?.size === 0) return plans[0];
+    if (plans.length === 1) return plans[0];
+    const completedParts = new Map();
+
+    async function completedPart(range) {
+      throwIfAborted(signal, "install");
+      const partName = rangePartName(modelName, range);
+      if (available && !available.has(partName)) return null;
+      if (completedParts.has(partName)) return completedParts.get(partName);
+      const partFile = await file(partName);
+      const expected = range.end - range.start + 1;
+      const completed = partFile?.size === expected ? partFile : null;
+      completedParts.set(partName, completed);
+      return completed;
+    }
+
+    const completedLegacyRanges = new Set();
+    for (const range of plans[1]) {
+      if (await completedPart(range)) completedLegacyRanges.add(range);
+    }
+    const hybrid = completeValue(plans[1].flatMap((range) => (
+      completedLegacyRanges.has(range)
+        ? [range]
+        : modelHttpSubranges(range)
+    )));
+    let selected = plans[0];
+    let selectedBytes = 0;
+    let selectedLastModified = 0;
+    for (const ranges of [plans[0], hybrid]) {
+      let completedBytes = 0;
+      let lastModified = 0;
+      for (const range of ranges) {
+        const partFile = await completedPart(range);
+        if (!partFile) continue;
+        completedBytes += range.end - range.start + 1;
+        if (Number.isFinite(partFile.lastModified)) {
+          lastModified = Math.max(lastModified, partFile.lastModified);
+        }
+      }
+      if (
+        completedBytes > selectedBytes
+        || (
+          completedBytes === selectedBytes
+          && completedBytes > 0
+          && lastModified > selectedLastModified
+        )
+      ) {
+        selected = ranges;
+        selectedBytes = completedBytes;
+        selectedLastModified = lastModified;
+      }
+    }
+    return selected;
+  }
+
   async function removeMemberRangeParts(modelName, {
     except = null,
     total = null,
   } = {}) {
     const existingNames = await memberRangePartNames(modelName);
-    const names = existingNames ?? (
-      Number.isSafeInteger(total) && total > 0
-        ? modelHttpRanges(total).map((range) => rangePartName(modelName, range))
-        : []
-    );
+    let names = existingNames;
+    if (names === null && Number.isSafeInteger(total) && total > 0) {
+      const plans = modelHttpRangePlans(total);
+      const hybridRanges = plans.length === 1
+        ? []
+        : plans[1].flatMap((range) => modelHttpSubranges(range));
+      names = [...new Set([
+        ...plans.flat(),
+        ...hybridRanges,
+      ].map((range) => rangePartName(modelName, range)))];
+    }
+    names ??= [];
     const removed = [];
     for (const name of names) {
       if (except?.has(name)) continue;
@@ -1211,9 +1346,10 @@ export function createDbopfsModelStore({
     for (let memberIndex = 0; memberIndex < members.length; memberIndex += 1) {
       const total = members[memberIndex].bytes;
       if (!Number.isSafeInteger(total) || total <= 0) continue;
-      for (const range of modelHttpRanges(total)) {
-        removed.push(await removeEntry(rangePartName(names.models[memberIndex].name, range)));
-      }
+      removed.push(await removeMemberRangeParts(
+        names.models[memberIndex].name,
+        { total },
+      ));
     }
     return removed.some(Boolean);
   }
@@ -1364,12 +1500,18 @@ export function createDbopfsModelStore({
     return modelFiles.every(Boolean) ? modelFiles : null;
   }
 
-  async function storedRangeCandidate(modelName, total, signal) {
+  async function storedRangeCandidateForPlan(
+    modelName,
+    ranges,
+    signal,
+    availableNames = null,
+  ) {
     const partFiles = [];
     let lastModified = 0;
-    for (const range of modelHttpRanges(total)) {
+    for (const range of ranges) {
       throwIfAborted(signal, "install");
       const partName = rangePartName(modelName, range);
+      if (availableNames && !availableNames.has(partName)) return null;
       const partFile = await file(partName);
       if (!partFile) return null;
       const expected = range.end - range.start + 1;
@@ -1385,26 +1527,53 @@ export function createDbopfsModelStore({
     return completeValue({
       file: new Blob(partFiles, { type: "application/octet-stream" }),
       lastModified,
-      total,
+      ranges,
+      total: ranges[0].total,
     });
   }
 
+  async function storedRangeCandidate(
+    modelName,
+    total,
+    signal,
+    availableNames = null,
+  ) {
+    const ranges = await rangePlanForInstall(
+      modelName,
+      total,
+      signal,
+      availableNames,
+    );
+    return storedRangeCandidateForPlan(
+      modelName,
+      ranges,
+      signal,
+      availableNames,
+    );
+  }
+
   async function storedRangeMember(member, modelName, signal) {
+    const names = await memberRangePartNames(modelName);
+    const availableNames = names === null ? null : new Set(names);
     const declaredTotal = Number.isSafeInteger(member.bytes) && member.bytes > 0
       ? member.bytes
       : null;
     if (declaredTotal !== null) {
-      const declared = await storedRangeCandidate(modelName, declaredTotal, signal);
+      const declared = await storedRangeCandidate(
+        modelName,
+        declaredTotal,
+        signal,
+        availableNames,
+      );
       if (declared) {
         await removeStaleRangePartsAfterCompletion(
           modelName,
-          modelHttpRanges(declaredTotal),
+          declared.ranges,
         );
         return declared.file;
       }
     }
 
-    const names = await memberRangePartNames(modelName);
     if (names === null) return null;
     const discoveredTotals = new Set();
     for (const name of names) {
@@ -1414,7 +1583,12 @@ export function createDbopfsModelStore({
     let selected = null;
     const totals = [...discoveredTotals].sort((left, right) => right - left);
     for (const total of totals) {
-      const candidate = await storedRangeCandidate(modelName, total, signal);
+      const candidate = await storedRangeCandidate(
+        modelName,
+        total,
+        signal,
+        availableNames,
+      );
       if (
         candidate
         && (
@@ -1426,7 +1600,7 @@ export function createDbopfsModelStore({
     if (selected === null) return null;
     await removeStaleRangePartsAfterCompletion(
       modelName,
-      modelHttpRanges(selected.total),
+      selected.ranges,
     );
     return selected.file;
   }

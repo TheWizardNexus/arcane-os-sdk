@@ -988,8 +988,8 @@ test('generated runtime reference contracts are exhaustive and reader-first',asy
             ['license',1]
         ])assert.equal(filterModuleSearchRecords(records,'',{kind}).length,count,kind);
         const ai=records.find(record=>record.name==='AI.js');
-        assert.equal(moduleMatchesSearch(ai,'provider speech cloud'),true);
-        assert.equal(moduleMatchesSearch(ai,'provider speech cloud',{kind:'worker'}),false);
+        assert.equal(moduleMatchesSearch(ai,'provider speech device'),true);
+        assert.equal(moduleMatchesSearch(ai,'provider speech device',{kind:'worker'}),false);
         assert.deepEqual(
             filterModuleSearchRecords(records,'directory select').map(record=>record.name),
             ['DirectoryPicker.js']

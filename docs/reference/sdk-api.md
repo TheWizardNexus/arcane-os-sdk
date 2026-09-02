@@ -6106,13 +6106,16 @@ pool; refusal keeps the original response as the ordinary single-fetch path,
 with readable `Content-Length` used for progress. A missing `Content-Range` can
 use optional descriptor `bytes` for Range planning; without either total, the
 store falls back to one full fetch. A confirmed source member is divided into
-up to 16 deterministic OPFS Range parts. A monolithic source may use at most
+deterministic OPFS Range parts of roughly 4 MB each, up to 4,096 parts. A
+monolithic source may use at most
 `downloadConcurrency` Range workers; split sources keep one Range worker per
 active member. Exact completed parts resume after interruption and are exposed
 in order as one logical Blob. A later non-206, contradictory exposed Range
 response, or incorrectly framed body fails rather than assembling partial
 content. On failure or cancellation, peers settle while completed shards and
-Range parts remain available for retry. A persisted Range part whose length
+Range parts remain available for retry; an unfinished active part restarts after
+refresh. An incomplete 0.5.3 cache keeps completed legacy parts and subdivides
+only missing legacy intervals into current small parts. A persisted Range part whose length
 does not match its requested HTTP frame is discarded and fetched again. A
 zero-length current whole entry or incomplete current Range set cannot shadow a
 complete legacy cache; once a current replacement completes, the store attempts

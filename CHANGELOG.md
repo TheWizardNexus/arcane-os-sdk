@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.4
+
+- Reduced Browser-WASM HTTP Range parts from roughly 128 MB to roughly 4 MB
+  and raised the deterministic part ceiling, so a refresh re-fetches only the
+  small in-flight parts while every completed part remains reusable. An
+  incomplete 0.5.3 cache keeps its completed legacy parts and subdivides only
+  the missing legacy intervals, preserving existing progress during adoption.
+- Kept all built-in audio processing on device: Whisper owns transcription and
+  Kokoro owns speech synthesis. Legacy OpenAI audio selections migrate to those
+  local routes, non-local speech configurations are rejected, and the retired
+  OpenAI audio credential and endpoints are no longer used.
+
 ## 0.5.3
 
 - Preserved every independently completed Browser-WASM HTTP Range part and

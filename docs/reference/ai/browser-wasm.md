@@ -112,11 +112,15 @@ retry. Each active member negotiates HTTP Range support. A split member uses at
 most one Range worker while a one-file source may use up to
 `downloadConcurrency` Range workers (four by default), so file and Range
 workers are never multiplied. A usable total from `Content-Range` or the
-optional descriptor `bytes` divides that member into up to 16 deterministic
-contiguous parts. Each exact completed part is committed separately in OPFS,
-so retry fetches only missing parts; the ordered parts are exposed to Wllama as
-one logical model Blob. Range offsets remain transport-local; only aggregate
-transfer telemetry is public.
+optional descriptor `bytes` divides that member into deterministic contiguous
+parts of roughly 4 MB each, up to 4,096 parts. Each exact completed part is
+committed separately in OPFS, so retry or refresh fetches only the small
+in-flight parts plus any other missing parts; the ordered parts are exposed to
+Wllama as one logical model Blob. Range offsets remain transport-local; only
+aggregate transfer telemetry is public.
+An incomplete cache written by 0.5.3 keeps each completed legacy part and
+subdivides only its missing legacy intervals into current small parts. The
+result preserves existing progress and limits loss on later refreshes.
 
 ## Model selection, optional hardening, and cache
 
@@ -516,13 +520,15 @@ redirect turns that probe into a full `200`, the source probes the final URL dir
 confirmed support cancels the original body and starts parallel Range workers,
 while refusal keeps the original full response as the single-fetch fallback. A
 valid `Content-Range`, or optional descriptor `bytes` when that header is not
-exposed, supplies the total for up to 16 deterministic resumable Range parts. Without
-an observable or declared total, the store falls back to one full fetch and
+exposed, supplies the total for deterministic resumable Range parts of roughly
+4 MB each, up to 4,096 parts. Without an observable or declared total, the store falls back to one full fetch and
 uses its readable `Content-Length` when available. A later non-206,
 contradictory exposed Range response, or incorrectly framed Range body fails
-rather than silently assembling a partial model. Failure or cancellation
-aborts peer transfers and waits for them to settle while preserving already
-completed members and exact Range parts for retry. A zero-length current whole
+rather than silently assembling a partial model. A transfer failure lets peer
+transfers settle; explicit cancellation stops active transfers. Both preserve
+completed members and exact Range parts for retry, while unfinished active
+parts restart after refresh. Completed 0.5.3 Range parts remain in the active
+plan, while only missing legacy intervals are subdivided. A zero-length current whole
 entry or incomplete current Range set cannot shadow a complete legacy cache;
 the complete legacy file is reused and the store attempts to remove abandoned
 replacement fragments. After

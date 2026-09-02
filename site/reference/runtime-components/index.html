@@ -658,7 +658,12 @@ bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.
 <p>Events: <code>directory-picker-ready</code>, <code>directory-picker-change</code>, <code>directory-picker-cancel</code>, <code>directory-picker-error</code>.</p>
 <p>Shared dependencies: <a href="../runtime-modules/#directorypickerjs"><code>DirectoryPicker.js</code></a>.</p>
 <h3 id="availability-and-normalization-9">Availability and normalization</h3>
-<p><strong>Browser and supported native WebViews.</strong> Complete plain-text directory paths and native selection/error content are preserved without an application character cap; malformed control-character paths still fail honestly. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app&#39;s capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
+<p><strong>Browser and supported native WebViews.</strong> Complete directory paths and native
+selection/error content are preserved without trimming, character caps, or a
+generic control-character gate. The provider or operating system owns any
+platform-specific path failure. HTMLImport + DOM; injected Arcane/provider
+modules where listed. Native methods remain subject to the bound app&#39;s
+capabilities. <a href="../protocols/">Deep protocol details</a>.</p>
 <h3 id="example-9">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
   id=&quot;directory-picker.html&quot;
