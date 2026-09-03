@@ -93,6 +93,13 @@ on device: Whisper (`LOCAL_SPEACH` / `whisper-small`) owns transcription and
 Kokoro (`LOCAL_SPEACH` / `kokoro`) owns speech synthesis. Neither audio route
 uses the TWiN key, and no OpenAI audio key is required.
 
+`fetchRequest()` and `streamRequest()` accept the provider-neutral
+`reasoningEffort` option with `none`, `low`, `medium`, `high`, or `max`. TWiN
+Cloud maps it to DigitalOcean Serverless Inference `reasoning_effort`; omitting
+it preserves the provider default. TWiN Cloud defaults to
+`openai-gpt-oss-120b`, and applications may explicitly select
+`openai-gpt-oss-20b` without changing streaming or structural-tool behavior.
+
 ## Browser-local AI
 
 `arcane-os/ai/browser-wasm` provides the shared Wllama LLM provider. The app

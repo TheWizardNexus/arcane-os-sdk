@@ -173,6 +173,15 @@ only WAV is accepted for the shared TTS result. TTS voice selection comes from
 the exact selected local provider/model catalog `defaultVoice`; a retired
 OpenAI voice is never forwarded to another provider route.
 
+`fetchRequest()` and `streamRequest()` accept `reasoningEffort` as a
+provider-neutral request option. Its exact values are `none`, `low`, `medium`,
+`high`, and `max`; an omitted value leaves the provider default unchanged.
+TWiN Cloud translates the selected value to the DigitalOcean Serverless
+Inference `reasoning_effort` field. Its default model remains
+`openai-gpt-oss-120b`, while an explicitly selected `openai-gpt-oss-20b` is
+preserved. Reasoning effort does not alter complete streaming data, structural
+tool declarations, emitted tool calls, or callback ordering.
+
 `configureSpeechProviders({stt,tts})` commits only the two speech routes and
 leaves the current LLM route and sticky lifecycle record unchanged. Both speech
 roles must be unloaded, use local-only selections, and own no request, load,

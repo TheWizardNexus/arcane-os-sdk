@@ -2212,6 +2212,18 @@ test(
         const requests=[];
         globalThis.fetch=async function answerTWiNCloudRequest(url,options) {
             requests.push({url:String(url),options});
+            const request=JSON.parse(options.body);
+            if(request.stream){
+                return new Response([
+                    'data: {"id":"cloud-stream","model":"openai-gpt-oss-120b","choices":[{"index":0,"delta":{"role":"assistant","content":"cloud stream"},"finish_reason":null}]}',
+                    'data: {"id":"cloud-stream","model":"openai-gpt-oss-120b","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}',
+                    'data: [DONE]',
+                    ''
+                ].join('\n\n'),{
+                    status:200,
+                    headers:{'content-type':'text/event-stream'}
+                });
+            }
             return new Response(JSON.stringify({
                 id:'cloud-response',
                 model:'openai-gpt-oss-120b',
@@ -2297,11 +2309,40 @@ test(
             assert.equal(directCloud.choices[0].message.content,'cloud response');
             assert.equal(runtime.status('llm').state,'ready');
             assert.equal(runtime.status('llm').busy,false);
+            const tool={
+                type:'function',
+                function:{
+                    name:'report_progress',
+                    description:'Report progress to the user.',
+                    parameters:{
+                        type:'object',
+                        properties:{
+                            message:{type:'string',minLength:1}
+                        },
+                        required:['message']
+                    }
+                }
+            };
             const publicCloud=await ai.fetchRequest({
-                messages:[{role:'user',content:'Public cloud'}]
+                messages:[{role:'user',content:'Public cloud'}],
+                reasoningEffort:'low',
+                tools:[tool]
             });
             assert.equal(publicCloud.choices[0].message.content,'cloud response');
-            assert.equal(requests.length,2);
+            const streamedCloud=await ai.streamRequest({
+                messages:[{role:'user',content:'Streamed cloud'}],
+                reasoningEffort:'high',
+                tools:[tool]
+            });
+            assert.equal(streamedCloud,'cloud stream');
+            await assert.rejects(
+                ai.fetchRequest({
+                    messages:[{role:'user',content:'Invalid reasoning'}],
+                    reasoningEffort:'minimal'
+                }),
+                error=>error?.code==='AI_REASONING_EFFORT_INVALID'
+            );
+            assert.equal(requests.length,3);
             assert.ok(requests.every(request=>
                 request.url==='https://inference.do-ai.run/v1/chat/completions'
             ));
@@ -2311,6 +2352,39 @@ test(
             assert.ok(requests.every(request=>
                 JSON.parse(request.options.body).model==='openai-gpt-oss-120b'
             ));
+            assert.equal(
+                JSON.parse(requests[0].options.body).reasoning_effort,
+                undefined
+            );
+            assert.equal(
+                JSON.parse(requests[1].options.body).reasoning_effort,
+                'low'
+            );
+            assert.deepEqual(JSON.parse(requests[1].options.body).tools,[tool]);
+            assert.equal(
+                JSON.parse(requests[2].options.body).reasoning_effort,
+                'high'
+            );
+            assert.deepEqual(JSON.parse(requests[2].options.body).tools,[tool]);
+
+            await runtime.unload('llm');
+            await ai.transitionAI(
+                'OPENAI',undefined,undefined,
+                'openai-gpt-oss-20b',undefined,undefined
+            );
+            assert.equal(ai.model,'openai-gpt-oss-20b');
+            await ai.fetchRequest({
+                messages:[{role:'user',content:'Smaller TWiN model'}],
+                reasoningEffort:'max'
+            });
+            assert.equal(
+                JSON.parse(requests[3].options.body).model,
+                'openai-gpt-oss-20b'
+            );
+            assert.equal(
+                JSON.parse(requests[3].options.body).reasoning_effort,
+                'max'
+            );
 
             const remoteSelection={
                 providerId:'remote-audio',

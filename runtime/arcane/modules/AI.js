@@ -30,6 +30,7 @@ const TTS_ANY_PUNCTUATION_AT_END=/(?<!\p{P})(?:(?<![\p{L}\p{N}])\p{P}+|\p{P}+(?!
 credentials='omit';
 
 const LEGACY_AI_SERVICES=new Set(['OPENAI','OLLAMA','LOCAL_SPEACH']);
+const AI_REASONING_EFFORTS=new Set(['none','low','medium','high','max']);
 export const AI_READY_EVENT='ai-ready';
 const AI_TTS_FAILURE_EVENT='ai-tts-failure';
 export const AI_INITIALIZATION_ERROR_CODES=completeValue({
@@ -126,6 +127,20 @@ function normalizeAIRequestAbort(error){
     normalized.name='AbortError';
     normalized.code='ARCANE_AI_REQUEST_ABORTED';
     return normalized;
+}
+
+function normalizeAIReasoningEffort(value){
+    if(value===undefined||value===null||value===''){
+        return '';
+    }
+    if(typeof value!=='string'||!AI_REASONING_EFFORTS.has(value)){
+        const error=new TypeError(
+            'AI reasoningEffort must be none, low, medium, high, or max.'
+        );
+        error.code='AI_REASONING_EFFORT_INVALID';
+        throw error;
+    }
+    return value;
 }
 
 function legacyAIProviderError(message,code,cause){
@@ -2000,7 +2015,7 @@ class AI {
                 ||model;
         }
         if(service==='OPENAI'){
-            return this.#models.OPENAI;
+            return model==='OPENAI'?this.#models.OPENAI:model;
         }
         return model;
     }
@@ -4126,7 +4141,8 @@ class AI {
             parallelToolCalls,
             payload.id??Date.now(),
             function ignoreLegacyLLMProviderRequest(){},
-            signal
+            signal,
+            payload.reasoningEffort
         );
     }
 
@@ -4153,7 +4169,9 @@ class AI {
             payload.structuredOutput??false,
             false,
             true,
-            emitLegacyLLMStreamData
+            emitLegacyLLMStreamData,
+            function ignoreLegacyLLMStreamResult(){},
+            payload.reasoningEffort
         );
     }
 
@@ -4323,9 +4341,13 @@ class AI {
         minP,
         seed,
         stop,
-        templateOptions
+        templateOptions,
+        reasoningEffort
     }={}){
         validateAIStructuralRequest(messages,tools,parallelToolCalls);
+        const normalizedReasoningEffort=normalizeAIReasoningEffort(
+            reasoningEffort===undefined?this.reasoningEffort:reasoningEffort
+        );
         if(localOnly!==true&&localOnly!==false){
             throw new TypeError('AI localOnly must be a boolean.');
         }
@@ -4355,7 +4377,10 @@ class AI {
                 ...(minP!==undefined?{minP}:{}),
                 ...(seed!==undefined?{seed}:{}),
                 ...(stop!==undefined?{stop}:{}),
-                ...(templateOptions!==undefined?{templateOptions}:{})
+                ...(templateOptions!==undefined?{templateOptions}:{}),
+                ...(normalizedReasoningEffort
+                    ?{reasoningEffort:normalizedReasoningEffort}
+                    :{})
             };
             const displayId=`M-${id}`;
             let handle=null;
@@ -4457,7 +4482,8 @@ class AI {
                 false,
                 true,
                 onDataChunk,
-                onDataResult
+                onDataResult,
+                normalizedReasoningEffort
             );
             const structuralToolCalls=normalizeAICompletionToolCalls(
                 completion
@@ -4563,7 +4589,8 @@ class AI {
         finishSpeech=true,
         returnCompletion=false,
         dataChunkHandler=function ignoreLegacyStreamDataChunk(){},
-        dataResultHandler=function ignoreLegacyStreamDataResult(){}
+        dataResultHandler=function ignoreLegacyStreamDataResult(){},
+        reasoningEffort
     ){
         let speechTurnCompleted=false;
 
@@ -4583,6 +4610,9 @@ class AI {
                 structuredOutput
             );
 
+        const normalizedReasoningEffort=normalizeAIReasoningEffort(
+            reasoningEffort===undefined?this.reasoningEffort:reasoningEffort
+        );
         const request={
             model:this.model,
             messages:messages, 
@@ -4603,8 +4633,11 @@ class AI {
             }
         }
 
-        if(this.llmService==='OLLAMA'&&this.reasoningEffort){
-            request.reasoning_effort=this.reasoningEffort;
+        if(
+            normalizedReasoningEffort
+            &&(this.llmService==='OPENAI'||this.llmService==='OLLAMA')
+        ){
+            request.reasoning_effort=normalizedReasoningEffort;
         }
 
         let isThinking=true;
@@ -4631,7 +4664,9 @@ class AI {
                 model:this.model,
                 messages:ollamaMessages,
                 stream:true,
-                ...(this.reasoningEffort?{think:this.reasoningEffort}:{}),
+                ...(normalizedReasoningEffort
+                    ?{think:normalizedReasoningEffort}
+                    :{}),
                 ...(structuredOutputFormat?{format:structuredOutputFormat}:{}),
                 ...(ollamaTools.length?{tools:ollamaTools}:{})
             };
@@ -5272,9 +5307,13 @@ class AI {
         minP,
         seed,
         stop,
-        templateOptions
+        templateOptions,
+        reasoningEffort
     }={}){
         validateAIStructuralRequest(messages,tools,parallelToolCalls);
+        const normalizedReasoningEffort=normalizeAIReasoningEffort(
+            reasoningEffort===undefined?this.reasoningEffort:reasoningEffort
+        );
         if(localOnly!==true&&localOnly!==false){
             throw new TypeError('AI localOnly must be a boolean.');
         }
@@ -5306,7 +5345,10 @@ class AI {
                 ...(minP!==undefined?{minP}:{}),
                 ...(seed!==undefined?{seed}:{}),
                 ...(stop!==undefined?{stop}:{}),
-                ...(templateOptions!==undefined?{templateOptions}:{})
+                ...(templateOptions!==undefined?{templateOptions}:{}),
+                ...(normalizedReasoningEffort
+                    ?{reasoningEffort:normalizedReasoningEffort}
+                    :{})
             };
             await this.#reportRequest(onRequest,request,id);
             if(signal?.aborted){
@@ -5332,7 +5374,7 @@ class AI {
             return response;
         }
 
-        return this.fetch(
+        return this.#fetchLegacy(
             messages,
             onResponse,
             structuredOutput,
@@ -5341,7 +5383,8 @@ class AI {
             parallelToolCalls,
             id,
             onRequest,
-            signal
+            signal,
+            normalizedReasoningEffort
         );
     }
 
@@ -5354,7 +5397,7 @@ class AI {
         parallel_tool_calls,
         id=Date.now(),
         requestHandler=function ignoreFetchRequest(){},
-        signal=null,
+        signal=null
     ){
         if(this.#shouldUseProviderRuntime('llm',this.llmService,false)){
             return this.fetchRequest({
@@ -5394,6 +5437,7 @@ class AI {
         id=Date.now(),
         requestHandler=function ignoreFetchRequest(){},
         signal=null,
+        reasoningEffort
     ){
         validateAIStructuralRequest(messages,tools,parallel_tool_calls);
         this.#assertServiceConfigured(this.llmService);
@@ -5408,6 +5452,9 @@ class AI {
         }
         const structuredOutputFormat=this.#structuredOutputFormat(structuredOutput);
 
+        const normalizedReasoningEffort=normalizeAIReasoningEffort(
+            reasoningEffort===undefined?this.reasoningEffort:reasoningEffort
+        );
         const request={
             model:this.model,
             messages:messages, 
@@ -5428,8 +5475,11 @@ class AI {
             }
         }
 
-        if(this.llmService==='OLLAMA'&&this.reasoningEffort){
-            request.reasoning_effort=this.reasoningEffort;
+        if(
+            normalizedReasoningEffort
+            &&(this.llmService==='OPENAI'||this.llmService==='OLLAMA')
+        ){
+            request.reasoning_effort=normalizedReasoningEffort;
         }
 
         const nativeOllama=this.#nativeOllama();
@@ -5448,7 +5498,9 @@ class AI {
                 model:this.model,
                 messages:ollamaMessages,
                 stream:false,
-                ...(this.reasoningEffort?{think:this.reasoningEffort}:{}),
+                ...(normalizedReasoningEffort
+                    ?{think:normalizedReasoningEffort}
+                    :{}),
                 ...(structuredOutputFormat?{format:structuredOutputFormat}:{}),
                 ...(ollamaTools.length?{tools:ollamaTools}:{})
             };
