@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.7
+
+- Added `PersistentAIChatSession.open()` for model-authored conversation
+  openings. Its application-authored bootstrap remains transient, while the
+  complete nonblank assistant response is committed atomically as durable
+  assistant-only chat history and survives maintenance and reload.
+
 ## 0.5.6
 
 - Sanitized newly persisted chat history into complete human-readable user,
