@@ -208,8 +208,8 @@ without data URLs, copied modules, or a consumer-owned loader.
 `generateImportMap()` is an internal toolchain operation, not a package export.
 The shared app-document owner derives the configured entry plus the
 deterministic admitted `.html`/`.htm` inventory from the descriptor's package
-include/exclude rules. `import-map`, development, upgrade, and packaging all
-reuse that discovery. One transaction writes the artifact and the same managed
+include/exclude rules. `import-map`, development, and packaging all reuse that
+discovery. One transaction writes the artifact and the same managed
 JSON into every selected document. The result reports
 `documentPaths`, `documentCount`, and `files`: artifact first, configured entry
 second, then additional documents as `role:"document"`. The public CLI keeps
@@ -261,7 +261,7 @@ an `integrated-legacy` skip result, and does not create the managed map pair.
 <summary>Refresh lifecycle and managed-file commit behavior</summary>
 
 Scaffolding (`new` and `init`) creates the map. `dev` refreshes once before
-binding. `import-map` and `upgrade` refresh every admitted document explicitly.
+binding. `import-map` refreshes every admitted document explicitly.
 Non-dry-run `package`, browser `build`, and paired native packaging refresh
 before collecting source. Packaging does not run tests or checks automatically.
 Explicit `test` and `check` operations read the existing map without rewriting it;

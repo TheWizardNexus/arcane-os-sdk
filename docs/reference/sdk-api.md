@@ -3894,12 +3894,10 @@ documents as one atomic refresh and has no
 supported dry-run.
 
 The exact command `'upgrade'` dispatches `upgradeApplication(options)`. It is
-external-workspace-only and composes three complete stages under one
-workspace-operation lease: exact lock reconciliation, runtime
-materialization, and the same multi-document import-map refresh. It performs no
-dependency installation, `package.json` merge, test, packaging, `dist`, or
-network operation. The stages are not presented as one filesystem-atomic
-transaction.
+external-workspace-only and runs that application's ordinary `npm upgrade`
+command. It does not independently reconcile the installed SDK projection,
+semantic Arcane lock, or managed import map; npm retains authority for
+dependency selection and network behavior.
 
 The exact command `'update-check'` dispatches one `checkSdkUpdate(options)`
 call. Dispatch never installs a recurring task, polls application state, or
@@ -5856,8 +5854,9 @@ controller. Applications continue to use this public controller method rather
 than importing that private specifier. `options` must be a plain object and cannot contain
 `chat`. The resulting session preserves coherent complete live context while
 letting each user/assistant/tool turn choose matching durable ChatEntity/DBOPFS
-persistence; `persist:false` does not write that turn to durable history or
-memory. There is no storage or provider fallback.
+persistence. A `persist:false` turn participates in one request and response,
+then retains neither side in subsequent model context, the transcript, durable
+history, memory, or DBOPFS. There is no storage or provider fallback.
 
 The session's `stream()` uses this controller's streaming transport when
 available and otherwise completes the same atomic turn through its configured

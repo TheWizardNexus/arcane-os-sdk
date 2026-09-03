@@ -176,8 +176,10 @@ The SDK runtime also owns `DBOPFSDocumentLibrary`,
 schema-driven and explicit; chat never searches a corpus unless the app wires
 that library into the request context builder. Persistent chat automatically
 maintains recurring model context and `ChatEntity` history/memory. A turn may
-set `persist:false` to remain in the current session context without entering
-durable chat or memory. `createArcaneAI(...).createChatSession(options)` wires
+set `persist:false` to participate in one request and response only; after that
+operation settles, neither side remains in subsequent model context, the
+retained transcript, durable chat, memory, or DBOPFS.
+`createArcaneAI(...).createChatSession(options)` wires
 that session to the same selected LLM controller, creates its `ChatEntity`, and
 uses the same controller for automatic memory extraction.
 
