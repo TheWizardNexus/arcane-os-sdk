@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.6
+
+- Sanitized newly persisted chat history into complete human-readable user,
+  assistant, and public tool-result records without storing internal prompts,
+  provider envelopes, raw tool protocol fields, or hidden request metadata.
+  Existing stored rows remain untouched.
+- Made `persist: false` turn-scoped: the request can use the complete temporary
+  turn, then retains neither side in model history, memory, DBOPFS, nor the Chat
+  transcript after the operation settles.
+
 ## 0.5.5
 
 - Added configurable complete text-to-speech stream segmentation through
