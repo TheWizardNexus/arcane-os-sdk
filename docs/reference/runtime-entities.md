@@ -71,21 +71,23 @@ console.log(new Calculation({expression: '2 + 2', result: 4}).toJSON());
 and optional app-scoped DBOPFS persistence. It installs no independent native
 authority; AI and storage dependencies must be available to the host.
 
-`messages` returns provider-facing copies with persistence, memory, legacy UI,
-and timestamp metadata removed while preserving complete content, reasoning,
-tool-call arrays, tool-result IDs, and caller extension fields. `transcript`
-returns complete copied records for UI and recovery, including legacy
-`ui_hidden` metadata; that flag no longer removes a saved record from the
-public transcript. Replacing `messages` keeps complete copied rows so malformed
-legacy history remains readable and unchanged even when provider-facing history
-validation later reports a coded recovery error.
+`messages` returns provider-facing copies for the active session. `transcript`
+returns the narrow human-readable projection owned by the durable storage
+boundary. User and assistant records contain only role, complete visible
+content, and their real timestamp. A visible tool record may additionally carry
+its public name and plain result status, while its `content` comes only from the
+tool call's required user-facing `message`. System prompts, reasoning,
+provider-extension fields, memory flags, raw tool calls, call IDs, argument
+objects, and raw tool returns never enter new DBOPFS writes.
 
 An assistant record may open an ordered array of structural calls with unique
-IDs. Until every pending ID receives exactly one matching nonblank
-`role:'tool'` result in the same atomic turn, another user/provider turn is
-rejected. Parallel call and result order, complete argument strings, and caller
-extension fields are retained. Persistence failures roll back the complete turn
-rather than leaving provider and stored history divergent.
+IDs in transient provider state. Until every pending ID receives exactly one
+matching nonblank `role:'tool'` result in the same active session, another
+user/provider turn is rejected. The durable transcript keeps only each call's
+user-facing message and any normalized tool name or result status. Existing
+stored files are not rewritten on load. Persistence failures roll
+back the complete turn rather than leaving provider and stored history
+divergent.
 
 ### Example
 

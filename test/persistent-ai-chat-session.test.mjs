@@ -321,7 +321,10 @@ test('persistent chat preserves ordered parallel calls and settles one exact res
         memory:false,
     });
 
-    const first=await session.send({message:{content:'Look up Alpha and Beta.'}});
+    const first=await session.send({message:{
+        content:'Look up Alpha and Beta.',
+        request_extension:{private:'transient'},
+    }});
     assert.deepEqual(first.message.tool_calls,calls);
     assert.deepEqual(first.message.assistant_extension,{source:'parallel-provider'});
     await assert.rejects(
@@ -340,39 +343,55 @@ test('persistent chat preserves ordered parallel calls and settles one exact res
             role:'tool',
             tool_call_id:'parallel-lookup-a',
             content:'Alpha result.',
+            message:'Alpha lookup completed.',
+            name:'lookup',
             result_extension:{catalog:'primary'},
+            status:'completed',
         },
         {
             role:'tool',
             tool_call_id:'parallel-lookup-b',
             content:'Beta result.',
+            message:'Beta lookup completed.',
+            name:'lookup',
             result_extension:{catalog:'secondary'},
+            status:'completed',
         },
     ];
     const continuation=await session.send({messages:toolResults});
     assert.equal(requests.length,2);
-    assert.deepEqual(requests[1].messages.slice(-2),toolResults);
+    assert.deepEqual(requests[1].messages.slice(-2),toolResults.map(result=>({
+        role:result.role,
+        tool_call_id:result.tool_call_id,
+        content:result.content,
+        result_extension:result.result_extension,
+    })));
     assert.equal(continuation.message.content,'Both lookups are complete.');
 
     const persisted=String(db.raw('chats',chatFileName))
         .trim()
         .split('\n')
         .map(row=>JSON.parse(row));
-    const persistedCallMessage=persisted.find(message=>message.tool_calls);
-    assert.deepEqual(persistedCallMessage.tool_calls,calls);
     assert.deepEqual(
-        persistedCallMessage.assistant_extension,
-        {source:'parallel-provider'},
+        persisted.map(message=>{
+            const {timestamp,...record}=message;
+            assert.ok(timestamp!==undefined);
+            return record;
+        }),
+        [
+            {role:'user',content:'Look up Alpha and Beta.'},
+            {role:'tool',content:'Looking up Alpha.',name:'lookup',status:'requested'},
+            {role:'tool',content:'Looking up Beta.',name:'lookup',status:'requested'},
+            {role:'tool',content:'Alpha lookup completed.',name:'lookup',status:'completed'},
+            {role:'tool',content:'Beta lookup completed.',name:'lookup',status:'completed'},
+            {role:'assistant',content:'Both lookups are complete.'},
+        ],
     );
-    const persistedResults=persisted.filter(message=>message.role==='tool');
-    assert.deepEqual(
-        persistedResults.map(message=>message.tool_call_id),
-        calls.map(call=>call.id),
-    );
-    assert.deepEqual(
-        persistedResults.map(message=>message.result_extension),
-        toolResults.map(message=>message.result_extension),
-    );
+    assert.equal(persisted.some(message=>Object.hasOwn(message,'tool_calls')),false);
+    assert.equal(persisted.some(message=>Object.hasOwn(message,'tool_call_id')),false);
+    assert.equal(persisted.some(message=>Object.hasOwn(message,'request_extension')),false);
+    assert.equal(persisted.some(message=>Object.hasOwn(message,'result_extension')),false);
+    assert.equal(persisted.some(message=>Object.hasOwn(message,'assistant_extension')),false);
 });
 
 test('disabled ChatEntity persistence suppresses automatic memory extraction',async()=>{
@@ -452,7 +471,7 @@ test('createArcaneAI adapts controller completions and owns serial automatic mem
     ]);
 });
 
-test('fresh named chat preserves and persists its configured system prompt',async()=>{
+test('fresh named chat keeps its configured system prompt transient',async()=>{
     const chatFileName=`chat folders/Δ complete ${'long session name '.repeat(48)}.jsonl`;
     const session=await PersistentAIChatSession.create({
         chat:async()=>({message:{role:'assistant',content:'named response'}}),
@@ -463,8 +482,55 @@ test('fresh named chat preserves and persists its configured system prompt',asyn
     assert.equal(session.fileName,chatFileName);
     await session.send({message:{content:'first named turn'}});
     const durable=String(db.raw('chats',chatFileName));
-    assert.match(durable,/Persist this named chat system prompt\./u);
+    assert.doesNotMatch(durable,/Persist this named chat system prompt\./u);
     assert.match(durable,/first named turn/u);
+});
+
+test('existing stored rows remain unchanged while later entity writes use the narrow record format',async()=>{
+    const chatFileName='existing-history-with-new-writes.jsonl';
+    const existingRows=[
+        {
+            role:'user',
+            content:'Existing user turn.',
+            timestamp:1,
+            request_metadata:{private:'existing'},
+        },
+        {
+            role:'assistant',
+            content:'Existing assistant turn.',
+            timestamp:2,
+            reasoning_content:'Existing private reasoning.',
+        },
+    ];
+    const existingContent=existingRows.map(message=>JSON.stringify(message)).join('\n')+'\n';
+    await db.set('chats',chatFileName,existingContent);
+    const session=await PersistentAIChatSession.create({
+        chat:async()=>({message:{role:'assistant',content:'unused'}}),
+        chatFileName,
+        loadExisting:true,
+        memory:false,
+    });
+
+    assert.equal(db.raw('chats',chatFileName),existingContent);
+    await session.chatEntity.addUserMessage('New user turn.');
+    await session.chatEntity.addAIMessage('New assistant turn.',{extractMemory:false});
+
+    const stored=String(db.raw('chats',chatFileName))
+        .trim()
+        .split('\n')
+        .map(row=>JSON.parse(row));
+    assert.deepEqual(stored.slice(0,existingRows.length),existingRows);
+    assert.deepEqual(
+        stored.slice(existingRows.length).map(message=>{
+            const {timestamp,...record}=message;
+            assert.ok(timestamp!==undefined);
+            return record;
+        }),
+        [
+            {role:'user',content:'New user turn.'},
+            {role:'assistant',content:'New assistant turn.'},
+        ],
+    );
 });
 
 test('automatic memory waits for a structural tool result and final response',async()=>{
@@ -598,7 +664,7 @@ test('persistent chat rolls back recurring context on durable failure and retain
     assert.ok(!requests.at(-1).messages.some(message=>message.content==='must roll back'));
 });
 
-test('legacy persisted structural calls remain readable without invented user-facing text',async()=>{
+test('legacy persisted structural calls stay untouched while the transcript omits unusable protocol data',async()=>{
     const chatFileName='legacy-missing-tool-message.jsonl';
     const legacyRows=[
         {role:'user',content:'Find Alpha.',timestamp:1},
@@ -622,7 +688,7 @@ test('legacy persisted structural calls remain readable without invented user-fa
         loadExisting:true,
         memory:false,
     });
-    assert.deepEqual(await session.transcript(),legacyRows);
+    assert.deepEqual(await session.transcript(),[legacyRows[0]]);
     await assert.rejects(
         session.history(),
         error=>{
@@ -634,11 +700,11 @@ test('legacy persisted structural calls remain readable without invented user-fa
             return true;
         },
     );
-    assert.deepEqual(await session.transcript(),legacyRows);
+    assert.deepEqual(await session.transcript(),[legacyRows[0]]);
     assert.equal(db.raw('chats',chatFileName),legacyContent);
 });
 
-test('legacy blank tool results remain readable but unavailable to provider history',async()=>{
+test('legacy blank tool results stay untouched while the transcript keeps only the tool message',async()=>{
     const chatFileName='legacy-blank-tool-result.jsonl';
     const legacyRows=[
         {role:'user',content:'Find Alpha.',timestamp:1},
@@ -671,16 +737,34 @@ test('legacy blank tool results remain readable but unavailable to provider hist
         loadExisting:true,
         memory:false,
     });
-    assert.deepEqual(await session.transcript(),legacyRows);
+    assert.deepEqual(await session.transcript(),[
+        legacyRows[0],
+        {
+            role:'tool',
+            content:'Looking up Alpha.',
+            name:'lookup',
+            status:'requested',
+            timestamp:2,
+        },
+    ]);
     await assert.rejects(
         session.history(),
         error=>error?.code==='AI_CHAT_INCOHERENT_PERSISTENCE',
     );
-    assert.deepEqual(await session.transcript(),legacyRows);
+    assert.deepEqual(await session.transcript(),[
+        legacyRows[0],
+        {
+            role:'tool',
+            content:'Looking up Alpha.',
+            name:'lookup',
+            status:'requested',
+            timestamp:2,
+        },
+    ]);
     assert.equal(db.raw('chats',chatFileName),legacyContent);
 });
 
-test('malformed persisted JSONL rows remain readable and unchanged',async()=>{
+test('malformed persisted JSONL rows remain untouched and outside the ordinary transcript',async()=>{
     const chatFileName='legacy-malformed-row.jsonl';
     const validRow={role:'user',content:'Keep the complete saved conversation.',timestamp:1};
     const malformedRow='{"role":"assistant","content":"unfinished"';
@@ -693,11 +777,11 @@ test('malformed persisted JSONL rows remain readable and unchanged',async()=>{
         loadExisting:true,
         memory:false,
     });
-    assert.deepEqual(await session.transcript(),[validRow,malformedRow]);
+    assert.deepEqual(await session.transcript(),[validRow]);
     await assert.rejects(
         session.history(),
         error=>error?.code==='AI_CHAT_INCOHERENT_PERSISTENCE',
     );
-    assert.deepEqual(await session.transcript(),[validRow,malformedRow]);
+    assert.deepEqual(await session.transcript(),[validRow]);
     assert.equal(db.raw('chats',chatFileName),legacyContent);
 });

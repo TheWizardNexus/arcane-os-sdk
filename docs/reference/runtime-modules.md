@@ -2325,8 +2325,8 @@ static `create()`, getters `ai`, `chatEntity`, and `fileName`, and `ready()`,
 `ready()` waits for initialization and resolves the same session instance.
 
 `send()` accepts either
-`{message:{content,role:'user'|'tool',tool_call_id?,persist},...}` or an atomic
-`{messages:[{content,role:'tool',tool_call_id,persist},...],...}` result batch,
+`{message:{content,role:'user'|'tool',tool_call_id?,message?,name?,status?,persist},...}`
+or an atomic tool-result batch with the same fields,
 plus `request?`, `response:{persist}`, and `signal?`. Every message and the
 response must use the same persistence choice. Plain-object `request` supplies
 per-turn generation options such as
@@ -2338,8 +2338,10 @@ use the persistence choice captured by its matching assistant tool call.
 
 `history()` returns provider-safe configured model context, including the
 system prompt, complete optional assistant reasoning, and every committed live
-turn. `transcript()` returns complete copies of every current ChatEntity record,
-including legacy UI metadata and display timestamps. A
+turn. `transcript()` returns the sanitized human-readable ChatEntity projection.
+User and assistant records retain only role, complete visible content, and the
+real timestamp. Tool records retain only role, the required user-facing
+`message` as content, and optional public `name` and result `status`. A
 `persist:false` turn remains in both live history and transcript for the active
 session while remaining excluded from DBOPFS durability and memory extraction.
 
@@ -2361,12 +2363,11 @@ not a session failure. The same caller signal and transaction rollback govern
 both paths.
 
 When an assistant response opens structural calls, the response persistence
-choice is retained under every exact call ID. One ordered `role:'tool'` request
-batch must settle all pending IDs with that same persistence choice before a
-new user or provider turn. Persisted legacy calls without the
-required nonempty argument `message` are never assigned invented text; loading
-reports the coded structural-message failure while leaving the stored record
-unchanged for application-owned recovery.
+choice is retained under every exact call ID only in the active session. One
+ordered `role:'tool'` request batch must settle all pending IDs with that same
+persistence choice before a new user or provider turn. Raw calls, IDs,
+arguments, provider envelopes, and raw results are never included in new
+durable records. Existing stored records are not rewritten on load.
 
 ### Availability and normalization
 

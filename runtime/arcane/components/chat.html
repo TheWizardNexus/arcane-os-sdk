@@ -1333,12 +1333,13 @@
     }
 
     function sameTranscriptRequest(actual,expected){
-        return actual?.role===expected?.role
-            &&actual.content===expected.content
-            &&(
-                expected.role!=='tool'
-                ||actual.tool_call_id===expected.tool_call_id
-            );
+        if(actual?.role!==expected?.role) return false;
+        if(expected.role==='tool'){
+            return actual.content===(expected.message??expected.content)
+                &&(expected.name===undefined||actual.name===expected.name)
+                &&(expected.status===undefined||actual.status===expected.status);
+        }
+        return actual.content===expected.content;
     }
 
     function latestCommittedTranscriptTurn(transcript,requestMessages){
@@ -1460,18 +1461,20 @@
                 }
                 if(actionable){
                     if(message.role==='tool'){
-                        if(
-                            typeof message.tool_call_id!=='string'
-                            ||!message.tool_call_id.trim()
-                            ||!message.content.trim()
-                            ||!restoredPendingToolCalls.has(message.tool_call_id)
-                        ){
-                            throw chatError(
-                                'Saved chat contains a tool result that does not match a pending structural tool call.',
-                                'AI_CHAT_INVALID_TOOL_MESSAGE'
-                            );
+                        if(message.tool_call_id!==undefined){
+                            if(
+                                typeof message.tool_call_id!=='string'
+                                ||!message.tool_call_id.trim()
+                                ||!message.content.trim()
+                                ||!restoredPendingToolCalls.has(message.tool_call_id)
+                            ){
+                                throw chatError(
+                                    'Saved chat contains a tool result that does not match a pending structural tool call.',
+                                    'AI_CHAT_INVALID_TOOL_MESSAGE'
+                                );
+                            }
+                            restoredPendingToolCalls.delete(message.tool_call_id);
                         }
-                        restoredPendingToolCalls.delete(message.tool_call_id);
                     }else{
                         if(restoredPendingToolCalls.size){
                             throw chatError(
@@ -1489,7 +1492,9 @@
                 const name=message.role==='user'
                     ?host.name
                     :message.role==='tool'
-                    ?'Tool'
+                    ?typeof message.name==='string'&&message.name.trim()
+                        ?`Tool · ${message.name}`
+                        :'Tool'
                     :message.role==='system'
                     ?'System'
                     :host.aiName;
@@ -3339,7 +3344,7 @@
         if(!Array.isArray(options.results)||options.results.length===0){
             throw new TypeError('Tool results must be a nonempty array.');
         }
-        const dispositions=new Map([
+        const statuses=new Map([
             ['executed','Executed'],
             ['declined','Declined'],
             ['cancelled','Cancelled'],
@@ -3369,7 +3374,7 @@
                 throw new TypeError(`Tool result ${index+1} must be a plain object.`);
             }
             const unsupportedResultField=Object.keys(result).find(
-                key=>!['disposition','message','persist','toolCallId'].includes(key)
+                key=>!['disposition','message','persist','status','toolCallId'].includes(key)
             );
             if(unsupportedResultField){
                 throw new TypeError(
@@ -3388,9 +3393,17 @@
                 error.code='AI_CHAT_INVALID_TOOL_MESSAGE';
                 throw error;
             }
-            if(!dispositions.has(result.disposition)){
+            if(
+                result.status!==undefined
+                &&result.disposition!==undefined
+                &&result.status!==result.disposition
+            ){
+                throw new TypeError('Tool-result status and legacy disposition must match.');
+            }
+            const status=result.status??result.disposition;
+            if(!statuses.has(status)){
                 throw new TypeError(
-                    'Tool-result disposition must be executed, declined, cancelled, or not-executed.'
+                    'Tool-result status must be executed, declined, cancelled, or not-executed.'
                 );
             }
             if(typeof result.message!=='string'||!result.message.trim()){
@@ -3401,9 +3414,12 @@
                 throw new TypeError('Tool-result persist must be boolean.');
             }
             resultsById.set(toolCallId,{
-                content:`${dispositions.get(result.disposition)} — ${result.message}`,
+                content:`${statuses.get(status)} — ${result.message}`,
+                message:result.message,
+                name:pendingById.get(toolCallId).function.name,
                 persist,
                 role:'tool',
+                status,
                 tool_call_id:toolCallId
             });
         }
@@ -3440,7 +3456,11 @@
         }
         try{
             for(const result of orderedResults){
-                const visibleMessage=appendTranscriptMessage('tool',result.content,'Tool');
+                const visibleMessage=appendTranscriptMessage(
+                    'tool',
+                    result.content,
+                    `Tool · ${result.name}`
+                );
                 visibleMessage.dataset.operationId=operationId;
                 visibleMessage.dataset.toolCallId=result.tool_call_id;
             }
@@ -3472,7 +3492,7 @@
             throw new TypeError('Tool-result options must be a plain object.');
         }
         const unsupportedOption=Object.keys(options).find(
-            key=>!['disposition','message','persist','request','toolCallId'].includes(key)
+            key=>!['disposition','message','persist','request','status','toolCallId'].includes(key)
         );
         if(unsupportedOption){
             throw new TypeError(`Unsupported tool-result option: ${unsupportedOption}.`);

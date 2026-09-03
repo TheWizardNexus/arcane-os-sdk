@@ -3133,6 +3133,9 @@ test(
         const transcriptSource=chatEntitySource.slice(transcriptStart,transcriptEnd);
         for(const field of [
             'memory_excluded',
+            'persistence_message',
+            'persistence_name',
+            'persistence_status',
             'persistence_excluded',
             'ui_hidden',
             'timestamp'
@@ -3149,13 +3152,13 @@ test(
         );
         assert.match(
             transcriptSource,
-            /this[.]#messages[.]map\(function publicTranscriptMessage\(message\)\{[\s\S]*?return copyCompleteValue\(message\);/u,
-            'Chat.transcript must retain complete saved records for the UI.'
+            /storedChatRecords\(this[.]#messages\)[.]map\(function publicTranscriptMessage\(message\)\{[\s\S]*?return copyCompleteValue\(message\);/u,
+            'Chat.transcript must expose the entity-owned sanitized durable projection.'
         );
-        assert.doesNotMatch(
+        assert.match(
             transcriptSource,
-            /ui_hidden|[.]filter\(/u,
-            'Legacy ui_hidden metadata must not suppress records from the complete transcript.'
+            /storedChatRecords/u,
+            'Chat.transcript must not expose raw provider or tool protocol records.'
         );
         const chatOutputStyleStart=source.indexOf('.chat_output {');
         const chatOutputStyleEnd=source.indexOf('\n    .chat_output > li',chatOutputStyleStart);
@@ -3281,8 +3284,8 @@ test(
         );
         assert.match(
             source,
-            /const dispositions=new Map\(\[[\s\S]*?\['executed','Executed'\],[\s\S]*?\['declined','Declined'\],[\s\S]*?\['cancelled','Cancelled'\],[\s\S]*?\['not-executed','Not executed'\][\s\S]*?\]\);/u,
-            'Chat.submitToolResults must preserve every public settlement disposition.'
+            /const statuses=new Map\(\[[\s\S]*?\['executed','Executed'\],[\s\S]*?\['declined','Declined'\],[\s\S]*?\['cancelled','Cancelled'\],[\s\S]*?\['not-executed','Not executed'\][\s\S]*?\]\);/u,
+            'Chat.submitToolResults must preserve every public result status.'
         );
         assert.match(
             source,
@@ -3291,8 +3294,8 @@ test(
         );
         assert.match(
             source,
-            /content:`\$\{dispositions[.]get\(result[.]disposition\)\} — \$\{result[.]message\}`,[\s\S]*?role:'tool',[\s\S]*?tool_call_id:toolCallId/u,
-            'Tool-result transcript text must use the caller-provided user-facing settlement message.'
+            /const status=result[.]status\?\?result[.]disposition;[\s\S]*?content:`\$\{statuses[.]get\(status\)\} — \$\{result[.]message\}`,[\s\S]*?message:result[.]message,[\s\S]*?name:pendingById[.]get\(toolCallId\)[.]function[.]name,[\s\S]*?status,[\s\S]*?tool_call_id:toolCallId/u,
+            'Tool-result storage metadata must use only the caller-provided message, public name, and result status.'
         );
         assert.match(
             source,
@@ -3799,13 +3802,13 @@ test(
                     results:[
                         {
                             toolCallId:'tool-two',
-                            disposition:'declined',
+                            status:'declined',
                             message:'Second action declined.',
                             persist:false
                         },
                         {
                             toolCallId:'tool-one',
-                            disposition:'executed',
+                            status:'executed',
                             message:'First action completed.',
                             persist:false
                         }
@@ -3821,14 +3824,20 @@ test(
             [
                 {
                     content:'Executed — First action completed.',
+                    message:'First action completed.',
+                    name:'firstAction',
                     persist:false,
                     role:'tool',
+                    status:'executed',
                     tool_call_id:'tool-one'
                 },
                 {
                     content:'Declined — Second action declined.',
+                    message:'Second action declined.',
+                    name:'secondAction',
                     persist:false,
                     role:'tool',
+                    status:'declined',
                     tool_call_id:'tool-two'
                 }
             ],

@@ -256,16 +256,16 @@ retained inside a collapsed `Tool call details` inspection surface. Displaying
 a call does not settle it or enable another user turn.
 `submitToolResults({results,request?},{operationId?,signal?})` atomically settles
 the current ordered pending-call set. `results` supplies exactly one
-`{toolCallId,disposition,message,persist?}` record for every pending ID, without
-duplicates or omissions. `disposition` is `executed`, `declined`, `cancelled`,
+`{toolCallId,status,message,persist?}` record for every pending ID, without
+duplicates or omissions. `status` is `executed`, `declined`, `cancelled`,
 or `not-executed`; every result in the batch uses the same persistence choice.
 The method preserves pending order, persists and renders every human-readable
-disposition plus complete message as matching `role:'tool'` requests, and then
+status plus complete message as matching `role:'tool'` requests, and then
 renders one assistant continuation. Live submission and restored history both
 require nonblank user-facing result content; accepted text is preserved exactly
 rather than trimmed or rewritten.
 
-`submitToolResult({toolCallId?,disposition,message,persist?,request?},{operationId?,signal?})`
+`submitToolResult({toolCallId?,status,message,persist?,request?},{operationId?,signal?})`
 is the one-call compatibility method. It infers the only pending ID when omitted
 and rejects when zero or multiple calls are pending; parallel calls must use
 `submitToolResults()`.
@@ -303,16 +303,12 @@ summaries and never exposes raw arguments. `pendingTool` is that compatibility
 summary only when exactly one call is pending. `pendingToolCalls` exposes
 complete copied call envelopes for an explicitly selected inspection or host
 settlement surface, while `pendingToolCall` is its one-call compatibility view.
-On restored history, `bindSession()` clears its binding guard before publishing
-`chat-session-bound` with all four views. A listener can therefore call
-`submitToolResult()` or `submitToolResults()` immediately after reload without
-parsing transcript DOM or duplicating the session protocol. Restoration keeps
-the complete ordered pending set and settles it only when the following tool
-records contain one exact matching `tool_call_id` with nonblank content for
-every call. An absent, blank, duplicate, different, partial, or overlapping
-record leaves the chat unavailable and reports the coded
-diagnostic to the developer console while the visible status says only that
-the saved chat could not be opened.
+These pending-call views exist only for the active transient protocol. Durable
+history stores each tool's required user-facing message as an ordinary
+`role:'tool'` record with optional public name and result status; it stores no
+call envelope or ID and therefore does not recreate a pending executable call
+after reload. `submitToolResult()` and `submitToolResults()` accept `status` as
+the public result term; `disposition` remains a compatibility spelling.
 
 For streaming sessions, every provisional structural card and the terminal
 result must preserve the same choice, ordered call position, exact ID, type,

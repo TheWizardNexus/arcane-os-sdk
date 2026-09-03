@@ -455,12 +455,16 @@ A chat session never searches the corpus unless the application
 deliberately wires a document context builder into the request; generated
 document context remains labeled untrusted.
 
-Persistent chat maintains complete live model context plus `ChatEntity`
-history/memory according to the caller's persistence choice. A turn with
-`persist:false` remains coherent in the live session without entering durable
-history or memory. `createArcaneAI(...).createChatSession(options)` binds the
-session and automatic memory work to that same selected LLM controller; it does
-not select a second provider or storage fallback.
+Persistent chat maintains complete live model context plus a sanitized
+`ChatEntity` transcript according to the caller's persistence choice. Active
+provider protocol may contain structural calls, IDs, argument envelopes, raw
+results, reasoning, and request metadata, but those fields never cross the new
+DBOPFS-write boundary. Durable user and assistant turns retain only role,
+complete visible content, and timestamp. Durable tool turns retain only role,
+the required user-facing message as content, and optional public name and result
+status. System prompts remain in the live session only. Existing stored files are not
+rewritten on load. A turn with `persist:false` remains coherent in the live
+session without entering durable history or memory.
 
 ### Cancellation and structural tools
 
