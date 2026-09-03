@@ -17,6 +17,11 @@ const completeValue=(value)=>value;
 
 let credentials='include';
 const LEGACY_TTS_RESPONSE_FORMAT='opus';
+const DEFAULT_TTS_SEGMENTATION={
+    punctuation:'sentence',
+    wordCadence:null
+};
+const TTS_PUNCTUATION_MODES=new Set(['sentence','any','none']);
 credentials='omit';
 
 const LEGACY_AI_SERVICES=new Set(['OPENAI','OLLAMA','LOCAL_SPEACH']);
@@ -140,6 +145,38 @@ function isPlainAIRecord(value){
     }
     const prototype=Object.getPrototypeOf(value);
     return prototype===Object.prototype||prototype===null;
+}
+
+function normalizeTTSSegmentation(value,current=DEFAULT_TTS_SEGMENTATION){
+    if(value===undefined||value===null){
+        return {...current};
+    }
+    if(!isPlainAIRecord(value)){
+        throw new TypeError('TTS segmentation must be a plain object.');
+    }
+
+    const punctuation=value.punctuation===undefined
+        ?current.punctuation
+        :value.punctuation;
+    if(!TTS_PUNCTUATION_MODES.has(punctuation)){
+        throw new TypeError(
+            'TTS segmentation punctuation must be sentence, any, or none.'
+        );
+    }
+
+    const wordCadence=value.wordCadence===undefined
+        ?current.wordCadence
+        :value.wordCadence;
+    if(
+        wordCadence!==null
+        &&(!Number.isSafeInteger(wordCadence)||wordCadence<1)
+    ){
+        throw new RangeError(
+            'TTS segmentation wordCadence must be null or a positive integer.'
+        );
+    }
+
+    return {punctuation,wordCadence};
 }
 
 function requireAIToolMessageSchemas(value,label='AI tools'){
@@ -1069,6 +1106,7 @@ class AI {
     #speechControlGeneration=0;
     #speechFailureSequence=0;
     #stopOllamaReady=null;
+    #ttsSegmentation={...DEFAULT_TTS_SEGMENTATION};
     #preferenceTuple=completeValue([
         'OPENAI',
         'LOCAL_SPEACH',
@@ -5512,6 +5550,18 @@ class AI {
         return responseJSON;
     }
 
+    get ttsSegmentation(){
+        return {...this.#ttsSegmentation};
+    }
+
+    configureTTSSegmentation(options={}){
+        this.#ttsSegmentation=normalizeTTSSegmentation(
+            options,
+            this.#ttsSegmentation
+        );
+        return this.ttsSegmentation;
+    }
+
     streamTTS(
         text='',
         end=false
@@ -5563,10 +5613,16 @@ class AI {
         let remainder=this.audioMessageChunks;
 
         while(remainder.length>0){
-            const terminator=this.#findSpeechTerminator(remainder,end);
-            let boundary=terminator
-                ?terminator.index+terminator[0].length
-                :-1;
+            const punctuationBoundary=this.#findSpeechPunctuationBoundary(
+                remainder,
+                end
+            );
+            const cadenceBoundary=this.#findSpeechCadenceBoundary(remainder,end);
+            let boundary=punctuationBoundary;
+
+            if(boundary<0||(cadenceBoundary>0&&cadenceBoundary<boundary)){
+                boundary=cadenceBoundary;
+            }
 
             if(boundary<0&&end){
                 boundary=remainder.length;
@@ -5588,7 +5644,14 @@ class AI {
         return segments;
     }
 
-    #findSpeechTerminator(text,end=false){
+    #findSpeechPunctuationBoundary(text,end=false){
+        if(this.#ttsSegmentation.punctuation==='none'){
+            return -1;
+        }
+        if(this.#ttsSegmentation.punctuation==='any'){
+            return this.#findAnySpeechPunctuationBoundary(text);
+        }
+
         const pattern=end
             ?/(?:[\u3002\uFF01\uFF1F]|[.!?](?=\s|$))/g
             :/(?:[\u3002\uFF01\uFF1F]|[.!?](?=\s+\S))/g;
@@ -5602,10 +5665,71 @@ class AI {
                 continue;
             }
 
-            return terminator;
+            return this.#includeSpeechBoundaryWhitespace(
+                text,
+                terminator.index+terminator[0].length
+            );
         }
 
-        return null;
+        return -1;
+    }
+
+    #findAnySpeechPunctuationBoundary(text){
+        const pattern=/\p{P}+/gu;
+        const firstContent=text.search(/\S/u);
+        let punctuation;
+
+        while((punctuation=pattern.exec(text))){
+            if(firstContent<0||punctuation.index<=firstContent){
+                continue;
+            }
+            const boundary=punctuation.index+punctuation[0].length;
+            if(boundary<text.length&&!/\s/u.test(text[boundary])){
+                continue;
+            }
+            return this.#includeSpeechBoundaryWhitespace(text,boundary);
+        }
+
+        return -1;
+    }
+
+    #findSpeechCadenceBoundary(text,end=false){
+        const wordCadence=this.#ttsSegmentation.wordCadence;
+        if(wordCadence===null){
+            return -1;
+        }
+
+        const words=/\S+/gu;
+        let word;
+        let wordCount=0;
+
+        while((word=words.exec(text))){
+            wordCount+=1;
+            if(wordCount!==wordCadence){
+                continue;
+            }
+            const boundary=word.index+word[0].length;
+            if(boundary===text.length&&!end){
+                return -1;
+            }
+            if(boundary<text.length&&!/\s/u.test(text[boundary])){
+                return -1;
+            }
+            return this.#includeSpeechBoundaryWhitespace(text,boundary);
+        }
+
+        return -1;
+    }
+
+    #includeSpeechBoundaryWhitespace(text,boundary){
+        let completeBoundary=boundary;
+        while(
+            completeBoundary<text.length
+            &&/\s/u.test(text[completeBoundary])
+        ){
+            completeBoundary+=1;
+        }
+        return completeBoundary;
     }
 
     #isSpeechAbbreviation(text,periodIndex){

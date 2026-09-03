@@ -139,7 +139,8 @@ default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and
 `configureSpeechProviders()`, `transitionAI()`, `transitionProviders()`,
 `transitionSpeechProviders()`, `startProviders()`, `setSpeechMuted()`,
 `streamRequest()`, `streamMessage()`, `fetchRequest()`, `fetch()`,
-`streamTTS()`, `finishTTS()`, `fetchTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`,
+read-only `ttsSegmentation`, `configureTTSSegmentation()`, `streamTTS()`,
+`finishTTS()`, `fetchTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`,
 `playAudio()`; consumes `user-entity-loaded` and `arcane-ollama-ready`,
 installs `window.ai`, and emits `ai-ready` and `ai-tts-failure`.
 
@@ -206,7 +207,16 @@ the setting is the legacy `opus` default and the model rejects it, the catalog's
 rejected. It propagates the caller-owned signal and returns a playable `Blob`;
 it does not independently choose a provider, cloud fallback, model, runtime, or
 voice policy for the application. Existing `streamTTS()` and `finishTTS()` use
-this same request boundary.
+this same request boundary. Streaming speech retains compatibility sentence
+segmentation by default. `configureTTSSegmentation({punctuation,wordCadence})`
+accepts `punctuation:'sentence'|'any'|'none'` and a `wordCadence` that is either
+`null` or a positive integer. `punctuation:'any'` completes a segment at a
+Unicode punctuation run followed by whitespace or the end of the stream;
+`wordCadence` completes one after that many whole words. The earliest available
+boundary wins. Segmentation preserves every character, including punctuation
+and whitespace, while the existing queue synthesizes and plays segments in
+order. Mute, stop, provider transition, and cancellation retain authority over
+the complete queue.
 Every active-generation, non-abort synthesis, decode, playback-start, or
 playback-resume failure emits `ai-tts-failure` with the complete `Error`, exact
 operation boundary, generation, and stable reason. Muting, explicit

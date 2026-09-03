@@ -153,6 +153,21 @@ must supply each runtime/model selection explicitly. Speech roles
 load, cancel, unload, fail, and recover independently, so speech failure never
 silently falls back or prevents text chat.
 
+Applications that need faster spoken-response onset can configure the shared
+TTS stream without taking over synthesis or playback:
+
+```js
+ai.configureTTSSegmentation({
+    punctuation:'any',
+    wordCadence:4
+});
+```
+
+The compatibility default remains sentence punctuation with no word cadence.
+The configured stream preserves every character and punctuation mark, chooses
+the earliest complete boundary, and keeps synthesis and playback sequential.
+Mute, stop, provider transition, and cancellation still govern the whole queue.
+
 The SDK runtime also owns `DBOPFSDocumentLibrary`,
 `DocumentLexicalSearch`, and `PersistentAIChatSession`. Document bootstrap is
 schema-driven and explicit; chat never searches a corpus unless the app wires

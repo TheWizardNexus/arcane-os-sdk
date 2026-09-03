@@ -2487,15 +2487,43 @@ test(
                 }),
                 error=>error?.code==='ARCANE_AI_TTS_VOICE_INVALID'
             );
-            assert.equal(await ai.streamTTS('Shared route synthesis.',true),true);
-            assert.equal(ttsRequests.length,2);
+            assert.deepEqual(ai.ttsSegmentation,{
+                punctuation:'sentence',
+                wordCadence:null
+            });
+            assert.deepEqual(
+                ai.configureTTSSegmentation({
+                    punctuation:'any',
+                    wordCadence:4
+                }),
+                {
+                    punctuation:'any',
+                    wordCadence:4
+                }
+            );
+            assert.equal(
+                await ai.streamTTS(
+                    'First, second third fourth fifth ',
+                    false
+                ),
+                true
+            );
+            assert.equal(ttsRequests.length,3);
             assert.deepEqual(ttsRequests[1],{
                 model:'catalog-tts-model',
                 voice:'provider_voice',
-                input:'Shared route synthesis.',
+                input:'First, ',
                 responseFormat:'wav',
                 speed:1
             });
+            assert.deepEqual(ttsRequests[2],{
+                model:'catalog-tts-model',
+                voice:'provider_voice',
+                input:'second third fourth fifth ',
+                responseFormat:'wav',
+                speed:1
+            });
+            assert.equal(await ai.finishTTS(),true);
             ai.stopAudio();
             await ai.setSpeechMuted(true);
             ai.configureProviders({
