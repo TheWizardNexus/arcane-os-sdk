@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.8
+
+- Added provider-neutral `reasoningEffort` to `AI.fetchRequest()` and
+  `AI.streamRequest()`, accepting `none`, `low`, `medium`, `high`, or
+  `max`. TWiN Cloud forwards an explicit value as `reasoning_effort`, omits
+  the field when unspecified, and preserves explicit
+  `openai-gpt-oss-120b` or `openai-gpt-oss-20b` model selection with the
+  existing streaming and structural-tool behavior.
+
 ## 0.5.7
 
 - Added `PersistentAIChatSession.open()` for model-authored conversation
