@@ -15,7 +15,7 @@
   },
   "artifactCount": 84,
   "javascriptArtifactCount": 82,
-  "esmExportCount": 351,
+  "esmExportCount": 353,
   "artifacts": [
     {
       "file": "runtime/arcane/modules/AI.js",
@@ -327,13 +327,15 @@
       "name": "ChatRecords.js",
       "kind": "esm",
       "exports": [
-        "hasUserEntry"
+        "hasConversationEntry",
+        "hasUserEntry",
+        "recurringChatMessages"
       ],
-      "summary": "Detects whether a chat record contains a meaningful user entry.",
+      "summary": "Detects conversation entries and projects retained state into provider-safe recurring chat context.",
       "availability": "Cross-host",
       "protocol": "In-process only",
-      "normalization": "Boolean normalized result.",
-      "surface": "`hasUserEntry()`."
+      "normalization": "Boolean conversation-entry results and recurring provider context are normalized.",
+      "surface": "`hasUserEntry()`, `hasConversationEntry()`, and `recurringChatMessages(chat,{settleCompleteToolTail=false}={})`; the optional flag settles a completed restored tail that has no active provider continuation."
     },
     {
       "file": "runtime/arcane/modules/CommunicationAppController.js",
@@ -434,11 +436,11 @@
         "normalizeStructuralToolCall",
         "default"
       ],
-      "summary": "Owns complete in-memory AI turns, context construction, provider response preservation, and atomic history commit.",
+      "summary": "Owns complete ordinary visible recurring AI turns, one active structural continuation, context construction, provider response preservation, and atomic history commit.",
       "availability": "Native bridge by default; cross-host with injected chat",
       "protocol": "Arcane.ai.chat or injected provider",
-      "normalization": "Complete mutable session/result; declarations and emitted calls require nonempty user-facing arguments.message; ordered parallel calls, exact IDs/names/arguments, and extension fields are preserved; one atomic result batch must settle every pending ID; per-turn request options cannot replace session-owned messages or signal; persisted sequencing has stable coded failures; and provider rejection remains visible.",
-      "surface": "default `ConfiguredAIChatSession`, named `normalizeStructuralToolCall`; constructor accepts complete initial messages and ordered structural tool-call arrays; history/clear/prepare/send; per-turn request overrides preserve session-owned messages/signal; every pending ID requires exactly one matching nonblank role=tool result in the same request batch."
+      "normalization": "Complete mutable session/result; declarations and emitted calls require nonempty user-facing arguments.message; ordered parallel calls and their exact IDs/names/arguments/extensions remain raw only through the active matching tool continuation, then settled recurrence becomes complete ordinary visible content; one atomic result batch must settle every pending ID; per-turn request options cannot replace session-owned messages or signal; persisted sequencing has stable coded failures; and provider rejection remains visible.",
+      "surface": "default `ConfiguredAIChatSession`, named `normalizeStructuralToolCall`; constructor accepts complete initial messages and one unresolved ordered structural-call tail; history/clear/prepare/send; per-turn request overrides preserve session-owned messages/signal; every pending ID requires exactly one matching nonblank role=tool result in the same request batch; settled raw protocol does not recur."
     },
     {
       "file": "runtime/arcane/modules/ConversationActionItems.js",
@@ -990,7 +992,7 @@
       "summary": "Composes complete configured chat with an existing ChatEntity so each user, assistant, and structural tool turn has an explicit persistence and transport policy.",
       "availability": "Browser or native WebView with the projected ChatEntity, DBOPFS, and a configured chat function or normalized Arcane.ai surface",
       "protocol": "Existing ChatEntity/DBOPFS methods plus provider-neutral chat request/result records",
-      "normalization": "Preserves provider-safe history, complete optional assistant reasoning, every timestamped UI transcript record including legacy ui_hidden metadata, and arbitrary nonempty caller-owned chat file names; commits live context atomically; falls back from optional streaming to configured non-stream transport; carries per-turn generation options while owning lifecycle callbacks; exposes complete data callbacks; accepts terminal-only structural calls; correlates every observed per-choice call against the exact validated terminal envelope before callback/persistence; atomically settles every pending ID once; and keeps malformed legacy records readable without inventing or rewriting messages.",
+      "normalization": "Preserves complete ordinary visible recurring provider history, one active raw structural continuation, every sanitized timestamped transcript record, and arbitrary nonempty caller-owned chat file names; commits live context atomically; falls back from optional streaming to configured non-stream transport; carries per-turn generation options while owning lifecycle callbacks; exposes complete data callbacks; accepts terminal-only structural calls; correlates every observed per-choice call against the exact validated terminal envelope before callback/persistence; atomically settles every pending ID once; and keeps malformed legacy records readable without inventing or rewriting messages.",
       "surface": "Default/named `PersistentAIChatSession`, `createPersistentAIChatSession()`; `create()`, `ai`, `chatEntity`, `fileName`, `ready()`, `history()`, `transcript()`, `settleMemory()`, `send()`, and `stream()`."
     },
     {

@@ -1,7 +1,11 @@
 import Is from '../../node_modules/strong-type/index.js';
 import '../modules/DBOPFS.js';
 import '../modules/AI.js';
-import {hasConversationEntry,hasUserEntry} from '../modules/ChatRecords.js';
+import {
+    hasConversationEntry,
+    hasUserEntry,
+    recurringChatMessages
+} from '../modules/ChatRecords.js';
 import {normalizeMemoryContent} from '../modules/MemoryRecords.js';
 
 const is = new Is(false);
@@ -454,15 +458,16 @@ class ChatEntity{
     /**
      * Returns the current chat message array.
      *
-     * This is intended to be passed directly into
-     * the AI request pipeline.
+     * This is intended to be passed directly into the AI request pipeline.
+     * Unresolved structural protocol remains available for its one matching
+     * continuation; settled exchanges recur only as ordinary visible content.
      *
      * @returns {Array<*>}
      */
     get messages(){
         const retainedMessages=retainedChatMessages(this.#messages);
         pendingToolCalls(retainedMessages);
-        return retainedMessages
+        return recurringChatMessages(retainedMessages)
             .map(function publicChatMessage(message){
             const copy={...message};
             if(copy.tool_calls){
@@ -633,8 +638,8 @@ class ChatEntity{
 
     /**
      * Adds an assistant tool call and its result as one hidden, atomic log exchange.
-     * The active provider context keeps the complete exchange. New durable history
-     * retains only the call's required user-facing arguments.message record.
+     * The immediate provider continuation receives the complete exchange. Recurring
+     * context and new durable history retain only ordinary user-facing content.
      */
     addToolExchange({id='',name='',arguments:argumentValue='',result='',persist=true}={}){
         const toolCallId=id;

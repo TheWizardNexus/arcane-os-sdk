@@ -632,9 +632,9 @@ class PersistentAIChatSession{
             if(streamState) this.#activeStream=streamState;
             try{
                 prepared=await this.#configured.prepare(
-                    settings.requestMessages.length===1
-                        ?settings.requestMessages[0]
-                        :settings.requestMessages,
+                    settings.entityRequestMessages.length===1
+                        ?settings.entityRequestMessages[0]
+                        :settings.entityRequestMessages,
                     {request:settings.request,signal:settings.signal},
                 );
             }finally{

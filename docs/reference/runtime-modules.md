@@ -58,13 +58,13 @@ own asynchronous work, cancellation, and backpressure.
 | [`BrowserTestSuite.js`](#browsertestsuitejs) | esm | Runs a complete sequential browser test list with explicit cancellation and full-detail lifecycle events. | Browser / standard Web APIs | Mutable results and skip/assertion errors normalized without suite-created caps or timers. |
 | [`CalculatorEngine.js`](#calculatorenginejs) | esm | Evaluates arithmetic, powers, constants, and common functions without `eval`. | Cross-host | Normalized `Calculation` result and parser errors. |
 | [`ChartLibrary.js`](#chartlibraryjs) | esm | Loads the bundled uPlot classic script once and returns its global constructor. | Browser / native WebView | Load state/errors normalized; uPlot result is vendor-native. |
-| [`ChatRecords.js`](#chatrecordsjs) | esm | Detects whether a chat record contains a meaningful user entry. | Cross-host | Boolean normalized result. |
+| [`ChatRecords.js`](#chatrecordsjs) | esm | Detects conversation entries and projects retained state into recurring provider context. | Cross-host | Boolean entry results and recurring context are normalized. |
 | [`CommunicationAppController.js`](#communicationappcontrollerjs) | esm | Binds shared inbox, conversation, settings, theme, and provider workflows into one UI controller. | Browser / native WebView hybrid | Controller state normalized; provider/DOM failures mixed. |
 | [`CommunicationHub.js`](#communicationhubjs) | esm | Fans out provider refresh/send operations and aggregates normalized threads/messages. | Cross-host with injected providers | Normalized aggregates; refresh contains per-provider failures. |
 | [`CommunicationPreferences.js`](#communicationpreferencesjs) | esm | Stores app-scoped, non-secret communication provider preferences. | Browser / native WebView hybrid | Normalized preference record; storage failures mixed. |
 | [`CommunicationProviderRegistry.js`](#communicationproviderregistryjs) | esm | Registers and queries validated provider definitions, channels, and required methods. | Cross-host | Strict normalized registry. |
 | [`ComponentContracts.js`](#componentcontractsjs) | esm | Owns normalized configuration/value contracts and shared explicit STT activation behavior for chart, dashboard, Markdown, and voice components. | Cross-host | Fully normalized labels, rows, definitions, visibility, formats, editor and voice options, plus capability-neutral STT activation intent and presentation state. Complete finite progress measures remain visible, including fractional and over-total values. |
-| [`ConfiguredAIChatSession.js`](#configuredaichatsessionjs) | esm | Owns complete in-memory AI turns, context construction, provider-response preservation, and atomic history commit. | Native bridge by default; cross-host with injected chat | Normalized session/result; provider rejection preserved. |
+| [`ConfiguredAIChatSession.js`](#configuredaichatsessionjs) | esm | Owns ordinary visible recurring AI turns, one active structural continuation, context construction, provider-response preservation, and atomic history commit. | Native bridge by default; cross-host with injected chat | Normalized session/result; provider rejection preserved. |
 | [`ConversationActionItems.js`](#conversationactionitemsjs) | esm | Normalizes, creates, updates, remembers, selects, and formats complete conversation action items. | Cross-host | Fully normalized status/base/presentation contract. |
 | [`ConversationClosingReport.js`](#conversationclosingreportjs) | esm | Defines the closing-report tool, instruction, result normalizer, call classifier, and formatter. | Cross-host | Fully normalized report contract. |
 | [`ConversationTimebox.js`](#conversationtimeboxjs) | esm | Owns conversation limits, control messages, submission barriers, elapsed formatting, and delivery proof. | Cross-host | Fully normalized state/command/delivery errors. |
@@ -1064,18 +1064,26 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Detects whether a chat record contains a user entry or a durable conversation
-entry, including a complete nonblank assistant-only model opening.
+Detects whether a chat record contains a user entry or durable conversation
+entry, and projects retained chat state into recurring provider context. That
+projection preserves an unresolved structural-call tail for its one active
+continuation, then replaces the settled protocol with complete ordinary visible
+messages.
 
 ### Public surface
 
-`hasUserEntry()` and `hasConversationEntry()`.
+`hasUserEntry()`, `hasConversationEntry()`, and
+`recurringChatMessages(chat,{settleCompleteToolTail=false}={})`. The optional
+settlement flag is for restoring a configured session that has no active
+provider continuation; unresolved calls remain raw regardless.
 
-Exact exports: `hasConversationEntry`, `hasUserEntry`.
+Exact exports: `hasConversationEntry`, `hasUserEntry`,
+`recurringChatMessages`.
 
 ### Availability and normalization
 
-**Cross-host.** Boolean normalized result. Transport: In-process only. [Deep protocol details](protocols.md).
+**Cross-host.** Boolean conversation-entry results and recurring provider
+context are normalized. Transport: In-process only. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -1246,8 +1254,9 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Owns complete in-memory AI turns, context construction, provider-response
-preservation, and atomic history commit.
+Owns complete ordinary visible recurring AI turns, one active structural
+continuation, context construction, provider-response preservation, and atomic
+history commit.
 
 ### Public surface
 
@@ -1259,17 +1268,20 @@ Default `ConfiguredAIChatSession`; named
 `initialMessages`, `request`, and `systemPrompt`. Compatibility keys
 `responseLength`, `maxContextCharacters`, `maxMessageCharacters`, and
 `maxMessages` are accepted as inert metadata and do not alter or limit content.
-`initialMessages` is an array of complete `user`, `assistant`, or
-`tool` messages. It excludes `system`, preserves optional assistant
-`reasoning_content`, accepts structural assistant tool-call
-arrays, and requires the tracked pending tool result before another user turn
-or tool-call sequence; `systemPrompt` owns the separate system message.
+`initialMessages` is an array of complete `user`, `assistant`, or `tool`
+messages. It excludes `system`, accepts one unresolved structural assistant
+tool-call tail, and requires its tracked result before another user turn or
+tool-call sequence; `systemPrompt` owns the separate system message. Settled
+structural protocol is projected immediately into ordinary visible recurring
+messages.
 
 Each assistant structural tool call is one complete function call with an exact
 nonempty string `id`, `type:'function'`, a nonempty `function.name`, and
 `function.arguments` as a JSON string encoding an object containing a nonempty
 user-facing `message`. One assistant message may contain an ordered array of
-calls with unique IDs; every call and every extension field is preserved.
+calls with unique IDs; every call and every extension field is preserved in the
+returned response and its active matching continuation, but not settled
+recurring history.
 Validation does not trim or reserialize an accepted ID, name, or argument
 string. A pending call set is settled atomically only by one request batch that
 contains exactly one `role:'tool'` message with nonempty content for every
@@ -1282,6 +1294,11 @@ exactly one terminal settlement is permitted. Plain-object per-turn `request`
 options merge over constructor defaults, while session-owned `messages` and
 `signal` are applied last. `messages`, `signal`, `stream`, `onChunk`,
 `onToolCall`, and `onResponse` cannot be supplied through either request layer.
+A matching tool result may include a complete public `message`, `name`, and
+`status`; those fields are excluded from the raw provider continuation. The
+public `message` becomes ordinary visible recurring content after settlement,
+while `name` and `status` remain optional durable transcript metadata. Raw
+call/result protocol is retained only until that one continuation commits.
 `send()` is the convenience path that prepares and then commits the turn.
 
 `prepareOpening(input,{request,signal})` is the dedicated transaction for an
@@ -2368,8 +2385,10 @@ structural tool result must use the persistence choice captured by its matching
 assistant tool call.
 
 `history()` returns provider-safe configured model context, including the
-system prompt, complete optional assistant reasoning, and every committed live
-turn. `transcript()` returns the sanitized human-readable ChatEntity projection.
+system prompt and every complete ordinary visible committed turn. Only a
+currently unresolved structural-call tail remains raw for its matching active
+continuation. `transcript()` returns the sanitized human-readable ChatEntity
+projection.
 User and assistant records retain only role, complete visible content, and the
 real timestamp. Tool records retain only role, the required user-facing
 `message` as content, and optional public `name` and result `status`.
@@ -2394,9 +2413,12 @@ both paths.
 When an assistant response opens structural calls, the response persistence
 choice is retained under every exact call ID only in the active session. One
 ordered `role:'tool'` request batch must settle all pending IDs with that same
-persistence choice before a new user or provider turn. Raw calls, IDs,
-arguments, provider envelopes, and raw results are never included in new
-durable records. Existing stored records are not rewritten on load.
+persistence choice before a new user or provider turn. That one provider
+continuation receives the raw calls, IDs, arguments, and results. Once it
+commits, recurring context replaces them with complete ordinary visible call,
+assistant, and any supplied public result messages. Raw protocol is never
+included in new durable records. Existing stored records are not rewritten on
+load.
 
 ### Availability and normalization
 

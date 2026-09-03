@@ -71,14 +71,17 @@ console.log(new Calculation({expression: '2 + 2', result: 4}).toJSON());
 and optional app-scoped DBOPFS persistence. It installs no independent native
 authority; AI and storage dependencies must be available to the host.
 
-`messages` returns provider-facing copies for the active session. `transcript`
-returns the narrow human-readable projection owned by the durable storage
-boundary. User and assistant records contain only role, complete visible
-content, and their real timestamp. A visible tool record may additionally carry
-its public name and plain result status, while its `content` comes only from the
-tool call's required user-facing `message`. System prompts, reasoning,
-provider-extension fields, memory flags, raw tool calls, call IDs, argument
-objects, and raw tool returns never enter new DBOPFS writes.
+`messages` returns provider-facing recurring context. An unresolved structural
+call and its matching results remain raw only through their one active provider
+continuation. Once that continuation settles, `messages` replaces the protocol
+with complete ordinary visible call, public result, and assistant content.
+`transcript` returns the narrow human-readable projection owned by the durable
+storage boundary. User and assistant records contain only role, complete
+visible content, and their real timestamp. A visible tool record may
+additionally carry its public name and plain result status, while its `content`
+comes only from the tool call's required user-facing `message`. System prompts,
+reasoning, provider-extension fields, memory flags, raw tool calls, call IDs,
+argument objects, and raw tool returns never enter new DBOPFS writes.
 Messages added with `persist:false` participate only in their current operation;
 they are not retained in `messages`, `transcript`, memory extraction, or DBOPFS.
 One complete nonblank assistant record is also a durable conversation entry, so

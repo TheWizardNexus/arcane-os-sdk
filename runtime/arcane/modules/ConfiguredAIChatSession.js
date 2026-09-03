@@ -1,3 +1,5 @@
+import {recurringChatMessages} from './ChatRecords.js';
+
 const FORBIDDEN_REQUEST_FIELDS=new Set([
     'messages',
     'onChunk',
@@ -254,19 +256,20 @@ function cloneMessage(value){
 }
 
 function publicMessage(value){
-    return {
-        ...value,
-        role:value.role,
-        content:value.content,
-        ...(Object.hasOwn(value,'reasoning_content')
-            ?{reasoning_content:value.reasoning_content}
-            :{}),
-        ...(value.tool_calls?{tool_calls:value.tool_calls.map(call=>({
-            ...call,
-            function:{...call.function},
-        }))}:{}),
-        ...(value.tool_call_id?{tool_call_id:value.tool_call_id}:{}),
-    };
+    const copy=cloneMessage(value);
+    if(copy.role==='tool'){
+        delete copy.message;
+        delete copy.name;
+        delete copy.status;
+    }
+    delete copy.memory_excluded;
+    delete copy.persistence_excluded;
+    delete copy.persistence_message;
+    delete copy.persistence_name;
+    delete copy.persistence_status;
+    delete copy.timestamp;
+    delete copy.ui_hidden;
+    return copy;
 }
 
 function normalizeInitialMessages(value){
@@ -493,7 +496,8 @@ function normalizeResponse(response){
 }
 
 /**
- * Maintains one complete, in-memory conversation through a configured chat provider.
+ * Maintains complete ordinary visible recurring conversation content plus only
+ * the active structural protocol required by a configured chat provider.
  *
  * This module performs no persistence, streaming, tool execution, rendering, or
  * provider selection. Applications own their prompt policy and may supply an
@@ -545,8 +549,10 @@ export default class ConfiguredAIChatSession{
         this.#request={...request};
         this.#systemPrompt=systemPrompt;
         const initialMessages=normalizeInitialMessages(options.initialMessages);
-        const initialHistory=completeHistory(this.#systemPrompt,initialMessages);
-        this.#conversation=initialHistory.filter(item=>item.role!=='system');
+        this.#conversation=recurringChatMessages(
+            initialMessages,
+            {settleCompleteToolTail:true},
+        );
     }
 
     history(){
@@ -732,11 +738,11 @@ export default class ConfiguredAIChatSession{
             const response=normalizeResponse(providerResponse);
             if(options.signal?.aborted) throw abortError();
             const retainedConversation=this.#conversation.map(cloneMessage);
-            const committed=completeHistory(
-                this.#systemPrompt,
-                [...retainedConversation,...inputMessages,response.message],
-            );
-            const nextConversation=committed.filter(item=>item.role!=='system');
+            const nextConversation=recurringChatMessages([
+                ...retainedConversation,
+                ...inputMessages,
+                response.message,
+            ]);
             let settled=false;
             return {
                 response,

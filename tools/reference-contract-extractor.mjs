@@ -59,7 +59,7 @@ export const RUNTIME_DOCUMENTED_CALLABLE_MEMBERS={
     'BrowserTestSuite.js':['list','run'],
     'CalculatorEngine.js':['evaluateExpression','calculate'],
     'ChartLibrary.js':['loadChartLibrary'],
-    'ChatRecords.js':['hasUserEntry'],
+    'ChatRecords.js':['hasConversationEntry','hasUserEntry','recurringChatMessages'],
     'CommunicationAppController.js':[
         'start','bind','configure','refresh','select','send'
     ],

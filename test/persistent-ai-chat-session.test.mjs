@@ -46,9 +46,104 @@ globalThis.ai={fetch:async()=>{
 const {default:PersistentAIChatSession}=await import(
     '../runtime/arcane/modules/PersistentAIChatSession.js?persistent-session-contract'
 );
+const {default:ConfiguredAIChatSession}=await import(
+    '../runtime/arcane/modules/ConfiguredAIChatSession.js?recurring-history-contract'
+);
+const {recurringChatMessages}=await import(
+    '../runtime/arcane/modules/ChatRecords.js?recurring-history-contract'
+);
 const {createArcaneAI}=await import(
     '../browser-runtime/ai/browser-wasm.mjs?persistent-session-contract'
 );
+
+test('recurring chat history keeps raw tool protocol only through its active continuation',async function recurringChatHistoryContract(){
+    const rawToolResult='{"title":"Alpha","body":"Complete internal lookup result."}';
+    const toolCall={
+        id:'lookup-alpha',
+        type:'function',
+        function:{
+            name:'lookup',
+            arguments:'{"id":"alpha","message":"Looking up Alpha."}',
+        },
+        provider_extension:{complete:true},
+    };
+    const active=[
+        {role:'user',content:'Find Alpha.'},
+        {
+            role:'assistant',
+            content:'I am checking Alpha.',
+            provider_metadata:{request:'active-only'},
+            reasoning_content:'Private active reasoning.',
+            tool_calls:[toolCall],
+        },
+        {
+            role:'tool',
+            content:rawToolResult,
+            message:'Alpha lookup completed.',
+            name:'lookup',
+            status:'completed',
+            tool_call_id:'lookup-alpha',
+        },
+    ];
+    assert.deepEqual(recurringChatMessages(active),[
+        {role:'user',content:'Find Alpha.'},
+        {
+            role:'assistant',
+            content:'I am checking Alpha.',
+            provider_metadata:{request:'active-only'},
+            reasoning_content:'Private active reasoning.',
+            tool_calls:[toolCall],
+        },
+        {role:'tool',content:rawToolResult,tool_call_id:'lookup-alpha'},
+    ]);
+    assert.deepEqual(
+        new ConfiguredAIChatSession({initialMessages:active}).history(),
+        [
+            {role:'user',content:'Find Alpha.'},
+            {role:'assistant',content:'I am checking Alpha.'},
+            {role:'assistant',content:'Looking up Alpha.'},
+            {role:'assistant',content:'Alpha lookup completed.'},
+        ],
+    );
+
+    const requests=[];
+    const session=new ConfiguredAIChatSession({
+        async chat(request){
+            requests.push(structuredClone(request));
+            return {message:{role:'assistant',content:'Alpha is ready.'}};
+        },
+        initialMessages:active.slice(0,2),
+    });
+    await session.send(active[2]);
+    assert.equal(requests[0].messages.at(-2).tool_calls[0].id,'lookup-alpha');
+    assert.equal(requests[0].messages.at(-2).reasoning_content,'Private active reasoning.');
+    assert.equal(requests[0].messages.at(-1).content,rawToolResult);
+    for(const field of ['message','name','status']){
+        assert.equal(Object.hasOwn(requests[0].messages.at(-1),field),false);
+    }
+    const visibleHistory=[
+        {role:'user',content:'Find Alpha.'},
+        {role:'assistant',content:'I am checking Alpha.'},
+        {role:'assistant',content:'Looking up Alpha.'},
+        {role:'assistant',content:'Alpha lookup completed.'},
+        {role:'assistant',content:'Alpha is ready.'},
+    ];
+    assert.deepEqual(session.history(),visibleHistory);
+
+    await session.send('Continue from the visible result.');
+    assert.equal(
+        requests[1].messages.some(function hasSettledRawToolProtocol(message){
+            return Object.hasOwn(message,'tool_calls')
+                ||Object.hasOwn(message,'tool_call_id')
+                ||message.content===rawToolResult;
+        }),
+        false,
+    );
+    assert.deepEqual(
+        requests[1].messages,
+        [...visibleHistory,{role:'user',content:'Continue from the visible result.'}],
+    );
+});
 
 test('persistent chat binds the SDK AI boundary and falls back from optional streaming',async()=>{
     const requests=[];
@@ -425,6 +520,38 @@ test('persistent chat preserves ordered parallel calls and settles one exact res
         result_extension:result.result_extension,
     })));
     assert.equal(continuation.message.content,'Both lookups are complete.');
+
+    const recurringHistory=[
+        {role:'user',content:'Look up Alpha and Beta.'},
+        {role:'assistant',content:'Looking up Alpha.'},
+        {role:'assistant',content:'Looking up Beta.'},
+        {role:'assistant',content:'Alpha lookup completed.'},
+        {role:'assistant',content:'Beta lookup completed.'},
+        {role:'assistant',content:'Both lookups are complete.'},
+    ];
+    assert.deepEqual(await session.history(),recurringHistory);
+    assert.deepEqual(session.chatEntity.messages,recurringHistory);
+    await session.send({
+        message:{content:'Continue from the visible results.',persist:false},
+        response:{persist:false},
+    });
+    assert.equal(requests.length,3);
+    assert.equal(
+        requests[2].messages.some(function hasSettledRawToolProtocol(message){
+            return Object.hasOwn(message,'tool_calls')
+                ||Object.hasOwn(message,'tool_call_id')
+                ||message.content==='Alpha result.'
+                ||message.content==='Beta result.';
+        }),
+        false,
+    );
+    assert.deepEqual(
+        requests[2].messages,
+        [
+            ...recurringHistory,
+            {role:'user',content:'Continue from the visible results.'},
+        ],
+    );
 
     const persisted=String(db.raw('chats',chatFileName))
         .trim()
