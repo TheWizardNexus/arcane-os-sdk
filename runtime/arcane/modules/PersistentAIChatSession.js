@@ -286,6 +286,35 @@ function normalizeSend(input){
     };
 }
 
+function normalizeOpening(input){
+    if(!isPlainRecord(input)) throw new TypeError('Persistent chat opening input must be a plain object.');
+    assertKnownKeys(input,new Set(['message','request','signal']),'Persistent chat opening input');
+    if(!isPlainRecord(input.message)) throw new TypeError('message must be a plain object.');
+    assertKnownKeys(input.message,new Set(['content','persist','role']),'message');
+    if(typeof input.message.content!=='string'||!input.message.content.trim()){
+        throw new TypeError('message.content must contain text.');
+    }
+    const role=input.message.role??'user';
+    if(role!=='user') throw new TypeError('message.role must be user.');
+    if(input.message.persist!==undefined&&input.message.persist!==false){
+        throw new TypeError('The chat opening bootstrap is always nonpersistent.');
+    }
+    const request=input.request??{};
+    if(!isPlainRecord(request)) throw new TypeError('request must be a plain object.');
+    const managedRequestField=Object.keys(request).find(
+        key=>SESSION_MANAGED_REQUEST_FIELDS.has(key)
+    );
+    if(managedRequestField){
+        throw new TypeError(`request.${managedRequestField} is managed by the chat session.`);
+    }
+    if(!signalLike(input.signal)) throw new TypeError('signal must be an AbortSignal.');
+    return {
+        message:{role:'user',content:input.message.content},
+        request:{...request},
+        signal:input.signal??null,
+    };
+}
+
 function fileName(value){
     if(typeof value!=='string'||value.length===0){
         throw new TypeError('chatFileName must be a nonempty string.');
@@ -504,6 +533,54 @@ class PersistentAIChatSession{
     async settleMemory(){
         await this.ready();
         return this.#entity.settleMemory();
+    }
+
+    /** Persists one model-authored opening while retaining none of its bootstrap request. */
+    async open(input){
+        const settings=normalizeOpening(input);
+        if(this.#pending){
+            throw coded(new Error('A chat request is already active for this session.'),'AI_CHAT_BUSY');
+        }
+        this.#pending=true;
+        let prepared=null;
+        try{
+            await this.ready();
+            if(this.#historyError)throw this.#historyError;
+            if(this.#entity.persist!==true){
+                throw coded(
+                    new Error('The model-authored chat opening requires durable chat persistence.'),
+                    'AI_CHAT_PERSISTENCE_UNAVAILABLE',
+                );
+            }
+            await this.#entity.settleMemory();
+            prepared=await this.#configured.prepareOpening(
+                settings.message,
+                {request:settings.request,signal:settings.signal},
+            );
+            await this.#entity.addAIMessage(
+                prepared.response.message.content,
+                {extractMemory:false,persist:true},
+            );
+            const committed=prepared.commit();
+            prepared=null;
+            const assistantRecord=this.#entity.transcript.at(-1);
+            return assistantRecord?.role==='assistant'
+                ?{
+                    ...committed,
+                    message:{
+                        ...committed.message,
+                        ...(assistantRecord.timestamp!==undefined
+                            ?{timestamp:assistantRecord.timestamp}
+                            :{}),
+                    },
+                }
+                :committed;
+        }catch(error){
+            prepared?.rollback();
+            throw error;
+        }finally{
+            this.#pending=false;
+        }
     }
 
     async #requestTurn(input,streamHandlers=null){

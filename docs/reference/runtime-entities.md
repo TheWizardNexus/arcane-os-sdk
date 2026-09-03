@@ -81,6 +81,9 @@ provider-extension fields, memory flags, raw tool calls, call IDs, argument
 objects, and raw tool returns never enter new DBOPFS writes.
 Messages added with `persist:false` participate only in their current operation;
 they are not retained in `messages`, `transcript`, memory extraction, or DBOPFS.
+One complete nonblank assistant record is also a durable conversation entry, so
+a model-authored opening can be stored and survive maintenance before the first
+ordinary user turn. No synthetic user record is required or written.
 
 An assistant record may open an ordered array of structural calls with unique
 IDs in transient provider state. Until every pending ID receives exactly one

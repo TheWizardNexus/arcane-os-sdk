@@ -108,6 +108,57 @@ test('persistent chat binds the SDK AI boundary and falls back from optional str
     );
 });
 
+test('persistent chat stores only a model-authored opening and reloads it without a user turn',async()=>{
+    const chatFileName='model-authored-opening.jsonl';
+    const requests=[];
+    const ai={
+        async fetchRequest(request){
+            requests.push(structuredClone(request));
+            return {message:{role:'assistant',content:'Welcome from the model.'}};
+        },
+    };
+    const session=await PersistentAIChatSession.create({
+        ai,
+        chatFileName,
+        memory:false,
+        systemPrompt:'Wait for the model-authored opening.',
+    });
+
+    const result=await session.open({
+        message:{content:'Internal application bootstrap.',persist:false},
+    });
+    assert.equal(result.message.content,'Welcome from the model.');
+    assert.ok(Number.isFinite(result.message.timestamp));
+    assert.equal(requests[0].messages.at(-1).content,'Internal application bootstrap.');
+    assert.deepEqual(await session.transcript(),[{
+        role:'assistant',
+        content:'Welcome from the model.',
+        timestamp:result.message.timestamp,
+    }]);
+    assert.ok(!(await session.history()).some(
+        message=>message.content==='Internal application bootstrap.'
+    ));
+    assert.deepEqual(
+        String(db.raw('chats',chatFileName)).trim().split('\n').map(row=>JSON.parse(row)),
+        [{
+            role:'assistant',
+            content:'Welcome from the model.',
+            timestamp:result.message.timestamp,
+        }],
+    );
+
+    const reloaded=await PersistentAIChatSession.create({
+        ai,
+        chatFileName,
+        loadExisting:true,
+        memory:false,
+    });
+    assert.deepEqual(await reloaded.transcript(),await session.transcript());
+    assert.ok(!(await reloaded.history()).some(
+        message=>message.content==='Internal application bootstrap.'
+    ));
+});
+
 test('persistent streaming accepts terminal-only calls and compares complete structural envelopes',async()=>{
     const structuralCall={
         id:'stream-lookup-1',

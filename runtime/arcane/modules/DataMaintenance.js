@@ -1,5 +1,5 @@
 import './DBOPFS.js';
-import {hasUserEntry} from './ChatRecords.js';
+import {hasConversationEntry,hasUserEntry} from './ChatRecords.js';
 import {hasMemoryContent} from './MemoryRecords.js';
 import {arcaneEvents} from 'arcane-os/event-manager';
 
@@ -16,7 +16,7 @@ async function clearEmptyChatsAndMemories(){
             true
         );
 
-        if(!hasUserEntry(chat)){
+        if(!hasConversationEntry(chat)){
             emptyChats.push(chatFileNames[i]);
         }
     }
@@ -96,6 +96,7 @@ function waitForDBOPFS(){
 
 export {
     clearEmptyChatsAndMemories,
+    hasConversationEntry,
     hasMemoryContent,
     hasUserEntry
 };

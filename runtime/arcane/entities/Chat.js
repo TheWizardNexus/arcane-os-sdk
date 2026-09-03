@@ -1,7 +1,7 @@
 import Is from '../../node_modules/strong-type/index.js';
 import '../modules/DBOPFS.js';
 import '../modules/AI.js';
-import {hasUserEntry} from '../modules/ChatRecords.js';
+import {hasConversationEntry,hasUserEntry} from '../modules/ChatRecords.js';
 import {normalizeMemoryContent} from '../modules/MemoryRecords.js';
 
 const is = new Is(false);
@@ -925,7 +925,7 @@ ${JSON.stringify(transcript)}`
      * @returns {Promise<*>}
      */
     async save(){
-        if(!hasUserEntry(this.#durableMessages())){
+        if(!hasConversationEntry(this.#durableMessages())){
             this.#saved=false;
             return false;
         }
@@ -1073,7 +1073,7 @@ ${JSON.stringify(transcript)}`
             return;
         }
 
-        if(!hasUserEntry(this.#durableMessages())){
+        if(!hasConversationEntry(this.#durableMessages())){
             return false;
         }
 

@@ -584,6 +584,83 @@ export default class ConfiguredAIChatSession{
         return context;
     }
 
+    /** Prepares one transient bootstrap request whose assistant response alone may be committed. */
+    async prepareOpening(input,options={}){
+        if(!isPlainRecord(options)) throw new TypeError('Chat opening options must be a plain object.');
+        const unsupported=Object.keys(options).find(key=>!['request','signal'].includes(key));
+        if(unsupported) throw new TypeError(`Unsupported chat opening option: ${unsupported}`);
+        if(!signalLike(options.signal)) throw new TypeError('signal must be an AbortSignal.');
+        if(options.signal?.aborted) throw abortError();
+        const turnRequest=normalizeRequestOptions(options.request,'request');
+        const [normalizedInputMessage]=normalizeInputMessages(input);
+        if(normalizedInputMessage.role!=='user'){
+            throw new TypeError('The chat opening bootstrap must be a user message.');
+        }
+        const inputMessage=message('user',normalizedInputMessage.content);
+        if(this.#pending){
+            throw coded(new Error('A chat request is already active for this session.'),'AI_CHAT_BUSY');
+        }
+        if(this.#conversation.length){
+            throw coded(
+                new Error('The chat already contains a retained conversation turn.'),
+                'AI_CHAT_OPENING_EXISTS',
+            );
+        }
+        this.#pending=true;
+        try{
+            const context=await this.#contextFor(inputMessage.content,options.signal);
+            if(options.signal?.aborted) throw abortError();
+            const transientContext=context
+                ?message('user',context)
+                :null;
+            const requestMessages=completeHistory(
+                this.#systemPrompt,
+                [...(transientContext?[transientContext]:[]),inputMessage],
+            );
+            let providerResponse;
+            try{
+                providerResponse=await this.#chat({
+                    ...this.#request,
+                    ...turnRequest,
+                    ...(options.signal?{signal:options.signal}:{}),
+                    messages:requestMessages.map(publicMessage),
+                });
+            }catch(error){
+                if(options.signal?.aborted) throw abortError();
+                throw error;
+            }
+            const response=normalizeResponse(providerResponse);
+            if(options.signal?.aborted) throw abortError();
+            if(response.message.tool_calls?.length||!response.message.content.trim()){
+                throw coded(
+                    new TypeError('The model-authored chat opening must contain visible assistant text.'),
+                    'AI_CHAT_INVALID_OPENING_RESPONSE',
+                );
+            }
+            const openingMessage=message('assistant',response.message.content);
+            let settled=false;
+            return {
+                response,
+                commit:()=>{
+                    if(settled) throw coded(new Error('The prepared chat opening is already settled.'),'AI_CHAT_TRANSACTION_SETTLED');
+                    this.#conversation=[openingMessage];
+                    settled=true;
+                    this.#pending=false;
+                    return response;
+                },
+                rollback:()=>{
+                    if(settled) return false;
+                    settled=true;
+                    this.#pending=false;
+                    return true;
+                },
+            };
+        }catch(error){
+            this.#pending=false;
+            throw error;
+        }
+    }
+
     async prepare(input,options={}){
         if(!isPlainRecord(options)) throw new TypeError('Chat send options must be a plain object.');
         const unsupported=Object.keys(options).find(key=>!['request','signal'].includes(key));

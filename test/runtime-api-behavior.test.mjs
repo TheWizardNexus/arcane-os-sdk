@@ -51,6 +51,7 @@ import {
     formatAIRuntimeProgress
 } from '../runtime/arcane/modules/ComponentContracts.js';
 import ConfiguredAIChatSession from '../runtime/arcane/modules/ConfiguredAIChatSession.js';
+import {hasConversationEntry,hasUserEntry} from '../runtime/arcane/modules/ChatRecords.js';
 import DevelopmentWorkspace,{contextQuery,setupTaskId,workspaceRoot} from '../runtime/arcane/modules/DevelopmentWorkspace.js';
 import {
     normalizeDirectoryPickerOptions,
@@ -67,6 +68,13 @@ import RecordReviewStore from '../runtime/arcane/modules/RecordReviewStore.js';
 import {assessScamRisk} from '../runtime/arcane/modules/ScamRiskPolicy.js';
 
 const repositoryRoot=new URL('../',import.meta.url);
+
+test('chat record predicates preserve complete model-authored openings',()=>{
+    assert.equal(hasUserEntry([{role:'assistant',content:'Welcome.'}]),false);
+    assert.equal(hasConversationEntry([{role:'assistant',content:'Welcome.'}]),true);
+    assert.equal(hasConversationEntry([{role:'assistant',content:'   '}]),false);
+    assert.equal(hasConversationEntry([{role:'system',content:'Internal prompt.'}]),false);
+});
 
 test('transcription assembly preserves complete whitespace and content',()=>{
     assert.equal(appendTranscription('', '  first  '), '  first  ');
@@ -514,6 +522,40 @@ test('configured chat accepts bounded initial history and keeps request context 
     await assert.rejects(
         session.send('never sent',{signal:aborted.signal}),
         error=>error?.code==='AI_CHAT_ABORTED',
+    );
+});
+
+test('configured chat prepares a model-authored opening without retaining its bootstrap',async()=>{
+    const requests=[];
+    const session=new ConfiguredAIChatSession({
+        chat:async request=>{
+            requests.push(structuredClone(request));
+            return {message:{role:'assistant',content:'Welcome from the selected model.'}};
+        },
+        systemPrompt:'Open the conversation after the application requests it.',
+    });
+
+    const prepared=await session.prepareOpening('Internal application bootstrap.');
+    assert.equal(
+        requests[0].messages.at(-1).content,
+        'Internal application bootstrap.',
+    );
+    assert.deepEqual(
+        session.history(),
+        [{role:'system',content:'Open the conversation after the application requests it.'}],
+    );
+    prepared.commit();
+    assert.deepEqual(
+        session.history(),
+        [
+            {role:'system',content:'Open the conversation after the application requests it.'},
+            {role:'assistant',content:'Welcome from the selected model.'},
+        ],
+    );
+    assert.ok(!session.history().some(message=>message.content==='Internal application bootstrap.'));
+    await assert.rejects(
+        session.prepareOpening('Do not create a second opening.'),
+        error=>error?.code==='AI_CHAT_OPENING_EXISTS',
     );
 });
 

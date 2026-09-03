@@ -179,6 +179,10 @@ maintains recurring model context and `ChatEntity` history/memory. A turn may
 set `persist:false` to participate in one request and response only; after that
 operation settles, neither side remains in subsequent model context, the
 retained transcript, durable chat, memory, or DBOPFS.
+For an automatic model-authored opening, call
+`session.open({message:{content:bootstrap,persist:false}})`: the bootstrap is
+request-only, while the complete nonblank assistant response becomes the first
+durable conversation row without a fabricated user turn.
 `createArcaneAI(...).createChatSession(options)` wires
 that session to the same selected LLM controller, creates its `ChatEntity`, and
 uses the same controller for automatic memory extraction.

@@ -467,6 +467,14 @@ are not rewritten on load. A turn with `persist:false` participates in its one
 request and response only, then remains absent from subsequent model context,
 the retained transcript, memory extraction, and DBOPFS.
 
+For an automatic model-authored conversation opening, the application calls the
+persistent session's `open()` operation with its internal bootstrap message.
+That bootstrap participates in the one provider request only. The operation
+durably appends only the complete nonblank assistant response, so the opening
+survives reload without a fabricated or retained user turn. A system prompt by
+itself is not a retained conversation turn; an existing retained user,
+assistant, or tool sequence prevents another opening.
+
 ### Cancellation and structural tools
 
 Cancellation is part of the provider lifecycle, not just a UI decision.

@@ -1055,13 +1055,14 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Detects whether a chat record contains a meaningful user entry.
+Detects whether a chat record contains a user entry or a durable conversation
+entry, including a complete nonblank assistant-only model opening.
 
 ### Public surface
 
-`hasUserEntry()`.
+`hasUserEntry()` and `hasConversationEntry()`.
 
-Exact exports: `hasUserEntry`.
+Exact exports: `hasConversationEntry`, `hasUserEntry`.
 
 ### Availability and normalization
 
@@ -1243,7 +1244,7 @@ preservation, and atomic history commit.
 
 Default `ConfiguredAIChatSession`; named
 `normalizeStructuralToolCall(call,label)`; instance methods `history()`,
-`clear()`, `prepare()`, and `send()`.
+`clear()`, `prepareOpening()`, `prepare()`, and `send()`.
 
 `new ConfiguredAIChatSession(options={})` uses `chat`, `contextBuilder`,
 `initialMessages`, `request`, and `systemPrompt`. Compatibility keys
@@ -1273,6 +1274,14 @@ options merge over constructor defaults, while session-owned `messages` and
 `signal` are applied last. `messages`, `signal`, `stream`, `onChunk`,
 `onToolCall`, and `onResponse` cannot be supplied through either request layer.
 `send()` is the convenience path that prepares and then commits the turn.
+
+`prepareOpening(input,{request,signal})` is the dedicated transaction for an
+automatic model-authored opening. It sends one application-authored user
+bootstrap only when retained history contains no conversation turn, requires a
+complete nonblank assistant response without structural calls, and prepares
+only that assistant content for commit. The bootstrap never enters history.
+An existing retained turn rejects as `AI_CHAT_OPENING_EXISTS`; an empty or
+structural response rejects as `AI_CHAT_INVALID_OPENING_RESPONSE`.
 
 An optional async `contextBuilder({input,history,signal})` receives a mutable,
 complete request snapshot and the same cancellation signal. Its complete
@@ -1452,7 +1461,8 @@ Deletes empty chats and associated/empty memory records inside the current app d
 
 `clearEmptyChatsAndMemories()` plus content predicates.
 
-Exact exports: `clearEmptyChatsAndMemories`, `hasMemoryContent`, `hasUserEntry`.
+Exact exports: `clearEmptyChatsAndMemories`, `hasConversationEntry`,
+`hasMemoryContent`, `hasUserEntry`.
 
 ### Availability and normalization
 
@@ -2320,9 +2330,18 @@ contextBuilder,loadExisting,memory,request,responseLength,systemPrompt}`. Legacy
 maximum-character/message options are accepted for compatibility but do not
 cap, truncate, clip, tail, or elide content. Public members are
 static `create()`, getters `ai`, `chatEntity`, and `fileName`, and `ready()`,
-`history()`, `transcript()`, `settleMemory()`, `send(input)`, and
+`history()`, `transcript()`, `settleMemory()`, `open(input)`, `send(input)`, and
 `stream(input,handlers)`.
 `ready()` waits for initialization and resolves the same session instance.
+
+`open({message:{content,persist:false?},request?,signal?})` performs one
+application-authored bootstrap request only when the retained conversation is
+otherwise empty. The bootstrap is never committed. After a complete nonblank
+model response succeeds, the operation atomically retains only the sanitized
+assistant content in configured model context and ChatEntity/DBOPFS history.
+That assistant-only opening survives reload and empty-chat maintenance without
+a fabricated user turn. A second opening rejects as `AI_CHAT_OPENING_EXISTS`;
+an unavailable durable ChatEntity rejects as `AI_CHAT_PERSISTENCE_UNAVAILABLE`.
 
 `send()` accepts either
 `{message:{content,role:'user'|'tool',tool_call_id?,message?,name?,status?,persist},...}`
@@ -2380,7 +2399,9 @@ Context builders are request-only, and document context remains explicitly
 untrusted. Errors include `AI_CHAT_BUSY`, `AI_CHAT_TOOL_RESULT_REQUIRED`,
 `AI_CHAT_INVALID_TOOL_MESSAGE`, `AI_CHAT_TOOL_MESSAGE_REQUIRED`, and
 `AI_CHAT_INCOHERENT_PERSISTENCE`, plus
-`AI_CHAT_STREAM_TOOL_CALL_MISMATCH` for a streamed/terminal envelope mismatch.
+`AI_CHAT_STREAM_TOOL_CALL_MISMATCH` for a streamed/terminal envelope mismatch,
+and `AI_CHAT_INVALID_OPENING_RESPONSE`, `AI_CHAT_OPENING_EXISTS`, or
+`AI_CHAT_PERSISTENCE_UNAVAILABLE` for the dedicated opening lifecycle.
 
 ### Example
 
