@@ -2503,7 +2503,15 @@ test(
             );
             assert.equal(
                 await ai.streamTTS(
-                    'First, second third fourth fifth ',
+                    'Don\'t re-',
+                    false
+                ),
+                true
+            );
+            assert.equal(ttsRequests.length,1);
+            assert.equal(
+                await ai.streamTTS(
+                    'enter,version2。Next words arrive now ',
                     false
                 ),
                 true
@@ -2512,7 +2520,7 @@ test(
             assert.deepEqual(ttsRequests[1],{
                 model:'catalog-tts-model',
                 voice:'provider_voice',
-                input:'First, ',
+                input:'Don\'t re-enter,version2。',
                 responseFormat:'wav',
                 speed:1
             });
@@ -2523,7 +2531,12 @@ test(
                 responseFormat:'wav',
                 speed:1
             });
+            assert.equal(await ai.streamTTS('Close）Next',false),true);
+            assert.equal(ttsRequests.length,4);
+            assert.equal(ttsRequests[3].input,'Close）');
             assert.equal(await ai.finishTTS(),true);
+            assert.equal(ttsRequests.length,5);
+            assert.equal(ttsRequests[4].input,'Next');
             ai.stopAudio();
             await ai.setSpeechMuted(true);
             ai.configureProviders({

@@ -166,6 +166,9 @@ ai.configureTTSSegmentation({
 The compatibility default remains sentence punctuation with no word cadence.
 The configured stream preserves every character and punctuation mark, chooses
 the earliest complete boundary, and keeps synthesis and playback sequential.
+Any-punctuation mode recognizes boundaries without requiring whitespace while
+keeping apostrophes, commas, and hyphens that join Unicode letters or numbers
+inside the same segment.
 Mute, stop, provider transition, and cancellation still govern the whole queue.
 
 The SDK runtime also owns `DBOPFSDocumentLibrary`,

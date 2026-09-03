@@ -22,6 +22,11 @@ const DEFAULT_TTS_SEGMENTATION={
     wordCadence:null
 };
 const TTS_PUNCTUATION_MODES=new Set(['sentence','any','none']);
+// A complete punctuation run is a boundary unless the whole run consists of
+// apostrophe, comma, or dash punctuation joining Unicode letters or numbers.
+// The streaming expression leaves a trailing joining run for the next chunk.
+const TTS_ANY_PUNCTUATION=/(?<!\p{P})(?:(?<![\p{L}\p{N}])\p{P}+(?!\p{P})(?=[\s\S])|\p{P}+(?!\p{P})(?=[^\p{L}\p{N}])|\p{P}*[^\P{P}'\u2019\uFF07,\u060C\u3001\uFF0C\p{Pd}]\p{P}*)(?!\p{P})/gu;
+const TTS_ANY_PUNCTUATION_AT_END=/(?<!\p{P})(?:(?<![\p{L}\p{N}])\p{P}+|\p{P}+(?![\p{L}\p{N}])|\p{P}*[^\P{P}'\u2019\uFF07,\u060C\u3001\uFF0C\p{Pd}]\p{P}*)(?!\p{P})/gu;
 credentials='omit';
 
 const LEGACY_AI_SERVICES=new Set(['OPENAI','OLLAMA','LOCAL_SPEACH']);
@@ -5649,7 +5654,7 @@ class AI {
             return -1;
         }
         if(this.#ttsSegmentation.punctuation==='any'){
-            return this.#findAnySpeechPunctuationBoundary(text);
+            return this.#findAnySpeechPunctuationBoundary(text,end);
         }
 
         const pattern=end
@@ -5674,8 +5679,11 @@ class AI {
         return -1;
     }
 
-    #findAnySpeechPunctuationBoundary(text){
-        const pattern=/\p{P}+/gu;
+    #findAnySpeechPunctuationBoundary(text,end=false){
+        const pattern=end
+            ?TTS_ANY_PUNCTUATION_AT_END
+            :TTS_ANY_PUNCTUATION;
+        pattern.lastIndex=0;
         const firstContent=text.search(/\S/u);
         let punctuation;
 
@@ -5684,9 +5692,6 @@ class AI {
                 continue;
             }
             const boundary=punctuation.index+punctuation[0].length;
-            if(boundary<text.length&&!/\s/u.test(text[boundary])){
-                continue;
-            }
             return this.#includeSpeechBoundaryWhitespace(text,boundary);
         }
 

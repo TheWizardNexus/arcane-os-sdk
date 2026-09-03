@@ -211,7 +211,10 @@ this same request boundary. Streaming speech retains compatibility sentence
 segmentation by default. `configureTTSSegmentation({punctuation,wordCadence})`
 accepts `punctuation:'sentence'|'any'|'none'` and a `wordCadence` that is either
 `null` or a positive integer. `punctuation:'any'` completes a segment at a
-Unicode punctuation run followed by whitespace or the end of the stream;
+Unicode punctuation run without requiring following whitespace. Apostrophes,
+commas, and hyphens remain inside a segment when they join Unicode letters or
+numbers. A potentially joining mark at the current end of an incremental stream
+waits for the next character or terminal flush before the boundary is decided;
 `wordCadence` completes one after that many whole words. The earliest available
 boundary wins. Segmentation preserves every character, including punctuation
 and whitespace, while the existing queue synthesizes and plays segments in
