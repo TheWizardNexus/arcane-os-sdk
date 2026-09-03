@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.5
+
+- Added configurable complete text-to-speech stream segmentation through
+  `AI.configureTTSSegmentation()`. Applications can speak on Unicode punctuation
+  or a whole-word cadence without discarding any text, while apostrophes,
+  commas, and hyphens that join Unicode letters or numbers remain intact.
+  Synthesis and playback stay sequential, and mute or cancellation still stops
+  the complete queue.
+
 ## 0.5.4
 
 - Reduced Browser-WASM HTTP Range parts from roughly 128 MB to roughly 4 MB
