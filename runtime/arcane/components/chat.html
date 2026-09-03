@@ -3074,6 +3074,7 @@
         if(!sessionRequestMessages.length){
             throw new TypeError('A chat session request must contain at least one message.');
         }
+        const retainTurn=sessionRequestMessages.every(message=>message.persist!==false);
         const request={
             ...(sessionRequestMessages.length===1
                 ?{message:sessionRequestMessages[0]}
@@ -3184,22 +3185,29 @@
                         ??committedTurn?.request?.timestamp
                 );
             }
-            const terminalToolCalls=normalizeVisibleToolCalls(result.message.tool_calls);
-            if(
-                streamedStructuralToolCalls.length
-                &&!sameStructuralToolCalls(streamedStructuralToolCalls,terminalToolCalls)
-            ){
-                throw chatError(
-                    'The terminal structural tool calls do not match the streamed calls.',
-                    'AI_CHAT_STREAM_TOOL_CALL_MISMATCH'
-                );
-            }
-            if(!streamedStructuralToolCalls.length){
-                for(const call of terminalToolCalls){
-                    appendVisibleToolCall(message,call);
+            if(retainTurn){
+                const terminalToolCalls=normalizeVisibleToolCalls(result.message.tool_calls);
+                if(
+                    streamedStructuralToolCalls.length
+                    &&!sameStructuralToolCalls(streamedStructuralToolCalls,terminalToolCalls)
+                ){
+                    throw chatError(
+                        'The terminal structural tool calls do not match the streamed calls.',
+                        'AI_CHAT_STREAM_TOOL_CALL_MISMATCH'
+                    );
                 }
+                if(!streamedStructuralToolCalls.length){
+                    for(const call of terminalToolCalls){
+                        appendVisibleToolCall(message,call);
+                    }
+                }
+                setPendingStructuralToolCalls(terminalToolCalls);
+            }else{
+                for(const requestMessage of requestMessages) requestMessage.remove();
+                message.remove();
+                setPendingStructuralToolCalls(previousPendingToolCalls);
+                scrollTranscriptToBottom();
             }
-            setPendingStructuralToolCalls(terminalToolCalls);
             setSessionStatus(
                 pendingStructuralToolMessage?'tool':'ready',
                 pendingStructuralToolMessage||'Chat ready.'

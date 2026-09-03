@@ -462,9 +462,10 @@ results, reasoning, and request metadata, but those fields never cross the new
 DBOPFS-write boundary. Durable user and assistant turns retain only role,
 complete visible content, and timestamp. Durable tool turns retain only role,
 the required user-facing message as content, and optional public name and result
-status. System prompts remain in the live session only. Existing stored files are not
-rewritten on load. A turn with `persist:false` remains coherent in the live
-session without entering durable history or memory.
+status. System prompts remain in the live session only. Existing stored files
+are not rewritten on load. A turn with `persist:false` participates in its one
+request and response only, then remains absent from subsequent model context,
+the retained transcript, memory extraction, and DBOPFS.
 
 ### Cancellation and structural tools
 

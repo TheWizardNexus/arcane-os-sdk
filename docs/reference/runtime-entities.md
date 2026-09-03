@@ -79,6 +79,8 @@ its public name and plain result status, while its `content` comes only from the
 tool call's required user-facing `message`. System prompts, reasoning,
 provider-extension fields, memory flags, raw tool calls, call IDs, argument
 objects, and raw tool returns never enter new DBOPFS writes.
+Messages added with `persist:false` participate only in their current operation;
+they are not retained in `messages`, `transcript`, memory extraction, or DBOPFS.
 
 An assistant record may open an ordered array of structural calls with unique
 IDs in transient provider state. Until every pending ID receives exactly one

@@ -3299,6 +3299,11 @@ test(
         );
         assert.match(
             source,
+            /const retainTurn=sessionRequestMessages[.]every\(message=>message[.]persist!==false\);[\s\S]*?if\(retainTurn\)\{[\s\S]*?\}else\{[\s\S]*?requestMessage[.]remove\(\);[\s\S]*?message[.]remove\(\);[\s\S]*?setPendingStructuralToolCalls\(previousPendingToolCalls\);/u,
+            'A nonpersistent session turn must leave no retained Chat cards or pending context.'
+        );
+        assert.match(
+            source,
             /if\(message[.]role==='tool'\)\{[\s\S]*?!message[.]content[.]trim\(\)[\s\S]*?'AI_CHAT_INVALID_TOOL_MESSAGE'/u,
             'Restored tool results must contain nonblank user-facing text.'
         );

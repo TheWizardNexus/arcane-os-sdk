@@ -138,11 +138,11 @@ function storedToolRecord({content,name,status,timestamp}){
     }];
 }
 
-function storedChatRecords(messages,{durableOnly=false,memoryOnly=false}={}){
+function storedChatRecords(messages,{memoryOnly=false}={}){
     const result=[];
     for(const message of messages){
         if(!plainRecord(message)) continue;
-        if(durableOnly&&message.persistence_excluded===true) continue;
+        if(message.persistence_excluded===true) continue;
         if(memoryOnly&&message.memory_excluded===true) continue;
         const timestamp=message.timestamp;
         if(message.role==='user'){
@@ -186,6 +186,10 @@ function storedChatRecords(messages,{durableOnly=false,memoryOnly=false}={}){
         }
     }
     return result;
+}
+
+function retainedChatMessages(messages){
+    return messages.filter(message=>message?.persistence_excluded!==true);
 }
 
 function turnMessage(value,label){
@@ -456,8 +460,10 @@ class ChatEntity{
      * @returns {Array<*>}
      */
     get messages(){
-        pendingToolCalls(this.#messages);
-        return this.#messages.map(function publicChatMessage(message){
+        const retainedMessages=retainedChatMessages(this.#messages);
+        pendingToolCalls(retainedMessages);
+        return retainedMessages
+            .map(function publicChatMessage(message){
             const copy={...message};
             if(copy.tool_calls){
                 copy.tool_calls=copyToolCalls(copy.tool_calls).map(call=>({
@@ -555,7 +561,7 @@ class ChatEntity{
         if(!is.boolean(persist)){
             throw new Error('persist must be boolean');
         }
-        if(pendingToolCalls(this.#messages).size){
+        if(pendingToolCalls(retainedChatMessages(this.#messages)).size){
             throw coded(
                 new TypeError('The pending structural tool results must be supplied before a new user turn.'),
                 'AI_CHAT_TOOL_RESULT_REQUIRED'
@@ -599,7 +605,7 @@ class ChatEntity{
         if(!is.boolean(persist)){
             throw new Error('persist must be boolean');
         }
-        if(pendingToolCalls(this.#messages).size){
+        if(pendingToolCalls(retainedChatMessages(this.#messages)).size){
             throw coded(
                 new TypeError('The pending structural tool results must be supplied before another assistant turn.'),
                 'AI_CHAT_TOOL_RESULT_REQUIRED'
@@ -644,7 +650,7 @@ class ChatEntity{
         if(!is.boolean(persist)){
             throw new TypeError('persist must be boolean.');
         }
-        if(pendingToolCalls(this.#messages).size){
+        if(pendingToolCalls(retainedChatMessages(this.#messages)).size){
             throw coded(
                 new TypeError('The pending structural tool results must be supplied before another tool exchange.'),
                 'AI_CHAT_TOOL_RESULT_REQUIRED'
@@ -720,7 +726,7 @@ class ChatEntity{
                 'AI_CHAT_INCOHERENT_PERSISTENCE'
             );
         }
-        const pendingTools=pendingToolCalls(this.#messages);
+        const pendingTools=pendingToolCalls(retainedChatMessages(this.#messages));
         const userRequest=requests.find(message=>message.role==='user');
         const toolRequests=requests.filter(message=>message.role==='tool');
         if(userRequest&&pendingTools.size){
@@ -781,15 +787,10 @@ class ChatEntity{
         };
         if(!extractMemory||toolCalls?.length) assistantRecord.memory_excluded=true;
         else delete assistantRecord.memory_excluded;
-        if(!messagePersist){
-            for(const requestRecord of requestRecords){
-                requestRecord.persistence_excluded=true;
-            }
-        }
-        if(!responsePersist) assistantRecord.persistence_excluded=true;
-        else delete assistantRecord.persistence_excluded;
-
-        const appended=this.#appendMessages([...requestRecords,assistantRecord],{prepared:true});
+        const appended=this.#appendMessages(
+            [...requestRecords,assistantRecord],
+            {persist:messagePersist,prepared:true}
+        );
         if(extractMemory&&messagePersist&&responsePersist&&!toolCalls?.length&&this.persist){
             return Promise.resolve(appended).then(result=>{
                 this.#queueMemoryUpdate(memoryRequest);
@@ -855,7 +856,7 @@ class ChatEntity{
             throw new TypeError('Memory request must be a function.');
         }
         return this.#writeMemory(
-            storedChatRecords(this.#messages,{durableOnly:true,memoryOnly:true})
+            storedChatRecords(this.#messages,{memoryOnly:true})
                 .map(message=>({...message})),
             request
         );
@@ -940,7 +941,7 @@ ${JSON.stringify(transcript)}`
     #queueMemoryUpdate(request){
         const snapshot=storedChatRecords(
             this.#messages,
-            {durableOnly:true,memoryOnly:true}
+            {memoryOnly:true}
         )
             .map(message=>copyCompleteValue(message));
         const queued=this.#memoryQueue.then(()=>this.#writeMemory(snapshot,request));
@@ -1050,22 +1051,20 @@ ${JSON.stringify(transcript)}`
                 .slice(0,this.#preservedStoredMessageCount)
                 .map(message=>copyCompleteValue(message)),
             ...storedChatRecords(
-                this.#messages.slice(this.#preservedStoredMessageCount),
-                {durableOnly:true}
+                this.#messages.slice(this.#preservedStoredMessageCount)
             ),
         ];
     }
 
     async #appendMessages(messages,{persist=true,prepared=false}={}){
-        const records=Array.from(messages||[]).map(message=>
-            prepared?message:(persist?message:{...message,persistence_excluded:true})
-        );
+        const records=Array.from(messages||[]).map(message=>prepared?message:{...message});
         if(!records.length){
             return false;
         }
+        if(!persist) return false;
 
         this.#messages.push(...records);
-        const durableRecords=storedChatRecords(records,{durableOnly:true});
+        const durableRecords=storedChatRecords(records);
         if(durableRecords.length){
             this.#saved=false;
         }

@@ -296,7 +296,7 @@ function fileName(value){
 /**
  * Composes the configured chat session with one automatically selected
  * ChatEntity. Request-only context is delegated to ConfiguredAIChatSession;
- * per-turn persistence affects DBOPFS and memory, never the live model context.
+ * persist:false uses the turn for one request and retains it nowhere afterward.
  */
 class PersistentAIChatSession{
     #activeStream=null;
@@ -583,6 +583,11 @@ class PersistentAIChatSession{
                         ...(streamState.streamedToolDetails[index]??[]),
                     );
                 }
+            }
+            if(!settings.messagePersist){
+                prepared.rollback();
+                prepared=null;
+                return result;
             }
             await this.#entity.addTurn({
                 assistantMessage:result.message,

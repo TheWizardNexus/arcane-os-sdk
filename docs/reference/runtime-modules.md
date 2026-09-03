@@ -97,7 +97,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`OllamaModelIdentifier.js`](#ollamamodelidentifierjs) | esm | Validates and canonicalizes the syntax of Ollama model identifiers without granting model admission. | Cross-host | Fully normalized string/boolean result. |
 | [`OllamaSettings.js`](#ollamasettingsjs) | esm | Defines complete runtime/service preference schemas and deterministic Arcane brain alias names. | Cross-host | Fully normalized settings/name contract. |
 | [`OpenMeteoWeatherProvider.js`](#openmeteoweatherproviderjs) | esm | Searches and loads Open-Meteo data into complete mutable Arcane weather entities. | Browser / native WebView / server with fetch + cloud | Provider data normalized to mutable entities; transport errors mixed. |
-| [`PersistentAIChatSession.js`](#persistentaichatsessionjs) | esm | Adds explicit durable history/memory policy to complete configured chat without changing DBOPFS or ChatEntity semantics. | Browser / native WebView with DBOPFS and configured chat | Live context commits atomically; persistence stays coherent across user/assistant/tool turns. |
+| [`PersistentAIChatSession.js`](#persistentaichatsessionjs) | esm | Adds explicit retained-history/memory policy to complete configured chat without changing DBOPFS or ChatEntity semantics. | Browser / native WebView with DBOPFS and configured chat | Retained context commits atomically; `persist:false` turns are one-operation-only. |
 | [`PreferenceStore.js`](#preferencestorejs) | esm | Loads and updates schema-defined app preferences through native storage with a narrow browser fallback. | Browser/native hybrid | Complete ordinary values remain mutable; setAll uses one optional atomic adapter batch for every selected value when advertised, otherwise retains complete serial compatibility, and only exact unsupported native capability changes future operations to the browser fallback. |
 | [`QRCode.min.js`](#qrcodeminjs) | classic-script | Vendored QRCode generator for DOM, canvas, SVG, and image output. | Browser vendor script | Vendor-native. |
 | [`Questionnaire.js`](#questionnairejs) | esm | Evaluates whether a one-time questionnaire prompt is due without performing the prompt. | Cross-host | Normalized conservative boolean. |
@@ -2332,18 +2332,19 @@ response must use the same persistence choice. Plain-object `request` supplies
 per-turn generation options such as
 `toolChoice:'none'`; it cannot replace session-owned `messages`, `signal`, or
 streaming/lifecycle callback state.
-`persist:false` still commits the coherent turn to complete live model context,
-but not to durable ChatEntity history or memory. A structural tool result must
-use the persistence choice captured by its matching assistant tool call.
+`persist:false` makes the input and response available only to that one request.
+After the response is returned, neither remains in subsequent model context,
+the retained transcript, memory extraction, or DBOPFS. A nonpersistent response
+therefore does not open a retained structural-tool continuation. A retained
+structural tool result must use the persistence choice captured by its matching
+assistant tool call.
 
 `history()` returns provider-safe configured model context, including the
 system prompt, complete optional assistant reasoning, and every committed live
 turn. `transcript()` returns the sanitized human-readable ChatEntity projection.
 User and assistant records retain only role, complete visible content, and the
 real timestamp. Tool records retain only role, the required user-facing
-`message` as content, and optional public `name` and result `status`. A
-`persist:false` turn remains in both live history and transcript for the active
-session while remaining excluded from DBOPFS durability and memory extraction.
+`message` as content, and optional public `name` and result `status`.
 
 `stream()` accepts the same input as `send()` and optional
 `{onChunk,onDataChunk,onDataResult,onToolCall}` handlers. When

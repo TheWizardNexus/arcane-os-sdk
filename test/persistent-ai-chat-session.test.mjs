@@ -171,6 +171,8 @@ test('persistent streaming accepts terminal-only calls and compares complete str
         JSON.parse(result.message.tool_calls[0].function.arguments).message,
         'Looking up Alpha in the local library.'
     );
+    assert.deepEqual(await session.history(),[]);
+    assert.deepEqual(await session.transcript(),[]);
 
     const terminalOnlyVisibleCalls=[];
     const terminalOnly=await PersistentAIChatSession.create({
@@ -212,7 +214,7 @@ test('persistent streaming accepts terminal-only calls and compares complete str
     assert.deepEqual(await mismatched.history(),[]);
 });
 
-test('persistent chat retains transient turns in recurring context without writing them',async()=>{
+test('persistent chat uses nonpersistent turns once without retaining context or history',async()=>{
     const requests=[];
     const session=await PersistentAIChatSession.create({
         chat:async request=>{
@@ -229,11 +231,13 @@ test('persistent chat retains transient turns in recurring context without writi
         response:{persist:false},
     });
     assert.equal(db.raw('chats',session.fileName),null);
+    assert.deepEqual(await session.transcript(),[]);
+    assert.deepEqual(await session.history(),[{role:'system',content:'system'}]);
 
     await session.send({message:{content:'durable question'}});
     const secondMessages=requests[1].messages;
-    assert.ok(secondMessages.some(message=>message.content==='transient analysis'));
-    assert.ok(secondMessages.some(message=>message.content==='reply-1'));
+    assert.ok(!secondMessages.some(message=>message.content==='transient analysis'));
+    assert.ok(!secondMessages.some(message=>message.content==='reply-1'));
     assert.equal(
         secondMessages.filter(message=>String(message.content).includes('retrieved only for')).length,
         1,
@@ -245,7 +249,8 @@ test('persistent chat retains transient turns in recurring context without writi
     assert.match(durable,/reply-2/u);
 
     const history=await session.history();
-    assert.ok(history.some(message=>message.content==='transient analysis'));
+    assert.ok(!history.some(message=>message.content==='transient analysis'));
+    assert.ok(!history.some(message=>message.content==='reply-1'));
     assert.ok(!history.some(message=>String(message.content).includes('retrieved only for')));
 });
 
@@ -256,6 +261,8 @@ test('response persistence inherits message persistence and rejects incoherent m
     });
     await session.send({message:{content:'not durable',persist:false}});
     assert.equal(db.raw('chats',session.fileName),null);
+    assert.deepEqual(await session.history(),[]);
+    assert.deepEqual(await session.transcript(),[]);
 
     await assert.rejects(
         session.send({

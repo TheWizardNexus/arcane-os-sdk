@@ -309,6 +309,9 @@ history stores each tool's required user-facing message as an ordinary
 call envelope or ID and therefore does not recreate a pending executable call
 after reload. `submitToolResult()` and `submitToolResults()` accept `status` as
 the public result term; `disposition` remains a compatibility spelling.
+When a submitted turn uses `persist:false`, Chat may show its cards while that
+one operation is active, then removes them when the operation settles; neither
+the input nor response remains in the retained transcript or model context.
 
 For streaming sessions, every provisional structural card and the terminal
 result must preserve the same choice, ordered call position, exact ID, type,
