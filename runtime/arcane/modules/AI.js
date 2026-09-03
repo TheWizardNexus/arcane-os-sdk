@@ -5036,7 +5036,6 @@ class AI {
                 const content=typeof choiceDelta.content==='string'
                     ?choiceDelta.content
                     :'';
-                let value=content;
                 let reasoning='';
                 if(seeThinking){
                     reasoning=typeof choiceDelta.reasoning_content==='string'
@@ -5046,8 +5045,13 @@ class AI {
                             :'';
                 }
                 isThinking=Boolean(reasoning);
-                if(reasoning) value=reasoning;
-                if(value) await streamHandler(value,`M-${id}`,isThinking);
+                if(reasoning){
+                    await streamHandler(reasoning,`M-${id}`,true);
+                }
+                if(content){
+                    isThinking=false;
+                    await streamHandler(content,`M-${id}`,false);
+                }
             }
         }
 
