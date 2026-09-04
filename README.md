@@ -82,7 +82,7 @@ OpenAI-compatible chat-completion requests to
 `https://inference.do-ai.run/v1/chat/completions` with model
 `openai-gpt-oss-120b`. Supply the bearer credential through `ai.twinKey` or
 `globalThis.arcane.config.twinCloud.accessKey`. The established `ai.license`
-property and internal `OPENAI` route identifier remain compatibility aliases;
+property and internal `OPENAI` route identifier are current runtime names;
 applications should present the service and credential as **TWiN Cloud** and
 **TWiN access key**. The TWiN key is used only for remote LLM chat. Audio stays
 on device: Whisper (`LOCAL_SPEACH` / `whisper-small`) owns transcription and

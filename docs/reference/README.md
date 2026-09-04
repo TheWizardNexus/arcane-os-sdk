@@ -17,7 +17,7 @@ high-level page links to the relevant deep section instead of repeating it.
 | Need | Start here |
 | --- | --- |
 | Use the Node.js package API | [SDK JavaScript API](sdk-api.md) |
-| Publish central events, capture bounded time-travel history, or observe the DOM | [EventManager and event-stack reference](event-manager.md) |
+| Publish central events, capture complete time-travel history, or observe the DOM | [EventManager and event-stack reference](event-manager.md) |
 | Use the `arcane` command | [CLI reference](cli.md) |
 | Generate named browser imports or inspect the selected physical runtime | [`arcane import-map`](cli.md#arcane-import-map) and [browser runtime delivery](protocols.md#browser-runtime-delivery) |
 | Choose browser, native, cloud, or cross-host behavior | [Availability and normalization](availability-and-normalization.md) |
@@ -151,10 +151,10 @@ cancel the corresponding activation-request event. Imports and state
 observation emit no lifecycle intent, and default
 `startTranscription=false` does not request an STT startup load or begin an
 automatic model download. It does not unload a role started independently.
-Compatibility availability never creates ready STT/TTS state without an
+Reported availability never creates ready STT/TTS state without an
 admitted, loaded provider. Shared STT cancel/destroy propagates an owned signal,
 and TTS Mute/Unmute updates the shared lifecycle owner. The selected local TTS
-provider/model catalog owns its default voice; a retired OpenAI voice is not
+provider/model catalog owns its default voice; a saved OpenAI-route voice is not
 forwarded to Core or browser speech.
 
 ## Authority and feature detection

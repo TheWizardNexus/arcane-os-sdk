@@ -1148,7 +1148,6 @@
       "kind": "esm",
       "exports": [
         "SPEECH_PLAYBACK_STATE_EVENT",
-        "SPEECH_VOICE_OPTIONS",
         "SpeechPlayback",
         "default",
         "splitSpeechText"
@@ -1157,7 +1156,7 @@
       "availability": "Browser + compatible AI/native bridge",
       "protocol": "AI.fetchTTS or compatible Arcane.speech.synthesize, globalThis.arcaneEvents, Blob URLs, audio element",
       "normalization": "Exact nonblank split/part input strings are preserved in mutable records while playback policy, cancellation, Blob results, and lifecycle state are normalized; provider failures remain external.",
-      "surface": "SpeechPlayback class/default, `SPEECH_PLAYBACK_STATE_EVENT`, `SPEECH_VOICE_OPTIONS`, `splitSpeechText()`, canonical playback lifecycle events, cancellation, and destroy APIs."
+      "surface": "SpeechPlayback class/default, `SPEECH_PLAYBACK_STATE_EVENT`, `splitSpeechText()`, canonical playback lifecycle events, cancellation, and destroy APIs."
     },
     {
       "file": "runtime/arcane/modules/StaticDocumentCatalog.js",

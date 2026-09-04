@@ -17,18 +17,18 @@ Apps import renderer ESM from `/arcane/modules/<file>`. Classic scripts, the OPF
 
 SDK runtime modules publish semantic state and lifecycle occurrences through the
 one branded, versioned `globalThis.arcaneEvents` authority in each JavaScript
-realm. A class can retain its existing `EventTarget` or `on()` compatibility
-surface, but that surface delegates to a `createArcaneEventSource()` view scoped
+realm. A class can retain its existing `EventTarget` or `on()` listener surface,
+but that surface delegates to a `createArcaneEventSource()` view scoped
 by the module's source and instance identifiers; it does not own a second event
 bus, listener `Map`, or listener `Set`. Every canonical occurrence and every
-one-way DOM compatibility projection carries an occurrence ID. DOM input events
+one-way DOM projection carries an occurrence ID. DOM input events
 remain local UI/platform input, and projected DOM `CustomEvent`s must not be
 mirrored back into the canonical source.
 
 `arcaneEvents.subscribe(type,handler,{once,signal})` and source-scoped
 `subscribe()`/`on()` registrations return one idempotent unsubscribe function
 (also exposed as `.dispose`). The singleton's convenience `on()`/`once()` methods are
-chainable compatibility APIs that return the manager; lifecycle-owned consumers
+chainable listener APIs that return the manager; lifecycle-owned consumers
 use `subscribe()`. Instance `dispose()`/`destroy()` methods remove owned
 listeners, abort owned work, suppress stale settlement, and dispose the instance
 source. Module-lifetime singleton sources instead expose a focused module
@@ -98,7 +98,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`OllamaSettings.js`](#ollamasettingsjs) | esm | Defines complete runtime/service preference schemas and deterministic Arcane brain alias names. | Cross-host | Fully normalized settings/name contract. |
 | [`OpenMeteoWeatherProvider.js`](#openmeteoweatherproviderjs) | esm | Searches and loads Open-Meteo data into complete mutable Arcane weather entities. | Browser / native WebView / server with fetch + cloud | Provider data normalized to mutable entities; transport errors mixed. |
 | [`PersistentAIChatSession.js`](#persistentaichatsessionjs) | esm | Adds explicit retained-history/memory policy to complete configured chat without changing DBOPFS or ChatEntity semantics. | Browser / native WebView with DBOPFS and configured chat | Retained context commits atomically; `persist:false` turns are one-operation-only. |
-| [`PreferenceStore.js`](#preferencestorejs) | esm | Loads and updates schema-defined app preferences through native storage with a narrow browser fallback. | Browser/native hybrid | Complete ordinary values remain mutable; setAll uses one optional atomic adapter batch for every selected value when advertised, otherwise retains complete serial compatibility, and only exact unsupported native capability changes future operations to the browser fallback. |
+| [`PreferenceStore.js`](#preferencestorejs) | esm | Loads and updates schema-defined app preferences through native storage with a narrow browser fallback. | Browser/native hybrid | Complete ordinary values remain mutable; setAll uses one optional atomic adapter batch for every selected value when advertised, otherwise performs complete ordered serial writes, and only exact unsupported native capability changes future operations to the browser fallback. |
 | [`QRCode.min.js`](#qrcodeminjs) | classic-script | Vendored QRCode generator for DOM, canvas, SVG, and image output. | Browser vendor script | Vendor-native. |
 | [`Questionnaire.js`](#questionnairejs) | esm | Evaluates whether a one-time questionnaire prompt is due without performing the prompt. | Cross-host | Normalized conservative boolean. |
 | [`RecordLinkIndex.js`](#recordlinkindexjs) | esm | Parses record links and builds their normalized index. | Cross-host | Fully normalized. |
@@ -148,7 +148,7 @@ Initialization uses the canonical realm user's actual readiness state. If
 `window.user?.ready` is already true, AI initializes immediately. Otherwise one
 shared registration observes `user-entity-loaded`, then rechecks readiness
 after registration so an event that occurred between the initial check and the
-subscription cannot strand initialization. Compatibility event projections do
+subscription cannot strand initialization. Source event projections do
 not need to preserve object identity with `window.user`; the event only prompts
 the readiness recheck. This boundary uses no timer or polling fallback.
 
@@ -170,8 +170,8 @@ keeps the selected provider's public response shape. Browser speech routes
 translate the existing AI.js STT `{audio:Blob|File,mimeType,model}` and TTS
 `{model,input,responseFormat,voice?,speed?}` requests at the provider boundary;
 only WAV is accepted for the shared TTS result. TTS voice selection comes from
-the exact selected local provider/model catalog `defaultVoice`; a retired
-OpenAI voice is never forwarded to another provider route.
+the exact selected local provider/model catalog `defaultVoice`; a saved
+OpenAI-route voice is never forwarded to another provider route.
 
 `fetchRequest()` and `streamRequest()` accept `reasoningEffort` as a
 provider-neutral request option. Its exact values are `none`, `low`, `medium`,
@@ -209,14 +209,14 @@ TTS route reaches ready; a failed load leaves the public state muted. In contras
 provider-neutral synthesis shape, requires any explicit model to match the
 selected route, and fills an omitted voice only from the selected model
 catalog's `defaultVoice`. An omitted response format preserves the instance's
-existing `audioFormat` for a compatibility-only catalog. When the selected model
-declares `speech.responseFormats`, that setting is used only when supported; if
+existing `audioFormat` when the catalog does not declare response formats. When
+the selected model declares `speech.responseFormats`, that setting is used only when supported; if
 the setting is the instance's `opus` default and the model rejects it, the catalog's
 `speech.defaultResponseFormat` is used, while any other unsupported setting is
 rejected. It propagates the caller-owned signal and returns a playable `Blob`;
 it does not independently choose a provider, cloud fallback, model, runtime, or
 voice policy for the application. Existing `streamTTS()` and `finishTTS()` use
-this same request boundary. Streaming speech retains compatibility sentence
+this same request boundary. Streaming speech retains sentence
 segmentation by default. `configureTTSSegmentation({punctuation,wordCadence})`
 accepts `punctuation:'sentence'|'any'|'none'` and a `wordCadence` that is either
 `null` or a positive integer. `punctuation:'any'` completes a segment at a
@@ -235,7 +235,7 @@ operation boundary, generation, and stable reason. Muting, explicit
 cancellation, permission waiting, and superseded generations do not emit a
 failure. The operation event does not rewrite provider readiness; the consuming
 Chat/Speech surface owns its visible mute and recovery state.
-`fetchSTT(audioFile,responseHandler,signal)` propagates the caller-owned signal;
+`fetchSTT(audioFile,signal)` propagates the caller-owned signal;
 provider routes accept a `Blob` or `File` directly and leave media decoding,
 PCM normalization, and WAV construction to the selected shared provider;
 delivery suppression is guaranteed after abort, while underlying provider-stop
@@ -389,7 +389,7 @@ and `operationId`:
 
 Canonical public details are mutable and contain `configurationId`, optional
 `descriptor`, optional exact `code`, and `reason`. The private source-local
-compatibility view also carries the caller-owned configuration and optional
+view also carries the caller-owned configuration and optional
 error, but `AI` does not expose that source handle and the global occurrence
 does not publish those private values. Reasons are exactly `speech-configuration-added`,
 `speech-configuration-replaced`, `speech-configuration-cancelled`,
@@ -427,8 +427,8 @@ boundaries with `ARCANE_AI_TTS_REQUEST_INVALID`,
 `ARCANE_AI_TTS_VOICE_REQUIRED`, `ARCANE_AI_TTS_RESPONSE_FORMAT_INVALID`, or
 `ARCANE_AI_TTS_SPEED_INVALID`; a non-playable provider result is
 `ARCANE_AI_TTS_PROVIDER_AUDIO_INVALID`. `fetchSTT()` uses
-`ARCANE_AI_STT_RESPONSE_HANDLER_INVALID`, `ARCANE_AI_STT_SIGNAL_INVALID`, and
-`ARCANE_AI_STT_PROVIDER_TRANSCRIPT_INVALID` at those exact boundaries. Owned
+`ARCANE_AI_STT_SIGNAL_INVALID` and `ARCANE_AI_STT_PROVIDER_TRANSCRIPT_INVALID`
+at those exact boundaries. Owned
 request abortion is `ARCANE_AI_REQUEST_ABORTED`.
 
 Exact exports: `AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL`,
@@ -558,7 +558,7 @@ own no ready/load/unload/dispose or request work, commits only STT/TTS, restores
 muted speech selection, and returns the mutable selection record. The current LLM
 routes, selection, readiness, operation generation, and sticky state remain
 unchanged. A malformed top-level, route, or selection record preserves the
-compatibility code
+current error code
 `ARCANE_AI_PROVIDER_RUNTIME_INVALID` and adds exact reason
 `speech-configuration-contract-mismatch`; runtime-disposed, reentrant,
 role-busy, and provider-locality failures retain their existing exact codes.
@@ -2458,7 +2458,7 @@ selected schema value before storage work. For every selected value it calls an
 advertised `setMany()` once and publishes the existing per-key change events
 only after that batch succeeds. A dispatched batch rejection propagates without
 a serial retry, in-memory state change, or change event. Adapters without
-`setMany()` retain ordered complete serial storage compatibility inside
+`setMany()` retain ordered complete serial storage behavior inside
 one queued operation, including state and events for each successful write before
 a later write fails.
 
@@ -2714,11 +2714,11 @@ synthesis, and controls lookahead HTML audio playback.
 
 ### Public surface
 
-`SpeechPlayback` class/default, `SPEECH_VOICE_OPTIONS`,
-`SPEECH_PLAYBACK_STATE_EVENT`, `splitSpeechText()`, and playback lifecycle APIs.
+`SpeechPlayback` class/default, `SPEECH_PLAYBACK_STATE_EVENT`,
+`splitSpeechText()`, and playback lifecycle APIs.
 
-Exact exports: `SPEECH_PLAYBACK_STATE_EVENT`, `SPEECH_VOICE_OPTIONS`,
-`SpeechPlayback`, `default`, and `splitSpeechText`.
+Exact exports: `SPEECH_PLAYBACK_STATE_EVENT`, `SpeechPlayback`, `default`, and
+`splitSpeechText`.
 
 ```text
 new SpeechPlayback({
@@ -2740,8 +2740,7 @@ new SpeechPlayback({
 speed,autoplay=true})` uses only caller-supplied model, voice, and response-format
 values; those three omitted values remain omitted so the selected AI/model
 catalog may provide its documented defaults. Speed defaults to `1`, is normalized
-as a positive number, and is always sent. The exported voice constants remain
-available but are not selected by the class. There is no
+as a positive number, and is always sent. There is no
 hard-coded model, response format, voice, or cloud/browser fallback.
 `splitSpeechText(value)` uses trimming only to detect blank input, then returns
 the caller's exact string in one mutable array without trimming, splitting, or

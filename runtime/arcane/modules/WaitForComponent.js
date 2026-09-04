@@ -301,7 +301,6 @@ function waitForComponent(element,options={}){
                     if(componentCode){
                         error.componentCode=componentCode;
                     }
-                    error.compatibilityCode=componentCode||'COMPONENT_READY_FAILED';
                     fail(
                         defineComponentWaitError(
                             error,

@@ -272,7 +272,6 @@ test('the public package API inventory matches every JavaScript export and MDN e
                 target:'./runtime/arcane/modules/SpeechPlayback.js',
                 names:[
                     'SPEECH_PLAYBACK_STATE_EVENT',
-                    'SPEECH_VOICE_OPTIONS',
                     'SpeechPlayback',
                     'default',
                     'splitSpeechText'
@@ -790,7 +789,7 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
         assert.match(speechSource,/session[.]generation === recordingGeneration[\s\S]*transcriptionOperationId === session[.]operationId/u);
         assert.match(speechSource,/transcribeAudio\(audioFile, session[.]operationId\)/u);
         assert.match(voiceSource,/canStartVoiceRecording\(sttRole,state,destroyed\)/u);
-        assert.match(voiceSource,/fetchSTT\(file,undefined,signal\)/u);
+        assert.match(voiceSource,/fetchSTT\(file,signal\)/u);
         assert.match(componentGuide,/Start\s+transcription[\s\S]*Cancel\s+loading[\s\S]*Try\s+again/u);
         assert.match(componentGuide,/preventDefault\(\)[\s\S]*suppresses the callback/u);
         assert.match(componentGuide,/emits no activation request on import or state observation/u);

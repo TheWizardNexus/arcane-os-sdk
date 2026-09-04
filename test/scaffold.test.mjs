@@ -251,7 +251,7 @@ test('create refuses a nonempty target and init preserves existing authored file
     assert.ok(receipt.createdFiles.includes('apps/preserved-app/index.html'));
 });
 
-test('init replaces an obsolete SDK lock with the canonical semantic document',async t=>{
+test('init replaces a noncanonical SDK lock with the canonical semantic document',async t=>{
     const workspaceRoot=await temporaryDirectory(t);
     const generated=workspaceTemplate({appId:'forged-lock'});
     const forged=JSON.parse(generated.files.get('arcane.lock.json'));

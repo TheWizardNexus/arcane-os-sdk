@@ -1294,7 +1294,7 @@
             const audioContext = new AudioContext();
             const source = audioContext.createMediaStreamSource(stream);
 
-            // ScriptProcessor remains the visible compatibility capture path
+            // ScriptProcessor remains the active silence-detection capture path
             // in this increment. AudioWorklet needs its own reviewed protocol.
             const processor = audioContext.createScriptProcessor(4096, 1, 1);
             session = {
@@ -1479,7 +1479,6 @@
 
             const transcription = await aiRuntime.fetchSTT(
                 audioFile,
-                undefined,
                 controller.signal
             );
             if (

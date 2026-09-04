@@ -1412,20 +1412,6 @@
       "normalization": "Exact immutable speech-playback-state event name"
     },
     {
-      "id": "speech-playback:SPEECH_VOICE_OPTIONS",
-      "name": "SPEECH_VOICE_OPTIONS",
-      "displayName": "SPEECH_VOICE_OPTIONS",
-      "kind": "constant",
-      "signature": "const SPEECH_VOICE_OPTIONS",
-      "entrypoints": ["arcane-os/speech-playback"],
-      "primaryImport": "arcane-os/speech-playback",
-      "group": "Portable runtime modules",
-      "summary": "Frozen provider-neutral voice option records exposed to shared UI.",
-      "availability": "Node and browser",
-      "protocol": "SpeechPlayback runtime contract",
-      "normalization": "Frozen ordered value and label records"
-    },
-    {
       "id": "speech-playback:SpeechPlayback",
       "name": "SpeechPlayback",
       "displayName": "SpeechPlayback",

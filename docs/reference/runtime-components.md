@@ -28,17 +28,17 @@ each component owns exactly one source created through
 `createArcaneEventSource(host,{source:'arcane.component.<name>',eventTypes})`.
 That source publishes synchronously to the realm's branded
 `globalThis.arcaneEvents` authority. Component DOM events are one-way
-compatibility projections of the same canonical occurrence; they are never
+projections of the same canonical occurrence; they are never
 republished into the authority. Every projected detail has the canonical
 `occurrenceId`, `arcaneSource`, `instanceId`, and `operationId` fields in a
-mutable complete record. A compatibility payload's existing `source` field remains
+mutable complete record. A source payload's existing `source` field remains
 source-local and may differ from `arcaneSource`; the payload may additionally
 retain source-local browser or provider objects.
 
 When a component uses a cancelable event before a requested operation, cancellation on
 either the canonical occurrence or its DOM projection makes the publication
 unaccepted, and the component does not continue the guarded operation. A
-cancelable compatibility notification emitted after committed work does not
+cancelable projected notification emitted after committed work does not
 roll that work back unless its component section explicitly says otherwise.
 Asynchronous work keeps its own `AbortSignal`, operation generation, and
 promise ownership; canonical publication is synchronous and does not become an
@@ -232,7 +232,7 @@ does not supply them; applications may instead consume the corresponding
 `submitMessage(textOverride='',context={})` returns `Promise<boolean>`.
 `context` accepts `source`, `preserveDraft`, `synthetic`, an optional exact
 `operationId`, and an optional caller-owned `AbortSignal`. The component owns a
-derived signal for each submission, supplies it in the mutable complete compatibility
+derived signal for each submission, supplies it in the mutable complete source
 `{message,context}` detail, and aborts it on canonical/DOM cancellation,
 component destruction, or caller cancellation. `chat-send-message` is
 cancelable and is the gate before `sendMessage(text,context)`; a canceled event
@@ -242,7 +242,7 @@ suppressed.
 
 `bindSession({ai,session,sessionOptions})` accepts exactly one of a public AI API
 module or an existing compatible session, restores the UI transcript when
-available, and uses provider-safe history as its compatibility fallback. The
+available, and uses provider-safe history as its restoration fallback. The
 transcript is a masked vertical scroll viewport; status and composer remain
 outside it. Initial restoration and every user, assistant, tool, streaming,
 progress, or failure mutation scrolls that viewport to its true bottom. Each
@@ -266,7 +266,7 @@ require nonblank user-facing result content; accepted text is preserved exactly
 rather than trimmed or rewritten.
 
 `submitToolResult({toolCallId?,status,message,persist?,request?},{operationId?,signal?})`
-is the one-call compatibility method. It infers the only pending ID when omitted
+is the single-call method. It infers the only pending ID when omitted
 and rejects when zero or multiple calls are pending; parallel calls must use
 `submitToolResults()`.
 Optional plain-object `request` contains per-turn generation choices forwarded
@@ -299,16 +299,16 @@ the status text and accessibility description; only the decorative track width
 is constrained to its visual range.
 
 `pendingTools` is the mutable ordered array of actionable `{id,name,message}`
-summaries and never exposes raw arguments. `pendingTool` is that compatibility
+summaries and never exposes raw arguments. `pendingTool` is that single-call
 summary only when exactly one call is pending. `pendingToolCalls` exposes
 complete copied call envelopes for an explicitly selected inspection or host
-settlement surface, while `pendingToolCall` is its one-call compatibility view.
+settlement surface, while `pendingToolCall` is its single-call view.
 These pending-call views exist only for the active transient protocol. Durable
 history stores each tool's required user-facing message as an ordinary
 `role:'tool'` record with optional public name and result status; it stores no
 call envelope or ID and therefore does not recreate a pending executable call
 after reload. `submitToolResult()` and `submitToolResults()` accept `status` as
-the public result term; `disposition` remains a compatibility spelling.
+the public result term; `disposition` remains an accepted input spelling.
 When a submitted turn uses `persist:false`, Chat may show its cards while that
 one operation is active, then removes them when the operation settles; neither
 the input nor response remains in the retained transcript or model context.
@@ -321,9 +321,9 @@ observed call fails with
 prior pending-call state is restored instead of leaving a ghost card or a false
 settlement.
 
-`setAIAvailability()` remains an LLM compatibility input, but selected sticky
-`AIRuntimeState` LLM state wins over that boolean. STT and TTS readiness always
-comes from sticky runtime role state; the method never forwards compatibility
+`setAIAvailability()` remains a current LLM availability input, but selected
+sticky `AIRuntimeState` LLM state wins over that boolean. STT and TTS readiness always
+comes from sticky runtime role state; the method never forwards standalone
 speech booleans or synthesizes ready speech roles without a selected, loaded
 provider.
 
@@ -1117,7 +1117,7 @@ component never selects a runtime or model, downloads artifacts, reloads after
 failure, or falls back to another provider.
 
 Each transcription request owns an `AbortController`; its signal is passed as
-the third argument to `AI.fetchSTT()`. Cancel, a newer capture, and `destroy()`
+the second argument to `AI.fetchSTT()`. Cancel, a newer capture, and `destroy()`
 abort that controller and suppress late results. This proves request delivery
 was canceled, not that an uncooperative provider stopped underlying work.
 
@@ -1401,8 +1401,7 @@ synchronously to sticky `AIRuntimeState.roles.stt`; its recording Start button
 and public `startRecording()` both remain unavailable unless that role is exactly
 `ready` and not busy. A configured `transcribe(file,context)` callback remains
 request plumbing rather than readiness authority. Its context now includes the
-owned `signal` additively. The default route calls
-`AI.fetchSTT(file,undefined,signal)` so the callback position remains valid and
+owned `signal` additively. The default route calls `AI.fetchSTT(file,signal)` so
 readiness loss or destruction can abort delivery.
 
 For a selected `unloaded`, `loading`, `unloading`, or `error` role, the component
@@ -1422,7 +1421,7 @@ owner explicitly marks nonblank copy with `userSafe:true`.
 If sticky readiness is lost during microphone acquisition, capture, or the STT
 request, the component invalidates the session, aborts the owned request signal,
 releases media, discards late completion, and emits
-`speech-transcription-cancelled`. Its local compatibility reason is
+`speech-transcription-cancelled`. Its source-local reason is
 `runtime-unready`, while its canonical/public reason is `stt-role-unready`. A
 busy role uses `stt-role-busy` in both views. A current provider cancellation
 returns the component workflow to `idle` with local

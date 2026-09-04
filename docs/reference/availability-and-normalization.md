@@ -150,7 +150,7 @@ not disabled.
 
 The projected [`AIProviderRuntime`](runtime-modules.md#aiproviderruntimejs)
 normalizes those browser providers and can admit an externally supplied native
-or cloud provider/2 adapter. `AI.js` also supplies compatibility adapters for
+or cloud provider/2 adapter. `AI.js` also supplies built-in adapters for
 an already-selected TWiN Cloud LLM route, Ollama route, or admitted local Core
 speech route. Its built-in audio selections are on-device only: saved `OPENAI`
 speech selections migrate to `LOCAL_SPEACH` with `whisper-small` for STT and

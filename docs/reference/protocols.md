@@ -56,16 +56,17 @@ the selected descriptor's directly navigable admitted `.html`/`.htm` documents
 through the package include/exclude rules and writes one canonical map to the
 artifact plus every such document. The current marker is exactly one matching
 `meta[name="arcane-app-id"]`; an unmarked secondary page with an active `base`
-remains admitted for patch compatibility. Wrong or duplicate explicit identity
-fails, and the selected page then must pass exact path-relative base validation.
+remains admitted under the current secondary-document rule. Wrong or duplicate
+explicit identity fails, and the selected page then must pass exact path-relative
+base validation.
 Included HTML with neither signal is a component fragment and remains a
 complete package file.
 `arcane-os/preference-store` and
 `arcane-os/speech-playback` are the two portable runtime subpaths: Node package
 exports and managed browser keys both resolve directly to the canonical runtime
 module namespaces, while `arcane/PreferenceStore` and
-`arcane/SpeechPlayback` remain browser compatibility names. There is no exported
-`importMapApplication()` function, `generateImportMap()` function, or
+`arcane/SpeechPlayback` are the established browser import-map names. There is
+no exported `importMapApplication()` function, `generateImportMap()` function, or
 `arcane-os/import-map` package subpath.
 
 The application dependency boundary is conditional. Only an application that
@@ -525,7 +526,7 @@ an `initialMuted:false` component configuration preserves that intent across an
 unselected or loading TTS route and exposes unmuted state only after readiness;
 mute calls `AI.setSpeechMuted(true)`, cancels active synthesis, and unloads TTS.
 The selected local TTS model catalog owns `defaultVoice`. AI.js never forwards
-a retired OpenAI voice to Core or browser Kokoro.
+a saved OpenAI-route voice to Core or browser Kokoro.
 
 LLM tool calls are structural result data only. The SDK never executes a
 handler. The application owns schema validation, authorization, side-effect

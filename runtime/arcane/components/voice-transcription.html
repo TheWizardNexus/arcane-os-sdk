@@ -605,7 +605,7 @@
             error.code='ARCANE_VOICE_TRANSCRIPTION_STT_RUNTIME_METHOD_UNAVAILABLE';
             throw error;
         }
-        return globalThis.ai.fetchSTT(file,undefined,signal);
+        return globalThis.ai.fetchSTT(file,signal);
     }
 
     function isTranscriptionCancellation(error,controller){

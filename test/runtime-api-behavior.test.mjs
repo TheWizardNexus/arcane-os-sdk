@@ -4747,7 +4747,7 @@ test(
         );
         assert.match(
             source,
-            /fetchSTT\([\s\S]*audioFile,[\s\S]*undefined,[\s\S]*controller[.]signal/u,
+            /fetchSTT\([\s\S]*audioFile,[\s\S]*controller[.]signal/u,
             'The shared STT request must receive its owned cancellation signal.'
         );
         assert.match(
@@ -5044,8 +5044,8 @@ test(
         );
         assert.match(
             voiceSource,
-            /return globalThis[.]ai[.]fetchSTT\(file,undefined,signal\)/u,
-            'The default voice path must preserve the AI.fetchSTT callback position and owned signal.'
+            /return globalThis[.]ai[.]fetchSTT\(file,signal\)/u,
+            'The default voice path must pass the owned signal to AI.fetchSTT.'
         );
         assert.match(
             voiceSource,

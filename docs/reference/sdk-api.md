@@ -186,7 +186,6 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `selectApp()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node |
 | `SpeechPlayback default export` | class | `arcane-os/speech-playback` | Portable runtime modules | Node with injected media adapters, or browser/native WebView media |
 | `SPEECH_PLAYBACK_STATE_EVENT` | constant | `arcane-os/speech-playback` | Portable runtime modules | Node and browser |
-| `SPEECH_VOICE_OPTIONS` | constant | `arcane-os/speech-playback` | Portable runtime modules | Node and browser |
 | `SpeechPlayback` | class | `arcane-os/speech-playback` | Portable runtime modules | Node with injected media adapters, or browser/native WebView media |
 | `splitSpeechText()` | function | `arcane-os/speech-playback` | Portable runtime modules | Node and browser |
 | `startDevServer()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node control plane; browser data plane |
@@ -1538,29 +1537,6 @@ const SPEECH_PLAYBACK_STATE_EVENT
 ```javascript
 import {SPEECH_PLAYBACK_STATE_EVENT} from 'arcane-os/speech-playback';
 console.log(SPEECH_PLAYBACK_STATE_EVENT);
-```
-
-## SPEECH_VOICE_OPTIONS
-
-### Overview
-
-Frozen provider-neutral voice option records exposed to shared UI.
-
-### Signature and result
-
-```text
-const SPEECH_VOICE_OPTIONS
-```
-
-### Availability and normalization
-
-**Node and browser.** Frozen ordered value/label records from the canonical runtime.
-
-### Example
-
-```javascript
-import {SPEECH_VOICE_OPTIONS} from 'arcane-os/speech-playback';
-console.log(SPEECH_VOICE_OPTIONS[0]);
 ```
 
 ## SpeechPlayback

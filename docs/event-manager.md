@@ -1,7 +1,7 @@
 # Canonical SDK events and time-travel review
 
 `arcaneEvents` is the canonical synchronous SDK event authority. The module
-installs or reuses exactly one branded authority at `globalThis.arcaneEvents` in
+installs or reuses one current-protocol authority at `globalThis.arcaneEvents` in
 each JavaScript realm, even when the same source is loaded through duplicate
 module URLs. It is not a cross-frame, worker, process, native-host, or cloud bus.
 
@@ -11,14 +11,13 @@ module URLs. It is not a cross-frame, worker, process, native-host, or cloud bus
 failure propagates to that publisher. Use `arcaneEvents.subscribe()` and
 `createArcaneEventSource()` for canonical SDK semantic events instead.
 
-The installed global is an own, non-enumerable, non-writable, non-configurable
-data property. Its authority brand is
-`Symbol.for('arcane-os.arcane-events-authority')`, and both the brand value and
-public `protocol` are exactly `arcane-event-authority/1`. A later import reuses
-the object only when its property, brand, protocol, and required callable API
-descriptors are compatible. An inherited value, accessor, unbranded value,
-mutable descriptor, incompatible protocol, incomplete API, or failed install is
-rejected; the SDK never replaces or wraps a competing global.
+When this module installs the authority, the global is an own, non-enumerable,
+writable, configurable data property. The created authority exposes
+`Symbol.for('arcane-os.arcane-events-authority')` and public `protocol` as
+`arcane-event-authority/1`. A later import reuses a value with that protocol and
+the required callable API. Otherwise the module installs a new authority when
+the property can be defined; installation failure reports
+`ARCANE_EVENT_AUTHORITY_INSTALL_FAILED`.
 
 Import the dedicated host-neutral entry point:
 
@@ -68,16 +67,17 @@ may have one active source, and the returned handle exposes
 addEventListener,removeEventListener,dispatch,dispatchEvent,dispose,destroy}`.
 
 `dispatch()` synchronously delivers one mutable `arcane-event-occurrence/1`
-to exact-type canonical subscribers, then an EventTarget-compatible view to the
+to exact-type canonical subscribers, then an EventTarget-shaped view to the
 source's own listeners. The occurrence contains `occurrenceId`, `type`, `source`,
 `instanceId`, `operationId`, a complete plain-data snapshot in `detail`,
-`cancelable`, live `defaultPrevented`, and `preventDefault()`. The richer
-compatibility detail remains local to the authority for source listeners and
-optional DOM projection; it is not placed on the canonical bus or in time-travel
-history.
+`cancelable`, live `defaultPrevented`, and `preventDefault()`. When
+`publicDetail` is omitted, canonical detail is the normalized source detail;
+record values merge with explicitly supplied `publicDetail`, and other
+combinations are retained under `{compatibility,publicDetail}`. The same
+canonical detail enters optional time-travel history.
 
 Source listeners retain EventTarget compatibility: function listeners receive
-the source owner as `this`, and the compatibility view exposes that owner as
+the source owner as `this`, and the source event view exposes that owner as
 both `target` and `currentTarget`. Plain records and arrays are shallow-copied;
 rich host objects remain local and are not recursively copied.
 EventTarget-shaped `addEventListener()` and `removeEventListener()` preserve
@@ -112,9 +112,9 @@ the owner to register a later source.
 Cancellation is synchronous and observational. For a cancelable occurrence,
 canonical or source listeners may call `preventDefault()`; `dispatch()` then
 returns `{occurrence,accepted:false}`. Callers decide whether cancellation gates
-their domain operation. `projectArcaneDOMEvent()` is a one-way compatibility
-projection: it creates one `CustomEvent`, adds the canonical identifiers to a
-mutable outer detail object, preserves any compatibility `source` value, exposes
+their domain operation. `projectArcaneDOMEvent()` is a one-way DOM adapter: it
+creates one `CustomEvent`, adds the canonical identifiers to a mutable outer
+detail object, preserves any source-detail `source` value, exposes
 the canonical emitter as `arcaneSource`, propagates DOM cancellation back to the
 occurrence, and never republishes the DOM event into the authority. It returns `false`
 without dispatching when the occurrence is already canceled.
@@ -126,23 +126,17 @@ cannot remove canonical or source-owned registrations. SDK publishers use
 source handles. AIRuntimeState consumers use the focused subscription helpers
 or `arcaneEvents.subscribe()`.
 
-## Stable authority failures
+## Authority failures
 
 `ARCANE_EVENT_ERROR_CODES` maps every key below to the identical
 string value. Thrown authority errors expose that value as `error.code`:
 
 ```text
-ARCANE_EVENT_AUTHORITY_ACCESSOR_COLLISION
-ARCANE_EVENT_AUTHORITY_VALUE_COLLISION
-ARCANE_EVENT_AUTHORITY_DESCRIPTOR_MISMATCH
-ARCANE_EVENT_AUTHORITY_PROTOCOL_MISMATCH
-ARCANE_EVENT_AUTHORITY_API_MISMATCH
 ARCANE_EVENT_AUTHORITY_INSTALL_FAILED
 ARCANE_EVENT_SOURCE_INVALID
 ARCANE_EVENT_SOURCE_ALREADY_REGISTERED
 ARCANE_EVENT_SOURCE_DISPOSED
 ARCANE_EVENT_SOURCE_EVENT_TYPE_UNDECLARED
-ARCANE_EVENT_COMPATIBILITY_DETAIL_INVALID
 ARCANE_EVENT_OCCURRENCE_INVALID
 ARCANE_EVENT_OCCURRENCE_SEQUENCE_EXHAUSTED
 ARCANE_EVENT_SOURCE_SEQUENCE_EXHAUSTED
@@ -162,8 +156,9 @@ Listener callback failure is observational: it appears as
 `arcane.event.listener.error` occurrence. Its complete public detail is
 `{code:'ARCANE_EVENT_LISTENER_CALLBACK_FAILED',reason:'listener-threw',
 eventType,occurrenceId,source,instanceId,operationId,error}`. Source disposal publishes
-`arcane.event.source.disposed` with public detail
-`{reason:'source-disposed'}` rather than throwing from committed source dispatch.
+`arcane.event.source.disposed` with normalized canonical detail
+`{source,instanceId,reason:'source-disposed'}` rather than throwing from committed
+source dispatch.
 
 ## Enable a complete event stack
 
@@ -200,9 +195,10 @@ error stack text. It performs no implicit redaction. Do not place credentials
 or secrets in event payloads or metadata. The durable JSON shape is published
 as `arcane-os/schemas/event-stack.json`.
 
-Recording retains the complete session until the caller clears history or
-disables recording. It never truncates, clips, tails, elides, or rotates event
-content. Arcane does not upload or persist a stack automatically.
+Recording retains the complete session until the caller clears history.
+Disabling recording stops future capture without clearing existing records. It
+never truncates, clips, tails, elides, or rotates event content. Arcane does not
+upload or persist a stack automatically.
 
 ## DOM observation
 

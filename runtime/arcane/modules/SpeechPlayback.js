@@ -1,17 +1,5 @@
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 
-const SPEECH_VOICE_OPTIONS=[
-    {value:'alloy',label:'Alloy'},
-    {value:'ash',label:'Ash'},
-    {value:'ballad',label:'Ballad'},
-    {value:'coral',label:'Coral'},
-    {value:'echo',label:'Echo'},
-    {value:'fable',label:'Fable'},
-    {value:'nova',label:'Nova'},
-    {value:'onyx',label:'Onyx'},
-    {value:'sage',label:'Sage'},
-    {value:'shimmer',label:'Shimmer'}
-];
 const SUPERSEDED={superseded:true};
 const SPEECH_PLAYBACK_STATE_EVENT='speech-playback-state';
 const SPEECH_PLAYBACK_FAILURE_REASONS={
@@ -853,7 +841,6 @@ class SpeechPlayback{
 }
 
 export {
-    SPEECH_VOICE_OPTIONS,
     SPEECH_PLAYBACK_STATE_EVENT,
     SpeechPlayback,
     splitSpeechText

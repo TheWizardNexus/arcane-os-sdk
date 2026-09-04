@@ -439,7 +439,7 @@ test(
         );
         assert.match(
             voiceSource,
-            /signal:controller[.]signal[\s\S]*fetchSTT[(]file,undefined,signal[)]/u
+            /signal:controller[.]signal[\s\S]*fetchSTT[(]file,signal[)]/u
         );
         assert.match(
             voiceSource,

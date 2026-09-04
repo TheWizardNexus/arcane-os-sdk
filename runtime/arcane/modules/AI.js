@@ -1178,24 +1178,12 @@ class AI {
         return `${this.#service.baseURL[this.llmService]}${this.#paths.chat[this.llmService]}`
     }
 
-    set url(value) {
-        return false;
-    }
-
     get urlTTS() {
         return `${this.#service.ttsURL[this.ttsService]}${this.#paths.tts[this.ttsService]}`
     }
 
-    set urlTTS(value) {
-        return false;
-    }
-
     get urlSTT() {
         return `${this.#service.sttURL[this.sttService]}${this.#paths.stt[this.sttService]}`
-    }
-
-    set urlSTT(value) {
-        return false;
     }
 
     #license='';
@@ -6180,17 +6168,8 @@ class AI {
         );
     }
 
-    async fetchSTT(
-        audioFile,
-        responseHandler=(text='')=>{},
-        signal=null
-    ){
+    async fetchSTT(audioFile,signal=null){
         this.#assertServiceConfigured(this.sttService,'stt');
-        if(typeof responseHandler!=='function'){
-            const error=new TypeError('AI.fetchSTT responseHandler must be a function.');
-            error.code='ARCANE_AI_STT_RESPONSE_HANDLER_INVALID';
-            throw error;
-        }
         if(signal&&(
             typeof signal.aborted!=='boolean'
             ||typeof signal.addEventListener!=='function'
@@ -6232,8 +6211,6 @@ class AI {
                 throw error;
             }
             if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
-            await responseHandler(text);
-            if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
             return text;
         }
 
@@ -6245,8 +6222,6 @@ class AI {
             },
             signal
         );
-        if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
-        await responseHandler(text);
         if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
         return text;
     }
