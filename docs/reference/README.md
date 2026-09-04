@@ -170,7 +170,7 @@ as package admission. Each method rechecks native policy at invocation time.
 
 ## Source and licensing
 
-- [SDK runtime authority record](../../tools/runtime-source.json)
+- [SDK runtime source](../../runtime/arcane)
 - [AGPL license](../../LICENSE)
 - [Commercial-license notice](../../COMMERCIAL-LICENSE.md)
 - [Third-party and distribution notice](../../NOTICE)

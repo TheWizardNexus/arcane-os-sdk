@@ -66,12 +66,11 @@ lets a refresh read the saved SDK source without copying it into the app.
 Distribution never follows that mount. It embeds the application's complete
 selected SDK projection.
 
-`tools/runtime-source.json` declares SDK-canonical authority for
-`runtime/arcane/` and retains the prior Arcane OS source only as migration
-history. The old OS-to-SDK synchronization direction is retired. Arcane OS must consume the selected SDK
-projection through the same package/source-mount boundary as other apps; its
-repository-side consumer cutover is coordinated separately and does not create
-a co-equal source.
+`runtime/arcane/` is the SDK-canonical source. Arcane OS must consume the
+selected SDK projection through the same package/source-mount boundary as
+other apps; its repository-side consumer cutover is coordinated separately and
+does not create a co-equal source. Git history records the completed ownership
+migration; the current tree has no OS-to-SDK synchronization path.
 
 ## Workspace profiles
 

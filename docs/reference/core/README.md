@@ -55,7 +55,7 @@ or provider boundaries can continue into the SDK's
 ## Source and license links
 
 - [Pinned upstream ARCANE-OS source](https://github.com/TheWizardNexus/ARCANE-OS/tree/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e)
-- [SDK runtime source pin](../../../tools/runtime-source.json)
+- [SDK runtime source](../../../runtime/arcane)
 - [AGPL license](../../../LICENSE)
 - [Commercial-license notice](../../../COMMERCIAL-LICENSE.md)
 - [Third-party and distribution notice](../../../NOTICE)

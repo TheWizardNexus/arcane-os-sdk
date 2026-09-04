@@ -70,14 +70,10 @@ is coordinated separately and cannot become a second source authority.
 
 The source-authority cutover is complete. `runtime/arcane/` is authored here,
 and applications copy the complete portable inventory selected by the package.
-The old Arcane OS-to-SDK synchronization direction is retired; it cannot
-overwrite SDK-canonical source.
-
-`tools/runtime-source.json` declares the SDK authority and retains the prior
-Arcane OS commit only as migration history.
 Arcane OS must consume the same locked SDK projection as other applications;
-any remaining OS-side duplicate is legacy consumer migration state, not source
-authority.
+an OS-side duplicate is consumer projection state, not source authority. Git
+history records the completed source-authority migration; the current tree has
+no OS-to-SDK synchronization command or migration-only runtime-source record.
 
 ## TWiN Cloud
 
