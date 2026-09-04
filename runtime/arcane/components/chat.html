@@ -3406,7 +3406,7 @@
                 &&result.disposition!==undefined
                 &&result.status!==result.disposition
             ){
-                throw new TypeError('Tool-result status and legacy disposition must match.');
+                throw new TypeError('Tool-result status and disposition must match.');
             }
             const status=result.status??result.disposition;
             if(!statuses.has(status)){

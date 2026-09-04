@@ -184,9 +184,9 @@ Refreshes one selected application's physical browser runtime map, generates
 its standard browser import map, discovers every directly navigable
 `.html`/`.htm` document admitted by the selected descriptor's existing
 include/exclude rules, and commits the map artifact plus those managed documents
-as one transactional refresh. A current directly navigable document declares exactly
-one `<meta name="arcane-app-id" content="<selected-id>">`; the patch-compatible
-legacy path also admits an unmarked secondary document with an active `<base>`.
+as one transactional refresh. A directly navigable entry document declares exactly
+one `<meta name="arcane-app-id" content="<selected-id>">`; an unmarked secondary
+document may instead carry an active `<base>`.
 Wrong or duplicate explicit app identity fails. The renderer then requires one
 path-correct base for every selected document. Included HTML files with neither
 the identity marker nor an active base are component fragments: they remain

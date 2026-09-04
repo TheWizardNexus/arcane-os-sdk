@@ -606,7 +606,7 @@ async function sourceFiles(root){
     return files;
 }
 
-test('active SDK and generated test surfaces contain no legacy Node test runner',async()=>{
+test('active SDK and generated test surfaces contain no unsupported Node test runner',async()=>{
     const activeRoots=['bin','src','test','.github'].map(relative=>path.join(repositoryRoot,relative));
     const files=(await Promise.all(activeRoots.map(sourceFiles))).flat();
     files.push(path.join(repositoryRoot,'package.json'));
