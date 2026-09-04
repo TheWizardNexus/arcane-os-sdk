@@ -344,8 +344,8 @@ class PersistentAIChatSession{
         assertKnownKeys(
             options,
             new Set([
-                'ai','chat','chatEntity','chatFileName','contextBuilder','loadExisting','maxContextCharacters',
-                'maxMessageCharacters','maxMessages','memory','request','responseLength','systemPrompt'
+                'ai','chat','chatEntity','chatFileName','contextBuilder','loadExisting','memory',
+                'request','responseLength','systemPrompt'
             ]),
             'Persistent chat options',
         );

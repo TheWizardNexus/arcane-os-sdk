@@ -961,9 +961,9 @@ Runs a complete sequential browser test list with explicit cancellation and full
 ### Public surface
 
 default `BrowserTestSuite`; `list()`, `run()`, `dispose()`/`destroy()`; emits
-complete suite/test start/result/complete events. Legacy `maxTests` and timeout
-fields are accepted as inert compatibility metadata and never limit execution or
-create a timer. Caller `AbortSignal` or disposal is the only suite-owned stop.
+complete suite/test start/result/complete events. Caller metadata does not limit
+execution or create a timer. Caller `AbortSignal` or disposal is the only
+suite-owned stop.
 
 Exact exports: `BROWSER_TEST_SUITE_ERROR_CODES`,
 `BROWSER_TEST_SUITE_EVENT_TYPES`, `BROWSER_TEST_SUITE_REASONS`,
@@ -992,11 +992,7 @@ Evaluates complete arithmetic expressions, powers, constants, and common functio
 ### Public surface
 
 `new CalculatorEngine()` exposes synchronous
-`calculate(expression): Calculation`,
-`addEventListener(type,listener,options): void`,
-`removeEventListener(type,listener,options): void`,
-`on(type,listener,options): unsubscribe`,
-`dispatchEvent(event): boolean`, and idempotent
+`calculate(expression): Calculation` and idempotent
 `dispose(): boolean` / `destroy(): boolean`. `evaluateExpression(input): number`
 remains the parser-only helper. `CALCULATOR_ENGINE_ERROR_CODES` is one mutable
 record containing the stable `disposed`, `input`, `syntax`, `domain`, and
@@ -1009,15 +1005,12 @@ Exact exports: `CALCULATOR_ENGINE_ERROR_CODES`, `default`,
 
 **Cross-host.** Each engine owns one `calculator-engine` source on the realm's
 branded `globalThis.arcaneEvents`. `calculator-result` publishes mutable public
-detail `{result}`; the legacy instance listener receives the same `Calculation`
-object returned by `calculate()`. `calculator-error` publishes mutable public
-detail `{code,error,expression}`; the legacy listener receives mutable
-`{expression,error}` while `calculate()` rethrows that same `Error`. Both
-occurrences carry one source-instance `operationId`. Listener callbacks are
-synchronous observations; their failures are reported by the central event
-authority and do not rewrite calculation settlement. Listener registration
-supports `{once,signal}` and its returned unsubscribe also exposes `.dispose()`.
-Disposal removes instance listeners and rejects later calculations with
+detail `{result}`. `calculator-error` publishes mutable public detail
+`{code,error,expression}` while `calculate()` rethrows that same complete
+`Error`. Both occurrences carry one
+source-instance `operationId`. Canonical listener callbacks are synchronous
+observations; their failures are reported by the central event authority and do
+not rewrite calculation settlement. Disposal rejects later calculations with
 `ARCANE_CALCULATOR_ENGINE_DISPOSED`. Invalid expression input, syntax, numeric
 domain, and unexpected evaluation boundaries use
 `ARCANE_CALCULATOR_EXPRESSION_INPUT_INVALID`,
@@ -1263,9 +1256,8 @@ Default `ConfiguredAIChatSession`; named
 `clear()`, `prepareOpening()`, `prepare()`, and `send()`.
 
 `new ConfiguredAIChatSession(options={})` uses `chat`, `contextBuilder`,
-`initialMessages`, `request`, and `systemPrompt`. Compatibility keys
-`responseLength`, `maxContextCharacters`, `maxMessageCharacters`, and
-`maxMessages` are accepted as inert metadata and do not alter or limit content.
+`initialMessages`, `request`, `responseLength`, and `systemPrompt`.
+`responseLength` is caller preference metadata and does not alter or limit content.
 `initialMessages` is an array of complete `user`, `assistant`, or `tool`
 messages. It excludes `system`, accepts one unresolved structural assistant
 tool-call tail, and requires its tracked result before another user turn or
@@ -1569,12 +1561,11 @@ Exact exports: `DBOPFSDocumentLibrary`, `createDBOPFSDocumentLibrary`,
 
 `new DBOPFSDocumentLibrary({concurrency,db,schema})` exposes `schema`,
 `bootstrap({files,onProgress,read,readFailurePolicy,signal})`,
-`search(query,{kinds,limit,signal,tags})` (legacy `limit` is inert),
+`search(query,{kinds,signal,tags})`,
 `evaluate(query,{sources,read,kinds?,tags?,readFailurePolicy?,onProgress?,signal?})`,
 `buildContext(query,{signal})`, and `createContextBuilder()`.
 
-Legacy maximum-character options remain accepted for compatibility but do not
-cap, truncate, clip, tail, or elide content. `evaluate()` requires `sources`
+`evaluate()` requires `sources`
 and `read`, filters source metadata before calling
 `read(source,{ordinal,signal})`, and never persists a caller-owned body.
 
@@ -1721,8 +1712,7 @@ Exact exports: `DOCUMENT_SEARCH_FIELD_ORDER`, `DocumentLexicalSearch`,
 and `scoreDocumentLexicalIndex`.
 
 `new DocumentLexicalSearch(records)` exposes
-`rank(query,{kinds,tags})` and `search(query,{kinds,limit,tags})`; the legacy
-`limit` field is accepted without limiting the result set.
+`rank(query,{kinds,tags})` and `search(query,{kinds,tags})`.
 
 ### Availability and normalization
 
@@ -1775,15 +1765,15 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Normalizes global errors/rejections, fingerprints and deduplicates incidents, persists a complete ledger, and performs complete delivery.
+Normalizes global errors/rejections, assigns occurrence identifiers, persists a complete ledger, and performs complete delivery.
 
 ### Public surface
 
-default `Errors`; event normalizers/fingerprint plus lifecycle, capture, delivery and teardown methods.
+default `Errors`; event normalizers plus lifecycle, capture, delivery and teardown methods.
 
 Exact exports: `GLOBAL_ERROR_EVENT_CODES`, `GLOBAL_ERROR_EVENT_TYPES`,
-`GLOBAL_ERROR_REASONS`, `default`, `fingerprintIncident`,
-`normalizeErrorEvent`, and `normalizeRejectionEvent`.
+`GLOBAL_ERROR_REASONS`, `default`, `normalizeErrorEvent`, and
+`normalizeRejectionEvent`.
 
 ### Availability and normalization
 
@@ -2350,9 +2340,7 @@ Exact exports: `PersistentAIChatSession`, `createPersistentAIChatSession`, and
 `default`.
 
 Constructor and factory options are `{ai,chat,chatEntity,chatFileName,
-contextBuilder,loadExisting,memory,request,responseLength,systemPrompt}`. Legacy
-maximum-character/message options are accepted for compatibility but do not
-cap, truncate, clip, tail, or elide content. Public members are
+contextBuilder,loadExisting,memory,request,responseLength,systemPrompt}`. Public members are
 static `create()`, getters `ai`, `chatEntity`, and `fileName`, and `ready()`,
 `history()`, `transcript()`, `settleMemory()`, `open(input)`, `send(input)`, and
 `stream(input,handlers)`.

@@ -553,7 +553,7 @@ class ChatEntity{
      * @param {string} text
      * Message content from the user.
      * @param {{hidden?:boolean,persist?:boolean}} options
-     * The legacy hidden option excludes the message from memory extraction without
+     * The hidden option excludes the message from memory extraction without
      * removing it from the complete saved or UI transcript.
      */
     addUserMessage(text='',{hidden=false,persist=true}={}){

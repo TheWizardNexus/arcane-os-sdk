@@ -30,7 +30,7 @@ const PLATFORM_CREATE_OBJECT_URL = typeof globalThis.URL?.createObjectURL === "f
 const PLATFORM_REVOKE_OBJECT_URL = typeof globalThis.URL?.revokeObjectURL === "function"
   ? globalThis.URL.revokeObjectURL.bind(globalThis.URL)
   : null;
-const LEGACY_ARTIFACT_ERROR_REASONS = completeValue({
+const ARTIFACT_ERROR_REASONS = completeValue({
   ARCANE_AI_REQUEST_ABORTED: "browser-speech-artifact-preparation-cancelled",
   ARCANE_AI_STORAGE_BUSY: "browser-speech-artifact-dbopfs-write-lock-unavailable",
   ARCANE_AI_STORAGE_UNAVAILABLE: "browser-speech-artifact-dbopfs-table-unavailable",
@@ -76,7 +76,7 @@ const ARTIFACT_GRAPH_IMPORT_MATCHES = new Set([
   "materialized-module-url",
 ]);
 
-function speechError(code, message, cause, reason = LEGACY_ARTIFACT_ERROR_REASONS[code]) {
+function speechError(code, message, cause, reason = ARTIFACT_ERROR_REASONS[code]) {
   const error = cause === undefined
     ? new Error(message)
     : new Error(message, { cause });

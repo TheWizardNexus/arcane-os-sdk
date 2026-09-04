@@ -120,23 +120,23 @@ import BrowserPreferenceStore,{
     Preference,
     preferenceSchema
 } from 'arcane-os/preference-store';
-import LegacyPreferenceStore from 'arcane/PreferenceStore';
+import BrowserRuntimePreferenceStore from 'arcane/PreferenceStore';
 import BrowserSpeechPlayback,{
     SpeechPlayback as NamedBrowserSpeechPlayback,
     managedStrongType,
     splitSpeechText
 } from 'arcane-os/speech-playback';
-import {managedStrongType as legacyManagedStrongType} from 'arcane/SpeechPlayback';
+import {managedStrongType as browserRuntimeManagedStrongType} from 'arcane/SpeechPlayback';
 import test from 'arcane-os/testing';
 test('managed bare and URL-like imports resolve inside the selected application source',()=>{
-    assert.equal(BrowserPreferenceStore,LegacyPreferenceStore);
+    assert.equal(BrowserPreferenceStore,BrowserRuntimePreferenceStore);
     assert.equal(PREFERENCE_STORE_ERROR_CODES.disposed,'DISPOSED');
     assert.equal(typeof Preference,'function');
     assert.equal(typeof preferenceSchema,'function');
     assert.equal(BrowserSpeechPlayback,NamedBrowserSpeechPlayback);
     assert.deepEqual(splitSpeechText('ready'),['ready']);
     assert.equal(managedStrongType,'managed-runtime');
-    assert.equal(legacyManagedStrongType,managedStrongType);
+    assert.equal(browserRuntimeManagedStrongType,managedStrongType);
 });
 `),
         writeFile(missingFile,`import 'arcane/NotExposed';

@@ -581,7 +581,6 @@ test('configured chat round-trips structural tool context and keeps prepared tur
                 }],
             },
         ],
-        maxMessageCharacters:256,
     });
     const prepared=await session.prepare({
         role:'tool',
@@ -630,16 +629,6 @@ test('configured chat round-trips structural tool context and keeps prepared tur
             },
         }),
         error=>error?.code==='AI_CHAT_TOOL_MESSAGE_REQUIRED',
-    );
-
-    const prefixed=new ConfiguredAIChatSession({
-        chat:async()=>({message:{role:'assistant',content:'unused'}}),
-        contextBuilder:async()=>'.'.repeat(256),
-        maxMessageCharacters:256,
-    });
-    await assert.rejects(
-        prefixed.send('context overflow'),
-        error=>error?.code==='AI_CHAT_CONTEXT_LIMIT',
     );
 });
 
@@ -5770,7 +5759,7 @@ test(
 );
 
 test(
-    'calculator lifecycle events use the singleton authority without changing legacy results',
+    'calculator lifecycle events use the singleton authority without changing results',
     async function testCalculatorEventAuthority() {
         const [{default: CalculatorEngine, CALCULATOR_ENGINE_ERROR_CODES}, {arcaneEvents}]
             = await Promise.all([
@@ -5779,7 +5768,6 @@ test(
             ]);
         const engine = new CalculatorEngine();
         const canonicalEvents = [];
-        const localEvents = [];
         const removeCanonicalResult = arcaneEvents.subscribe(
             'calculator-result',
             function observeCanonicalCalculatorResult(event) {
@@ -5792,34 +5780,18 @@ test(
                 canonicalEvents.push(event);
             }
         );
-        const removeLocalResult = engine.on(
-            'calculator-result',
-            function observeLocalCalculatorResult(event) {
-                localEvents.push(event);
-            }
-        );
-        const removeLocalError = engine.on(
-            'calculator-error',
-            function observeLocalCalculatorError(event) {
-                localEvents.push(event);
-            }
-        );
-
         const calculation = engine.calculate('2 + 3');
         assert.equal(calculation.result, 5);
-        assert.equal(localEvents[0].detail, calculation);
-        const instanceId = localEvents[0].instanceId;
         const resultOccurrence = canonicalEvents.find(
-            event => event.instanceId === instanceId && event.type === 'calculator-result'
+            event => event.type === 'calculator-result'
         );
+        const instanceId = resultOccurrence.instanceId;
         assert.deepEqual(resultOccurrence.detail, {result: 5});
         resultOccurrence.detail.annotation='complete result occurrence';
         assert.equal(
             resultOccurrence.detail.annotation,
             'complete result occurrence'
         );
-        assert.equal(resultOccurrence.operationId, localEvents[0].operationId);
-
         let domainError;
         assert.throws(
             function rejectCalculatorDomainFailure() {
@@ -5830,13 +5802,13 @@ test(
                 return error?.code === CALCULATOR_ENGINE_ERROR_CODES.domain;
             }
         );
-        const localError = localEvents.find(event => event.type === 'calculator-error');
         const errorOccurrence = canonicalEvents.find(
             event => event.instanceId === instanceId && event.type === 'calculator-error'
         );
-        assert.equal(localError.detail.error, domainError);
         assert.deepEqual(errorOccurrence.detail, {
-            code: CALCULATOR_ENGINE_ERROR_CODES.domain
+            code: CALCULATOR_ENGINE_ERROR_CODES.domain,
+            error: domainError,
+            expression: '1 / 0'
         });
         errorOccurrence.detail.annotation='complete error occurrence';
         assert.equal(
@@ -5850,9 +5822,6 @@ test(
             error => error?.code === CALCULATOR_ENGINE_ERROR_CODES.input
         );
 
-        assert.equal(removeLocalResult(), true);
-        assert.equal(removeLocalResult(), false);
-        assert.equal(removeLocalError.dispose(), true);
         assert.equal(removeCanonicalResult(), true);
         assert.equal(removeCanonicalError.dispose(), true);
         assert.equal(engine.dispose(), true);

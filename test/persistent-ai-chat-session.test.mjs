@@ -161,9 +161,6 @@ test('persistent chat binds the SDK AI boundary and falls back from optional str
     const session=await PersistentAIChatSession.create({
         ai,
         contextBuilder:async()=>context,
-        maxContextCharacters:1,
-        maxMessageCharacters:1,
-        maxMessages:1,
         memory:false,
         request:{localOnly:true,toolChoice:'auto'},
         systemPrompt:'Complete system prompt '.repeat(12),
@@ -849,23 +846,23 @@ test('persistent chat rolls back recurring context on durable failure and retain
     assert.ok(!requests.at(-1).messages.some(message=>message.content==='must roll back'));
 });
 
-test('legacy persisted structural calls stay untouched while the transcript omits unusable protocol data',async()=>{
-    const chatFileName='legacy-missing-tool-message.jsonl';
-    const legacyRows=[
+test('pre-existing persisted structural calls stay untouched while the transcript omits unusable protocol data',async()=>{
+    const chatFileName='pre-existing-missing-tool-message.jsonl';
+    const storedRows=[
         {role:'user',content:'Find Alpha.',timestamp:1},
         {
             role:'assistant',
             content:'',
             timestamp:2,
             tool_calls:[{
-                id:'legacy-lookup-1',
+                id:'stored-lookup-1',
                 type:'function',
                 function:{name:'lookup',arguments:'{"id":"alpha"}'},
             }],
         },
     ];
-    const legacyContent=legacyRows.map(message=>JSON.stringify(message)).join('\n')+'\n';
-    await db.set('chats',chatFileName,legacyContent);
+    const storedContent=storedRows.map(message=>JSON.stringify(message)).join('\n')+'\n';
+    await db.set('chats',chatFileName,storedContent);
 
     const session=await PersistentAIChatSession.create({
         chat:async()=>({message:{role:'assistant',content:'must not run'}}),
@@ -873,7 +870,7 @@ test('legacy persisted structural calls stay untouched while the transcript omit
         loadExisting:true,
         memory:false,
     });
-    assert.deepEqual(await session.transcript(),[legacyRows[0]]);
+    assert.deepEqual(await session.transcript(),[storedRows[0]]);
     await assert.rejects(
         session.history(),
         error=>{
@@ -885,20 +882,20 @@ test('legacy persisted structural calls stay untouched while the transcript omit
             return true;
         },
     );
-    assert.deepEqual(await session.transcript(),[legacyRows[0]]);
-    assert.equal(db.raw('chats',chatFileName),legacyContent);
+    assert.deepEqual(await session.transcript(),[storedRows[0]]);
+    assert.equal(db.raw('chats',chatFileName),storedContent);
 });
 
-test('legacy blank tool results stay untouched while the transcript keeps only the tool message',async()=>{
-    const chatFileName='legacy-blank-tool-result.jsonl';
-    const legacyRows=[
+test('pre-existing blank tool results stay untouched while the transcript keeps only the tool message',async()=>{
+    const chatFileName='pre-existing-blank-tool-result.jsonl';
+    const storedRows=[
         {role:'user',content:'Find Alpha.',timestamp:1},
         {
             role:'assistant',
             content:'',
             timestamp:2,
             tool_calls:[{
-                id:'legacy-lookup-2',
+                id:'stored-lookup-2',
                 type:'function',
                 function:{
                     name:'lookup',
@@ -910,11 +907,11 @@ test('legacy blank tool results stay untouched while the transcript keeps only t
             role:'tool',
             content:'   ',
             timestamp:3,
-            tool_call_id:'legacy-lookup-2',
+            tool_call_id:'stored-lookup-2',
         },
     ];
-    const legacyContent=legacyRows.map(message=>JSON.stringify(message)).join('\n')+'\n';
-    await db.set('chats',chatFileName,legacyContent);
+    const storedContent=storedRows.map(message=>JSON.stringify(message)).join('\n')+'\n';
+    await db.set('chats',chatFileName,storedContent);
 
     const session=await PersistentAIChatSession.create({
         chat:async()=>({message:{role:'assistant',content:'must not run'}}),
@@ -923,7 +920,7 @@ test('legacy blank tool results stay untouched while the transcript keeps only t
         memory:false,
     });
     assert.deepEqual(await session.transcript(),[
-        legacyRows[0],
+        storedRows[0],
         {
             role:'tool',
             content:'Looking up Alpha.',
@@ -937,7 +934,7 @@ test('legacy blank tool results stay untouched while the transcript keeps only t
         error=>error?.code==='AI_CHAT_INCOHERENT_PERSISTENCE',
     );
     assert.deepEqual(await session.transcript(),[
-        legacyRows[0],
+        storedRows[0],
         {
             role:'tool',
             content:'Looking up Alpha.',
@@ -946,15 +943,15 @@ test('legacy blank tool results stay untouched while the transcript keeps only t
             timestamp:2,
         },
     ]);
-    assert.equal(db.raw('chats',chatFileName),legacyContent);
+    assert.equal(db.raw('chats',chatFileName),storedContent);
 });
 
 test('malformed persisted JSONL rows remain untouched and outside the ordinary transcript',async()=>{
-    const chatFileName='legacy-malformed-row.jsonl';
+    const chatFileName='pre-existing-malformed-row.jsonl';
     const validRow={role:'user',content:'Keep the complete saved conversation.',timestamp:1};
     const malformedRow='{"role":"assistant","content":"unfinished"';
-    const legacyContent=`${JSON.stringify(validRow)}\n${malformedRow}\n`;
-    await db.set('chats',chatFileName,legacyContent);
+    const storedContent=`${JSON.stringify(validRow)}\n${malformedRow}\n`;
+    await db.set('chats',chatFileName,storedContent);
 
     const session=await PersistentAIChatSession.create({
         chat:async()=>({message:{role:'assistant',content:'must not run'}}),
@@ -968,5 +965,5 @@ test('malformed persisted JSONL rows remain untouched and outside the ordinary t
         error=>error?.code==='AI_CHAT_INCOHERENT_PERSISTENCE',
     );
     assert.deepEqual(await session.transcript(),[validRow]);
-    assert.equal(db.raw('chats',chatFileName),legacyContent);
+    assert.equal(db.raw('chats',chatFileName),storedContent);
 });

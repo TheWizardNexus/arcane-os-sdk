@@ -1159,7 +1159,7 @@ console.log(getSdkRoot());
 
 ### Overview
 
-Loads an authored schema-2 descriptor or a complete legacy projection with its source label.
+Loads an authored schema-2 descriptor or a complete package/registry projection with its source label.
 
 ### Signature and result
 

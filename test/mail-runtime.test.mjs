@@ -331,7 +331,7 @@ test('Mail queues offline and drains through both manual and online lifecycle pa
     mail.dispose();
 });
 
-test('error mail uses the same durable outbox path and preserves legacy formatting',async function durableErrorMail(){
+test('error mail uses the same durable outbox path and preserves established formatting',async function durableErrorMail(){
     const storage=new MemoryMailStorage();
     let request=null;
     const mail=new Mail(mailConfig(),{
@@ -821,7 +821,7 @@ test('window Mail singleton reconfigures only before use and recovers after disp
 test('window Mail singleton reports an incompatible owner',function windowSingletonConflict(){
     const previousWindow=globalThis.window;
     const hadWindow=Object.hasOwn(globalThis,'window');
-    const foreignMail={legacy:true};
+    const foreignMail={external:true};
     globalThis.window={mail:foreignMail};
     try{
         assert.throws(

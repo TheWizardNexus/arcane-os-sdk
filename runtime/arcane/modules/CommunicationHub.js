@@ -7,7 +7,6 @@ const communicationHubEvents={
     refreshCancelled:'communications-refresh-cancelled',
     refreshCompleted:'communications-refresh-completed',
     refreshFailed:'communications-refresh-failed',
-    refreshLegacy:'communications-refresh',
     refreshPartiallyCompleted:'communications-refresh-partially-completed',
     refreshStarted:'communications-refresh-started'
 };
@@ -465,14 +464,6 @@ export default class CommunicationHub extends EventTarget{
                 state,
                 threadCount:threads.length
             };
-            const legacyDetail={
-                errors:[...returnedErrors],
-                threads:[...returnedThreads]
-            };
-            const legacyPublicDetail={
-                ...publicDetail,
-                failures:publicDetail.failures.map(copyProviderFailure)
-            };
             operation.terminal=true;
             this.#clearRefreshOperation(operation);
             this.#events.dispatch(
@@ -483,16 +474,6 @@ export default class CommunicationHub extends EventTarget{
                     publicDetail
                 }
             );
-            if(!this.#events.disposed){
-                this.#events.dispatch(
-                    communicationHubEvents.refreshLegacy,
-                    legacyDetail,
-                    {
-                        operationId:operation.operationId,
-                        publicDetail:legacyPublicDetail
-                    }
-                );
-            }
             return {threads:returnedThreads,errors:returnedErrors};
         }catch(error){
             if(operation.terminal){

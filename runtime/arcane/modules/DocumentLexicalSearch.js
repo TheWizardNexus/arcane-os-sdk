@@ -203,7 +203,7 @@ class DocumentLexicalSearch{
 
     search(query,options={}){
         if(!isPlainRecord(options)) fail('Search options must be a plain object.','DOCUMENT_SEARCH_INVALID_QUERY');
-        const unknown=Object.keys(options).find(key=>!['kinds','limit','tags'].includes(key));
+        const unknown=Object.keys(options).find(key=>!['kinds','tags'].includes(key));
         if(unknown) fail(`Search options contain an unsupported field: ${unknown}.`,'DOCUMENT_SEARCH_INVALID_QUERY');
         return this.rank(query,{
             kinds:options.kinds,

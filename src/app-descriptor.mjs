@@ -437,7 +437,7 @@ export async function loadAppDescriptor({workspaceRoot,appRoot,appId,packageMani
     const nativeDescriptor=isObject(registry?.apps?.[appId])?registry.apps[appId]:undefined;
     return completeValue({
         descriptor:synthesizedDescriptor(packageManifest,nativeDescriptor),
-        source:nativeDescriptor?'legacy-registry':'legacy-package',
+        source:nativeDescriptor?'registry-projection':'package-projection',
         descriptorPath:null
     });
 }

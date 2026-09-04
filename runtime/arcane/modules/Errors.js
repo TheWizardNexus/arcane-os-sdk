@@ -129,15 +129,7 @@ export function normalizeRejectionEvent(event={},target=globalThis.window){
     };
 }
 
-/**
- * Return a fresh opaque occurrence identifier for legacy callers of the former
- * fingerprint helper. The incident is intentionally not read: identifiers do
- * not group, admit, or derive identity from error content.
- *
- * @param {Object} incident
- * @returns {string}
- */
-export function fingerprintIncident(_incident){
+function nextErrorOccurrenceId(){
     runtimeOccurrenceSequence+=1;
     return `error-${RUNTIME_OCCURRENCE_PREFIX}-${runtimeOccurrenceSequence.toString(36)}`;
 }
@@ -517,9 +509,9 @@ class Errors {
                 && storedRecord.occurrenceId.trim()
             )
                 ? storedRecord.occurrenceId
-                : fingerprintIncident(storedRecord.incident);
+                : nextErrorOccurrenceId();
             while(this.pending.has(occurrenceId)){
-                occurrenceId=fingerprintIncident(storedRecord.incident);
+                occurrenceId=nextErrorOccurrenceId();
             }
             const record={
                 capturedAt,
@@ -656,9 +648,9 @@ class Errors {
             return false;
         }
 
-        let occurrenceId=fingerprintIncident(incident);
+        let occurrenceId=nextErrorOccurrenceId();
         while(this.pending.has(occurrenceId)){
-            occurrenceId=fingerprintIncident(incident);
+            occurrenceId=nextErrorOccurrenceId();
         }
         const incidentKind=incident?.type==='unhandledrejection'
             ?'unhandled-promise-rejection'
@@ -675,12 +667,11 @@ class Errors {
         this.#operationSequence+=1;
         this.#events.dispatch(
             eventType,
-            {id:occurrenceId,fingerprint:occurrenceId,code,kind:incidentKind,reason},
+            {id:occurrenceId,code,kind:incidentKind,reason},
             {
                 operationId:`global-error-handler-${this.#events.instanceId}-${this.#operationSequence.toString(36)}`,
                 publicDetail:{
                     id:occurrenceId,
-                    fingerprint:occurrenceId,
                     code,
                     kind:incidentKind,
                     reason
@@ -748,10 +739,6 @@ class Errors {
                 this.persistLedger();
             });
         return true;
-    }
-
-    flushFingerprint(fingerprint){
-        return this.flushOccurrence(fingerprint);
     }
 
     buildNotification(record){

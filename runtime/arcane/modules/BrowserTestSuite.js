@@ -12,14 +12,11 @@ export const BROWSER_TEST_SUITE_EVENT_TYPES={
 export const BROWSER_TEST_SUITE_ERROR_CODES={
     assertion:'BROWSER_TEST_ASSERTION',
     busy:'BROWSER_TEST_BUSY',
-    callbackRejectedLegacy:'BROWSER_TEST_ERROR',
+    callbackRejected:'BROWSER_TEST_ERROR',
     clockInvalid:'BROWSER_TEST_INVALID_CLOCK',
     descriptorCaseCollision:'BROWSER_TEST_CASE_COLLISION',
-    descriptorDuplicate:'BROWSER_TEST_CASE_COLLISION',
     descriptorInvalid:'BROWSER_TEST_INVALID_DESCRIPTOR',
     disposed:'BROWSER_TEST_SUITE_DISPOSED',
-    limitExceeded:'BROWSER_TEST_LIMIT',
-    limitInvalid:'BROWSER_TEST_INVALID_LIMIT',
     optionsInvalid:'BROWSER_TEST_INVALID_OPTIONS',
     resultInvalid:'BROWSER_TEST_INVALID_RESULT',
     runAborted:'BROWSER_TEST_ABORTED',
@@ -230,7 +227,7 @@ function browserTestResultReason(result){
     if(result.code===BROWSER_TEST_SUITE_ERROR_CODES.timedOut){
         return BROWSER_TEST_SUITE_REASONS.testTimedOut;
     }
-    if(result.code===BROWSER_TEST_SUITE_ERROR_CODES.callbackRejectedLegacy){
+    if(result.code===BROWSER_TEST_SUITE_ERROR_CODES.callbackRejected){
         return BROWSER_TEST_SUITE_REASONS.testCallbackRejected;
     }
     if(result.status==='pass')return BROWSER_TEST_SUITE_REASONS.testPassed;

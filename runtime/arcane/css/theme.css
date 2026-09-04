@@ -1,5 +1,5 @@
 /* Arcane OS shared appearance layer.
- * Load after legacy layout.css (when used) and before primitives or app CSS.
+ * Load after the shared layout.css (when used) and before primitives or app CSS.
  * Explicit user preferences use data-color-scheme; otherwise the device
  * preference selects the light or dark base.
  */

@@ -502,7 +502,7 @@ function normalizeResponse(response){
  * This module performs no persistence, streaming, tool execution, rendering, or
  * provider selection. Applications own their prompt policy and may supply an
  * asynchronous contextBuilder that returns additional system text for each send.
- * Legacy response-length options are accepted without changing or shortening
+ * The response-length preference is accepted without changing or shortening
  * the caller's prompt. A configured chat function may return either the normalized
  * session response or a non-stream OpenAI-compatible completion.
  */
@@ -520,9 +520,6 @@ export default class ConfiguredAIChatSession{
             'chat',
             'contextBuilder',
             'initialMessages',
-            'maxContextCharacters',
-            'maxMessageCharacters',
-            'maxMessages',
             'request',
             'responseLength',
             'systemPrompt',

@@ -421,10 +421,10 @@ The Worker error envelope carries `cause` as an optional mutable diagnostic
 record. It preserves complete nested messages, stacks, codes, reasons, details,
 own properties, and cycles without a depth or content cap. Worker and client
 sources must come from the same SDK revision so their `/1` envelope shape is
-updated atomically; a current client still accepts the legacy four-field form.
+updated atomically; a current client still accepts the cause-free four-field form.
 If the platform cannot clone an exotic diagnostic value, the Worker keeps the
 complete raw failure in its console diagnostics and retries the response with
-that legacy four-field envelope so the caller still receives an error.
+that cause-free four-field envelope so the caller still receives an error.
 
 Representative stable codes include:
 
@@ -444,7 +444,7 @@ Representative stable codes include:
 Malformed selected descriptors, missing required files, unreadable responses,
 unsupported provider namespace shapes, and unavailable browser APIs reject at
 their functional owner. Runtime operations are not rejected because a route,
-edge, transform, capability, or legacy security declaration is absent.
+edge, transform, capability, or security declaration is absent.
 
 ## Ownership
 

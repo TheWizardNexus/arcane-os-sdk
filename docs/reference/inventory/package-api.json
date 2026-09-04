@@ -948,7 +948,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Runtime and app descriptors",
-      "summary": "Loads an authored schema-2 descriptor or a complete legacy projection with its source label.",
+      "summary": "Loads an authored schema-2 descriptor or a complete package/registry projection with its source label.",
       "availability": "Node",
       "protocol": "Node ESM",
       "normalization": "SDK-normalized inputs, errors, events, and documented result"

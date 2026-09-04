@@ -34,7 +34,7 @@ function allowedTokensForSlot(allowedValues,index){
 /**
  * Normalizes the shared six-slot AI preference contract without choosing any
  * provider or model policy. Applications supply their own defaults, allowed
- * values, and legacy aliases.
+ * values, and provider aliases.
  *
  * Slot order:
  * [LLM provider, STT provider, TTS provider, LLM model, TTS model, STT model]

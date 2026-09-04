@@ -82,7 +82,7 @@ function normalizedDocumentPaths(entry,documents){
 function decodedEscape(source,index){
     const character=source[index];
     if(/[1-9]/u.test(character)||(character==='0'&&/[0-9]/u.test(source[index+1]??''))){
-        fail('Import-map scan found a legacy octal or decimal string escape.');
+        fail('Import-map scan found an octal or decimal string escape.');
     }
     const simple={b:'\b',f:'\f',n:'\n',r:'\r',t:'\t',v:'\v','0':'\0'};
     if(Object.hasOwn(simple,character))return {value:simple[character],next:index+1};

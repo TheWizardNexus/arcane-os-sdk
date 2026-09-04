@@ -177,7 +177,7 @@ host artifacts remain unchanged.
 
 External repository delivery adds a distinct schema-1
 `arcane-app-release-bundle` envelope. Bundle creation uses an authored schema-2
-`arcane-app.json`; a synthesized legacy descriptor remains valid for integrated
+`arcane-app.json`; a synthesized package or registry projection remains valid for integrated
 packaging but is not used for an external bundle. The
 archive contains exactly `ARCANE_APP_BUNDLE.json`, canonical `arcane-app.json`,
 `payload/ARCANE_APP_RELEASE.json`, and the release inventory beneath `payload/`

@@ -118,14 +118,14 @@ test('browser compatibility accepts the reviewed https scheme frame policy only 
     );
 });
 
-test('legacy package-only apps remain browser-only without invented publisher attribution',async t=>{
+test('package-only projections remain browser-only without invented publisher attribution',async t=>{
     const workspaceRoot=await temporaryDirectory(t);
-    const appRoot=path.join(workspaceRoot,'apps','legacy-app');
+    const appRoot=path.join(workspaceRoot,'apps','projected-app');
     await mkdir(appRoot,{recursive:true});
     const manifest={
         schemaVersion:1,
-        id:'legacy-app',
-        displayName:'Legacy App',
+        id:'projected-app',
+        displayName:'Projected App',
         version:'0.1.0',
         entry:'index.html',
         strategy:'static',
@@ -134,20 +134,20 @@ test('legacy package-only apps remain browser-only without invented publisher at
         exclude:[],
         shared:['browser-runtime']
     };
-    const loaded=await loadAppDescriptor({workspaceRoot,appRoot,appId:'legacy-app',packageManifest:manifest});
-    assert.equal(loaded.source,'legacy-package');
+    const loaded=await loadAppDescriptor({workspaceRoot,appRoot,appId:'projected-app',packageManifest:manifest});
+    assert.equal(loaded.source,'package-projection');
     assert.deepEqual(loaded.descriptor.targets,['browser']);
     assert.equal(loaded.descriptor.publisher.id,'publisher-undeclared');
 });
 
-test('legacy registry apps expose every implemented native development target',async t=>{
+test('registry projections expose every implemented native development target',async t=>{
     const workspaceRoot=await temporaryDirectory(t);
-    const appRoot=path.join(workspaceRoot,'apps','legacy-native');
+    const appRoot=path.join(workspaceRoot,'apps','registry-native');
     await mkdir(appRoot,{recursive:true});
     const manifest={
         schemaVersion:1,
-        id:'legacy-native',
-        displayName:'Legacy Native',
+        id:'registry-native',
+        displayName:'Registry Native',
         version:'0.1.0',
         entry:'index.html',
         strategy:'static',
@@ -159,8 +159,8 @@ test('legacy registry apps expose every implemented native development target',a
     await mkdir(path.join(workspaceRoot,'machine_bundles','arcane-os-machine-bundle'),{recursive:true});
     await writeFile(path.join(workspaceRoot,'machine_bundles','arcane-os-machine-bundle','arcane-apps.json'),JSON.stringify({
         apps:{
-            'legacy-native':{
-                description:'A legacy native Arcane application.',
+            'registry-native':{
+                description:'A registry-projected native Arcane application.',
                 icon:'img/icon.png',
                 order:100,
                 type:'app',
@@ -169,21 +169,21 @@ test('legacy registry apps expose every implemented native development target',a
             }
         }
     }));
-    const loaded=await loadAppDescriptor({workspaceRoot,appRoot,appId:'legacy-native',packageManifest:manifest});
-    assert.equal(loaded.source,'legacy-registry');
+    const loaded=await loadAppDescriptor({workspaceRoot,appRoot,appId:'registry-native',packageManifest:manifest});
+    assert.equal(loaded.source,'registry-projection');
     assert.deepEqual(loaded.descriptor.targets,[
         'android-arm64','browser','linux-arm64','linux-x64','portable','windows-x64'
     ]);
 });
 
-test('legacy package security remains authoritative without a registry admission gate',async t=>{
+test('package-projection security remains authoritative without a registry admission gate',async t=>{
     const workspaceRoot=await temporaryDirectory(t);
-    const appRoot=path.join(workspaceRoot,'apps','legacy-native');
+    const appRoot=path.join(workspaceRoot,'apps','registry-native');
     await mkdir(appRoot,{recursive:true});
     const manifest={
         schemaVersion:1,
-        id:'legacy-native',
-        displayName:'Legacy Native',
+        id:'registry-native',
+        displayName:'Registry Native',
         version:'0.1.0',
         entry:'index.html',
         strategy:'static',
@@ -195,8 +195,8 @@ test('legacy package security remains authoritative without a registry admission
     await mkdir(path.join(workspaceRoot,'machine_bundles','arcane-os-machine-bundle'),{recursive:true});
     await writeFile(path.join(workspaceRoot,'machine_bundles','arcane-os-machine-bundle','arcane-apps.json'),JSON.stringify({
         apps:{
-            'legacy-native':{
-                description:'A legacy native Arcane application.',
+            'registry-native':{
+                description:'A registry-projected native Arcane application.',
                 icon:null,
                 order:100,
                 type:'app',
@@ -209,7 +209,7 @@ test('legacy package security remains authoritative without a registry admission
             }
         }
     }));
-    const loaded=await loadAppDescriptor({workspaceRoot,appRoot,appId:'legacy-native',packageManifest:manifest});
+    const loaded=await loadAppDescriptor({workspaceRoot,appRoot,appId:'registry-native',packageManifest:manifest});
     assert.deepEqual(loaded.descriptor.security,manifest.security);
 });
 

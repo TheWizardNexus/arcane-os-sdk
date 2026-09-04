@@ -150,7 +150,7 @@ function createProviderAuthority({
 }) {
   if (graph !== undefined) {
     if (model !== undefined || runtime !== undefined) {
-      throw new TypeError("Browser speech graph is mutually exclusive with legacy model and runtime descriptors.");
+      throw new TypeError("Browser speech graph is mutually exclusive with model and runtime descriptors.");
     }
     if (!isBrowserSpeechArtifactGraph(graph)) {
       throw new TypeError("Browser speech graph must be created by createBrowserSpeechArtifactGraph().");

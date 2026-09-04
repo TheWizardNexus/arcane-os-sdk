@@ -186,39 +186,39 @@ test(
         );
         assert.equal(policyNeutralPlayback.destroy(), true);
 
-        let legacySynthesisRequest=null;
-        const legacySynthesisPlayback=new SpeechPlayback({
+        let nativeSynthesisRequest=null;
+        const nativeSynthesisPlayback=new SpeechPlayback({
             audio: new ContractAudio(),
             speech: {
                 async synthesize(payload,options) {
-                    legacySynthesisRequest={payload,options};
+                    nativeSynthesisRequest={payload,options};
                     return minimalWavBytes().buffer;
                 }
             },
-            createObjectURL: function createLegacySynthesisURL(blob) {
+            createObjectURL: function createNativeSynthesisURL(blob) {
                 assert.equal(blob.type,'audio/wav');
-                return 'blob:legacy-synthesis';
+                return 'blob:native-synthesis';
             },
-            revokeObjectURL: function revokeLegacySynthesisURL(url) {
+            revokeObjectURL: function revokeNativeSynthesisURL(url) {
                 revoked.push(url);
             }
         });
         assert.deepEqual(
-            await legacySynthesisPlayback.prepare({
-                parts:[{input:'Legacy synthesis route.'}],
+            await nativeSynthesisPlayback.prepare({
+                parts:[{input:'Native synthesis route.'}],
                 autoplay: false
             }),
             {ready:true,played:false}
         );
-        assert.deepEqual(legacySynthesisRequest?.payload,{
-            input:'Legacy synthesis route.',
+        assert.deepEqual(nativeSynthesisRequest?.payload,{
+            input:'Native synthesis route.',
             speed:1
         });
         assert.equal(
-            legacySynthesisRequest?.options.signal instanceof AbortSignal,
+            nativeSynthesisRequest?.options.signal instanceof AbortSignal,
             true
         );
-        assert.equal(legacySynthesisPlayback.destroy(),true);
+        assert.equal(nativeSynthesisPlayback.destroy(),true);
 
         const invalidSynthesizedResults=[
             {

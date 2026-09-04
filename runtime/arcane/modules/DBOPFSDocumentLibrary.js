@@ -732,7 +732,7 @@ class DBOPFSDocumentLibrary{
 
     async search(query,options={}){
         if(!isPlainRecord(options)) fail('Document search options must be a plain object.');
-        assertKnownKeys(options,new Set(['kinds','limit','signal','tags']),'Document search options');
+        assertKnownKeys(options,new Set(['kinds','signal','tags']),'Document search options');
         if(!signalLike(options.signal)) fail('signal must be an AbortSignal.');
         const corpus=await this.#corpus(options.signal);
         const search=new DocumentLexicalSearch(corpus.records);
@@ -863,7 +863,7 @@ class DBOPFSDocumentLibrary{
 
     async buildContext(query,options={}){
         if(!isPlainRecord(options)) fail('Document context options must be a plain object.');
-        assertKnownKeys(options,new Set(['limit','maxCharacters','maxDocumentCharacters','signal']),'Document context options');
+        assertKnownKeys(options,new Set(['signal']),'Document context options');
         if(!signalLike(options.signal)) fail('signal must be an AbortSignal.');
         const result=await this.search(query,{signal:options.signal});
         const preamble='DBOPFS DOCUMENT CONTEXT\n';
@@ -895,9 +895,8 @@ class DBOPFSDocumentLibrary{
 
     createContextBuilder(options={}){
         if(!isPlainRecord(options)) fail('Context builder options must be a plain object.');
-        assertKnownKeys(options,new Set(['limit','maxCharacters','maxDocumentCharacters']),'Context builder options');
-        const settings={...options};
-        return async({input,signal}={})=>(await this.buildContext(input,{...settings,signal})).text;
+        assertKnownKeys(options,new Set(),'Context builder options');
+        return async({input,signal}={})=>(await this.buildContext(input,{signal})).text;
     }
 }
 

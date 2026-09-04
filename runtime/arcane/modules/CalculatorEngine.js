@@ -50,10 +50,6 @@ export default class CalculatorEngine{
     #events;
     #operationSequence=0;
     constructor(){this.#events=createArcaneEventSource(this,{source:'calculator-engine',eventTypes:['calculator-result','calculator-error']});}
-    addEventListener(type,listener,options){return this.#events.addEventListener(type,listener,options);}
-    removeEventListener(type,listener,options){return this.#events.removeEventListener(type,listener,options);}
-    on(type,listener,options){return this.#events.on(type,listener,options);}
-    dispatchEvent(value){return this.#events.dispatchEvent(value);}
     calculate(expression){
         if(this.#disposed)throw disposedError();
         const operationId=`${this.#events.instanceId}:calculate:${(++this.#operationSequence).toString(36)}`;

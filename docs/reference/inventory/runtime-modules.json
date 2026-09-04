@@ -305,8 +305,8 @@
       "summary": "Evaluates complete arithmetic expressions, powers, constants, and common functions without `eval`.",
       "availability": "Cross-host",
       "protocol": "arcane-event-source/1 on the per-realm globalThis.arcaneEvents authority",
-      "normalization": "Mutable complete canonical result/error details, source-instance operation IDs, exact parser/evaluation error codes, and state-free EventTarget compatibility.",
-      "surface": "CALCULATOR_ENGINE_ERROR_CODES; default CalculatorEngine with calculate(), EventTarget/on compatibility, dispose()/destroy(); evaluateExpression()."
+      "normalization": "Mutable complete canonical result/error details, source-instance operation IDs, and exact parser/evaluation error codes.",
+      "surface": "CALCULATOR_ENGINE_ERROR_CODES; default CalculatorEngine with calculate() and dispose()/destroy(); evaluateExpression()."
     },
     {
       "file": "runtime/arcane/modules/ChartLibrary.js",
@@ -681,15 +681,14 @@
         "GLOBAL_ERROR_EVENT_TYPES",
         "GLOBAL_ERROR_REASONS",
         "default",
-        "fingerprintIncident",
         "normalizeErrorEvent",
         "normalizeRejectionEvent"
       ],
-      "summary": "Normalizes global errors/rejections, fingerprints and deduplicates incidents, persists a ledger, and performs bounded delivery.",
+      "summary": "Normalizes global errors/rejections, assigns occurrence identifiers, persists a ledger, and performs bounded delivery.",
       "availability": "Browser / native WebView hybrid",
       "protocol": "Window error input, DBOPFS, Mail, and per-realm globalThis.arcaneEvents authority",
       "normalization": "Incident records normalized; storage/mail failures isolated.",
-      "surface": "Global error event/code/reason constants; default `Errors`; event normalizers/fingerprint plus lifecycle, capture, delivery, state-free compatibility observation, and teardown methods."
+      "surface": "Global error event/code/reason constants; default `Errors`; event normalizers plus lifecycle, capture, delivery, state-free compatibility observation, and teardown methods."
     },
     {
       "file": "runtime/arcane/modules/GifEncoder.js",

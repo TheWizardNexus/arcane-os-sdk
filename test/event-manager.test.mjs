@@ -623,7 +623,7 @@ test('source dispatch preserves canonical order and complete rich local compatib
     }finally{
         arcaneEvents.disableTimeTravel();
         arcaneEvents.clearHistory();
-        arcaneEvents.off(type,observeLegacyPayload);
+        arcaneEvents.off(type,observeDirectPayload);
         unsubscribeCentralOne();
         unsubscribeCentralTwo();
         unsubscribeSourceOne();

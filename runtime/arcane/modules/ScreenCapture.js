@@ -1197,11 +1197,9 @@ export default class ScreenCapture extends EventTarget{
         return operation.stopCallPromise;
     }
 
-    async prepare(stream,optionsValue={},legacyOptionsValue={}){
+    async prepare(stream,optionsValue={}){
         this.#assertOpen();
-        const options=typeof optionsValue==='number'
-            ?optionsRecord(legacyOptionsValue,'Screen capture display options')
-            :optionsRecord(optionsValue,'Screen capture display options');
+        const options=optionsRecord(optionsValue,'Screen capture display options');
         if(options.signal?.aborted)throw abortError(options.signal.reason);
         let video;
         try{

@@ -85,15 +85,15 @@ test('DBOPFS document libraries own schema-bound manifest-last bootstrap and exp
     assert.equal(progress.at(-1).phase,'complete');
     assert.deepEqual(db.operations.at(-1).slice(0,2),['set','document_library_manifests']);
 
-    const search=await library.search('blue whale',{limit:1});
+    const search=await library.search('blue whale');
     assert.equal(search.matches.length,1);
     assert.equal(search.matches[0].id,'beta');
     assert.ok(search.matches[0].matchedFields.includes('body'));
 
-    const context=await library.buildContext('red fox',{limit:1,maxCharacters:2048});
+    const context=await library.buildContext('red fox');
     assert.match(context.text,/UNTRUSTED DBOPFS DOCUMENT CONTEXT/u);
     assert.match(context.text,/red fox/u);
-    const contextBuilder=library.createContextBuilder({limit:1,maxCharacters:2048});
+    const contextBuilder=library.createContextBuilder();
     assert.equal(typeof await contextBuilder({input:'red fox'}),'string');
 
     const replacement=await library.bootstrap({files:[files[0]]});
@@ -600,5 +600,5 @@ test('document bootstrap rejects schema drift and bounds aggregate corpus and se
         name:'Z body',
         summary:'alpha beta',
     }]});
-    assert.equal((await ranked.search('alpha beta',{limit:1})).matches[0].id,'z-body');
+    assert.equal((await ranked.search('alpha beta')).matches[0].id,'z-body');
 });

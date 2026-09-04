@@ -575,10 +575,10 @@ test("speech Worker exposes complete local errors through SDK-owned envelopes", 
   const admitted = normalizeSpeechWorkerErrorEnvelope(envelope.error, "stt", "use");
   assert.equal(admitted?.reason, "stt-transcription-engine-operation-rejected");
   assert.equal(admitted?.cause?.message, completeFailure);
-  const { cause: ignoredCause, ...legacyEnvelope } = envelope.error;
+  const { cause: ignoredCause, ...causeFreeEnvelope } = envelope.error;
   void ignoredCause;
   assert.equal(
-    normalizeSpeechWorkerErrorEnvelope(legacyEnvelope, "stt", "use")?.reason,
+    normalizeSpeechWorkerErrorEnvelope(causeFreeEnvelope, "stt", "use")?.reason,
     "stt-transcription-engine-operation-rejected",
   );
   assert.equal(normalizeSpeechWorkerErrorEnvelope({
