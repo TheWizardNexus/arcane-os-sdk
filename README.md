@@ -132,9 +132,6 @@ workers (four by default) over deterministic, resumable HTTP range parts of
 roughly 4 MB each, up to 4,096 parts, when the server confirms `206` responses
 and the total comes from `Content-Range` or, when that header is not exposed,
 optional declared `bytes`.
-An incomplete cache written by 0.5.3 keeps its completed coarse parts and
-subdivides only the missing intervals into the smaller current parts, so an SDK
-update preserves existing progress while reducing later refresh loss.
 When a followed redirect turns the first Range probe into `200`, the SDK probes
 the final URL directly before reusing that original response as the single-fetch
 fallback. Completed range parts survive restart and are presented to Wllama as
@@ -143,8 +140,8 @@ Range worker per member, so completed parts within a shard can also resume
 without multiplying the configured transfer bound. A probe without an
 observable or declared total falls back to one full fetch. Once a complete
 whole file or Range set is available, the store removes superseded fragments
-and the exact legacy duplicate for that model when DBOPFS deletion succeeds;
-cleanup failure is warned without hiding the usable model.
+when DBOPFS deletion succeeds; cleanup failure is warned without hiding the
+usable model.
 Capability reports evaluate each
 app-supplied model as `compatible`, `incompatible`, or `unknown`; the app can
 render that result without the SDK inventing or filtering its catalog.

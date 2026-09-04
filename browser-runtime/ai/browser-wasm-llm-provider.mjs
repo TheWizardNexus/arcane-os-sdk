@@ -10,9 +10,6 @@ import { arcaneEvents } from "../event-manager.mjs";
 
 const completeValue = (value) => value;
 
-// Compatibility export only. Ordinary model caching no longer creates or
-// requires completion manifests, receipts, or byte identities.
-const MODEL_MANIFEST_SCHEMA = "arcane.ai.browser-wasm.model.v4";
 const BROWSER_MODEL_SOURCES = new WeakSet();
 const BROWSER_MODEL_SOURCE_METADATA = new WeakMap();
 const BROWSER_MODEL_SOURCE_TRANSPORTS = new WeakMap();
@@ -31,8 +28,6 @@ const MODEL_DOWNLOAD_PROGRESS_INTERVAL_MS = 250;
 const MODEL_DOWNLOAD_SPEED_WINDOW_MS = 5_000;
 const MODEL_DOWNLOAD_MAX_RANGE_PARTS = 4_096;
 const MODEL_DOWNLOAD_TARGET_RANGE_BYTES = 4_000_000;
-const LEGACY_MODEL_DOWNLOAD_MAX_RANGE_PARTS = 16;
-const LEGACY_MODEL_DOWNLOAD_TARGET_RANGE_BYTES = 128_000_000;
 const INTEL_VENDOR_ID = 0x8086;
 const CAPABILITY_POLICY_PROTOCOL = "arcane-ai-browser-capability-policy/1";
 let highPerformanceGpuNoticeShown = false;
@@ -132,39 +127,6 @@ function modelHttpRanges(total) {
   );
 }
 
-function modelHttpSubranges(range) {
-  const length = range.end - range.start + 1;
-  const maximumParts = Math.floor(
-    MODEL_DOWNLOAD_MAX_RANGE_PARTS / LEGACY_MODEL_DOWNLOAD_MAX_RANGE_PARTS,
-  );
-  return completeValue(modelHttpRangesFor(
-    length,
-    maximumParts,
-    MODEL_DOWNLOAD_TARGET_RANGE_BYTES,
-  ).map((part) => completeValue({
-    start: range.start + part.start,
-    end: range.start + part.end,
-    total: range.total,
-  })));
-}
-
-function modelHttpRangePlans(total) {
-  const current = modelHttpRanges(total);
-  const legacy = modelHttpRangesFor(
-    total,
-    LEGACY_MODEL_DOWNLOAD_MAX_RANGE_PARTS,
-    LEGACY_MODEL_DOWNLOAD_TARGET_RANGE_BYTES,
-  );
-  if (
-    current.length === legacy.length
-    && current.every((range, index) => (
-      range.start === legacy[index].start
-      && range.end === legacy[index].end
-    ))
-  ) return completeValue([current]);
-  return completeValue([current, legacy]);
-}
-
 function progressClock() {
   return typeof globalThis.performance?.now === "function"
     ? globalThis.performance.now()
@@ -208,7 +170,7 @@ function modelIdText(value) {
   return id;
 }
 
-function descriptorFileName(value, url, fallbackName = null) {
+function descriptorFileName(value, url) {
   const suppliedName = value.name;
   let name = suppliedName;
   if (name === undefined) {
@@ -218,7 +180,6 @@ function descriptorFileName(value, url, fallbackName = null) {
     } catch {
       name = "";
     }
-    if (!name && fallbackName) name = fallbackName;
   }
   name = requiredText(name, "file name");
   if (
@@ -236,23 +197,19 @@ function descriptorFileName(value, url, fallbackName = null) {
   return name;
 }
 
-function descriptorFile(value, { fallbackName = null } = {}) {
+function descriptorFile(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new TypeError("Each browser model file descriptor must be an object.");
   }
-  if (
-    value.url !== undefined
-    && value.immutableUrl !== undefined
-    && value.url !== value.immutableUrl
-  ) {
-    throw new TypeError("Browser model file url and legacy immutableUrl must match when both are provided.");
+  if (Object.hasOwn(value, "immutableUrl")) {
+    throw new TypeError("Browser model file descriptors must use url.");
   }
-  const url = modelSourceUrl(value.url ?? value.immutableUrl);
+  const url = modelSourceUrl(value.url);
   if (!url) {
     throw new TypeError("Browser model file url must be a valid absolute URL.");
   }
   const file = {
-    name: descriptorFileName(value, url, fallbackName),
+    name: descriptorFileName(value, url),
     url: url.href,
   };
   if (Number.isSafeInteger(value.bytes) && value.bytes > 0) {
@@ -266,24 +223,14 @@ function modelDescriptor(value) {
     throw new TypeError("A browser model descriptor is required.");
   }
   const id = modelIdText(value.id);
-  const hasFiles = value.files !== undefined;
-  const hasLegacyFile = ["url", "immutableUrl", "name"]
-    .some((field) => value[field] !== undefined);
-  if (hasFiles && hasLegacyFile) {
-    throw new TypeError("Browser model files[] is mutually exclusive with legacy one-file fields.");
+  if (["url", "immutableUrl", "name", "bytes", "sha256", "licenseSpdx", "sourceRevision"]
+    .some((field) => Object.hasOwn(value, field))) {
+    throw new TypeError("Browser model descriptor files must be declared in files[].");
   }
-  let files;
-  let legacy = false;
-  if (hasFiles) {
-    if (!Array.isArray(value.files) || value.files.length === 0) {
-      throw new TypeError("Browser model files must be a nonempty ordered array.");
-    }
-    files = value.files.map((file) => descriptorFile(file));
-  } else {
-    legacy = true;
-    const safeId = id.replace(/[^a-z0-9._-]+/giu, "_");
-    files = [descriptorFile(value, { fallbackName: `${safeId}.gguf` })];
+  if (!Array.isArray(value.files) || value.files.length === 0) {
+    throw new TypeError("Browser model files must be a nonempty ordered array.");
   }
+  let files = value.files.map((file) => descriptorFile(file));
   const names = new Set();
   const urls = new Set();
   for (const file of files) {
@@ -303,16 +250,8 @@ function modelDescriptor(value) {
     url: file.url,
     ...(file.bytes === undefined ? {} : { bytes: file.bytes }),
   })));
-  let descriptor;
-  if (legacy) {
-    const [file] = files;
-    descriptor = { id, url: file.url };
-    if (file.bytes !== undefined) descriptor.bytes = file.bytes;
-  } else {
-    descriptor = { id, files: publicFiles };
-  }
-  descriptor = completeValue(descriptor);
-  MODEL_DESCRIPTOR_METADATA.set(descriptor, completeValue({ files, legacy }));
+  const descriptor = completeValue({ id, files: publicFiles });
+  MODEL_DESCRIPTOR_METADATA.set(descriptor, completeValue({ files }));
   return descriptor;
 }
 
@@ -394,7 +333,6 @@ function sourceMetadata(source) {
 
 /**
  * Creates a browser download authority for one caller-supplied model file set.
- * Legacy one-file descriptors normalize to one ordered member.
  * Security is an intent-only seam and does not change ordinary downloads.
  */
 export function createBrowserModelSource(descriptor, {
@@ -470,15 +408,7 @@ export function createBrowserModelSource(descriptor, {
     });
   }
 
-  async function open(memberOrOptions = 0, options = {}) {
-    let memberIndex = memberOrOptions;
-    if (!Number.isSafeInteger(memberOrOptions)) {
-      if (metadata.files.length !== 1) {
-        throw new TypeError("A browser model file index is required for a multi-file source.");
-      }
-      memberIndex = 0;
-      options = memberOrOptions ?? {};
-    }
+  async function open(memberIndex = 0, options = {}) {
     const { signal } = options;
     const download = await request(memberIndex, { signal });
     if (!download.response?.ok) await rejectHttpResponse(download);
@@ -587,10 +517,6 @@ export function createBrowserModelSource(descriptor, {
     descriptor: model,
     open,
   };
-  if (metadata.legacy) {
-    sourceRecord.name = metadata.files[0].name;
-    sourceRecord.immutableUrl = metadata.files[0].url;
-  }
   const source = completeValue(sourceRecord);
   BROWSER_MODEL_SOURCES.add(source);
   BROWSER_MODEL_SOURCE_METADATA.set(source, metadata);
@@ -654,18 +580,14 @@ function injectiveStorageId(id) {
   ).join("");
 }
 
-function storageName(source, { legacy = false } = {}) {
-  const safeId = legacy
-    ? source.id.replace(/[^a-z0-9._-]+/giu, "_")
-    : `id-${injectiveStorageId(source.id)}`;
+function storageName(source) {
+  const safeId = `id-${injectiveStorageId(source.id)}`;
   const models = sourceMetadata(source).files.map((file) => completeValue({
     file,
     name: `${safeId}--${file.name}`,
   }));
   return completeValue({
     models: completeValue(models),
-    model: models[0].name,
-    manifest: `${safeId}.complete.json`,
   });
 }
 
@@ -973,7 +895,7 @@ export function createDbopfsModelStore({
     } = {},
   ) {
     const transport = BROWSER_MODEL_SOURCE_TRANSPORTS.get(source);
-    const ranges = await rangePlanForInstall(name, total, signal);
+    const ranges = rangePlanForInstall(total, signal);
     const partFiles = new Array(ranges.length);
     const pendingRangeIndexes = [];
     for (let rangeIndex = 0; rangeIndex < ranges.length; rangeIndex += 1) {
@@ -1161,7 +1083,6 @@ export function createDbopfsModelStore({
   async function removeNames(names) {
     const removed = [];
     for (const entry of names.models) removed.push(await removeEntry(entry.name));
-    removed.push(await removeEntry(names.manifest));
     return removed.some(Boolean);
   }
 
@@ -1176,74 +1097,9 @@ export function createDbopfsModelStore({
     return names;
   }
 
-  async function rangePlanForInstall(
-    modelName,
-    total,
-    signal,
-    knownNames = undefined,
-  ) {
-    const plans = modelHttpRangePlans(total);
-    const existingNames = knownNames === undefined
-      ? await memberRangePartNames(modelName)
-      : knownNames;
-    const available = existingNames === null
-      ? null
-      : existingNames instanceof Set
-        ? existingNames
-        : new Set(existingNames);
-    if (available?.size === 0) return plans[0];
-    if (plans.length === 1) return plans[0];
-    const completedParts = new Map();
-
-    async function completedPart(range) {
-      throwIfAborted(signal, "install");
-      const partName = rangePartName(modelName, range);
-      if (available && !available.has(partName)) return null;
-      if (completedParts.has(partName)) return completedParts.get(partName);
-      const partFile = await file(partName);
-      const expected = range.end - range.start + 1;
-      const completed = partFile?.size === expected ? partFile : null;
-      completedParts.set(partName, completed);
-      return completed;
-    }
-
-    const completedLegacyRanges = new Set();
-    for (const range of plans[1]) {
-      if (await completedPart(range)) completedLegacyRanges.add(range);
-    }
-    const hybrid = completeValue(plans[1].flatMap((range) => (
-      completedLegacyRanges.has(range)
-        ? [range]
-        : modelHttpSubranges(range)
-    )));
-    let selected = plans[0];
-    let selectedBytes = 0;
-    let selectedLastModified = 0;
-    for (const ranges of [plans[0], hybrid]) {
-      let completedBytes = 0;
-      let lastModified = 0;
-      for (const range of ranges) {
-        const partFile = await completedPart(range);
-        if (!partFile) continue;
-        completedBytes += range.end - range.start + 1;
-        if (Number.isFinite(partFile.lastModified)) {
-          lastModified = Math.max(lastModified, partFile.lastModified);
-        }
-      }
-      if (
-        completedBytes > selectedBytes
-        || (
-          completedBytes === selectedBytes
-          && completedBytes > 0
-          && lastModified > selectedLastModified
-        )
-      ) {
-        selected = ranges;
-        selectedBytes = completedBytes;
-        selectedLastModified = lastModified;
-      }
-    }
-    return selected;
+  function rangePlanForInstall(total, signal) {
+    throwIfAborted(signal, "install");
+    return modelHttpRanges(total);
   }
 
   async function removeMemberRangeParts(modelName, {
@@ -1253,14 +1109,7 @@ export function createDbopfsModelStore({
     const existingNames = await memberRangePartNames(modelName);
     let names = existingNames;
     if (names === null && Number.isSafeInteger(total) && total > 0) {
-      const plans = modelHttpRangePlans(total);
-      const hybridRanges = plans.length === 1
-        ? []
-        : plans[1].flatMap((range) => modelHttpSubranges(range));
-      names = [...new Set([
-        ...plans.flat(),
-        ...hybridRanges,
-      ].map((range) => rangePartName(modelName, range)))];
+      names = modelHttpRanges(total).map((range) => rangePartName(modelName, range));
     }
     names ??= [];
     const removed = [];
@@ -1356,118 +1205,9 @@ export function createDbopfsModelStore({
 
   async function remove(source) {
     const names = storageName(source);
-    const legacyNames = storageName(source, { legacy: true });
-    let legacyManifest = null;
-    let removeLegacy = sourceMetadata(source).legacy;
-    try {
-      legacyManifest = await legacyManifestForSource(source, legacyNames);
-      removeLegacy ||= Boolean(legacyManifest);
-    } catch (error) {
-      globalThis.console?.warn?.(
-        "Arcane could not inspect the legacy browser model cache during removal.",
-        error,
-      );
-    }
     let removed = await removeNames(names);
     removed = await removeRangeParts(source, names) || removed;
-    if (removeLegacy) {
-      removed = await removeNames(
-        legacyStorageNames(source, legacyNames, legacyManifest),
-      ) || removed;
-    }
     return removed;
-  }
-
-  async function legacyManifestForSource(source, legacyNames) {
-    const manifestFile = await file(legacyNames.manifest);
-    if (!manifestFile) return null;
-    let manifest;
-    try {
-      manifest = JSON.parse(await manifestFile.text());
-    } catch {
-      return null;
-    }
-    const model = manifest?.model;
-    return manifest?.complete === true && model?.id === source.id ? manifest : null;
-  }
-
-  function legacyStorageNames(source, names, manifest) {
-    if (!manifest) return names;
-    const safeId = source.id.replace(/[^a-z0-9._-]+/giu, "_");
-    const storedNames = new Set(names.models.map((entry) => entry.name));
-    const candidates = [];
-    if (Array.isArray(manifest.model?.files)) candidates.push(...manifest.model.files);
-    if (manifest.model && typeof manifest.model === "object") candidates.push(manifest.model);
-    if (Array.isArray(manifest.files)) candidates.push(...manifest.files);
-    for (const candidate of candidates) {
-      if (!candidate || typeof candidate !== "object") continue;
-      if (
-        candidate.name === undefined
-        && candidate.url === undefined
-        && candidate.immutableUrl === undefined
-      ) continue;
-      try {
-        const url = modelSourceUrl(candidate.url ?? candidate.immutableUrl)
-          ?? new URL("https://arcane.invalid/model.gguf");
-        const name = descriptorFileName(candidate, url);
-        storedNames.add(`${safeId}--${name}`);
-      } catch {
-        // Keep cleanup limited to valid filenames attributable to this manifest.
-      }
-    }
-    return completeValue({
-      ...names,
-      models: completeValue([...storedNames].map((name) => completeValue({ name }))),
-    });
-  }
-
-  async function legacyNamespaceMatchesSource(source, legacyNames) {
-    const metadata = sourceMetadata(source);
-    if (metadata.legacy) return true;
-    if (metadata.files.length !== 1) return false;
-    const manifest = await legacyManifestForSource(source, legacyNames);
-    if (!manifest) return false;
-    const model = manifest.model;
-    const [member] = metadata.files;
-    if (model.url === member.url) return true;
-    if (model.name === member.name && model.immutableUrl === member.url) return true;
-    return Array.isArray(model.files)
-      && model.files.length === 1
-      && model.files[0]?.name === member.name
-      && model.files[0]?.url === member.url;
-  }
-
-  async function legacyCacheForSource(source, signal) {
-    const names = storageName(source, { legacy: true });
-    if (!await legacyNamespaceMatchesSource(source, names)) return null;
-    const files = await storedModelFiles(names, signal);
-    return files ? completeValue({ files, names }) : null;
-  }
-
-  async function removeLegacyCacheAfterReplacement(source) {
-    try {
-      const names = storageName(source, { legacy: true });
-      const manifest = await legacyManifestForSource(source, names);
-      if (!sourceMetadata(source).legacy && !manifest) return;
-      await removeNames(legacyStorageNames(source, names, manifest));
-    } catch (error) {
-      globalThis.console?.warn?.(
-        "Arcane could not remove the superseded legacy browser model cache.",
-        error,
-      );
-    }
-  }
-
-  async function removeIncompleteReplacement(source, names) {
-    try {
-      await removeNames(names);
-      await removeRangeParts(source, names);
-    } catch (error) {
-      globalThis.console?.warn?.(
-        "Arcane could not remove an incomplete duplicate browser model cache.",
-        error,
-      );
-    }
   }
 
   async function storagePolicy({ cached = false } = {}) {
@@ -1493,11 +1233,6 @@ export function createDbopfsModelStore({
       }
     }
     return modelFiles;
-  }
-
-  async function storedModelFiles(names, signal) {
-    const modelFiles = await availableModelFiles(names, signal);
-    return modelFiles.every(Boolean) ? modelFiles : null;
   }
 
   async function storedRangeCandidateForPlan(
@@ -1538,12 +1273,7 @@ export function createDbopfsModelStore({
     signal,
     availableNames = null,
   ) {
-    const ranges = await rangePlanForInstall(
-      modelName,
-      total,
-      signal,
-      availableNames,
-    );
+    const ranges = rangePlanForInstall(total, signal);
     return storedRangeCandidateForPlan(
       modelName,
       ranges,
@@ -1624,20 +1354,10 @@ export function createDbopfsModelStore({
     signal,
   } = {}) {
     const names = storageName(source);
-    let modelFiles = await availableResumableModelFiles(source, names, signal);
-    if (modelFiles.every(Boolean)) {
-      await removeLegacyCacheAfterReplacement(source);
-    } else {
-      const legacyCache = await legacyCacheForSource(source, signal);
-      if (legacyCache) {
-        await removeIncompleteReplacement(source, names);
-        modelFiles = legacyCache.files;
-      }
-    }
+    const modelFiles = await availableResumableModelFiles(source, names, signal);
     if (!modelFiles.every(Boolean)) return null;
     return completeValue({
       files: completeValue(modelFiles),
-      file: modelFiles.length === 1 ? modelFiles[0] : null,
     });
   }
 
@@ -1744,13 +1464,11 @@ export function createDbopfsModelStore({
         }
       }
       if (failure !== null) throw failure;
-      await removeLegacyCacheAfterReplacement(source);
       progress.finish();
       if (failure !== null) throw failure;
       throwIfAborted(downloadSignal, "install");
       return completeValue({
         files: completeValue(modelFiles),
-        file: modelFiles.length === 1 ? modelFiles[0] : null,
       });
     } catch (error) {
       retainFailure(error);
@@ -3011,13 +2729,12 @@ function capabilityPolicy(
   });
 }
 
-function providerModelSources(source, sources) {
-  const list = sources === undefined ? [source] : sources;
-  if (!Array.isArray(list) || list.length === 0) {
-    throw new TypeError("createBrowserWasmLlmProvider requires a nonempty sources array or legacy source.");
+function providerModelSources(sources) {
+  if (!Array.isArray(sources) || sources.length === 0) {
+    throw new TypeError("createBrowserWasmLlmProvider requires a nonempty sources array.");
   }
   const ids = new Set();
-  for (const candidate of list) {
+  for (const candidate of sources) {
     if (!BROWSER_MODEL_SOURCES.has(candidate)) {
       throw new TypeError("Every browser-WASM model source must come from createBrowserModelSource().");
     }
@@ -3026,27 +2743,20 @@ function providerModelSources(source, sources) {
     }
     ids.add(candidate.id);
   }
-  if (source !== undefined && !BROWSER_MODEL_SOURCES.has(source)) {
-    throw new TypeError("The legacy default source must come from createBrowserModelSource().");
-  }
-  if (source !== undefined && !list.includes(source)) {
-    throw new TypeError("The legacy default source must be one member of sources.");
-  }
   return completeValue({
-    sources: completeValue(list.slice()),
-    defaultSource: source ?? list[0],
+    sources: completeValue(sources.slice()),
+    defaultSource: sources[0],
   });
 }
 
 export function createBrowserWasmLlmProvider({
-  source,
   sources,
   store,
   loadDefaults = {},
   security,
   logger = console,
 } = {}) {
-  const configuredModels = providerModelSources(source, sources);
+  const configuredModels = providerModelSources(sources);
   const modelSources = configuredModels.sources;
   const defaultSource = configuredModels.defaultSource;
   if (!DBOPFS_MODEL_STORES.has(store)) {
@@ -3751,5 +3461,3 @@ export function adaptV1LlmProvider(provider) {
   V1_LLM_PROVIDER_ADAPTERS.set(provider, adapted);
   return adapted;
 }
-
-export { MODEL_MANIFEST_SCHEMA };

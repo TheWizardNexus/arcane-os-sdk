@@ -9,8 +9,6 @@ import {
 const RANGE_TOTAL = 40_000_000;
 const RANGE_PART_LENGTH = 4_000_000;
 const FAILED_RANGE = 'bytes=12000000-15999999';
-const LEGACY_RANGE_TOTAL = 400_000_000;
-const LEGACY_RANGE_PART_LENGTH = 100_000_000;
 
 function missingEntry(name) {
     const error = new Error(`Missing ${name}.`);
@@ -286,10 +284,12 @@ test(
         const url = 'https://example.invalid/models/resumable/model.gguf';
         const source = createBrowserModelSource(
             {
-                bytes: RANGE_TOTAL,
                 id: 'resumable-range-model',
-                name: 'model.gguf',
-                url
+                files: [{
+                    bytes: RANGE_TOTAL,
+                    name: 'model.gguf',
+                    url
+                }]
             },
             {
                 async fetchImpl(requestUrl, options = {}) {
@@ -395,107 +395,6 @@ test(
             }
         );
         assert.equal(cached.cache, 'cached');
-    }
-);
-
-test(
-    'browser-WASM keeps completed legacy ranges and splits only their missing gaps',
-    async function resumeLegacyRangesWithSmallRestartUnits() {
-        const directory = memoryDirectory();
-        const requests = [];
-        const modelId = 'legacy-range-model';
-        const fileName = 'legacy-model.gguf';
-        const modelName = persistedModelName(modelId, fileName);
-        for (const start of [0, 100_000_000, 200_000_000]) {
-            const end = start + LEGACY_RANGE_PART_LENGTH - 1;
-            directory.put(
-                persistedRangeName(
-                    modelName,
-                    start,
-                    end,
-                    LEGACY_RANGE_TOTAL
-                ),
-                LEGACY_RANGE_PART_LENGTH
-            );
-        }
-        const url = 'https://example.invalid/models/resumable/legacy-model.gguf';
-        const source = createBrowserModelSource(
-            {
-                bytes: LEGACY_RANGE_TOTAL,
-                id: modelId,
-                name: fileName,
-                url
-            },
-            {
-                async fetchImpl(requestUrl, options = {}) {
-                    const range = options.headers?.Range ?? null;
-                    requests.push(range);
-                    if (range === 'bytes=0-0') {
-                        return rangeResponse(
-                            requestUrl,
-                            range,
-                            readableBody(1),
-                            LEGACY_RANGE_TOTAL
-                        );
-                    }
-                    const match = /^bytes=([0-9]+)-([0-9]+)$/u.exec(range);
-                    const logicalByteLength = Number(match[2]) - Number(match[1]) + 1;
-                    return rangeResponse(
-                        requestUrl,
-                        range,
-                        readableBody(logicalByteLength),
-                        LEGACY_RANGE_TOTAL
-                    );
-                }
-            }
-        );
-        const store = storeFor(directory);
-        const progressEvents = [];
-
-        const installed = await store.ensure(
-            source,
-            {
-                onProgress(progress) {
-                    progressEvents.push(progress);
-                }
-            }
-        );
-        assert.equal(installed.cache, 'installed');
-        const dataRequests = requests.filter(function retainDataRange(range) {
-            return range !== 'bytes=0-0';
-        });
-        assert.equal(dataRequests.length, 25);
-        assert.ok(dataRequests.every(function requestsOnlySmallMissingRanges(range) {
-            const match = /^bytes=([0-9]+)-([0-9]+)$/u.exec(range);
-            const start = Number(match[1]);
-            const end = Number(match[2]);
-            return start >= 300_000_000
-                && end < LEGACY_RANGE_TOTAL
-                && end - start + 1 <= RANGE_PART_LENGTH;
-        }));
-        assert.equal(
-            dataRequests.includes('bytes=300000000-399999999'),
-            false
-        );
-        assert.equal(
-            progressEvents.some(function observedLegacyProgress(progress) {
-                return progress.phase === 'download'
-                    && progress.loadedBytes === 300_000_000
-                    && progress.totalBytes === LEGACY_RANGE_TOTAL
-                    && progress.remainingBytes === 100_000_000;
-            }),
-            true
-        );
-
-        const requestCount = requests.length;
-        const cached = await store.ensure(
-            source,
-            {
-                offline: true
-            }
-        );
-        assert.equal(cached.cache, 'cached');
-        assert.equal(requests.length, requestCount);
     }
 );
 

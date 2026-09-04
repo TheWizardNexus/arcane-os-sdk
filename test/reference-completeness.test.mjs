@@ -295,7 +295,7 @@ test('the public package API inventory matches every JavaScript export and MDN e
             ['completeValueText','completeValueText(value)'],
             ['createArcaneAI',"createArcaneAI({ llm=null, provider=null, loadPolicy='on-demand', security }={})"],
             ['createBrowserModelSource','createBrowserModelSource(descriptor, { fetchImpl=null }={})'],
-            ['createBrowserWasmLlmProvider','createBrowserWasmLlmProvider({ source, sources, store, loadDefaults={}, security, logger=console }={})'],
+            ['createBrowserWasmLlmProvider','createBrowserWasmLlmProvider({ sources, store, loadDefaults={}, security, logger=console }={})'],
             ['createDbopfsModelStore',"createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models', estimateStorage=null, downloadConcurrency=4 }={})"]
         ]);
         const browserWasmMembers=inventory.members.filter(member=>
@@ -440,7 +440,6 @@ test('the public package API inventory matches every JavaScript export and MDN e
             'files',
             'sources',
             'DBOPFS',
-            'arcane.ai.browser-wasm.model.v4',
             'load({offline:true})',
             'ARCANE_AI_MODEL_OFFLINE_MISS',
             'AbortSignal',

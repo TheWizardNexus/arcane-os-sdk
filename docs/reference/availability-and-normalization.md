@@ -112,9 +112,8 @@ fetches only missing work. Exact part length is used only to recognize a
 completed HTTP transport frame. Zero-length whole entries and incomplete Range
 sets cannot become cache hits; failed or incorrectly framed active parts are
 removed. After a
-complete current representation exists, the store attempts to remove its exact
-legacy duplicate and redundant Range fragments; cleanup failure is warned
-without hiding the usable model. Optional
+complete current representation exists, the store attempts to remove redundant
+Range fragments; cleanup failure is warned without hiding the usable model. Optional
 `secure:true` records intent only; historical checking remains disabled until a
 separately authorized user review. Successful
 Wllama model loading remains mandatory. `load({offline:true})` permits only a compatible

@@ -77,8 +77,10 @@ const EXACT_EXPORTS=[
 ];
 const GRANITE_AUTHORITY={
     id:'ibm-granite-4.1-3b-q4-k-s',
-    name:'granite-4.1-3b-Q4_K_S.gguf',
-    url:'https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/main/granite-4.1-3b-Q4_K_S.gguf'
+    files:[{
+        name:'granite-4.1-3b-Q4_K_S.gguf',
+        url:'https://huggingface.co/ibm-granite/granite-4.1-3b-GGUF/resolve/main/granite-4.1-3b-Q4_K_S.gguf'
+    }]
 };
 
 function json(value){
@@ -119,8 +121,10 @@ async function debugAuthority(){
         path:absolute,
         descriptor:{
             id:'disposable-debug-model',
-            name,
-            url:`https://debug.invalid/arcane/${encodeURIComponent(name)}`
+            files:[{
+                name,
+                url:`https://debug.invalid/arcane/${encodeURIComponent(name)}`
+            }]
         }
     };
 }
@@ -1112,7 +1116,7 @@ async function run(){
             return {
                 ok:response.ok,
                 status:response.status,
-                url:MODEL.url,
+                url:MODEL.files[0].url,
                 headers:response.headers,
                 body:response.body
             };
@@ -1125,7 +1129,7 @@ async function run(){
         microBatchTokens:64,
         gpuLayers:99_999
     };
-    const provider=api.createBrowserWasmLlmProvider({source,store,loadDefaults});
+    const provider=api.createBrowserWasmLlmProvider({sources:[source],store,loadDefaults});
     const adapted=api.adaptV1LlmProvider(provider);
     equal(adapted.protocol,'arcane-ai-provider/2','Adapted provider protocol drifted');
     equal(adapted.role,'llm','Adapted provider role drifted');
@@ -1194,13 +1198,13 @@ async function run(){
             exports:Object.keys(api).sort(),
             mode:'granite-final-warm-only',
             authoritative:true,
-            model:{id:MODEL.id,name:MODEL.name,url:MODEL.url},
+            model:{id:MODEL.id,files:MODEL.files},
             runtime:api.BROWSER_WASM_RUNTIME_AUTHORITY,
             adapted:{
                 protocol:adapted.protocol,
                 role:adapted.role,
                 localOnly:adapted.localOnly,
-                catalog:adapted.catalog().map(item=>({id:item.id,url:item.url}))
+                catalog:adapted.catalog().map(item=>({id:item.id,files:item.files}))
             },
             compatibility,
             finalWarm:{
@@ -1272,7 +1276,7 @@ async function run(){
         }
     });
     const offlineProvider=api.createBrowserWasmLlmProvider({
-        source:offlineSource,
+        sources:[offlineSource],
         store,
         loadDefaults
     });
@@ -1302,7 +1306,7 @@ async function run(){
         exports:Object.keys(api).sort(),
         mode:DEBUG?'disposable-debug':'granite-authority',
         authoritative:!DEBUG,
-        model:{id:MODEL.id,name:MODEL.name,url:MODEL.url},
+        model:{id:MODEL.id,files:MODEL.files},
         runtime:api.BROWSER_WASM_RUNTIME_AUTHORITY,
         compatibility,
         cold:{
@@ -1337,11 +1341,11 @@ if(!ENABLED){
     test('the installed real-Chrome browser-WASM contract remains an explicit one-host gate',()=>{
         assert.equal(ENABLED,false);
         assert.deepEqual(Object.keys(GRANITE_AUTHORITY),[
-            'id','name','url'
+            'id','files'
         ]);
         assert.equal(GRANITE_AUTHORITY.id,'ibm-granite-4.1-3b-q4-k-s');
-        assert.equal(GRANITE_AUTHORITY.name,'granite-4.1-3b-Q4_K_S.gguf');
-        assert.match(GRANITE_AUTHORITY.url,/^https:\/\/huggingface\.co\/ibm-granite\//u);
+        assert.equal(GRANITE_AUTHORITY.files[0].name,'granite-4.1-3b-Q4_K_S.gguf');
+        assert.match(GRANITE_AUTHORITY.files[0].url,/^https:\/\/huggingface\.co\/ibm-granite\//u);
     });
 }else test('the installed package runs real browser-WASM inference and offline DBOPFS reuse',{
     timeout:60*60*1000
@@ -1575,7 +1579,7 @@ if(!ENABLED){
             localOnly:true,
             catalog:[{
                 id:GRANITE_AUTHORITY.id,
-                url:GRANITE_AUTHORITY.url
+                files:GRANITE_AUTHORITY.files
             }]
         });
         const finalWarm=report.result.finalWarm;

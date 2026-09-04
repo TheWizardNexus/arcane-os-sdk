@@ -21,7 +21,6 @@ function missingEntry(name){
 
 function observedDirectory(){
     const entries=new Map();
-    const writes=[];
     let modelReadPasses=0;
     const table=Object.freeze({
         async getFileHandle(name,{create=false}={}){
@@ -69,7 +68,6 @@ function observedDirectory(){
                                 offset+=chunk.byteLength;
                             }
                             entries.set(name,bytes);
-                            writes.push(name);
                         },
                         async abort(){}
                     });
@@ -84,16 +82,11 @@ function observedDirectory(){
         table,
         modelReadPasses:()=>modelReadPasses,
         names:()=>[...entries.keys()],
-        writes:()=>writes.slice(),
         seed(name,value){
             entries.set(name,value instanceof Uint8Array
                 ?value.slice()
                 :new TextEncoder().encode(String(value)));
         },
-        async completion(){
-            const name=[...entries.keys()].find(value=>value.endsWith('.complete.json'));
-            return name?JSON.parse(new TextDecoder().decode(entries.get(name))):null;
-        }
     });
 }
 
@@ -218,9 +211,11 @@ test('disabled model checks record observed bytes without expected-size rejectio
     let fetches=0;
     const source=createBrowserModelSource({
         id:'unchecked-model',
-        url:'https://example.invalid/models/0123456789abcdef/unchecked.gguf',
-        bytes:99,
-        sha256:'0'.repeat(64)
+        files:[{
+            url:'https://example.invalid/models/0123456789abcdef/unchecked.gguf',
+            bytes:99,
+            sha256:'0'.repeat(64)
+        }]
     },{
         fetchImpl:async()=>{
             fetches+=1;
@@ -233,9 +228,11 @@ test('disabled model checks record observed bytes without expected-size rejectio
 
     assert.deepEqual(source.descriptor,{
         id:'unchecked-model',
-        url:'https://example.invalid/models/0123456789abcdef/unchecked.gguf',
-        bytes:99,
-        sha256:'0'.repeat(64)
+        files:[{
+            name:'unchecked.gguf',
+            url:'https://example.invalid/models/0123456789abcdef/unchecked.gguf',
+            bytes:99
+        }]
     });
     const installed=await store.ensure(source);
     assert.equal(installed.observedBytes,actual.byteLength);
@@ -243,7 +240,6 @@ test('disabled model checks record observed bytes without expected-size rejectio
     assert.equal(installed.integrity.byteLength.state,'unchecked');
     assert.equal(installed.integrity.sha256.state,'unchecked');
     assert.equal(directory.modelReadPasses(),0);
-    assert.equal((await directory.completion()).observedBytes,actual.byteLength);
 
     const cached=await store.ensure(source,{offline:true});
     assert.equal(cached.cache,'cached');
@@ -257,17 +253,21 @@ test('the default unchecked policy accepts the minimal canonical descriptor',asy
     const directory=observedDirectory();
     const source=createBrowserModelSource({
         id:'minimal-model',
-        url:'https://example.invalid/models/0123456789abcdef/minimal.gguf'
+        files:[{
+            url:'https://example.invalid/models/0123456789abcdef/minimal.gguf'
+        }]
     },{fetchImpl:async()=>new Response(Uint8Array.of(4,5))});
 
     assert.deepEqual(source.descriptor,{
         id:'minimal-model',
-        url:'https://example.invalid/models/0123456789abcdef/minimal.gguf'
+        files:[{
+            name:'minimal.gguf',
+            url:'https://example.invalid/models/0123456789abcdef/minimal.gguf'
+        }]
     });
     const installed=await storeFor(directory).ensure(source);
     assert.equal(installed.observedBytes,2);
     assert.equal(installed.integrity.state,'unchecked');
-    assert.equal((await directory.completion()).observedBytes,2);
     assert.equal(directory.modelReadPasses(),0);
 });
 
@@ -277,7 +277,9 @@ test('enabled checks require and enforce only their corresponding descriptor fie
     let fetches=0;
     const missing=createBrowserModelSource({
         id:'missing-authority',
-        url:'https://example.invalid/models/0123456789abcdef/missing.gguf'
+        files:[{
+            url:'https://example.invalid/models/0123456789abcdef/missing.gguf'
+        }]
     },{fetchImpl:async()=>{fetches+=1;return new Response(Uint8Array.of(1));}});
     await assert.rejects(
         store.ensure(missing,{security:{checks:{byteLength:true}}}),
@@ -291,8 +293,10 @@ test('enabled checks require and enforce only their corresponding descriptor fie
 
     const mismatched=createBrowserModelSource({
         id:'length-mismatch',
-        url:'https://example.invalid/models/0123456789abcdef/mismatch.gguf',
-        bytes:4
+        files:[{
+            url:'https://example.invalid/models/0123456789abcdef/mismatch.gguf',
+            bytes:4
+        }]
     },{
         fetchImpl:async()=>new Response(Uint8Array.of(1,2,3),{
             status:200,
@@ -305,45 +309,7 @@ test('enabled checks require and enforce only their corresponding descriptor fie
     );
 });
 
-test('disabled byte-length checking reuses legacy caches without rewriting them',async()=>{
-    const directory=observedDirectory();
-    const actual=Uint8Array.of(7,8,9);
-    const url='https://example.invalid/models/0123456789abcdef/legacy.gguf';
-    directory.seed('legacy-unchecked--legacy.gguf',actual);
-    directory.seed('legacy-unchecked.complete.json',`${JSON.stringify({
-        schema:'arcane.ai.browser-wasm.model.v2',
-        complete:true,
-        model:{
-            id:'legacy-unchecked',
-            name:'legacy.gguf',
-            immutableUrl:url,
-            bytes:99,
-            sha256:'0'.repeat(64),
-            licenseSpdx:'Apache-2.0',
-            sourceRevision:'legacy-revision'
-        },
-        finalUrl:url
-    })}\n`);
-    const source=createBrowserModelSource({
-        id:'legacy-unchecked',
-        url,
-        bytes:99,
-        sha256:'0'.repeat(64)
-    },{fetchImpl:async()=>{throw new Error('offline cache must not fetch');}});
-
-    const cached=await storeFor(directory).ensure(source,{offline:true});
-    assert.equal(cached.cache,'cached');
-    assert.equal(cached.observedBytes,actual.byteLength);
-    assert.equal(cached.integrity.state,'unchecked');
-    assert.equal(directory.modelReadPasses(),0);
-    const completion=await directory.completion();
-    assert.equal(completion.schema,'arcane.ai.browser-wasm.model.v2');
-    assert.equal(completion.observedBytes,undefined);
-    assert.equal(completion.model.id,'legacy-unchecked');
-    assert.equal(completion.model.immutableUrl,url);
-});
-
-test('ordered model files preserve legacy descriptors and reject ambiguous members',()=>{
+test('ordered model files require canonical descriptors and reject ambiguous members',()=>{
     const files=[
         {
             name:'model-00001-of-00002.gguf',
@@ -361,23 +327,22 @@ test('ordered model files preserve legacy descriptors and reject ambiguous membe
     const split=createBrowserModelSource({id:'split-model',files});
     assert.deepEqual(split.descriptor,{id:'split-model',files});
 
-    const legacy=createBrowserModelSource({
-        id:'legacy-model',
-        url:'https://example.invalid/models/0123456789abcdef/legacy.gguf',
-        bytes:7,
-        sha256:'3'.repeat(64)
-    });
-    assert.deepEqual(legacy.descriptor,{
-        id:'legacy-model',
-        url:'https://example.invalid/models/0123456789abcdef/legacy.gguf',
-        bytes:7,
-        sha256:'3'.repeat(64)
-    });
     assert.throws(()=>createBrowserModelSource({
         id:'ambiguous-model',
         url:'https://example.invalid/models/0123456789abcdef/model.gguf',
         files
-    }),/mutually exclusive/u);
+    }),/must be declared in files/u);
+    assert.throws(()=>createBrowserModelSource({
+        id:'missing-files',
+        url:'https://example.invalid/models/0123456789abcdef/model.gguf'
+    }),/must be declared in files/u);
+    assert.throws(()=>createBrowserModelSource({
+        id:'removed-file-alias',
+        files:[{
+            name:'model.gguf',
+            immutableUrl:'https://example.invalid/models/0123456789abcdef/model.gguf'
+        }]
+    }),/must use url/u);
     assert.throws(()=>createBrowserModelSource({
         id:'duplicate-name',
         files:[files[0],{...files[1],name:'MODEL-00001-OF-00002.GGUF'}]
@@ -404,7 +369,7 @@ test('ordered model files preserve legacy descriptors and reject ambiguous membe
     }),/Unicode NFC normalization/u);
 });
 
-test('ordered model files retain descriptor order and commit their complete set manifest last',async()=>{
+test('ordered model files retain descriptor order and cache their complete set',async()=>{
     const directory=observedDirectory();
     const downloads=[];
     let estimates=0;
@@ -447,18 +412,10 @@ test('ordered model files retain descriptor order and commit their complete set 
     });
     assert.deepEqual(downloads,[...bodies.keys()]);
     assert.equal(installed.files.length,2);
-    assert.equal(installed.file,null);
     assert.equal(installed.observedBytes,5);
     assert.equal(installed.integrity.byteLength.state,'verified');
     assert.equal(installed.integrity.sha256.state,'unchecked');
     assert.equal(estimates,1);
-    assert.match(directory.writes().at(-1),/^id-[a-f0-9]+\.complete\.json$/u);
-    const completion=await directory.completion();
-    assert.equal(completion.schema,'arcane.ai.browser-wasm.model.v4');
-    assert.deepEqual(
-        completion.files.map(file=>file.name),
-        [...bodies.keys()]
-    );
 
     const cached=await store.ensure(source,{
         offline:true,
@@ -496,7 +453,7 @@ test('catalog compatibility records measured storage failure before model downlo
     const store=storeFor(directory,{
         estimateStorage:async()=>({quota:5,usage:0})
     });
-    const provider=createBrowserWasmLlmProvider({source,store});
+    const provider=createBrowserWasmLlmProvider({sources:[source],store});
     await assert.rejects(
         provider.load({security:{checks:{byteLength:true}}}),
         error=>error?.code==='ARCANE_AI_STORAGE_CAPACITY_INSUFFICIENT'
@@ -552,7 +509,6 @@ test('secure download hashes each member while writing and rejects tamper withou
         error=>error?.code==='ARCANE_AI_MODEL_DIGEST_MISMATCH'
     );
     assert.equal(tamperedDirectory.modelReadPasses(),0);
-    assert.equal(await tamperedDirectory.completion(),null);
 });
 
 test('injective model storage ids cannot collide after lossy filename normalization',async()=>{
@@ -564,24 +520,28 @@ test('injective model storage ids cannot collide after lossy filename normalizat
     for(const descriptor of descriptors){
         const source=createBrowserModelSource({
             id:descriptor.id,
-            url:`https://example.invalid/models/0123456789abcdef/${descriptor.name}`
+            files:[{
+                url:`https://example.invalid/models/0123456789abcdef/${descriptor.name}`
+            }]
         },{fetchImpl:async()=>new Response(Uint8Array.of(1))});
         await storeFor(directory).ensure(source);
     }
-    const manifests=directory.names().filter(name=>name.endsWith('.complete.json'));
-    assert.equal(manifests.length,2);
-    assert.notEqual(manifests[0],manifests[1]);
-    assert.equal(manifests.every(name=>/^id-[a-f0-9]+\.complete\.json$/u.test(name)),true);
+    const storedModels=directory.names().filter(name=>name.endsWith('.gguf'));
+    assert.equal(storedModels.length,2);
+    assert.notEqual(storedModels[0],storedModels[1]);
+    assert.equal(storedModels.every(name=>/^id-[a-f0-9]+--(?:first|second)\.gguf$/u.test(name)),true);
 });
 
-test('unchecked declared bytes stay unknown until observed bytes and manifest are admitted',async()=>{
+test('unchecked declared bytes stay unknown until observed model files are admitted',async()=>{
     const directory=observedDirectory();
     const policies=[];
     let estimates=0;
     const source=createBrowserModelSource({
         id:'unchecked-storage',
-        url:'https://example.invalid/models/0123456789abcdef/unchecked-storage.gguf',
-        bytes:1
+        files:[{
+            url:'https://example.invalid/models/0123456789abcdef/unchecked-storage.gguf',
+            bytes:1
+        }]
     },{fetchImpl:async()=>new Response(Uint8Array.of(1,2,3))});
     const installed=await storeFor(directory,{
         estimateStorage:async()=>{
@@ -604,8 +564,10 @@ test('one provider catalogs caller models and v2 selection fails closed for over
     const directory=observedDirectory();
     const primary=createBrowserModelSource({
         id:'catalog-primary',
-        url:'https://example.invalid/models/0123456789abcdef/primary.gguf',
-        bytes:1
+        files:[{
+            url:'https://example.invalid/models/0123456789abcdef/primary.gguf',
+            bytes:1
+        }]
     });
     const oversized=createBrowserModelSource({
         id:'catalog-oversized',
@@ -616,7 +578,6 @@ test('one provider catalogs caller models and v2 selection fails closed for over
         }]
     });
     const provider=createBrowserWasmLlmProvider({
-        source:primary,
         sources:[primary,oversized],
         store:storeFor(directory)
     });

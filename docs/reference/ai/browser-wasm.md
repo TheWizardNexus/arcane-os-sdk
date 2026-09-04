@@ -38,7 +38,7 @@ const dbopfs = globalThis.dbopfs || new DBOPFS({applicationId:'my-app'});
 await dbopfs.readyPromise;
 const source = createBrowserModelSource(MODEL);
 const store = createDbopfsModelStore({dbopfs});
-const provider = createBrowserWasmLlmProvider({source, store});
+const provider = createBrowserWasmLlmProvider({sources:[source], store});
 const ai = createArcaneAI({
     provider,
     loadPolicy:'manual'
@@ -109,7 +109,7 @@ additional transferred content.
 The DBOPFS store uses one bounded transfer axis. Ordered multi-file GGUF sets
 download several members concurrently and preserve completed shards across a
 retry. Each active member negotiates HTTP Range support. A split member uses at
-most one Range worker while a one-file source may use up to
+most one Range worker while a single-member source may use up to
 `downloadConcurrency` Range workers (four by default), so file and Range
 workers are never multiplied. A usable total from `Content-Range` or the
 optional descriptor `bytes` divides that member into deterministic contiguous
@@ -118,9 +118,6 @@ committed separately in OPFS, so retry or refresh fetches only the small
 in-flight parts plus any other missing parts; the ordered parts are exposed to
 Wllama as one logical model Blob. Range offsets remain transport-local; only
 aggregate transfer telemetry is public.
-An incomplete cache written by 0.5.3 keeps each completed legacy part and
-subdivides only its missing legacy intervals into current small parts. The
-result preserves existing progress and limits loss on later refreshes.
 
 ## Model selection, optional hardening, and cache
 
@@ -129,9 +126,7 @@ The canonical model descriptor is
 names and URLs are unique. Each URL must be absolute HTTPS without credentials
 or a fragment. An optional positive safe-integer `bytes` value is used only for
 progress and HTTP Range planning. Missing or unusable metadata never blocks a
-download, and a declared value is not a content-length check. The legacy
-one-file `{id,url,bytes?}` shape remains accepted and normalizes to one ordered
-member.
+download, and a declared value is not a content-length check.
 
 Fetch follows HTTPS redirects and records the requested and final HTTPS URL. A
 redirect that leaves HTTPS is rejected as an unavoidable transport-safety
@@ -165,11 +160,7 @@ console.log(security.secure); // false unless explicitly selected
 console.log(cache);
 ```
 
-For one-file compatibility, older descriptors can supply `immutableUrl` as the
-URL alias and `name` as a cache-filename hint. If both `url` and
-`immutableUrl` are present, they must match. Legacy `licenseSpdx` and
-`sourceRevision` properties are not canonical descriptor fields. Applications
-remain responsible for model selection and license compliance.
+Applications remain responsible for model selection and license compliance.
 
 `localOnly:true` describes inference after load. It does not mean a cache miss
 cannot download. Source downloads use CORS, omit credentials and referrer,
@@ -408,8 +399,7 @@ provider.
 ### Overview
 
 Validates a caller-owned canonical ordered multi-file descriptor and creates
-the cancellable HTTPS download source accepted by this provider. A legacy
-one-file descriptor normalizes to one ordered member.
+the cancellable HTTPS download source accepted by this provider.
 
 ### Signature and result
 
@@ -418,8 +408,8 @@ createBrowserModelSource(descriptor, { fetchImpl=null }={})
 ```
 
 The mutable source includes `kind`, the canonical descriptor fields,
-`descriptor`, and `open(memberIndex,{signal})`. `open()` requires a member
-index for multi-file sources and returns the complete readable response body,
+`descriptor`, and `open(memberIndex=0,{signal})`. An omitted index selects the
+first member. The method returns the complete readable response body,
 requested/final URLs, nullable observed `contentLength`, and `cancel()`; caching
 and the store's private per-member Range negotiation remain store-owned.
 
@@ -447,13 +437,12 @@ created by this module. Structural lookalikes are rejected.
 ### Signature and result
 
 ```text
-createBrowserWasmLlmProvider({ source, sources, store, loadDefaults={}, security, logger=console }={})
+createBrowserWasmLlmProvider({ sources, store, loadDefaults={}, security, logger=console }={})
 ```
 
-`sources` is a nonempty array of unique SDK-created model sources. Optional
-legacy `source` identifies the default and must be one member of `sources`; when
-`sources` is omitted, `source` supplies the one-model catalog. The mutable
-result exposes protocol and provider identity, default model metadata,
+`sources` is a nonempty array of unique SDK-created model sources. Its first
+entry is the default model. The mutable result exposes protocol and provider
+identity, default model metadata,
 `catalog`, `capabilities`, `status`, `load`, `unload`, `chat`, `stream`,
 `streamChat`, `use`, `probe`, and `dispose`. Direct provider `load()` selects a
 catalog model and returns `{model,status}`;
@@ -489,7 +478,7 @@ console.log(provider.status().state); // unloaded
 ### Overview
 
 Adapts an existing DBOPFS instance without renaming or replacing its public
-methods. The adapter owns model-file, cache, and completion behavior.
+methods. The adapter owns model-file caching and complete-set exposure.
 
 ### Signature and result
 
@@ -527,13 +516,8 @@ contradictory exposed Range response, or incorrectly framed Range body fails
 rather than silently assembling a partial model. A transfer failure lets peer
 transfers settle; explicit cancellation stops active transfers. Both preserve
 completed members and exact Range parts for retry, while unfinished active
-parts restart after refresh. Completed 0.5.3 Range parts remain in the active
-plan, while only missing legacy intervals are subdivided. A zero-length current whole
-entry or incomplete current Range set cannot shadow a complete legacy cache;
-the complete legacy file is reused and the store attempts to remove abandoned
-replacement fragments. After
-a replacement completes, the store attempts to remove its exact legacy
-duplicate. A complete whole member similarly supersedes its Range fragments.
+parts restart after refresh. A complete whole member supersedes its current
+Range fragments.
 Cleanup failure is warned without replacing a usable model. Zero-length abandoned entries are removed
 because Wllama cannot consume an empty model Blob or File.
 

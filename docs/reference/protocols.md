@@ -340,18 +340,15 @@ directly before reusing the original response as its single-fetch fallback.
 Confirmed support uses deterministic OPFS Range parts of roughly 4 MB each, up
 to 4,096 parts per member, with bounded active workers; completed parts and
 split-model members survive interruption so a retry fetches only missing work.
-An incomplete 0.5.3 cache keeps its completed coarse parts and subdivides only
-the missing intervals into current small parts. Only unfinished active parts
-restart after refresh. Without usable range support
+Only unfinished active parts restart after refresh. Without usable range support
 or an observable or declared total it falls back to one full fetch. A normal
 cache miss may fetch only the
 caller-supplied HTTPS sources; `offline:true` performs no model request and uses
 only a compatible completed cache, otherwise it rejects with
 `ARCANE_AI_MODEL_OFFLINE_MISS`. Unload releases the active Wllama session but
-does not silently delete the app-owned cache. When a complete current model
-replaces the exact legacy cache entry, the store attempts to remove the legacy
-duplicate; a complete whole member likewise supersedes its resumable fragments.
-Cleanup failure is warned without hiding the usable model.
+does not silently delete the app-owned cache. A complete whole member supersedes
+its current resumable fragments. Cleanup failure is warned without hiding the
+usable model.
 
 SDK `0.3.4` requires WebGPU. Load requests full offload and waits for the runtime
 to report a loaded model. `navigator.gpu` presence alone is

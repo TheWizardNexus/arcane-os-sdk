@@ -5763,8 +5763,7 @@ canonical descriptor is `{id,files:[{name?,url,bytes?},...]}`. The nonempty file
 array has unique normalized names and URLs. A positive safe-integer `bytes`
 value supplies observational progress and HTTP Range planning only; missing or
 unusable metadata is treated as unavailable and never blocks the download. It
-is never a content-validation, admission, identity, or cache-reuse rule. The
-one-file `{id,url,name?,bytes?}` shape also normalizes to one ordered member.
+is never a content-validation, admission, identity, or cache-reuse rule.
 
 ### Signature and result
 
@@ -5775,16 +5774,11 @@ createBrowserModelSource(descriptor, { fetchImpl=null }={})
 Every URL must be absolute HTTPS with no credentials or fragment. Use a
 caller-selected version-pinned URL when reproducibility matters. The mutable
 source exposes `kind`, the canonical descriptor fields, `descriptor`, and
-`open(memberIndex,{signal})`.
-For a one-file source, `open({signal})` remains accepted. The result is
+`open(memberIndex=0,{signal})`; an omitted index selects the first member. The result is
 `{body,requestedUrl,finalUrl,contentLength,cancel}`; `contentLength` is the
 positive observed HTTP response length or `null`. Every direct `open()`
 performs the configured fetch and preserves the complete response body subject
 only to unavoidable HTTP framing.
-
-Legacy `immutableUrl` remains an input alias for `url`; both must match when
-supplied together. Legacy `licenseSpdx` and `sourceRevision` properties are not
-ordinary runtime gates or proof of license rights.
 
 ### Availability and normalization
 
@@ -5822,12 +5816,11 @@ requests and exposes provider states `unloaded`, `loading`, `ready`,
 ### Signature and result
 
 ```text
-createBrowserWasmLlmProvider({ source, sources, store, loadDefaults={}, security, logger=console }={})
+createBrowserWasmLlmProvider({ sources, store, loadDefaults={}, security, logger=console }={})
 ```
 
-`sources` is a nonempty array of unique SDK-created sources. Optional legacy
-`source` names the default and must be one member of `sources`; when `sources`
-is omitted, `source` supplies the one-model catalog. The mutable provider
+`sources` is a nonempty array of unique SDK-created sources. Its first entry is
+the default model. The mutable provider
 exposes `protocol`, `id`, default `model`, `catalog`, `capabilities`, `status`,
 `load`, `unload`, `chat`, `stream`, `streamChat`, `use`, `probe`, and `dispose`.
 Direct `load()` selects a catalog model and returns `{model,status}`; the
@@ -5898,15 +5891,15 @@ createDbopfsModelStore({ dbopfs, tableName='arcane_ai_browser_models', estimateS
 `downloadConcurrency` must be a positive safe integer and defaults to four.
 It bounds exactly one transfer axis: ordered multi-file GGUF sources use that
 many concurrent member workers, with at most one Range worker inside each
-member, while a one-file source can use the whole bound for HTTP Range workers
+member, while a single-member source can use the whole bound for HTTP Range
+workers
 when the probe returns a usable total from exposed `Content-Range` or optional
 descriptor `bytes`. The mutable
 result contains `kind`, `tableName`, `downloadConcurrency`, the original
 `adapter`, and `ready`, `install`, `ensure`, and `remove`. `ensure()` returns
-`files`, the one-file compatibility `file` or `null`, and
-`cache:'cached'|'installed'`. It preserves the complete model content.
+`files` and `cache:'cached'|'installed'`. It preserves the complete model content.
 `offline:true` never downloads and rejects a miss with
-`ARCANE_AI_MODEL_OFFLINE_MISS`. Existing legacy one-file caches remain readable.
+`ARCANE_AI_MODEL_OFFLINE_MISS`.
 
 When supplied, `onProgress` receives existing ordered file progress plus
 `loadedBytes`, `totalBytes`, `remainingBytes`, `bytesPerSecond`, `etaSeconds`,
@@ -5926,9 +5919,9 @@ known.
 ### Availability and normalization
 
 **Browser with a ready DBOPFS instance and OPFS.** Cache metadata is not a
-transferable capability or license proof. Provider unload/dispose keeps all cached files;
-`store.remove(source)` explicitly deletes that source's files, resumable Range
-parts, and any legacy manifest. For any source member, a followed redirect that
+transferable capability or license proof. Provider unload/dispose keeps all
+cached files; `store.remove(source)` explicitly deletes that source's files and
+resumable Range parts. For any source member, a followed redirect that
 turns the first `bytes=0-0` probe into `200` triggers one direct probe of the
 final URL. Confirmed support cancels the original body and starts the Range
 pool; refusal keeps the original response as the ordinary single-fetch path,
@@ -5943,13 +5936,9 @@ in order as one logical Blob. A later non-206, contradictory exposed Range
 response, or incorrectly framed body fails rather than assembling partial
 content. On failure or cancellation, peers settle while completed shards and
 Range parts remain available for retry; an unfinished active part restarts after
-refresh. An incomplete 0.5.3 cache keeps completed legacy parts and subdivides
-only missing legacy intervals into current small parts. A persisted Range part whose length
-does not match its requested HTTP frame is discarded and fetched again. A
-zero-length current whole entry or incomplete current Range set cannot shadow a
-complete legacy cache; once a current replacement completes, the store attempts
-to remove its exact legacy duplicate. A complete whole member similarly
-supersedes its redundant Range fragments. Cleanup failure is warned without
+refresh. A persisted Range part whose length does not match its requested HTTP
+frame is discarded and fetched again. A complete whole member supersedes its
+redundant current Range fragments. Cleanup failure is warned without
 hiding the usable model. Wllama requires every selected model Blob or File to
 be non-empty.
 

@@ -2873,7 +2873,7 @@
       ],
       "primaryImport": "arcane-os/ai/browser-wasm",
       "group": "Browser-WASM local AI",
-      "summary": "Validates a caller-supplied ordered multi-file model descriptor with optional progress-only byte metadata (or the legacy one-file shape) and creates cancellable no-credentials HTTPS member downloads.",
+      "summary": "Validates a caller-supplied ordered multi-file model descriptor with optional progress metadata and creates cancellable no-credentials HTTPS member downloads.",
       "availability": "Browser with Fetch and a readable response body; each direct member open performs its configured HTTPS fetch",
       "protocol": "Caller-supplied version-pinned HTTPS model-file URLs",
       "normalization": "Canonical mutable ordered descriptor with optional observational bytes plus a complete per-member download handle with nullable observed content length"
@@ -2883,7 +2883,7 @@
       "name": "createBrowserWasmLlmProvider",
       "displayName": "createBrowserWasmLlmProvider()",
       "kind": "function",
-      "signature": "createBrowserWasmLlmProvider({ source, sources, store, loadDefaults={}, security, logger=console }={})",
+      "signature": "createBrowserWasmLlmProvider({ sources, store, loadDefaults={}, security, logger=console }={})",
       "entrypoints": [
         "arcane-os/ai/browser-wasm"
       ],
@@ -2908,7 +2908,7 @@
       "summary": "Adapts an existing DBOPFS instance into a resumable model cache with bounded parallel shard or monolithic Range-part transfer and live aggregate byte progress.",
       "availability": "Browser with a ready DBOPFS instance and OPFS support",
       "protocol": "Resumable ordered model members and deterministic per-member Range parts over existing DBOPFS method semantics",
-      "normalization": "Uses one bounded transfer axis, preserves ordered completed shards and exact deterministic Range parts within any member across interruption, emits 250 ms-coalesced additive loaded/total/remaining/rate/ETA/active-worker telemetry, rolls discarded partial writes back out of progress, attempts best-effort cleanup of superseded exact legacy and fragment duplicates after a complete replacement exists, and settles failed or cancelled peers while retaining completed work for retry"
+      "normalization": "Uses one bounded transfer axis, preserves ordered completed shards and deterministic current Range parts within any member across interruption, emits coalesced additive loaded/total/remaining/rate/ETA/active-worker telemetry, rolls discarded partial writes back out of progress, cleans superseded current Range parts after a complete replacement exists, and settles failed or cancelled peers while retaining completed work for retry"
     },
     {
       "id": "browser-speech:BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL",

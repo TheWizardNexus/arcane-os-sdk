@@ -606,7 +606,7 @@ async function initializeApplication() {
   // checks require explicit secure:true selection and user review before activation.
   const source = createBrowserModelSource(localModelDescriptor(selectedModel));
   browserModelProvider = createBrowserWasmLlmProvider({
-    source,
+    sources: [source],
     store: createDbopfsModelStore({ dbopfs }),
     loadDefaults: {
       contextTokens,
