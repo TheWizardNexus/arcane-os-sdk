@@ -23,7 +23,7 @@ A component file does not register its own custom element. The `<html-import>` h
 
 ## Shared semantic-event and lifecycle contract
 
-Except for the legacy `header.html` and platform-owned `theme-switcher.html`,
+Except for shared `header.html` and platform-owned `theme-switcher.html`,
 each component owns exactly one source created through
 `createArcaneEventSource(host,{source:'arcane.component.<name>',eventTypes})`.
 That source publishes synchronously to the realm's branded
@@ -72,7 +72,7 @@ appropriate.
 | [`file-drop.html`](#file-drophtml) | Acquires complete file selections by drag/drop or picker and presents busy, progress, error, and cleared state. | `configure()`<br>`openPicker()`<br>`clear()`<br>`setBusy()`<br>`setError()`<br>`setProgress()`<br>`destroy()` | `file-drop-ready`<br>`file-drop-selected`<br>`file-drop-progress`<br>`file-drop-state`<br>`file-drop-error` | Complete selections preserved; browser File/drop errors mixed |
 | [`file-inspector.html`](#file-inspectorhtml) | Displays file metadata, preview, busy/error state, and caller-defined actions. | `configure()`<br>`show()`<br>`clear()`<br>`setActions()`<br>`setBusy()`<br>`setError()`<br>`setPreview()`<br>`destroy()` | `file-inspector-ready`<br>`file-inspector-action`<br>`file-inspector-change`<br>`file-inspector-cleared`<br>`file-inspector-error` | State normalized; preview/provider behavior mixed |
 | [`file-manager.html`](#file-managerhtml) | Browses, filters, selects, opens, and acts on app-scoped files. | `setProvider()`<br>`loadAll()`<br>`setFilter()`<br>`select()`<br>`clearSelection()`<br>`destroy()` | `file-manager-ready`<br>`file-manager-select`<br>`file-manager-open`<br>`file-manager-action` | Selection/filter state normalized; storage/provider behavior mixed |
-| [`header.html`](#headerhtml) | Legacy title bar with history, reload, online marker, presentation labels, and 988 link. | None | No component-specific event | Browser/platform-native behavior; no component-ready contract |
+| [`header.html`](#headerhtml) | Shared title bar with history, reload, online marker, presentation labels, and 988 link. | None | No component-specific event | Browser/platform-native behavior; no component-ready contract |
 | [`integration-settings.html`](#integration-settingshtml) | Edits non-secret communication service configuration and service actions. | `configure()`<br>`getValues()`<br>`setStatus()`<br>`destroy()` | `integration-settings-ready`<br>`integration-settings-save`<br>`integration-settings-close`<br>`integration-action` | Normalized non-secret values |
 | [`local-ai-status.html`](#local-ai-statushtml) | Presents local-AI standby, failure, recovery, guidance, retry, and dismissal states. | `configure()`<br>`begin()`<br>`present()`<br>`destroy()`<br>`hidden` | `local-ai-status-ready`<br>`local-ai-status-dismissed`<br>`local-ai-retry` | Fully normalized LocalAIReadiness report |
 | [`markdown-document.html`](#markdown-documenthtml) | Renders and navigates a complete Markdown document with focusable fragments. | `configure()`<br>`load()`<br>`render()`<br>`clear()`<br>`fail()`<br>`focus()`<br>`focusFragment()`<br>`destroy()` | `markdown-document-ready`<br>`markdown-document-state`<br>`markdown-document-loading`<br>`markdown-document-rendered`<br>`markdown-document-empty`<br>`markdown-document-error`<br>`markdown-document-navigate` | Complete Markdown/state normalized; malformed input and Marked/DOM failures remain visible |
@@ -86,7 +86,7 @@ appropriate.
 | [`screen-capture.html`](#screen-capturehtml) | Presents image, video, or GIF display-capture workflow. | `capture` (`ScreenCapture` instance)<br>`destroy()` | `screen-capture-ready`<br>`screen-capture-result` | State/result normalized; media permission/codec failures mixed |
 | [`source-code-viewer.html`](#source-code-viewerhtml) | Renders complete line-addressable source code with load, error, focus, and state behavior. | `configure()`<br>`load()`<br>`render()`<br>`clear()`<br>`fail()`<br>`focus()`<br>`focusLine()`<br>`destroy()` | `source-code-viewer-ready`<br>`source-code-viewer-state`<br>`source-code-viewer-state-loading`<br>`source-code-viewer-state-ready`<br>`source-code-viewer-state-empty`<br>`source-code-viewer-state-error` | Complete mutable source/state |
 | [`source-explanation.html`](#source-explanationhtml) | Presents an evidence finding, source selection, explanation, and save state. | `showFinding()`<br>`populate()`<br>`selectSource()`<br>`markSaved()`<br>`destroy()` | `source-explanation-ready`<br>`source-explanation-save`<br>`source-explanation-source-selected` | DOM-normalized |
-| [`speech.html`](#speechhtml) | Coordinates explicit STT activation, speech controls, transcription completion, mute state, and microphone availability. | `configure()`<br>`setAvailability()`<br>`setMuted()`<br>`reportTTSError()`<br>`requestSTTActivation()`<br>`destroy()`<br>`availability`<br>`muted`<br>`initialMuted`<br>`componentReady` | `speech-ready`<br>`speech-transcription-complete`<br>`speech-transcription-error`<br>`speech-transcription-cancelled`<br>`speech-microphone-unavailable`<br>`speech-stt-activation-request`<br>`speech-stt-activation-error`<br>`speech-tts-lifecycle-error`<br>`speech-synthesis-error` | Sticky runtime speech readiness, explicit STT activation, request cancellation, TTS mute lifecycle intent, and exact TTS operation failures normalized; provider/model authority remains external |
+| [`speech.html`](#speechhtml) | Coordinates explicit STT activation, speech controls, transcription completion, mute state, and microphone availability. | `configure()`<br>`setMuted()`<br>`reportTTSError()`<br>`requestSTTActivation()`<br>`destroy()`<br>`availability`<br>`muted`<br>`initialMuted`<br>`componentReady` | `speech-ready`<br>`speech-transcription-complete`<br>`speech-transcription-error`<br>`speech-transcription-cancelled`<br>`speech-microphone-unavailable`<br>`speech-stt-activation-request`<br>`speech-stt-activation-error`<br>`speech-tts-lifecycle-error`<br>`speech-synthesis-error` | Sticky runtime speech readiness, explicit STT activation, request cancellation, TTS mute lifecycle intent, and exact TTS operation failures normalized; provider/model authority remains external |
 | [`summary-strip.html`](#summary-striphtml) | Displays compact selectable KPI or summary items. | `configure()`<br>`setItems()`<br>`updateItem()`<br>`clear()`<br>`destroy()` | `summary-strip-ready`<br>`summary-strip-change`<br>`summary-strip-select` | DOM-normalized |
 | [`table.html`](#tablehtml) | Builds and updates a simple header/body table. | `buildHeader()`<br>`buildTable()`<br>`destroy()` | `table-ready`<br>`header-update`<br>`body-update` | DOM-normalized |
 | [`task-progress.html`](#task-progresshtml) | Runs and displays a task list with started/change/complete/error state. | `configure()`<br>`setTasks()`<br>`updateTask()`<br>`runTasks()`<br>`clear()`<br>`destroy()` | `task-progress-ready`<br>`task-progress-started`<br>`task-progress-change`<br>`task-progress-complete`<br>`task-progress-error` | Task state normalized; injected task results mixed |
@@ -666,7 +666,7 @@ Shared dependencies: [`DBOPFS.js`](runtime-modules.md#dbopfsjs), [`File.js`](run
 
 ### Overview
 
-Legacy title bar with history, reload, online marker, presentation labels, and 988 link.
+Shared title bar with history, reload, online marker, presentation labels, and 988 link.
 
 ### Public surface
 
@@ -1051,7 +1051,7 @@ completion, mute state, and microphone availability.
 
 ### Public surface
 
-Methods/properties: `configure()`, `setAvailability()`, `setMuted()`,
+Methods/properties: `configure()`, `setMuted()`,
 `reportTTSError(error,boundary='synthesis')`, `requestSTTActivation()`,
 `destroy()`, `availability`, `muted`, `initialMuted`, and `componentReady`.
 
@@ -1115,12 +1115,6 @@ Provider registration and selection remain inert, and default
 provider/runtime owner decides whether and how to execute a user intent; the
 component never selects a runtime or model, downloads artifacts, reloads after
 failure, or falls back to another provider.
-
-`setAvailability()` is compatibility-only for microphone and negative
-unselected-role reports. Positive STT/TTS booleans cannot manufacture a ready
-role, and no compatibility value can replace a selected sticky role. Hold to
-talk stays disabled without sticky ready STT, and compatibility input cannot
-enable a no-selection TTS role or bypass explicit TTS activation.
 
 Each transcription request owns an `AbortController`; its signal is passed as
 the third argument to `AI.fetchSTT()`. Cancel, a newer capture, and `destroy()`

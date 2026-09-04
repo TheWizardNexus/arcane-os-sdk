@@ -301,7 +301,6 @@
         || function requestSTTActivation(intent) {
             return requestAIRuntimeIntent(intent);
         };
-    host.setAvailability = setAvailability;
     host.setMuted = setMuted;
     host.availability = {
         microphone: Boolean(
@@ -417,40 +416,15 @@
             applyConfiguredMutedState(configuredMuted);
         }
 
-        if (
-            Object.prototype.hasOwnProperty.call(options, 'stt')
-            || Object.prototype.hasOwnProperty.call(options, 'tts')
-            || Object.prototype.hasOwnProperty.call(options, 'microphone')
-        ) {
-            setAvailability(options);
-        }
-
         return host;
     }
 
-    function setAvailability(input = {}) {
+    function updateMicrophoneAvailability(available) {
         if (destroyed) {
-            return { ...host.availability };
+            return;
         }
-        // Compatibility-only explicit adapter report. Canonical consumers use
-        // the sticky AIRuntimeState role records instead of this wrapper.
-        const previousSTTRole = sttRole;
-        const previousTTSRole = ttsRole;
         const microphoneWasAvailable = host.availability.microphone;
-
-        if (Object.prototype.hasOwnProperty.call(input, 'microphone')) {
-            host.availability.microphone = Boolean(input.microphone);
-        }
-        if (Object.prototype.hasOwnProperty.call(input, 'stt')
-            && !Boolean(input.stt)
-            && !selectedRole(sttRole)) {
-            sttRole = unavailableRole('stt');
-        }
-        if (Object.prototype.hasOwnProperty.call(input, 'tts')
-            && !Boolean(input.tts)
-            && !selectedRole(ttsRole)) {
-            ttsRole = unavailableRole('tts');
-        }
+        host.availability.microphone = Boolean(available);
 
         if (microphoneWasAvailable && !host.availability.microphone) {
             cancelSTTOperation('microphone-unavailable');
@@ -462,8 +436,7 @@
         ) {
             localStatus = null;
         }
-        applyRoleTransitions(previousSTTRole, previousTTSRole);
-        return { ...host.availability };
+        applyRoleTransitions(sttRole, ttsRole);
     }
 
     function setMuted(muted) {
@@ -796,10 +769,8 @@
         if (destroyed) {
             return;
         }
-        setAvailability(
-            {
-                microphone: microphonePermissionStatus?.state !== 'denied'
-            }
+        updateMicrophoneAvailability(
+            microphonePermissionStatus?.state !== 'denied'
         );
     }
 
@@ -1265,7 +1236,7 @@
                     owner: 'microphone'
                 };
                 if (microphonePermissionStatus?.state === 'denied') {
-                    setAvailability({ microphone: false });
+                    updateMicrophoneAvailability(false);
                 }
                 dispatchSpeechEvent(
                     'speech-microphone-unavailable',

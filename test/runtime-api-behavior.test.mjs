@@ -3222,11 +3222,6 @@ test(
             /stt:latestAIRuntimeRoles[\s\S]*latestAIRuntimeRoles[.]stt[.]state==='ready'/u,
             'Speech readiness must remain bound to sticky STT state.'
         );
-        assert.doesNotMatch(
-            source,
-            /speech[.]setAvailability/u,
-            'Chat compatibility availability must not synthesize speech readiness.'
-        );
         assert.match(
             source,
             /time[.]dateTime=value[.]toISOString\(\);[\s\S]*?toLocaleTimeString\(\[\],\{[\s\S]*?hour:'2-digit',[\s\S]*?minute:'2-digit',[\s\S]*?hourCycle:'h23'[\s\S]*?\}\);[\s\S]*?time[.]title=value[.]toLocaleString\(\);/u,
@@ -4807,12 +4802,6 @@ test(
             5,
             'Every speech error projection must use the shared boundary/cause fields.'
         );
-        assert.match(
-            source,
-            /Object[.]prototype[.]hasOwnProperty[.]call\(input, 'stt'\)[\s\S]*!Boolean\(input[.]stt\)[\s\S]*!selectedRole\(sttRole\)/u,
-            'Speech compatibility input must neither create readiness nor replace a selected sticky STT role.'
-        );
-
         const availabilityStart = voiceSource.indexOf(
             'function canStartVoiceRecording('
         );
