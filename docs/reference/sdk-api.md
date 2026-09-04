@@ -1375,8 +1375,8 @@ const result=await materializeWorkspaceRuntimeContent({workspaceRoot});
 
 Default binding for the canonical PreferenceStore runtime class. The static
 specifier `arcane-os/preference-store` works in Node package consumers and is
-mapped to the same runtime module in managed browsers; legacy browser code may
-continue using `arcane/PreferenceStore`.
+mapped to the same runtime module in managed browsers. `arcane/PreferenceStore`
+is the direct browser runtime name generated into the managed import map.
 
 ### Signature and result
 
@@ -1496,8 +1496,8 @@ const schema=preferenceSchema([]);
 
 Default binding for the canonical SpeechPlayback runtime class. The static
 specifier `arcane-os/speech-playback` works in Node package consumers and maps
-to the same runtime module in managed browsers; `arcane/SpeechPlayback` remains
-the legacy browser-compatible name.
+to the same runtime module in managed browsers. `arcane/SpeechPlayback` is the
+direct browser runtime name generated into the managed import map.
 
 ### Signature and result
 
@@ -4623,7 +4623,7 @@ if (document.protocol !== ARCANE_EVENT_STACK_PROTOCOL) {
 
 ### Overview
 
-The frozen default list of capture-phase browser interaction names observed by DOM instrumentation. Pass a smaller `eventTypes` array when a debugger needs only a focused interaction class.
+The mutable default list of 44 capture-phase browser interaction names observed by DOM instrumentation. Pass a smaller `eventTypes` array when a debugger needs only a focused interaction class.
 
 ### Value and use
 
@@ -4635,7 +4635,7 @@ The list is configuration, not an event source. Observation begins only after a 
 
 ### Availability and normalization
 
-**Node and browser/bundler; meaningful to browser DOM instrumentation.** The exact frozen strings are normalized; live host event objects are never stored in this value.
+**Node and browser/bundler; meaningful to browser DOM instrumentation.** The array contains the exact event-name strings; live host event objects are never stored in this value.
 
 ### Example
 
@@ -4649,7 +4649,7 @@ console.log(DEFAULT_DOM_EVENT_TYPES.includes('click'));
 
 ### Overview
 
-The event name used for complete diagnostics of captured clicks, keys, pointer actions, form activity, and the other configured DOM interactions. Its payload describes the target and path without retaining DOM nodes; private targets and credential-named fields remain protected.
+The event name used for complete diagnostics of captured clicks, keys, pointer actions, form activity, and the other configured DOM interactions. Its payload describes the target and path without retaining DOM nodes and preserves readable event details and target values.
 
 ### Value and use
 
@@ -4657,7 +4657,7 @@ The event name used for complete diagnostics of captured clicks, keys, pointer a
 const DOM_INTERACTION_EVENT = 'arcane.dom.interaction'
 ```
 
-Listen on the EventManager to update a debugger in real time. DOM instrumentation defaults `captureEventDetails`, `captureInputValues`, and `captureNodeMarkup` to `true`, preserving complete non-private interaction details and values. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
+Listen on the EventManager to update a debugger in real time. DOM instrumentation records complete readable interaction details and target values. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
 
 ### Availability and normalization
 
@@ -4685,11 +4685,11 @@ The event name used for normalized attribute, character-data, and child-list mut
 const DOM_MUTATION_EVENT = 'arcane.dom.mutation'
 ```
 
-Mutation capture uses `MutationObserver` and is enabled by default when DOM instrumentation starts. Complete non-private markup, text, selectors, and URLs are preserved by default; private elements and credential-like attribute-mutation values remain redacted. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
+Mutation capture uses `MutationObserver` and is enabled by default when DOM instrumentation starts. Complete markup, text, selectors, URLs, and attribute values are preserved. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
 
 ### Availability and normalization
 
-**Browser DOM or a DOM-compatible test host; constant imports in Node.** The payload is a complete credential-protected diagnostic projection and cannot reconstruct or authorize changes to the DOM.
+**Browser DOM or a DOM-compatible test host; constant imports in Node.** The payload is complete normalized diagnostic data and cannot reconstruct or authorize changes to the DOM.
 
 ### Example
 
@@ -4769,16 +4769,13 @@ A synchronous pub/sub manager with opt-in complete time-travel recording, strict
 new EventManager({
     timeTravel=false,
     dom=null,
-    captureStacks=false,
-    secure=false,
-    redactSensitive=secure,
     clock=()=>new Date(),
     now,
     sessionId
 }={})
 ```
 
-Listeners receive the original live arguments synchronously. When recording is enabled, the manager separately stores complete deeply frozen snapshots, parent/causation structure, timing, status, and error detail. Ordinary `secure:false, redactSensitive:false` preserves complete URLs, public details, and captured stack text while credential-named fields remain `[REDACTED]`; `captureStacks` defaults to `false`. Optional URL redaction requires `secure:true, redactSensitive:true`. Legacy maximum options remain accepted for compatibility but do not cap, clip, tail, truncate, or elide content. See the [central events guide](event-manager.md) for every getter, method, default, failure, and recovery path. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
+Listeners receive the original live arguments synchronously. When recording is enabled, the manager separately stores complete mutable snapshots, parent/causation structure, timing, status, captured stack text, and error detail. History has no configured retention cap. See the [central events guide](event-manager.md) for every getter, method, default, failure, and recovery path. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
 
 ### Availability and normalization
 
@@ -4799,7 +4796,7 @@ console.log(events.history.at(-1).status);
 
 ### Overview
 
-The playback lifecycle event emitted when an AbortSignal aborts an active review. Its frozen summary reports the source session, number delivered, current cursor, `completed:false`, and complete credential-protected error detail.
+The playback lifecycle event emitted when an AbortSignal aborts an active review. Its mutable summary reports the source session, number delivered, current cursor, `completed:false`, and a complete normalized error snapshot.
 
 ### Value and use
 
@@ -4827,7 +4824,7 @@ arcaneEvents.on(PLAYBACK_CANCELLED_EVENT, result => {
 
 ### Overview
 
-The playback lifecycle event emitted after every selected record and `onRecord` callback completes. The same frozen summary shape is returned from `playback()`.
+The playback lifecycle event emitted after every selected record and `onRecord` callback completes. The same mutable summary shape is returned from `playback()`.
 
 ### Value and use
 
@@ -4863,11 +4860,11 @@ The playback lifecycle event emitted when parsing, timing, event delivery, or th
 const PLAYBACK_FAILED_EVENT = 'arcane.time-travel.playback.failed'
 ```
 
-The diagnostic error in the lifecycle payload is complete credential-protected detail and may not preserve object identity. Ordinary mode preserves URLs and captured stack text; explicit secure redaction may replace URLs. Records delivered before failure are not undone. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
+The diagnostic error in the lifecycle payload is a complete normalized snapshot and may not preserve object identity. Records delivered before failure are not undone. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
 
 ### Availability and normalization
 
-**Node and browser/bundler.** The failure summary is normalized with credential-named fields protected; the thrown error remains the local failure value.
+**Node and browser/bundler.** The failure summary is normalized; the thrown error remains the local failure value.
 
 ### Example
 
@@ -4883,7 +4880,7 @@ arcaneEvents.on(PLAYBACK_FAILED_EVENT, result => {
 
 ### Overview
 
-The event emitted once per selected stack record in the safe default `review` playback mode. Debuggers can render the immutable record without re-emitting the record's original application event.
+The event emitted once per selected stack record in the default `review` playback mode. Debuggers can render the mutable normalized record without re-emitting the record's original application event.
 
 ### Value and use
 
@@ -4895,7 +4892,7 @@ Use `review` for inspection. `mode:'events'` deliberately re-emits original type
 
 ### Availability and normalization
 
-**Node and browser/bundler.** Each delivered value is a validated immutable `arcane-event-stack/1` record.
+**Node and browser/bundler.** Each delivered value is a validated mutable `arcane-event-stack/1` record.
 
 ### Example
 
@@ -4951,7 +4948,7 @@ Seeking never dispatches the selected record's original type and never mutates h
 
 ### Availability and normalization
 
-**Node and browser/bundler.** The cursor payload is normalized and contains an immutable retained record when one exists.
+**Node and browser/bundler.** The cursor payload is normalized and contains the mutable retained record when one exists.
 
 ### Example
 
@@ -4967,11 +4964,11 @@ arcaneEvents.on(TIME_TRAVEL_SEEK_EVENT, ({sequence}) => {
 
 ### Overview
 
-The one SDK-owned synchronous semantic event authority in the current
-JavaScript realm. Module evaluation installs or reuses the exact branded value
-at `globalThis.arcaneEvents`; duplicate module URLs do not create another bus.
-Window, frame, worker, Node realm, and process boundaries remain distinct and
-have no automatic transport between them.
+The synchronous semantic event authority used in the current JavaScript realm.
+Module evaluation reads `globalThis.arcaneEvents`, reuses a value with the
+current protocol and required callable API, or installs a new authority. Window,
+frame, worker, Node realm, and process boundaries remain distinct and have no
+automatic transport between them.
 
 ### Value and use
 
@@ -4982,18 +4979,19 @@ arcaneEvents[Symbol.for('arcane-os.arcane-events-authority')]
     === 'arcane-event-authority/1'
 ```
 
-The global is an own, non-enumerable, non-writable, non-configurable data
-property. Its brand and public protocol descriptors are immutable. An accessor,
-inherited or unbranded value, mismatched descriptor/protocol, incomplete API,
-or failed installation is rejected with its exact
-`ARCANE_EVENT_AUTHORITY_*` code; the SDK never replaces the collision.
+When this module installs the authority, the global is an own, non-enumerable,
+writable, configurable data property. The created authority's brand and public
+protocol properties are ordinary mutable properties. An existing value is
+reused based on its protocol and required callable API; any other value is
+replaced when the property can be defined. A failed definition throws
+`ARCANE_EVENT_AUTHORITY_INSTALL_FAILED`.
 
 Canonical subscription is
 `arcaneEvents.subscribe(type,handler,{once=false,signal}={})`. It returns an
 idempotent `unsubscribe` function with
 `unsubscribe.dispose === unsubscribe`. An already-aborted signal installs
 nothing; later abort removes the registration synchronously. `handler` receives
-one frozen `arcane-event-occurrence/1`, and wildcard subscription is not
+one mutable `arcane-event-occurrence/1`, and wildcard subscription is not
 admitted.
 
 The source factory signatures are:
@@ -5003,7 +5001,7 @@ arcaneEvents.createSource(owner,{source,eventTypes,onListenerError?})
 createArcaneEventSource(owner,{source,eventTypes,onListenerError?})
 ```
 
-The exported wrapper calls the authority method and returns the same frozen
+The exported wrapper calls the authority method and returns the same mutable
 handle. One owner may have one active source. The handle exposes
 `protocol`, `descriptor`, `source`, `instanceId`, `eventTypes`, `disposed`,
 `subscribe`, `on`, `once`, `addEventListener`, `removeEventListener`,
@@ -5013,50 +5011,38 @@ the canonical listener-error occurrence at the owner-local boundary;
 `errorOccurrence` is `null` only when that secondary publication could not be
 constructed.
 
-`source.dispatch(type,compatibilityDetail,{operationId=null,publicDetail={},
-cancelable=false}={})` synchronously returns the frozen
-`{occurrence,accepted}` publication. The occurrence contains immutable
+`source.dispatch(type,detail,{operationId=null,publicDetail,
+cancelable=false}={})` synchronously returns the mutable
+`{occurrence,accepted}` publication. The occurrence contains mutable
 `protocol`, `occurrenceId`, `type`, `source`, `instanceId`, `operationId`,
-complete credential-protected deeply frozen `detail`, `cancelable`, live
+complete normalized `detail`, `cancelable`, live
 `defaultPrevented`, and `preventDefault()`. Canonical listeners run before the
-source's EventTarget-compatible listeners. Cancellation is synchronous and only
+source's EventTarget-shaped listeners. When `publicDetail` is omitted, canonical
+detail is the normalized source detail; record values merge with explicitly
+supplied `publicDetail`, and other combinations are retained under
+`{compatibility,publicDetail}`. Cancellation is synchronous and only
 sets acceptance; the publisher decides whether to begin or continue domain work.
 
 Listener promises are not awaited. The authority is not an async queue:
 operation-owned promises and `createEventQueue()` own async ordering,
 backpressure, cancellation, and failure. Listener exceptions are observational;
-they publish one privacy-safe `arcane.event.listener.error` occurrence with code
-`ARCANE_EVENT_LISTENER_CALLBACK_FAILED` and do not throw from committed source
-dispatch.
+they publish one `arcane.event.listener.error` occurrence with code
+`ARCANE_EVENT_LISTENER_CALLBACK_FAILED`, source identifiers, and a complete
+normalized error snapshot, and do not throw from committed source dispatch.
 
-`ARCANE_EVENT_ERROR_CODES` is frozen and maps each stable key to that identical
-string value: `ARCANE_EVENT_AUTHORITY_ACCESSOR_COLLISION`,
-`ARCANE_EVENT_AUTHORITY_VALUE_COLLISION`,
-`ARCANE_EVENT_AUTHORITY_DESCRIPTOR_MISMATCH`,
-`ARCANE_EVENT_AUTHORITY_PROTOCOL_MISMATCH`,
-`ARCANE_EVENT_AUTHORITY_API_MISMATCH`,
-`ARCANE_EVENT_AUTHORITY_INSTALL_FAILED`, `ARCANE_EVENT_SOURCE_INVALID`,
-`ARCANE_EVENT_SOURCE_ALREADY_REGISTERED`, `ARCANE_EVENT_SOURCE_DISPOSED`,
-`ARCANE_EVENT_SOURCE_EVENT_TYPE_UNDECLARED`,
-`ARCANE_EVENT_COMPATIBILITY_DETAIL_INVALID`, `ARCANE_EVENT_OCCURRENCE_INVALID`,
-`ARCANE_EVENT_OCCURRENCE_SEQUENCE_EXHAUSTED`,
-`ARCANE_EVENT_SOURCE_SEQUENCE_EXHAUSTED`,
-`ARCANE_EVENT_LISTENER_CALLBACK_FAILED`, `ARCANE_EVENT_DOM_DETAIL_COLLISION`,
-`ARCANE_EVENT_DOM_TARGET_INVALID`, `ARCANE_EVENT_DOM_OPTIONS_INVALID`,
-`ARCANE_EVENT_SUBSCRIPTION_TYPE_INVALID`,
-`ARCANE_EVENT_SUBSCRIPTION_HANDLER_INVALID`,
-`ARCANE_EVENT_SUBSCRIPTION_OPTIONS_INVALID`,
-`ARCANE_EVENT_SUBSCRIPTION_SIGNAL_INVALID`, and
-`ARCANE_EVENT_DISPATCH_EVENT_INVALID`. Thrown authority failures expose the
-matching value as `error.code`; the listener callback code is carried by its
-observational error occurrence.
+`ARCANE_EVENT_ERROR_CODES` is a mutable object that maps every exported code key
+to that identical string value. Thrown authority failures expose the matching
+value as `error.code`; `ARCANE_EVENT_LISTENER_CALLBACK_FAILED` is carried by its
+observational error occurrence, and
+`ARCANE_EVENT_DISPATCH_EVENT_INVALID` identifies invalid Event-like input to a
+source handle's `dispatchEvent()` adapter.
 
 `projectArcaneDOMEvent(target,occurrence,{type,bubbles=false,composed=false,
-cancelable=occurrence.cancelable}={})` is a one-way compatibility projection.
-Its frozen detail carries `occurrenceId`, `arcaneSource`, `instanceId`, and
+cancelable=occurrence.cancelable}={})` is a one-way DOM projection.
+Its mutable detail carries `occurrenceId`, `arcaneSource`, `instanceId`, and
 `operationId`; it never republishes the DOM event. DOM cancellation propagates
 back to a cancelable occurrence. `isArcaneEventOccurrence(value)` recognizes
-only canonical occurrences and source compatibility views created by this
+only canonical occurrences and source event views created by this
 realm's authority.
 
 The first `source.dispose()`/`destroy()` publishes the final noncancelable
@@ -5067,9 +5053,10 @@ the owner for a new source, and returns `true`; later or reentrant calls return
 ### Availability and normalization
 
 **Node and browser/bundler, once per JavaScript realm; DOM projection requires
-`CustomEvent` and a target with `dispatchEvent`.** Canonical public detail is
-defensively snapshotted and deeply frozen. Rich compatibility detail remains
-owner-local and is shallow-frozen only when it is a plain record or array.
+`CustomEvent` and a target with `dispatchEvent`.** Canonical public detail is a
+complete mutable normalized snapshot. Array and plain-record source detail is
+shallow-copied for the source event view; other host objects remain owner-local
+by identity.
 
 ### Example
 
@@ -5087,7 +5074,7 @@ const unsubscribe = arcaneEvents.subscribe(
 );
 source.dispatch(
     'sdk.operation.completed',
-    Object.freeze({operationId:'operation-1'}),
+    {operationId:'operation-1'},
     {operationId:'operation-1', publicDetail:{operationId:'operation-1'}}
 );
 unsubscribe.dispose();
@@ -5098,8 +5085,8 @@ source.dispose();
 
 ### Overview
 
-Global registry symbol that brands the one compatible Arcane event authority in
-a JavaScript realm.
+Global registry symbol used as a protocol marker on an Arcane event authority
+created in a JavaScript realm.
 
 ### Value and import
 
@@ -5111,8 +5098,9 @@ Its exact value is `Symbol.for('arcane-os.arcane-events-authority')`.
 
 ### Availability and normalization
 
-**Node and browser/bundler.** The brand property is immutable and
-non-enumerable. It is a compatibility marker, not transport or authenticity.
+**Node and browser/bundler.** A created authority receives this ordinary
+enumerable, writable, configurable symbol property. It is a realm-local protocol
+marker, not transport or authenticity.
 
 ### Example
 
@@ -5125,7 +5113,7 @@ console.log(arcaneEvents[ARCANE_EVENT_AUTHORITY_BRAND]);
 
 ### Overview
 
-Stable kind discriminator for the frozen authority descriptor.
+Stable kind discriminator for the authority descriptor.
 
 ### Value and import
 
@@ -5162,8 +5150,9 @@ Its exact value is `arcane-event-authority/1`.
 
 ### Availability and normalization
 
-**Node and browser/bundler.** An incompatible installed protocol fails closed
-and is never replaced or wrapped.
+**Node and browser/bundler.** A global value with this protocol and all required
+authority methods is reused. Other values are replaced when the global property
+can be defined.
 
 ### Example
 
@@ -5176,7 +5165,7 @@ console.log(arcaneEvents.protocol===ARCANE_EVENT_AUTHORITY_PROTOCOL);
 
 ### Overview
 
-Frozen registry of every stable canonical event-authority failure code.
+Mutable registry of event-authority failure-code names.
 
 ### Value and import
 
@@ -5189,8 +5178,8 @@ the matching value as `error.code`.
 
 ### Availability and normalization
 
-**Node and browser/bundler.** The registry contains no mutable registration API
-or vague fallback code.
+**Node and browser/bundler.** The registry is an exported code lookup, not a
+registration API. Each current key maps to its identical string value.
 
 ### Example
 
@@ -5215,10 +5204,11 @@ Its exact value is `arcane.event.listener.error`.
 
 ### Availability and normalization
 
-**Node and browser/bundler.** Frozen public detail carries the exact failure code
-and source occurrence identifiers, never the raw error. Its shape is exactly
+**Node and browser/bundler.** Mutable public detail carries the exact failure
+code, source occurrence identifiers, and a complete normalized error snapshot.
+Its shape is
 `{code:'ARCANE_EVENT_LISTENER_CALLBACK_FAILED',reason:'listener-threw',
-eventType,occurrenceId,source,instanceId,operationId}`. Publication is
+eventType,occurrenceId,source,instanceId,operationId,error}`. Publication is
 synchronous and nonrecursive.
 
 ### Example
@@ -5232,7 +5222,7 @@ const unsubscribe=arcaneEvents.subscribe(ARCANE_EVENT_LISTENER_ERROR_EVENT,conso
 
 ### Overview
 
-Stable protocol discriminator for immutable canonical occurrences.
+Stable protocol discriminator for canonical occurrences.
 
 ### Value and import
 
@@ -5244,8 +5234,8 @@ Its exact value is `arcane-event-occurrence/1`.
 
 ### Availability and normalization
 
-**Node and browser/bundler.** Occurrences are realm-owned identity values with
-deeply frozen public detail and synchronous cancellation state.
+**Node and browser/bundler.** Occurrences are mutable realm-owned identity values
+with complete normalized public detail and synchronous cancellation state.
 
 ### Example
 
@@ -5270,8 +5260,8 @@ Its exact value is `arcane.event.source.disposed`.
 
 ### Availability and normalization
 
-**Node and browser/bundler.** Public detail is exactly
-`{reason:'source-disposed'}`. Delivery precedes source-listener cleanup;
+**Node and browser/bundler.** Canonical detail is the normalized merged value
+`{source,instanceId,reason:'source-disposed'}`. Delivery precedes source-listener cleanup;
 reentrant or later disposal publishes nothing and returns `false`.
 
 ### Example
@@ -5286,7 +5276,7 @@ source.dispose();
 
 ### Overview
 
-Stable kind discriminator for frozen source descriptors.
+Stable kind discriminator for source descriptors.
 
 ### Value and import
 
@@ -5311,7 +5301,7 @@ console.log(source.descriptor.kind===ARCANE_EVENT_SOURCE_KIND);
 
 ### Overview
 
-Stable protocol discriminator for frozen source handles and descriptors.
+Stable protocol discriminator for source handles and descriptors.
 
 ### Value and import
 
@@ -5347,8 +5337,8 @@ createArcaneEventSource(owner, options)
 ```
 
 `options` is the closed data record `{source,eventTypes,onListenerError?}`. The
-result is one frozen `arcane-event-source/1` handle with synchronous
-subscription, publication, cancellation admission, EventTarget compatibility,
+result is one mutable `arcane-event-source/1` handle with synchronous
+subscription, publication, cancellation admission, EventTarget-shaped adapters,
 and idempotent disposal. A second active source for the same owner fails with
 `ARCANE_EVENT_SOURCE_ALREADY_REGISTERED`.
 
@@ -5373,7 +5363,7 @@ source.dispose();
 
 ### Overview
 
-Recognizes canonical occurrences and source compatibility views created by the
+Recognizes canonical occurrences and source event views created by the
 current realm's authority.
 
 ### Signature and result
@@ -5410,9 +5400,9 @@ republishing the DOM event into the canonical authority.
 projectArcaneDOMEvent(target, occurrence, options)
 ```
 
-The result is the combined DOM/canonical acceptance boolean. Frozen projection
+The result is the combined DOM/canonical acceptance boolean. Mutable projection
 detail adds the occurrence, canonical source, source instance, and operation
-identifiers while preserving a caller-owned compatibility `source`. A
+identifiers while preserving a caller-owned source-detail `source`. A
 pre-cancelled occurrence skips DOM dispatch; DOM cancellation propagates only
 to a cancelable occurrence.
 
@@ -5432,7 +5422,7 @@ projectArcaneDOMEvent(button,publication.occurrence,{bubbles:true});
 
 ### Overview
 
-Creates a frozen controller that projects DOM interactions and mutations into an EventManager. The returned controller owns `start()`, `stop()`, `active`, `observedRootCount`, and the configured `root`.
+Creates a mutable controller that projects DOM interactions and mutations into an EventManager. The returned controller owns `start()`, `stop()`, `active`, `cleanupPending`, `observedRootCount`, and the configured `root`.
 
 ### Syntax and result
 
@@ -5442,15 +5432,12 @@ createDOMInstrumentation({
     root=document,
     eventTypes=DEFAULT_DOM_EVENT_TYPES,
     MutationObserver,
-    captureEventDetails=true,
-    captureInputValues=true,
-    captureNodeMarkup=true,
     captureMutations=true,
     observeOpenShadowRoots=true
 }={})
 ```
 
-The factory validates configuration but does not start automatically. Its three content-capture flags default to `true`, so complete non-private values, markup, selectors, URLs, and object details are retained. Private elements and credential-like attribute-mutation values remain redacted; later EventManager snapshots also protect credential-named object fields. Callers may explicitly disable an individual capture flag to omit that content. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
+The factory validates configuration but does not start automatically. It records complete readable event details, target values, markup, text, selectors, URLs, and mutation attribute values. `captureMutations` and `observeOpenShadowRoots` are the two boolean capture controls and both default to `true`. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
 
 ### Availability and normalization
 
@@ -5479,7 +5466,7 @@ Constructs an independent EventManager using the same options and validation as 
 createEventManager(options)
 ```
 
-The returned manager does not share listeners, history, session, cursor, DOM controller, or retention state with `arcaneEvents` or any other instance. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
+The returned manager does not share listeners, history, session, cursor, or DOM controller with `arcaneEvents` or any other instance. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
 
 ### Availability and normalization
 
@@ -5498,7 +5485,7 @@ events.instrument('checkout.started', {cartId:'cart-1'}, {source:'test'});
 
 ### Overview
 
-Returns a frozen content-free descriptor for a document, shadow root, text node, element, global object, or generic event target. It is useful for diagnostic UI and behavioral assertions without retaining the target.
+Returns a mutable descriptor for a document, shadow root, text node, element, global object, or generic event target. It is useful for diagnostic UI and behavioral assertions without retaining the target object.
 
 ### Syntax and result
 
@@ -5506,7 +5493,7 @@ Returns a frozen content-free descriptor for a document, shadow root, text node,
 describeDOMTarget(target, root)
 ```
 
-Element descriptors include a best-effort selector, tag, id, role, name, type, and private marker. Text descriptors never include text content; shadow-root descriptors may include their host descriptor. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
+Element descriptors include a best-effort selector, tag, id, role, name, type, and complete markup or text content. Text descriptors include complete text content; shadow-root descriptors may include their host descriptor. Full operational guidance: [central events, DOM instrumentation, and time-travel review](event-manager.md).
 
 ### Availability and normalization
 
@@ -5551,7 +5538,7 @@ console.log(domSelector(document.activeElement, document));
 
 ### Overview
 
-Parses a JSON string or object and strictly validates an `arcane-event-stack/1` document. It returns a deeply frozen canonical data object suitable for review or playback.
+Parses a JSON string or object and strictly validates an `arcane-event-stack/1` document. It returns a mutable null-prototype normalized data object suitable for review or playback.
 
 ### Syntax and result
 
@@ -5563,7 +5550,7 @@ Validation rejects unknown keys, accessors, sparse arrays, unsafe values, invali
 
 ### Availability and normalization
 
-**Node and browser/bundler.** The result is canonical immutable diagnostic data. Parsing never dispatches events, restores live objects, or confers host authority.
+**Node and browser/bundler.** The result is mutable normalized diagnostic data. Parsing never dispatches events, restores live objects, or confers host authority.
 
 ### Example
 

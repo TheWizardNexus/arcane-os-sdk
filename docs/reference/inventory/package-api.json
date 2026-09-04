@@ -2170,10 +2170,10 @@
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Global registry symbol that brands the canonical per-realm Arcane event authority.",
+      "summary": "Global registry symbol used as a protocol marker on a created per-realm Arcane event authority.",
       "availability": "Node and browser/bundler",
       "protocol": "Symbol.for('arcane-os.arcane-events-authority') with arcane-event-authority/1",
-      "normalization": "Exact global symbol key; the authority brand descriptor is non-enumerable, non-writable, and non-configurable"
+      "normalization": "Exact global symbol key; a created authority receives an enumerable, writable, configurable marker property"
     },
     {
       "id": "root:ARCANE_EVENT_AUTHORITY_KIND",
@@ -2187,10 +2187,10 @@
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Identifies the frozen canonical authority descriptor kind.",
+      "summary": "Identifies the canonical authority descriptor kind.",
       "availability": "Node and browser/bundler",
       "protocol": "arcane-event-authority",
-      "normalization": "Exact immutable descriptor-kind discriminator"
+      "normalization": "Exact descriptor-kind discriminator"
     },
     {
       "id": "root:ARCANE_EVENT_AUTHORITY_PROTOCOL",
@@ -2204,10 +2204,10 @@
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Identifies compatible canonical Arcane event authorities.",
+      "summary": "Identifies the current Arcane event-authority protocol.",
       "availability": "Node and browser/bundler",
       "protocol": "arcane-event-authority/1",
-      "normalization": "Exact authority protocol discriminator; incompatible or malformed globals reject"
+      "normalization": "Exact authority protocol discriminator; a global with this protocol and the required callable API is reused, otherwise the module installs a new authority when possible"
     },
     {
       "id": "root:ARCANE_EVENT_ERROR_CODES",
@@ -2221,10 +2221,10 @@
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Frozen map of every stable event-authority error code to its identical string value.",
+      "summary": "Mutable map of event-authority error-code names to their identical string values.",
       "availability": "Node and browser/bundler",
       "protocol": "arcane-event-authority/1 failures",
-      "normalization": "Exact frozen string-to-itself code map"
+      "normalization": "Exact mutable string-to-itself code map"
     },
     {
       "id": "root:ARCANE_EVENT_LISTENER_ERROR_EVENT",
@@ -2238,10 +2238,10 @@
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Canonical observational event emitted for a privacy-safe listener failure.",
+      "summary": "Canonical observational event emitted for a listener failure.",
       "availability": "Node and browser/bundler",
       "protocol": "arcane.event.listener.error over arcane-event-authority/1",
-      "normalization": "Frozen public failure detail; raw listener errors remain at the owner-local reporting boundary"
+      "normalization": "Mutable public detail includes the code, source identifiers, and complete normalized error snapshot; the raw error also reaches the owner-local callback"
     },
     {
       "id": "root:ARCANE_EVENT_OCCURRENCE_PROTOCOL",
@@ -2255,10 +2255,10 @@
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Identifies immutable canonical event occurrences.",
+      "summary": "Identifies canonical event occurrences.",
       "availability": "Node and browser/bundler",
       "protocol": "arcane-event-occurrence/1",
-      "normalization": "Exact occurrence protocol discriminator; complete public detail is deeply frozen while credential-named fields remain redacted"
+      "normalization": "Exact occurrence protocol discriminator; occurrences and their complete normalized detail are mutable"
     },
     {
       "id": "root:ARCANE_EVENT_SOURCE_DISPOSED_EVENT",
@@ -2275,7 +2275,7 @@
       "summary": "Final noncancelable canonical occurrence published when a source is disposed.",
       "availability": "Node and browser/bundler",
       "protocol": "arcane.event.source.disposed over arcane-event-authority/1",
-      "normalization": "Frozen public detail with exact source-disposed reason before source listener cleanup"
+      "normalization": "Mutable normalized detail contains source, instanceId, and the exact source-disposed reason before source listener cleanup"
     },
     {
       "id": "root:ARCANE_EVENT_SOURCE_KIND",
@@ -2289,10 +2289,10 @@
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Identifies the frozen canonical source descriptor kind.",
+      "summary": "Identifies the canonical source descriptor kind.",
       "availability": "Node and browser/bundler",
       "protocol": "arcane-event-source",
-      "normalization": "Exact immutable descriptor-kind discriminator"
+      "normalization": "Exact descriptor-kind discriminator"
     },
     {
       "id": "root:ARCANE_EVENT_SOURCE_PROTOCOL",
@@ -2306,7 +2306,7 @@
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Identifies frozen canonical event source handles and descriptors.",
+      "summary": "Identifies canonical event source handles and descriptors.",
       "availability": "Node and browser/bundler",
       "protocol": "arcane-event-source/1",
       "normalization": "Exact source protocol discriminator with declared event types and one realm-local instance id"
@@ -2340,10 +2340,10 @@
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Frozen default set of 48 capture-phase DOM interaction event names.",
+      "summary": "Mutable default set of 44 capture-phase DOM interaction event names.",
       "availability": "Node and browser/bundler; meaningful to browser DOM instrumentation",
       "protocol": "Synchronous DOM observation projected into arcane-event-stack/1 records",
-      "normalization": "Exact frozen event-name list; host event objects are not retained"
+      "normalization": "Exact mutable event-name list; host event objects are not retained"
     },
     {
       "id": "root:DOM_INTERACTION_EVENT",
@@ -2357,10 +2357,10 @@
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Event type emitted for a complete DOM interaction diagnostic with private and credential-named content protected.",
+      "summary": "Event type emitted for a complete DOM interaction diagnostic.",
       "availability": "Browser DOM or a DOM-compatible test host; constant imports in Node",
       "protocol": "In-process event-pubsub; optional arcane-event-stack/1 recording",
-      "normalization": "Complete non-private values, selectors, URLs, and object details are retained by default; private targets remain redacted and EventManager snapshots protect credential-named fields"
+      "normalization": "Complete readable event fields, target values, selectors, URLs, markup or text content, and object details are retained"
     },
     {
       "id": "root:DOM_MUTATION_EVENT",
@@ -2374,10 +2374,10 @@
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Event type emitted for a complete DOM mutation diagnostic with private and credential-named content protected.",
+      "summary": "Event type emitted for a complete DOM mutation diagnostic.",
       "availability": "Browser DOM or a DOM-compatible test host; constant imports in Node",
       "protocol": "MutationObserver projected through in-process events and optional arcane-event-stack/1 recording",
-      "normalization": "Complete non-private markup, text, selectors, and URLs are retained by default; private targets and credential-like attribute-mutation values are redacted"
+      "normalization": "Complete markup, text, selectors, URLs, character data, and attribute values are retained"
     },
     {
       "id": "root:DOM_OBSERVATION_STARTED_EVENT",
@@ -2425,10 +2425,10 @@
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Runs synchronous pub/sub with optional complete, immutable time-travel history and DOM instrumentation.",
+      "summary": "Runs synchronous pub/sub with optional complete, mutable time-travel history and DOM instrumentation.",
       "availability": "Node and browser/bundler; DOM capture requires a browser DOM or compatible host",
       "protocol": "Synchronous event-pubsub plus optional arcane-event-stack/1 export/import",
-      "normalization": "Live listener arguments retain identity; ordinary secure:false recording preserves complete URLs, public details, and captured stacks in deeply frozen snapshots while credential-named fields remain redacted"
+      "normalization": "Live listener arguments retain identity; recording preserves complete normalized values, URLs, public details, and captured stack text in mutable snapshots without a configured retention cap"
     },
     {
       "id": "root:PLAYBACK_CANCELLED_EVENT",
@@ -2445,7 +2445,7 @@
       "summary": "Lifecycle event emitted when an AbortSignal cancels event-stack playback.",
       "availability": "Node and browser/bundler",
       "protocol": "In-process playback lifecycle over an arcane-event-stack/1 source",
-      "normalization": "Frozen summary with session, delivered count, cursor, completion flag, and a complete credential-protected error snapshot"
+      "normalization": "Mutable summary with session, delivered count, cursor, completion flag, and a complete normalized error snapshot"
     },
     {
       "id": "root:PLAYBACK_COMPLETED_EVENT",
@@ -2462,7 +2462,7 @@
       "summary": "Lifecycle event emitted after selected event-stack records finish playback.",
       "availability": "Node and browser/bundler",
       "protocol": "In-process playback lifecycle over an arcane-event-stack/1 source",
-      "normalization": "Frozen summary with session, delivered count, cursor, and completed=true"
+      "normalization": "Mutable summary with session, delivered count, cursor, and completed=true"
     },
     {
       "id": "root:PLAYBACK_FAILED_EVENT",
@@ -2479,7 +2479,7 @@
       "summary": "Lifecycle event emitted when event-stack playback fails for a reason other than signal cancellation.",
       "availability": "Node and browser/bundler",
       "protocol": "In-process playback lifecycle over an arcane-event-stack/1 source",
-      "normalization": "Frozen summary with session, delivered count, cursor, completion flag, and a complete credential-protected error snapshot"
+      "normalization": "Mutable summary with session, delivered count, cursor, completion flag, and a complete normalized error snapshot"
     },
     {
       "id": "root:PLAYBACK_RECORD_EVENT",
@@ -2493,10 +2493,10 @@
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Review-mode event that presents one validated immutable record without re-emitting its original type.",
+      "summary": "Review-mode event that presents one validated mutable record without re-emitting its original type.",
       "availability": "Node and browser/bundler",
       "protocol": "In-process review projection of arcane-event-stack/1",
-      "normalization": "Validated immutable event-stack record"
+      "normalization": "Validated mutable event-stack record"
     },
     {
       "id": "root:PLAYBACK_STARTED_EVENT",
@@ -2530,7 +2530,7 @@
       "summary": "Event emitted when the review cursor seeks to sequence zero or a retained sequence.",
       "availability": "Node and browser/bundler",
       "protocol": "In-process review cursor event; the retained stack remains unchanged",
-      "normalization": "Normalized sessionId, requested sequence, and immutable matching record or null"
+      "normalization": "Normalized sessionId, requested sequence, and mutable matching record or null"
     },
     {
       "id": "root:arcaneEvents",
@@ -2547,7 +2547,7 @@
       "summary": "Package-scoped EventManager singleton for applications that want one shared event bus.",
       "availability": "Node and browser/bundler; DOM capture requires a compatible DOM",
       "protocol": "Synchronous event-pubsub plus opt-in arcane-event-stack/1 recording",
-      "normalization": "Same module singleton through root and focused subpath; time travel starts disabled and ordinary recording defaults to secure:false"
+      "normalization": "Same module singleton through root and focused subpath; time travel starts disabled; complete mutable recording is available when enabled"
     },
     {
       "id": "root:createArcaneEventSource",
@@ -2564,7 +2564,7 @@
       "summary": "Registers one declared semantic event source for a non-null object or function owner.",
       "availability": "Node and browser/bundler",
       "protocol": "arcane-event-source/1 over the per-realm arcane-event-authority/1 singleton",
-      "normalization": "Returns one frozen source handle with declared event types, a realm-local instance id, synchronous publication, and deterministic disposal"
+      "normalization": "Returns one mutable source handle with declared event types, a realm-local instance id, synchronous publication, and deterministic disposal"
     },
     {
       "id": "root:createDOMInstrumentation",
@@ -2581,7 +2581,7 @@
       "summary": "Creates a start/stop controller that projects DOM interactions and mutations into an EventManager.",
       "availability": "Browser DOM or a DOM-compatible test host",
       "protocol": "Capture-phase DOM events and MutationObserver projected to in-process EventManager events",
-      "normalization": "Defaults detail, input-value, and node-markup capture to true; preserves complete non-private values, markup, selectors, URLs, and object details while redacting private targets and credential-like attribute-mutation values"
+      "normalization": "Accepts eventManager, root, eventTypes, MutationObserver, captureMutations, and observeOpenShadowRoots; preserves complete readable event, value, markup, text, selector, URL, and mutation detail"
     },
     {
       "id": "root:createEventManager",
@@ -2598,7 +2598,7 @@
       "summary": "Constructs and returns an independent EventManager instance.",
       "availability": "Node and browser/bundler; DOM capture requires a compatible DOM",
       "protocol": "Synchronous event-pubsub plus optional arcane-event-stack/1",
-      "normalization": "Equivalent constructor behavior without sharing the arcaneEvents singleton; secure:false and redactSensitive:false are the ordinary defaults"
+      "normalization": "Equivalent constructor behavior without sharing the arcaneEvents singleton; accepts the current timeTravel, dom, clock, now, and sessionId options"
     },
     {
       "id": "root:describeDOMTarget",
@@ -2612,7 +2612,7 @@
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Returns a frozen, content-free diagnostic descriptor for a DOM target.",
+      "summary": "Returns a mutable diagnostic descriptor for a DOM target, including complete text or markup content when present.",
       "availability": "Browser DOM or DOM-compatible objects; importable in Node",
       "protocol": "Local DOM diagnostic helper",
       "normalization": "Normalizes document, shadow root, text, element, global, and generic event targets without retaining nodes"
@@ -2646,7 +2646,7 @@
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Recognizes canonical occurrences and compatibility views created by the current realm authority.",
+      "summary": "Recognizes canonical occurrences and source event views created by the current realm authority.",
       "availability": "Node and browser/bundler",
       "protocol": "arcane-event-occurrence/1 realm-local recognition",
       "normalization": "Returns a boolean from authority-owned identity records; protocol-shaped foreign objects are not admitted"
@@ -2656,17 +2656,17 @@
       "name": "parseEventStack",
       "displayName": "parseEventStack()",
       "kind": "function",
-      "signature": "parseEventStack(source, options={})",
+      "signature": "parseEventStack(source)",
       "entrypoints": [
         "arcane-os",
         "arcane-os/event-manager"
       ],
       "primaryImport": "arcane-os/event-manager",
       "group": "Central events, time travel, and DOM instrumentation",
-      "summary": "Strictly parses and validates an event-stack object or JSON string into a canonical frozen document.",
+      "summary": "Strictly parses and validates an event-stack object or JSON string into a mutable normalized document.",
       "availability": "Node and browser/bundler",
       "protocol": "arcane-event-stack/1",
-      "normalization": "Rejects extra keys, malformed nesting, unsafe values, invalid timing or session structure, and non-increasing sequences; returns a deeply frozen canonical document"
+      "normalization": "Rejects extra keys, malformed nesting, unsafe values, invalid timing or session structure, and non-increasing sequences; returns a mutable null-prototype normalized document"
     },
     {
       "id": "root:projectArcaneDOMEvent",
@@ -2682,8 +2682,8 @@
       "group": "Central events, time travel, and DOM instrumentation",
       "summary": "Projects one canonical occurrence to one CustomEvent without republishing it into the authority.",
       "availability": "Browser DOM or a DOM-compatible test host",
-      "protocol": "One-way arcane-event-occurrence/1 to CustomEvent compatibility projection",
-      "normalization": "Adds immutable occurrence, source, instance, and operation identifiers; DOM cancellation propagates only to a cancelable occurrence"
+      "protocol": "One-way arcane-event-occurrence/1 to CustomEvent projection",
+      "normalization": "Adds mutable occurrence, source, instance, and operation identifiers; DOM cancellation propagates only to a cancelable occurrence"
     },
     {
       "id": "root:SDK_UPDATE_REGISTRY",

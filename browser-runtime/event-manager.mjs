@@ -42,16 +42,6 @@ const EVENT_MANAGER_BUS_OFF=Symbol('EventManager.busOff');
 const EVENT_MANAGER_DISPATCH=Symbol('EventManager.dispatch');
 
 const ARCANE_EVENT_ERRORS={
-    ARCANE_EVENT_AUTHORITY_ACCESSOR_COLLISION:
-        'globalThis.arcaneEvents must be an own data property.',
-    ARCANE_EVENT_AUTHORITY_VALUE_COLLISION:
-        'globalThis.arcaneEvents is occupied by an unbranded value.',
-    ARCANE_EVENT_AUTHORITY_DESCRIPTOR_MISMATCH:
-        'The globalThis.arcaneEvents property, authority brand, or protocol descriptor is incompatible.',
-    ARCANE_EVENT_AUTHORITY_PROTOCOL_MISMATCH:
-        'globalThis.arcaneEvents uses an incompatible authority protocol.',
-    ARCANE_EVENT_AUTHORITY_API_MISMATCH:
-        'globalThis.arcaneEvents does not expose the required authority API.',
     ARCANE_EVENT_AUTHORITY_INSTALL_FAILED:
         'The Arcane event authority could not be installed on globalThis.',
     ARCANE_EVENT_SOURCE_INVALID:
@@ -62,8 +52,6 @@ const ARCANE_EVENT_ERRORS={
         'The Arcane event source is disposed.',
     ARCANE_EVENT_SOURCE_EVENT_TYPE_UNDECLARED:
         'The Arcane event source cannot publish an undeclared event type.',
-    ARCANE_EVENT_COMPATIBILITY_DETAIL_INVALID:
-        'Arcane event compatibility detail must be safely shallow-copyable.',
     ARCANE_EVENT_OCCURRENCE_INVALID:
         'The Arcane event occurrence value or creation options are invalid.',
     ARCANE_EVENT_OCCURRENCE_SEQUENCE_EXHAUSTED:
@@ -73,7 +61,7 @@ const ARCANE_EVENT_ERRORS={
     ARCANE_EVENT_LISTENER_CALLBACK_FAILED:
         'An Arcane event listener threw during observational delivery.',
     ARCANE_EVENT_DOM_DETAIL_COLLISION:
-        'Arcane DOM projection metadata conflicts with compatibility detail.',
+        'Arcane DOM projection metadata conflicts with source detail.',
     ARCANE_EVENT_DOM_TARGET_INVALID:
         'Arcane DOM projection requires a target with dispatchEvent and CustomEvent support.',
     ARCANE_EVENT_DOM_OPTIONS_INVALID:
