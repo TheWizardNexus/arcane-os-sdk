@@ -385,8 +385,8 @@ rejects with code `ARCANE_AI_INVALID_REQUEST`, message
 `The speech worker operation is not part of its protocol.`, and role-specific
 reason `stt-worker-operation-unknown` or `tts-worker-operation-unknown`.
 Failures use the separate
-`arcane-ai-speech-worker-error/1` envelope. The legacy form has the four data
-properties `code,message,protocol,reason`; the current form may add one `cause`
+`arcane-ai-speech-worker-error/1` envelope. Its cause-free form has the four data
+properties `code,message,protocol,reason`; the diagnostic form may add one `cause`
 data property containing the complete serialized diagnostic, including cycles.
 The protocol, registered code, nonempty message, reason, role, and operation
 must agree. A foreign, incomplete, extra-keyed, accessor-bearing, cross-role,
@@ -396,8 +396,8 @@ Nested module Workers use
 rejection only as `artifact-module-worker-bootstrap-rejected`.
 
 If the platform cannot clone an exotic `cause`, the Worker keeps the complete
-raw failure in its console diagnostics and retries settlement with the legacy
-four-field envelope. Nested Workers are terminated during role teardown.
+raw failure in its console diagnostics and retries settlement with the
+cause-free four-field envelope. Nested Workers are terminated during role teardown.
 
 Kokoro is configured through `namespace.env.wasmPaths`; Transformers is
 configured through `namespace.env.backends.onnx.wasm.wasmPaths`. Ordinary mode
@@ -563,7 +563,7 @@ browser-WASM component protocol is `arcane-ai-browser-wasm/2`; its
 direct controller adapter uses `arcane-ai-adapter/1`, and
 `adaptV1LlmProvider()` projects that surface into the provider/2 LLM role.
 Browser speech stores identify themselves as
-`arcane-ai-browser-speech-artifacts/1`. Legacy authorities retain
+`arcane-ai-browser-speech-artifacts/1`. Direct authorities use
 `arcane-ai-model-authority/1`. Optional browser-speech graphs use
 `arcane-ai-browser-speech-artifact-graph/1`, kind
 `browser-speech-authenticated-artifact-graph`. Those identifiers describe

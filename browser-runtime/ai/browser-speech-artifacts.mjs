@@ -13,11 +13,7 @@ const MODEL_AUTHORITY_PROTOCOL = "arcane-ai-model-authority/1";
 const ARTIFACT_GRAPH_KIND = "browser-speech-authenticated-artifact-graph";
 const ARTIFACT_GRAPH_MODULE_KIND =
   "browser-speech-authenticated-artifact-graph";
-const ARTIFACT_GRAPH_GUARDS = "__arcaneBrowserSpeechArtifactGraphGuardsV1";
 const ARTIFACT_MODULE_ROUTER = "__arcaneBrowserSpeechModuleRouterV1";
-const MUTABLE_PATH_PATTERN = /\/(?:resolve\/)?(?:main|master|latest)(?:\/|$)/iu;
-const ARTIFACT_GRAPH_MUTABLE_SOURCE_PATTERN =
-  /\/(?:refs\/heads\/(?:main|master)|resolve\/(?:main|master)|(?:main|master|latest))(?:\/|$)|@(?:latest|next)(?:\/|$)/iu;
 const AUTHORITIES = new WeakSet();
 const AUTHORITY_METADATA = new WeakMap();
 const ARTIFACT_GRAPHS = new WeakSet();
@@ -66,14 +62,6 @@ const ARTIFACT_GRAPH_JAVASCRIPT_KINDS = new Set([
 const ARTIFACT_GRAPH_ONNX_NAMESPACES = new Set([
   "kokoro-env-wasm-paths",
   "transformers-env-backends-onnx-wasm",
-]);
-const ARTIFACT_GRAPH_EDGE_POLICIES = new Set([
-  "artifact-targets-admitted",
-  "inactive-runtime-branch-rejected",
-]);
-const ARTIFACT_GRAPH_IMPORT_MATCHES = new Set([
-  "exact-runtime-specifier",
-  "materialized-module-url",
 ]);
 
 function speechError(code, message, cause, reason = ARTIFACT_ERROR_REASONS[code]) {
@@ -151,29 +139,6 @@ function ordinarySourceUrl(value, label) {
   }
   if (result.username || result.password) {
     throw new TypeError(`${label} must not contain credentials.`);
-  }
-  return result.href;
-}
-
-function immutableUrl(value, label) {
-  let result;
-  try {
-    result = new URL(value, globalThis.location?.href);
-  } catch {
-    throw new TypeError(`${label} must be an absolute or same-origin URL.`);
-  }
-  const sameOrigin = globalThis.location?.origin
-    && result.origin === globalThis.location.origin;
-  if (
-    (result.protocol !== "https:" && !sameOrigin)
-    || result.username
-    || result.password
-    || result.hash
-    || MUTABLE_PATH_PATTERN.test(result.pathname)
-  ) {
-    throw new TypeError(
-      `${label} must be immutable HTTPS or a same-origin immutable URL without credentials or fragments.`,
-    );
   }
   return result.href;
 }
@@ -302,137 +267,11 @@ function graphRuntimeRequestUrl(value, label) {
   return result.href;
 }
 
-function graphRedirectFinalOrigin(value, label) {
-  const text = artifactGraphText(
-    value,
-    label,
-    "artifact-graph-source-redirect-final-origin-text-required",
-  );
-  if (text !== value) {
-    throw artifactGraphTypeError(
-      "artifact-graph-source-redirect-final-origin-whitespace-rejected",
-      `${label} must not contain surrounding whitespace.`,
-    );
-  }
-  let result;
-  try {
-    result = new URL(text);
-  } catch (error) {
-    throw artifactGraphTypeError(
-      "artifact-graph-source-redirect-final-origin-not-absolute",
-      `${label} must be an absolute origin.`,
-      error,
-    );
-  }
-  if (result.username || result.password) {
-    throw artifactGraphTypeError(
-      "artifact-graph-source-redirect-final-origin-credentials-rejected",
-      `${label} must not contain credentials.`,
-    );
-  }
-  if (result.pathname !== "/") {
-    throw artifactGraphTypeError(
-      "artifact-graph-source-redirect-final-origin-path-rejected",
-      `${label} must not contain a path.`,
-    );
-  }
-  if (result.search) {
-    throw artifactGraphTypeError(
-      "artifact-graph-source-redirect-final-origin-query-rejected",
-      `${label} must not contain a query.`,
-    );
-  }
-  if (result.hash) {
-    throw artifactGraphTypeError(
-      "artifact-graph-source-redirect-final-origin-fragment-rejected",
-      `${label} must not contain a fragment.`,
-    );
-  }
-  return result.origin;
-}
-
-function normalizeGraphRedirectFinalOrigins(value, path) {
-  if (value === undefined) return completeValue([]);
-  if (!Array.isArray(value)) {
-    throw artifactGraphTypeError(
-      "artifact-graph-source-redirect-final-origins-not-array",
-      `Artifact graph file ${path} redirectFinalOrigins must be an array.`,
-    );
-  }
-  if (value.length < 1) {
-    throw artifactGraphTypeError(
-      "artifact-graph-source-redirect-final-origin-inventory-empty",
-      `Artifact graph file ${path} redirectFinalOrigins must contain at least one final origin when supplied.`,
-    );
-  }
-  const origins = value.map((origin, index) => graphRedirectFinalOrigin(
-    origin,
-    `Artifact graph file ${path} redirectFinalOrigins[${String(index)}]`,
-  ));
-  const unique = new Set(origins);
-  if (unique.size !== origins.length) {
-    throw artifactGraphTypeError(
-      "artifact-graph-source-redirect-final-origin-duplicate",
-      `Artifact graph file ${path} redirectFinalOrigins must be unique after canonicalization.`,
-    );
-  }
-  return completeValue([...origins].sort(lexicalCompare));
-}
-
-function graphImmutableUrl(value, label, revision) {
-  let url;
-  try {
-    url = immutableUrl(
-      artifactGraphText(
-        value,
-        label,
-        "artifact-graph-source-url-missing",
-      ),
-      label,
-    );
-  } catch (error) {
-    if (ARTIFACT_ERRORS.has(error)) throw error;
-    throw artifactGraphTypeError(
-      "artifact-graph-source-url-mutable",
-      `${label} must identify an immutable HTTPS or same-origin source authority.`,
-      error,
-    );
-  }
-  if (ARTIFACT_GRAPH_MUTABLE_SOURCE_PATTERN.test(new URL(url).pathname)) {
-    throw artifactGraphTypeError(
-      "artifact-graph-source-url-mutable",
-      `${label} names a mutable branch, channel, or release alias.`,
-    );
-  }
-  if (!url.toLowerCase().includes(revision.toLowerCase())) {
-    throw artifactGraphTypeError(
-      "artifact-graph-source-revision-unbound",
-      `${label} must contain the file revision.`,
-    );
-  }
-  return url;
-}
-
 function lexicalCompare(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-// Structural comparison for dormant authenticated-graph compatibility
-// normalizers only. Ordinary graph creation treats edges and transforms as
-// inert metadata and never calls these helpers. Do not enable them, including
-// for secure mode, without an explicit review with the user.
-function compatibilityRecordKey(value) {
-  if (Array.isArray(value)) {
-    return `[${value.map(compatibilityRecordKey).join(",")}]`;
-  }
-  if (value && typeof value === "object") {
-    return `{${Object.keys(value).sort().map((key) =>
-      `${JSON.stringify(key)}:${compatibilityRecordKey(value[key])}`).join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
-function normalizeFile(value, kind, index, revision, secure) {
+function normalizeFile(value, kind, index) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new TypeError(`${kind} file ${String(index)} must be an object.`);
   }
@@ -444,14 +283,7 @@ function normalizeFile(value, kind, index, revision, secure) {
   ) {
     throw new TypeError(`${kind} file path must be a normalized relative path.`);
   }
-  const url = secure
-    ? immutableUrl(value.url, `${kind} file url`)
-    : ordinarySourceUrl(value.url, `${kind} file url`);
-  if (secure && !url.toLowerCase().includes(revision.toLowerCase())) {
-    throw new TypeError(
-      `${kind} file URL must contain its caller-supplied revision.`,
-    );
-  }
+  const url = ordinarySourceUrl(value.url, `${kind} file url`);
   return completeValue({
     kind,
     index,
@@ -465,9 +297,8 @@ function normalizeFile(value, kind, index, revision, secure) {
   });
 }
 
-function uniqueFiles(files, label, kind, revision, {
+function uniqueFiles(files, label, kind, {
   allowEmpty = false,
-  secure = false,
 } = {}) {
   if (!Array.isArray(files) || (!allowEmpty && files.length < 1)) {
     throw new TypeError(
@@ -479,7 +310,7 @@ function uniqueFiles(files, label, kind, revision, {
   const paths = new Set();
   const urls = new Set();
   return completeValue(files.map((value, index) => {
-    const file = normalizeFile(value, kind, index, revision, secure);
+    const file = normalizeFile(value, kind, index);
     if (paths.has(file.path) || urls.has(file.url)) {
       throw new TypeError(`${label} file paths and URLs must be unique.`);
     }
@@ -498,7 +329,7 @@ function publicFile(file) {
   return completeValue(result);
 }
 
-function normalizeArtifactGraphFile(value, index, secure = false) {
+function normalizeArtifactGraphFile(value, index) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw artifactGraphTypeError(
       "artifact-graph-file-descriptor-not-object",
@@ -526,19 +357,9 @@ function normalizeArtifactGraphFile(value, index, secure = false) {
     "artifact-graph-file-revision-missing",
     "artifact-graph-file-revision-length-exceeded",
   );
-  const sourceUrl = secure
-    ? graphImmutableUrl(
-      value.sourceUrl ?? value.url,
-      `Artifact graph file ${path} sourceUrl`,
-      revision,
-    )
-    : ordinarySourceUrl(
-      value.sourceUrl ?? value.url,
-      `Artifact graph file ${path} sourceUrl`,
-    );
-  const redirectFinalOrigins = normalizeGraphRedirectFinalOrigins(
-    value.redirectFinalOrigins,
-    path,
+  const sourceUrl = ordinarySourceUrl(
+    value.sourceUrl ?? value.url,
+    `Artifact graph file ${path} sourceUrl`,
   );
   // Legal metadata belongs to the selected upstream distribution. Preserve a
   // caller-supplied value as inert metadata, but never require or interpret it
@@ -604,7 +425,6 @@ function normalizeArtifactGraphFile(value, index, secure = false) {
     mediaType,
     sourceMediaType,
     runtimeRequestUrls: completeValue(normalizedRequestUrls),
-    redirectFinalOrigins,
   });
 }
 
@@ -620,34 +440,7 @@ function publicArtifactGraphFile(file) {
       ? {}
       : { sourceMediaType: file.sourceMediaType }),
     runtimeRequestUrls: file.runtimeRequestUrls,
-    ...(file.redirectFinalOrigins.length < 1
-      ? {}
-      : { redirectFinalOrigins: file.redirectFinalOrigins }),
   });
-}
-
-function normalizeGraphOccurrence(value, label) {
-  return graphPositiveInteger(
-    value,
-    `${label} occurrence`,
-    "artifact-graph-edge-occurrence-positive-safe-integer-required",
-  );
-}
-
-function normalizeGraphModulePath(value, label, filesByPath) {
-  const path = canonicalArtifactPath(
-    value,
-    `${label} modulePath`,
-    "artifact-graph-edge-module-path-missing",
-    "artifact-graph-edge-module-path-noncanonical",
-  );
-  if (!ARTIFACT_GRAPH_JAVASCRIPT_KINDS.has(filesByPath.get(path)?.kind)) {
-    throw artifactGraphTypeError(
-      "artifact-graph-edge-module-path-not-runtime-javascript",
-      `${label} modulePath must name one declared runtime JavaScript file.`,
-    );
-  }
-  return path;
 }
 
 function normalizeGraphTargetPath(value, label, filesByPath, javascript = false) {
@@ -665,380 +458,6 @@ function normalizeGraphTargetPath(value, label, filesByPath, javascript = false)
     );
   }
   return path;
-}
-
-function normalizeGraphPolicy(value, label) {
-  const policy = value ?? "artifact-targets-admitted";
-  if (!ARTIFACT_GRAPH_EDGE_POLICIES.has(policy)) {
-    throw artifactGraphTypeError(
-      "artifact-graph-edge-policy-not-admitted",
-      `${label} edgePolicy must identify an admitted artifact target or an inactive rejected runtime branch.`,
-    );
-  }
-  return policy;
-}
-
-function normalizeGraphTargets(value, label, filesByPath, {
-  javascript = false,
-  worker = false,
-} = {}) {
-  if (!Array.isArray(value)) {
-    throw artifactGraphTypeError(
-      "artifact-graph-edge-targets-not-array",
-      `${label} targets must be an array.`,
-    );
-  }
-  const allowedMatches = worker
-    ? new Set([...ARTIFACT_GRAPH_IMPORT_MATCHES, "self-module-url"])
-    : ARTIFACT_GRAPH_IMPORT_MATCHES;
-  const targets = value.map((target, index) => {
-    if (!target || typeof target !== "object" || Array.isArray(target)) {
-      throw artifactGraphTypeError(
-        "artifact-graph-edge-target-not-object",
-        `${label} target ${String(index)} must be an object.`,
-      );
-    }
-    const match = artifactGraphText(
-      target.match,
-      `${label} target ${String(index)} match`,
-      "artifact-graph-edge-target-match-missing",
-    );
-    if (!allowedMatches.has(match)) {
-      throw artifactGraphTypeError(
-        "artifact-graph-edge-target-match-not-admitted",
-        `${label} target ${String(index)} match is not admitted.`,
-      );
-    }
-    const targetPath = normalizeGraphTargetPath(
-      target.targetPath,
-      `${label} target ${String(index)}`,
-      filesByPath,
-      javascript,
-    );
-    const exactSpecifier = match === "exact-runtime-specifier"
-      ? artifactGraphText(
-        target.exactSpecifier ?? target.specifier,
-        `${label} target ${String(index)} exactSpecifier`,
-        "artifact-graph-edge-target-specifier-missing",
-      )
-      : null;
-    return completeValue({ match, targetPath, exactSpecifier });
-  });
-  targets.sort((left, right) =>
-    lexicalCompare(compatibilityRecordKey(left), compatibilityRecordKey(right)));
-  const identities = new Set(targets.map(compatibilityRecordKey));
-  if (identities.size !== targets.length) {
-    throw artifactGraphTypeError(
-      "artifact-graph-edge-target-duplicate",
-      `${label} targets must be unique.`,
-    );
-  }
-  return completeValue(targets);
-}
-
-function normalizeArtifactGraphEdges(value, filesByPath, negativeRuntimeRequestUrls) {
-  const edges = value ?? {};
-  if (!edges || typeof edges !== "object" || Array.isArray(edges)) {
-    throw artifactGraphTypeError(
-      "artifact-graph-edges-not-object",
-      "Artifact graph edges must be an object.",
-    );
-  }
-  const allowedEdgeNames = new Set([
-    "cacheOpens",
-    "dynamicImports",
-    "fetches",
-    "moduleWorkers",
-    "staticImports",
-  ]);
-  if (Reflect.ownKeys(edges).some((name) =>
-    typeof name !== "string" || !allowedEdgeNames.has(name))) {
-    throw artifactGraphTypeError(
-      "artifact-graph-edge-kind-not-admitted",
-      "Artifact graph edges contain an edge kind that is not admitted.",
-    );
-  }
-
-  function normalizeArray(name, normalize) {
-    const values = edges[name] ?? [];
-    if (!Array.isArray(values)) {
-      throw artifactGraphTypeError(
-        "artifact-graph-edge-list-not-array",
-        `Artifact graph ${name} must be an array.`,
-      );
-    }
-    const normalized = values.map((edge, index) => {
-      if (!edge || typeof edge !== "object" || Array.isArray(edge)) {
-        throw artifactGraphTypeError(
-          "artifact-graph-edge-not-object",
-          `Artifact graph ${name}[${String(index)}] must be an object.`,
-        );
-      }
-      const label = `Artifact graph ${name}[${String(index)}]`;
-      const modulePath = normalizeGraphModulePath(edge.modulePath, label, filesByPath);
-      const occurrence = normalizeGraphOccurrence(edge.occurrence, label);
-      return normalize(edge, label, modulePath, occurrence);
-    });
-    normalized.sort((left, right) =>
-      lexicalCompare(compatibilityRecordKey(left), compatibilityRecordKey(right)));
-    const occurrences = new Set();
-    for (const edge of normalized) {
-      const key = `${edge.modulePath}\u0000${String(edge.occurrence)}`;
-      if (occurrences.has(key)) {
-        throw artifactGraphTypeError(
-          "artifact-graph-edge-occurrence-duplicate",
-          `Artifact graph ${name} contains a duplicate module occurrence.`,
-        );
-      }
-      occurrences.add(key);
-    }
-    return completeValue(normalized);
-  }
-
-  const staticImports = normalizeArray(
-    "staticImports",
-    (edge, label, modulePath, occurrence) => completeValue({
-      modulePath,
-      occurrence,
-      specifier: artifactGraphText(
-        edge.specifier,
-        `${label} specifier`,
-        "artifact-graph-static-import-specifier-missing",
-      ),
-      targetPath: normalizeGraphTargetPath(
-        edge.targetPath,
-        label,
-        filesByPath,
-        true,
-      ),
-    }),
-  );
-  const dynamicImports = normalizeArray(
-    "dynamicImports",
-    (edge, label, modulePath, occurrence) => {
-      const edgePolicy = normalizeGraphPolicy(edge.edgePolicy, label);
-      const targets = normalizeGraphTargets(edge.targets ?? [], label, filesByPath, {
-        javascript: true,
-      });
-      if (
-        (edgePolicy === "artifact-targets-admitted") !== (targets.length > 0)
-      ) {
-        throw artifactGraphTypeError(
-          "artifact-graph-dynamic-import-policy-target-mismatch",
-          `${label} must have targets exactly when its edgePolicy admits artifact targets.`,
-        );
-      }
-      return completeValue({ modulePath, occurrence, edgePolicy, targets });
-    },
-  );
-  const moduleWorkers = normalizeArray(
-    "moduleWorkers",
-    (edge, label, modulePath, occurrence) => {
-      const edgePolicy = normalizeGraphPolicy(edge.edgePolicy, label);
-      const targets = normalizeGraphTargets(edge.targets ?? [], label, filesByPath, {
-        javascript: true,
-        worker: true,
-      });
-      if (
-        (edgePolicy === "artifact-targets-admitted") !== (targets.length > 0)
-      ) {
-        throw artifactGraphTypeError(
-          "artifact-graph-module-worker-policy-target-mismatch",
-          `${label} must have targets exactly when its edgePolicy admits artifact targets.`,
-        );
-      }
-      if (targets.some((target) =>
-        target.match === "self-module-url" && target.targetPath !== modulePath)) {
-        throw artifactGraphTypeError(
-          "artifact-graph-module-worker-self-target-mismatch",
-          `${label} self-module-url target must equal modulePath.`,
-        );
-      }
-      return completeValue({ modulePath, occurrence, edgePolicy, targets });
-    },
-  );
-  const fetches = normalizeArray(
-    "fetches",
-    (edge, label, modulePath, occurrence) => {
-      const edgePolicy = normalizeGraphPolicy(edge.edgePolicy, label);
-      const methods = edge.methods ?? ["GET"];
-      if (
-        !Array.isArray(methods)
-        || methods.length !== 1
-        || methods[0] !== "GET"
-      ) {
-        throw artifactGraphTypeError(
-          "artifact-graph-fetch-method-not-get",
-          `${label} methods must be exactly ["GET"].`,
-        );
-      }
-      const targetPaths = edge.targetPaths ?? [];
-      if (!Array.isArray(targetPaths)) {
-        throw artifactGraphTypeError(
-          "artifact-graph-fetch-targets-not-array",
-          `${label} targetPaths must be an array.`,
-        );
-      }
-      const normalizedTargetPaths = [...new Set(targetPaths.map((path) =>
-        normalizeGraphTargetPath(path, label, filesByPath)))].sort();
-      if (normalizedTargetPaths.length !== targetPaths.length) {
-        throw artifactGraphTypeError(
-          "artifact-graph-fetch-target-duplicate",
-          `${label} targetPaths must be unique.`,
-        );
-      }
-      if (normalizedTargetPaths.some((path) =>
-        ARTIFACT_GRAPH_JAVASCRIPT_KINDS.has(filesByPath.get(path)?.kind))) {
-        throw artifactGraphTypeError(
-          "artifact-graph-fetch-javascript-target-rejected",
-          `${label} must not expose authenticated JavaScript bytes through a fetch edge.`,
-        );
-      }
-      const negativeUrls = edge.negativeRuntimeRequestUrls ?? [];
-      if (!Array.isArray(negativeUrls)) {
-        throw artifactGraphTypeError(
-          "artifact-graph-fetch-negative-routes-not-array",
-          `${label} negativeRuntimeRequestUrls must be an array.`,
-        );
-      }
-      const normalizedNegativeUrls = [...new Set(negativeUrls.map((url, index) =>
-        graphRuntimeRequestUrl(url, `${label} negativeRuntimeRequestUrls[${String(index)}]`)))].sort();
-      if (
-        normalizedNegativeUrls.length !== negativeUrls.length
-        || normalizedNegativeUrls.some((url) => !negativeRuntimeRequestUrls.has(url))
-      ) {
-        throw artifactGraphTypeError(
-          "artifact-graph-fetch-negative-route-undeclared",
-          `${label} negative runtime request routes must be unique graph-level declarations.`,
-        );
-      }
-      if (
-        edgePolicy === "artifact-targets-admitted"
-        && normalizedTargetPaths.length === 0
-        && normalizedNegativeUrls.length === 0
-      ) {
-        throw artifactGraphTypeError(
-          "artifact-graph-fetch-targets-incomplete",
-          `${label} must admit at least one artifact or authenticated negative route.`,
-        );
-      }
-      if (
-        edgePolicy === "inactive-runtime-branch-rejected"
-        && (normalizedTargetPaths.length > 0 || normalizedNegativeUrls.length > 0)
-      ) {
-        throw artifactGraphTypeError(
-          "artifact-graph-fetch-policy-target-mismatch",
-          `${label} rejected inactive branch must not name fetch targets.`,
-        );
-      }
-      return completeValue({
-        modulePath,
-        occurrence,
-        edgePolicy,
-        methods: completeValue(["GET"]),
-        targetPaths: completeValue(normalizedTargetPaths),
-        negativeRuntimeRequestUrls: completeValue(normalizedNegativeUrls),
-        allowMaterializedUrls: edge.allowMaterializedUrls === true,
-      });
-    },
-  );
-  const cacheOpens = normalizeArray(
-    "cacheOpens",
-    (edge, label, modulePath, occurrence) => {
-      const edgePolicy = normalizeGraphPolicy(edge.edgePolicy, label);
-      const cacheName = artifactGraphText(
-        edge.cacheName,
-        `${label} cacheName`,
-        "artifact-graph-cache-name-missing",
-      );
-      const targetPaths = edge.targetPaths ?? [];
-      if (!Array.isArray(targetPaths)) {
-        throw artifactGraphTypeError(
-          "artifact-graph-cache-targets-not-array",
-          `${label} targetPaths must be an array.`,
-        );
-      }
-      const normalizedTargetPaths = [...new Set(targetPaths.map((path) =>
-        normalizeGraphTargetPath(path, label, filesByPath)))].sort();
-      if (normalizedTargetPaths.length !== targetPaths.length) {
-        throw artifactGraphTypeError(
-          "artifact-graph-cache-target-duplicate",
-          `${label} targetPaths must be unique.`,
-        );
-      }
-      if (normalizedTargetPaths.some((path) =>
-        ARTIFACT_GRAPH_JAVASCRIPT_KINDS.has(filesByPath.get(path)?.kind))) {
-        throw artifactGraphTypeError(
-          "artifact-graph-cache-javascript-target-rejected",
-          `${label} must not expose authenticated JavaScript bytes through a cache edge.`,
-        );
-      }
-      if (
-        (edgePolicy === "artifact-targets-admitted") !== (normalizedTargetPaths.length > 0)
-      ) {
-        throw artifactGraphTypeError(
-          "artifact-graph-cache-policy-target-mismatch",
-          `${label} must have targets exactly when its edgePolicy admits authenticated cache reads.`,
-        );
-      }
-      return completeValue({
-        modulePath,
-        occurrence,
-        edgePolicy,
-        cacheName,
-        targetPaths: completeValue(normalizedTargetPaths),
-      });
-    },
-  );
-  return completeValue({
-    staticImports,
-    dynamicImports,
-    moduleWorkers,
-    fetches,
-    cacheOpens,
-  });
-}
-
-function normalizeArtifactGraphTransforms(value, filesByPath) {
-  const transforms = value ?? [];
-  if (!Array.isArray(transforms)) {
-    throw artifactGraphTypeError(
-      "artifact-graph-transforms-not-array",
-      "Artifact graph transforms must be an array.",
-    );
-  }
-  const normalized = transforms.map((transform, index) => {
-    if (!transform || typeof transform !== "object" || Array.isArray(transform)) {
-      throw artifactGraphTypeError(
-        "artifact-graph-transform-not-object",
-        `Artifact graph transform ${String(index)} must be an object.`,
-      );
-    }
-    const label = `Artifact graph transform ${String(index)}`;
-    if (!["function-return-this-to-global-this", "typed-array-constructor"].includes(
-      transform.kind,
-    )) {
-      throw artifactGraphTypeError(
-        "artifact-graph-transform-kind-not-admitted",
-        `${label} kind is not admitted.`,
-      );
-    }
-    return completeValue({
-      kind: transform.kind,
-      modulePath: normalizeGraphModulePath(transform.modulePath, label, filesByPath),
-      occurrence: normalizeGraphOccurrence(transform.occurrence, label),
-    });
-  });
-  normalized.sort((left, right) =>
-    lexicalCompare(compatibilityRecordKey(left), compatibilityRecordKey(right)));
-  const identities = new Set(normalized.map(compatibilityRecordKey));
-  if (identities.size !== normalized.length) {
-    throw artifactGraphTypeError(
-      "artifact-graph-transform-occurrence-duplicate",
-      "Artifact graph transform occurrences must be unique.",
-    );
-  }
-  return completeValue(normalized);
 }
 
 function normalizeArtifactGraphVoices(value, defaultVoice, filesByPath) {
@@ -1098,8 +517,6 @@ function artifactGraphProjection({
   model,
   runtime,
   files,
-  edges,
-  transforms,
 }) {
   return completeValue({
     protocol: BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL,
@@ -1109,8 +526,6 @@ function artifactGraphProjection({
     model,
     runtime,
     files: completeValue(files.map((file) => publicArtifactGraphFile(file))),
-    edges,
-    transforms,
   });
 }
 
@@ -1127,8 +542,6 @@ export function createBrowserSpeechArtifactGraph({
   model,
   runtime,
   files,
-  edges,
-  transforms,
 } = {}) {
   if (kind !== ARTIFACT_GRAPH_KIND) {
     throw artifactGraphTypeError(
@@ -1173,7 +586,7 @@ export function createBrowserSpeechArtifactGraph({
     );
   }
   const normalizedFiles = files.map((file, index) =>
-    normalizeArtifactGraphFile(file, index, false));
+    normalizeArtifactGraphFile(file, index));
   normalizedFiles.sort((left, right) => lexicalCompare(left.path, right.path));
   const filesByPath = new Map();
   const lowercasePaths = new Set();
@@ -1318,11 +731,6 @@ export function createBrowserSpeechArtifactGraph({
     );
   }
 
-  // Negative-route admission belonged to the former authenticated graph. The
-  // ordinary materializer now routes known files and lets every unknown URL
-  // continue through the browser's native operation.
-  const normalizedNegativeRoutes = completeValue([]);
-
   const modelId = artifactGraphIdentifier(
     model.id,
     "Browser speech artifact graph model id",
@@ -1378,33 +786,6 @@ export function createBrowserSpeechArtifactGraph({
     ? normalizeArtifactGraphVoices(model.voices, defaultVoice, filesByPath)
     : completeValue([]);
 
-  // Edge and transform declarations are retained only as inert compatibility
-  // metadata. Ordinary execution discovers routing from the complete file
-  // inventory and never admits or rejects runtime operations through them.
-  const edgeRecord = edges && typeof edges === "object" && !Array.isArray(edges)
-    ? edges
-    : {};
-  const normalizedEdges = completeValue({
-    staticImports: completeValue(Array.isArray(edgeRecord.staticImports)
-      ? edgeRecord.staticImports.map((edge) => completeValue({ ...edge }))
-      : []),
-    dynamicImports: completeValue(Array.isArray(edgeRecord.dynamicImports)
-      ? edgeRecord.dynamicImports.map((edge) => completeValue({ ...edge }))
-      : []),
-    moduleWorkers: completeValue(Array.isArray(edgeRecord.moduleWorkers)
-      ? edgeRecord.moduleWorkers.map((edge) => completeValue({ ...edge }))
-      : []),
-    fetches: completeValue(Array.isArray(edgeRecord.fetches)
-      ? edgeRecord.fetches.map((edge) => completeValue({ ...edge }))
-      : []),
-    cacheOpens: completeValue(Array.isArray(edgeRecord.cacheOpens)
-      ? edgeRecord.cacheOpens.map((edge) => completeValue({ ...edge }))
-      : []),
-  });
-  const normalizedTransforms = completeValue(Array.isArray(transforms)
-    ? transforms.map((transform) => completeValue({ ...transform }))
-    : []);
-
   const runtimeFiles = completeValue(normalizedFiles.filter((file) =>
     file.kind.startsWith("runtime-")));
   const modelFiles = completeValue(normalizedFiles.filter((file) =>
@@ -1448,7 +829,6 @@ export function createBrowserSpeechArtifactGraph({
       wasmPath,
       ...(numThreads === null ? {} : { numThreads }),
     }),
-    negativeRuntimeRequestUrls: completeValue(normalizedNegativeRoutes),
   });
   const normalizedModel = completeValue({
     id: modelId,
@@ -1466,8 +846,6 @@ export function createBrowserSpeechArtifactGraph({
     model: normalizedModel,
     runtime: normalizedRuntime,
     files: normalizedFiles,
-    edges: normalizedEdges,
-    transforms: normalizedTransforms,
   });
   const graph = completeValue({
     ...projection,
@@ -1482,8 +860,6 @@ export function createBrowserSpeechArtifactGraph({
     modelFiles,
     model: normalizedModel,
     runtime: normalizedRuntime,
-    edges: normalizedEdges,
-    transforms: normalizedTransforms,
     ...(normalizedSecurity ? { security: normalizedSecurity } : {}),
   }));
   return graph;
@@ -1524,11 +900,7 @@ export function createBrowserSpeechAuthority({
     model.files ?? [],
     "Browser speech model",
     "model",
-    modelRevision,
-    {
-      allowEmpty: true,
-      secure: false,
-    },
+    { allowEmpty: true },
   );
   const runtimeAdapter = requiredText(runtime.adapter, "Browser speech runtime adapter");
   const expectedAdapter = role === "stt"
@@ -1543,8 +915,6 @@ export function createBrowserSpeechAuthority({
     runtime.files,
     "Browser speech runtime",
     "runtime",
-    runtimeRevision,
-    { secure: false },
   );
   const wasmPaths = runtime.wasmPaths === undefined
     ? null
@@ -1708,7 +1078,6 @@ function storageNames(authority, files) {
   return completeValue({
     key: prefix,
     selection: `${prefix}.selection.json`,
-    legacyManifest: `${prefix}.complete.json`,
     files: completeValue(files.map((_, index) =>
       `${prefix}.${String(index).padStart(4, "0")}.artifact`)),
   });
@@ -1743,341 +1112,6 @@ async function* byteChunks(body, signal) {
     "ARCANE_AI_ARTIFACT_SOURCE_INVALID",
     "A browser speech artifact did not provide readable bytes.",
   );
-}
-
-// Runtime entry bytes use one deliberately closed capability grammar. The only
-// module reference is import.meta and the only artifact transport is fetch(),
-// which the Worker replaces with its admitted object-URL map before import.
-// Executable strings, child execution contexts, script loaders, and alternate
-// network transports are outside the grammar. Literal escape sequences are
-// decoded before the same capability tokens are evaluated.
-const CLOSED_MODULE_OUT_OF_GRAMMAR_IDENTIFIERS = new Set([
-  "AsyncFunction",
-  "AsyncGeneratorFunction",
-  "EventSource",
-  "Function",
-  "GeneratorFunction",
-  "RTCPeerConnection",
-  "SharedWorker",
-  "WebSocket",
-  "WebTransport",
-  "Worker",
-  "XMLHttpRequest",
-  "eval",
-  "importScripts",
-]);
-const CLOSED_MODULE_OUT_OF_GRAMMAR_LITERAL =
-  /(?:^|[^A-Za-z0-9_$])(?:AsyncFunction|AsyncGeneratorFunction|EventSource|Function|GeneratorFunction|RTCPeerConnection|SharedWorker|WebSocket|WebTransport|Worker|XMLHttpRequest|constructor|eval|importScripts)(?:$|[^A-Za-z0-9_$])|(?:^|[^A-Za-z0-9_$])import\s*\(/u;
-
-function assertSelfContainedModuleSource(source, label) {
-  let index = 0;
-  let nextTemplateId = 1;
-  const templateStack = [];
-  const literalFragments = [];
-
-  function fail() {
-    throw speechError(
-      "ARCANE_AI_RUNTIME_MODULE_GRAPH_UNDECLARED",
-      `${label} must be one self-contained JavaScript module without imports or re-exports.`,
-    );
-  }
-
-  function identifierStart(character) {
-    return /[A-Za-z_$]/u.test(character ?? "");
-  }
-
-  function identifierPart(character) {
-    return /[A-Za-z0-9_$]/u.test(character ?? "");
-  }
-
-  function assertLiteral(value) {
-    if (CLOSED_MODULE_OUT_OF_GRAMMAR_LITERAL.test(value)) fail();
-  }
-
-  function assertComputedLiteral(value) {
-    if (value.includes("constructor") || /import\s*\(/u.test(value)) fail();
-    for (const identifier of CLOSED_MODULE_OUT_OF_GRAMMAR_IDENTIFIERS) {
-      if (value.includes(identifier)) fail();
-    }
-  }
-
-  function recordLiteral(start, end, value) {
-    assertLiteral(value);
-    literalFragments.push(completeValue({
-      start,
-      end,
-      value,
-      templateIds: completeValue([...templateStack]),
-    }));
-  }
-
-  function stripJoinerTrivia(value) {
-    return value
-      .replace(/\/\*[\s\S]*?\*\//gu, "")
-      .replace(/\/\/[^\r\n]*(?:\r?\n|$)/gu, "")
-      .replace(/\s+/gu, "");
-  }
-
-  function sharesTemplate(left, right) {
-    return left.templateIds.some((id) => right.templateIds.includes(id));
-  }
-
-  function staticallyJoins(left, right) {
-    const separator = stripJoinerTrivia(source.slice(left.end, right.start));
-    const usesConcat = separator.includes(".concat");
-    const withoutConcat = separator.replace(/\.concat/gu, "");
-    const usesPlus = withoutConcat.includes("+");
-    const usesTemplate = sharesTemplate(left, right)
-      && (withoutConcat.includes("${") || withoutConcat.includes("}"));
-    if (!usesConcat && !usesPlus && !usesTemplate) return false;
-    return (usesTemplate ? /^[+()${}]*$/u : /^[+()]*$/u).test(withoutConcat);
-  }
-
-  function assertStaticLiteralChains() {
-    let chain = [];
-    function flushChain() {
-      if (chain.length > 1) {
-        assertComputedLiteral(chain.map((fragment) => fragment.value).join(""));
-      }
-      chain = [];
-    }
-    for (const fragment of literalFragments) {
-      const previous = chain[chain.length - 1];
-      if (previous && staticallyJoins(previous, fragment)) {
-        chain.push(fragment);
-        continue;
-      }
-      flushChain();
-      chain.push(fragment);
-    }
-    flushChain();
-  }
-
-  function readEscape() {
-    if (index >= source.length) fail();
-    const character = source[index];
-    index += 1;
-    if (character === "x") {
-      const hex = source.slice(index, index + 2);
-      if (!/^[a-f0-9]{2}$/iu.test(hex)) fail();
-      index += 2;
-      return String.fromCodePoint(Number.parseInt(hex, 16));
-    }
-    if (character === "u") {
-      if (source[index] === "{") {
-        const end = source.indexOf("}", index + 1);
-        if (end < 0) fail();
-        const hex = source.slice(index + 1, end);
-        if (!/^[a-f0-9]{1,6}$/iu.test(hex)) fail();
-        const codePoint = Number.parseInt(hex, 16);
-        if (codePoint > 0x10ffff) fail();
-        index = end + 1;
-        return String.fromCodePoint(codePoint);
-      }
-      const hex = source.slice(index, index + 4);
-      if (!/^[a-f0-9]{4}$/iu.test(hex)) fail();
-      index += 4;
-      return String.fromCodePoint(Number.parseInt(hex, 16));
-    }
-    if (character === "\n") return "";
-    if (character === "\r") {
-      if (source[index] === "\n") index += 1;
-      return "";
-    }
-    return completeValue({
-      "0": "\0",
-      b: "\b",
-      f: "\f",
-      n: "\n",
-      r: "\r",
-      t: "\t",
-      v: "\v",
-    })[character] ?? character;
-  }
-
-  function readQuoted(quote) {
-    const start = index;
-    let value = "";
-    index += 1;
-    while (index < source.length) {
-      const character = source[index];
-      index += 1;
-      if (character === "\\") {
-        value += readEscape();
-        continue;
-      }
-      if (character === quote) {
-        recordLiteral(start, index, value);
-        return;
-      }
-      if (character === "\n" || character === "\r") fail();
-      value += character;
-    }
-    fail();
-  }
-
-  function skipRegex() {
-    index += 1;
-    let inClass = false;
-    while (index < source.length) {
-      const character = source[index];
-      index += 1;
-      if (character === "\\") {
-        index += 1;
-        continue;
-      }
-      if (character === "[") inClass = true;
-      else if (character === "]") inClass = false;
-      else if (character === "/" && !inClass) {
-        while (/[A-Za-z]/u.test(source[index] ?? "")) index += 1;
-        return;
-      } else if (character === "\n" || character === "\r") {
-        fail();
-      }
-    }
-    fail();
-  }
-
-  function canStartRegex(lastToken) {
-    return lastToken === null
-      || [
-        "(", "[", "{", "=", ":", ",", ";", "!", "?",
-        "&&", "||", "=>", "return", "case", "throw",
-      ].includes(lastToken);
-  }
-
-  function readTemplate() {
-    const templateId = nextTemplateId;
-    nextTemplateId += 1;
-    templateStack.push(templateId);
-    let fragmentStart = index;
-    let value = "";
-    index += 1;
-    while (index < source.length) {
-      const character = source[index];
-      index += 1;
-      if (character === "\\") {
-        value += readEscape();
-        continue;
-      }
-      if (character === "`") {
-        recordLiteral(fragmentStart, index, value);
-        templateStack.pop();
-        return;
-      }
-      if (character === "$" && source[index] === "{") {
-        recordLiteral(fragmentStart, index - 1, value);
-        value = "";
-        index += 1;
-        scanCode(true);
-        fragmentStart = index;
-        continue;
-      }
-      value += character;
-    }
-    fail();
-  }
-
-  function scanCode(stopAtTemplateBrace = false) {
-    let nestedBraces = 0;
-    let lastToken = null;
-    while (index < source.length) {
-      const character = source[index];
-      const next = source[index + 1];
-      if (/\s/u.test(character)) {
-        index += 1;
-        continue;
-      }
-      if (character === "/" && next === "/") {
-        index += 2;
-        while (index < source.length && source[index] !== "\n") index += 1;
-        continue;
-      }
-      if (character === "/" && next === "*") {
-        const end = source.indexOf("*/", index + 2);
-        if (end < 0) fail();
-        index = end + 2;
-        continue;
-      }
-      if (character === "'" || character === '"') {
-        if (lastToken === "from") fail();
-        readQuoted(character);
-        lastToken = "literal";
-        continue;
-      }
-      if (character === "`") {
-        if (lastToken === "from") fail();
-        readTemplate();
-        lastToken = "literal";
-        continue;
-      }
-      if (character === "/" && canStartRegex(lastToken)) {
-        skipRegex();
-        lastToken = "literal";
-        continue;
-      }
-      if (identifierStart(character)) {
-        const start = index;
-        index += 1;
-        while (identifierPart(source[index])) index += 1;
-        const word = source.slice(start, index);
-        if (CLOSED_MODULE_OUT_OF_GRAMMAR_IDENTIFIERS.has(word)) fail();
-        if (word === "constructor" && lastToken === ".") fail();
-        if (word === "import") {
-          while (/\s/u.test(source[index] ?? "")) index += 1;
-          if (source[index] === "." && source.slice(index + 1, index + 5) === "meta") {
-            index += 5;
-            lastToken = "import.meta";
-            continue;
-          }
-          fail();
-        }
-        lastToken = word;
-        continue;
-      }
-      if (character === "\\") fail();
-      if (stopAtTemplateBrace && character === "}") {
-        if (nestedBraces === 0) {
-          index += 1;
-          return;
-        }
-        nestedBraces -= 1;
-      } else if (stopAtTemplateBrace && character === "{") {
-        nestedBraces += 1;
-      }
-      const twoCharacters = `${character}${next ?? ""}`;
-      if (["&&", "||", "=>"].includes(twoCharacters)) {
-        lastToken = twoCharacters;
-        index += 2;
-      } else {
-        lastToken = character;
-        index += 1;
-      }
-    }
-    if (stopAtTemplateBrace) fail();
-  }
-
-  scanCode();
-  assertStaticLiteralChains();
-}
-
-// Dormant hardening retained for future review only. Ordinary speech artifact
-// preparation never calls this closed-module inspection, and it must not be
-// enabled for secure mode without an explicit review with the user.
-async function assertSelfContainedRuntime(admitted, metadata) {
-  const javascriptFiles = admitted.files.filter(({ descriptor }) =>
-    descriptor.kind === "runtime" && descriptor.mediaType === "text/javascript");
-  if (
-    javascriptFiles.length !== 1
-    || javascriptFiles[0].descriptor.path !== metadata.runtime.entry
-  ) {
-    throw speechError(
-      "ARCANE_AI_RUNTIME_MODULE_GRAPH_UNDECLARED",
-      "Browser speech requires exactly one admitted self-contained runtime module.",
-    );
-  }
-  const [{ descriptor, file }] = javascriptFiles;
-  void file;
 }
 
 function tokenizeArtifactGraphModule(source, modulePath) {
@@ -2302,694 +1336,6 @@ function tokenizeArtifactGraphModule(source, modulePath) {
 
   scanCode();
   return completeValue(tokens);
-}
-
-function artifactGraphDeclarationsByModule(values) {
-  const result = new Map();
-  for (const value of values) {
-    const entries = result.get(value.modulePath) ?? [];
-    entries.push(value);
-    result.set(value.modulePath, entries);
-  }
-  for (const entries of result.values()) {
-    entries.sort((left, right) => left.occurrence - right.occurrence);
-  }
-  return result;
-}
-
-function assertArtifactGraphOccurrences(observed, declared, modulePath, subject) {
-  if (observed.length !== declared.length) {
-    throw artifactGraphError(
-      observed.length > declared.length
-        ? "artifact-graph-runtime-edge-undeclared"
-        : "artifact-graph-runtime-edge-declaration-unmatched",
-      `${modulePath} exposes ${String(observed.length)} ${subject} occurrence(s), but the graph declares ${String(declared.length)}.`,
-    );
-  }
-  for (let index = 0; index < declared.length; index += 1) {
-    if (declared[index].occurrence !== index + 1) {
-      throw artifactGraphError(
-        "artifact-graph-runtime-edge-occurrence-noncanonical",
-        `${modulePath} ${subject} declarations must use contiguous one-based occurrence values.`,
-      );
-    }
-  }
-}
-
-function inspectArtifactGraphModuleSource(source, modulePath, metadata, {
-  strict = false,
-} = {}) {
-  const tokens = tokenizeArtifactGraphModule(source, modulePath);
-  const staticImports = [];
-  const dynamicImports = [];
-  const fetches = [];
-  const moduleWorkers = [];
-  const cacheOpens = [];
-  const returnThisTransforms = [];
-  const typedArrayConstructors = [];
-  const warnings = new Set();
-  const forbiddenDynamicCode = new Set([
-    "AsyncFunction",
-    "AsyncGeneratorFunction",
-    "BroadcastChannel",
-    "GeneratorFunction",
-    "RTCPeerConnection",
-    "ShadowRealm",
-    "eval",
-    "importScripts",
-    "WebSocketStream",
-  ]);
-
-  function next(index, offset = 1) {
-    return tokens[index + offset] ?? null;
-  }
-
-  function previous(index, offset = 1) {
-    return tokens[index - offset] ?? null;
-  }
-
-  function recordGuardCall(target, index, kind) {
-    const token = tokens[index];
-    const opening = next(index);
-    if (opening?.value !== "(") {
-      throw artifactGraphError(
-        `artifact-graph-runtime-${kind.toLowerCase()}-direct-call-required`,
-        `${modulePath} references ${kind} outside an admitted direct call boundary.`,
-      );
-    }
-    let start = token.start;
-    if (previous(index)?.value === ".") {
-      if (!["globalThis", "self"].includes(previous(index, 2)?.value)) {
-        throw artifactGraphError(
-          `artifact-graph-runtime-${kind.toLowerCase()}-receiver-not-global`,
-          `${modulePath} calls ${kind} through a non-global receiver.`,
-        );
-      }
-      start = previous(index, 2).start;
-    }
-    target.push(completeValue({ start, end: opening.end }));
-  }
-
-  function typedArrayConstructor(index) {
-    const opening = next(index);
-    if (opening?.value !== "(") return null;
-    const property = previous(index, 2);
-    if (property?.type !== "identifier") return null;
-    if (previous(index, 3)?.value === "new") {
-      return completeValue({
-        start: property.start,
-        end: tokens[index].end,
-        receiver: source.slice(property.start, property.end),
-      });
-    }
-    if (
-      previous(index, 3)?.value === "."
-      && previous(index, 4)?.value === "]"
-      && previous(index, 5)?.value === "0"
-      && previous(index, 6)?.value === "["
-      && previous(index, 7)?.type === "identifier"
-      && previous(index, 8)?.value === "new"
-    ) {
-      return completeValue({
-        start: previous(index, 7).start,
-        end: tokens[index].end,
-        receiver: source.slice(previous(index, 7).start, property.end),
-      });
-    }
-    return null;
-  }
-
-  for (let index = 0; index < tokens.length; index += 1) {
-    const token = tokens[index];
-    if (
-      (token.type === "identifier" || token.type === "string")
-      && token.value === ARTIFACT_GRAPH_GUARDS
-    ) {
-      throw artifactGraphError(
-        "artifact-graph-runtime-guard-reference-reserved",
-        `${modulePath} references the SDK-owned artifact graph runtime guard name.`,
-      );
-    }
-    if (
-      token.type === "string"
-      && [
-        "Function",
-        "BroadcastChannel",
-        "RTCPeerConnection",
-        "ShadowRealm",
-        "SharedWorker",
-        "Worker",
-        "WebSocketStream",
-        "XMLHttpRequest",
-        "constructor",
-        "eval",
-        "fetch",
-        "importScripts",
-      ].includes(token.value)
-      && previous(index)?.value === "["
-      && next(index)?.value === "]"
-    ) {
-      if (strict) {
-        throw artifactGraphError(
-          "artifact-graph-runtime-computed-dynamic-code-undeclared",
-          `${modulePath} contains computed access to dynamic code capability ${token.value}.`,
-        );
-      }
-      warnings.add(token.value);
-      continue;
-    }
-    if (token.type !== "identifier") continue;
-    if (forbiddenDynamicCode.has(token.value)) {
-      if (strict) {
-        throw artifactGraphError(
-          "artifact-graph-runtime-dynamic-code-undeclared",
-          `${modulePath} contains dynamic code capability ${token.value}, which is not admitted.`,
-        );
-      }
-      warnings.add(token.value);
-      continue;
-    }
-    if (token.value === "Function") {
-      const sequence = [
-        next(index)?.value,
-        next(index, 2)?.value,
-        next(index, 3)?.value,
-        next(index, 4)?.value,
-        next(index, 5)?.value,
-      ];
-      if (
-        [".", "?."].includes(previous(index)?.value)
-        || previous(index)?.value === "new"
-        || sequence[0] !== "("
-        || next(index, 2)?.type !== "string"
-        || sequence[1].trim() !== "return this"
-        || sequence[2] !== ")"
-        || sequence[3] !== "("
-        || sequence[4] !== ")"
-      ) {
-        if (strict) {
-          throw artifactGraphError(
-            "artifact-graph-runtime-dynamic-code-undeclared",
-            `${modulePath} contains a Function constructor outside the sole supported global-object transform.`,
-          );
-        }
-        warnings.add("Function");
-        continue;
-      }
-      returnThisTransforms.push(completeValue({
-        start: token.start,
-        end: next(index, 5).end,
-      }));
-      index += 5;
-      continue;
-    }
-    if (
-      token.value === "caches"
-      && next(index)?.value === "."
-      && next(index, 2)?.value === "open"
-      && next(index, 3)?.value === "("
-    ) {
-      let start = token.start;
-      if (previous(index)?.value === ".") {
-        if (!["globalThis", "self"].includes(previous(index, 2)?.value)) {
-          throw artifactGraphError(
-            "artifact-graph-runtime-cache-open-receiver-not-global",
-            `${modulePath} calls CacheStorage.open through a non-global receiver.`,
-          );
-        }
-        start = previous(index, 2).start;
-      }
-      cacheOpens.push(completeValue({ start, end: next(index, 3).end }));
-      continue;
-    }
-    if (token.value === "caches") {
-      if (previous(index)?.value === "typeof") continue;
-      throw artifactGraphError(
-        "artifact-graph-runtime-cache-open-direct-call-required",
-        `${modulePath} references CacheStorage outside an admitted direct open call.`,
-      );
-    }
-    if (
-      token.value === "constructor"
-      && [".", "?."].includes(previous(index)?.value)
-      && next(index)?.value === "("
-    ) {
-      const observed = previous(index)?.value === "." ? typedArrayConstructor(index) : null;
-      if (!observed) {
-        throw artifactGraphError(
-          "artifact-graph-runtime-constructor-dynamic-code-undeclared",
-          `${modulePath} calls a constructor property outside the declared typed-array constructor transform.`,
-        );
-      }
-      typedArrayConstructors.push(observed);
-      continue;
-    }
-    if (token.value === "import") {
-      if (next(index)?.value === "." && next(index, 2)?.value === "meta") {
-        index += 2;
-        continue;
-      }
-      if (next(index)?.value === "(") {
-        dynamicImports.push(completeValue({ start: token.start, end: next(index).end }));
-        continue;
-      }
-      let specifier = next(index)?.type === "string" ? next(index) : null;
-      if (!specifier) {
-        for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
-          if (tokens[cursor].value === ";") break;
-          if (tokens[cursor].value === "from" && next(cursor)?.type === "string") {
-            specifier = next(cursor);
-            break;
-          }
-        }
-      }
-      if (!specifier) {
-        throw artifactGraphError(
-          "artifact-graph-static-import-specifier-unresolved",
-          `${modulePath} contains a static import without one literal specifier.`,
-        );
-      }
-      staticImports.push(completeValue({
-        start: specifier.start,
-        end: specifier.end,
-        specifier: specifier.value,
-      }));
-      continue;
-    }
-    if (token.value === "export") {
-      if (!["*", "{"].includes(next(index)?.value)) continue;
-      let specifier = null;
-      for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
-        if (tokens[cursor].value === ";") break;
-        if (tokens[cursor].value === "from" && next(cursor)?.type === "string") {
-          specifier = next(cursor);
-          break;
-        }
-        if (["export", "import"].includes(tokens[cursor].value)) break;
-      }
-      if (specifier) {
-        staticImports.push(completeValue({
-          start: specifier.start,
-          end: specifier.end,
-          specifier: specifier.value,
-        }));
-      }
-      continue;
-    }
-    if (token.value === "fetch") {
-      recordGuardCall(fetches, index, "fetch");
-      continue;
-    }
-    if (token.value === "Worker") {
-      const opening = next(index);
-      if (opening?.value !== "(") {
-        if (strict) {
-          throw artifactGraphError(
-            "artifact-graph-runtime-worker-constructor-call-required",
-            `${modulePath} references Worker outside an admitted constructor boundary.`,
-          );
-        }
-        warnings.add("Worker");
-        continue;
-      }
-      let start = token.start;
-      if (previous(index)?.value === "new") {
-        start = previous(index).start;
-      } else if (previous(index)?.value === ".") {
-        if (!["globalThis", "self"].includes(previous(index, 2)?.value)) {
-          if (strict) {
-            throw artifactGraphError(
-              "artifact-graph-runtime-worker-receiver-not-global",
-              `${modulePath} constructs Worker through a non-global receiver.`,
-            );
-          }
-          warnings.add("Worker");
-          continue;
-        }
-        start = previous(index, 2).start;
-        if (previous(index, 3)?.value === "new") start = previous(index, 3).start;
-      }
-      moduleWorkers.push(completeValue({ start, end: opening.end }));
-    }
-  }
-
-  const moduleTransforms = artifactGraphDeclarationsByModule(metadata.transforms)
-    .get(modulePath) ?? [];
-  const declarations = {
-    staticImports: artifactGraphDeclarationsByModule(metadata.edges.staticImports)
-      .get(modulePath) ?? [],
-    dynamicImports: artifactGraphDeclarationsByModule(metadata.edges.dynamicImports)
-      .get(modulePath) ?? [],
-    fetches: artifactGraphDeclarationsByModule(metadata.edges.fetches)
-      .get(modulePath) ?? [],
-    moduleWorkers: artifactGraphDeclarationsByModule(metadata.edges.moduleWorkers)
-      .get(modulePath) ?? [],
-    cacheOpens: artifactGraphDeclarationsByModule(metadata.edges.cacheOpens)
-      .get(modulePath) ?? [],
-    returnThisTransforms: moduleTransforms.filter((transform) =>
-      transform.kind === "function-return-this-to-global-this"),
-    typedArrayConstructors: moduleTransforms.filter((transform) =>
-      transform.kind === "typed-array-constructor"),
-  };
-  assertArtifactGraphOccurrences(
-    staticImports,
-    declarations.staticImports,
-    modulePath,
-    "static import or re-export",
-  );
-  assertArtifactGraphOccurrences(
-    dynamicImports,
-    declarations.dynamicImports,
-    modulePath,
-    "dynamic import",
-  );
-  assertArtifactGraphOccurrences(fetches, declarations.fetches, modulePath, "fetch");
-  assertArtifactGraphOccurrences(
-    moduleWorkers,
-    declarations.moduleWorkers,
-    modulePath,
-    "module Worker",
-  );
-  assertArtifactGraphOccurrences(
-    cacheOpens,
-    declarations.cacheOpens,
-    modulePath,
-    "CacheStorage open",
-  );
-  assertArtifactGraphOccurrences(
-    returnThisTransforms,
-    declarations.returnThisTransforms,
-    modulePath,
-    "Function return-this transform",
-  );
-  assertArtifactGraphOccurrences(
-    typedArrayConstructors,
-    declarations.typedArrayConstructors,
-    modulePath,
-    "typed-array constructor transform",
-  );
-  for (let index = 0; index < staticImports.length; index += 1) {
-    if (staticImports[index].specifier !== declarations.staticImports[index].specifier) {
-      throw artifactGraphError(
-        "artifact-graph-static-import-specifier-mismatch",
-        `${modulePath} static import occurrence ${String(index + 1)} does not match its declared specifier.`,
-      );
-    }
-  }
-  return completeValue({
-    source,
-    staticImports: completeValue(staticImports),
-    dynamicImports: completeValue(dynamicImports),
-    fetches: completeValue(fetches),
-    moduleWorkers: completeValue(moduleWorkers),
-    cacheOpens: completeValue(cacheOpens),
-    returnThisTransforms: completeValue(returnThisTransforms),
-    typedArrayConstructors: completeValue(typedArrayConstructors),
-    warnings: completeValue([...warnings].sort()),
-    declarations,
-  });
-}
-
-function assertArtifactGraphStaticImportClosure(metadata) {
-  const dependencies = new Map(metadata.runtimeFiles
-    .filter((file) => ARTIFACT_GRAPH_JAVASCRIPT_KINDS.has(file.kind))
-    .map((file) => [file.path, []]));
-  for (const edge of metadata.edges.staticImports) {
-    dependencies.get(edge.modulePath).push(edge.targetPath);
-  }
-  const visiting = new Set();
-  const visited = new Set();
-  const order = [];
-  function visit(path) {
-    if (visiting.has(path)) {
-      throw artifactGraphError(
-        "artifact-graph-runtime-static-import-cycle",
-        `Artifact graph static imports contain a cycle at ${path}.`,
-      );
-    }
-    if (visited.has(path)) return;
-    visiting.add(path);
-    for (const dependency of dependencies.get(path) ?? []) visit(dependency);
-    visiting.delete(path);
-    visited.add(path);
-    order.push(path);
-  }
-  for (const path of [...dependencies.keys()].sort()) visit(path);
-  return completeValue(order);
-}
-
-// Dormant hardening retained for future review only. Ordinary materialization
-// uses the permissive router below; these declaration, capability, and closed
-// inspection controls must not be enabled without explicit user review.
-async function inspectArtifactGraphRuntime(admitted, metadata, signal) {
-  const admittedByPath = new Map(admitted.files.map((entry) => [entry.descriptor.path, entry]));
-  const plans = new Map();
-  for (const descriptor of metadata.runtimeFiles) {
-    throwIfAborted(signal);
-    if (!ARTIFACT_GRAPH_JAVASCRIPT_KINDS.has(descriptor.kind)) continue;
-    const file = admittedByPath.get(descriptor.path)?.file;
-    if (!file) {
-      throw artifactGraphError(
-        "artifact-graph-runtime-javascript-file-missing",
-        `Artifact graph runtime JavaScript file ${descriptor.path} is unavailable.`,
-      );
-    }
-    let source;
-    try {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      source = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    } catch (error) {
-      throw artifactGraphError(
-        "artifact-graph-runtime-javascript-utf8-decode-rejected",
-        `Artifact graph runtime JavaScript file ${descriptor.path} is not valid UTF-8.`,
-        error,
-      );
-    }
-    plans.set(
-      descriptor.path,
-      inspectArtifactGraphModuleSource(source, descriptor.path, metadata, {
-        strict: false,
-      }),
-    );
-  }
-  const order = assertArtifactGraphStaticImportClosure(metadata);
-  const warnings = [...new Set([...plans.values()].flatMap((plan) => plan.warnings))]
-    .sort();
-  throwIfAborted(signal);
-  return completeValue({ plans, order, warnings: completeValue(warnings) });
-}
-
-function assertArtifactGraphRuntimeInspection(inspection) {
-  if (
-    !inspection
-    || !(inspection.plans instanceof Map)
-    || !Array.isArray(inspection.order)
-    || !Array.isArray(inspection.warnings)
-  ) {
-    throw artifactGraphError(
-      "artifact-graph-runtime-inspection-missing",
-      "Artifact graph runtime inspection is required before executable materialization.",
-    );
-  }
-  return inspection;
-}
-
-function applyArtifactGraphModuleTransforms(plan, materializedByPath, guardCapability) {
-  const replacements = [];
-  for (let index = 0; index < plan.staticImports.length; index += 1) {
-    const observed = plan.staticImports[index];
-    const declared = plan.declarations.staticImports[index];
-    const targetUrl = materializedByPath.get(declared.targetPath)?.moduleUrl;
-    if (!targetUrl) {
-      throw artifactGraphError(
-        "artifact-graph-static-import-target-unmaterialized",
-        `Static import target ${declared.targetPath} was not materialized before ${declared.modulePath}.`,
-      );
-    }
-    replacements.push({
-      start: observed.start,
-      end: observed.end,
-      value: JSON.stringify(targetUrl),
-    });
-  }
-  for (let index = 0; index < plan.dynamicImports.length; index += 1) {
-    const observed = plan.dynamicImports[index];
-    const declared = plan.declarations.dynamicImports[index];
-    replacements.push({
-      start: observed.start,
-      end: observed.end,
-      value: `globalThis.${ARTIFACT_GRAPH_GUARDS}.dynamicImport(${JSON.stringify(guardCapability)},${JSON.stringify(declared.modulePath)},${String(declared.occurrence)},`,
-    });
-  }
-  for (let index = 0; index < plan.fetches.length; index += 1) {
-    const observed = plan.fetches[index];
-    const declared = plan.declarations.fetches[index];
-    replacements.push({
-      start: observed.start,
-      end: observed.end,
-      value: `globalThis.${ARTIFACT_GRAPH_GUARDS}.fetch(${JSON.stringify(guardCapability)},${JSON.stringify(declared.modulePath)},${String(declared.occurrence)},`,
-    });
-  }
-  for (let index = 0; index < plan.moduleWorkers.length; index += 1) {
-    const observed = plan.moduleWorkers[index];
-    const declared = plan.declarations.moduleWorkers[index];
-    replacements.push({
-      start: observed.start,
-      end: observed.end,
-      value: `globalThis.${ARTIFACT_GRAPH_GUARDS}.createWorker(${JSON.stringify(guardCapability)},${JSON.stringify(declared.modulePath)},${String(declared.occurrence)},`,
-    });
-  }
-  for (let index = 0; index < plan.cacheOpens.length; index += 1) {
-    const observed = plan.cacheOpens[index];
-    const declared = plan.declarations.cacheOpens[index];
-    replacements.push({
-      start: observed.start,
-      end: observed.end,
-      value: `globalThis.${ARTIFACT_GRAPH_GUARDS}.openCache(${JSON.stringify(guardCapability)},${JSON.stringify(declared.modulePath)},${String(declared.occurrence)},`,
-    });
-  }
-  for (const observed of plan.returnThisTransforms) {
-    replacements.push({ start: observed.start, end: observed.end, value: "globalThis" });
-  }
-  for (let index = 0; index < plan.typedArrayConstructors.length; index += 1) {
-    const observed = plan.typedArrayConstructors[index];
-    const declared = plan.declarations.typedArrayConstructors[index];
-    replacements.push({
-      start: observed.start,
-      end: observed.end,
-      value: `(globalThis.${ARTIFACT_GRAPH_GUARDS}.typedArrayConstructor(${JSON.stringify(guardCapability)},${JSON.stringify(declared.modulePath)},${String(declared.occurrence)},${observed.receiver}))`,
-    });
-  }
-  replacements.sort((left, right) => right.start - left.start);
-  let source = plan.source;
-  let previousStart = source.length;
-  for (const replacement of replacements) {
-    if (replacement.end > previousStart) {
-      throw artifactGraphError(
-        "artifact-graph-module-transform-overlap",
-        "Artifact graph module transforms overlap and cannot be applied deterministically.",
-      );
-    }
-    source = `${source.slice(0, replacement.start)}${replacement.value}${source.slice(replacement.end)}`;
-    previousStart = replacement.start;
-  }
-  return source;
-}
-
-function artifactGraphGuardCapability() {
-  return "ordinary";
-}
-
-async function createArtifactGraphObjectUrls(admitted, metadata, inspection) {
-  if (
-    typeof PLATFORM_CREATE_OBJECT_URL !== "function"
-    || typeof PLATFORM_REVOKE_OBJECT_URL !== "function"
-  ) {
-    throw artifactGraphError(
-      "artifact-graph-object-url-platform-unavailable",
-      "Artifact graph materialization requires native Blob URL creation and revocation.",
-    );
-  }
-  const admittedByPath = new Map(admitted.files.map((entry) => [entry.descriptor.path, entry]));
-  const materializedByPath = new Map();
-  const created = [];
-  const createdIdentities = new Set();
-  const guardCapability = artifactGraphGuardCapability();
-  const runtimeInspection = assertArtifactGraphRuntimeInspection(inspection);
-  async function materialize(descriptor, body) {
-    const blob = body instanceof Blob && body.type === descriptor.mediaType
-      ? body
-      : new Blob([body], { type: descriptor.mediaType });
-    const moduleUrl = PLATFORM_CREATE_OBJECT_URL(blob);
-    if (typeof moduleUrl !== "string" || !moduleUrl.startsWith("blob:")) {
-      throw artifactGraphError(
-        "artifact-graph-object-url-scheme-not-blob",
-        `Materialized artifact graph file ${descriptor.path} did not produce a Blob URL.`,
-      );
-    }
-    if (createdIdentities.has(moduleUrl)) {
-      throw artifactGraphError(
-        "artifact-graph-object-url-identity-ambiguous",
-        `Materialized artifact graph file ${descriptor.path} reused another file's Blob URL.`,
-      );
-    }
-    createdIdentities.add(moduleUrl);
-    created.push(moduleUrl);
-    materializedByPath.set(descriptor.path, completeValue({
-      kind: descriptor.kind,
-      path: descriptor.path,
-      sourceUrl: descriptor.sourceUrl,
-      revision: descriptor.revision,
-      moduleUrl,
-      mediaType: descriptor.mediaType,
-      ...(descriptor.sourceMediaType === descriptor.mediaType
-        ? {}
-        : { sourceMediaType: descriptor.sourceMediaType }),
-      runtimeRequestUrls: descriptor.runtimeRequestUrls,
-      ...(descriptor.redirectFinalOrigins.length < 1
-        ? {}
-        : { redirectFinalOrigins: descriptor.redirectFinalOrigins }),
-    }));
-  }
-  try {
-    for (const descriptor of metadata.files) {
-      if (ARTIFACT_GRAPH_JAVASCRIPT_KINDS.has(descriptor.kind)) continue;
-      const admittedFile = admittedByPath.get(descriptor.path)?.file;
-      if (!admittedFile) {
-        throw artifactGraphError(
-          "artifact-graph-materialized-source-file-missing",
-          `Artifact graph file ${descriptor.path} is unavailable for materialization.`,
-        );
-      }
-      await materialize(descriptor, admittedFile);
-    }
-    for (const path of runtimeInspection.order) {
-      const descriptor = metadata.filesByPath.get(path);
-      const plan = runtimeInspection.plans.get(path);
-      if (!descriptor || !plan) {
-        throw artifactGraphError(
-          "artifact-graph-runtime-inspection-incomplete",
-          `Artifact graph runtime inspection is incomplete for ${path}.`,
-        );
-      }
-      await materialize(
-        descriptor,
-        applyArtifactGraphModuleTransforms(plan, materializedByPath, guardCapability),
-      );
-    }
-    const files = metadata.files.map((descriptor) => {
-      const materialized = materializedByPath.get(descriptor.path);
-      if (!materialized) {
-        throw artifactGraphError(
-          "artifact-graph-materialization-incomplete",
-          `Artifact graph file ${descriptor.path} was not materialized.`,
-        );
-      }
-      return materialized;
-    });
-    return completeValue({
-      guardCapability,
-      files: completeValue(files),
-      release() {
-        for (const url of created.splice(0).reverse()) {
-          try {
-            PLATFORM_REVOKE_OBJECT_URL(url);
-          } catch {
-            // Object URL revocation follows worker termination and is best effort.
-          }
-        }
-      },
-    });
-  } catch (error) {
-    for (const url of created.splice(0).reverse()) {
-      try {
-        PLATFORM_REVOKE_OBJECT_URL(url);
-      } catch {
-        // Preserve the graph inspection or materialization error.
-      }
-    }
-    throw error;
-  }
 }
 
 function ordinaryArtifactUrl(value, base) {
@@ -3382,9 +1728,6 @@ async function createOrdinaryArtifactObjectUrls(
         ? {}
         : { sourceMediaType: descriptor.sourceMediaType }),
       runtimeRequestUrls: descriptor.runtimeRequestUrls,
-      ...(descriptor.redirectFinalOrigins.length < 1
-        ? {}
-        : { redirectFinalOrigins: descriptor.redirectFinalOrigins }),
     }));
   }
   try {
@@ -3591,18 +1934,15 @@ export function createDbopfsSpeechArtifactStore({
     const metadata = artifactMetadata(authority);
     const names = storageNames(authority, metadata.files);
     const priorSelection = await readJsonFile(names.selection);
-    const legacySelection = await readJsonFile(names.legacyManifest);
-    const priorCount = Math.max(
-      Array.isArray(priorSelection?.files) ? priorSelection.files.length : 0,
-      Array.isArray(legacySelection?.files) ? legacySelection.files.length : 0,
-    );
+    const priorCount = Array.isArray(priorSelection?.files)
+      ? priorSelection.files.length
+      : 0;
     const fileNames = Array.from(
       { length: Math.max(names.files.length, priorCount) },
       (_, index) => `${names.key}.${String(index).padStart(4, "0")}.artifact`,
     );
     const results = await Promise.all([
       removeEntry(names.selection),
-      removeEntry(names.legacyManifest),
       ...fileNames.map(removeEntry),
     ]);
     return results.some(Boolean);

@@ -325,7 +325,7 @@ test('the public package API inventory matches every JavaScript export and MDN e
             ['BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL','const BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL'],
             ['BROWSER_SPEECH_ARTIFACT_PROTOCOL','const BROWSER_SPEECH_ARTIFACT_PROTOCOL'],
             ['createBrowserKokoroProvider','createBrowserKokoroProvider(options={})'],
-            ['createBrowserSpeechArtifactGraph',"createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', security, providerId=null, role, model, runtime, files, edges, transforms }={})"],
+            ['createBrowserSpeechArtifactGraph',"createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', security, providerId=null, role, model, runtime, files }={})"],
             ['createBrowserSpeechAuthority','createBrowserSpeechAuthority({ providerId, role, model, runtime, security }={})'],
             ['createBrowserWhisperProvider','createBrowserWhisperProvider(options={})'],
             ['createDbopfsSpeechArtifactStore',"createDbopfsSpeechArtifactStore({ dbopfs, tableName='arcane_ai_browser_speech', fetchImpl=null, objectUrlFactory=null }={})"]

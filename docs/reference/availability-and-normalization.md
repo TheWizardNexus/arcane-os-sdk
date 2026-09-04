@@ -145,9 +145,8 @@ through the SDK-created DBOPFS adapter.
 Materialized speech graphs use their file inventory as a routing table, not an
 admission policy. Known downloaded imports, fetches, Workers, and cache reads
 route to their materialized URLs; unmapped operations fall through to the
-native browser API with caller options preserved. Edge, transform,
-negative-route, and security records retained for compatibility do not gate the
-ordinary path, and native cache writes are not disabled.
+native browser API with caller options preserved, and native cache writes are
+not disabled.
 
 The projected [`AIProviderRuntime`](runtime-modules.md#aiproviderruntimejs)
 normalizes those browser providers and can admit an externally supplied native

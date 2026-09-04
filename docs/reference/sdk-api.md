@@ -6023,9 +6023,9 @@ role lifecycle and observation, but are not exports of this package subpath.
 ### Overview
 
 Stable protocol identifier for an SDK-created browser speech materialization
-graph. The historical `authenticated` discriminator remains for compatibility;
-it identifies one complete caller-owned runtime, model, and voice routing record
-but grants no provider, model, runtime, voice, network, or license authority.
+graph. The current `authenticated` discriminator identifies one complete
+caller-owned runtime, model, and voice routing record but grants no provider,
+model, runtime, voice, network, or license authority.
 
 ### Value and import
 
@@ -6099,21 +6099,19 @@ those values.
 ### Signature and result
 
 ```text
-createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', security, providerId=null, role, model, runtime, files, edges, transforms }={})
+createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', security, providerId=null, role, model, runtime, files }={})
 ```
 
 `role` is exactly `stt` or `tts`; its model and runtime adapter fields must match
 that role. Files are normalized into one functional path/source inventory, the
 runtime entry and selected ONNX MJS/WASM pair must exist, and TTS voice records
 must identify their selected files. Legal metadata is optional and inert; it is
-never required or interpreted for runtime materialization. `edges` and
-`transforms` remain mutable compatibility metadata and do not gate ordinary
-routing.
+never required or interpreted for runtime materialization.
 
 The result is one mutable `arcane-ai-browser-speech-artifact-graph/1` record
-containing `{protocol,kind,providerId,role,model,runtime,files,edges,transforms,
-security?}`. The historical `kind` and `runtime.moduleGraph` value remains
-`browser-speech-authenticated-artifact-graph` for compatibility.
+containing `{protocol,kind,providerId,role,model,runtime,files,security?}`. The
+current `kind` and `runtime.moduleGraph` value is
+`browser-speech-authenticated-artifact-graph`.
 
 ### Availability and normalization
 

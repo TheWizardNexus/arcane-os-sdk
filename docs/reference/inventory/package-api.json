@@ -2921,10 +2921,10 @@
       ],
       "primaryImport": "arcane-os/ai/browser-speech",
       "group": "Browser speech providers",
-      "summary": "Stable compatibility protocol identifier for a complete caller-owned browser speech materialization graph.",
+      "summary": "Stable protocol identifier for a complete caller-owned browser speech materialization graph.",
       "availability": "Browser metadata; graph construction is side-effect free and provider use requires the selected browser storage and Worker capabilities",
       "protocol": "arcane-ai-browser-speech-artifact-graph/1",
-      "normalization": "Exact compatibility protocol string; the graph file inventory routes known materialized files and does not select artifacts or enforce edge policy"
+      "normalization": "Exact protocol string; the graph file inventory routes known materialized files and does not select artifacts or enforce edge policy"
     },
     {
       "id": "browser-speech:BROWSER_SPEECH_ARTIFACT_PROTOCOL",
@@ -2940,7 +2940,7 @@
       "summary": "Stable protocol identifier for browser speech artifact stores.",
       "availability": "Browser metadata; model/runtime use requires DBOPFS, Web Locks, Workers, and caller-selected artifacts",
       "protocol": "arcane-ai-browser-speech-artifacts/1 over arcane-ai-provider/2",
-      "normalization": "Exact compatibility protocol string; it grants no model authority and names no model download"
+      "normalization": "Exact protocol string; it grants no model authority and names no model download"
     },
     {
       "id": "browser-speech:createBrowserKokoroProvider",
@@ -2963,7 +2963,7 @@
       "name": "createBrowserSpeechArtifactGraph",
       "displayName": "createBrowserSpeechArtifactGraph()",
       "kind": "function",
-      "signature": "createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', security, providerId=null, role, model, runtime, files, edges, transforms }={})",
+      "signature": "createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', security, providerId=null, role, model, runtime, files }={})",
       "entrypoints": [
         "arcane-os/ai/browser-speech"
       ],
@@ -2972,7 +2972,7 @@
       "summary": "Normalizes one complete caller-owned browser speech materialization graph.",
       "availability": "Browser metadata; construction starts no fetch, cache, Worker, provider, or event operation",
       "protocol": "arcane-ai-browser-speech-artifact-graph/1",
-      "normalization": "Returns one mutable graph with normalized file, model, runtime, edge, transform, and routing facts"
+      "normalization": "Returns one mutable graph with normalized file, model, runtime, and routing facts"
     },
     {
       "id": "browser-speech:createBrowserSpeechAuthority",

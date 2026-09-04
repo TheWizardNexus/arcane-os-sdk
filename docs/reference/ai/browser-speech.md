@@ -44,9 +44,9 @@ import {
 Importing this entrypoint downloads nothing, opens no cache, creates no Worker,
 and publishes no event.
 
-## Protocol compatibility
+## Protocol identifiers
 
-These exact strings remain public compatibility discriminators:
+These exact strings identify the current public contracts:
 
 | Subject | Exact value |
 | --- | --- |
@@ -60,10 +60,9 @@ These exact strings remain public compatibility discriminators:
 | Worker error envelope | `arcane-ai-speech-worker-error/1` |
 | Nested module Worker | `arcane-ai-browser-speech-artifact-module-worker/1` |
 
-The word `authenticated` in the existing graph discriminator is historical. It
-does not activate an authentication, admission, or isolation stage. Changing
-that string would break existing consumers, so the SDK retains it only as a
-protocol value.
+The word `authenticated` in the graph discriminator does not activate an
+authentication, admission, or isolation stage. It is the current protocol
+value.
 
 ## `createBrowserSpeechArtifactGraph()`
 
@@ -156,8 +155,7 @@ Each file record uses:
   license?,
   mediaType,
   sourceMediaType?,
-  runtimeRequestUrls?,
-  redirectFinalOrigins?
+  runtimeRequestUrls?
 }
 ```
 
@@ -178,23 +176,8 @@ Runtime file kinds are `runtime-entrypoint-javascript`,
 
 Graph construction requires paths and route aliases to be unambiguous so one
 known URL maps to at most one stored file. The runtime router is independently
-permissive: if ambiguous compatibility metadata nevertheless reaches it, that
+permissive: if ambiguous routing metadata nevertheless reaches it, that
 URL is left unmapped and uses the native browser operation.
-
-### Legacy metadata is inert
-
-`edges`, `transforms`, and `runtime.negativeRuntimeRequestUrls` remain accepted
-and projected for compatibility with existing descriptors. They are inert
-metadata:
-
-- they do not authorize or reject an import, fetch, Worker, or Cache operation;
-- they do not limit methods, target files, branches, or Cache names;
-- they do not install a guard capability or runtime isolation; and
-- a missing, extra, or stale declaration does not block ordinary execution.
-
-New descriptors may omit `edges` and `transforms`. The normalized negative-route
-array is empty. Unknown routes use native browser behavior instead of a local
-synthetic response.
 
 ## `createDbopfsSpeechArtifactStore()`
 
@@ -222,18 +205,17 @@ only existing DBOPFS state. Preparation returns the selected runtime/model
 configuration, `cache` as `installed` or `cached`, object URLs, and a `release()`
 function that revokes the materialized URLs.
 
-`security` is an intent-only compatibility seam. Ordinary preparation does not
+`security` records caller intent only. Ordinary preparation does not
 forward a security payload to the Worker and performs no security work. Passing
-`{secure:true}` does not activate the dormant implementation. Any future
-hardening stage requires a separate user review and an explicit implementation
-change before it may execute.
+`{secure:true}` does not activate hardening. Any future hardening stage requires
+a separate user review and an explicit implementation change before it may execute.
 
 ## Ordinary module routing
 
 Artifact-graph preparation reads each stored JavaScript module, discovers
 ordinary module operations, and materializes the complete stored files as
 object URLs. The prepared runtime retains the existing
-`browser-speech-authenticated-artifact-graph` discriminator for compatibility.
+`browser-speech-authenticated-artifact-graph` discriminator.
 
 The Worker installs one private module router before importing the entrypoint:
 
@@ -265,11 +247,6 @@ cannot interpret a module, that module is left unchanged and follows its native
 URLs. A static-import cycle may likewise retain an original source URL where a
 target has not yet been materialized. These fallbacks preserve functionality;
 they do not silently convert into a rejection policy.
-
-Older private guard, declared-edge, closed-module, typed-array, dynamic-code,
-and Cache-isolation helpers remain dormant source for later review. The ordinary
-load path never calls them. They must not be activated, including for
-`secure:true`, without a separate explicit review with the user.
 
 ## ONNX runtime configuration
 
@@ -443,8 +420,8 @@ Representative stable codes include:
 
 Malformed selected descriptors, missing required files, unreadable responses,
 unsupported provider namespace shapes, and unavailable browser APIs reject at
-their functional owner. Runtime operations are not rejected because a route,
-edge, transform, capability, or security declaration is absent.
+their functional owner. An unmapped runtime route retains the native browser
+operation.
 
 ## Ownership
 
