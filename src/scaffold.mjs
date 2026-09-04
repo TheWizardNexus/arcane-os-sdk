@@ -386,8 +386,6 @@ export async function initWorkspace({
     },async workspaceOperationLease=>{
     const profile=await existingWorkspaceProfile(resolvedRoot);
     const workspaceMode=profile?.workspaceMode??'external';
-    const legacyIntegrated=workspaceMode==='integrated'
-        &&profile.config.browserRuntimeLayout==='integrated-legacy';
     const existingPackage=workspaceMode==='external'
         ?await readExistingPackage(resolvedRoot)
         :null;
@@ -407,7 +405,7 @@ export async function initWorkspace({
             appId,
             displayName,
             appOnly:true,
-            namedImports:!legacyIntegrated,
+            namedImports:true,
             minimumCoreVersion:await integratedCoreVersion(resolvedRoot),
             target,
             appIcon:await scaffoldIcon(target)
@@ -457,24 +455,14 @@ export async function initWorkspace({
             onEvent
         })
         :null;
-    const importMap=legacyIntegrated
-        ?{
-            appId,
-            skipped:true,
-            compatibility:'integrated-legacy',
-            reason:'The canonical integrated Arcane OS root retains its physical two-route browser runtime.'
-        }
-        :await generateImportMap({
-            workspaceRoot:resolvedRoot,
-            appId,
-            appRoot:path.join(resolvedRoot,'apps',appId),
-            workspaceOperationLease,
-            signal,
-            onEvent
-        });
-    if(legacyIntegrated){
-        await emit(onEvent,{type:'import-map.compatibility.skipped',...importMap});
-    }
+    const importMap=await generateImportMap({
+        workspaceRoot:resolvedRoot,
+        appId,
+        appRoot:path.join(resolvedRoot,'apps',appId),
+        workspaceOperationLease,
+        signal,
+        onEvent
+    });
     const result={
         workspaceRoot:resolvedRoot,
         workspaceMode,

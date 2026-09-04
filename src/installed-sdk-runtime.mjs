@@ -1,4 +1,4 @@
-import {lstat,readFile,realpath,rm,stat,writeFile} from 'node:fs/promises';
+import {lstat,readFile,realpath,stat,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {materializeWorkspaceRuntimeContent} from './workspace-runtime.mjs';
 import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
@@ -68,15 +68,6 @@ async function writeWorkspaceLock(lockPath,lock){
     await writeFile(lockPath,`${JSON.stringify(lock,null,2)}\n`,'utf8');
 }
 
-async function removeRetiredInstalledRuntimeReceipt(canonicalRoot){
-    const receiptPath=path.join(
-        canonicalRoot,
-        '.arcane',
-        'installed-sdk-runtime.json'
-    );
-    await rm(receiptPath,{force:true});
-}
-
 export async function materializeInstalledSdkRuntime({
     workspaceRoot,
     sdkPackageSource,
@@ -94,7 +85,6 @@ export async function materializeInstalledSdkRuntime({
         workspaceOperationLease
     },async()=>{
         const authority=await installedSdkAuthority(canonicalRoot,{sdkPackageSource});
-        await removeRetiredInstalledRuntimeReceipt(canonicalRoot);
         const workspaceRuntime=await materializeWorkspaceRuntimeContent({
             workspaceRoot:canonicalRoot,
             runtimeRoot:authority.installation.runtimeRoot,

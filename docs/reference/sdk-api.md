@@ -77,13 +77,11 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `ARCANE_INTEGRATED_PROVIDER_RELATIVE_PATH` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `ARCANE_MACHINE_BUNDLE_VERSION` | constant | `arcane-os` | Identity and protocol constants | Node |
 | `ARCANE_NATIVE_PROVIDER_PATHS` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
-| `ARCANE_PORTABLE_PROVIDER_PATH` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `ARCANE_PROTOCOL` | constant | `arcane-os` | Identity and protocol constants | Node |
 | `ARCANE_UPSTREAM_REPOSITORY` | constant | `arcane-os` | Identity and protocol constants | Node |
 | `ArcaneError` | class | `arcane-os` | Errors | Node |
 | `adaptV1LlmProvider()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser; the wrapped provider retains its own WebGPU, storage, model, and lifecycle requirements |
 | `assertIntegratedNativeToolchain()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
-| `assertIntegratedPortableToolchain()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `assessArcaneOllama()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node; Microsoft NT managed-service assessment |
 | `buildApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `buildTarget()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
@@ -140,11 +138,9 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `loadAppDescriptor()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `loadArcaneIntegratedProvider()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `loadArcaneNativeProvider()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
-| `loadArcanePortableProvider()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `loadRuntimeRelease()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `loadSdkBrowserRuntimeRelease()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `materializeInstalledSdkRuntime()` | function | `arcane-os` | Runtime and app descriptors | Node |
-| `materializeWorkspaceRuntime()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `materializeWorkspaceRuntimeContent()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `NATIVE_BUILD_PLAN_PROTOCOL` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `NATIVE_BUILDER_PROTOCOL` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
@@ -174,7 +170,6 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `repositoryPush()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node; network-assisted Git |
 | `repositoryStatus()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node |
 | `resolveNativeBuildOutputRoot()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
-| `resolvePortableBuildOutputRoot()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `resolveWorkspace()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node |
 | `ROOT_CONFIG_NAME` | constant | `arcane-os/packager` | Packaging and release bundles | Node |
 | `discoverApps()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node |
@@ -191,7 +186,6 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `selectApp()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node |
 | `SpeechPlayback default export` | class | `arcane-os/speech-playback` | Portable runtime modules | Node with injected media adapters, or browser/native WebView media |
 | `SPEECH_PLAYBACK_STATE_EVENT` | constant | `arcane-os/speech-playback` | Portable runtime modules | Node and browser |
-| `SPEECH_VOICE_ALIASES` | constant | `arcane-os/speech-playback` | Portable runtime modules | Node and browser |
 | `SPEECH_VOICE_OPTIONS` | constant | `arcane-os/speech-playback` | Portable runtime modules | Node and browser |
 | `SpeechPlayback` | class | `arcane-os/speech-playback` | Portable runtime modules | Node with injected media adapters, or browser/native WebView media |
 | `splitSpeechText()` | function | `arcane-os/speech-playback` | Portable runtime modules | Node and browser |
@@ -1345,33 +1339,6 @@ import {materializeInstalledSdkRuntime} from 'arcane-os';
 const result=await materializeInstalledSdkRuntime({workspaceRoot});
 ```
 
-## materializeWorkspaceRuntime()
-
-### Overview
-
-Compatibility alias for `materializeWorkspaceRuntimeContent()`.
-
-### Signature and result
-
-```text
-async materializeWorkspaceRuntime(options={})
-```
-
-Import it from `arcane-os`. It forwards the complete options record and returns
-the same materialization result.
-
-### Availability and normalization
-
-**Node.** Complete workspace runtime content. Deep protocol: [Installed SDK runtime materialization](protocols.md#installed-sdk-runtime-materialization).
-
-### Example
-
-```javascript
-import {materializeWorkspaceRuntime} from 'arcane-os';
-
-const result=await materializeWorkspaceRuntime({workspaceRoot});
-```
-
 ## materializeWorkspaceRuntimeContent()
 
 ### Overview
@@ -1572,29 +1539,6 @@ const SPEECH_PLAYBACK_STATE_EVENT
 ```javascript
 import {SPEECH_PLAYBACK_STATE_EVENT} from 'arcane-os/speech-playback';
 console.log(SPEECH_PLAYBACK_STATE_EVENT);
-```
-
-## SPEECH_VOICE_ALIASES
-
-### Overview
-
-Read-only compatibility aliases for canonical speech voice identifiers.
-
-### Signature and result
-
-```text
-const SPEECH_VOICE_ALIASES
-```
-
-### Availability and normalization
-
-**Node and browser.** Provides read-only membership without mutable Set authority.
-
-### Example
-
-```javascript
-import {SPEECH_VOICE_ALIASES} from 'arcane-os/speech-playback';
-console.log(SPEECH_VOICE_ALIASES.has('default'));
 ```
 
 ## SPEECH_VOICE_OPTIONS
@@ -1859,32 +1803,6 @@ import {ARCANE_NATIVE_PROVIDER_PATHS} from 'arcane-os';
 console.log(ARCANE_NATIVE_PROVIDER_PATHS);
 ```
 
-## ARCANE_PORTABLE_PROVIDER_PATH
-
-### Overview
-
-Compatibility alias for the portable provider path.
-
-### Value and import
-
-```text
-const ARCANE_PORTABLE_PROVIDER_PATH
-```
-
-Import it from `arcane-os` or `arcane-os/native-provider`. Treat arrays and records as immutable public values.
-
-### Availability and normalization
-
-**Node; selected browser/native target or provider as documented.** Exact immutable SDK value. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
-
-### Example
-
-```javascript
-import {ARCANE_PORTABLE_PROVIDER_PATH} from 'arcane-os';
-
-console.log(ARCANE_PORTABLE_PROVIDER_PATH);
-```
-
 ## assertIntegratedNativeToolchain()
 
 ### Overview
@@ -1910,34 +1828,6 @@ import {assertIntegratedNativeToolchain} from 'arcane-os';
 
 async function useassertIntegratedNativeToolchain(...arguments_) {
     return assertIntegratedNativeToolchain(...arguments_);
-}
-```
-
-## assertIntegratedPortableToolchain()
-
-### Overview
-
-Portable-target compatibility wrapper for the integrated native checkout assertion.
-
-### Signature and result
-
-```text
-assertIntegratedPortableToolchain(options={})
-```
-
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
-
-### Availability and normalization
-
-**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
-
-### Example
-
-```javascript
-import {assertIntegratedPortableToolchain} from 'arcane-os';
-
-async function useassertIntegratedPortableToolchain(...arguments_) {
-    return assertIntegratedPortableToolchain(...arguments_);
 }
 ```
 
@@ -2218,34 +2108,6 @@ async function useloadArcaneNativeProvider(...arguments_) {
 }
 ```
 
-## loadArcanePortableProvider()
-
-### Overview
-
-Compatibility wrapper that loads the portable native provider.
-
-### Signature and result
-
-```text
-loadArcanePortableProvider(options={})
-```
-
-Import it from `arcane-os` or `arcane-os/native-provider`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
-
-### Availability and normalization
-
-**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
-
-### Example
-
-```javascript
-import {loadArcanePortableProvider} from 'arcane-os';
-
-async function useloadArcanePortableProvider(...arguments_) {
-    return loadArcanePortableProvider(...arguments_);
-}
-```
-
 ## NATIVE_BUILD_PLAN_PROTOCOL
 
 ### Overview
@@ -2351,34 +2213,6 @@ import {resolveNativeBuildOutputRoot} from 'arcane-os';
 
 async function useresolveNativeBuildOutputRoot(...arguments_) {
     return resolveNativeBuildOutputRoot(...arguments_);
-}
-```
-
-## resolvePortableBuildOutputRoot()
-
-### Overview
-
-Portable-target compatibility wrapper for native output-root resolution.
-
-### Signature and result
-
-```text
-resolvePortableBuildOutputRoot(options={})
-```
-
-Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
-
-### Availability and normalization
-
-**Node; selected browser/native target or provider as documented.** Normalized complete plan and result; target-specific artifact detail preserved. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
-
-### Example
-
-```javascript
-import {resolvePortableBuildOutputRoot} from 'arcane-os';
-
-async function useresolvePortableBuildOutputRoot(...arguments_) {
-    return resolvePortableBuildOutputRoot(...arguments_);
 }
 ```
 
@@ -3887,9 +3721,8 @@ Dispatches one named headless SDK operation with normalized acceptance, events, 
 The exact command `'import-map'` dispatches one app-scoped refresh
 across every `.html`/`.htm` file selected by the descriptor's existing
 include/exclude rules and returns `{workspaceRoot, workspaceMode, appId,
-importMap}`. A normal `importMap` value reports the generated imports and
-complete ordered `documentPaths`. The canonical integrated-legacy layout returns its documented skip
-record instead. This route mutates the map artifact and selected managed HTML
+importMap}`. The `importMap` value reports the generated imports and complete
+ordered `documentPaths`. This route mutates the map artifact and selected managed HTML
 documents as one atomic refresh and has no
 supported dry-run.
 
@@ -4068,8 +3901,7 @@ only exact entries such as `arcane/SpeechPlayback`, preserves
 `arcane-os/testing`, resolves supported URL-like compatibility keys, and rejects
 an unmapped `arcane/*` or `#arcane/*` specifier. The compact map
 locator is removed from the child environment before application test code is
-imported. Integrated-legacy testing retains its existing no-map compatibility
-path.
+imported.
 
 ### Signature and result
 
@@ -5230,9 +5062,7 @@ realm's authority.
 The first `source.dispose()`/`destroy()` publishes the final noncancelable
 `arcane.event.source.disposed` occurrence, removes source-owned listeners, frees
 the owner for a new source, and returns `true`; later or reentrant calls return
-`false`. The deprecated `aiRuntimeEvents` export is a frozen, state-free
-EventTarget compatibility view over the AIRuntimeState source, not another event
-owner.
+`false`.
 
 ### Availability and normalization
 

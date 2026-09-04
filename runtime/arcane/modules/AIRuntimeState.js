@@ -82,24 +82,9 @@ const STARTUP_TERMINAL_STATES = new Set([
     'disposed'
 ]);
 
-/**
- * @deprecated Subscribe through the focused runtime helpers or arcaneEvents.
- * This state-free EventTarget compatibility view delegates to the module's
- * canonical source; it does not own a second listener registry or event bus.
- */
-const aiRuntimeEventCompatibilityView = {
-    addEventListener(type, listener, options) {
-        return aiRuntimeEventSource.addEventListener(type, listener, options);
-    },
-    removeEventListener(type, listener, options) {
-        return aiRuntimeEventSource.removeEventListener(type, listener, options);
-    },
-    dispatchEvent(event) {
-        return aiRuntimeEventSource.dispatchEvent(event);
-    }
-};
+const aiRuntimeEventOwner = {};
 const aiRuntimeEventSource = createArcaneEventSource(
-    aiRuntimeEventCompatibilityView,
+    aiRuntimeEventOwner,
     {
         source: 'ai-runtime-state',
         eventTypes: completeValue([
@@ -109,7 +94,6 @@ const aiRuntimeEventSource = createArcaneEventSource(
         ])
     }
 );
-export const aiRuntimeEvents = completeValue(aiRuntimeEventCompatibilityView);
 
 function fail(message) {
     throw new TypeError(`ARCANE_AI_RUNTIME_STATE_INVALID: ${message}`);

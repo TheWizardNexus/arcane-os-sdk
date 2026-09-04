@@ -128,7 +128,6 @@
         "AI_RUNTIME_STARTUP_EVENT",
         "AI_RUNTIME_STATES",
         "AI_RUNTIME_STATE_EVENT",
-        "aiRuntimeEvents",
         "getAIRuntimeState",
         "publishAIRuntimeRoleState",
         "publishAIRuntimeRolesState",
@@ -139,9 +138,9 @@
       ],
       "summary": "Sticky mutable LLM, speech-to-text, and text-to-speech lifecycle snapshots, intents, subscriptions, and startup-settlement barriers.",
       "availability": "Cross-host in-process state contract; actual role readiness remains provider specific",
-      "protocol": "arcane-ai-runtime-state/1 over the per-realm globalThis.arcaneEvents authority; deprecated state-free EventTarget compatibility view",
+      "protocol": "arcane-ai-runtime-state/1 over the per-realm globalThis.arcaneEvents authority",
       "normalization": "Closed monotonic sticky role snapshots, transient lifecycle intents, synchronous current-state replay, AbortSignal cleanup, and startup settlement are normalized; events report state but grant no authority.",
-      "surface": "Protocol/event/role/state constants; deprecated `aiRuntimeEvents` compatibility view; snapshot, state subscribe/publish, intent request/subscribe, and `startAIRuntime({startMuted,startTranscription,signal})` returning `{barrier,settled,cancel}`."
+      "surface": "Protocol/event/role/state constants; snapshot, state subscribe/publish, intent request/subscribe, and `startAIRuntime({startMuted,startTranscription,signal})` returning `{barrier,settled,cancel}`."
     },
     {
       "file": "runtime/arcane/modules/AnsiText.js",
@@ -1156,7 +1155,6 @@
       "kind": "esm",
       "exports": [
         "SPEECH_PLAYBACK_STATE_EVENT",
-        "SPEECH_VOICE_ALIASES",
         "SPEECH_VOICE_OPTIONS",
         "SpeechPlayback",
         "default",
@@ -1166,7 +1164,7 @@
       "availability": "Browser + compatible AI/native bridge",
       "protocol": "AI.fetchTTS or compatible Arcane.speech.synthesize, globalThis.arcaneEvents, Blob URLs, audio element",
       "normalization": "Exact nonblank split/part input strings are preserved in mutable records while playback policy, cancellation, Blob results, and lifecycle state are normalized; provider failures remain external.",
-      "surface": "SpeechPlayback class/default, `SPEECH_PLAYBACK_STATE_EVENT`, voice aliases/options, `splitSpeechText()`, caller-configured playback lifecycle, cancellation, and destroy APIs."
+      "surface": "SpeechPlayback class/default, `SPEECH_PLAYBACK_STATE_EVENT`, `SPEECH_VOICE_OPTIONS`, `splitSpeechText()`, caller-configured playback lifecycle, cancellation, and destroy APIs."
     },
     {
       "file": "runtime/arcane/modules/StaticDocumentCatalog.js",

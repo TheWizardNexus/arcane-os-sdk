@@ -38,8 +38,7 @@ test('public runtime contracts expose complete structural file and content APIs'
         'listSdkBrowserRuntimeFiles',
         'loadSdkBrowserRuntimeRelease',
         'readSdkBrowserRuntimeFile',
-        'materializeWorkspaceRuntimeContent',
-        'materializeWorkspaceRuntime'
+        'materializeWorkspaceRuntimeContent'
     ]){
         assert.equal(typeof sdk[name],'function',`${name} is public.`);
     }

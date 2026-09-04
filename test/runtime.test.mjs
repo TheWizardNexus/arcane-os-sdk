@@ -15,10 +15,7 @@ import {
     loadSdkBrowserRuntimeRelease,
     readSdkBrowserRuntimeFile
 } from '../src/sdk-browser-runtime.mjs';
-import {
-    materializeWorkspaceRuntime,
-    materializeWorkspaceRuntimeContent
-} from '../src/workspace-runtime.mjs';
+import {materializeWorkspaceRuntimeContent} from '../src/workspace-runtime.mjs';
 
 async function fixture(t){
     const root=await mkdtemp(path.join(os.tmpdir(),'arcane-runtime-content-'));
@@ -96,7 +93,4 @@ test('workspace materialization copies every selected source file without alteri
         path.join(selected.workspaceRoot,'arcane','sdk','ai','complete.mjs'),
         'utf8'
     ),selected.browserContent);
-
-    const alias=await materializeWorkspaceRuntime(selected);
-    assert.equal(alias.runtimeRoot,result.runtimeRoot);
 });

@@ -258,11 +258,6 @@ projection. The private `/ARCANE_APP_RELEASE.json` record is not served to
 application code. Malformed projection data fails
 `ARCANE_RUNTIME_PROJECTION_INVALID`.
 
-The canonical integrated-legacy workspace has a deliberate compatibility
-result instead of an artifact: `importMap.skipped` is `true`,
-`importMap.compatibility` is `'integrated-legacy'`, and the reason states that
-the physical two-route browser runtime is retained.
-
 `new` and `init` generate the map during scaffolding. `dev` refreshes all
 selected documents once before binding; non-dry-run `package` refreshes them
 once, then collects the complete release. Packaging does not run tests or
@@ -364,7 +359,6 @@ Node loader honors only exact managed entries, including `arcane/*`,
 `#arcane/*`, reached `arcane-os/*`, and URL-like dependency compatibility keys.
 An unmapped reserved Arcane name is rejected before import. The compact map locator is
 removed from the isolated child's environment before app test code imports.
-Integrated-legacy scope retains its existing no-map compatibility path.
 
 ### Example
 

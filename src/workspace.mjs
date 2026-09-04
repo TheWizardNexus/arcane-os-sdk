@@ -179,18 +179,6 @@ function classifyRootConfig(config){
             include:['components','css','dependencies','entities','img','modules','sdk','security']
         }
     ];
-    const integratedLegacy=[
-        {
-            source:'arcane',
-            destination:'arcane',
-            include:['components','css','entities','img','modules','security']
-        },
-        {
-            source:'node_modules/strong-type',
-            destination:'node_modules/strong-type',
-            include:['index.js','licence','package.json']
-        }
-    ];
     const matches=(expected,{optionalArcaneSecurity=false}={})=>{
         if(routes.length!==expected.length)return false;
         return routes.every(function routeMatches(route,index){
@@ -210,23 +198,17 @@ function classifyRootConfig(config){
         });
     };
     let workspaceMode;
-    let browserRuntimeLayout;
     if(matches(external,{optionalArcaneSecurity:true})){
         workspaceMode='external';
-        browserRuntimeLayout='physical-v1';
     }else if(matches(integrated,{optionalArcaneSecurity:true})){
         workspaceMode='integrated';
-        browserRuntimeLayout='physical-v1';
-    }else if(matches(integratedLegacy)){
-        workspaceMode='integrated';
-        browserRuntimeLayout='integrated-legacy';
     }else{
         fail(`${ROOT_CONFIG_NAME} browser-runtime routes must match the external SDK or integrated Arcane workspace contract.`);
     }
     return completeValue({
         ...validated,
         workspaceMode,
-        browserRuntimeLayout,
+        browserRuntimeLayout:'physical-v1',
         ...(workspaceMode==='external'?{sdkPackageSource:externalPackageSource}:{})
     });
 }
@@ -577,12 +559,9 @@ export async function validateWorkspace({
         });
     }else{
         await add('workspace-runtime',async()=>{
-            const strongType=resolved.config.browserRuntimeLayout==='integrated-legacy'
-                ?path.join('node_modules','strong-type')
-                :path.join('arcane','dependencies','strong-type');
             for(const [relative,label] of [
                 ['arcane','Integrated Arcane runtime'],
-                [strongType,'Integrated strong-type runtime']
+                [path.join('arcane','dependencies','strong-type'),'Integrated strong-type runtime']
             ]){
                 const info=await stat(path.join(resolved.workspaceRoot,relative));
                 if(!info.isDirectory()){

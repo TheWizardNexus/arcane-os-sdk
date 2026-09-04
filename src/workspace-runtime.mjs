@@ -168,7 +168,3 @@ export async function materializeWorkspaceRuntimeContent({
         if(!backedUp||promoted)await removeTemporaryTree(backupRoot);
     }
 }
-
-export async function materializeWorkspaceRuntime(options={}){
-    return materializeWorkspaceRuntimeContent(options);
-}

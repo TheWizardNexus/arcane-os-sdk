@@ -27,8 +27,6 @@ export const ARCANE_NATIVE_PROVIDER_PATHS={
     'android-arm64':[...FIXED_NATIVE_PROVIDER_PATHS['android-arm64']]
 };
 
-export const ARCANE_PORTABLE_PROVIDER_PATH=[...ARCANE_NATIVE_PROVIDER_PATHS.portable];
-
 function fail(message,details){
     throw new ArcaneError(ERROR_CODES.targetUnavailable,message,{details});
 }
@@ -157,11 +155,4 @@ export async function loadArcaneNativeProvider(options={}){
         message:`The Arcane ${String(target)} provider is ready.`
     });
     return pairing;
-}
-
-export function loadArcanePortableProvider(options={}){
-    if(options===null||typeof options!=='object'||Array.isArray(options)){
-        fail('Arcane portable provider options must be an object.');
-    }
-    return loadArcaneNativeProvider({...options,target:'portable'});
 }

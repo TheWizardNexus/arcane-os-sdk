@@ -561,7 +561,7 @@ test('source dispatch preserves canonical order and complete rich local compatib
     const thrown=new Error('owner-local only');
     const richCompatibility={host,thrown,secretMarker:'compatibility-only-marker'};
     const publicDetail={availability:{state:'ready'},count:1};
-    const legacy=[];
+    const direct=[];
     const owner={};
     let sourceListenerThis=null;
     const source=createArcaneEventSource(owner,{
@@ -587,8 +587,8 @@ test('source dispatch preserves canonical order and complete rich local compatib
     const unsubscribeSourceTwo=source.on(type,function observeCompatibilitySecond(){
         order.push('source-two');
     });
-    function observeLegacyPayload(value){legacy.push(value);}
-    arcaneEvents.on(type,observeLegacyPayload);
+    function observeDirectPayload(value){direct.push(value);}
+    arcaneEvents.on(type,observeDirectPayload);
     arcaneEvents.clearHistory();
     arcaneEvents.enableTimeTravel();
     try{
@@ -615,7 +615,7 @@ test('source dispatch preserves canonical order and complete rich local compatib
         assert.equal(publication.occurrence.detail.secretMarker,'compatibility-only-marker');
         assert.equal(publication.occurrence.detail.thrown.message,'owner-local only');
         assert.equal(publication.occurrence.operationId,'operation-source-privacy');
-        assert.deepEqual(legacy,[]);
+        assert.deepEqual(direct,[]);
         assert.match(
             JSON.stringify(arcaneEvents.history),
             /compatibility-only-marker|owner-local only/u
@@ -780,13 +780,13 @@ test('canonical cancellation and one-way DOM projection share one occurrence',()
             }
         );
 
-        const legacySource=source.dispatch(
+        const compatibilitySource=source.dispatch(
             projectType,
-            {message:'legacy source',source:'picker'},
+            {message:'source payload',source:'picker'},
             {publicDetail:{},cancelable:false}
         );
         const acceptingTarget={dispatchEvent(event){projected=event;return true;}};
-        assert.equal(projectArcaneDOMEvent(acceptingTarget,legacySource.occurrence),true);
+        assert.equal(projectArcaneDOMEvent(acceptingTarget,compatibilitySource.occurrence),true);
         assert.equal(projected.detail.source,'picker');
         assert.equal(projected.detail.arcaneSource,source.source);
     }finally{
@@ -868,6 +868,11 @@ test('subscriptions abort, unsubscribe, reenter, and dispose without corrupting 
 test('EventTarget adapters deduplicate listeners and preserve declared cancellation',()=>{
     const centralType='sdk.test.event-target-adapter';
     const sourceType='sdk.test.source-event-target';
+    const sourceOwner={kind:'source-event-target-owner'};
+    const source=createArcaneEventSource(sourceOwner, {
+        source:'sdk.test.source-event-target',
+        eventTypes:[centralType,sourceType]
+    });
     const centralSeen=[];
     function centralListener(occurrence){
         centralSeen.push(occurrence.defaultPrevented);
@@ -876,13 +881,6 @@ test('EventTarget adapters deduplicate listeners and preserve declared cancellat
     arcaneEvents.addEventListener(centralType,centralListener);
     arcaneEvents.addEventListener(centralType,centralListener);
     arcaneEvents.addEventListener(centralType,centralListener,true);
-    const centralInput={
-        type:centralType,
-        detail:{operationId:'operation-event-target',status:'ready'},
-        cancelable:true,
-        defaultPrevented:true,
-        preventDefault(){this.defaultPrevented=true;}
-    };
     try{
         assert.doesNotThrow(function ignoreInvalidCentralListeners(){
             arcaneEvents.addEventListener(centralType,null);
@@ -890,85 +888,63 @@ test('EventTarget adapters deduplicate listeners and preserve declared cancellat
             arcaneEvents.removeEventListener(centralType,null);
             arcaneEvents.removeEventListener(centralType,{});
         });
-        assert.equal(arcaneEvents.dispatchEvent(centralInput),false);
-        assert.deepEqual(centralSeen,[true,true]);
+        assert.equal(
+            source.dispatch(centralType,{}, {publicDetail:{},cancelable:true}).accepted,
+            false
+        );
+        assert.deepEqual(centralSeen,[false,true]);
         arcaneEvents.removeEventListener(centralType,centralListener);
-        centralInput.defaultPrevented=false;
-        assert.equal(arcaneEvents.dispatchEvent(centralInput),false);
-        assert.deepEqual(centralSeen,[true,true,false]);
+        assert.equal(
+            source.dispatch(centralType,{}, {publicDetail:{},cancelable:true}).accepted,
+            false
+        );
+        assert.deepEqual(centralSeen,[false,true,false]);
 
         let onceCalls=0;
         function onceListener(){onceCalls+=1;}
         arcaneEvents.addEventListener(centralType,onceListener,{once:true});
-        arcaneEvents.dispatchEvent(centralInput);
+        source.dispatch(centralType,{}, {publicDetail:{},cancelable:true});
         arcaneEvents.addEventListener(centralType,onceListener,{once:true});
-        arcaneEvents.dispatchEvent(centralInput);
+        source.dispatch(centralType,{}, {publicDetail:{},cancelable:true});
         assert.equal(onceCalls,2);
 
+        assert.doesNotThrow(function ignoreInvalidSourceListeners(){
+            source.addEventListener(sourceType,null);
+            source.addEventListener(sourceType,7);
+            source.removeEventListener(sourceType,null);
+            source.removeEventListener(sourceType,7);
+        });
+        let sourceEvent=null;
+        let sourceListenerThis=null;
+        source.addEventListener(sourceType,function cancelSourceEvent(event){
+            sourceListenerThis=this;
+            sourceEvent=event;
+            event.preventDefault();
+        });
+        const sourceInput={
+            type:sourceType,
+            detail:{value:42},
+            cancelable:true,
+            defaultPrevented:false,
+            preventDefault(){this.defaultPrevented=true;}
+        };
+        assert.equal(source.dispatchEvent(sourceInput),false);
+        assert.equal(sourceInput.defaultPrevented,true);
+        assert.equal(sourceEvent.detail.value,42);
+        assert.equal(sourceListenerThis,sourceOwner);
+        assert.equal(sourceEvent.target,sourceOwner);
+        assert.equal(sourceEvent.currentTarget,sourceOwner);
         assert.throws(
-            function rejectMissingDataDetail(){
-                arcaneEvents.dispatchEvent({type:centralType});
+            function rejectUndeclaredSourceEvent(){
+                source.dispatchEvent({type:'sdk.test.undeclared',detail:{}});
             },
-            function isInvalidDispatchEvent(error){
-                return error?.code==='ARCANE_EVENT_DISPATCH_EVENT_INVALID';
+            function isUndeclared(error){
+                return error?.code==='ARCANE_EVENT_SOURCE_EVENT_TYPE_UNDECLARED';
             }
         );
-        const accessorInput={type:centralType};
-        Object.defineProperty(accessorInput,'detail',{
-            get(){throw new Error('detail getter must not run');}
-        });
-        assert.throws(
-            function rejectAccessorDetail(){arcaneEvents.dispatchEvent(accessorInput);},
-            function isAccessorDispatchInvalid(error){
-                return error?.code==='ARCANE_EVENT_DISPATCH_EVENT_INVALID';
-            }
-        );
-
-        const sourceOwner={kind:'source-event-target-owner'};
-        const source=createArcaneEventSource(sourceOwner, {
-            source:'sdk.test.source-event-target',
-            eventTypes:[sourceType]
-        });
-        try{
-            assert.doesNotThrow(function ignoreInvalidSourceListeners(){
-                source.addEventListener(sourceType,null);
-                source.addEventListener(sourceType,7);
-                source.removeEventListener(sourceType,null);
-                source.removeEventListener(sourceType,7);
-            });
-            let sourceEvent=null;
-            let sourceListenerThis=null;
-            source.addEventListener(sourceType,function cancelSourceEvent(event){
-                sourceListenerThis=this;
-                sourceEvent=event;
-                event.preventDefault();
-            });
-            const sourceInput={
-                type:sourceType,
-                detail:{value:42},
-                cancelable:true,
-                defaultPrevented:false,
-                preventDefault(){this.defaultPrevented=true;}
-            };
-            assert.equal(source.dispatchEvent(sourceInput),false);
-            assert.equal(sourceInput.defaultPrevented,true);
-            assert.equal(sourceEvent.detail.value,42);
-            assert.equal(sourceListenerThis,sourceOwner);
-            assert.equal(sourceEvent.target,sourceOwner);
-            assert.equal(sourceEvent.currentTarget,sourceOwner);
-            assert.throws(
-                function rejectUndeclaredSourceEvent(){
-                    source.dispatchEvent({type:'sdk.test.undeclared',detail:{}});
-                },
-                function isUndeclared(error){
-                    return error?.code==='ARCANE_EVENT_SOURCE_EVENT_TYPE_UNDECLARED';
-                }
-            );
-        }finally{
-            source.dispose();
-        }
     }finally{
         arcaneEvents.removeEventListener(centralType,centralListener,true);
+        source.dispose();
     }
 });
 

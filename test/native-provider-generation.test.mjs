@@ -4,8 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {
-    ARCANE_PORTABLE_PROVIDER_PATH,
-    loadArcanePortableProvider
+    ARCANE_NATIVE_PROVIDER_PATHS,
+    loadArcaneNativeProvider
 } from '../src/native-provider-loader.mjs';
 import {NATIVE_BUILDER_PROTOCOL} from '../src/native-plan.mjs';
 
@@ -25,7 +25,7 @@ function builder(name){
 async function checkout(t){
     const arcaneRoot=await mkdtemp(path.join(os.tmpdir(),'arcane-provider-refresh-'));
     t.after(()=>rm(arcaneRoot,{recursive:true,force:true}));
-    const providerPath=path.join(arcaneRoot,...ARCANE_PORTABLE_PROVIDER_PATH);
+    const providerPath=path.join(arcaneRoot,...ARCANE_NATIVE_PROVIDER_PATHS.portable);
     await mkdir(path.dirname(providerPath),{recursive:true});
     await writeFile(providerPath,'export default {};\n');
     return {arcaneRoot,providerPath};
@@ -35,13 +35,15 @@ test('each provider load uses the current ordinary module result',async t=>{
     const selected=await checkout(t);
     let calls=0;
     const importModule=async()=>({default:builder(`provider-${++calls}`)});
-    const first=await loadArcanePortableProvider({
+    const first=await loadArcaneNativeProvider({
         arcaneRoot:selected.arcaneRoot,
-        importModule
+        importModule,
+        target:'portable'
     });
-    const second=await loadArcanePortableProvider({
+    const second=await loadArcaneNativeProvider({
         arcaneRoot:selected.arcaneRoot,
-        importModule
+        importModule,
+        target:'portable'
     });
     assert.equal(calls,2);
     assert.equal(first.nativeBuilder.name,'provider-1');
@@ -55,8 +57,8 @@ test('concurrent ordinary loads remain independent and complete',async t=>{
     let calls=0;
     const importModule=async()=>({default:builder(`provider-${++calls}`)});
     const [first,second]=await Promise.all([
-        loadArcanePortableProvider({arcaneRoot:selected.arcaneRoot,importModule}),
-        loadArcanePortableProvider({arcaneRoot:selected.arcaneRoot,importModule})
+        loadArcaneNativeProvider({arcaneRoot:selected.arcaneRoot,importModule,target:'portable'}),
+        loadArcaneNativeProvider({arcaneRoot:selected.arcaneRoot,importModule,target:'portable'})
     ]);
     assert.equal(calls,2);
     assert.notEqual(first.nativeBuilder,second.nativeBuilder);

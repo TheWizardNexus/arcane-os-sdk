@@ -137,48 +137,6 @@ async function configureIntegratedWorkspace(workspaceRoot){
     assert.equal(runtimeStrongType.version,'1.1.0');
 }
 
-async function configureLegacyIntegratedWorkspace(workspaceRoot){
-    await mkdir(workspaceRoot,{recursive:true});
-    await writeJson(path.join(workspaceRoot,'package.json'),{
-        name:'arcane-os',
-        private:true,
-        type:'module'
-    });
-    await writeJson(
-        path.join(workspaceRoot,'machine_bundles','arcane-os-machine-bundle','package.json'),
-        {name:'arcane-os-machine-bundle',version:'0.8.12'}
-    );
-    await writeJson(path.join(workspaceRoot,'arcane-packager.json'),{
-        schemaVersion:1,
-        appsRoot:'apps',
-        distRoot:'dist',
-        sharedPayloads:{
-            'browser-runtime':[
-                {
-                    source:'arcane',
-                    destination:'arcane',
-                    include:['components','css','entities','img','modules','security'],
-                    exclude:[]
-                },
-                {
-                    source:'node_modules/strong-type',
-                    destination:'node_modules/strong-type',
-                    include:['index.js','licence','package.json'],
-                    exclude:[]
-                }
-            ]
-        }
-    });
-    await cp(path.join(repositoryRoot,'runtime','arcane'),path.join(workspaceRoot,'arcane'),{
-        recursive:true
-    });
-    await cp(
-        path.join(repositoryRoot,'runtime','strong-type'),
-        path.join(workspaceRoot,'node_modules','strong-type'),
-        {recursive:true}
-    );
-}
-
 test('installed SDK materialization copies the complete alias runtime without byte identity metadata',async t=>{
     const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-installed-runtime-'});
     await writeJson(path.join(workspaceRoot,'package.json'),{
@@ -188,14 +146,12 @@ test('installed SDK materialization copies the complete alias runtime without by
         devDependencies:{'arcane-sdk':`npm:${SDK_NAME}@${SDK_VERSION}`}
     });
     const installedRoot=await installSdkAliasRuntime(workspaceRoot);
-    const legacyRuntimeLock=path.join(workspaceRoot,'arcane.lock.json');
-    const retiredReceipt=path.join(workspaceRoot,'.arcane','installed-sdk-runtime.json');
+    const workspaceRuntimeLock=path.join(workspaceRoot,'arcane.lock.json');
     const preservedWorkspaceEntry=path.join(workspaceRoot,'.arcane','preserved.txt');
-    await writeJson(legacyRuntimeLock,{
+    await writeJson(workspaceRuntimeLock,{
         schemaVersion:1,
         sdk:{name:SDK_NAME,version:'0.2.1'}
     });
-    await writeJson(retiredReceipt,{sdk:{name:SDK_NAME,version:'0.3.1'}});
     await writeFile(preservedWorkspaceEntry,'preserve this workspace entry\n');
 
     const created=await materializeInstalledSdkRuntime({workspaceRoot});
@@ -209,7 +165,7 @@ test('installed SDK materialization copies the complete alias runtime without by
     assert.equal(Object.hasOwn(created,'persistentReceipt'),false);
     assert.equal(Object.hasOwn(created,'receiptPath'),false);
     assert.equal(Object.hasOwn(created,'lockReconciliation'),false);
-    const refreshedLock=JSON.parse(await readFile(legacyRuntimeLock,'utf8'));
+    const refreshedLock=JSON.parse(await readFile(workspaceRuntimeLock,'utf8'));
     assert.deepEqual(refreshedLock,{
         schemaVersion:1,
         sdk:{name:SDK_NAME,version:SDK_VERSION},
@@ -221,21 +177,14 @@ test('installed SDK materialization copies the complete alias runtime without by
             targetAdapter:'arcane-target-adapter/1'
         }
     });
-    assert.equal(created.workspaceLock.path,legacyRuntimeLock);
+    assert.equal(created.workspaceLock.path,workspaceRuntimeLock);
     assert.deepEqual(created.workspaceLock.document,refreshedLock);
-    await assert.rejects(lstat(retiredReceipt),{code:'ENOENT'});
-    assert.equal(
-        await readFile(preservedWorkspaceEntry,'utf8'),
-        'preserve this workspace entry\n'
-    );
 
     const stalePath=path.join(workspaceRoot,'arcane','stale-runtime-file.txt');
     await writeFile(stalePath,'stale\n');
-    await writeJson(retiredReceipt,{sdk:{name:SDK_NAME,version:'0.3.1'}});
     const refreshed=await materializeInstalledSdkRuntime({workspaceRoot});
     assert.equal(refreshed.status,'materialized');
     await assert.rejects(lstat(stalePath),{code:'ENOENT'});
-    await assert.rejects(lstat(retiredReceipt),{code:'ENOENT'});
     assert.equal(
         await readFile(preservedWorkspaceEntry,'utf8'),
         'preserve this workspace entry\n'
@@ -269,65 +218,6 @@ test('application upgrade runs the application npm upgrade without runtime recon
     assert.equal(Object.hasOwn(upgraded,'lockReconciliation'),false);
     assert.equal(await readFile(staleRuntimePath,'utf8'),'stale\n');
     assert.equal(await readFile(reviewPath,'utf8'),'<main>ordinary application content</main>\n');
-});
-
-test('unchanged two-route integrated Arcane workspace keeps legacy dev and package behavior',async t=>{
-    const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-integrated-legacy-'});
-    const appId='legacy-app';
-    await configureLegacyIntegratedWorkspace(workspaceRoot);
-    const initialized=await initializeApplication({
-        workspaceRoot,
-        appId,
-        displayName:'Legacy App'
-    });
-    assert.equal(initialized.workspaceMode,'integrated');
-    assert.equal(initialized.importMap.skipped,true);
-    assert.equal(initialized.importMap.compatibility,'integrated-legacy');
-    const appRoot=path.join(workspaceRoot,'apps',appId);
-    assert.match(
-        await readFile(path.join(appRoot,'modules','App.js'),'utf8'),
-        /from '[.][.][\/][.][.][\/][.][.][\/]arcane\/modules\/ThemeBootstrap[.]js'/u
-    );
-    await assert.rejects(
-        lstat(path.join(appRoot,'modules','arcane.importmap.json')),
-        error=>error?.code==='ENOENT'
-    );
-    const validation=await validateWorkspace({workspaceRoot,appId});
-    assert.equal(validation.config.browserRuntimeLayout,'integrated-legacy');
-    const tested=await testApplication({workspaceRoot,appId});
-    assert.equal(tested.passed,true);
-    assert.equal(tested.skipped,false);
-
-    const development=await developApplication({workspaceRoot,appId,host:'127.0.0.1',port:0});
-    t.after(()=>development.close());
-    developmentOrigin(development);
-    assert.equal(
-        (await request(development,'/node_modules/strong-type/index.js')).status,
-        200
-    );
-    await development.close();
-    await development.lifecycle;
-
-    const packaged=await packageApplication({workspaceRoot,appId});
-    assert.equal(packaged.release.appId,appId);
-    assert.equal(
-        await readFile(path.join(workspaceRoot,'dist',appId,'node_modules','strong-type','index.js'),'utf8'),
-        await readFile(path.join(workspaceRoot,'node_modules','strong-type','index.js'),'utf8')
-    );
-    const built=await buildApplication({workspaceRoot,appId,target:'browser'});
-    assert.equal(built.target,'browser');
-    assert.equal(built.release.appId,appId);
-    const running=await runApplication({
-        workspaceRoot,
-        appId,
-        target:'browser',
-        host:'127.0.0.1',
-        port:0
-    });
-    assert.equal(running.target,'browser');
-    assert.equal(running.verified.verified,true);
-    await running.close();
-    await running.lifecycle;
 });
 
 test('integrated Arcane workspace supports the complete browser app workflow',async t=>{

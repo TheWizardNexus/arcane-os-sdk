@@ -191,15 +191,9 @@ test('the selected npm tarball installs and exposes the public SDK',{
     }));
     await writeConsumerFile(
         consumerRoot,
-        '.arcane/installed-sdk-runtime.json',
-        json({sdk:{name:'arcane-os',version:'0.3.1'}})
-    );
-    await writeConsumerFile(
-        consumerRoot,
         '.arcane/preserved.txt',
         'preserve this workspace entry\n'
     );
-
     const testRoot=path.join(consumerRoot,'test');
     await mkdir(testRoot);
     const capabilityContract=path.join(testRoot,'installed-capability.test.mjs');
@@ -242,10 +236,6 @@ test('installed public SDK entrypoints and runtime materialization are functiona
             targetAdapter:'arcane-target-adapter/1'
         }
     });
-    await assert.rejects(
-        readFile(path.join(workspaceRoot,'.arcane','installed-sdk-runtime.json'),'utf8'),
-        {code:'ENOENT'}
-    );
     assert.equal(
         await readFile(path.join(workspaceRoot,'.arcane','preserved.txt'),'utf8'),
         'preserve this workspace entry\\n'

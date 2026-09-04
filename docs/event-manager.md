@@ -120,16 +120,10 @@ occurrence, and never republishes the DOM event into the authority. It returns `
 without dispatching when the occurrence is already canceled.
 
 The authority also retains `on`, `once`, `off`, `reset`, `emit`, `instrument`,
-and `forward` for legacy direct EventManager-style diagnostics. Those handlers
+and `forward` for direct EventManager-style diagnostics. Those handlers
 are separate from canonical `subscribe()` registrations; `off()` and `reset()`
-cannot remove canonical or source-owned registrations. New SDK publishers must
-use source handles. Authority-level `dispatchEvent()` exists only as a deprecated
-EventTarget compatibility adapter for older `aiRuntimeEvents` callers.
-
-`aiRuntimeEvents` is itself deprecated. It is a state-free
-EventTarget-compatible view over the `AIRuntimeState` source registered with
-this authority; it has no listener registry, `EventTarget`, or lifecycle state
-of its own. New consumers use the focused AIRuntimeState subscription helpers
+cannot remove canonical or source-owned registrations. SDK publishers use
+source handles. AIRuntimeState consumers use the focused subscription helpers
 or `arcaneEvents.subscribe()`.
 
 ## Stable authority failures

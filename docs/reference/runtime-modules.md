@@ -706,7 +706,7 @@ observable without exposing provider transports in application code.
 
 Exact exports: `AI_RUNTIME_INTENT_EVENT`, `AI_RUNTIME_PROTOCOL`,
 `AI_RUNTIME_ROLES`, `AI_RUNTIME_STARTUP_EVENT`, `AI_RUNTIME_STATES`,
-`AI_RUNTIME_STATE_EVENT`, `aiRuntimeEvents`, `getAIRuntimeState`,
+`AI_RUNTIME_STATE_EVENT`, `getAIRuntimeState`,
 `publishAIRuntimeRoleState`, `publishAIRuntimeRolesState`,
 `requestAIRuntimeIntent`, `startAIRuntime`, `subscribeAIRuntimeIntents`, and
 `subscribeAIRuntimeState`.
@@ -716,9 +716,7 @@ busy,operationId,progress,error}`.
 `subscribeAIRuntimeState(listener,{signal=null,emitCurrent=true})` installs its
 subscription and synchronously replays the current mutable snapshot by default;
 `subscribeAIRuntimeIntents(listener,{signal=null})` is future-only. Both return
-one idempotent unsubscribe/dispose closure. `aiRuntimeEvents` is a deprecated,
-state-free EventTarget compatibility view over the same canonical source; it is
-not a second authority and owns no listener registry.
+one idempotent unsubscribe/dispose closure.
 `startAIRuntime({startLanguageModel=true,startMuted=true,startTranscription=false,signal})` returns
 `{barrier,settled,cancel}`: `barrier` settles for requested text-chat startup,
 while `settled` covers every requested role. With `startLanguageModel:false`, a
@@ -2729,11 +2727,11 @@ synthesis, and controls lookahead HTML audio playback.
 
 ### Public surface
 
-`SpeechPlayback` class/default, voice compatibility constants,
+`SpeechPlayback` class/default, `SPEECH_VOICE_OPTIONS`,
 `SPEECH_PLAYBACK_STATE_EVENT`, `splitSpeechText()`, and playback lifecycle APIs.
 
-Exact exports: `SPEECH_PLAYBACK_STATE_EVENT`, `SPEECH_VOICE_ALIASES`,
-`SPEECH_VOICE_OPTIONS`, `SpeechPlayback`, `default`, and `splitSpeechText`.
+Exact exports: `SPEECH_PLAYBACK_STATE_EVENT`, `SPEECH_VOICE_OPTIONS`,
+`SpeechPlayback`, `default`, and `splitSpeechText`.
 
 ```text
 new SpeechPlayback({

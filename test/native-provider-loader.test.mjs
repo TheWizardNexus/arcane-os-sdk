@@ -5,9 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {
     ARCANE_NATIVE_PROVIDER_PATHS,
-    ARCANE_PORTABLE_PROVIDER_PATH,
-    loadArcaneNativeProvider,
-    loadArcanePortableProvider
+    loadArcaneNativeProvider
 } from '../src/native-provider-loader.mjs';
 import {NATIVE_BUILDER_PROTOCOL} from '../src/native-plan.mjs';
 
@@ -34,7 +32,7 @@ async function checkoutFixture(t,target='portable'){
 }
 
 test('native provider paths remain exact first-party checkout paths',()=>{
-    assert.deepEqual(ARCANE_PORTABLE_PROVIDER_PATH,[
+    assert.deepEqual(ARCANE_NATIVE_PROVIDER_PATHS.portable,[
         'machine_bundles','arcane-os-machine-bundle','tools','portable-native-provider.mjs'
     ]);
     assert.equal(ARCANE_NATIVE_PROVIDER_PATHS['windows-x64'].at(-1),'windows-native-provider.mjs');
@@ -44,8 +42,9 @@ test('ordinary provider loading imports the selected module and returns direct b
     const selected=await checkoutFixture(t);
     const builder=provider();
     let imported;
-    const pairing=await loadArcanePortableProvider({
+    const pairing=await loadArcaneNativeProvider({
         arcaneRoot:selected.arcaneRoot,
+        target:'portable',
         async importModule(specifier){
             imported=specifier;
             return {arcaneNativeBuilderProvider:builder};

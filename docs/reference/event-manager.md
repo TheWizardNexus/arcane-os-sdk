@@ -72,13 +72,12 @@ export intentionally, then call `clearHistory()`.
 | DOM interaction and mutation capture | No native DOM | Yes | No | No | DOM activity becomes semantic event-stack records |
 | Event-stack schema | Yes | Yes | Data contract only | Can be transported explicitly by the developer | `arcane-event-stack/1` |
 
-In an external or physical-v1 integrated workspace, the managed browser map
+In an external or integrated workspace, the managed browser map
 resolves `arcane-os/event-manager` to
 `./arcane/sdk/event-manager.mjs` and its private bare dependency
 `event-pubsub` to
-`./arcane/sdk/dependencies/event-pubsub/index.js`. The canonical
-integrated-legacy workspace retains its older physical routes instead. The
-selected Arcane browser runtime does not inject this SDK-authored module into
+`./arcane/sdk/dependencies/event-pubsub/index.js`. The selected Arcane browser
+runtime does not inject this SDK-authored module into
 Shell, Provisioner, Core, or built-in apps. There is no transparent fallback to
 the Node package root, `arcane/1`, HTTP, WebSocket, Ollama, or a cloud event
 service.
@@ -376,16 +375,12 @@ an EventManager, EventTarget, or component-local bus.
 `addEventListener()` and `removeEventListener()` expose EventTarget-shaped
 canonical registration, including function/EventListener-object callbacks,
 type/listener/capture deduplication, `once`, and `signal`. They return
-`undefined`. Authority-level `dispatchEvent()` is a deprecated admission adapter
-for older `aiRuntimeEvents` callers. It accepts an Event-like value with a valid
-type and data `detail`, creates one new occurrence from source
-`event-target-compatibility`, preserves preexisting and observer cancellation,
-and never uses raw `EventManager.emit()` as a parallel path.
+`undefined`.
 
 The inherited `on`, `once`, `off`, `reset`, `emit`, `instrument`, and `forward`
-surface is retained for legacy direct diagnostics. Its registrations are
-separate: source dispatch does not re-emit raw compatibility detail to legacy
-listeners, and legacy `off()`/`reset()` cannot remove canonical or source-owned
+surface supports direct diagnostics. Its registrations are separate: source
+dispatch does not re-emit raw compatibility detail to direct listeners, and
+direct `off()`/`reset()` cannot remove canonical or source-owned
 registrations. New SDK publishers use `createArcaneEventSource()`.
 
 ### Example
@@ -502,8 +497,8 @@ aliases returning an idempotent disposable unsubscribe. `once()` is the
 one-delivery form. `addEventListener()`/`removeEventListener()` use EventTarget
 deduplication, ignore null or non-listener callbacks, and return `undefined`.
 The stricter `on()`/`subscribe()` APIs reject invalid handlers.
-`dispatchEvent(event)` is a compatibility
-adapter that accepts only a declared type, preserves cancellation, and publishes
+`dispatchEvent(event)` is an EventTarget adapter that accepts only a declared
+type, preserves cancellation, and publishes
 a new canonical occurrence rather than the raw input.
 
 `dispose()` is idempotent: the first call publishes the final noncancelable

@@ -269,9 +269,7 @@ export async function runDoctor({
             checks.push(check(
                 'workspace-runtime',
                 'pass',
-                layout==='integrated-legacy'
-                    ?'The legacy integrated Arcane runtime routes are valid.'
-                    :'The integrated physical browser-runtime routes are valid.',
+                'The integrated physical browser-runtime routes are valid.',
                 {details:{layout}}
             ));
         }

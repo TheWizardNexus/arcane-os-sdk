@@ -675,7 +675,6 @@ test('the complete API reference is a first-party generated Pages corpus',async 
         assert.match(decodedCli,/ARCANE_RUNTIME_PROJECTION[.]json/u);
         assert.match(decodedCli,/ARCANE_RUNTIME_PROJECTION_INVALID/u);
         assert.match(decodedCli,/private \/ARCANE_APP_RELEASE[.]json/u);
-        assert.match(decodedCli,/integrated-legacy/u);
         assert.match(cli,/There is no supported <code>--dry-run<\/code> for <code>import-map<\/code>/u);
         assert.match(decodedCli,/no\s+watcher, polling, scheduled refresh, download, or self-update/u);
         for(const code of [

@@ -74,9 +74,7 @@ export {
 export {runDoctor,assessArcaneOllama} from './doctor.mjs';
 export {
     ARCANE_NATIVE_PROVIDER_PATHS,
-    ARCANE_PORTABLE_PROVIDER_PATH,
-    loadArcaneNativeProvider,
-    loadArcanePortableProvider
+    loadArcaneNativeProvider
 } from './native-provider-loader.mjs';
 export {
     ARCANE_INTEGRATED_PROVIDER_RELATIVE_PATH,
@@ -99,7 +97,6 @@ export {
 } from './targets/index.mjs';
 export {
     assertIntegratedNativeToolchain,
-    assertIntegratedPortableToolchain,
     buildApplication,
     bundleApplication,
     checkApplication,
@@ -117,7 +114,6 @@ export {
     planApplication,
     prepareNativeTarget,
     resolveNativeBuildOutputRoot,
-    resolvePortableBuildOutputRoot,
     repositoryApplication,
     runApplication,
     testApplication,
@@ -138,10 +134,7 @@ export {
     loadSdkBrowserRuntimeRelease,
     readSdkBrowserRuntimeFile
 } from './sdk-browser-runtime.mjs';
-export {
-    materializeWorkspaceRuntime,
-    materializeWorkspaceRuntimeContent
-} from './workspace-runtime.mjs';
+export {materializeWorkspaceRuntimeContent} from './workspace-runtime.mjs';
 export {
     discoverApps,
     inspectWorkspaceProfile,

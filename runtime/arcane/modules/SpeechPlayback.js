@@ -29,10 +29,6 @@ const WAV_AUDIO_CONTENT_TYPES=new Set([
 ]);
 const queuesBySpeechClient=new WeakMap();
 
-const SPEECH_VOICE_ALIASES=new Set(
-    SPEECH_VOICE_OPTIONS.map(function voiceAlias(option){return option.value;})
-);
-
 function splitSpeechText(value=''){
     const text=String(value??'');
     return text.trim()?[text]:[];
@@ -866,7 +862,6 @@ class SpeechPlayback{
 }
 
 export {
-    SPEECH_VOICE_ALIASES,
     SPEECH_VOICE_OPTIONS,
     SPEECH_PLAYBACK_STATE_EVENT,
     SpeechPlayback,

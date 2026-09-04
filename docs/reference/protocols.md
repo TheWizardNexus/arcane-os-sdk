@@ -253,10 +253,6 @@ client of `globalThis.Arcane`. Import-map resolution is not a new Arcane wire
 protocol, Core capability, network authority, or provider fallback. Import
 transport and host RPC remain separate layers.
 
-The canonical integrated-legacy Arcane OS root is the documented exception. It
-retains its physical `/arcane` and `/node_modules/strong-type` routes, returns
-an `integrated-legacy` skip result, and does not create the managed map pair.
-
 <details>
 <summary>Refresh lifecycle and managed-file commit behavior</summary>
 

@@ -284,17 +284,6 @@ async function validatePreparedRuntime(prepared,{signal}={}){
 }
 
 async function refreshPreparedImportMap(prepared,{signal,onEvent,workspaceOperationLease}={}){
-    if(prepared.workspaceMode==='integrated'
-        &&prepared.validation.config.browserRuntimeLayout==='integrated-legacy'){
-        const result={
-            appId:prepared.appId,
-            skipped:true,
-            compatibility:'integrated-legacy',
-            reason:'The canonical integrated Arcane OS root retains its physical two-route browser runtime.'
-        };
-        await emit(onEvent,{type:'import-map.compatibility.skipped',...result});
-        return result;
-    }
     const manifest=prepared.validation.app.manifest;
     const inspected=await inspectPackagedApp({
         workspaceRoot:prepared.workspaceRoot,
@@ -389,15 +378,11 @@ export async function doctorApplication(options={}){
 
 async function runPreparedApplicationTests(prepared,options={}){
     throwIfAborted(options.signal);
-    const integratedLegacy=prepared.workspaceMode==='integrated'
-        &&prepared.validation.config.browserRuntimeLayout==='integrated-legacy';
-    const managedImportMapContext=integratedLegacy
-        ?null
-        :await readApplicationTestImportMapContext({
-            workspaceRoot:prepared.workspaceRoot,
-            applicationRoot:prepared.appRoot,
-            signal:options.signal
-        });
+    const managedImportMapContext=await readApplicationTestImportMapContext({
+        workspaceRoot:prepared.workspaceRoot,
+        applicationRoot:prepared.appRoot,
+        signal:options.signal
+    });
     return runApplicationTests({
         workspaceRoot:prepared.workspaceRoot,
         workspaceMode:prepared.workspaceMode,
@@ -701,10 +686,6 @@ export function resolveNativeBuildOutputRoot({target,workspaceMode,workspaceRoot
     return resolved;
 }
 
-export function resolvePortableBuildOutputRoot(options={}){
-    return resolveNativeBuildOutputRoot({...options,target:'portable'});
-}
-
 function sameCanonicalPath(left,right){
     const normalize=value=>{
         const normalized=path.normalize(path.resolve(value));
@@ -721,10 +702,6 @@ export function assertIntegratedNativeToolchain({workspaceMode,workspaceRoot,too
             `An integrated ${target??'native'} build must use the same Arcane OS checkout for --workspace and --arcane-root.`
         );
     }
-}
-
-export function assertIntegratedPortableToolchain(options={}){
-    return assertIntegratedNativeToolchain({...options,target:'portable'});
 }
 
 export async function verifyNativeArtifact(options={}){

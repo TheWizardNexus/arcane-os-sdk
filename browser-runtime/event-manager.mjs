@@ -28,7 +28,6 @@ export const ARCANE_EVENT_AUTHORITY_KIND='arcane-event-authority';
 export const ARCANE_EVENT_SOURCE_KIND='arcane-event-source';
 export const ARCANE_EVENT_LISTENER_ERROR_EVENT='arcane.event.listener.error';
 export const ARCANE_EVENT_SOURCE_DISPOSED_EVENT='arcane.event.source.disposed';
-const ARCANE_EVENT_TARGET_COMPATIBILITY_SOURCE='event-target-compatibility';
 const ARCANE_EVENT_NAME_PATTERN=/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/u;
 const ARCANE_EVENT_CHANNEL_PREFIX='arcane.event.authority.internal:';
 const ARCANE_EVENT_PROJECTION_KEYS=[
@@ -36,7 +35,7 @@ const ARCANE_EVENT_PROJECTION_KEYS=[
 ];
 const ARCANE_EVENT_REQUIRED_AUTHORITY_API=[
     'on','once','off','reset','emit','instrument','forward','subscribe','createSource',
-    'projectDOMEvent','isOccurrence','addEventListener','removeEventListener','dispatchEvent'
+    'projectDOMEvent','isOccurrence','addEventListener','removeEventListener'
 ];
 const EVENT_MANAGER_BUS_ON=Symbol('EventManager.busOn');
 const EVENT_MANAGER_BUS_OFF=Symbol('EventManager.busOff');
@@ -88,7 +87,7 @@ const ARCANE_EVENT_ERRORS={
     ARCANE_EVENT_SUBSCRIPTION_SIGNAL_INVALID:
         'Arcane event subscription signal must be an AbortSignal.',
     ARCANE_EVENT_DISPATCH_EVENT_INVALID:
-        'arcaneEvents.dispatchEvent requires an Event-like object with a valid type and data detail.'
+        'dispatchEvent requires an Event-like object with a valid type and data detail.'
 };
 export const ARCANE_EVENT_ERROR_CODES=Object.fromEntries(
     Object.keys(ARCANE_EVENT_ERRORS).map(code=>[code,code])
@@ -1345,7 +1344,7 @@ function createArcaneEventAuthority(){
     const compatibilityByOccurrence=new WeakMap();
     const sourceRecordByOccurrence=new WeakMap();
     const authorityTargetListeners=[];
-    const legacyListeners=[];
+    const directListeners=[];
     let occurrenceSequence=0;
     let sourceSequence=0;
     let reportingListenerError=false;
@@ -1664,9 +1663,9 @@ function createArcaneEventAuthority(){
         record.unsubscribe();
     }
 
-    function dispatchEventLike(value,sourceRecord=null){
+    function dispatchEventLike(value,sourceRecord){
         const admitted=eventLikeRecord(value);
-        if(sourceRecord&&!sourceRecord.eventTypes.has(admitted.type)){
+        if(!sourceRecord.eventTypes.has(admitted.type)){
             throw eventAuthorityError('ARCANE_EVENT_SOURCE_EVENT_TYPE_UNDECLARED');
         }
         const detail=compatibilityDetail(admitted.detail);
@@ -1679,8 +1678,8 @@ function createArcaneEventAuthority(){
         const publication=dispatchOccurrence({
             type:admitted.type,
             sourceRecord,
-            source:sourceRecord?.source??ARCANE_EVENT_TARGET_COMPATIBILITY_SOURCE,
-            instanceId:sourceRecord?.instanceId??'arcane-source-compatibility',
+            source:sourceRecord.source,
+            instanceId:sourceRecord.instanceId,
             compatibility:detail,
             publicDetail:detail,
             operationId,
@@ -1943,43 +1942,43 @@ function createArcaneEventAuthority(){
         return accepted&&!occurrence.defaultPrevented;
     }
 
-    function safeLegacyOn(type,handler,once=false){
+    function safeDirectOn(type,handler,once=false){
         const admittedType=type==='*'?'*':eventName(type);
         const admitted=eventListener(handler);
         if(typeof once!=='boolean'){
             throw eventAuthorityError('ARCANE_EVENT_SUBSCRIPTION_OPTIONS_INVALID',undefined,TypeError);
         }
         const record={type:admittedType,identity:admitted.identity,wrapper:null};
-        function safeLegacyListener(value,...rest){
-            if(once)removeLegacyRecord(record);
+        function safeDirectListener(value,...rest){
+            if(once)removeDirectRecord(record);
             try{admitted.invoke(value,manager,...rest);}
             catch(error){reportListenerFailure(error,null,null);}
         }
-        record.wrapper=safeLegacyListener;
-        legacyListeners.push(record);
-        manager[EVENT_MANAGER_BUS_ON](admittedType,safeLegacyListener);
+        record.wrapper=safeDirectListener;
+        directListeners.push(record);
+        manager[EVENT_MANAGER_BUS_ON](admittedType,safeDirectListener);
         return manager;
     }
 
-    function removeLegacyRecord(record){
-        const index=legacyListeners.indexOf(record);
+    function removeDirectRecord(record){
+        const index=directListeners.indexOf(record);
         if(index<0)return false;
-        legacyListeners.splice(index,1);
+        directListeners.splice(index,1);
         manager[EVENT_MANAGER_BUS_OFF](record.type,record.wrapper);
         return true;
     }
 
-    function safeLegacyOff(type='*',handler='*'){
+    function safeDirectOff(type='*',handler='*'){
         const admittedType=type==='*'?'*':eventName(type);
-        const selected=legacyListeners.filter(record=>(admittedType==='*'||record.type===admittedType)
+        const selected=directListeners.filter(record=>(admittedType==='*'||record.type===admittedType)
             &&(handler==='*'||record.identity===handler));
         if(handler!=='*')eventListener(handler);
-        for(const record of selected)removeLegacyRecord(record);
+        for(const record of selected)removeDirectRecord(record);
         return manager;
     }
 
-    function safeLegacyReset(){
-        for(const record of [...legacyListeners])removeLegacyRecord(record);
+    function safeDirectReset(){
+        for(const record of [...directListeners])removeDirectRecord(record);
         return manager;
     }
 
@@ -1987,10 +1986,10 @@ function createArcaneEventAuthority(){
         [ARCANE_EVENT_AUTHORITY_BRAND]:ARCANE_EVENT_AUTHORITY_PROTOCOL,
         protocol:ARCANE_EVENT_AUTHORITY_PROTOCOL,
         descriptor,
-        on:safeLegacyOn,
-        once:(type,handler)=>safeLegacyOn(type,handler,true),
-        off:safeLegacyOff,
-        reset:safeLegacyReset,
+        on:safeDirectOn,
+        once:(type,handler)=>safeDirectOn(type,handler,true),
+        off:safeDirectOff,
+        reset:safeDirectReset,
         subscribe,
         createSource,
         projectDOMEvent,
@@ -2007,8 +2006,7 @@ function createArcaneEventAuthority(){
         },
         removeEventListener(type,handler,options){
             removeEventTargetListener(authorityTargetListeners,type,handler,options);
-        },
-        dispatchEvent:value=>dispatchEventLike(value)
+        }
     });
     return manager;
 }

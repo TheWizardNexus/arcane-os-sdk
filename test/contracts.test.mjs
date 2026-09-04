@@ -20,7 +20,6 @@ test('SDK index exposes complete runtime content and structural package contract
         'loadSdkBrowserRuntimeRelease',
         'getSdkBrowserRuntimeRoot',
         'materializeWorkspaceRuntimeContent',
-        'materializeWorkspaceRuntime',
         'discoverPackagerApps',
         'inspectApp',
         'packageApp',

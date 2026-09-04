@@ -242,23 +242,6 @@
       "normalization": "Exact immutable SDK value"
     },
     {
-      "id": "root:ARCANE_PORTABLE_PROVIDER_PATH",
-      "name": "ARCANE_PORTABLE_PROVIDER_PATH",
-      "displayName": "ARCANE_PORTABLE_PROVIDER_PATH",
-      "kind": "constant",
-      "signature": "const ARCANE_PORTABLE_PROVIDER_PATH",
-      "entrypoints": [
-        "arcane-os",
-        "arcane-os/native-provider"
-      ],
-      "primaryImport": "arcane-os",
-      "group": "Targets, native plans, and providers",
-      "summary": "Compatibility alias for the portable provider path.",
-      "availability": "Node; selected browser/native target or provider as documented",
-      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Exact immutable SDK value"
-    },
-    {
       "id": "root:ARCANE_PROTOCOL",
       "name": "ARCANE_PROTOCOL",
       "displayName": "ARCANE_PROTOCOL",
@@ -319,23 +302,6 @@
       "primaryImport": "arcane-os",
       "group": "Targets, native plans, and providers",
       "summary": "Requires an integrated workspace and selected native toolchain root to resolve to the same canonical Arcane checkout.",
-      "availability": "Node; selected browser/native target or provider as documented",
-      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
-    },
-    {
-      "id": "root:assertIntegratedPortableToolchain",
-      "name": "assertIntegratedPortableToolchain",
-      "displayName": "assertIntegratedPortableToolchain()",
-      "kind": "function",
-      "signature": "assertIntegratedPortableToolchain(options={})",
-      "entrypoints": [
-        "arcane-os",
-        "arcane-os/toolchain"
-      ],
-      "primaryImport": "arcane-os",
-      "group": "Targets, native plans, and providers",
-      "summary": "Portable-target compatibility wrapper for the integrated native checkout assertion.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
       "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
@@ -1022,23 +988,6 @@
       "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
     },
     {
-      "id": "root:loadArcanePortableProvider",
-      "name": "loadArcanePortableProvider",
-      "displayName": "loadArcanePortableProvider()",
-      "kind": "function",
-      "signature": "loadArcanePortableProvider(options={})",
-      "entrypoints": [
-        "arcane-os",
-        "arcane-os/native-provider"
-      ],
-      "primaryImport": "arcane-os",
-      "group": "Targets, native plans, and providers",
-      "summary": "Compatibility wrapper that loads the portable native provider.",
-      "availability": "Node; selected browser/native target or provider as documented",
-      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
-    },
-    {
       "id": "root:listRuntimeFiles",
       "name": "listRuntimeFiles",
       "displayName": "listRuntimeFiles()",
@@ -1117,22 +1066,6 @@
       "availability": "Node",
       "protocol": "Installed SDK runtime materialization",
       "normalization": "Complete installed runtime content and a mutable materialization result"
-    },
-    {
-      "id": "root:materializeWorkspaceRuntime",
-      "name": "materializeWorkspaceRuntime",
-      "displayName": "materializeWorkspaceRuntime()",
-      "kind": "function",
-      "signature": "async materializeWorkspaceRuntime(options={})",
-      "entrypoints": [
-        "arcane-os"
-      ],
-      "primaryImport": "arcane-os",
-      "group": "Runtime and app descriptors",
-      "summary": "Compatibility alias for materializeWorkspaceRuntimeContent().",
-      "availability": "Node",
-      "protocol": "Workspace runtime materialization",
-      "normalization": "Complete workspace runtime content and a mutable materialization result"
     },
     {
       "id": "root:materializeWorkspaceRuntimeContent",
@@ -1479,20 +1412,6 @@
       "normalization": "Exact immutable speech-playback-state event name"
     },
     {
-      "id": "speech-playback:SPEECH_VOICE_ALIASES",
-      "name": "SPEECH_VOICE_ALIASES",
-      "displayName": "SPEECH_VOICE_ALIASES",
-      "kind": "constant",
-      "signature": "const SPEECH_VOICE_ALIASES",
-      "entrypoints": ["arcane-os/speech-playback"],
-      "primaryImport": "arcane-os/speech-playback",
-      "group": "Portable runtime modules",
-      "summary": "Read-only compatibility aliases for canonical speech voice identifiers.",
-      "availability": "Node and browser",
-      "protocol": "SpeechPlayback runtime contract",
-      "normalization": "Read-only alias membership without mutable Set authority"
-    },
-    {
       "id": "speech-playback:SPEECH_VOICE_OPTIONS",
       "name": "SPEECH_VOICE_OPTIONS",
       "displayName": "SPEECH_VOICE_OPTIONS",
@@ -1677,23 +1596,6 @@
       "primaryImport": "arcane-os",
       "group": "Targets, native plans, and providers",
       "summary": "Resolves and validates one native output root, including integrated-checkout non-overlap.",
-      "availability": "Node; selected browser/native target or provider as documented",
-      "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
-      "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
-    },
-    {
-      "id": "root:resolvePortableBuildOutputRoot",
-      "name": "resolvePortableBuildOutputRoot",
-      "displayName": "resolvePortableBuildOutputRoot()",
-      "kind": "function",
-      "signature": "resolvePortableBuildOutputRoot(options={})",
-      "entrypoints": [
-        "arcane-os",
-        "arcane-os/toolchain"
-      ],
-      "primaryImport": "arcane-os",
-      "group": "Targets, native plans, and providers",
-      "summary": "Portable-target compatibility wrapper for native output-root resolution.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
       "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"

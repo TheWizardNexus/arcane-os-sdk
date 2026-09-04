@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
 import test from '../src/testing.mjs';
+import {arcaneEvents} from '../src/event-manager.mjs';
 import {
     applyAIResponseLength,
     AI_RESPONSE_LENGTH_DEFAULT,
@@ -27,7 +28,6 @@ import {
     AI_RUNTIME_STARTUP_EVENT,
     AI_RUNTIME_STATE_EVENT,
     AI_RUNTIME_STATES,
-    aiRuntimeEvents,
     getAIRuntimeState,
     publishAIRuntimeRoleState,
     requestAIRuntimeIntent,
@@ -1072,11 +1072,11 @@ test(
             intents.push(intent);
         }
 
-        function observeStateEvent(event) {
-            stateEvents.push(event.detail);
+        function observeStateEvent(occurrence) {
+            stateEvents.push(occurrence.detail);
         }
 
-        aiRuntimeEvents.addEventListener(
+        const unsubscribeStateEvents = arcaneEvents.subscribe(
             AI_RUNTIME_STATE_EVENT,
             observeStateEvent
         );
@@ -1112,7 +1112,13 @@ test(
                 )
             );
             assert.equal(snapshots.at(-1), loading);
-            assert.equal(stateEvents.at(-1), loading);
+            assert.deepEqual(stateEvents.at(-1), {
+                revision: loading.revision,
+                role: 'tts',
+                state: 'loading',
+                operationId: 'tts-load-1',
+                progress: loading.roles.tts.progress
+            });
             assert.equal(loading.roles.llm, initial.roles.llm);
             assert.equal(loading.roles.stt, initial.roles.stt);
             loading.roles.tts.progress.annotation='caller progress annotation';
@@ -1277,11 +1283,11 @@ test(
                 startupIntents.push(intent);
             }
 
-            function observeStartupReport(event) {
-                startupReports.push(event.detail);
+            function observeStartupReport(occurrence) {
+                startupReports.push(occurrence.detail);
             }
 
-            aiRuntimeEvents.addEventListener(
+            const unsubscribeStartupReports = arcaneEvents.subscribe(
                 AI_RUNTIME_STARTUP_EVENT,
                 observeStartupReport
             );
@@ -1411,7 +1417,11 @@ test(
                 assert.equal(barrierReport.roles.llm.state, startSnapshot.roles.llm);
                 assert.equal(barrierReport.roles.stt.state.state, 'unloaded');
                 assert.equal(barrierReport.roles.tts.state, standbyTTS);
-                assert.equal(startupReports.at(-1), barrierReport);
+                assert.deepEqual(startupReports.at(-1), {
+                    revision: barrierReport.currentRevision,
+                    role: 'llm',
+                    state: barrierReport.roles.llm.state.state
+                });
                 barrierReport.context='complete startup report';
                 assert.equal(barrierReport.context,'complete startup report');
                 delete barrierReport.context;
@@ -1515,10 +1525,7 @@ test(
                 unmutedStart.cancel();
             } finally {
                 unsubscribeStartupIntents();
-                aiRuntimeEvents.removeEventListener(
-                    AI_RUNTIME_STARTUP_EVENT,
-                    observeStartupReport
-                );
+                unsubscribeStartupReports();
             }
         } finally {
             stateController.abort();
@@ -1526,10 +1533,7 @@ test(
             unsubscribeState();
             unsubscribeIntents();
             unsubscribeIntents();
-            aiRuntimeEvents.removeEventListener(
-                AI_RUNTIME_STATE_EVENT,
-                observeStateEvent
-            );
+            unsubscribeStateEvents();
         }
     }
 );
