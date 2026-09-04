@@ -812,7 +812,6 @@
       "name": "MailTransport.mjs",
       "kind": "esm",
       "exports": [
-        "DEFAULT_MAIL_REQUEST_TIMEOUT_MS",
         "MailTransportError",
         "normalizeMailEndpoint",
         "serializeMailReport",
@@ -822,7 +821,7 @@
       "availability": "Browser/server with fetch + cloud",
       "protocol": "HTTP(S) fetch + AbortController",
       "normalization": "Endpoint, timeout, cancellation, network, HTTP, and response-contract errors are normalized.",
-      "surface": "Timeout constant, `MailTransportError`, `normalizeMailEndpoint()`, `serializeMailReport()`, and `sendMailReport()`."
+      "surface": "`MailTransportError`, `normalizeMailEndpoint()`, `serializeMailReport()`, and `sendMailReport()`."
     },
     {
       "file": "runtime/arcane/modules/Marked.min.js",

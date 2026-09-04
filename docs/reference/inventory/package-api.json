@@ -3023,20 +3023,6 @@
       "normalization": "Serializes complete caller-selected content, invalidates stale cache selections without byte identities, routes known materialized imports/fetches/Workers/cache reads, falls back to native browser behavior for unmapped operations, and keeps secure intent dormant"
     },
     {
-      "id": "mail:DEFAULT_MAIL_REQUEST_TIMEOUT_MS",
-      "name": "DEFAULT_MAIL_REQUEST_TIMEOUT_MS",
-      "displayName": "DEFAULT_MAIL_REQUEST_TIMEOUT_MS",
-      "kind": "constant",
-      "signature": "const DEFAULT_MAIL_REQUEST_TIMEOUT_MS",
-      "entrypoints": ["arcane-os/mail"],
-      "primaryImport": "arcane-os/mail",
-      "group": "Portable Mail",
-      "summary": "Default timeout selection for one Mail HTTP request.",
-      "availability": "Node and browser with Fetch and AbortController for transport use",
-      "protocol": "Arcane Mail HTTP transport",
-      "normalization": "Exact value null; the ordinary transport adds no request deadline"
-    },
-    {
       "id": "mail:MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS",
       "name": "MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS",
       "displayName": "MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS",

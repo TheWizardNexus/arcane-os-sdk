@@ -1,7 +1,6 @@
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 import MailOutbox from './MailOutbox.mjs';
 import {
-    DEFAULT_MAIL_REQUEST_TIMEOUT_MS,
     sendMailReport,
 } from './MailTransport.mjs';
 
@@ -258,7 +257,7 @@ export function resolveMailConfig(
             : defaultMailEndpoint(location,supplied.baseDomain||declaredMailBaseDomain(document)),
         requestTimeout:Number.isFinite(supplied.requestTimeout)
             ? supplied.requestTimeout
-            : DEFAULT_MAIL_REQUEST_TIMEOUT_MS,
+            : null,
     });
 }
 

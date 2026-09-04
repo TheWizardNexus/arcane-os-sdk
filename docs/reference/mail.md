@@ -39,10 +39,7 @@ import Mail,{
   `MAIL_OUTBOX_TABLE`, `MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS`, and
   `MAIL_OUTBOX_STATES`; and
 - `MailTransportError`, `normalizeMailEndpoint`, `serializeMailReport`,
-  `sendMailReport`, and `DEFAULT_MAIL_REQUEST_TIMEOUT_MS`.
-
-`DEFAULT_MAIL_REQUEST_TIMEOUT_MS` is `null`; it means the ordinary transport
-adds no default deadline.
+  and `sendMailReport`.
 
 This entrypoint contains only the portable browser/WebView runtime, outbox, and
 transport contract. It does not import the Node HTTP gateway or Windows

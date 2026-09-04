@@ -247,7 +247,6 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `isArcaneEventOccurrence()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
 | `parseEventStack()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
 | `projectArcaneDOMEvent()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Browser DOM or a DOM-compatible test host |
-| `DEFAULT_MAIL_REQUEST_TIMEOUT_MS` | constant | `arcane-os/mail` | Portable Mail | Node and browser with Fetch and AbortController for transport use |
 | `MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
 | `MAIL_OUTBOX_PROTOCOL` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
 | `MAIL_OUTBOX_STATES` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
@@ -6405,29 +6404,6 @@ async function synthesizeAfterUserChoice() {
 The `arcane-os/mail` subpath is the dependency-free portable Mail boundary.
 Node credentials, Resend commands, and the loopback gateway remain toolchain
 and CLI responsibilities rather than browser-package exports.
-
-## DEFAULT_MAIL_REQUEST_TIMEOUT_MS
-
-### Overview
-
-Default timeout selection for one Mail HTTP request.
-
-### Value and import
-
-```text
-const DEFAULT_MAIL_REQUEST_TIMEOUT_MS
-```
-
-### Availability and normalization
-
-Node and browser with Fetch and AbortController. The value is `null`, so the
-ordinary transport adds no request deadline.
-
-### Example
-
-```js
-import {DEFAULT_MAIL_REQUEST_TIMEOUT_MS} from 'arcane-os/mail';
-```
 
 ## MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS
 

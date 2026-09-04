@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from '../src/testing.mjs';
 import Mail,{
-    DEFAULT_MAIL_REQUEST_TIMEOUT_MS,
     MAIL_OUTBOX_PROTOCOL,
     Mail as NamedMail,
     MailOutbox,
@@ -15,7 +14,6 @@ import Mail,{
 import * as mailApi from '../src/mail-api.mjs';
 
 const PUBLIC_MAIL_EXPORTS=[
-    'DEFAULT_MAIL_REQUEST_TIMEOUT_MS',
     'MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS',
     'MAIL_OUTBOX_PROTOCOL',
     'MAIL_OUTBOX_STATES',
@@ -43,7 +41,6 @@ test('the portable Mail source entrypoint exposes one exact export contract',fun
     assert.equal(typeof sendMailReport,'function');
     assert.equal(typeof serializeMailReport,'function');
     assert.equal(MAIL_OUTBOX_PROTOCOL,'arcane-mail-outbox/1');
-    assert.equal(DEFAULT_MAIL_REQUEST_TIMEOUT_MS,null);
     for(const method of ['audit','deleteInvalid','quarantineInvalid','repairInvalid']){
         assert.equal(typeof MailOutbox.prototype[method],'function');
     }

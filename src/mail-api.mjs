@@ -12,7 +12,6 @@ export {
     createMailOutbox
 } from '../runtime/arcane/modules/MailOutbox.mjs';
 export {
-    DEFAULT_MAIL_REQUEST_TIMEOUT_MS,
     MailTransportError,
     normalizeMailEndpoint,
     sendMailReport,

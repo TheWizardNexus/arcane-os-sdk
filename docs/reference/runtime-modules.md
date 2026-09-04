@@ -2086,12 +2086,11 @@ Sends one complete mail report to a normalized HTTP(S) endpoint.
 
 ### Public surface
 
-Compatibility timeout constant, `MailTransportError`, `normalizeMailEndpoint()`,
-`serializeMailReport()`, and `sendMailReport()`.
+`MailTransportError`, `normalizeMailEndpoint()`, `serializeMailReport()`, and
+`sendMailReport()`.
 
-Exact exports: `DEFAULT_MAIL_REQUEST_TIMEOUT_MS`,
-`MailTransportError`, `normalizeMailEndpoint`, `serializeMailReport`,
-`sendMailReport`.
+Exact exports: `MailTransportError`, `normalizeMailEndpoint`,
+`serializeMailReport`, `sendMailReport`.
 
 ### Availability and normalization
 

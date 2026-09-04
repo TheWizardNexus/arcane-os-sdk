@@ -1,5 +1,3 @@
-export const DEFAULT_MAIL_REQUEST_TIMEOUT_MS=null;
-
 const REPORT_KEY_PATTERN=/^[a-zA-Z0-9._:-]+$/;
 const REQUEST_ID_PATTERN=/^[a-zA-Z0-9-]+$/;
 const PROVIDER_ID_PATTERN=/^[a-zA-Z0-9._:-]+$/;
@@ -223,7 +221,7 @@ export async function sendMailReport({
     fetchImpl=globalThis.fetch,
     report,
     reportKey,
-    requestTimeout=DEFAULT_MAIL_REQUEST_TIMEOUT_MS,
+    requestTimeout=null,
     serializedReport,
     signal,
 }){
