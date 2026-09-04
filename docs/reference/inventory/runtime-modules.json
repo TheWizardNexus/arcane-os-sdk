@@ -6,11 +6,6 @@
     "commit": "9e657b31f758a2c7943446533fe87afda206ac49",
     "path": "runtime/arcane",
     "sdkVersion": "0.3.4",
-    "legacyProjection": {
-      "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
-      "commit": "c540014afe69f14cf5ae60493b7295f36dbcec64",
-      "bundleVersion": "0.8.12"
-    },
     "protocol": "arcane/1"
   },
   "artifactCount": 84,
@@ -95,11 +90,11 @@
         "applyAIResponseLength",
         "normalizeAIResponseLength"
       ],
-      "summary": "Preserves legacy low/medium/high preference selectors as inert compatibility metadata while leaving complete prompts unchanged.",
+      "summary": "Normalizes low/medium/high response-preference selectors while leaving complete prompts unchanged.",
       "availability": "Cross-host",
       "protocol": "In-process only",
-      "normalization": "Legacy selectors normalize to low, medium, or high; every label is Complete, the instruction is empty, and prompt content remains unchanged.",
-      "surface": "Inert compatibility constants plus `normalizeAIResponseLength()`, `aiResponseLengthInstruction()`, and `applyAIResponseLength()`."
+      "normalization": "Selectors normalize to low, medium, or high; every label is Complete, the instruction is empty, and prompt content remains unchanged.",
+      "surface": "Response-preference constants plus `normalizeAIResponseLength()`, `aiResponseLengthInstruction()`, and `applyAIResponseLength()`."
     },
     {
       "file": "runtime/arcane/modules/AIResponseURLPolicy.js",
@@ -990,7 +985,7 @@
       "summary": "Composes complete configured chat with an existing ChatEntity so each user, assistant, and structural tool turn has an explicit persistence and transport policy.",
       "availability": "Browser or native WebView with the projected ChatEntity, DBOPFS, and a configured chat function or normalized Arcane.ai surface",
       "protocol": "Existing ChatEntity/DBOPFS methods plus provider-neutral chat request/result records",
-      "normalization": "Preserves complete ordinary visible recurring provider history, one active raw structural continuation, every sanitized timestamped transcript record, and arbitrary nonempty caller-owned chat file names; commits live context atomically; falls back from optional streaming to configured non-stream transport; carries per-turn generation options while owning lifecycle callbacks; exposes complete data callbacks; accepts terminal-only structural calls; correlates every observed per-choice call against the exact validated terminal envelope before callback/persistence; atomically settles every pending ID once; and keeps malformed legacy records readable without inventing or rewriting messages.",
+      "normalization": "Preserves complete ordinary visible recurring provider history, one active raw structural continuation, every sanitized timestamped transcript record, and arbitrary nonempty caller-owned chat file names; commits live context atomically; falls back from optional streaming to configured non-stream transport; carries per-turn generation options while owning lifecycle callbacks; exposes complete data callbacks; accepts terminal-only structural calls; correlates every observed per-choice call against the exact validated terminal envelope before callback/persistence; atomically settles every pending ID once; and keeps malformed stored records readable without inventing or rewriting messages.",
       "surface": "Default/named `PersistentAIChatSession`, `createPersistentAIChatSession()`; `create()`, `ai`, `chatEntity`, `fileName`, `ready()`, `history()`, `transcript()`, `settleMemory()`, `send()`, and `stream()`."
     },
     {
@@ -1163,7 +1158,7 @@
       "availability": "Browser + compatible AI/native bridge",
       "protocol": "AI.fetchTTS or compatible Arcane.speech.synthesize, globalThis.arcaneEvents, Blob URLs, audio element",
       "normalization": "Exact nonblank split/part input strings are preserved in mutable records while playback policy, cancellation, Blob results, and lifecycle state are normalized; provider failures remain external.",
-      "surface": "SpeechPlayback class/default, `SPEECH_PLAYBACK_STATE_EVENT`, `SPEECH_VOICE_OPTIONS`, `splitSpeechText()`, caller-configured playback lifecycle, cancellation, and destroy APIs."
+      "surface": "SpeechPlayback class/default, `SPEECH_PLAYBACK_STATE_EVENT`, `SPEECH_VOICE_OPTIONS`, `splitSpeechText()`, canonical playback lifecycle events, cancellation, and destroy APIs."
     },
     {
       "file": "runtime/arcane/modules/StaticDocumentCatalog.js",

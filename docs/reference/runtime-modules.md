@@ -27,7 +27,7 @@ mirrored back into the canonical source.
 
 `arcaneEvents.subscribe(type,handler,{once,signal})` and source-scoped
 `subscribe()`/`on()` registrations return one idempotent unsubscribe function
-(also exposed as `.dispose`). The singleton's legacy `on()`/`once()` methods are
+(also exposed as `.dispose`). The singleton's convenience `on()`/`once()` methods are
 chainable compatibility APIs that return the manager; lifecycle-owned consumers
 use `subscribe()`. Instance `dispose()`/`destroy()` methods remove owned
 listeners, abort owned work, suppress stale settlement, and dispose the instance
@@ -44,7 +44,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`AIPreferenceRuntime.js`](#aipreferenceruntimejs) | esm | Applies and reads non-persistent per-user AI preference overrides. | Cross-host | Normalized six-slot preference state. |
 | [`AIPreferenceTuple.js`](#aipreferencetuplejs) | esm | Normalizes and compares the six provider/model preference slots. | Cross-host | Fully normalized frozen tuple. |
 | [`AIProviderRuntime.js`](#aiproviderruntimejs) | esm | Owns provider-neutral selection, lifecycle, routing, startup, requests, streaming, cancellation, and independent LLM/STT/TTS state. | Cross-host runtime; provider-specific availability | Normalized required provider members plus route/status contracts, with explicit local-only selection and no implicit fallback. |
-| [`AIResponseLength.js`](#airesponselengthjs) | esm | Retains legacy response-preference selectors as inert compatibility metadata while preserving complete prompts. | Cross-host | Legacy selector normalization; prompt content remains unchanged. |
+| [`AIResponseLength.js`](#airesponselengthjs) | esm | Normalizes current low/medium/high response-preference selectors while preserving complete prompts. | Cross-host | Current selector normalization; prompt content remains unchanged. |
 | [`AIResponseURLPolicy.js`](#airesponseurlpolicyjs) | esm | Extracts and audits links from AI Markdown, rendered HTML, CSS, srcset, bare URLs, and email text. | Cross-host | Normalized frozen allowlist audit. |
 | [`AIRuntimeState.js`](#airuntimestatejs) | esm | Publishes sticky mutable role snapshots, lifecycle intents, and startup-settlement barriers. | Cross-host state contract | Closed monotonic state records; events report state but grant no authority. |
 | [`AnsiText.js`](#ansitextjs) | esm | Parses terminal ANSI sequences into display spans or strips them to plain text. | Cross-host | Normalized text/span output. |
@@ -159,9 +159,9 @@ cross-role transitions: each stops queued audio, unloads the current LLM, STT,
 and TTS roles, then applies the replacement configuration. `transitionAI()`
 returns aggregate runtime status; `transitionProviders()` returns the configured
 three-role route configuration. Selected TWiN Cloud `OPENAI` LLM, `OLLAMA` LLM,
-and Core `LOCAL_SPEACH` STT/TTS legacy routes expose truthful capability-only
+and Core `LOCAL_SPEACH` STT/TTS built-in routes expose truthful capability-only
 readiness through internal provider/2 adapters without probing, downloading, or
-hiding a load. Legacy `OPENAI` speech preferences migrate to on-device
+hiding a load. Configured `OPENAI` speech preferences migrate to on-device
 `LOCAL_SPEACH`, with Whisper for STT and Kokoro for TTS. TWiN Cloud availability
 requires the selected LLM route, its model, a credential, and `fetch`; Core speech
 availability requires the exact selected `Arcane.speech.transcribe` or
@@ -211,7 +211,7 @@ selected route, and fills an omitted voice only from the selected model
 catalog's `defaultVoice`. An omitted response format preserves the instance's
 existing `audioFormat` for a compatibility-only catalog. When the selected model
 declares `speech.responseFormats`, that setting is used only when supported; if
-the setting is the legacy `opus` default and the model rejects it, the catalog's
+the setting is the instance's `opus` default and the model rejects it, the catalog's
 `speech.defaultResponseFormat` is used, while any other unsupported setting is
 rejected. It propagates the caller-owned signal and returns a playable `Blob`;
 it does not independently choose a provider, cloud fallback, model, runtime, or
@@ -268,7 +268,7 @@ Partial structural deltas remain private until the matching terminal envelope
 validates. Request observers receive
 `onRequest(request,id,metadata)` and any transport metadata supplied by the
 selected route is forwarded unchanged. Every async native, HTTP, provider, and
-legacy callback is observed before the next callback or terminal settlement.
+built-in callback is observed before the next callback or terminal settlement.
 
 Native Ollama responses are adapted before the shared structural validator:
 provider-native calls may omit `id` and `type` or provide object arguments, so
@@ -645,12 +645,12 @@ console.log(runtime.protocol, runtime.status());
 
 ### Overview
 
-Retains legacy low/medium/high response-preference selectors as inert
-compatibility metadata while preserving complete prompts unchanged.
+Normalizes current low/medium/high response-preference selectors while
+preserving complete prompts unchanged.
 
 ### Public surface
 
-Compatibility constants plus `normalizeAIResponseLength()`,
+Response-preference constants plus `normalizeAIResponseLength()`,
 `aiResponseLengthInstruction()`, and `applyAIResponseLength()`. Every option is
 labeled `Complete`, the instruction helper returns an empty string, and the
 application helper returns its complete `systemPrompt` unchanged.
@@ -659,7 +659,7 @@ Exact exports: `AI_RESPONSE_LENGTH_DEFAULT`, `AI_RESPONSE_LENGTH_OPTIONS`, `aiRe
 
 ### Availability and normalization
 
-**Cross-host.** Legacy selector normalization with no prompt transformation.
+**Cross-host.** Current selector normalization with no prompt transformation.
 Transport: In-process only. [Deep protocol details](protocols.md).
 
 ### Example
@@ -2729,7 +2729,6 @@ new SpeechPlayback({
   voice=null,
   responseFormat=null,
   speed=1,
-  onState=()=>{},
   createObjectURL,
   revokeObjectURL,
   delay,
@@ -2742,8 +2741,8 @@ new SpeechPlayback({
 speed,autoplay=true})` uses only caller-supplied model, voice, and response-format
 values; those three omitted values remain omitted so the selected AI/model
 catalog may provide its documented defaults. Speed defaults to `1`, is normalized
-as a positive number, and is always sent. The legacy voice constants remain
-exported for compatibility but are not selected by the class. There is no
+as a positive number, and is always sent. The exported voice constants remain
+available but are not selected by the class. There is no
 hard-coded model, response format, voice, or cloud/browser fallback.
 `splitSpeechText(value)` uses trimming only to detect blank input, then returns
 the caller's exact string in one mutable array without trimming, splitting, or
@@ -2755,9 +2754,8 @@ Every preparation owns an operation ID and one AbortController for each active
 synthesis segment or playback delay. Replacement,
 `stop()`, `cancel()`, and `destroy()` abort their owned signals, suppress stale
 settlement, release Blob URLs, and publish synchronous
-`speech-playback-state` occurrences through `globalThis.arcaneEvents` before
-calling the compatibility `onState(detail)` callback. Both receive mutable
-public state detail. The detail contains
+`speech-playback-state` occurrences through `globalThis.arcaneEvents`.
+Subscribers receive mutable public state detail. The detail contains
 `state`, `message`, `key`, `index`, `total`, `producing`, `buffered`, `hasAudio`,
 `operationId`, `code`, and `reason`; provider rejection remains preserved to the
 `prepare()` caller. `destroy()` also removes every audio listener and disposes

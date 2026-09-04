@@ -103,11 +103,11 @@ console.log(runtime.protocol,runtime.status());`
     {
         name:'AIResponseLength.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Pure inert compatibility normalization with no prompt, provider, or storage side effects.',
-        paramsResults:'normalizeAIResponseLength(value) accepts legacy low, medium, or high selectors and defaults to medium; every option is labeled Complete. aiResponseLengthInstruction() returns an empty string. applyAIResponseLength(systemPrompt,value) returns the complete systemPrompt unchanged.',
+        lifecycleSideEffects:'Pure response-preference normalization with no prompt, provider, or storage side effects.',
+        paramsResults:'normalizeAIResponseLength(value) accepts low, medium, or high selectors and defaults to medium; every option is labeled Complete. aiResponseLengthInstruction() returns an empty string. applyAIResponseLength(systemPrompt,value) returns the complete systemPrompt unchanged.',
         events:[],
         errors:['TypeError when systemPrompt is not a string'],
-        capabilitiesCore:'Provider-neutral compatibility surface; it does not alter prompts, Core, or provider behavior.',
+        capabilitiesCore:'Provider-neutral preference surface; it does not alter prompts, Core, or provider behavior.',
         example:`const prompt=applyAIResponseLength('Return the complete answer.','low');
 console.log(normalizeAIResponseLength('LOW'),prompt);`
     },

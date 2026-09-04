@@ -329,7 +329,6 @@ class SpeechPlayback{
         voice=null,
         responseFormat=null,
         speed=1,
-        onState=function noop(){},
         createObjectURL,
         revokeObjectURL,
         delay,
@@ -351,7 +350,6 @@ class SpeechPlayback{
                 eventTypes:[SPEECH_PLAYBACK_STATE_EVENT]
             }
         );
-        this.onState=onState;
         this.createObjectURL=createObjectURL||function createAudioURL(blob){return URL.createObjectURL(blob);};
         this.revokeObjectURL=revokeObjectURL||function revokeAudioURL(url){URL.revokeObjectURL(url);};
         this.delay=delay||function playbackDelay(duration,signal){
@@ -441,12 +439,6 @@ class SpeechPlayback{
                     publicDetail:detail
                 }
             );
-        }
-        try{
-            this.onState(detail);
-        }catch(error){
-            if(typeof globalThis.reportError==='function')globalThis.reportError(error);
-            else console.error(error);
         }
         return detail;
     }
@@ -856,7 +848,6 @@ class SpeechPlayback{
         this.audio.removeEventListener('error',this.boundError);
         this.destroyed=true;
         this.events.dispose();
-        this.onState=function destroyedSpeechPlaybackStateObserver(){};
         return true;
     }
 }

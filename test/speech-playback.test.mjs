@@ -76,7 +76,6 @@ test(
         const completeNarration='Complete narration. '.repeat(20_000);
         assert.deepEqual(splitSpeechText(completeNarration),[completeNarration]);
         const requests = [];
-        const states = [];
         const occurrences = [];
         const revoked = [];
         let urlSequence = 0;
@@ -102,9 +101,6 @@ test(
             voice: 'caller-voice',
             responseFormat: 'wav',
             speed: 1.25,
-            onState: function observeCompatibilityState(state) {
-                states.push(state);
-            },
             createObjectURL: function createContractAudioURL(blob) {
                 assert.equal(blob.type, 'audio/wav');
                 urlSequence += 1;
@@ -129,12 +125,11 @@ test(
             responseFormat: 'wav'
         });
         assert.equal(requests[0].signal instanceof AbortSignal, true);
-        assert.equal(states.some(state => state.state === 'ready'), true);
-        assert.equal(states.every(state => !Object.isFrozen(state)), true);
         const playbackReadyOccurrence=occurrences.find(occurrence => (
             occurrence.detail.state === 'ready'
             && occurrence.instanceId === playback.events.descriptor.instanceId
         ));
+        assert.equal(Object.isFrozen(playbackReadyOccurrence?.detail),false);
         assert.equal(
             playbackReadyOccurrence?.operationId,
             `${playback.events.descriptor.instanceId}:playback:1`
@@ -362,9 +357,15 @@ test(
 
         const synthesisError = new Error('The selected synthesizer rejected the request.');
         playback.fail(synthesisError);
-        const failure = states.at(-1);
-        assert.equal(failure.code, 'ARCANE_SPEECH_PLAYBACK_SYNTHESIS_REQUEST_REJECTED');
-        assert.equal(failure.reason, 'speech-synthesis-rejected');
+        const failureOccurrence=occurrences.filter(occurrence => (
+            occurrence.instanceId === playback.events.descriptor.instanceId
+            && occurrence.detail.state === 'error'
+        )).at(-1);
+        assert.equal(
+            failureOccurrence?.detail.code,
+            'ARCANE_SPEECH_PLAYBACK_SYNTHESIS_REQUEST_REJECTED'
+        );
+        assert.equal(failureOccurrence?.detail.reason,'speech-synthesis-rejected');
 
         assert.equal(playback.destroy(), true);
         assert.equal(playback.destroy(), false);
