@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.5.13
+
+- Derive local browser resource queries from the selected SDK package version
+  across managed import maps, runtime materialization, source serving and
+  packaged application resource graphs. Preserve existing query parameters,
+  fragments and ordinary caching; revalidate entry documents on navigation.
+- Carry component and Worker module references through the same versioned
+  paths. Preserve fetched document/attachment content, CSS comments and text,
+  remote URLs, model data and user storage. Existing open documents adopt the
+  new resource graph on ordinary refresh or navigation, without a forced reload.
+
 ## 0.5.12
 
 - Add optional `voice`, `speed`, `pauseAfterMs`, and `waitForPlayback` fields to
