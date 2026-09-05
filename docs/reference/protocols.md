@@ -159,7 +159,7 @@ imports such as:
 import ollama from 'arcane/Ollama';
 ```
 
-The physical-v1 tree lives entirely beneath `arcane/`. SDK `0.5.12` projects the
+The physical-v1 tree lives entirely beneath `arcane/`. SDK `0.5.15` projects the
 complete canonical runtime and browser runtime selected by the installed SDK
 package. Runtime dependencies stay under
 `arcane/dependencies/`; the SDK event and browser-AI closure stays under
@@ -174,7 +174,7 @@ integrated physical route uses the same ordered include list in its one route.
 Omitting only that final optional entry is compatible. Removing, reordering, or
 renaming any preceding entry changes the physical contract.
 
-The `0.5.12` map derives its complete entries from the selected runtime graph;
+The `0.5.15` map derives its complete entries from the selected runtime graph;
 application source imports do not select a fixed entry count. The operation
 result reports `imports`, `entryCount`, and `excludedModules`; reached-file
 traversal remains internal. The
@@ -239,8 +239,8 @@ exactly `dependencyName`, `packageSource`,
 `canonicalPackageRoot`, `packageName`, `packageVersion`, `runtimeRoot`,
 and `browserRuntimeRoot`. A
 workspace may use the canonical dependency name or one exact npm alias such as
-`npm:arcane-os@0.5.12`; the physical package manifest must still identify
-exactly as `arcane-os@0.5.12`. Canonical-plus-alias duplicates, multiple aliases,
+`npm:arcane-os@0.5.15`; the physical package manifest must still identify
+exactly as `arcane-os@0.5.15`. Canonical-plus-alias duplicates, multiple aliases,
 links/junctions, indirect package roots, or version drift are reported.
 
 For external workspaces, `arcane dev` serves the projected `arcane/` root,
@@ -351,7 +351,7 @@ does not silently delete the app-owned cache. A complete whole member supersedes
 its current resumable fragments. Cleanup failure is warned without hiding the
 usable model.
 
-SDK `0.5.12` requires WebGPU. Load requests full offload and waits for the runtime
+SDK `0.5.15` requires WebGPU. Load requests full offload and waits for the runtime
 to report a loaded model. `navigator.gpu` presence alone is
 not readiness. There is no CPU fallback, partial-offload success mode, or
 silent switch to native/Core/cloud inference.

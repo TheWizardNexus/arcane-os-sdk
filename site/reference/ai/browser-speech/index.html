@@ -13,10 +13,10 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../">Overview</a><a href="../../../guides/">Guides</a><a href="../../../examples/">Examples</a><a href="../../../playground/">Playground</a><a href="../../../testing/">Testing</a><a href="../../" aria-current="page">Reference</a><a class="repo-link" href="../../sdk-api/">API</a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">Browser speech providers</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="browser-speech-providers">Browser speech providers</h1><p class="doc-lead">arcane-os/ai/browser-speech is the browser-only SDK boundary for caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It provides artifact storage, live module routing, role Workers, provider/2 adapters, bounded parallel TTS synthesis, audio normalization, cancellation, and cleanup.</p><div class="doc-meta"><span>SDK 0.5.12</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">Browser speech providers</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="browser-speech-providers">Browser speech providers</h1><p class="doc-lead">arcane-os/ai/browser-speech is the browser-only SDK boundary for caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It provides artifact storage, live module routing, role Workers, provider/2 adapters, bounded parallel TTS synthesis, audio normalization, cancellation, and cleanup.</p><div class="doc-meta"><span>SDK 0.5.15</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../">Normalized AI</a><a href="../twin-cloud/">TWiN Cloud quick start</a><a href="../browser-wasm/">Browser-WASM AI</a><a href="./" aria-current="page">Browser speech</a><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../core/">Core map</a><a href="../../core/arcane-api/">Arcane API</a><a href="../../core/capabilities/">Capabilities and admission</a><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../../core/arcane-events/">Events</a><a href="../../core/arcane-ai-contracts/">AI contracts</a><a href="../../core/arcane-entities/">Entity exports</a><a href="../../core/ollama-module/">Ollama internals (advanced)</a><a href="../../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/ai/browser-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#quick-start-say-one-sentence">Quick start: say one sentence</a><a href="#four-synthesis-slots-and-exact-order-playback">Four synthesis slots and exact-order playback</a><a href="#queue-complete-passages-and-wait-for-playback">Queue complete passages and wait for playback</a><a href="#stream-chunks-as-they-arrive">Stream chunks as they arrive</a><a href="#choose-a-device-or-reduce-memory-use">Choose a device or reduce memory use</a><a href="#inspect-the-requested-and-selected-device">Inspect the requested and selected device</a><a href="#stop-mute-cancel-and-release">Stop, mute, cancel, and release</a><a href="#advanced-provider-and-artifact-reference">Advanced provider and artifact reference</a><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-identifiers">Protocol identifiers</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#ordinary-module-routing">Ordinary module routing</a><a href="#onnx-runtime-configuration">ONNX runtime configuration</a><a href="#providers">Providers</a><a href="#lifecycle-and-cancellation">Lifecycle and cancellation</a><a href="#errors">Errors</a><a href="#ownership">Ownership</a><a href="#related">Related</a></nav></details><p><code>arcane-os/ai/browser-speech</code> is the browser-only SDK boundary for
+      <article class="prose reference-prose" data-reference-source="docs/reference/ai/browser-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#quick-start-say-one-sentence">Quick start: say one sentence</a><a href="#developer-diagnostics">Developer diagnostics</a><a href="#four-synthesis-slots-and-exact-order-playback">Four synthesis slots and exact-order playback</a><a href="#play-a-complete-array-with-speechplayback">Play a complete array with SpeechPlayback</a><a href="#queue-complete-passages-and-wait-for-playback">Queue complete passages and wait for playback</a><a href="#stream-chunks-as-they-arrive">Stream chunks as they arrive</a><a href="#choose-a-device-or-reduce-memory-use">Choose a device or reduce memory use</a><a href="#inspect-the-requested-and-selected-device">Inspect the requested and selected device</a><a href="#stop-mute-cancel-and-release">Stop, mute, cancel, and release</a><a href="#advanced-provider-and-artifact-reference">Advanced provider and artifact reference</a><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-identifiers">Protocol identifiers</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#ordinary-module-routing">Ordinary module routing</a><a href="#onnx-runtime-configuration">ONNX runtime configuration</a><a href="#providers">Providers</a><a href="#lifecycle-and-cancellation">Lifecycle and cancellation</a><a href="#errors">Errors</a><a href="#ownership">Ownership</a><a href="#related">Related</a></nav></details><p><code>arcane-os/ai/browser-speech</code> is the browser-only SDK boundary for
 caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It
 provides artifact storage, live module routing, role Workers, provider/2
 adapters, bounded parallel TTS synthesis, audio normalization, cancellation,
@@ -25,7 +25,7 @@ and cleanup.</p>
 <p>Use this in a browser application served by <code>arcane dev</code>, where the generated
 import map resolves <code>arcane/AI</code> and <code>arcane/DBOPFS</code>. These browser modules are
 not Node inference APIs. To create an application:</p>
-<div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npx arcane-os@0.5.12 new hello-speech --path ./hello-speech --target browser
+<div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npx arcane-os@0.5.15 new hello-speech --path ./hello-speech --target browser
 cd hello-speech
 npm install
 npm run dev
@@ -120,6 +120,41 @@ window.addEventListener(&#39;ai-tts-failure&#39;, function reportSpeechFailure(e
 }, { signal: speechEvents.signal });
 </code></pre></div>
 <p>Call <code>speechEvents.abort()</code> when disposing that interface to remove the listener.</p>
+<h2 id="developer-diagnostics">Developer diagnostics</h2>
+<p>The shared logging API and speech traces are available in SDK <code>0.5.14</code>.</p>
+<p>Arcane uses the existing shared <code>user.developer</code> preference for diagnostic
+logging. Enable <strong>developer mode</strong> in the application&#39;s profile settings; the
+logger reads that preference on every emission after the shared user is ready.
+There is no separate speech verbosity or language setting. Ordinary warnings
+and errors remain visible with developer mode disabled.</p>
+<p>Applications can use the same owner for their complete AI requests and parsed
+responses:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import { arcaneLogging } from &#39;arcane-os/logging&#39;;
+
+arcaneLogging.info(&#39;AI request&#39;, request);
+arcaneLogging.info(&#39;AI response&#39;, response);
+</code></pre></div>
+<p><code>arcaneLogging.log</code>, <code>.info</code>, and <code>.debug</code> use the developer preference and
+appear at the browser console&#39;s normal Info level. <code>.warn</code>, <code>.error</code>, and
+failure <code>.trace</code> calls remain visible in either mode. The same logger is
+available as <code>globalThis.arcaneLogging</code>; it stores no diagnostic history.</p>
+<p>Speech diagnostics include complete API inputs and results, selected provider
+and model, exact segment text, voice and speed, generation queue state, Worker
+request IDs and responses, and decoding/playback events. Worker requests are
+copied only for developer diagnostics before native transfer detaches their
+audio buffers; the original request still goes to the Worker unchanged.</p>
+<p>Follow a speech <code>jobId</code> through <code>queue.add</code>, <code>generation.request</code>,
+<code>generation.result</code>, <code>decode.result</code>, <code>playback.scheduled</code>, <code>playback.ended</code>,
+and <code>queue.complete</code>. Cancellation and failure appear as <code>queue.cancelled</code>
+and <code>queue.failed</code>. Each playback record includes the audio clock,
+sample rate, duration, playback rate, and scheduled start/end when available.
+For ready adjacent buffers, <code>gapSeconds</code> is zero on the same audio clock;
+<code>audioEnd</code> marks the end of audio and <code>scheduledEnd</code> includes the caller&#39;s
+requested pause. A positive gap can expose generation arriving too late to
+fill the audio clock continuously. A scheduled event alone does not establish
+that the buffer finished; use its <code>playback.ended</code> event.</p>
+<p>Diagnostics do not change text, voice, speed, language selection, segmentation,
+generation capacity, or playback scheduling. They stay outside chat history.</p>
 <h2 id="four-synthesis-slots-and-exact-order-playback">Four synthesis slots and exact-order playback</h2>
 <p>Capacity 4 means up to four segments synthesize at once. Segment 5 and later
 wait in the SDK&#39;s FIFO queue; they are not dropped. Synthesis may finish out of
@@ -131,6 +166,43 @@ provider directly beyond its capacity returns <code>ARCANE_AI_PROVIDER_BUSY</cod
 Ready adjacent audio buffers use contiguous AudioContext scheduling. Browser
 audio scheduling and selected WebGPU status do not prove physical GPU kernel
 overlap or audio quality. LLM and Whisper/STT capacity remains one.</p>
+<h2 id="play-a-complete-array-with-speechplayback">Play a complete array with <code>SpeechPlayback</code></h2>
+<p>Use this when your application already has complete segments in an array. The
+configured <code>ai</code> below is the same instance created in the quick start.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import SpeechPlayback from &#39;arcane/SpeechPlayback&#39;;
+
+const audio = document.body.appendChild(document.createElement(&#39;audio&#39;));
+audio.controls = true;
+const narration = new SpeechPlayback({audio, speech: ai});
+const speakAll = document.body.appendChild(document.createElement(&#39;button&#39;));
+speakAll.textContent = &#39;Speak all segments&#39;;
+speakAll.addEventListener(&#39;click&#39;, async function speakAllSegments() {
+  await ai.setSpeechMuted(false);
+  await narration.prepare({
+    parts: [
+      &#39;First complete segment.&#39;,
+      &#39;Second complete segment.&#39;,
+      &#39;Third complete segment.&#39;
+    ],
+    autoplay: true
+  });
+});
+</code></pre></div>
+<p><code>prepare()</code> submits all three parts immediately because this <code>ai</code> exposes
+<code>fetchTTS</code> and advertises TTS execution capacity. With the default configuration,
+the provider admits up to four synthesis requests and keeps later requests in
+its FIFO queue. Completed audio remains indexed, so playback is always first,
+second, third even if the third synthesis finishes first.</p>
+<p>This eager path is capability-driven. A native <code>Arcane.speech.synthesize</code>
+client, or a custom client without a positive advertised TTS execution capacity,
+retains serialized synthesis with one lookahead segment. <code>togglePause()</code> pauses
+and resumes the same <code>audio</code> element. <code>stop()</code> cancels all requests owned by the
+playback. <code>replay()</code> keeps completed and pending provider segments and retries
+only failed missing segments.</p>
+<p>The default <code>{device:&#39;auto&#39;,maxConcurrentRequests:4}</code> attempts the full ONNX
+Worker/session pool on WebGPU, then recreates that pool on WASM only if WebGPU
+loading fails. Use the status example below to read <code>selectedDevice</code>; console
+node-assignment warnings alone do not identify the selected execution device.</p>
 <h2 id="queue-complete-passages-and-wait-for-playback">Queue complete passages and wait for playback</h2>
 <p>These options are available in SDK <code>0.5.12</code>.</p>
 <p>For a complete page or passage, call
@@ -824,9 +896,9 @@ this entrypoint.</li>
 <li><a href="../../protocols/#portable-ai-provider-runtime">Protocol architecture</a></li>
 </ul>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#quick-start-say-one-sentence">Quick start: say one sentence</a><a href="#four-synthesis-slots-and-exact-order-playback">Four synthesis slots and exact-order playback</a><a href="#queue-complete-passages-and-wait-for-playback">Queue complete passages and wait for playback</a><a href="#stream-chunks-as-they-arrive">Stream chunks as they arrive</a><a href="#choose-a-device-or-reduce-memory-use">Choose a device or reduce memory use</a><a href="#inspect-the-requested-and-selected-device">Inspect the requested and selected device</a><a href="#stop-mute-cancel-and-release">Stop, mute, cancel, and release</a><a href="#advanced-provider-and-artifact-reference">Advanced provider and artifact reference</a><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-identifiers">Protocol identifiers</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#ordinary-module-routing">Ordinary module routing</a><a href="#onnx-runtime-configuration">ONNX runtime configuration</a><a href="#providers">Providers</a><a href="#lifecycle-and-cancellation">Lifecycle and cancellation</a><a href="#errors">Errors</a><a href="#ownership">Ownership</a><a href="#related">Related</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#quick-start-say-one-sentence">Quick start: say one sentence</a><a href="#developer-diagnostics">Developer diagnostics</a><a href="#four-synthesis-slots-and-exact-order-playback">Four synthesis slots and exact-order playback</a><a href="#play-a-complete-array-with-speechplayback">Play a complete array with SpeechPlayback</a><a href="#queue-complete-passages-and-wait-for-playback">Queue complete passages and wait for playback</a><a href="#stream-chunks-as-they-arrive">Stream chunks as they arrive</a><a href="#choose-a-device-or-reduce-memory-use">Choose a device or reduce memory use</a><a href="#inspect-the-requested-and-selected-device">Inspect the requested and selected device</a><a href="#stop-mute-cancel-and-release">Stop, mute, cancel, and release</a><a href="#advanced-provider-and-artifact-reference">Advanced provider and artifact reference</a><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-identifiers">Protocol identifiers</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#ordinary-module-routing">Ordinary module routing</a><a href="#onnx-runtime-configuration">ONNX runtime configuration</a><a href="#providers">Providers</a><a href="#lifecycle-and-cancellation">Lifecycle and cancellation</a><a href="#errors">Errors</a><a href="#ownership">Ownership</a><a href="#related">Related</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.5.12, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.5.15, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

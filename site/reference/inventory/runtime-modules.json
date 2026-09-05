@@ -5,7 +5,7 @@
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
     "branch": "main",
     "path": "runtime/arcane",
-    "sdkVersion": "0.5.12",
+    "sdkVersion": "0.5.15",
     "protocol": "arcane/1"
   },
   "artifactCount": 84,
@@ -1153,10 +1153,10 @@
         "default",
         "splitSpeechText"
       ],
-      "summary": "Preserves exact nonblank text as one segment without trimming, splitting, or freezing it; queues latest-request synthesis and controls lookahead HTML audio playback.",
+      "summary": "Preserves exact nonblank segment text without trimming, splitting, or freezing it; eagerly submits complete parts to a capacity-advertising fetchTTS provider while keeping playback indexed, and retains serialized one-segment lookahead for other clients.",
       "availability": "Browser + compatible AI/native bridge",
-      "protocol": "AI.fetchTTS or compatible Arcane.speech.synthesize, globalThis.arcaneEvents, Blob URLs, audio element",
-      "normalization": "Exact nonblank split/part input strings are preserved in mutable records while playback policy, cancellation, Blob results, and lifecycle state are normalized; provider failures remain external.",
+      "protocol": "AI.fetchTTS plus providerRuntime TTS execution capacity, or compatible serialized Arcane.speech.synthesize; globalThis.arcaneEvents, Blob URLs, audio element",
+      "normalization": "Exact nonblank split/part input strings are preserved in mutable records. A capable provider receives complete segments immediately and owns bounded FIFO admission; URLs and playback stay in exact input order. Native/custom clients remain serialized. Cancellation, Replay recovery, Blob results, and lifecycle state are normalized; provider failures remain external.",
       "surface": "SpeechPlayback class/default, `SPEECH_PLAYBACK_STATE_EVENT`, `splitSpeechText()`, canonical playback lifecycle events, cancellation, and destroy APIs."
     },
     {

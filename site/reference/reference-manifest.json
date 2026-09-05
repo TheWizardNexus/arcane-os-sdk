@@ -3,16 +3,16 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.5.12",
+    "sdk": "0.5.15",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
   "counts": {
-    "markdownPages": 28,
+    "markdownPages": 29,
     "collectionPages": 2,
     "generatedPages": 86,
     "runtimeModulePages": 84,
-    "htmlPages": 116,
+    "htmlPages": 117,
     "inventories": 4
   },
   "pages": [
@@ -44,6 +44,12 @@
       "source": "docs/reference/arcane-ollama.md",
       "output": "site/reference/arcane-ollama/index.html",
       "route": "reference/arcane-ollama/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/asset-versioning.md",
+      "output": "site/reference/asset-versioning/index.html",
+      "route": "reference/asset-versioning/",
       "kind": "markdown"
     },
     {
@@ -303,7 +309,7 @@
         "reviewedCallables": 17,
         "publicMembers": 36,
         "literalCustomEvents": 0,
-        "directCodedFailures": 36,
+        "directCodedFailures": 32,
         "exportedErrorSubclasses": 0
       }
     },

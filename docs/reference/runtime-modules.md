@@ -2849,8 +2849,9 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Preserves exact nonblank text as one segment, queues latest-request speech
-synthesis, and controls lookahead HTML audio playback.
+Preserves exact nonblank text, admits complete speech segments according to the
+selected client's advertised capacity, and plays indexed HTML audio in exact
+input order.
 
 ### Public surface
 
@@ -2888,6 +2889,26 @@ freezing it. `prepare()` likewise preserves each nonblank part's exact `input`
 string while normalizing its other playback fields into a new mutable record.
 The class applies no part-count, character-count, pause, or input upper cap.
 
+### Admission and playback order
+
+When `speech` exposes both `fetchTTS(payload, signal)` and
+`providerRuntime.status('tts', {execution:true}).execution.maxConcurrentRequests`
+as a positive safe integer, `prepare()` submits every complete `parts` entry
+immediately. `SpeechPlayback` does not create a second limiter: the provider
+runtime owns bounded FIFO admission. Browser Kokoro defaults that capacity to
+four, so up to four segments can synthesize while later submissions wait in the
+provider queue. A later segment may finish first, but its Blob URL stays at its
+original index and is never played ahead of an earlier segment.
+
+If that capacity is absent, invalid, or unavailable, `SpeechPlayback` retains
+the compatible serialized path and prepares only one lookahead segment. This is
+the default for `Arcane.speech.synthesize` and custom clients, so native hosts
+with one synthesis lock are not driven concurrently. Pause and Resume control
+the same supplied `audio` element. Stop aborts every owned synthesis signal and
+releases prepared URLs. Replay keeps completed URLs and still-pending provider
+work, then re-submits only failed missing provider segments before starting
+again from index zero.
+
 Every preparation owns an operation ID and one AbortController for each active
 synthesis segment or playback delay. Replacement,
 `stop()`, `cancel()`, and `destroy()` abort their owned signals, suppress stale
@@ -2895,9 +2916,10 @@ settlement, release Blob URLs, and publish synchronous
 `speech-playback-state` occurrences through `globalThis.arcaneEvents`.
 Subscribers receive mutable public state detail. The detail contains
 `state`, `message`, `key`, `index`, `total`, `producing`, `buffered`, `hasAudio`,
-`operationId`, `code`, and `reason`; provider rejection remains preserved to the
-`prepare()` caller. `destroy()` also removes every audio listener and disposes
-its per-instance canonical source handle; repeated destroy returns
+`operationId`, `code`, and `reason`; a first-segment provider rejection remains
+preserved to the `prepare()` caller. Later failures surface when ordered
+playback reaches that segment. `destroy()` also removes every audio listener
+and disposes its per-instance canonical source handle; repeated destroy returns
 `false`. Signal abortion proves delivery suppression; whether provider work
 actually stops remains the selected provider's cancellation boundary.
 
@@ -2934,22 +2956,37 @@ const audio = document.body.appendChild(document.createElement('audio'));
 audio.controls = true;
 const speech = new SpeechPlayback({
   audio,
-  speech: globalThis.ai,
-  model: 'caller-selected-model',
-  voice: 'caller-selected-voice',
-  responseFormat: 'wav'
+  speech: globalThis.ai
 });
-const speakButton = document.body.appendChild(document.createElement('button'));
-speakButton.type = 'button';
-speakButton.textContent = 'Speak';
-speakButton.addEventListener('click', async () => {
+const button = document.body.appendChild(document.createElement('button'));
+button.textContent = 'Speak';
+button.addEventListener('click', async function speakCompleteSegments() {
+  await globalThis.ai.setSpeechMuted(false);
   await speech.prepare({
-    key: 'ready',
-    parts: ['Arcane is ready.'],
+    parts: [
+      'First complete segment.',
+      'Second complete segment.'
+    ],
     autoplay: true
   });
 });
 ```
+
+With the default browser speech configuration, both parts enter its capacity-4
+queue immediately and still play first, then second. Inspect the selected
+execution device without guessing from console warnings:
+
+```javascript
+const execution = globalThis.ai.providerRuntime.status(
+  'tts',
+  { execution: true }
+).execution;
+console.log(execution.selectedDevice, execution.maxConcurrentRequests);
+```
+
+`requestedDevice:'auto'` attempts the complete ONNX Worker/session pool on
+WebGPU and recreates it on WASM if WebGPU loading fails. The reported selected
+device proves provider selection, not physical GPU kernel overlap.
 
 ## StaticDocumentCatalog.js
 

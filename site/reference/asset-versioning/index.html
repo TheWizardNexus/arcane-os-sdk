@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="The SDK&#39;s public import-map generator, runtime materializer, source server and application packager use the selected SDK package version for local browser resource references. The query field is arcaneVersion. Its value comes from SDK package metadata, not a timestamp, content measurement, or application constant.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/asset-versioning/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Release-derived browser asset URLs · Arcane OS SDK"><meta property="og:description" content="The SDK&#39;s public import-map generator, runtime materializer, source server and application packager use the selected SDK package version for local browser resource references. The query field is arcaneVersion. Its value comes from SDK package metadata, not a timestamp, content measurement, or application constant."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/asset-versioning/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Release-derived browser asset URLs · Arcane OS SDK"><meta name="twitter:description" content="The SDK&#39;s public import-map generator, runtime materializer, source server and application packager use the selected SDK package version for local browser resource references. The query field is arcaneVersion. Its value comes from SDK package metadata, not a timestamp, content measurement, or application constant."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Release-derived browser asset URLs | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../sdk-api/">API</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Release-derived browser asset URLs</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="release-derived-browser-asset-urls">Release-derived browser asset URLs</h1><p class="doc-lead">The SDK&#39;s public import-map generator, runtime materializer, source server and application packager use the selected SDK package version for local browser resource references. The query field is arcaneVersion. Its value comes from SDK package metadata, not a timestamp, content measurement, or application constant.</p><div class="doc-meta"><span>SDK 0.5.15</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/asset-versioning.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#public-tooling">Public tooling</a><a href="#navigation-and-caching">Navigation and caching</a><a href="#scope-and-work">Scope and work</a></nav></details><p>The SDK&#39;s public import-map generator, runtime materializer, source server and
+application packager use the selected SDK package version for local browser
+resource references. The query field is <code>arcaneVersion</code>. Its value comes from
+SDK package metadata, not a timestamp, content measurement, or application
+constant.</p>
+<p>For example, an existing <code>./arcane/modules/HTMLImport.js?v=6#module</code> reference
+retains its application revision and fragment and gains
+<code>&amp;arcaneVersion=${version}</code> before the fragment. Regenerating for another SDK
+release replaces only the <code>arcaneVersion</code> value. Existing query spelling and
+application parameters remain intact.</p>
+<h2 id="public-tooling">Public tooling</h2>
+<ul>
+<li>Run the installed SDK&#39;s <code>materializeInstalledSdkRuntime()</code> to refresh the
+workspace runtime from that installation. Its generated local resource
+references use the installed package version, including npm aliases.</li>
+<li>Run <code>arcane import-map</code> through the installed SDK to regenerate the managed
+import map and its application HTML. Named SDK imports and URL-shaped module
+entries point to versioned resources.</li>
+<li><code>arcane dev</code> applies the same reference transformation to served source
+without editing the source files. An explicit live SDK source mount uses the
+version in that source checkout&#39;s <code>package.json</code>. Otherwise it uses the
+materialized SDK version recorded by the workspace&#39;s existing semantic lock.</li>
+<li>The application packager applies resource versioning after its selected
+adapter finishes. The resulting application can be served by an ordinary
+static host without a JavaScript transformation service.</li>
+</ul>
+<p>The shared transformation edits actual local module imports, resource URL
+construction, HTML resource attributes and CSS resource references. It does not
+change displayed text, prompts, application data, downloaded model content,
+remote provider URLs, or arbitrary strings that happen to resemble filenames.
+Worker entry references and their local module imports are versioned separately:
+Workers do not inherit a document&#39;s import map. <code>HTMLImport</code> carries its own
+release query into local dynamically loaded components and their resources.</p>
+<p>Computed application URLs that have no statically identifiable resource
+reference remain application-owned expressions. The SDK does not intercept
+global <code>fetch</code>, <code>URL</code>, <code>Worker</code>, or DOM APIs. An import-map URL entry can resolve
+an exact matching computed module URL, but is not a wildcard query rule.</p>
+<h2 id="navigation-and-caching">Navigation and caching</h2>
+<p>The SDK server sends <code>Cache-Control: no-cache</code> for application entry/managed
+HTML and managed import-map JSON. This allows storage but requests revalidation, so an ordinary navigation
+or refresh obtains the current entry document and release URLs. Other assets
+retain ordinary caching; no cache or user storage is cleared.</p>
+<p>An independently configured static host must likewise revalidate entry HTML
+and managed import-map JSON. The generated package supplies versioned resource
+references; it cannot configure another server&#39;s HTTP headers.</p>
+<p>An already-open document keeps modules it has evaluated. Versioned references
+take effect on ordinary navigation or refresh; they do not replace live module
+instances, force a reload, restart a model, or erase a conversation. The SDK does
+not retain earlier installed runtime trees after materialization.</p>
+<h2 id="scope-and-work">Scope and work</h2>
+<p>One invocation acts on the selected workspace/application. Runtime
+materialization reuses its existing recursive copy; packaging reuses its
+selected output inventory. Packaging follows resource references from the entry,
+managed application pages and SDK runtime. Source serving recognizes those
+resources and browser script/style/worker requests. Files included only as
+documents or attachments are not transformed merely because they contain HTML,
+JavaScript or CSS. Source serving transforms the requested resource response,
+not the entire workspace, and leaves source files unchanged.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#public-tooling">Public tooling</a><a href="#navigation-and-caching">Navigation and caching</a><a href="#scope-and-work">Scope and work</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.5.15, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

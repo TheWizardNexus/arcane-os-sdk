@@ -13,7 +13,7 @@ import map resolves `arcane/AI` and `arcane/DBOPFS`. These browser modules are
 not Node inference APIs. To create an application:
 
 ```bash
-npx arcane-os@0.5.14 new hello-speech --path ./hello-speech --target browser
+npx arcane-os@0.5.15 new hello-speech --path ./hello-speech --target browser
 cd hello-speech
 npm install
 npm run dev
@@ -179,6 +179,50 @@ provider directly beyond its capacity returns `ARCANE_AI_PROVIDER_BUSY`.
 Ready adjacent audio buffers use contiguous AudioContext scheduling. Browser
 audio scheduling and selected WebGPU status do not prove physical GPU kernel
 overlap or audio quality. LLM and Whisper/STT capacity remains one.
+
+## Play a complete array with `SpeechPlayback`
+
+Use this when your application already has complete segments in an array. The
+configured `ai` below is the same instance created in the quick start.
+
+```javascript
+import SpeechPlayback from 'arcane/SpeechPlayback';
+
+const audio = document.body.appendChild(document.createElement('audio'));
+audio.controls = true;
+const narration = new SpeechPlayback({audio, speech: ai});
+const speakAll = document.body.appendChild(document.createElement('button'));
+speakAll.textContent = 'Speak all segments';
+speakAll.addEventListener('click', async function speakAllSegments() {
+  await ai.setSpeechMuted(false);
+  await narration.prepare({
+    parts: [
+      'First complete segment.',
+      'Second complete segment.',
+      'Third complete segment.'
+    ],
+    autoplay: true
+  });
+});
+```
+
+`prepare()` submits all three parts immediately because this `ai` exposes
+`fetchTTS` and advertises TTS execution capacity. With the default configuration,
+the provider admits up to four synthesis requests and keeps later requests in
+its FIFO queue. Completed audio remains indexed, so playback is always first,
+second, third even if the third synthesis finishes first.
+
+This eager path is capability-driven. A native `Arcane.speech.synthesize`
+client, or a custom client without a positive advertised TTS execution capacity,
+retains serialized synthesis with one lookahead segment. `togglePause()` pauses
+and resumes the same `audio` element. `stop()` cancels all requests owned by the
+playback. `replay()` keeps completed and pending provider segments and retries
+only failed missing segments.
+
+The default `{device:'auto',maxConcurrentRequests:4}` attempts the full ONNX
+Worker/session pool on WebGPU, then recreates that pool on WASM only if WebGPU
+loading fails. Use the status example below to read `selectedDevice`; console
+node-assignment warnings alone do not identify the selected execution device.
 
 ## Queue complete passages and wait for playback
 

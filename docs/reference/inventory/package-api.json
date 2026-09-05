@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.5.14",
+  "sdkVersion": "0.5.15",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
@@ -1392,10 +1392,10 @@
       "entrypoints": ["arcane-os/speech-playback"],
       "primaryImport": "arcane-os/speech-playback",
       "group": "Portable runtime modules",
-      "summary": "Default binding for the canonical SpeechPlayback runtime class in Node and managed browsers.",
+      "summary": "Default binding for the canonical SpeechPlayback runtime class, with capability-gated eager provider submission and exact-order playback.",
       "availability": "Node with injected media adapters, or browser/native WebView media",
       "protocol": "SpeechPlayback runtime contract",
-      "normalization": "Binding identity and namespace come directly from the canonical runtime module"
+      "normalization": "Binding identity and namespace come directly from the canonical runtime module; a fetchTTS client with positive advertised TTS execution capacity receives all complete segments immediately while its provider owns bounded admission and SpeechPlayback retains indexed order; other clients remain serialized"
     },
     {
       "id": "speech-playback:SPEECH_PLAYBACK_STATE_EVENT",
@@ -1420,10 +1420,10 @@
       "entrypoints": ["arcane-os/speech-playback"],
       "primaryImport": "arcane-os/speech-playback",
       "group": "Portable runtime modules",
-      "summary": "Named binding for the same canonical class exposed as the subpath default.",
+      "summary": "Named binding for the same capability-aware, exact-order canonical class exposed as the subpath default.",
       "availability": "Node with injected media adapters, or browser/native WebView media",
       "protocol": "SpeechPlayback runtime contract",
-      "normalization": "Binding identity equals the default export; prepare preserves each nonblank part input exactly without trimming, splitting, or freezing it; provider and media availability remain host-owned"
+      "normalization": "Binding identity equals the default export; prepare preserves each nonblank part input exactly without trimming, splitting, or freezing it; provider-advertised capacity enables eager submission while the provider owns its bound, native and custom clients remain serialized, and media availability remains host-owned"
     },
     {
       "id": "speech-playback:splitSpeechText",

@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 0.5.15
+
+- Let `SpeechPlayback.prepare()` submit every complete segment immediately when
+  an `AI.fetchTTS` client advertises positive TTS execution capacity. The AI
+  provider queue retains bounded FIFO admission (four synthesis slots by
+  default), while indexed Blob URLs keep playback in exact input order even
+  when later segments finish first.
+- Preserve the serialized one-segment-lookahead path for native and custom
+  speech clients that do not advertise provider execution capacity. Pause and
+  Resume keep the same audio element; Stop aborts all owned synthesis; Replay
+  retains completed and pending provider segments while retrying only failed
+  missing segments, including failures with falsy rejection values.
+- Add basic copyable `SpeechPlayback` examples and synchronize the installed
+  reference, current release identities, generated documentation site, and
+  focused behavioral contract source for the new admission model.
+
 ## 0.5.14
 
 - Add the shared `arcane-os/logging` console owner using the existing

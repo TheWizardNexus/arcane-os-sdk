@@ -18,7 +18,7 @@ This table is the Node `package.json#exports` map: it defines package
 entrypoints for SDK/tooling code. It is distinct from the generated browser
 import map that resolves application-facing `arcane/*` modules and the focused
 EventManager entry. See [browser runtime delivery](protocols.md#browser-runtime-delivery)
-for the installed-inventory-derived physical-runtime contract in SDK `0.5.14`.
+for the installed-inventory-derived physical-runtime contract in SDK `0.5.15`.
 
 | Specifier | Purpose |
 | --- | --- |
@@ -751,7 +751,7 @@ deterministic map. The package root also contains the public
 {
   schemaVersion: 1,
   kind: 'arcane-app-runtime-projection',
-  sdkVersion: '0.5.14',
+  sdkVersion: '0.5.15',
   pathPrefix: 'arcane/',
   files: [{path}]
 }
@@ -1500,6 +1500,14 @@ specifier `arcane-os/speech-playback` works in Node package consumers and maps
 to the same runtime module in managed browsers. `arcane/SpeechPlayback` is the
 direct browser runtime name generated into the managed import map.
 
+When the supplied `speech` client has `fetchTTS` and reports a positive
+`providerRuntime.status('tts', {execution:true}).execution.maxConcurrentRequests`,
+`prepare()` submits every complete part immediately. The provider owns its
+bounded FIFO queue (browser Kokoro defaults to four), while Blob URLs and
+playback remain in exact input order. A native or custom client without that
+advertised capacity stays serialized with one lookahead. Replay keeps completed
+URLs and pending requests while retrying failed missing provider segments.
+
 ### Signature and result
 
 ```text
@@ -1516,7 +1524,18 @@ runtime module; provider and media availability remain host-owned.
 
 ```javascript
 import SpeechPlayback from 'arcane-os/speech-playback';
-const playback=new SpeechPlayback({audio,speech});
+
+const audio=document.body.appendChild(document.createElement('audio'));
+const playback=new SpeechPlayback({audio,speech:globalThis.ai});
+const button=document.body.appendChild(document.createElement('button'));
+button.textContent='Speak';
+button.addEventListener('click',async function speakCompleteSegments(){
+  await globalThis.ai.setSpeechMuted(false);
+  await playback.prepare({
+    parts:['First complete segment.','Second complete segment.'],
+    autoplay:true
+  });
+});
 ```
 
 ## SPEECH_PLAYBACK_STATE_EVENT
@@ -1546,7 +1565,9 @@ console.log(SPEECH_PLAYBACK_STATE_EVENT);
 
 ### Overview
 
-Named binding for the same canonical class exposed as the speech-playback default. `prepare()` preserves each nonblank part's exact input string without trimming, splitting, or freezing that content.
+Named binding for the same capability-aware, exact-order canonical class exposed
+as the speech-playback default. `prepare()` preserves each nonblank part's exact
+input string without trimming, splitting, or freezing that content.
 
 ### Signature and result
 
@@ -1557,7 +1578,9 @@ new SpeechPlayback(options={})
 ### Availability and normalization
 
 **Node with injected media adapters, or browser/native WebView media.** Binding
-identity equals the default export; provider and media availability remain host-owned.
+identity equals the default export. Provider-advertised capacity enables eager
+submission while that provider owns its bound; native and custom speech stays
+serialized, and media availability remains host-owned.
 
 ### Example
 
@@ -3440,7 +3463,7 @@ workspace it additionally returns the exact installed package authority:
     packageSource,
     canonicalPackageRoot,
     packageName: 'arcane-os',
-    packageVersion: '0.5.14',
+    packageVersion: '0.5.15',
     runtimeRoot,
     browserRuntimeRoot
   }
@@ -3448,9 +3471,9 @@ workspace it additionally returns the exact installed package authority:
 ```
 
 The dependency can be named `arcane-os` or be one exact npm alias for
-`npm:arcane-os@0.5.14`. The selected installation must still be one direct,
+`npm:arcane-os@0.5.15`. The selected installation must still be one direct,
 physical, non-link package directory whose manifest identifies exactly as
-`arcane-os@0.5.14`; duplicate canonical/alias declarations reject.
+`arcane-os@0.5.15`; duplicate canonical/alias declarations reject.
 `allowMissingManagedImportMap` is an internal packaging/development seam. An
 ordinary caller should leave it `false`.
 
