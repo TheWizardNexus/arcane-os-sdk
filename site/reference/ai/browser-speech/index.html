@@ -45,7 +45,7 @@ Loading this selection uses those upstream publishers&#39; downloads and caches.
     id: &#39;onnx-community/Kokoro-82M-v1.0-ONNX&#39;,
     repository: &#39;onnx-community/Kokoro-82M-v1.0-ONNX&#39;,
     revision: &#39;1939ad2a8e416c0acfeecc08a694d14ef25f2231&#39;,
-    dtype: &#39;q8&#39;,
+    dtype: &#39;fp32&#39;,
     defaultVoice: &#39;af_heart&#39;
   },
   runtime: {
@@ -62,6 +62,14 @@ Loading this selection uses those upstream publishers&#39; downloads and caches.
   }
 };
 </code></pre></div>
+<p>The omitted execution record below uses the SDK&#39;s WebGPU-first automatic
+selection, so this basic configuration uses <code>fp32</code> because
+<a href="https://github.com/hexgrad/kokoro/tree/main/kokoro.js#usage" target="_blank" rel="noreferrer">Kokoro.js recommends <code>fp32</code> when using WebGPU</a>.
+Automatic fallback carries this same selected model and dtype to WASM; the SDK
+does not rewrite the application selection. If you intentionally choose
+another dtype, evaluate that exact model, browser, and execution route.
+<code>selectedDevice</code> reports routing after load, not pronunciation, text fidelity,
+or audio quality.</p>
 <p>Then use this <strong><code>App.js</code></strong>. The application creates and owns the DBOPFS
 instance. Configuration selects the provider without loading it; the button
 explicitly loads and unmutes TTS before requesting speech.</p>
@@ -201,8 +209,10 @@ playback. <code>replay()</code> keeps completed and pending provider segments an
 only failed missing segments.</p>
 <p>The default <code>{device:&#39;auto&#39;,maxConcurrentRequests:4}</code> attempts the full ONNX
 Worker/session pool on WebGPU, then recreates that pool on WASM only if WebGPU
-loading fails. Use the status example below to read <code>selectedDevice</code>; console
-node-assignment warnings alone do not identify the selected execution device.</p>
+loading fails. The basic configuration above keeps <code>fp32</code> for this WebGPU-first
+path and any automatic WASM fallback. Use the status example below to read
+<code>selectedDevice</code>; console node-assignment warnings alone do not identify the
+selected execution device or assess the generated audio.</p>
 <h2 id="queue-complete-passages-and-wait-for-playback">Queue complete passages and wait for playback</h2>
 <p>These options are available in SDK <code>0.5.12</code>.</p>
 <p>For a complete page or passage, call
@@ -356,7 +366,9 @@ button. The same projection is at
 until a pool is selected and returns to <code>null</code> on unload. Providers without an
 execution report omit <code>execution</code>; do not infer a device from <code>navigator.gpu</code>
 or a configured preference alone. An explicit inspection can throw a provider
-status error; handle it with the same <code>error.code</code> / <code>error.message</code> pattern.</p>
+status error; handle it with the same <code>error.code</code> / <code>error.message</code> pattern.
+Treat <code>selectedDevice</code> as route status only; evaluate actual speech output for
+the model, dtype, browser, and device combinations your application supports.</p>
 <h2 id="stop-mute-cancel-and-release">Stop, mute, cancel, and release</h2>
 <p>These are actions for your own controls, using the same <code>ai</code> instance:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">function stopSpeech() {
@@ -813,7 +825,8 @@ cache state, and warnings. Kokoro status also includes an <code>execution</code>
 with requested and selected device, request limit, and active request count. A
 successful <code>selectedDevice:&#39;webgpu&#39;</code> reports the execution provider selected by
 the upstream model load; it does not claim that browser, driver, or GPU kernels
-overlap physically. A security field is absent in ordinary mode.</p>
+overlap physically or that generated audio has been quality-validated. A
+security field is absent in ordinary mode.</p>
 <p>The provider/2 load context accepts an optional progress callback for interface
 compatibility, but the current browser-speech artifact and Worker transport
 publishes no progress records. Consumers present the explicit lifecycle states

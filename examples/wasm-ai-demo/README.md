@@ -8,6 +8,8 @@ For the smallest first request, start with the [browser speech quick start](../.
 
 The demo deliberately omits `tts.execution` in `speechConfiguration(dbopfs)` so it consumes the SDK default `{device:'auto',maxConcurrentRequests:4}`. Change that application's TTS record to `execution:{device:'wasm',maxConcurrentRequests:1}` to use less memory, or choose `webgpu` explicitly. Allowed capacities are 1 through 4; Whisper and the LLM retain capacity one.
 
+The maintained Kokoro selection uses `fp32` because [Kokoro.js recommends `fp32` when using WebGPU](https://github.com/hexgrad/kokoro/tree/main/kokoro.js#usage). Automatic fallback keeps the same dtype on WASM. `selectedDevice` identifies the loaded route; it does not validate speech correctness or audio quality, so evaluate actual output for each browser and device combination your application supports.
+
 Capacity 4 means up to four segments synthesize at once. Segment 5 and later wait in the SDK's FIFO queue; they are not dropped. Synthesis may finish out of order, but playback waits for earlier segments and plays exact input order. Each slot owns a Worker/model session, so raising capacity trades memory for latency.
 
 Use the shared Speech component to load/unmute speech, then select **Inspect speech execution** below Chat. The button reads `ai.providerRuntime.status('tts',{execution:true}).execution` and displays requested device, selected device, capacity, active requests, and automatic WASM fallback. It is a snapshot at the moment clicked. `selectedDevice:null` means no pool is selected; `webgpu` reports the upstream execution-provider selection and does not prove physical GPU kernel overlap or audio quality. Auto may fall back to WASM with the same selected model/dtype; explicit WebGPU reports an error when it cannot load.
@@ -39,7 +41,7 @@ Model weights are deliberately excluded from Git. Place the maintained GGUF shar
 
 The maintained model descriptors include each shard's known byte length as progress metadata. During a cold install, the SDK reports aggregate loaded and remaining bytes, transfer speed, estimated time, and active file or Range transfers while Chat presents the existing activation progress bar. Completed shards and completed Range parts within a shard remain available after interruption, so retry downloads only missing work.
 
-The app gives the SDK browser-speech owner the existing Whisper tiny.en FP32 and Kokoro 82M Q8 descriptors. The app does not import those runtimes or create a speech worker itself.
+The app gives the SDK browser-speech owner the existing Whisper tiny.en FP32 and Kokoro 82M FP32 descriptors. The app does not import those runtimes or create a speech worker itself.
 
 ## Local retrieval
 

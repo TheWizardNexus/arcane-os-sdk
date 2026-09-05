@@ -51,6 +51,10 @@ For a first spoken sentence, copy the application-owned
 beside `App.js`, then use this module. That one configuration file defines the
 upstream runtime, model, dtype, and voice. This module creates the application's
 DBOPFS store; the SDK creates and manages its speech providers and Workers.
+The linked automatic/WebGPU-first selection uses `fp32` because
+[Kokoro.js recommends `fp32` when using WebGPU](https://github.com/hexgrad/kokoro/tree/main/kokoro.js#usage).
+Its `selectedDevice` status reports the loaded route, not speech correctness or
+audio quality.
 
 ```javascript
 import arcaneThemeReady from 'arcane/ThemeBootstrap';

@@ -37,7 +37,7 @@ export const speechSelection = {
     id: 'onnx-community/Kokoro-82M-v1.0-ONNX',
     repository: 'onnx-community/Kokoro-82M-v1.0-ONNX',
     revision: '1939ad2a8e416c0acfeecc08a694d14ef25f2231',
-    dtype: 'q8',
+    dtype: 'fp32',
     defaultVoice: 'af_heart'
   },
   runtime: {
@@ -54,6 +54,15 @@ export const speechSelection = {
   }
 };
 ```
+
+The omitted execution record below uses the SDK's WebGPU-first automatic
+selection, so this basic configuration uses `fp32` because
+[Kokoro.js recommends `fp32` when using WebGPU](https://github.com/hexgrad/kokoro/tree/main/kokoro.js#usage).
+Automatic fallback carries this same selected model and dtype to WASM; the SDK
+does not rewrite the application selection. If you intentionally choose
+another dtype, evaluate that exact model, browser, and execution route.
+`selectedDevice` reports routing after load, not pronunciation, text fidelity,
+or audio quality.
 
 Then use this **`App.js`**. The application creates and owns the DBOPFS
 instance. Configuration selects the provider without loading it; the button
@@ -221,8 +230,10 @@ only failed missing segments.
 
 The default `{device:'auto',maxConcurrentRequests:4}` attempts the full ONNX
 Worker/session pool on WebGPU, then recreates that pool on WASM only if WebGPU
-loading fails. Use the status example below to read `selectedDevice`; console
-node-assignment warnings alone do not identify the selected execution device.
+loading fails. The basic configuration above keeps `fp32` for this WebGPU-first
+path and any automatic WASM fallback. Use the status example below to read
+`selectedDevice`; console node-assignment warnings alone do not identify the
+selected execution device or assess the generated audio.
 
 ## Queue complete passages and wait for playback
 
@@ -401,6 +412,8 @@ until a pool is selected and returns to `null` on unload. Providers without an
 execution report omit `execution`; do not infer a device from `navigator.gpu`
 or a configured preference alone. An explicit inspection can throw a provider
 status error; handle it with the same `error.code` / `error.message` pattern.
+Treat `selectedDevice` as route status only; evaluate actual speech output for
+the model, dtype, browser, and device combinations your application supports.
 
 ## Stop, mute, cancel, and release
 
@@ -875,7 +888,8 @@ cache state, and warnings. Kokoro status also includes an `execution` record
 with requested and selected device, request limit, and active request count. A
 successful `selectedDevice:'webgpu'` reports the execution provider selected by
 the upstream model load; it does not claim that browser, driver, or GPU kernels
-overlap physically. A security field is absent in ordinary mode.
+overlap physically or that generated audio has been quality-validated. A
+security field is absent in ordinary mode.
 
 The provider/2 load context accepts an optional progress callback for interface
 compatibility, but the current browser-speech artifact and Worker transport

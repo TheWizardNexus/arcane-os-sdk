@@ -435,12 +435,13 @@ function speechConfiguration(dbopfs) {
     },
     tts: {
       // Omit execution to use the SDK's auto device and four synthesis slots.
+      // Kokoro.js recommends fp32 for the WebGPU route attempted by auto.
       providerId: "wasm-ai-demo-browser-kokoro",
       model: {
         id: "onnx-community/Kokoro-82M-v1.0-ONNX",
         repository: "onnx-community/Kokoro-82M-v1.0-ONNX",
         revision: "1939ad2a8e416c0acfeecc08a694d14ef25f2231",
-        dtype: "q8",
+        dtype: "fp32",
         defaultVoice: "af_heart",
       },
       runtime: {
