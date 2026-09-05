@@ -5,7 +5,7 @@
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
     "branch": "main",
     "path": "runtime/arcane",
-    "sdkVersion": "0.5.11",
+    "sdkVersion": "0.5.12",
     "protocol": "arcane/1"
   },
   "artifactCount": 84,
@@ -30,7 +30,7 @@
       "availability": "Browser + native bridge + TWiN Cloud",
       "protocol": "arcane-ai-browser-speech-configuration/1, AIProviderRuntime arcane-ai-provider/2 routes, globalThis.arcaneEvents, TWiN Cloud HTTPS, Arcane.ollama, Arcane.speech, Android WebView bridge",
       "normalization": "Complete mutable caller-owned browser speech authority, SDK-owned provider registration/replacement/disposal, explicit STT/TTS activation, normalized Kokoro TTS execution with default capacity 4, explicit provider-neutral execution snapshots through status(role,{execution:true}), sticky readiness, canonical window.user readiness without compatibility-event object-identity admission or polling, exact ordered structural calls with required arguments.message, atomic nonblank all-ID tool-result sequencing, complete all-choice streaming/data validation, native Ollama structural adaptation, complete-response then all validated tool callbacks then completion ordering, observed async callbacks, Blob/File transcription, immediate exact-segment synthesis, per-call voice/speed capture, optional final-segment pause on the existing audio clock, optional per-call terminal playback completion, ordered audio-clock scheduling, playable audio, active-generation TTS operation-failure routing, mute, and cancellation are normalized; provider/model/runtime/voice policy remains caller-owned.",
-      "surface": "Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; explicit `providerRuntime.status(role,{execution:true})` snapshots; `streamTTS(text,end,options={})` with optional voice, speed, pauseAfterMs, and waitForPlayback (current main source; not yet published); configure/dispose speech, route lifecycle, declaration-validated chat/stream requests with exact ordered calls, synthesis/transcription, and playback controls; initializes from current canonical user readiness, installs `window.ai`, and projects `ai-ready` plus active-generation `ai-tts-failure`."
+      "surface": "Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; explicit `providerRuntime.status(role,{execution:true})` snapshots; `streamTTS(text,end,options={})` with optional voice, speed, pauseAfterMs, and waitForPlayback (available in SDK 0.5.12); configure/dispose speech, route lifecycle, declaration-validated chat/stream requests with exact ordered calls, synthesis/transcription, and playback controls; initializes from current canonical user readiness, installs `window.ai`, and projects `ai-ready` plus active-generation `ai-tts-failure`."
     },
     {
       "file": "runtime/arcane/modules/AIPreferenceRuntime.js",

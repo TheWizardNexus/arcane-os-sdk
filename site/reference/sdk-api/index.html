@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="./">API</a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane, the portable arcane-os/event-manager, arcane-os/mail, arcane-os/preference-store, and arcane-os/speech-playback entrypoints, and the browser-only arcane-os/ai/browser-wasm and arcane-os/ai/browser-speech entrypoints. Those package subpaths are distinct from application-facing projection modules in the managed browser map, such as arcane/AIProviderRuntime, arcane/AIRuntimeState, and arcane/ThemeBootstrap. Applications use those mapped runtime modules and call globalThis.Arcane for capability-gated host behavior; they are not additional package.json#exports entrypoints.</p><div class="doc-meta"><span>SDK 0.5.11</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane, the portable arcane-os/event-manager, arcane-os/mail, arcane-os/preference-store, and arcane-os/speech-playback entrypoints, and the browser-only arcane-os/ai/browser-wasm and arcane-os/ai/browser-speech entrypoints. Those package subpaths are distinct from application-facing projection modules in the managed browser map, such as arcane/AIProviderRuntime, arcane/AIRuntimeState, and arcane/ThemeBootstrap. Applications use those mapped runtime modules and call globalThis.Arcane for capability-gated host behavior; they are not additional package.json#exports entrypoints.</p><div class="doc-meta"><span>SDK 0.5.12</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="./" aria-current="page">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/sdk-api.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a><a href="#browser-speech-providers">Browser speech providers</a><a href="#portable-mail">Portable Mail</a></nav></details><p>The npm package exposes a Node.js ESM control plane, the portable
@@ -31,7 +31,7 @@ behavior; they are not additional <code>package.json#exports</code> entrypoints.
 entrypoints for SDK/tooling code. It is distinct from the generated browser
 import map that resolves application-facing <code>arcane/*</code> modules and the focused
 EventManager entry. See <a href="../protocols/#browser-runtime-delivery">browser runtime delivery</a>
-for the installed-inventory-derived physical-runtime contract in SDK <code>0.5.11</code>.</p>
+for the installed-inventory-derived physical-runtime contract in SDK <code>0.5.12</code>.</p>
 <div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
 <tr>
@@ -1789,7 +1789,7 @@ deterministic map. The package root also contains the public
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const result = {
   schemaVersion: 1,
   kind: &#39;arcane-app-runtime-projection&#39;,
-  sdkVersion: &#39;0.5.11&#39;,
+  sdkVersion: &#39;0.5.12&#39;,
   pathPrefix: &#39;arcane/&#39;,
   files: [{path}]
 };
@@ -2870,7 +2870,7 @@ separate <code>ERROR_CODES.cancelled</code> value.</p>
 <code>ARCANE_IMPORT_MAP_INVALID</code>, <code>ARCANE_IMPORT_MAP_UNRESOLVED</code>, and
 <code>ARCANE_IMPORT_MAP_COLLISION</code>; package assembly can additionally report
 <code>ARCANE_IMPORT_MAP_CLEANUP_FAILED</code>. They are normalized <code>ArcaneError.code</code>
-values, but are not properties added to this general registry in SDK <code>0.5.11</code>.</p>
+values, but are not properties added to this general registry in SDK <code>0.5.12</code>.</p>
 <h4 id="value-and-import-31">Value and import</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">const ERROR_CODES
 </code></pre></div>
@@ -3370,16 +3370,16 @@ workspace it additionally returns the exact installed package authority:</p>
     packageSource,
     canonicalPackageRoot,
     packageName: &#39;arcane-os&#39;,
-    packageVersion: &#39;0.5.11&#39;,
+    packageVersion: &#39;0.5.12&#39;,
     runtimeRoot,
     browserRuntimeRoot
   }
 };
 </code></pre></div>
 <p>The dependency can be named <code>arcane-os</code> or be one exact npm alias for
-<code>npm:arcane-os@0.5.11</code>. The selected installation must still be one direct,
+<code>npm:arcane-os@0.5.12</code>. The selected installation must still be one direct,
 physical, non-link package directory whose manifest identifies exactly as
-<code>arcane-os@0.5.11</code>; duplicate canonical/alias declarations reject.
+<code>arcane-os@0.5.12</code>; duplicate canonical/alias declarations reject.
 <code>allowMissingManagedImportMap</code> is an internal packaging/development seam. An
 ordinary caller should leave it <code>false</code>.</p>
 <h4 id="availability-and-normalization-107">Availability and normalization</h4>
@@ -5552,6 +5552,6 @@ const body = serializeMailReport(report);
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a><a href="#browser-speech-providers">Browser speech providers</a><a href="#portable-mail">Portable Mail</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.5.11, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.5.12, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

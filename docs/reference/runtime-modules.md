@@ -256,7 +256,7 @@ rejected. It propagates the caller-owned signal and returns a playable `Blob`;
 it does not independently choose a provider, cloud fallback, model, runtime, or
 voice policy for the application. `streamTTS(text='',end=false,options={})` and
 `finishTTS()` use this same request boundary. The third-argument options below
-are available in current `main` source and are not yet published:
+are available in SDK `0.5.12`:
 
 | Field | Default | Meaning |
 | --- | --- | --- |
@@ -1696,7 +1696,7 @@ and `read`, filters source metadata before calling
 **Browser or compatible host with an injected DBOPFS adapter.** The adapter
 keeps the existing `get`, `set`, `getAllKeys`, and `delete` method names; Node
 can use the same class only through an explicitly imported runtime module and a
-compatible storage adapter; SDK `0.5.11` publishes no Node package subpath or
+compatible storage adapter; SDK `0.5.12` publishes no Node package subpath or
 Node storage implementation for it. Bootstrap uses a concurrent
 generation, commits its manifest last, cleans partial data on failure, and
 rejects case-colliding IDs. Search

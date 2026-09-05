@@ -361,7 +361,7 @@ Chat listens for the bound (or current global) AI runtime's `ai-tts-failure`
 event and forwards its complete Error and exact operation boundary to
 `speech.reportTTSError()`. Playback-start or playback-resume failures can occur
 after Chat's two-argument `streamTTS()` preparation promise has resolved.
-Current `main` source adds an unpublished `waitForPlayback:true` mode for the
+SDK `0.5.12` adds a `waitForPlayback:true` mode for the
 terminal result of the segments submitted by one invocation; Chat continues
 to feed chunks without waiting for playback. Runtime mute, cancellation,
 permission waiting, and stale generations remain non-errors.

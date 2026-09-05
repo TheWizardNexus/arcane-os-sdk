@@ -13,7 +13,7 @@ import map resolves `arcane/AI` and `arcane/DBOPFS`. These browser modules are
 not Node inference APIs. To create an application:
 
 ```bash
-npx arcane-os@0.5.11 new hello-speech --path ./hello-speech --target browser
+npx arcane-os@0.5.12 new hello-speech --path ./hello-speech --target browser
 cd hello-speech
 npm install
 npm run dev
@@ -137,8 +137,7 @@ overlap or audio quality. LLM and Whisper/STT capacity remains one.
 
 ## Queue complete passages and wait for playback
 
-These options are available in current `main` source and are not yet in a
-published SDK package.
+These options are available in SDK `0.5.12`.
 
 For a complete page or passage, call
 `ai.streamTTS(text, true, {voice, speed, pauseAfterMs, waitForPlayback:true})`.

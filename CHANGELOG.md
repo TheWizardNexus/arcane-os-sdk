@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.5.12
+
 - Add optional `voice`, `speed`, `pauseAfterMs`, and `waitForPlayback` fields to
   `AI.streamTTS(text, end, options)`. Complete passages can enter the existing
   segmented generation queue immediately, retain their authored pauses on the

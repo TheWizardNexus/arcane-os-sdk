@@ -5,7 +5,7 @@
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
     "branch": "main",
     "path": "runtime/arcane/components",
-    "sdkVersion": "0.5.11"
+    "sdkVersion": "0.5.12"
   },
   "componentCount": 39,
   "loader": "/arcane/modules/HTMLImport.js",
