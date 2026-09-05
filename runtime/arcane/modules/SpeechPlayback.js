@@ -289,6 +289,90 @@ function queueFor(speech){
     return queue;
 }
 
+function providerSpeechCapacity(speech){
+    if(typeof speech?.fetchTTS!=='function')return null;
+    try{
+        const providerRuntime=speech.providerRuntime;
+        if(!providerRuntime||typeof providerRuntime.status!=='function')return null;
+        const capacity=providerRuntime.status(
+            'tts',
+            {execution:true}
+        )?.execution?.maxConcurrentRequests;
+        return Number.isSafeInteger(capacity)&&capacity>0?capacity:null;
+    }catch{
+        // Clients without inspectable provider capacity retain serialized admission.
+        return null;
+    }
+}
+
+function startProviderSegment(playback,index,providerSynthesisBatch){
+    if(
+        providerSynthesisBatch!==playback.providerSynthesisBatch
+        ||index<0
+        ||index>=playback.parts.length
+        ||playback.urls[index]
+    )return null;
+    const existing=playback.segmentRequests.get(index);
+    if(existing?.providerSynthesisBatch===providerSynthesisBatch){
+        return existing;
+    }
+
+    playback.segmentErrors.delete(index);
+    const record={providerSynthesisBatch,index,promise:null};
+    record.promise=playback.synthesizeSegment(
+        index,
+        playback.generation,
+        index===0,
+        providerSynthesisBatch
+    ).then(
+        function storeProviderSynthesizedSegment(outcome){
+            if(outcome===SUPERSEDED)return {ready:false,superseded:true};
+            if(providerSynthesisBatch!==playback.providerSynthesisBatch){
+                playback.revokeObjectURL(outcome.url);
+                return {ready:false,superseded:true};
+            }
+            playback.urls[index]=outcome.url;
+            return {ready:true};
+        },
+        function handleProviderSegmentFailure(error){
+            if(providerSynthesisBatch===playback.providerSynthesisBatch){
+                playback.segmentErrors.set(
+                    index,
+                    {providerSynthesisBatch,index,error}
+                );
+            }
+            return {ready:false,error};
+        }
+    ).finally(function clearSettledProviderSegment(){
+        if(playback.segmentRequests.get(index)===record){
+            playback.segmentRequests.delete(index);
+        }
+    }).catch(function observeProviderSegmentHandlingFailure(error){
+        if(providerSynthesisBatch===playback.providerSynthesisBatch){
+            playback.segmentErrors.set(
+                index,
+                {providerSynthesisBatch,index,error}
+            );
+        }
+        return {ready:false,error};
+    });
+    playback.segmentRequests.set(index,record);
+    return record;
+}
+
+function startProviderSynthesis(playback,providerSynthesisBatch){
+    let first=null;
+    for(let index=0;index<playback.parts.length;index+=1){
+        const record=startProviderSegment(
+            playback,
+            index,
+            providerSynthesisBatch
+        );
+        if(index===0)first=record;
+    }
+    return first;
+}
+
 const DEFAULT_MESSAGES={
     idle:'Speech is ready when visual content is available.',
     queued:'Waiting for the current local speech request. The latest narration will begin next.',
@@ -364,6 +448,9 @@ class SpeechPlayback{
         this.pendingGenerations=new Set();
         this.lookahead=null;
         this.lookaheadError=null;
+        this.providerSynthesisBatch=null;
+        this.segmentRequests=new Map();
+        this.segmentErrors=new Map();
         this.model=model===null||model===undefined?null:String(model);
         this.voice=voice===null||voice===undefined?null:String(voice);
         this.responseFormat=responseFormat===null||responseFormat===undefined
@@ -441,7 +528,12 @@ class SpeechPlayback{
         );
     }
 
-    hasAudio(key=this.key){return Boolean(this.urls.some(Boolean)&&(!key||key===this.key));}
+    hasAudio(key=this.key){
+        const playable=this.providerSynthesisBatch
+            ?Boolean(this.urls[0])
+            :this.urls.some(Boolean);
+        return Boolean(playable&&(!key||key===this.key));
+    }
 
     releaseURLs(){
         for(const url of this.urls){
@@ -451,6 +543,9 @@ class SpeechPlayback{
         this.parts=[];
         this.lookahead=null;
         this.lookaheadError=null;
+        this.providerSynthesisBatch=null;
+        this.segmentRequests.clear();
+        this.segmentErrors.clear();
     }
 
     releaseUrls(){this.releaseURLs();}
@@ -496,39 +591,55 @@ class SpeechPlayback{
         throw error;
     }
 
-    async synthesizeSegment(index,generation,announce=false){
+    async synthesizeSegment(
+        index,
+        generation,
+        announce=false,
+        providerSynthesisBatch=null
+    ){
         const playback=this;
         const controller=new AbortController();
         const token={generation,index,controller};
-        const queue=queueFor(this.speech);
+        const queue=providerSynthesisBatch?null:queueFor(this.speech);
         this.pendingGenerations.add(token);
         this.abortControllers.add(controller);
+        function segmentRequestIsCurrent(){
+            return providerSynthesisBatch
+                ?providerSynthesisBatch===playback.providerSynthesisBatch
+                :generation===playback.generation;
+        }
+        async function synthesizeQueuedSegment(){
+            const part=playback.parts[index];
+            if(!segmentRequestIsCurrent()||!part){
+                controller.abort();
+                return SUPERSEDED;
+            }
+            if(announce){
+                playback.emit('synthesizing',playback.message('preparing',{count:playback.parts.length}));
+            }
+            const audio=await playback.requestSpeech(
+                part,
+                controller.signal
+            );
+            if(!segmentRequestIsCurrent()){
+                controller.abort();
+                return SUPERSEDED;
+            }
+            const url=playback.createObjectURL(audio);
+            if(!segmentRequestIsCurrent()){
+                playback.revokeObjectURL(url);
+                controller.abort();
+                return SUPERSEDED;
+            }
+            return {url};
+        }
         try{
-            return await queue.enqueue(async function synthesizeQueuedSegment(){
-                const part=playback.parts[index];
-                if(generation!==playback.generation||!part){
-                    controller.abort();
-                    return SUPERSEDED;
-                }
-                if(announce){
-                    playback.emit('synthesizing',playback.message('preparing',{count:playback.parts.length}));
-                }
-                const audio=await playback.requestSpeech(
-                    part,
-                    controller.signal
+            return providerSynthesisBatch
+                ?await Promise.resolve().then(synthesizeQueuedSegment)
+                :await queue.enqueue(
+                    synthesizeQueuedSegment,
+                    {speculative:!announce}
                 );
-                if(generation!==playback.generation){
-                    controller.abort();
-                    return SUPERSEDED;
-                }
-                const url=playback.createObjectURL(audio);
-                if(generation!==playback.generation){
-                    playback.revokeObjectURL(url);
-                    controller.abort();
-                    return SUPERSEDED;
-                }
-                return {url};
-            },{speculative:!announce});
         }finally{
             this.pendingGenerations.delete(token);
             this.abortControllers.delete(controller);
@@ -576,6 +687,19 @@ class SpeechPlayback{
     async waitForSegment(index,generation){
         if(generation!==this.generation)return false;
         if(this.urls[index])return true;
+        if(this.providerSynthesisBatch){
+            const segmentError=this.segmentErrors.get(index);
+            if(segmentError?.providerSynthesisBatch===this.providerSynthesisBatch){
+                return false;
+            }
+            const record=this.segmentRequests.get(index);
+            if(!record)return Boolean(this.urls[index]);
+            const result=await record.promise;
+            return generation===this.generation
+                &&record.providerSynthesisBatch===this.providerSynthesisBatch
+                &&result.ready===true
+                &&Boolean(this.urls[index]);
+        }
         if(
             this.lookaheadError
             &&this.lookaheadError.generation===generation
@@ -666,13 +790,28 @@ class SpeechPlayback{
             throw error;
         }
 
-        const queue=queueFor(this.speech);
-        if(queue.busy)this.emit('synthesizing',this.message('queued',{count:normalized.length}));
         let outcome;
         try{
-            outcome=await this.synthesizeSegment(0,generation,true);
+            const providerCapacity=providerSpeechCapacity(this.speech);
+            if(providerCapacity===null){
+                const queue=queueFor(this.speech);
+                if(queue.busy)this.emit('synthesizing',this.message('queued',{count:normalized.length}));
+                outcome=await this.synthesizeSegment(0,generation,true);
+            }else{
+                const providerSynthesisBatch={capacity:providerCapacity};
+                this.providerSynthesisBatch=providerSynthesisBatch;
+                const first=startProviderSynthesis(
+                    this,
+                    providerSynthesisBatch
+                );
+                const result=await first.promise;
+                if(Object.hasOwn(result,'error'))throw result.error;
+                outcome=result.ready?{url:this.urls[0]}:SUPERSEDED;
+            }
         }catch(error){
             if(generation!==this.generation)return {ready:false,played:false};
+            for(const controller of this.abortControllers)controller.abort();
+            this.abortControllers.clear();
             this.releaseURLs();
             this.fail(error);
             throw error;
@@ -693,7 +832,9 @@ class SpeechPlayback{
         this.loadCurrent();
         this.emit('ready',this.message('ready'));
         const played=autoplay?await this.play():false;
-        if(generation===this.generation)this.startLookahead(1,generation);
+        if(generation===this.generation&&!this.providerSynthesisBatch){
+            this.startLookahead(1,generation);
+        }
         return {ready:true,played};
     }
 
@@ -723,14 +864,34 @@ class SpeechPlayback{
         if(!this.hasAudio())return false;
         this.generation+=1;
         const generation=this.generation;
-        this.lookahead=null;
-        this.lookaheadError=null;
+        if(this.providerSynthesisBatch){
+            const providerSynthesisBatch=this.providerSynthesisBatch;
+            for(const [index,segmentError] of this.segmentErrors){
+                if(
+                    segmentError?.providerSynthesisBatch
+                        ===providerSynthesisBatch
+                    &&!this.urls[index]
+                    &&!this.segmentRequests.has(index)
+                ){
+                    startProviderSegment(
+                        this,
+                        index,
+                        providerSynthesisBatch
+                    );
+                }
+            }
+        }else{
+            this.lookahead=null;
+            this.lookaheadError=null;
+        }
         this.audio.pause();
         this.index=0;
         this.loadCurrent();
         this.audio.currentTime=0;
         const played=await this.play();
-        if(generation===this.generation)this.startLookahead(1,generation);
+        if(generation===this.generation&&!this.providerSynthesisBatch){
+            this.startLookahead(1,generation);
+        }
         return played;
     }
 
@@ -772,12 +933,15 @@ class SpeechPlayback{
             const ready=await this.waitForSegment(nextIndex,generation);
             if(!ready||generation!==this.generation){
                 if(generation===this.generation&&this.state==='buffering'){
-                    const bufferedError=(
-                        this.lookaheadError
+                    const providerError=this.segmentErrors.get(nextIndex);
+                    const providerFailed=this.providerSynthesisBatch
+                        &&providerError?.providerSynthesisBatch
+                            ===this.providerSynthesisBatch;
+                    const lookaheadFailed=this.lookaheadError
                         &&this.lookaheadError.generation===generation
-                        &&this.lookaheadError.index===nextIndex
-                    )?this.lookaheadError.error:null;
-                    if(bufferedError)this.fail(bufferedError);
+                        &&this.lookaheadError.index===nextIndex;
+                    if(providerFailed)this.fail(providerError.error);
+                    else if(lookaheadFailed)this.fail(this.lookaheadError.error);
                     else this.emit('ready',this.message('ready'));
                 }
                 return false;
@@ -786,7 +950,9 @@ class SpeechPlayback{
         this.index=nextIndex;
         this.loadCurrent();
         const played=await this.play();
-        if(generation===this.generation)this.startLookahead(nextIndex+1,generation);
+        if(generation===this.generation&&!this.providerSynthesisBatch){
+            this.startLookahead(nextIndex+1,generation);
+        }
         return played;
     }
 

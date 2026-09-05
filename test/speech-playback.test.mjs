@@ -70,6 +70,29 @@ function minimalWavBlob() {
     return new Blob([minimalWavBytes()],{type:'audio/wav'});
 }
 
+function deferredRequest() {
+    let resolve;
+    let reject;
+    const promise=new Promise(function captureDeferredRequest(
+        resolveRequest,
+        rejectRequest
+    ) {
+        resolve=resolveRequest;
+        reject=rejectRequest;
+    });
+    return {promise,reject,resolve};
+}
+
+async function waitForContract(condition,message) {
+    for(let attempt=0;attempt<25;attempt+=1) {
+        if(condition())return;
+        await new Promise(function waitForAsyncContractTurn(resolve) {
+            globalThis.setTimeout(resolve,0);
+        });
+    }
+    assert.fail(message);
+}
+
 test(
     'SpeechPlayback uses caller policy, owned cancellation, and canonical state',
     async function testProviderNeutralSpeechPlayback() {
@@ -373,6 +396,274 @@ test(
         assert.equal(playback.state, 'idle');
         assert.equal(unsubscribe(), true);
         assert.ok(revoked.includes('blob:contract-1'));
+    }
+);
+
+test(
+    'SpeechPlayback eagerly admits capable provider segments and plays exact order',
+    async function testProviderParallelAdmissionAndReplay() {
+        const requests=[];
+        const statusCalls=[];
+        const blobInputs=new Map();
+        const createdURLs=[];
+        const audio=new ContractAudio();
+        const speech={
+            providerRuntime:{
+                status(role,options) {
+                    statusCalls.push({role,options});
+                    return {execution:{maxConcurrentRequests:4}};
+                }
+            },
+            fetchTTS(payload,signal) {
+                const deferred=deferredRequest();
+                const request={...deferred,payload,signal};
+                requests.push(request);
+                return deferred.promise;
+            }
+        };
+        const playback=new SpeechPlayback({
+            audio,
+            speech,
+            createObjectURL(blob) {
+                const input=blobInputs.get(blob);
+                const url=`blob:${input}:${createdURLs.length+1}`;
+                createdURLs.push({input,url});
+                return url;
+            },
+            revokeObjectURL() {}
+        });
+        function resolveRequest(request) {
+            const blob=minimalWavBlob();
+            blobInputs.set(blob,request.payload.input);
+            request.resolve(blob);
+        }
+
+        const preparation=playback.prepare({
+            key:'provider-order',
+            parts:['First.','Second.','Third.'],
+            autoplay:false
+        });
+        await waitForContract(
+            () => requests.length===3,
+            'Every complete provider segment should be submitted before the first settles.'
+        );
+        assert.deepEqual(statusCalls,[
+            {role:'tts',options:{execution:true}}
+        ]);
+        assert.equal(requests.every(request => request.signal instanceof AbortSignal),true);
+
+        resolveRequest(requests[2]);
+        requests[1].reject(false);
+        await waitForContract(
+            () => playback.urls[2]&&playback.segmentErrors.has(1),
+            'Out-of-order provider settlement should remain indexed.'
+        );
+        assert.equal(playback.hasAudio(),false);
+        assert.equal(audio.src,'');
+
+        resolveRequest(requests[0]);
+        assert.deepEqual(await preparation,{ready:true,played:false});
+        const firstURL=playback.urls[0];
+        const thirdURL=playback.urls[2];
+        assert.equal(audio.src,firstURL);
+        assert.equal(await playback.advance(),false);
+        assert.equal(playback.index,0);
+        assert.equal(playback.state,'error');
+
+        const sameAudio=playback.audio;
+        assert.equal(await playback.replay(),true);
+        assert.equal(playback.audio,sameAudio);
+        await waitForContract(
+            () => requests.length===4,
+            'Replay should re-admit the failed missing segment.'
+        );
+        assert.equal(requests[3].payload.input,'Second.');
+        assert.equal(playback.urls[0],firstURL);
+        assert.equal(playback.urls[2],thirdURL);
+        assert.equal(
+            createdURLs.filter(record => record.input==='Third.').length,
+            1
+        );
+
+        resolveRequest(requests[3]);
+        await waitForContract(
+            () => Boolean(playback.urls[1]),
+            'The replayed segment should become available.'
+        );
+        assert.equal(await playback.togglePause(),true);
+        assert.equal(audio.paused,true);
+        assert.equal(playback.audio,sameAudio);
+        assert.equal(await playback.togglePause(),true);
+        assert.equal(audio.paused,false);
+        assert.equal(playback.audio,sameAudio);
+
+        assert.equal(await playback.advance(),true);
+        assert.equal(audio.src,playback.urls[1]);
+        assert.equal(await playback.advance(),true);
+        assert.equal(audio.src,thirdURL);
+        assert.equal(await playback.advance(),true);
+        assert.equal(playback.destroy(),true);
+    }
+);
+
+test(
+    'SpeechPlayback preserves every falsy provider rejection',
+    async function testFalsyProviderRejections() {
+        for(const rejection of [undefined,null,false,0,'']) {
+            const playback=new SpeechPlayback({
+                audio:new ContractAudio(),
+                speech:{
+                    providerRuntime:{
+                        status() {
+                            return {execution:{maxConcurrentRequests:4}};
+                        }
+                    },
+                    fetchTTS() {
+                        return Promise.reject(rejection);
+                    }
+                }
+            });
+            let rejected=false;
+            try {
+                await playback.prepare({
+                    parts:['Reject this segment.'],
+                    autoplay:false
+                });
+            } catch(error) {
+                rejected=true;
+                assert.equal(error,rejection);
+            }
+            assert.equal(rejected,true);
+            assert.equal(playback.state,'error');
+            assert.equal(playback.hasAudio(),false);
+            assert.equal(playback.destroy(),true);
+        }
+    }
+);
+
+test(
+    'SpeechPlayback keeps native synthesis serialized with one lookahead',
+    async function testSerializedNativeSynthesis() {
+        const requests=[];
+        const blobInputs=new Map();
+        const audio=new ContractAudio();
+        const playback=new SpeechPlayback({
+            audio,
+            speech:{
+                synthesize(payload,options) {
+                    const deferred=deferredRequest();
+                    const request={...deferred,payload,options};
+                    requests.push(request);
+                    return deferred.promise;
+                }
+            },
+            createObjectURL(blob) {
+                return `blob:${blobInputs.get(blob)}`;
+            },
+            revokeObjectURL() {}
+        });
+        function resolveRequest(request) {
+            const blob=minimalWavBlob();
+            blobInputs.set(blob,request.payload.input);
+            request.resolve(blob);
+        }
+
+        const preparation=playback.prepare({
+            parts:['Native first.','Native second.','Native third.'],
+            autoplay:false
+        });
+        await waitForContract(
+            () => requests.length===1,
+            'Native synthesis should admit only the first segment initially.'
+        );
+        assert.equal(requests[0].options.signal instanceof AbortSignal,true);
+        resolveRequest(requests[0]);
+        assert.deepEqual(await preparation,{ready:true,played:false});
+        await waitForContract(
+            () => requests.length===2,
+            'Native synthesis should prepare one lookahead segment.'
+        );
+        assert.equal(requests.length,2);
+
+        resolveRequest(requests[1]);
+        await waitForContract(
+            () => Boolean(playback.urls[1]),
+            'The native lookahead should settle before advancing.'
+        );
+        assert.equal(await playback.advance(),true);
+        assert.equal(audio.src,'blob:Native second.');
+        await waitForContract(
+            () => requests.length===3,
+            'The next native request should begin only after ordered playback advances.'
+        );
+        resolveRequest(requests[2]);
+        await waitForContract(
+            () => Boolean(playback.urls[2]),
+            'The final native lookahead should settle.'
+        );
+        assert.equal(playback.destroy(),true);
+    }
+);
+
+test(
+    'SpeechPlayback stop aborts every pending capable provider segment',
+    async function testProviderParallelCancellation() {
+        const requests=[];
+        const blobInputs=new Map();
+        const createdURLs=[];
+        const revokedURLs=[];
+        const playback=new SpeechPlayback({
+            audio:new ContractAudio(),
+            speech:{
+                providerRuntime:{
+                    status() {
+                        return {execution:{maxConcurrentRequests:4}};
+                    }
+                },
+                fetchTTS(payload,signal) {
+                    const deferred=deferredRequest();
+                    const request={...deferred,payload,signal};
+                    requests.push(request);
+                    return deferred.promise;
+                }
+            },
+            createObjectURL(blob) {
+                const url=`blob:${blobInputs.get(blob)}`;
+                createdURLs.push(url);
+                return url;
+            },
+            revokeObjectURL(url) {
+                revokedURLs.push(url);
+            }
+        });
+        function resolveRequest(request) {
+            const blob=minimalWavBlob();
+            blobInputs.set(blob,request.payload.input);
+            request.resolve(blob);
+        }
+
+        const preparation=playback.prepare({
+            parts:['One.','Two.','Three.','Four.'],
+            autoplay:false
+        });
+        await waitForContract(
+            () => requests.length===4,
+            'The capable provider should receive every complete segment immediately.'
+        );
+        resolveRequest(requests[0]);
+        assert.deepEqual(await preparation,{ready:true,played:false});
+        playback.stop();
+        assert.equal(requests.slice(1).every(request => request.signal.aborted),true);
+        assert.equal(playback.hasAudio(),false);
+
+        for(const request of requests.slice(1))resolveRequest(request);
+        await waitForContract(
+            () => playback.pendingGenerations.size===0,
+            'Late provider settlement should be observed and suppressed after stop.'
+        );
+        assert.deepEqual(createdURLs,['blob:One.']);
+        assert.deepEqual(revokedURLs,['blob:One.']);
+        assert.equal(playback.destroy(),true);
     }
 );
 
