@@ -206,7 +206,7 @@ import * as browserSpeech from 'arcane-os/ai/browser-speech';
 import * as browserWasm from 'arcane-os/ai/browser-wasm';
 import * as mail from 'arcane-os/mail';
 import PreferenceStore from 'arcane-os/preference-store';
-import SpeechPlayback from 'arcane-os/speech-playback';
+import SpeechPlayback,{SPEECH_VOICE_ALIASES,SPEECH_VOICE_OPTIONS} from 'arcane-os/speech-playback';
 
 test('installed public SDK entrypoints and runtime materialization are functional',async()=>{
     assert.equal(SDK_VERSION,${JSON.stringify(verified.version)});
@@ -215,6 +215,29 @@ test('installed public SDK entrypoints and runtime materialization are functiona
     assert.equal(typeof mail.Mail,'function');
     assert.equal(typeof PreferenceStore,'function');
     assert.equal(typeof SpeechPlayback,'function');
+    const speechVoiceValues=SPEECH_VOICE_OPTIONS.map(
+        function speechVoiceValue(option){return option.value;}
+    );
+    assert.deepEqual(speechVoiceValues,[
+        'alloy','ash','ballad','coral','echo',
+        'fable','nova','onyx','sage','shimmer'
+    ]);
+    assert.deepEqual([...SPEECH_VOICE_ALIASES],speechVoiceValues);
+    const speechStates=[];
+    const speechAudio=new EventTarget();
+    speechAudio.pause=function pauseSpeechAudio(){};
+    speechAudio.removeAttribute=function removeSpeechAudioAttribute(){};
+    speechAudio.load=function loadSpeechAudio(){};
+    const speechPlayback=new SpeechPlayback({
+        audio:speechAudio,
+        onState:function recordSpeechPlaybackState(detail){
+            speechStates.push(detail);
+        }
+    });
+    speechPlayback.cancel();
+    assert.equal(speechStates.at(-1)?.state,'idle');
+    assert.equal(Object.isFrozen(speechStates.at(-1)),false);
+    assert.equal(speechPlayback.destroy(),true);
     assert.equal(typeof browserSpeech.createBrowserWhisperProvider,'function');
     assert.equal(typeof browserSpeech.createBrowserKokoroProvider,'function');
     assert.equal(typeof browserWasm.createBrowserWasmLlmProvider,'function');

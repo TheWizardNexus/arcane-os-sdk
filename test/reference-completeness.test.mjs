@@ -271,6 +271,8 @@ test('the public package API inventory matches every JavaScript export and MDN e
                 target:'./runtime/arcane/modules/SpeechPlayback.js',
                 names:[
                     'SPEECH_PLAYBACK_STATE_EVENT',
+                    'SPEECH_VOICE_ALIASES',
+                    'SPEECH_VOICE_OPTIONS',
                     'SpeechPlayback',
                     'default',
                     'splitSpeechText'

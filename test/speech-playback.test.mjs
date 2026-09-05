@@ -5,6 +5,8 @@ import test from '../src/testing.mjs';
 import {arcaneEvents} from '../src/event-manager.mjs';
 import {
     SPEECH_PLAYBACK_STATE_EVENT,
+    SPEECH_VOICE_ALIASES,
+    SPEECH_VOICE_OPTIONS,
     SpeechPlayback,
     splitSpeechText
 } from '../runtime/arcane/modules/SpeechPlayback.js';
@@ -96,10 +98,38 @@ async function waitForContract(condition,message) {
 test(
     'SpeechPlayback uses caller policy, owned cancellation, and canonical state',
     async function testProviderNeutralSpeechPlayback() {
+        const expectedVoiceOptions=[
+            {value:'alloy',label:'Alloy'},
+            {value:'ash',label:'Ash'},
+            {value:'ballad',label:'Ballad'},
+            {value:'coral',label:'Coral'},
+            {value:'echo',label:'Echo'},
+            {value:'fable',label:'Fable'},
+            {value:'nova',label:'Nova'},
+            {value:'onyx',label:'Onyx'},
+            {value:'sage',label:'Sage'},
+            {value:'shimmer',label:'Shimmer'}
+        ];
+        assert.deepEqual(SPEECH_VOICE_OPTIONS,expectedVoiceOptions);
+        assert.deepEqual(
+            [...SPEECH_VOICE_ALIASES],
+            expectedVoiceOptions.map(function expectedVoiceAlias(option) {
+                return option.value;
+            })
+        );
+        assert.equal(Object.isFrozen(SPEECH_VOICE_OPTIONS),false);
+        assert.equal(
+            SPEECH_VOICE_OPTIONS.every(function voiceOptionIsMutable(option) {
+                return !Object.isFrozen(option);
+            }),
+            true
+        );
         const completeNarration='Complete narration. '.repeat(20_000);
         assert.deepEqual(splitSpeechText(completeNarration),[completeNarration]);
         const requests = [];
         const occurrences = [];
+        const compatibilityStates = [];
+        const compatibilityDeliveryOrder = [];
         const revoked = [];
         let urlSequence = 0;
         const unsubscribe = arcaneEvents.subscribe(
@@ -124,6 +154,17 @@ test(
             voice: 'caller-voice',
             responseFormat: 'wav',
             speed: 1.25,
+            onState: function observeCompatibilityState(state) {
+                compatibilityDeliveryOrder.push(
+                    occurrences.some(function matchingCanonicalState(occurrence) {
+                        return occurrence.instanceId
+                                ===playback.events.descriptor.instanceId
+                            &&occurrence.detail.state===state.state
+                            &&occurrence.operationId===state.operationId;
+                    })
+                );
+                compatibilityStates.push(state);
+            },
             createObjectURL: function createContractAudioURL(blob) {
                 assert.equal(blob.type, 'audio/wav');
                 urlSequence += 1;
@@ -148,6 +189,24 @@ test(
             responseFormat: 'wav'
         });
         assert.equal(requests[0].signal instanceof AbortSignal, true);
+        assert.equal(
+            compatibilityStates.some(function compatibilityStateIsReady(state) {
+                return state.state==='ready';
+            }),
+            true
+        );
+        assert.equal(
+            compatibilityDeliveryOrder.every(function canonicalStateWasDelivered(delivered) {
+                return delivered;
+            }),
+            true
+        );
+        assert.equal(
+            compatibilityStates.every(function compatibilityStateIsMutable(state) {
+                return !Object.isFrozen(state);
+            }),
+            true
+        );
         const playbackReadyOccurrence=occurrences.find(occurrence => (
             occurrence.detail.state === 'ready'
             && occurrence.instanceId === playback.events.descriptor.instanceId
