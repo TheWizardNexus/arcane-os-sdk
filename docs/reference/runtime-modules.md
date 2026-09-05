@@ -152,6 +152,24 @@ entry points. `streamMessage(...)` and `streamRequest(options)` deliver
 incremental responses. The positional and object forms share the existing
 provider implementations; neither form is a retired compatibility API.
 
+Built-in cloud chat decodes an HTTP error body once as JSON or text and rejects
+with that complete value unchanged. It does not reconstruct an Error, replace
+the message, or add `providerMessage`, `status`, or an SDK failure code to the
+provider body. Network and decoding errors also pass through; cancellation
+retains the existing `ARCANE_AI_REQUEST_ABORTED` contract.
+
+When the HTTP status is `429` and the existing `error.message`, `message`, or
+plain-text body contains `overload`, ignoring case, the request retries after
+three seconds without a retry-count limit. Each warning shows the complete
+message followed by `Retrying in ${retryDelayMs / 1000} seconds` through the
+shared console logger, separately from the provider error. Every attempt uses
+the same destination, headers, complete serialized body, and cancellation
+signal; `onRequest` runs once for the logical request. Cancellation stops the
+delay and prevents another attempt. Retrying happens before a successful
+response is consumed, so partial streams and tool callbacks are never replayed.
+Native Ollama and externally supplied provider adapters retain their own
+transport behavior.
+
 Initialization uses the canonical realm user's actual readiness state. If
 `window.user?.ready` is already true, AI initializes immediately. Otherwise one
 shared registration observes `user-entity-loaded`, then rechecks readiness

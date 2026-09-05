@@ -3545,6 +3545,7 @@ export class AIProviderRuntime {
             const projectedStreamChunks = [];
             const projectedStreamReaders = [];
             let projectedStreamClosed = false;
+            let projectedStreamFailed = false;
             let projectedStreamError = null;
             let terminalSettled = false;
             let resolveTerminal;
@@ -3570,7 +3571,7 @@ export class AIProviderRuntime {
                 }
                 while (projectedStreamReaders.length) {
                     const reader = projectedStreamReaders.shift();
-                    if (projectedStreamError) {
+                    if (projectedStreamFailed) {
                         reader.reject(projectedStreamError);
                     } else {
                         reader.resolve({value: undefined, done: true});
@@ -3583,11 +3584,12 @@ export class AIProviderRuntime {
                 drainProjectedAIProviderStreamReaders();
             }
 
-            function closeProjectedAIProviderStream(error = null) {
+            function closeProjectedAIProviderStream(error) {
                 if (projectedStreamClosed) {
                     return;
                 }
                 projectedStreamClosed = true;
+                projectedStreamFailed = arguments.length > 0;
                 projectedStreamError = error;
                 drainProjectedAIProviderStreamReaders();
             }
@@ -3600,7 +3602,7 @@ export class AIProviderRuntime {
                     });
                 }
                 if (projectedStreamClosed) {
-                    return projectedStreamError
+                    return projectedStreamFailed
                         ? Promise.reject(projectedStreamError)
                         : Promise.resolve({value: undefined, done: true});
                 }
@@ -3625,7 +3627,7 @@ export class AIProviderRuntime {
                     slot.activeRequests.delete(requestSequence);
                 }
                 runtime.#drainRoleRequestQueue(slot);
-                if (error) {
+                if (arguments.length === 1) {
                     closeProjectedAIProviderStream(error);
                     restoreAIProviderRoleAfterRequest(error);
                     rejectTerminal(error);
@@ -3703,8 +3705,8 @@ export class AIProviderRuntime {
                 );
             }
 
-            async function cancelAIProviderStream(reason, terminalError = null) {
-                const terminalOutcome = terminalError ?? normalizedAbort(
+            async function cancelAIProviderStream(reason, terminalError) {
+                const terminalOutcome = arguments.length > 1 ? terminalError : normalizedAbort(
                     reason instanceof Error
                         ? reason
                         : operationError(

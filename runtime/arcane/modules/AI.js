@@ -547,6 +547,7 @@ function createBuiltInAIStreamBridge(execute,sourceSignal){
     const queue=[];
     const waiters=[];
     let complete=false;
+    let failed=false;
     let failure=null;
     let detached=false;
 
@@ -595,11 +596,12 @@ function createBuiltInAIStreamBridge(execute,sourceSignal){
             return;
         }
         complete=true;
-        failure=error||null;
+        failed=arguments.length>0;
+        failure=error;
         detachBuiltInAIStreamAbort();
         while(waiters.length){
             const waiter=waiters.shift();
-            if(failure){
+            if(failed){
                 waiter.reject(failure);
             }else{
                 waiter.resolve({value:undefined,done:true});
@@ -619,7 +621,7 @@ function createBuiltInAIStreamBridge(execute,sourceSignal){
         }
     ).then(
         function acceptBuiltInAIStreamResult(value){
-            finishBuiltInAIStream(null);
+            finishBuiltInAIStream();
             return value;
         },
         function rejectBuiltInAIStreamResult(error){
@@ -648,7 +650,7 @@ function createBuiltInAIStreamBridge(execute,sourceSignal){
                 return Promise.resolve({value:queue.shift(),done:false});
             }
             if(complete){
-                return failure
+                return failed
                     ?Promise.reject(failure)
                     :Promise.resolve({value:undefined,done:true});
             }
@@ -3765,41 +3767,67 @@ class AI {
         return true;
     }
 
-    async #assertResponseOK(response){
-        if(response.ok){
-            return response;
-        }
-
-        let detail='';
-
+    async #fetchHTTPResponse(url,options){
+        const {signal}=options;
+        const retryDelayMs=3000;
         try{
-            const contentType=response.headers.get('content-type')||'';
-
-            if(contentType.includes('application/json')){
-                const errorResponse=await response.json();
-                detail=errorResponse?.error?.message
-                    || errorResponse?.message
-                    || '';
-            }else{
-                const errorText=await response.text();
-
-                if(errorText&&!errorText.trim().startsWith('<')){
-                    detail=errorText;
+            while(true){
+                if(signal?.aborted){
+                    throw normalizeAIRequestAbort(signal.reason);
                 }
-            }
-        }catch{
-            // The response status is enough when its body cannot be read.
-        }
+                const response=await fetch(url,options);
+                if(signal?.aborted){
+                    throw normalizeAIRequestAbort(signal.reason);
+                }
+                if(response.ok){
+                    return response;
+                }
 
-        const status=[response.status,response.statusText]
-            .filter(Boolean)
-            .join(' ');
-        const message=`AI request failed${status ? ` (${status})`:''}`;
-        const error=new Error(message);
-        error.code='AI_REQUEST_FAILED';
-        error.status=response.status;
-        error.providerMessage=detail;
-        throw error;
+                const contentType=response.headers.get('content-type')||'';
+                const error=contentType.includes('application/json')
+                    ?await response.json()
+                    :await response.text();
+                if(signal?.aborted){
+                    throw normalizeAIRequestAbort(signal.reason);
+                }
+                const message=typeof error==='string'
+                    ?error
+                    :error?.error?.message??error?.message;
+                if(
+                    response.status!==429
+                    ||typeof message!=='string'
+                    ||!message.toLowerCase().includes('overload')
+                ){
+                    throw error;
+                }
+
+                arcaneLogging.warn(
+                    `${message}\nRetrying in ${retryDelayMs / 1000} seconds`,
+                    error
+                );
+                await new Promise(function waitForOverloadRetry(resolve,reject){
+                    function finishRetryDelay(){
+                        signal?.removeEventListener('abort',cancelRetryDelay);
+                        resolve();
+                    }
+                    function cancelRetryDelay(){
+                        clearTimeout(timer);
+                        signal.removeEventListener('abort',cancelRetryDelay);
+                        reject(normalizeAIRequestAbort(signal.reason));
+                    }
+                    const timer=setTimeout(finishRetryDelay,retryDelayMs);
+                    signal?.addEventListener('abort',cancelRetryDelay,{once:true});
+                    if(signal?.aborted){
+                        cancelRetryDelay();
+                    }
+                });
+            }
+        }catch(error){
+            if(isAIRequestAbort(error,signal)){
+                throw normalizeAIRequestAbort(error);
+            }
+            throw error;
+        }
     }
 
     #nativeOllama(){
@@ -4906,35 +4934,16 @@ class AI {
             destination:this.url
         });
         const body = JSON.stringify(request);
-        let response;
-
-        try{
-            response=await fetch(
-                this.url,
-                {
-                    method:'POST',
-                    credentials,
-                    headers:this.#serviceHeaders[this.llmService],
-                    body,
-                    ...(signal?{signal}:{})
-                }
-            );
-        }catch(err){
-            if(signal?.aborted||err?.name==='AbortError'){
-                const error=new Error('The AI request was cancelled.',{cause:err});
-                error.name='AbortError';
-                error.code='ARCANE_AI_REQUEST_ABORTED';
-                throw error;
+        const response=await this.#fetchHTTPResponse(
+            this.url,
+            {
+                method:'POST',
+                credentials,
+                headers:this.#serviceHeaders[this.llmService],
+                body,
+                ...(signal?{signal}:{})
             }
-            const error=new Error(
-                'Unable to reach the AI service.',
-                {cause:err}
-            );
-            error.code='AI_SERVICE_UNREACHABLE';
-            throw error;
-        }
-
-        await this.#assertResponseOK(response);
+        );
 
         let sseBuffer='';
         const completeToolCallsByChoice=new Map();
@@ -5654,33 +5663,16 @@ class AI {
             destination:this.url
         });
         const body = JSON.stringify(request);
-        
-        let response;
-                
-        try{
-            response = await fetch(
-                this.url, 
-                {
-                    method: 'POST',
-                    credentials: credentials,
-                    headers: this.#serviceHeaders[this.llmService],
-                    body: body,
-                    ...(signal?{signal}:{})
-                }
-            );
-        }catch(err){
-            if(isAIRequestAbort(err,signal)){
-                throw normalizeAIRequestAbort(err);
+        const response=await this.#fetchHTTPResponse(
+            this.url,
+            {
+                method:'POST',
+                credentials,
+                headers:this.#serviceHeaders[this.llmService],
+                body,
+                ...(signal?{signal}:{})
             }
-            const error=new Error(
-                'Unable to reach the AI service.',
-                {cause:err}
-            );
-            error.code='AI_SERVICE_UNREACHABLE';
-            throw error;
-        }
-
-        await this.#assertResponseOK(response);
+        );
 
         const contentType=response.headers.get('content-type')||'';
 
