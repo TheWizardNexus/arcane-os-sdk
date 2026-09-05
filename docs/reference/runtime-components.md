@@ -360,17 +360,20 @@ unload.
 Chat listens for the bound (or current global) AI runtime's `ai-tts-failure`
 event and forwards its complete Error and exact operation boundary to
 `speech.reportTTSError()`. Playback-start or playback-resume failures can occur
-after Chat's two-argument `streamTTS()` preparation promise has resolved.
+after Chat's `streamTTS()` preparation promise has resolved.
 SDK `0.5.12` adds a `waitForPlayback:true` mode for the
 terminal result of the segments submitted by one invocation; Chat continues
 to feed chunks without waiting for playback. Runtime mute, cancellation,
 permission waiting, and stale generations remain non-errors.
 
-Each visible model chunk is still forwarded to `AI.streamTTS()` in arrival
-order. The AI owner preserves exact segmentation, admits completed segments to
-bounded synthesis immediately, and schedules the contiguous ready audio prefix
-on the audio clock. Chat neither creates a second queue nor reorders, combines,
-or rewrites speech text.
+Each visible model chunk is forwarded to
+`AI.streamTTS(text,false,{textFormat:'markdown'})` in arrival order. The AI
+owner removes repeated Markdown formatting marks from narration before the
+configured segmentation, admits completed segments to bounded synthesis
+immediately, and schedules the contiguous ready audio prefix on the audio
+clock. Chat retains the original Markdown for display and storage and owns no
+second speech queue. Single punctuation, ordinary repeated punctuation,
+language, and voice retain their existing behavior.
 
 Events: `chat-ready`, `chat-session-bound`, `chat-session-message`,
 `chat-session-error`, `chat-send-message`, `chat-send-error`,

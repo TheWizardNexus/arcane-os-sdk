@@ -88,6 +88,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`Mail.js`](#mailjs) | esm | Builds complete reports and prefers the native mail capability with an explicit HTTP transport fallback. | Browser/native hybrid + cloud | Mail inputs/results normalized; transport failures mixed. |
 | [`MailOutbox.mjs`](#mailoutboxmjs) | esm | Persists complete mail reports before delivery and normalizes idempotent enqueue, retry, reconciliation, and invalid-record maintenance. | Browser/native WebView or compatible injected host | Complete records, full work, cancellation, and lifecycle states normalized; storage, lock, and delivery failures coded. |
 | [`MailTransport.mjs`](#mailtransportmjs) | esm | Sends one complete mail report to a normalized HTTP(S) endpoint. | Browser/server with fetch + cloud | Normalized endpoint and transport errors; remote detail preserved. |
+| [`MarkdownSpeech.js`](#markdownspeechjs) | esm | Removes repeated Markdown formatting marks from streamed narration. | Cross-host | Speech-only filtering; single marks and ordinary punctuation remain literal. |
 | [`Marked.min.js`](#markedminjs) | esm | Vendored Marked 18.0.5 Markdown lexer, parser, renderer, extension, and walk-token API. | Cross-host vendor module | Vendor-native Marked contract. |
 | [`MD.js`](#mdjs) | esm | Renders complete Markdown with Marked and exposes the complete rendered markup. | Browser / native WebView | Complete raw and rendered Marked values; parse errors vendor-native. |
 | [`MemoryRecords.js`](#memoryrecordsjs) | esm | Normalizes memory content and detects meaningful stored memory. | Cross-host | Fully normalized string/boolean results. |
@@ -282,12 +283,24 @@ are available in SDK `0.5.12`:
 | `speed` | Current `ai.voiceSpeed` | A supplied positive speed is captured for those segments and forwarded to `fetchTTS()`. It does not change `ai.voiceSpeed`. |
 | `pauseAfterMs` | `0` | Finite, nonnegative milliseconds placed after the final extracted segment on the existing audio clock. Invalid values throw `RangeError`; no pause is inserted between this call's other segments. |
 | `waitForPlayback` | `false` | Omission retains the preparation promise. With `true`, the promise resolves after every extracted segment reaches a terminal playback state: `true` when all naturally end, or `false` after terminal cancellation or failure. |
+| `textFormat` | `plain` for a new stream | `markdown` removes repeated same formatting marks (`*`, `#`, `_`, backtick, `~`) before segmentation. Single marks and ordinary punctuation remain literal. The selected format lasts through this producer's terminal flush. |
 
 The voice and speed use the existing `fetchTTS()` validation and error path.
-No option rewrites the submitted text. Overrides belong to the segments
+Plain mode preserves the submitted text. Markdown mode changes narration only;
+it leaves displayed, stored, and model content untouched. It is a narrow
+formatting-mark filter, not a full Markdown parser: links, code contents, list
+text, and other characters remain literal. A trailing candidate mark waits for
+the next character so a repeated run split across chunks is still omitted.
+Ordinary prose streams immediately. `end:true`, `finishTTS()`, muted terminal
+calls, and `stopAudio()` clear the formatting state. An explicit format change
+flushes pending formatting marks under the preceding mode before accepting
+the next text. `fetchTTS()` retains its exact-text contract.
+
+Voice, speed, pause, and playback overrides belong to the segments
 extracted in that invocation, including any text buffered by an earlier call.
-Options are not retained with an unfinished `end:false` remainder; a later
-call supplies its own options, and `finishTTS()` uses defaults. Use `end:true`
+Those overrides are not retained with an unfinished `end:false` remainder; a
+later call supplies its own options, and `finishTTS()` uses their defaults
+while retaining the active text format. Use `end:true`
 for a complete passage. A call extracting no segments resolves
 `true` without waiting for earlier jobs; `finishTTS()` remains a preparation
 flush, not a queue-wide playback barrier. A muted call resolves `false`.
@@ -2242,6 +2255,41 @@ Exact exports: `MailTransportError`, `normalizeMailEndpoint`,
 import * as module from '/arcane/modules/MailTransport.mjs';
 
 console.log(Object.keys(module));
+```
+
+## MarkdownSpeech.js
+
+### Overview
+
+Filters repeated same Markdown formatting marks from narration before speech
+segmentation. The filter recognizes `*`, `#`, `_`, backtick, and `~` runs of two
+or more, including runs arriving across separate chunks. Single marks,
+ellipses, quoted sentence endings, whitespace, and all other text remain
+literal. It neither interprets links nor changes language or voice.
+
+### Public surface
+
+`MarkdownSpeech`; `append(text='',end=false)`, `reset()`.
+
+Exact exports: `MarkdownSpeech`.
+
+### Availability and normalization
+
+**Cross-host.** Plain JavaScript with no dependencies. `append()` returns only
+the newly available narration. Only a trailing candidate marker and whether
+it repeats are retained; ordinary text is emitted immediately. Terminal
+`append(text,true)` flushes a single pending mark and resets state. `reset()`
+clears pending formatting state when its narration is cancelled. Non-string
+input throws `TypeError`.
+
+### Example
+
+```javascript
+import {MarkdownSpeech} from '/arcane/modules/MarkdownSpeech.js';
+
+const speech = new MarkdownSpeech();
+const first = speech.append('**Hello'); // Hello
+const last = speech.append('**...', true); // ...
 ```
 
 ## Marked.min.js

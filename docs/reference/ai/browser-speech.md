@@ -286,8 +286,9 @@ all speech owned by that AI instance and settles pending playback results
 The selected voice and speed are captured for segments extracted by that call.
 That includes any text left in the same AI instance's partial-stream buffer;
 finish the previous producer before starting a separate complete passage.
-Options are not retained with an unfinished `end:false` remainder. A later
-call supplies its own options, and `finishTTS()` uses defaults.
+Voice, speed, pause, and playback options are not retained with an unfinished
+`end:false` remainder. A later call supplies its own options, and `finishTTS()`
+uses their defaults. The optional text format below lasts through that flush.
 A call extracting no segments returns `true` without waiting for earlier jobs.
 An already muted call returns `false`.
 
@@ -347,6 +348,30 @@ before feeding the stream. Chunk boundaries themselves do not force a sentence
 boundary; `finishTTS()` flushes any remaining text. It is not a playback-ended
 notification. Do not mute or dispose immediately after it if playback should
 continue.
+
+## Omit Markdown formatting marks from narration
+
+Select `textFormat:'markdown'` for raw model text that contains formatting:
+
+```javascript
+ai.streamTTS('## Heading\n**Hello', false, {textFormat:'markdown'});
+ai.streamTTS('**. Next sentence.');
+await ai.finishTTS();
+```
+
+The SDK omits runs of two or more of the same `*`, `#`, `_`, backtick, or `~`
+before speech segmentation. A candidate run split across chunks is still
+recognized. Single marks, ellipses, quoted endings, and all other text are
+preserved. This is a small narration filter, not a full Markdown parser.
+Ordinary prose is forwarded immediately; only a trailing formatting candidate
+waits for its next character or the final flush.
+
+The format stays active until `end:true`, `finishTTS()`, or cancellation. New
+streams default to `plain`, which preserves exact submitted text. The shared
+chat component selects Markdown mode automatically. Applications already
+speaking visible DOM text can keep plain mode. Displayed messages, saved
+history, model input, language, voice, synthesis capacity, and playback timing
+are not changed by the filter.
 
 ## Choose a device or reduce memory use
 

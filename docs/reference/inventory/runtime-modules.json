@@ -8,9 +8,9 @@
     "sdkVersion": "0.5.15",
     "protocol": "arcane/1"
   },
-  "artifactCount": 84,
-  "javascriptArtifactCount": 82,
-  "esmExportCount": 353,
+  "artifactCount": 85,
+  "javascriptArtifactCount": 83,
+  "esmExportCount": 354,
   "artifacts": [
     {
       "file": "runtime/arcane/modules/AI.js",
@@ -30,7 +30,7 @@
       "availability": "Browser + native bridge + TWiN Cloud",
       "protocol": "arcane-ai-browser-speech-configuration/1, AIProviderRuntime arcane-ai-provider/2 routes, globalThis.arcaneEvents, TWiN Cloud HTTPS, Arcane.ollama, Arcane.speech, Android WebView bridge",
       "normalization": "Complete mutable caller-owned browser speech authority, SDK-owned provider registration/replacement/disposal, explicit STT/TTS activation, normalized Kokoro TTS execution with default capacity 4, explicit provider-neutral execution snapshots through status(role,{execution:true}), sticky readiness, canonical window.user readiness without compatibility-event object-identity admission or polling, exact ordered structural calls with required arguments.message, atomic nonblank all-ID tool-result sequencing, complete all-choice streaming/data validation, native Ollama structural adaptation, complete-response then all validated tool callbacks then completion ordering, observed async callbacks, Blob/File transcription, immediate exact-segment synthesis, per-call voice/speed capture, optional final-segment pause on the existing audio clock, optional per-call terminal playback completion, ordered audio-clock scheduling, playable audio, active-generation TTS operation-failure routing, mute, and cancellation are normalized; provider/model/runtime/voice policy remains caller-owned.",
-      "surface": "Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; explicit `providerRuntime.status(role,{execution:true})` snapshots; `streamTTS(text,end,options={})` with optional voice, speed, pauseAfterMs, and waitForPlayback (available in SDK 0.5.12); configure/dispose speech, route lifecycle, declaration-validated chat/stream requests with exact ordered calls, synthesis/transcription, and playback controls; initializes from current canonical user readiness, installs `window.ai`, and projects `ai-ready` plus active-generation `ai-tts-failure`."
+      "surface": "Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; explicit `providerRuntime.status(role,{execution:true})` snapshots; `streamTTS(text,end,options={})` with optional voice, speed, pauseAfterMs, waitForPlayback, and speech-only textFormat plain/markdown; configure/dispose speech, route lifecycle, declaration-validated chat/stream requests with exact ordered calls, synthesis/transcription, and playback controls; initializes from current canonical user readiness, installs `window.ai`, and projects `ai-ready` plus active-generation `ai-tts-failure`."
     },
     {
       "file": "runtime/arcane/modules/AIPreferenceRuntime.js",
@@ -823,6 +823,19 @@
       "protocol": "HTTP(S) fetch + AbortController",
       "normalization": "Endpoint, timeout, cancellation, network, HTTP, and response-contract errors are normalized.",
       "surface": "`MailTransportError`, `normalizeMailEndpoint()`, `serializeMailReport()`, and `sendMailReport()`."
+    },
+    {
+      "file": "runtime/arcane/modules/MarkdownSpeech.js",
+      "name": "MarkdownSpeech.js",
+      "kind": "esm",
+      "exports": [
+        "MarkdownSpeech"
+      ],
+      "summary": "Removes repeated same Markdown formatting marks from streamed narration before speech segmentation.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Speech-only filtering of repeated *, #, _, backtick, and ~ runs across chunks; single marks and all other characters remain literal; terminal flush and reset clear pending formatting state.",
+      "surface": "`MarkdownSpeech`; `append(text='',end=false)`, `reset()`."
     },
     {
       "file": "runtime/arcane/modules/Marked.min.js",

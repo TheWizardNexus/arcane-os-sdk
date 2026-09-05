@@ -305,6 +305,14 @@ keeping apostrophes, commas, and hyphens that join Unicode letters or numbers
 inside the same segment.
 Mute, stop, provider transition, and cancellation still govern the whole queue.
 
+For raw Markdown narration, use
+`ai.streamTTS(text,false,{textFormat:'markdown'})`. The SDK removes repeated
+same formatting marks (`*`, `#`, `_`, backtick, `~`) before segmentation,
+including runs split across chunks. Single punctuation and ordinary repeated
+punctuation remain literal. The format lasts through `finishTTS()`; new
+streams default to exact plain text. Shared chat selects Markdown mode while
+preserving original messages for display and storage.
+
 The SDK runtime also owns `DBOPFSDocumentLibrary`,
 `DocumentLexicalSearch`, and `PersistentAIChatSession`. Document bootstrap is
 schema-driven and explicit; chat never searches a corpus unless the app wires

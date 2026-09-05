@@ -2817,7 +2817,9 @@
         ){
             const aiRuntime=boundChatAI??globalThis.ai;
             if(typeof aiRuntime?.streamTTS==='function'){
-                void Promise.resolve(aiRuntime.streamTTS(text)).catch(
+                void Promise.resolve(aiRuntime.streamTTS(
+                    text,false,{textFormat:'markdown'}
+                )).catch(
                     reportTTSError
                 );
             }else{

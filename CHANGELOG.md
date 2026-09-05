@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Add optional Markdown narration filtering before `AI.streamTTS()`
+  segmentation. Omit repeated same formatting marks across streamed chunks,
+  preserve single marks and ordinary punctuation, and clear formatting state
+  on terminal flush or cancellation. Keep plain speech, displayed and stored
+  text, language, voice, synthesis capacity, and audio scheduling unchanged.
+- Select Markdown narration in shared chat and include focused filter test
+  source without adding a parser dependency.
+
 ## 0.5.15
 
 - Let `SpeechPlayback.prepare()` submit every complete segment immediately when

@@ -13,6 +13,7 @@ import {
 } from './AIProviderRuntime.js';
 import {normalizeOllamaModelIdentifier} from './OllamaModelIdentifier.js';
 import {arcaneLogging} from 'arcane-os/logging';
+import {MarkdownSpeech} from './MarkdownSpeech.js';
 
 const completeValue=(value)=>value;
 
@@ -2029,6 +2030,8 @@ class AI {
     }
 
     audioMessageChunks='';
+    #speechTextFormat='plain';
+    #markdownSpeech=new MarkdownSpeech();
     sourceNodes=[];
     isSpeaking=false;
     audioContext=null;
@@ -5731,6 +5734,8 @@ class AI {
         if(this.muted){
             if(end){
                 this.audioMessageChunks='';
+                this.#speechTextFormat='plain';
+                this.#markdownSpeech.reset();
             }
             this.#traceSpeech('streamTTS.result',{callId,result:false,reason:'muted'});
             return Promise.resolve(false);
@@ -5742,11 +5747,24 @@ class AI {
             throw new RangeError('Speech pauses must be a nonnegative number of milliseconds.');
         }
 
-        this.audioMessageChunks+=String(text||'');
+        const textFormat=options.textFormat??this.#speechTextFormat;
+        if(textFormat!=='plain'&&textFormat!=='markdown'){
+            throw new TypeError('Speech textFormat must be plain or markdown.');
+        }
+        let speechText='';
+        if(textFormat!==this.#speechTextFormat){
+            speechText=this.#markdownSpeech.append('',true);
+        }
+        const incomingText=String(text||'');
+        speechText+=textFormat==='markdown'
+            ?this.#markdownSpeech.append(incomingText,end)
+            :incomingText;
+        this.#speechTextFormat=end?'plain':textFormat;
+        this.audioMessageChunks+=speechText;
         const outputs=this.#extractSpeechSegments(end);
         this.#traceSpeech('streamTTS.segments',{
             callId,segments:outputs,remainder:this.audioMessageChunks,
-            segmentation:this.ttsSegmentation
+            segmentation:this.ttsSegmentation,textFormat,speechText
         });
 
         if(!outputs.length){
@@ -6414,6 +6432,8 @@ class AI {
         this.speechScheduleContext=null;
         this.speechScheduleTime=0;
         this.audioMessageChunks='';
+        this.#speechTextFormat='plain';
+        this.#markdownSpeech.reset();
         this.#clearSpeechUnlock();
 
         for(const job of this.speechJobs){
