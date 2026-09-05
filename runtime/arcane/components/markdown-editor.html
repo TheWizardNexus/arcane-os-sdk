@@ -75,16 +75,11 @@
 
 <script type="module">
     const host=this;
-    const componentURL=new URL(
-        host.getAttribute('href')||'./arcane/components/markdown-editor.html',
-        document.baseURI
-    );
-    const moduleURL=name=>new URL(`../modules/${name}`,componentURL).href;
-    const {default:MD}=await import(moduleURL('MD.js?v=2'));
+    const {default:MD}=await import('../modules/MD.js?v=2');
     const {
         applyMarkdownFormat,
         normalizeMarkdownOptions
-    }=await import(moduleURL('ComponentContracts.js'));
+    }=await import('../modules/ComponentContracts.js');
     const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
     const events=createArcaneEventSource(host,{source:'arcane.component.markdown-editor',eventTypes:['markdown-editor-change','markdown-editor-saved','markdown-editor-ready']});
     const lifecycleController=new AbortController();

@@ -1,11 +1,13 @@
 import {lstat,mkdir,readFile as readFileFromDisk,readdir,realpath,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {SDK_VERSION} from './constants.mjs';
 
 export const IMPORT_MAP_RELATIVE_PATH='modules/arcane.importmap.json';
 export const MANAGED_IMPORT_MAP_ATTRIBUTE='data-arcane-import-map';
 
 const JAVASCRIPT_EXTENSION=/\.(?:js|mjs)$/u;
+const RESOURCE_EXTENSION=/\.(?:m?js|html?|css|wasm|svg|png|gif|jpe?g|webp|avif|ico|bmp|woff2?|ttf|otf|eot|mp3|wav|ogg|oga|opus|m4a|mp4|webm|ogv|vtt)(?:[?#]|$)/iu;
 const PERSISTENT_CHAT_IMPORT='#arcane/persistent-ai-chat-session';
 const PERSISTENT_CHAT_MODULE='modules/PersistentAIChatSession.js';
 const SDK_BROWSER_ENTRY='sdk/event-manager.mjs';
@@ -17,6 +19,7 @@ const STATIC_RUNTIME_PACKAGE_IMPORTS=new Map([
 ]);
 const SDK_BROWSER_SELF_IMPORTS=new Map([
     ['arcane-os/event-manager',SDK_BROWSER_ENTRY],
+    ['arcane-os/logging','sdk/logging.mjs'],
     ['arcane-os/ai/browser-wasm',SDK_BROWSER_AI_ENTRY],
     ['arcane-os/ai/browser-speech',SDK_BROWSER_SPEECH_ENTRY]
 ]);
@@ -646,6 +649,7 @@ function tokenize(source){
 function matchingToken(tokens,start,opening,closing){
     let depth=0;
     for(let index=start;index<tokens.length;index+=1){
+        if(tokens[index].type!=='punctuator')continue;
         if(tokens[index].value===opening)depth+=1;
         else if(tokens[index].value===closing){
             depth-=1;
@@ -691,6 +695,7 @@ function topLevelCommas(tokens,start,end){
     const commas=[];
     const depths={parenthesis:0,bracket:0,brace:0};
     for(let index=start;index<end;index+=1){
+        if(tokens[index].type!=='punctuator')continue;
         const value=tokens[index].value;
         if(value==='(')depths.parenthesis+=1;
         else if(value===')'&&depths.parenthesis>0)depths.parenthesis-=1;
@@ -711,7 +716,10 @@ function importRecord(kind,token){
 
 export function scanModuleImports(source,{importer='<module>'}={}){
     if(typeof source!=='string')throw new TypeError('scanModuleImports source must be a string.');
-    const tokens=tokenize(source);
+    return moduleImportsFromTokens(tokenize(source),importer);
+}
+
+function moduleImportsFromTokens(tokens,importer){
     const imports=[];
     let hasModuleSyntax=false;
     for(let index=0;index<tokens.length;index+=1){
@@ -784,6 +792,348 @@ export function scanModuleImports(source,{importer='<module>'}={}){
     };
 }
 
+export function versionAssetUrl(value,version=SDK_VERSION){
+    if(typeof value!=='string')return value;
+    return applyReferenceEdits(value,assetUrlVersionEdits(value,version));
+}
+
+function assetUrlVersionEdits(value,version){
+    if(typeof value!=='string'||!value||!version||value.startsWith('#')
+        ||value.startsWith('//')||/^[A-Za-z][A-Za-z0-9+.-]*:/u.test(value)
+        ||/^\s/u.test(value))return [];
+    const fragmentStart=value.indexOf('#');
+    const address=fragmentStart<0?value:value.slice(0,fragmentStart);
+    const queryStart=address.indexOf('?');
+    const pathname=queryStart<0?address:address.slice(0,queryStart);
+    if(!pathname)return [];
+    const versionValue=encodeURIComponent(String(version));
+    if(queryStart<0)return [{start:address.length,end:address.length,value:`?arcaneVersion=${versionValue}`}];
+    const query=address.slice(queryStart+1);
+    const edits=[];
+    let offset=queryStart+1;
+    for(const parameter of query.split('&')){
+        const equals=parameter.indexOf('=');
+        const key=equals<0?parameter:parameter.slice(0,equals);
+        let decodedKey=key;
+        try{decodedKey=decodeURIComponent(key.replaceAll('+',' '));}
+        catch{decodedKey=key;}
+        if(decodedKey==='arcaneVersion'){
+            edits.push({
+                start:offset+(equals<0?parameter.length:equals+1),
+                end:offset+parameter.length,
+                value:`${equals<0?'=':''}${versionValue}`
+            });
+        }
+        offset+=parameter.length+1;
+    }
+    if(edits.length===0)edits.push({
+        start:address.length,
+        end:address.length,
+        value:`${query&&!query.endsWith('&')?'&':''}arcaneVersion=${versionValue}`
+    });
+    return edits;
+}
+
+function applyReferenceEdits(source,edits){
+    let result=source;
+    for(const edit of edits.sort(function descendingReferenceOffset(left,right){
+        return right.start-left.start;
+    })){
+        result=result.slice(0,edit.start)+edit.value+result.slice(edit.end);
+    }
+    return result;
+}
+
+function stringReferenceEdit(source,token,version){
+    const urlEdits=assetUrlVersionEdits(token.value,version);
+    if(urlEdits.length===0)return null;
+    const quote=source[token.start];
+    const positions=[];
+    let cursor=token.start+1;
+    while(cursor<token.end-1){
+        const start=cursor;
+        if(source[cursor]==='\\'){
+            const decoded=decodedEscape(source,cursor+1);
+            for(let index=0;index<decoded.value.length;index+=1)positions.push(start-token.start);
+            cursor=decoded.next;
+        }else{
+            positions.push(cursor-token.start);
+            cursor+=1;
+        }
+    }
+    positions.push(token.end-token.start-1);
+    const edits=urlEdits.map(function authoredStringReference(edit){
+        return {
+            start:positions[edit.start],
+            end:positions[edit.end],
+            value:edit.value.replaceAll('\\','\\\\').replaceAll(quote,`\\${quote}`)
+        };
+    });
+    const original=source.slice(token.start,token.end);
+    const value=applyReferenceEdits(original,edits);
+    return value===original?null:{start:token.start,end:token.end,value};
+}
+
+function callArgumentTokens(tokens,opening){
+    const closing=matchingToken(tokens,opening,'(',')');
+    if(closing<0)return [];
+    const separators=topLevelCommas(tokens,opening+1,closing);
+    const boundaries=[opening,...separators,closing];
+    const argumentsList=[];
+    for(let index=0;index<boundaries.length-1;index+=1){
+        argumentsList.push(tokens.slice(boundaries[index]+1,boundaries[index+1]));
+    }
+    return argumentsList;
+}
+
+function literalExpressionResults(tokens){
+    if(tokens.length===1&&tokens[0].type==='string')return tokens;
+    if(tokens[0]?.value==='('&&matchingToken(tokens,0,'(',')')===tokens.length-1){
+        return literalExpressionResults(tokens.slice(1,-1));
+    }
+    let depth=0;
+    let conditional=-1;
+    let nestedConditionals=0;
+    for(let index=0;index<tokens.length;index+=1){
+        if(tokens[index].type!=='punctuator')continue;
+        const value=tokens[index].value;
+        if(['(','[','{'].includes(value)){depth+=1;continue;}
+        if([')',']','}'].includes(value)){depth-=1;continue;}
+        if(depth!==0)continue;
+        if(value==='?'){
+            if(conditional<0)conditional=index;
+            else nestedConditionals+=1;
+        }else if(value===':'&&conditional>=0){
+            if(nestedConditionals>0){nestedConditionals-=1;continue;}
+            return [
+                ...literalExpressionResults(tokens.slice(conditional+1,index)),
+                ...literalExpressionResults(tokens.slice(index+1))
+            ];
+        }
+    }
+    return [];
+}
+
+function globalResourceCallee(tokens,index){
+    if(!identifierIsProperty(tokens,index))return index;
+    if((tokens[index-1]?.value==='.'||tokens[index-1]?.value==='?.')
+        &&new Set(['globalThis','window','self']).has(tokens[index-2]?.value)
+        &&!identifierIsProperty(tokens,index-2))return index-2;
+    return -1;
+}
+
+function localResourceBase(tokens){
+    if(!tokens)return false;
+    if(tokens.some(function nonExpressionToken(token){return !['identifier','punctuator'].includes(token.type);}))return false;
+    const base=tokens.map(function baseToken(token){return token.value;}).join('');
+    return [
+        'import.meta.url','document.baseURI','location.href','window.location.href',
+        'globalThis.location.href','self.location.href','window.document.baseURI',
+        'globalThis.document.baseURI'
+    ].includes(base);
+}
+
+function literalResourceFetch(argumentsList){
+    if(argumentsList.length===1)return true;
+    const options=argumentsList[1];
+    if(options?.[0]?.value!=='{'||options.at(-1)?.value!=='}')return false;
+    for(let index=1;index<options.length-1;index+=1){
+        const token=options[index];
+        if(token.value==='...'||(token.value==='.'&&options[index+1]?.value==='.'))return false;
+        if(token.value==='body')return false;
+        if(options[index+1]?.value!==':')continue;
+        if(token.value==='method'&&(options[index+2]?.type!=='string'
+            ||!['GET','HEAD'].includes(options[index+2].value.toUpperCase())))return false;
+    }
+    return true;
+}
+
+function reportAssetReference(onReference,url,kind,baseKind){
+    if(typeof onReference==='function')onReference({url,kind,baseHref:null,...(baseKind?{baseKind}:{})});
+}
+
+function javascriptReferenceEdits(source,version,onReference){
+    const tokens=tokenize(source);
+    const selected=new Map();
+    const imports=moduleImportsFromTokens(tokens,'asset source').imports;
+    const byOffset=new Map(tokens.map(function tokenByOffset(token){
+        return [token.start,token];
+    }));
+    for(const entry of imports){
+        reportAssetReference(onReference,entry.specifier,'import');
+        if(/^(?:\.{1,2}\/|\/)/u.test(entry.specifier)){
+            selected.set(entry.offset,byOffset.get(entry.offset));
+        }
+    }
+    for(let index=0;index<tokens.length;index+=1){
+        const token=tokens[index];
+        if(token.type!=='identifier'||tokens[index+1]?.value!=='(')continue;
+        if(!['URL','Worker','SharedWorker','importScripts','fetch'].includes(token.value))continue;
+        const callee=globalResourceCallee(tokens,index);
+        if(callee<0)continue;
+        const constructor=tokens[callee-1]?.value==='new';
+        if(['URL','Worker','SharedWorker'].includes(token.value)&&!constructor)continue;
+        const argumentsList=callArgumentTokens(tokens,index+1);
+        if(token.value==='fetch'&&!literalResourceFetch(argumentsList))continue;
+        if(token.value==='URL'&&!localResourceBase(argumentsList[1]))continue;
+        const selectedArguments=token.value==='importScripts'?argumentsList:argumentsList.slice(0,1);
+        for(const argument of selectedArguments){
+            for(const literal of literalExpressionResults(argument)){
+                if((token.value==='fetch'||token.value==='URL')
+                    &&!RESOURCE_EXTENSION.test(literal.value))continue;
+                if((token.value==='fetch'||token.value==='URL')
+                    &&/\.html?(?:[?#]|$)/iu.test(literal.value))continue;
+                const kind=token.value==='fetch'?'fetch'
+                    :token.value==='URL'&&!/\.(?:js|mjs)(?:[?#]|$)/iu.test(literal.value)?'asset':'script';
+                const documentBase=['Worker','SharedWorker','fetch'].includes(token.value)
+                    ||(token.value==='URL'&&argumentsList[1]?.[0]?.value!=='import');
+                reportAssetReference(onReference,literal.value,kind,documentBase?'document':undefined);
+                selected.set(literal.start,literal);
+            }
+        }
+    }
+    return [...selected.values()].map(function versionJavaScriptReference(token){
+        return stringReferenceEdit(source,token,version);
+    }).filter(Boolean);
+}
+
+function cssStringEnd(source,start){
+    const quote=source[start];
+    let cursor=start+1;
+    while(cursor<source.length){
+        if(source[cursor]==='\\'){cursor+=2;continue;}
+        if(source[cursor]===quote)return cursor+1;
+        cursor+=1;
+    }
+    return source.length;
+}
+
+function cssReferenceEdits(source,version,onReference,versionReference=versionAssetUrl){
+    const edits=[];
+    let cursor=0;
+    let importUrlStart=-1;
+    function skipSpaceAndComments(start){
+        let position=start;
+        while(position<source.length){
+            if(/\s/u.test(source[position])){position+=1;continue;}
+            if(source.startsWith('/*',position)){
+                const close=source.indexOf('*/',position+2);
+                position=close<0?source.length:close+2;
+                continue;
+            }
+            break;
+        }
+        return position;
+    }
+    function addReference(start,end,kind='asset'){
+        const original=source.slice(start,end);
+        if(original.includes('\\'))return;
+        reportAssetReference(onReference,original,kind);
+        const value=versionReference(original,version);
+        if(value!==original)edits.push({start,end,value});
+    }
+    while(cursor<source.length){
+        if(source.startsWith('/*',cursor)){
+            const end=source.indexOf('*/',cursor+2);
+            cursor=end<0?source.length:end+2;
+            continue;
+        }
+        if(source[cursor]==='"'||source[cursor]==="'"){
+            cursor=cssStringEnd(source,cursor);
+            continue;
+        }
+        const rest=source.slice(cursor);
+        if(/^@import(?![\w-])/iu.test(rest)){
+            const start=skipSpaceAndComments(cursor+7);
+            importUrlStart=start;
+            if(source[start]==='"'||source[start]==="'"){
+                const end=cssStringEnd(source,start);
+                addReference(start+1,end-1,'style');
+                cursor=end;
+                continue;
+            }
+        }
+        if(!/[\w-]/u.test(source[cursor-1]??'')&&/^url\s*\(/iu.test(rest)){
+            const kind=cursor===importUrlStart?'style':'asset';
+            const open=source.indexOf('(',cursor);
+            const start=skipSpaceAndComments(open+1);
+            if(source[start]==='"'||source[start]==="'"){
+                const end=cssStringEnd(source,start);
+                addReference(start+1,end-1,kind);
+                cursor=end;
+            }else{
+                let end=start;
+                while(end<source.length&&source[end]!==')'){
+                    end+=source[end]==='\\'?2:1;
+                }
+                let valueEnd=Math.min(end,source.length);
+                while(valueEnd>start&&/\s/u.test(source[valueEnd-1]))valueEnd-=1;
+                addReference(start,valueEnd,kind);
+                cursor=Math.min(end+1,source.length);
+            }
+            continue;
+        }
+        cursor+=1;
+    }
+    return edits;
+}
+
+function importMapReferenceEdits(source,version,onReference){
+    const tokens=tokenize(source);
+    const edits=[];
+    function objectProperties(start){
+        if(tokens[start]?.type!=='punctuator'||tokens[start].value!=='{')return [];
+        const properties=[];
+        let cursor=start+1;
+        while(cursor<tokens.length&&!(tokens[cursor].type==='punctuator'&&tokens[cursor].value==='}')){
+            const key=tokens[cursor];
+            if(key.type!=='string'||tokens[cursor+1]?.value!==':')return [];
+            const valueIndex=cursor+2;
+            const value=tokens[valueIndex];
+            if(!value)return [];
+            properties.push({key:key.value,valueIndex,value});
+            let end=valueIndex;
+            if(value.type==='punctuator'&&(value.value==='{'||value.value==='[')){
+                end=matchingToken(tokens,valueIndex,value.value,value.value==='{'?'}':']');
+                if(end<0)return [];
+            }
+            cursor=end+1;
+            if(tokens[cursor]?.value===',')cursor+=1;
+            else if(tokens[cursor]?.value!=='}')return [];
+        }
+        return properties;
+    }
+    function addImports(start){
+        for(const property of objectProperties(start)){
+            if(property.value.type!=='string')continue;
+            if(property.key.endsWith('/')||property.value.value.split(/[?#]/u)[0].endsWith('/'))continue;
+            reportAssetReference(onReference,property.value.value,'import');
+            const edit=stringReferenceEdit(source,property.value,version);
+            if(edit)edits.push(edit);
+        }
+    }
+    for(const property of objectProperties(0)){
+        if(property.key==='imports')addImports(property.valueIndex);
+        if(property.key==='scopes'){
+            for(const scope of objectProperties(property.valueIndex))addImports(scope.valueIndex);
+        }
+    }
+    return edits;
+}
+
+export function rewriteAssetReferences(source,{filePath,version=SDK_VERSION,onReference}={}){
+    if(typeof source!=='string')throw new TypeError('Asset reference source must be a string.');
+    const extension=path.extname(String(filePath??'')).toLowerCase();
+    if(extension==='.js'||extension==='.mjs'){
+        return applyReferenceEdits(source,javascriptReferenceEdits(source,version,onReference));
+    }
+    if(extension==='.css')return applyReferenceEdits(source,cssReferenceEdits(source,version,onReference));
+    if(extension==='.html'||extension==='.htm'){
+        return applyReferenceEdits(source,htmlReferenceEdits(source,version,onReference));
+    }
+    return source;
+}
+
 function registerSpecifier(registry,specifier,target){
     registry.set(specifier,{specifier,target});
 }
@@ -798,7 +1148,7 @@ function validateInventory(files){
     return exact;
 }
 
-export async function buildImportMap({files,signal}={}){
+export async function buildImportMap({files,signal,version=SDK_VERSION}={}){
     throwIfAborted(signal);
     const inventory=validateInventory(files);
     const modules=[...inventory]
@@ -858,9 +1208,14 @@ export async function buildImportMap({files,signal}={}){
             './arcane/sdk/dependencies/event-pubsub/index.js'
         );
     }
+    for(const relative of [...inventory].sort(compareText)){
+        if(JAVASCRIPT_EXTENSION.test(relative)){
+            registerSpecifier(namedRegistry,`./arcane/${relative}`,`./arcane/${relative}`);
+        }
+    }
     const imports={};
     for(const entry of [...namedRegistry.values()].sort((left,right)=>compareText(left.specifier,right.specifier))){
-        imports[entry.specifier]=entry.target;
+        imports[entry.specifier]=versionAssetUrl(entry.target,version);
     }
     return {
         imports,
@@ -918,9 +1273,22 @@ async function physicalRuntime(workspaceRoot,signal){
 
 async function managedImportMapBuild(resolvedWorkspace,signal){
     const runtime=await physicalRuntime(resolvedWorkspace,signal);
-    const built=await buildImportMap({files:runtime.files,signal});
+    const version=await readWorkspaceAssetVersion(resolvedWorkspace);
+    const built=await buildImportMap({files:runtime.files,signal,version});
     const json=`${JSON.stringify({imports:built.imports},null,2).replaceAll('<','\\u003c')}\n`;
-    return {built,json};
+    return {built,json,version};
+}
+
+export async function readWorkspaceAssetVersion(workspaceRoot){
+    let source;
+    try{source=await readFileFromDisk(path.join(workspaceRoot,'arcane.lock.json'),'utf8');}
+    catch(error){
+        if(error?.code==='ENOENT')return SDK_VERSION;
+        throw error;
+    }
+    const document=JSON.parse(source);
+    const version=document?.sdk?.version;
+    return typeof version==='string'&&version?version:SDK_VERSION;
 }
 
 function asciiLower(value){
@@ -946,7 +1314,9 @@ function htmlTagName(value){
 function parseTagAttributes(openTag){
     const attributes=new Map();
     const duplicates=new Set();
+    const positions=new Map();
     Object.defineProperty(attributes,'duplicates',{value:duplicates});
+    Object.defineProperty(attributes,'positions',{value:positions});
     const tagHead=openTag.match(/^<[A-Za-z][^\t\n\f\r />]*(?=[\t\n\f\r />])/u);
     if(!tagHead)fail('Application HTML contains a malformed structural start tag.');
     let index=tagHead[0].length;
@@ -963,25 +1333,34 @@ function parseTagAttributes(openTag){
         const name=asciiLower(openTag.slice(start,index));
         while(/[\t\n\f\r ]/u.test(openTag[index]??''))index+=1;
         let value='';
+        let valueStart=index;
+        let valueEnd=index;
+        let quote='';
         if(openTag[index]==='='){
             index+=1;
             while(/[\t\n\f\r ]/u.test(openTag[index]??''))index+=1;
-            const quote=openTag[index];
+            quote=openTag[index];
             if(quote==='\''||quote==='"'){
                 index+=1;
-                const valueStart=index;
+                valueStart=index;
                 while(index<openTag.length&&openTag[index]!==quote)index+=1;
+                valueEnd=index;
                 value=openTag.slice(valueStart,index);
                 if(openTag[index]===quote)index+=1;
             }else{
-                const valueStart=index;
+                quote='';
+                valueStart=index;
                 while(index<openTag.length&&!/[\t\n\f\r >]/u.test(openTag[index]))index+=1;
+                valueEnd=index;
                 value=openTag.slice(valueStart,index);
             }
         }
         if(name){
             if(attributes.has(name))duplicates.add(name);
-            else attributes.set(name,value);
+            else{
+                attributes.set(name,value);
+                positions.set(name,{start:valueStart,end:valueEnd,quote});
+            }
         }
     }
     return attributes;
@@ -1004,7 +1383,9 @@ function decodeStructuralAttribute(value,label){
             return String.fromCodePoint(point);
         }
     );
-    if(decoded.includes('&')){
+    if(/&(?:#[^;\s&]*|[A-Za-z][A-Za-z0-9]*);/u.test(source.replace(
+        /&(?:#[0-9]+|#x[a-f0-9]+|amp|apos|gt|lt|quot);/giu,''
+    ))){
         fail(
             `Application HTML ${label} contains an unsupported or ambiguous character reference.`
         );
@@ -1087,13 +1468,13 @@ function rawElementEnd(html,tag,openEnd){
     const closePattern=new RegExp(`<\\/${tag}(?=[\\t\\n\\f\\r />]|$)`,'gi');
     closePattern.lastIndex=openEnd;
     const close=closePattern.exec(html);
-    if(!close)return {end:html.length,closed:false};
+    if(!close)return {end:html.length,contentEnd:html.length,closed:false};
     const end=htmlTagEnd(html,close.index+close[0].length);
     const closeTag=html.slice(close.index,end);
     if(!new RegExp(`^<\\/${tag}[\\t\\n\\f\\r ]*>$`,'i').test(closeTag)){
         fail(`Application HTML contains a malformed </${tag}> end tag.`);
     }
-    return {end,closed:true};
+    return {end,contentEnd:close.index,closed:true};
 }
 
 function commentEnd(html,start){
@@ -1179,6 +1560,8 @@ function scanHtmlStructure(html){
     const links=[];
     const bases=[];
     const metas=[];
+    const elements=[];
+    const styles=[];
     let headClose=-1;
     let bodyClose=-1;
     let cursor=0;
@@ -1225,6 +1608,7 @@ function scanHtmlStructure(html){
             cursor=openEnd;
             continue;
         }
+        if(tag!=='template')elements.push({tag,start,end:openEnd,open});
         if(tag==='link'){
             links.push({start,end:openEnd,open});
             cursor=openEnd;
@@ -1256,13 +1640,158 @@ function scanHtmlStructure(html){
         if(tag==='script')scripts.push({
             start,
             openEnd,
+            contentEnd:raw.contentEnd,
             end:raw.end,
             open,
             closed:raw.closed
         });
+        if(tag==='style')styles.push({start:openEnd,end:raw.contentEnd});
         cursor=raw.end;
     }
-    return {scripts,links,bases,metas,headClose,bodyClose};
+    return {scripts,links,bases,metas,elements,styles,headClose,bodyClose};
+}
+
+function htmlAttributeView(value){
+    let decoded='';
+    const positions=[];
+    for(let cursor=0;cursor<value.length;){
+        const entity=value.slice(cursor).match(/^&(?:#([0-9]+)|#x([a-f0-9]+)|(amp|apos|gt|lt|quot));/iu);
+        if(entity){
+            const point=entity[1]||entity[2]
+                ?Number.parseInt(entity[1]??entity[2],entity[1]?10:16)
+                :null;
+            if(point!==null&&(!Number.isSafeInteger(point)||point<=0||point>0x10ffff))return null;
+            const character=point===null
+                ?{amp:'&',apos:"'",gt:'>',lt:'<',quot:'"'}[asciiLower(entity[3])]
+                :String.fromCodePoint(point);
+            for(let index=0;index<character.length;index+=1)positions.push(cursor);
+            decoded+=character;
+            cursor+=entity[0].length;
+        }else{
+            if(/^&[A-Za-z][A-Za-z0-9]*;/u.test(value.slice(cursor)))return null;
+            positions.push(cursor);
+            decoded+=value[cursor++];
+        }
+    }
+    positions.push(value.length);
+    return {decoded,positions};
+}
+
+function versionHtmlAttribute(value,version){
+    // Map decoded URL positions back to authored HTML so existing query spelling survives.
+    const view=htmlAttributeView(value);
+    if(!view)return value;
+    const {decoded,positions}=view;
+    const edits=assetUrlVersionEdits(decoded,version).map(function authoredAttributeEdit(edit){
+        return {
+            start:positions[edit.start],
+            end:positions[edit.end],
+            value:edit.value.replaceAll('&','&amp;')
+        };
+    });
+    return applyReferenceEdits(value,edits);
+}
+
+function htmlStyleReferenceEdits(source,version,onReference){
+    const view=htmlAttributeView(source);
+    if(!view)return [];
+    const edits=cssReferenceEdits(view.decoded,version,onReference);
+    return edits.map(function authoredStyleReference(edit){
+        const start=view.positions[edit.start];
+        const end=view.positions[edit.end];
+        return {start,end,value:versionHtmlAttribute(source.slice(start,end),version)};
+    });
+}
+
+function srcsetReferenceEdits(source,version,onReference){
+    const edits=[];
+    let cursor=0;
+    while(cursor<source.length){
+        while(/[\t\n\f\r ,]/u.test(source[cursor]??''))cursor+=1;
+        const start=cursor;
+        while(cursor<source.length&&!/[\t\n\f\r ]/u.test(source[cursor]))cursor+=1;
+        let end=cursor;
+        while(end>start&&source[end-1]===',')end-=1;
+        const original=source.slice(start,end);
+        const view=htmlAttributeView(original);
+        if(view)reportAssetReference(onReference,view.decoded,'asset');
+        const value=versionHtmlAttribute(original,version);
+        if(value!==original)edits.push({start,end,value});
+        if(end<cursor)continue;
+        while(cursor<source.length&&source[cursor]!==',')cursor+=1;
+    }
+    return edits;
+}
+
+function htmlReferenceEdits(source,version,onReference){
+    const structure=scanHtmlStructure(source);
+    const edits=[];
+    const sourceTags=new Set(['script','html-import','img','audio','video','source','track','iframe','embed']);
+    const linkResources=new Set(['stylesheet','modulepreload','preload','icon','manifest']);
+    const base=structure.bases[0];
+    const baseHref=base?structuralAttribute(parseTagAttributes(base.open),'href','base'):null;
+    if(baseHref&&(/^[A-Za-z][A-Za-z0-9+.-]*:/u.test(baseHref)||baseHref.startsWith('//')))version=null;
+    function reportHtmlReference(reference){
+        if(typeof onReference==='function')onReference({...reference,baseHref});
+    }
+    function addNestedEdits(offset,nested){
+        for(const edit of nested)edits.push({...edit,start:offset+edit.start,end:offset+edit.end});
+    }
+    for(const element of structure.elements){
+        const attributes=parseTagAttributes(element.open);
+        const selected=[];
+        const activeScript=element.tag!=='script'
+            ||['','module','text/javascript','application/javascript'].includes(scriptType(attributes));
+        if(sourceTags.has(element.tag)&&element.tag!=='html-import'&&activeScript)selected.push('src');
+        if(element.tag==='html-import')selected.push('href');
+        if(element.tag==='video')selected.push('poster');
+        if(element.tag==='object')selected.push('data');
+        if(element.tag==='input'&&canonicalHtmlToken(attributes.get('type')??'')==='image')selected.push('src');
+        const relationships=canonicalHtmlToken(attributes.get('rel')??'').split(/[\t\n\f\r ]+/u);
+        if(element.tag==='link'){
+            if(relationships.some(function loadsResource(relationship){return linkResources.has(relationship);})){selected.push('href');}
+        }
+        for(const name of selected){
+            const original=attributes.get(name);
+            if(!original)continue;
+            const destination=canonicalHtmlToken(attributes.get('as')??'');
+            const kind=element.tag==='script'?'script'
+                :element.tag==='html-import'?'component'
+                :element.tag==='iframe'?'document'
+                :element.tag==='link'&&relationships.includes('stylesheet')?'style'
+                :element.tag==='link'&&relationships.includes('modulepreload')?'script'
+                :element.tag==='link'&&relationships.includes('preload')
+                    &&['script','worker','style'].includes(destination)?destination==='style'?'style':'script':'asset';
+            const view=htmlAttributeView(original);
+            if(view)reportAssetReference(reportHtmlReference,view.decoded,kind);
+            const value=versionHtmlAttribute(original,version);
+            if(value===original)continue;
+            const position=attributes.positions.get(name);
+            edits.push({start:element.start+position.start,end:element.start+position.end,value});
+        }
+        if((element.tag==='img'||element.tag==='source')&&attributes.has('srcset')){
+            addNestedEdits(element.start+attributes.positions.get('srcset').start,
+                srcsetReferenceEdits(attributes.get('srcset'),version,reportHtmlReference));
+        }
+        if(attributes.has('style')){
+            addNestedEdits(element.start+attributes.positions.get('style').start,
+                htmlStyleReferenceEdits(attributes.get('style'),version,reportHtmlReference));
+        }
+    }
+    for(const script of structure.scripts){
+        const attributes=parseTagAttributes(script.open);
+        if(attributes.has('src'))continue;
+        const type=scriptType(attributes);
+        const body=source.slice(script.openEnd,script.contentEnd);
+        if(type==='importmap')addNestedEdits(script.openEnd,importMapReferenceEdits(body,version,reportHtmlReference));
+        else if(['','module','text/javascript','application/javascript'].includes(type)){
+            addNestedEdits(script.openEnd,javascriptReferenceEdits(body,version,reportHtmlReference));
+        }
+    }
+    for(const style of structure.styles){
+        addNestedEdits(style.start,cssReferenceEdits(source.slice(style.start,style.end),version,reportHtmlReference));
+    }
+    return edits;
 }
 
 function removeManagedBlocks(html,blocks){
@@ -1579,7 +2108,7 @@ export async function createApplicationTestImportMapContext({
             fail(`Application test import-map entry is invalid: ${String(specifier)}.`);
         }
         const relative=safeRelativePath(
-            target.slice(2),
+            decodeURIComponent(target.slice(2).split(/[?#]/u)[0]),
             `application test import-map target for ${specifier}`
         );
         if(boundary==='source'&&/^(?:dist|test)\//u.test(relative)){
@@ -1699,10 +2228,13 @@ async function generateImportMapUnlocked({
         renderManagedHtml(html,'{"imports":{}}\n',baseHref);
         documentStates.push({filePath:documentPath,html,label,baseHref});
     }
-    const {built,json}=await managedImportMapBuild(resolvedWorkspace,signal);
+    const {built,json,version}=await managedImportMapBuild(resolvedWorkspace,signal);
     const renderedDocuments=documentStates.map(item=>({
         ...item,
-        content:renderManagedHtml(item.html,json,item.baseHref)
+        content:rewriteAssetReferences(renderManagedHtml(item.html,json,item.baseHref),{
+            filePath:item.filePath,
+            version
+        })
     }));
 
     throwIfAborted(signal);

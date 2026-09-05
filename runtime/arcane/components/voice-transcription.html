@@ -84,21 +84,16 @@
             ]
         }
     );
-    const componentURL=new URL(
-        host.getAttribute('href')||'./arcane/components/voice-transcription.html',
-        document.baseURI
-    );
-    const moduleURL=name=>new URL(`../modules/${name}`,componentURL).href;
-    const {default:MD}=await import(moduleURL('MD.js?v=2'));
+    const {default:MD}=await import('../modules/MD.js?v=2');
     const {
         appendTranscription,
         createSTTActivationController,
         normalizeVoiceOptions
-    }=await import(moduleURL('ComponentContracts.js'));
+    }=await import('../modules/ComponentContracts.js');
     const {
         requestAIRuntimeIntent,
         subscribeAIRuntimeState
-    }=await import(moduleURL('AIRuntimeState.js'));
+    }=await import('../modules/AIRuntimeState.js');
     const description=host.shadowRoot.querySelector('#description');
     const transcriptElement=host.shadowRoot.querySelector('#transcript');
     const status=host.shadowRoot.querySelector('#status');
@@ -598,7 +593,7 @@
             return options.transcribe(file,context);
         }
         if(typeof globalThis.ai?.fetchSTT!=='function'){
-            await import(moduleURL('AI.js'));
+            await import('../modules/AI.js');
         }
         if(typeof globalThis.ai?.fetchSTT!=='function'){
             const error=new Error('Speech transcription is not configured.');

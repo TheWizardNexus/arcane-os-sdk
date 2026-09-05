@@ -12,7 +12,7 @@ import {
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {withWorkspaceOperationLock} from '../workspace-operation-lock.mjs';
-import {inspectImportMapHtml} from '../import-map.mjs';
+import {inspectImportMapHtml,readWorkspaceAssetVersion,rewriteAssetReferences} from '../import-map.mjs';
 
 export const ROOT_CONFIG_NAME='arcane-packager.json';
 export const APP_CONFIG_NAME='arcane-package.json';
@@ -704,6 +704,65 @@ async function packageWithContext(context,options={}){
             await copyBase();
         }
         const files=await listOutputFiles(stagingRoot,{signal});
+        // Traverse actual browser resources after the adapter finishes. Files
+        // included only as application documents retain their original content.
+        const version=await readWorkspaceAssetVersion(context.workspaceRoot);
+        const inventory=new Set(files);
+        const entryUrl=new URL(context.config.entry,'http://arcane.invalid/');
+        const entryDocument=inspected.browserDocuments.find(document=>document.path===context.config.entry);
+        const documentUrl=entryDocument?.bases[0]?.href
+            ?new URL(entryDocument.bases[0].href,entryUrl):entryUrl;
+        const pending=[{file:context.config.entry,documentUrl}];
+        for(const file of files){
+            if(/^arcane\/(?:modules|entities|components|css|sdk|dependencies)\//u.test(file)
+                &&/\.(?:m?js|html?|css)$/iu.test(file))pending.push({file,documentUrl});
+        }
+        for(const document of inspected.browserDocuments){
+            if(document.managedMaps.length>0){
+                const url=new URL(document.path,entryUrl.origin);
+                pending.push({file:document.path,documentUrl:document.bases[0]?.href
+                    ?new URL(document.bases[0].href,url):url});
+            }
+        }
+        const visited=new Set();
+        const resources=new Map();
+        for(const current of pending){
+            const relative=current.file;
+            throwIfAborted(signal);
+            const contextKey=`${relative}\n${current.documentUrl.href}`;
+            if(visited.has(contextKey)||!inventory.has(relative)
+                ||!/\.(?:m?js|html?|css)$/iu.test(relative))continue;
+            visited.add(contextKey);
+            const filePath=path.join(stagingRoot,...relative.split('/'));
+            let resource=resources.get(relative);
+            if(!resource){
+                const original=await readFile(filePath,'utf8');
+                const references=[];
+                const content=rewriteAssetReferences(original,{
+                    filePath:relative,version,onReference:reference=>references.push(reference)
+                });
+                if(content!==original)await writeFile(filePath,content,'utf8');
+                resource={references};
+                resources.set(relative,resource);
+            }
+            for(const {url,kind,baseHref,baseKind} of resource.references){
+                if(kind==='fetch'||(kind==='asset'&&!/\.css(?:[?#]|$)/iu.test(url))
+                    ||(kind==='import'&&!/^(?:\.{1,2}\/|\/)/u.test(url)))continue;
+                try{
+                    const ownerUrl=new URL(relative,entryUrl.origin);
+                    const base=baseHref?new URL(baseHref,ownerUrl)
+                        :baseKind==='document'?current.documentUrl:ownerUrl;
+                    const target=new URL(url,base);
+                    if(target.origin===entryUrl.origin){
+                        pending.push({
+                            file:decodeURIComponent(target.pathname).replace(/^\//u,''),
+                            documentUrl:kind==='document'?target
+                                :baseHref?new URL(baseHref,ownerUrl):current.documentUrl
+                        });
+                    }
+                }catch{ /* Non-URL values remain under their existing owner. */ }
+            }
+        }
         if(files.some(file=>pathKey(file)===pathKey(RELEASE_MANIFEST_NAME))){
             fail(`Package content must not author ${RELEASE_MANIFEST_NAME}.`);
         }

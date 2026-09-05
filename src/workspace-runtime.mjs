@@ -1,6 +1,8 @@
 import {randomUUID} from 'node:crypto';
-import {copyFile,lstat,mkdir,readdir,realpath,rename,rm} from 'node:fs/promises';
+import {copyFile,lstat,mkdir,readFile,readdir,realpath,rename,rm,writeFile} from 'node:fs/promises';
 import path from 'node:path';
+import {SDK_VERSION} from './constants.mjs';
+import {rewriteAssetReferences} from './import-map.mjs';
 import {getSdkRoot} from './runtime.mjs';
 import {getSdkBrowserRuntimeRoot} from './sdk-browser-runtime.mjs';
 
@@ -47,12 +49,18 @@ async function realDirectory(location,label){
     return canonical;
 }
 
-async function copyCompleteEntry(source,destination,label,signal){
+async function copyCompleteEntry(source,destination,label,signal,version){
     throwIfAborted(signal);
     const info=await lstat(source);
     if(info.isSymbolicLink())fail(`${label} must not contain a symbolic link or junction.`);
     if(info.isFile()){
-        await copyFile(source,destination);
+        if(/\.(?:m?js|html?|css)$/iu.test(source)){
+            const original=await readFile(source,'utf8');
+            const content=rewriteAssetReferences(original,{filePath:source,version});
+            await writeFile(destination,content,'utf8');
+        }else{
+            await copyFile(source,destination);
+        }
         return;
     }
     if(!info.isDirectory())fail(`${label} contains a non-file entry.`);
@@ -65,7 +73,8 @@ async function copyCompleteEntry(source,destination,label,signal){
             path.join(source,entry.name),
             path.join(destination,entry.name),
             `${label}/${entry.name}`,
-            signal
+            signal,
+            version
         );
     }
 }
@@ -78,6 +87,7 @@ export async function materializeWorkspaceRuntimeContent({
     workspaceRoot,
     runtimeRoot=path.join(getSdkRoot(),'runtime'),
     browserRuntimeRoot=getSdkBrowserRuntimeRoot(),
+    sdkVersion=SDK_VERSION,
     signal,
     onEvent
 }={}){
@@ -100,13 +110,14 @@ export async function materializeWorkspaceRuntimeContent({
 
     await mkdir(stagingRoot);
     try{
-        await copyCompleteEntry(runtimeArcane,stagingRoot,'SDK Arcane runtime',signal);
+        await copyCompleteEntry(runtimeArcane,stagingRoot,'SDK Arcane runtime',signal,sdkVersion);
         await mkdir(path.join(stagingRoot,'dependencies'),{recursive:true});
         await copyCompleteEntry(
             runtimeStrongType,
             path.join(stagingRoot,'dependencies','strong-type'),
             'SDK strong-type runtime',
-            signal
+            signal,
+            sdkVersion
         );
         const sdkDestination=path.join(stagingRoot,'sdk');
         await mkdir(sdkDestination,{recursive:true});
@@ -118,7 +129,8 @@ export async function materializeWorkspaceRuntimeContent({
                 path.join(browserRuntime,entry.name),
                 path.join(sdkDestination,entry.name),
                 `SDK browser runtime/${entry.name}`,
-                signal
+                signal,
+                sdkVersion
             );
         }
 

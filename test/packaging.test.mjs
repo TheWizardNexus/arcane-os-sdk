@@ -59,6 +59,48 @@ async function workspaceFixture(t,{security}={}){
     return {workspaceRoot,appRoot,html,document,module};
 }
 
+test('selected static package carries one release through entry, modules, Worker and CSS references',async t=>{
+    const selected=await workspaceFixture(t);
+    const sourceRoot=path.join(selected.workspaceRoot,'runtime','modules');
+    const version='8.7.6';
+    await writeJson(path.join(selected.workspaceRoot,'arcane.lock.json'),{sdk:{version}});
+    const corpus='<base href="./"><script src="./original.js"></script>'
+        +'<style>p{background:url(original.svg)}</style><p>Complete supplied HTML</p>';
+    await writeFile(path.join(selected.appRoot,'content','document.html'),corpus);
+    await writeFile(path.join(selected.appRoot,'index.html'),
+        '<!doctype html><script type="module" src="./arcane/modules/entry.js?v=6"></script>'
+        +'<link rel="stylesheet" href="./arcane/modules/theme.css?theme=day#palette">'
+        +'<p>./arcane/modules/entry.js?v=6</p>');
+    await writeFile(path.join(sourceRoot,'entry.js'),
+        "import './child.js?v=2';\nnew Worker(new URL('./worker.js',import.meta.url),{type:'module'});\n");
+    await writeFile(path.join(sourceRoot,'child.js'),'export const content="keep all text";\n');
+    await writeFile(path.join(sourceRoot,'worker.js'),"import './child.js?v=2';\n");
+    await writeFile(path.join(sourceRoot,'theme.css'),'body{background:url(./icon.svg?color=blue#mark)}\n');
+    await writeFile(path.join(sourceRoot,'icon.svg'),'<svg xmlns="http://www.w3.org/2000/svg"/>');
+    await writeFile(path.join(selected.appRoot,'content','App.js'),"new Worker('./content/root-worker.js',{type:'module'});\n");
+    await writeFile(path.join(selected.appRoot,'content','root-worker.js'),"import './worker-child.js';\n");
+    await writeFile(path.join(selected.appRoot,'content','worker-child.js'),'export const workerReady=true;\n');
+    const initialEntry=await readFile(path.join(selected.appRoot,'index.html'),'utf8');
+    await writeFile(path.join(selected.appRoot,'index.html'),initialEntry
+        +'<script type="module" src="./content/App.js"></script>');
+    const packaged=await packageApp({workspaceRoot:selected.workspaceRoot,appId:'complete-app'});
+    const entry=await readFile(path.join(packaged.outputRoot,'index.html'),'utf8');
+    assert.ok(entry.includes(`entry.js?v=6&amp;arcaneVersion=${version}`));
+    assert.ok(entry.includes(`theme.css?theme=day&amp;arcaneVersion=${version}#palette`));
+    assert.ok(entry.includes('<p>./arcane/modules/entry.js?v=6</p>'));
+    const module=await readFile(path.join(packaged.outputRoot,'arcane/modules/entry.js'),'utf8');
+    assert.ok(module.includes(`child.js?v=2&arcaneVersion=${version}`));
+    assert.ok(module.includes(`worker.js?arcaneVersion=${version}`));
+    const worker=await readFile(path.join(packaged.outputRoot,'arcane/modules/worker.js'),'utf8');
+    assert.ok(worker.includes(`child.js?v=2&arcaneVersion=${version}`));
+    const style=await readFile(path.join(packaged.outputRoot,'arcane/modules/theme.css'),'utf8');
+    assert.ok(style.includes(`icon.svg?color=blue&arcaneVersion=${version}#mark`));
+    assert.equal(await readFile(path.join(packaged.outputRoot,'content/document.html'),'utf8'),corpus);
+    assert.ok((await readFile(path.join(packaged.outputRoot,'content/root-worker.js'),'utf8'))
+        .includes(`worker-child.js?arcaneVersion=${version}`));
+    assert.equal(await readFile(path.join(packaged.outputRoot,'content/document.txt'),'utf8'),selected.document);
+});
+
 test('packager materializes every selected app and shared file with complete content',async t=>{
     const selected=await workspaceFixture(t);
     assert.deepEqual(await discoverApps({workspaceRoot:selected.workspaceRoot}),['complete-app']);

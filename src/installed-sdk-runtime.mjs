@@ -89,6 +89,7 @@ export async function materializeInstalledSdkRuntime({
             workspaceRoot:canonicalRoot,
             runtimeRoot:authority.installation.runtimeRoot,
             browserRuntimeRoot:authority.installation.browserRuntimeRoot,
+            sdkVersion:authority.installation.packageVersion,
             signal,
             onEvent
         });

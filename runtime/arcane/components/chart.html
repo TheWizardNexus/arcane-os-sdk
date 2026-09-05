@@ -162,16 +162,11 @@
 
 <script type="module">
     const host=this;
-    const componentURL=new URL(
-        host.getAttribute('href')||'./arcane/components/chart.html',
-        document.baseURI
-    );
-    const moduleURL=name=>new URL(`../modules/${name}`,componentURL).href;
-    const {default:loadChartLibrary}=await import(moduleURL('ChartLibrary.js'));
+    const {default:loadChartLibrary}=await import('../modules/ChartLibrary.js');
     const {
         normalizeChartOptions,
         normalizeChartRows
-    }=await import(moduleURL('ComponentContracts.js'));
+    }=await import('../modules/ComponentContracts.js');
     const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
     const events=createArcaneEventSource(host,{source:'arcane.component.chart',eventTypes:['chart-remove','chart-ready']});
     const lifecycleController=new AbortController();

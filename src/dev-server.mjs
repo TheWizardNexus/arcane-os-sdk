@@ -1,14 +1,19 @@
 import {constants as FS_CONSTANTS} from 'node:fs';
-import {lstat,open,realpath} from 'node:fs/promises';
+import {lstat,open,readFile,realpath} from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import {resolveWorkspace} from './workspace.mjs';
 import {createEventQueue} from './event-queue.mjs';
+import {
+    inspectImportMapHtml,MANAGED_IMPORT_MAP_ATTRIBUTE,
+    readWorkspaceAssetVersion,rewriteAssetReferences
+} from './import-map.mjs';
 
 const MIME_TYPES=new Map([
     ['.css','text/css; charset=utf-8'],
     ['.gif','image/gif'],
     ['.html','text/html; charset=utf-8'],
+    ['.htm','text/html; charset=utf-8'],
     ['.ico','image/x-icon'],
     ['.jpeg','image/jpeg'],
     ['.jpg','image/jpeg'],
@@ -308,11 +313,21 @@ async function openSafeFile(root,segments){
     }
 }
 
-async function sendFile(response,opened,{head=false}={}){
+async function sendFile(response,opened,{head=false,assetVersion,revalidate=false,onReference}={}){
     const extension=path.extname(opened.candidate).toLowerCase();
+    const content=assetVersion&&/\.(?:m?js|html?|css)$/iu.test(extension)
+        ?Buffer.from(rewriteAssetReferences(opened.content.toString('utf8'),{
+            filePath:opened.candidate,
+            version:assetVersion,
+            onReference
+        }),'utf8')
+        :opened.content;
+    // Entry documents must discover the current generated graph on navigation.
+    // no-cache permits storage and revalidation; ordinary asset caching is unchanged.
     response.writeHead(200,{
         'content-type':MIME_TYPES.get(extension)||'application/octet-stream',
-        'content-length':opened.content.byteLength
+        'content-length':content.byteLength,
+        ...(revalidate?{'cache-control':'no-cache'}:{})
     });
     await new Promise((resolve,reject)=>{
         let settled=false;
@@ -336,7 +351,7 @@ async function sendFile(response,opened,{head=false}={}){
         response.once('error',failed);
         response.once('finish',completed);
         response.once('close',completed);
-        response.end(head?undefined:opened.content);
+        response.end(head?undefined:content);
     });
 }
 
@@ -509,11 +524,23 @@ async function startOwnedDevServer({
         })
         :await packagedRoutes(releaseRoot);
     const mappings=deterministicMappings(routeSet.mappings);
+    async function selectedAssetVersion(){
+        if(mode!=='source')return undefined;
+        return sdkRuntimeSourceRoot===undefined
+            ?readWorkspaceAssetVersion(routeSet.workspaceRoot)
+            :JSON.parse(await readFile(
+                path.join(routeSet.runtime.sourceRoot,'package.json'),'utf8'
+            )).version;
+    }
+    let assetVersion=await selectedAssetVersion();
     for(const mapping of mappings){
         const info=await lstat(mapping.root);
         if(info.isSymbolicLink()||!info.isDirectory())fail(`Server route root must be a real directory: ${mapping.root}.`);
         mapping.root=await realpath(mapping.root);
     }
+    // Remember actual resource edges as their owners are served, not every
+    // HTML/JS/CSS file in an application's document or attachment corpus.
+    const resourcePaths=new Set([routeSet.startPath]);
     const requestTasks=new Set();
     const runFileWork=createFileWorkLimiter();
     const server=http.createServer((request,response)=>{
@@ -541,7 +568,47 @@ async function startOwnedDevServer({
             await runFileWork(async()=>{
                 const opened=await openSafeFile(mapping.root,relative);
                 if(!opened){deny(response,404,'Not found.');return;}
-                await sendFile(response,opened,{head:request.method==='HEAD'});
+                const extension=path.extname(opened.candidate).toLowerCase();
+                const html=extension==='.html'||extension==='.htm';
+                let managedDocument=false;
+                if(html&&opened.content.includes(MANAGED_IMPORT_MAP_ATTRIBUTE)){
+                    try{
+                        managedDocument=inspectImportMapHtml(
+                            opened.content.toString('utf8')
+                        ).managedMaps.length>0;
+                    }catch{
+                        // An unrelated document is not a source validation surface.
+                    }
+                }
+                const entryDocument=target.path===routeSet.startPath||managedDocument;
+                const managedMap=path.basename(opened.candidate)==='arcane.importmap.json';
+                // A live server can span an SDK upgrade. Refresh the small
+                // version record on navigation, not on each resource request.
+                if(entryDocument||managedMap)assetVersion=await selectedAssetVersion();
+                const runtimeResource=segments[0]==='arcane';
+                const browserResource=['script','style','worker','sharedworker','serviceworker']
+                    .includes(request.headers['sec-fetch-dest']);
+                const rewrite=runtimeResource||entryDocument||browserResource
+                    ||resourcePaths.has(target.path);
+                const onReference=({url,kind,baseHref,baseKind})=>{
+                    if(baseKind==='document'||kind==='fetch'||(kind==='asset'&&!/\.css(?:[?#]|$)/iu.test(url))
+                        ||(kind==='import'&&!/^(?:\.{1,2}\/|\/)/u.test(url)))return;
+                    try{
+                        const documentUrl=new URL(target.path,'http://arcane.invalid');
+                        const base=baseHref?new URL(baseHref,documentUrl):documentUrl;
+                        const resource=new URL(url,base);
+                        if(resource.origin===documentUrl.origin
+                            &&/\.(?:m?js|html?|css)$/iu.test(resource.pathname)){
+                            resourcePaths.add(decodeURIComponent(resource.pathname));
+                        }
+                    }catch{ /* Non-URL values remain under their existing owner. */ }
+                };
+                await sendFile(response,opened,{
+                    head:request.method==='HEAD',
+                    assetVersion:rewrite?assetVersion:undefined,
+                    revalidate:entryDocument||managedMap,
+                    onReference
+                });
             });
         })().catch(async error=>{
             await events.enqueue({type:'server.request.failed',message:error.message});

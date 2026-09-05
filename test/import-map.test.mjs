@@ -19,6 +19,7 @@ import {
     scanModuleImports
 } from '../src/import-map.mjs';
 import {temporaryDirectory} from './helpers.mjs';
+import {SDK_VERSION} from '../src/constants.mjs';
 
 async function writeWorkspaceFile(workspaceRoot,relative,source){
     const filePath=path.join(workspaceRoot,...relative.split('/'));
@@ -143,7 +144,7 @@ test('complete runtime inventory produces a mutable named import map without rea
     });
 
     assert.equal(readAttempted,false);
-    assert.deepEqual(result.imports,{
+    const expected={
         '#arcane/persistent-ai-chat-session':'./arcane/modules/PersistentAIChatSession.js',
         './node_modules/strong-type/index.js':'./arcane/dependencies/strong-type/index.js',
         'arcane-os/ai/browser-speech':'./arcane/sdk/ai/browser-speech.mjs',
@@ -158,7 +159,10 @@ test('complete runtime inventory produces a mutable named import map without rea
         'arcane/ThemeBootstrap':'./arcane/modules/ThemeBootstrap.js',
         'arcane/entities/Preference':'./arcane/entities/Preference.js',
         'event-pubsub':'./arcane/sdk/dependencies/event-pubsub/index.js'
-    });
+    };
+    for(const target of Object.values(expected))expected[target]=target;
+    for(const specifier of Object.keys(expected))expected[specifier]+=`?arcaneVersion=${SDK_VERSION}`;
+    assert.deepEqual(result.imports,expected);
     assert.deepEqual(result.excludedModules,[]);
     result.imports['fixture/mutable']='./fixture.js';
     result.excludedModules.push('fixture.js');
@@ -400,6 +404,6 @@ test('application tests read the existing managed browser map from the workspace
     assert.deepEqual(context.imports,generated.imports);
     assert.equal(
         context.imports['arcane/ThemeBootstrap'],
-        './arcane/modules/ThemeBootstrap.js'
+        `./arcane/modules/ThemeBootstrap.js?arcaneVersion=${SDK_VERSION}`
     );
 });

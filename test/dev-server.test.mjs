@@ -15,12 +15,16 @@ function assertPermissiveDevelopmentHeaders(response){
         'content-security-policy',
         'cross-origin-resource-policy',
         'referrer-policy',
-        'cache-control',
         'x-content-type-options',
         'set-cookie'
     ]){
         assert.equal(response.headers.get(name),null,name);
     }
+    const entry=response.status===200&&(
+        response.headers.get('content-type')?.startsWith('text/html')
+        ||new URL(response.url).pathname.endsWith('/arcane.importmap.json')
+    );
+    assert.equal(response.headers.get('cache-control'),entry?'no-cache':null);
 }
 
 async function request(origin,requestPath,options={}){
@@ -148,6 +152,52 @@ async function assertPortCanBeReused(port){
     });
     await new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));
 }
+
+test('source server versions local references from selected SDK metadata and revalidates entry HTML',async t=>{
+    const parent=await temporaryDirectory(t,{prefix:'arcane-versioned-source-'});
+    const workspaceRoot=path.join(parent,'workspace');
+    await createWorkspace({targetPath:workspaceRoot,appId:'served-app'});
+    const sourceRoot=await createSdkRuntimeSource(parent,{version:'9.8.7'});
+    await writeFile(path.join(sourceRoot,'runtime/arcane/modules/AI.js'),
+        "import './child.js?v=2';\nnew Worker(new URL('./worker.js',import.meta.url),{type:'module'});\n");
+    await writeFile(path.join(sourceRoot,'runtime/arcane/modules/child.js'),'export const ready=true;\n');
+    await writeFile(path.join(sourceRoot,'runtime/arcane/modules/worker.js'),"import './child.js?v=2';\n");
+    const corpus='<base href="./"><script src="./original.js"></script>'
+        +'<style>p{background:url(original.svg)}</style><p>Complete supplied HTML</p>';
+    await writeFile(path.join(workspaceRoot,'apps/served-app/modules/document.html'),corpus);
+    const instance=await startDevServer({workspaceRoot,appId:'served-app',sdkRuntimeSourceRoot:sourceRoot});
+    t.after(()=>instance.close());
+    const entry=await request(instance.origin,'/apps/served-app/index.html');
+    assert.equal(entry.status,200);
+    assert.equal(entry.headers.get('cache-control'),'no-cache');
+    assert.ok((await entry.text()).includes('arcaneVersion=9.8.7'));
+    const module=await request(instance.origin,'/arcane/modules/AI.js?arcaneVersion=9.8.7');
+    assert.equal(module.status,200);
+    assert.equal(module.headers.get('cache-control'),null);
+    const source=await module.text();
+    assert.ok(source.includes('child.js?v=2&arcaneVersion=9.8.7'));
+    assert.ok(source.includes('worker.js?arcaneVersion=9.8.7'));
+    const worker=await request(instance.origin,'/arcane/modules/worker.js?arcaneVersion=9.8.7');
+    assert.equal(worker.status,200);
+    assert.ok((await worker.text()).includes('child.js?v=2&arcaneVersion=9.8.7'));
+    assert.equal(await readFile(path.join(sourceRoot,'runtime/arcane/modules/worker.js'),'utf8'),
+        "import './child.js?v=2';\n");
+    const document=await request(instance.origin,'/apps/served-app/modules/document.html');
+    assert.equal(document.status,200);
+    assert.equal(document.headers.get('cache-control'),null);
+    assert.equal(await document.text(),corpus);
+    const malformedCorpus='<base href="./" href="../"><script src="./a.js" src="./b.js"></script>'
+        +'<!-- data-arcane-import-map -->';
+    await writeFile(path.join(workspaceRoot,'apps/served-app/modules/document.html'),malformedCorpus);
+    const malformedDocument=await request(instance.origin,'/apps/served-app/modules/document.html');
+    assert.equal(malformedDocument.status,200);
+    assert.equal(await malformedDocument.text(),malformedCorpus);
+    await writeFile(path.join(sourceRoot,'package.json'),JSON.stringify({name:SDK_NAME,version:'9.8.8'}));
+    const refreshedEntry=await request(instance.origin,'/apps/served-app/index.html');
+    assert.ok((await refreshedEntry.text()).includes('arcaneVersion=9.8.8'));
+    const refreshedWorker=await request(instance.origin,'/arcane/modules/worker.js?arcaneVersion=9.8.8');
+    assert.ok((await refreshedWorker.text()).includes('child.js?v=2&arcaneVersion=9.8.8'));
+});
 
 test('source server exposes the selected app and installed SDK browser routes',async t=>{
     const parent=await temporaryDirectory(t,{prefix:'arcane-server-'});

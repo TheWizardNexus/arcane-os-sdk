@@ -214,12 +214,7 @@
     const host=this;
     host.ready=false;
 
-    const componentURL=new URL(
-        host.getAttribute('href')||'./arcane/components/markdown-document.html',
-        document.baseURI
-    );
-    const moduleURL=name=>new URL(`../modules/${name}`,componentURL).href;
-    const {default:MD}=await import(moduleURL('MD.js?v=2'));
+    const {default:MD}=await import('../modules/MD.js?v=2');
     const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
     const events=createArcaneEventSource(host,{source:'arcane.component.markdown-document',eventTypes:['markdown-document-state','markdown-document-empty','markdown-document-error','markdown-document-loading','markdown-document-rendered','markdown-document-navigate','markdown-document-ready']});
     const lifecycleController=new AbortController();

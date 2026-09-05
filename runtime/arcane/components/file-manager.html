@@ -825,8 +825,8 @@
         icon.className='tree-entry-icon';
         icon.alt='';
         icon.src=entry.kind==='directory'
-            ?'./arcane/img/folder.svg'
-            :'./arcane/img/doc.svg';
+            ?new URL('./arcane/img/folder.svg',document.baseURI).href
+            :new URL('./arcane/img/doc.svg',document.baseURI).href;
         name.className='tree-entry-name';
         name.innerText=entry.name;
         count.className='tree-file-count';
@@ -1404,7 +1404,7 @@
         deleteButton.innerText='Delete File';
         deleteIcon.alt='';
         deleteIcon.className='action-icon';
-        deleteIcon.src='./arcane/img/trash.svg';
+        deleteIcon.src=new URL('./arcane/img/trash.svg',document.baseURI).href;
         deleteButton.prepend(deleteIcon);
         deleteButton.addEventListener(
             'click',
@@ -1610,7 +1610,7 @@
 
         fileIcon.alt='';
         fileIcon.className='icon file-icon';
-        fileIcon.src='./arcane/img/doc.svg';
+        fileIcon.src=new URL('./arcane/img/doc.svg',document.baseURI).href;
         fileDetails.className='file-details';
         fileLabel.className='file-name';
         fileLabel.innerText=fileName;
@@ -1633,7 +1633,7 @@
 
         deleteIcon.alt='';
         deleteIcon.className='action-icon';
-        deleteIcon.src='./arcane/img/trash.svg';
+        deleteIcon.src=new URL('./arcane/img/trash.svg',document.baseURI).href;
 
         openButton.addEventListener(
             'click',
@@ -1933,7 +1933,7 @@
             directory.dataset.directory=tableName;
             folder.className='file folder';
             folderIcon.className='icon';
-            folderIcon.src='./arcane/img/folder.svg';
+            folderIcon.src=new URL('./arcane/img/folder.svg',document.baseURI).href;
             folderName.innerText=tableName;
             fileCount.className='file-count';
             fileCount.innerText=`${files.length} ${files.length===1?'file':'files'}`;

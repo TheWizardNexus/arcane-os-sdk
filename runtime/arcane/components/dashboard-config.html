@@ -11,18 +11,13 @@
 
 <script type="module">
     const host=this;
-    const componentURL=new URL(
-        host.getAttribute('href')||'./arcane/components/dashboard-config.html',
-        document.baseURI
-    );
-    const moduleURL=name=>new URL(`../modules/${name}`,componentURL).href;
-    const {default:waitForComponent}=await import(moduleURL('WaitForComponent.js'));
+    const {default:waitForComponent}=await import('../modules/WaitForComponent.js');
     const {
         effectiveDashboardVisibility,
         normalizeDashboardDefinitions,
         normalizeDashboardOptions,
         normalizeDashboardVisibility
-    }=await import(moduleURL('ComponentContracts.js'));
+    }=await import('../modules/ComponentContracts.js');
     const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
     const events=createArcaneEventSource(host,{source:'arcane.component.dashboard-config',eventTypes:['dashboard-config-closed','dashboard-config-opened','dashboard-config-change','dashboard-config-ready']});
     const lifecycleController=new AbortController();
@@ -232,7 +227,7 @@
         const items=document.createElement('section');
 
         styles.rel='stylesheet';
-        styles.href='./arcane/css/dashboard-config.css?v=2';
+        styles.href=new URL('./arcane/css/dashboard-config.css?v=2',document.baseURI).href;
         heading.dataset.dashboardConfigHeading='';
         message.dataset.dashboardConfigDescription='';
         empty.className='dashboard-config-empty';

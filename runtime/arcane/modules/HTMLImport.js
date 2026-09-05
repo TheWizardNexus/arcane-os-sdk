@@ -12,6 +12,44 @@ globalThis[htmlImportHostRegistryKey]=htmlImportHostRegistry;
 
 let htmlImportScriptId=0;
 
+const htmlImportModuleURL=new URL(import.meta.url);
+const htmlImportAssetVersion=htmlImportModuleURL.searchParams.get('arcaneVersion');
+
+function versionComponentResource(value,baseHref){
+  if(!htmlImportAssetVersion||typeof value!=='string'||!value||value.startsWith('#')){
+    return value;
+  }
+  let resolvedURL;
+  try{
+    resolvedURL=new URL(value,baseHref);
+  }catch{
+    return value;
+  }
+  if(resolvedURL.protocol!==htmlImportModuleURL.protocol
+    ||resolvedURL.origin!==htmlImportModuleURL.origin){
+    return value;
+  }
+
+  const fragmentIndex=value.indexOf('#');
+  const fragment=fragmentIndex<0?'':value.slice(fragmentIndex);
+  const resource=fragmentIndex<0?value:value.slice(0,fragmentIndex);
+  const queryIndex=resource.indexOf('?');
+  const pathname=queryIndex<0?resource:resource.slice(0,queryIndex);
+  const query=queryIndex<0?'':resource.slice(queryIndex+1);
+  const versionField=`arcaneVersion=${encodeURIComponent(htmlImportAssetVersion)}`;
+  let replaced=false;
+  const fields=query?query.split('&').map(function versionQueryField(field){
+    if(!new URLSearchParams(field).has('arcaneVersion'))return field;
+    if(replaced)return null;
+    replaced=true;
+    return versionField;
+  }).filter(function retainQueryField(field){
+    return field!==null;
+  }):[];
+  if(!replaced)fields.push(versionField);
+  return `${pathname}?${fields.join('&')}${fragment}`;
+}
+
 function componentRuntimeRoot(resolvedHref){
   const componentURL=new URL(resolvedHref);
   const componentMarker='/arcane/components/';
@@ -32,28 +70,157 @@ function resolveComponentResource(value,runtimeRoot){
 }
 
 function resolveComponentStyleResources(styleText,runtimeRoot){
-  if(!runtimeRoot)return styleText;
-  return styleText.replace(
-    /url\(\s*(['"]?)\.\/arcane\/([^)'"\s]+)\1\s*\)/gu,
-    function resolveStyleURL(_match,quote,resourcePath){
-      const resolved=new URL(resourcePath,runtimeRoot).href;
-      return `url(${quote}${resolved}${quote})`;
+  if(!runtimeRoot&&!htmlImportAssetVersion)return styleText;
+  const parts=[];
+  let copiedThrough=0;
+  let index=0;
+
+  function afterComment(start){
+    const end=styleText.indexOf('*/',start+2);
+    return end<0?styleText.length:end+2;
+  }
+
+  function afterEscape(start){
+    let end=start+1;
+    if(/[\da-f]/iu.test(styleText[end]||'')){
+      const limit=end+6;
+      while(end<limit&&/[\da-f]/iu.test(styleText[end]||''))end+=1;
+      if(/[\t\n\f\r ]/u.test(styleText[end]||'')){
+        end+=styleText[end]==='\r'&&styleText[end+1]==='\n'?2:1;
+      }
+      return end;
     }
-  );
+    return end+(styleText[end]==='\r'&&styleText[end+1]==='\n'?2:1);
+  }
+
+  function afterString(start){
+    const quote=styleText[start];
+    let end=start+1;
+    while(end<styleText.length){
+      if(styleText[end]==='\\'){
+        end=afterEscape(end);
+      }else if(styleText[end]===quote){
+        return end+1;
+      }else if(/[\n\r\f]/u.test(styleText[end])){
+        return end;
+      }else{
+        end+=1;
+      }
+    }
+    return styleText.length;
+  }
+
+  function afterWhitespaceAndComments(start){
+    let end=start;
+    while(end<styleText.length){
+      if(/[\t\n\f\r ]/u.test(styleText[end])){
+        end+=1;
+      }else if(styleText.startsWith('/*',end)){
+        end=afterComment(end);
+      }else{
+        break;
+      }
+    }
+    return end;
+  }
+
+  function appendResource(start,end){
+    const resourcePath=styleText.slice(start,end);
+    // CSS escapes retain their original spelling until their URL syntax is decoded.
+    if(resourcePath.includes('\\'))return;
+    const resolved=versionComponentResource(
+      resolveComponentResource(resourcePath,runtimeRoot),
+      document.baseURI
+    );
+    if(resolved===resourcePath)return;
+    parts.push(styleText.slice(copiedThrough,start),resolved);
+    copiedThrough=end;
+  }
+
+  while(index<styleText.length){
+    if(styleText.startsWith('/*',index)){
+      index=afterComment(index);
+      continue;
+    }
+    if(styleText[index]==='"'||styleText[index]==="'"){
+      index=afterString(index);
+      continue;
+    }
+
+    const atRule=styleText[index]==='@';
+    const hashToken=styleText[index]==='#';
+    const nameStart=atRule||hashToken?index+1:index;
+    let nameEnd=nameStart;
+    while(nameEnd<styleText.length&&/[-\w\u0080-\uFFFF\\]/u.test(styleText[nameEnd])){
+      nameEnd=styleText[nameEnd]==='\\'?afterEscape(nameEnd):nameEnd+1;
+    }
+    if(nameEnd===nameStart){
+      index+=1;
+      continue;
+    }
+    const name=styleText.slice(nameStart,nameEnd).toLowerCase();
+    index=nameEnd;
+    if(hashToken)continue;
+    if(atRule&&name==='import'){
+      const start=afterWhitespaceAndComments(nameEnd);
+      if(styleText[start]==='"'||styleText[start]==="'"){
+        const end=afterString(start);
+        if(styleText[end-1]===styleText[start])appendResource(start+1,end-1);
+        index=end;
+      }
+      continue;
+    }
+    if(atRule||name!=='url'||styleText[nameEnd]!=='(')continue;
+
+    let start=nameEnd+1;
+    while(start<styleText.length&&/[\t\n\f\r ]/u.test(styleText[start]))start+=1;
+    if(styleText[start]==='"'||styleText[start]==="'"){
+      const end=afterString(start);
+      const close=afterWhitespaceAndComments(end);
+      if(styleText[end-1]===styleText[start]&&styleText[close]===')'){
+        appendResource(start+1,end-1);
+        index=close+1;
+      }else{
+        index=end;
+      }
+      continue;
+    }
+
+    let end=start;
+    while(end<styleText.length&&!/[\t\n\f\r )'"(]/u.test(styleText[end])){
+      end=styleText[end]==='\\'?afterEscape(end):end+1;
+    }
+    let close=end;
+    while(close<styleText.length&&/[\t\n\f\r ]/u.test(styleText[close]))close+=1;
+    if(styleText[close]===')'){
+      appendResource(start,end);
+      index=close+1;
+    }else{
+      index=end;
+    }
+  }
+  if(parts.length===0)return styleText;
+  parts.push(styleText.slice(copiedThrough));
+  return parts.join('');
 }
 
 function createComponentFragment(html,resolvedHref){
   const template=document.createElement('template');
   template.innerHTML=html;
   const runtimeRoot=componentRuntimeRoot(resolvedHref);
-  if(!runtimeRoot)return template.content;
 
   for(const element of template.content.querySelectorAll('[href],[src]')){
     for(const attribute of ['href','src']){
       if(!element.hasAttribute(attribute))continue;
       const value=element.getAttribute(attribute);
       const resolved=resolveComponentResource(value,runtimeRoot);
-      if(resolved!==value)element.setAttribute(attribute,resolved);
+      const navigation=attribute==='href'
+        &&['a','area','base'].includes(element.localName);
+      const versioned=navigation?resolved:versionComponentResource(
+        resolved,
+        element.localName==='script'?resolvedHref:document.baseURI
+      );
+      if(versioned!==value)element.setAttribute(attribute,versioned);
     }
   }
   for(const style of template.content.querySelectorAll('style')){
@@ -69,7 +236,8 @@ function resolveRelativeDynamicImports(source,baseHref){
   return source.replace(
     /\bimport\s*\(\s*(['"])(\.{1,2}\/[^'"]+)\1\s*\)/gu,
     function resolveDynamicImport(_match,_quote,specifier){
-      return `import(${JSON.stringify(new URL(specifier,baseHref).href)})`;
+      const resolved=versionComponentResource(new URL(specifier,baseHref).href,baseHref);
+      return `import(${JSON.stringify(resolved)})`;
     }
   );
 }
@@ -138,8 +306,8 @@ class HTMLImport extends HTMLElement {
 
     try{
       const resolvedURL=new URL(href,document.baseURI);
-      resolvedHref=resolvedURL.href;
-      const response=await fetch(resolvedURL.href,{
+      resolvedHref=versionComponentResource(resolvedURL.href,document.baseURI);
+      const response=await fetch(resolvedHref,{
         cache:'default',
         method:'GET',
         signal:controller.signal
@@ -308,7 +476,10 @@ class HTMLImport extends HTMLElement {
         let sourceBaseHref=contentBaseHref;
         const scriptSource=script.getAttribute('src');
         if(scriptSource!==null){
-          const requestedScriptHref=new URL(scriptSource,contentBaseHref).href;
+          const requestedScriptHref=versionComponentResource(
+            new URL(scriptSource,contentBaseHref).href,
+            contentBaseHref
+          );
           const response=await fetch(requestedScriptHref,{
             cache:'default',
             method:'GET',
