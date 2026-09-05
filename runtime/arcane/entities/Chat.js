@@ -365,10 +365,10 @@ function turnMessages(requestMessage,requestMessages){
  *
  * chat.addUserMessage('Hello');
  *
- * ai.streamRequest({
- *     messages:chat.messages,
- *     onChunk:streamHandler
- * });
+ * ai.streamMessage(
+ *     chat.messages,
+ *     streamHandler
+ * );
  * ```
  */
 class ChatEntity{
@@ -629,9 +629,7 @@ class ChatEntity{
         const appended=this.#appendMessage(message,{persist});
         if(extractMemory&&persist&&this.persist){
             return Promise.resolve(appended).then(result=>{
-                this.#queueMemoryUpdate(function requestChatMemory(messages){
-                    return ai.fetchRequest({messages});
-                });
+                this.#queueMemoryUpdate(messages=>ai.fetch(messages));
                 return result;
             });
         }
@@ -711,9 +709,7 @@ class ChatEntity{
     addTurn({
         assistantMessage,
         extractMemory=true,
-        memoryRequest=function requestTurnMemory(messages){
-            return ai.fetchRequest({messages});
-        },
+        memoryRequest=messages=>ai.fetch(messages),
         messagePersist=true,
         requestMessage,
         requestMessages,
@@ -860,11 +856,7 @@ class ChatEntity{
         return this.transcript;
     }
 
-    async getMemoriesAboutUser({
-        request=function requestUserMemories(messages){
-            return ai.fetchRequest({messages});
-        }
-    }={}){
+    async getMemoriesAboutUser({request=messages=>ai.fetch(messages)}={}){
         if(typeof request!=='function'){
             throw new TypeError('Memory request must be a function.');
         }

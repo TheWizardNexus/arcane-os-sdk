@@ -140,12 +140,17 @@ default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and
 `disposeBrowserSpeech({signal})`, `setAI()`, `configureProviders()`,
 `configureSpeechProviders()`, `transitionAI()`, `transitionProviders()`,
 `transitionSpeechProviders()`, `startProviders()`, `setSpeechMuted()`,
-`streamRequest()`, `fetchRequest()`,
+`streamRequest()`, `streamMessage()`, `fetchRequest()`, `fetch()`,
 read-only `ttsSegmentation`, `configureTTSSegmentation()`,
 `streamTTS(text='',end=false,options={})`,
 `finishTTS()`, `fetchTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`,
 `playAudio()`; consumes `user-entity-loaded` and `arcane-ollama-ready`,
 installs `window.ai`, and emits `ai-ready` and `ai-tts-failure`.
+
+`fetch(...)` and `fetchRequest(options)` are asynchronous complete-response
+entry points. `streamMessage(...)` and `streamRequest(options)` deliver
+incremental responses. The positional and object forms share the existing
+provider implementations; neither form is a retired compatibility API.
 
 Initialization uses the canonical realm user's actual readiness state. If
 `window.user?.ready` is already true, AI initializes immediately. Otherwise one

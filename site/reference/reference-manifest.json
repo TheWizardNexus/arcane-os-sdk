@@ -300,8 +300,8 @@
       "moduleClassification": "public-first-party",
       "contractCounts": {
         "exports": 8,
-        "reviewedCallables": 15,
-        "publicMembers": 34,
+        "reviewedCallables": 17,
+        "publicMembers": 36,
         "literalCustomEvents": 0,
         "directCodedFailures": 36,
         "exportedErrorSubclasses": 0

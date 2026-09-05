@@ -8,21 +8,15 @@
   audio clock, and await their own playback completion. Existing calls still
   return after preparation; stop and terminal failure settle playback waits
   as `false`, while autoplay permission waiting remains pending.
-- Remove the superseded positional `AI.fetch(...)` and `AI.streamMessage(...)`
-  methods and their unreachable private streaming modes. Use
-  `AI.fetchRequest({messages, ...options})` and
-  `AI.streamRequest({messages, ...options})`. SDK chat-memory defaults now use
-  `fetchRequest`; current provider responses, prompts, persistence, streaming,
-  tool calls, cancellation, and speech ownership are unchanged by this cleanup.
-- This is a source API break. Before adopting it, consumers must move positional
-  arguments to the object request fields, including `onResponse`, `onChunk`,
-  `onComplete`, `tools`, `toolChoice`, `parallelToolCalls`, `structuredOutput`,
-  `onToolCall`, `onRequest`, `onDataChunk`, `onDataResult`, `id`, `seeThinking`,
-  and `signal` when used. Use `onResponse` or `onDataResult` for complete streaming
-  response objects; `streamRequest` resolves the current output form.
-- Update maintained SDK references and their generated pages to expose only
-  current AI request APIs, omit obsolete provider context-token guidance, and
-  describe current native defaults and Winlogon bindings without treating them
+- Restore `AI.fetch(...)` and `AI.streamMessage(...)` after their unintended
+  removal during source cleanup. Their existing signatures, callbacks, return
+  behavior, and private inference plumbing remain available alongside
+  `fetchRequest({...})` and `streamRequest({...})`; callers do not need to
+  migrate. Restore chat-memory callers and document both public forms as
+  sharing the current provider implementations.
+- Update maintained SDK references and their generated pages, omit obsolete
+  provider context-token guidance, and describe current native defaults and
+  Winlogon bindings without treating them
   as retired SDK APIs. Native Core implementations and upstream dependencies
   are not changed by this SDK cleanup.
 

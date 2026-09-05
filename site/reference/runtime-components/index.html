@@ -541,8 +541,11 @@ optional speech controller&#39;s <code>destroy()</code>, sets <code>ready</code>
 unload.</p>
 <p>Chat listens for the bound (or current global) AI runtime&#39;s <code>ai-tts-failure</code>
 event and forwards its complete Error and exact operation boundary to
-<code>speech.reportTTSError()</code>. This includes decode and playback-start failures that
-settle after <code>streamTTS()</code> has already resolved. Runtime mute, cancellation,
+<code>speech.reportTTSError()</code>. Playback-start or playback-resume failures can occur
+after Chat&#39;s two-argument <code>streamTTS()</code> preparation promise has resolved.
+Current <code>main</code> source adds an unpublished <code>waitForPlayback:true</code> mode for the
+terminal result of the segments submitted by one invocation; Chat continues
+to feed chunks without waiting for playback. Runtime mute, cancellation,
 permission waiting, and stale generations remain non-errors.</p>
 <p>Each visible model chunk is still forwarded to <code>AI.streamTTS()</code> in arrival
 order. The AI owner preserves exact segmentation, admits completed segments to
