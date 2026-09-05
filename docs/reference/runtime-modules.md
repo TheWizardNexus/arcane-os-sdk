@@ -140,7 +140,7 @@ default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and
 `disposeBrowserSpeech({signal})`, `setAI()`, `configureProviders()`,
 `configureSpeechProviders()`, `transitionAI()`, `transitionProviders()`,
 `transitionSpeechProviders()`, `startProviders()`, `setSpeechMuted()`,
-`streamRequest()`, `streamMessage()`, `fetchRequest()`, `fetch()`,
+`streamRequest()`, `fetchRequest()`,
 read-only `ttsSegmentation`, `configureTTSSegmentation()`, `streamTTS()`,
 `finishTTS()`, `fetchTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`,
 `playAudio()`; consumes `user-entity-loaded` and `arcane-ollama-ready`,

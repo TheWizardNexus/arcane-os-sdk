@@ -4205,18 +4205,14 @@ class AI {
         return this.#streamBuiltInMessage(
             payload.messages??[],
             function ignoreBuiltInLLMScalarStream(){},
-            function ignoreBuiltInLLMProviderCompletion(){},
             payload.tools??[],
             payload.toolChoice??'auto',
-            function retainBuiltInLLMStreamToolUntilCompletion(){},
             parallelToolCalls,
             payload.id??Date.now(),
             payload.seeThinking??false,
             bridge.signal,
             function ignoreBuiltInLLMProviderRequest(){},
             payload.structuredOutput??false,
-            false,
-            true,
             emitBuiltInLLMStreamData,
             function ignoreBuiltInLLMStreamResult(){},
             payload.reasoningEffort
@@ -4517,18 +4513,14 @@ class AI {
             const completion=await this.#streamBuiltInMessage(
                 messages,
                 onChunk,
-                function retainBuiltInCompletionUntilResponse(){},
                 tools,
                 toolChoice,
-                function retainBuiltInToolCallUntilResponse(){},
                 parallelToolCalls,
                 id,
                 seeThinking,
                 signal,
                 onRequest,
                 structuredOutput,
-                false,
-                true,
                 onDataChunk,
                 onDataResult,
                 normalizedReasoningEffort
@@ -4564,78 +4556,17 @@ class AI {
         }
     }
 
-    async streamMessage(
-        messages=[],
-        streamHandler=function ignoreStreamChunk(){},
-        streamComplete=function finishIgnoredStream(){},
-        tools=[],
-        tool_choice='auto',
-        earlyFunctionTrigger=function ignoreEarlyFunction(){},
-        parallel_tool_calls,
-        id=Date.now(),
-        seeThinking=false,
-        signal=null,
-        requestHandler=function ignoreStreamRequest(){},
-        structuredOutput=false,
-        returnCompletion=false,
-        onDataChunk=function ignoreStreamDataChunk(){},
-        onDataResult=function ignoreStreamDataResult(){}
-    ){
-        if(this.#shouldUseProviderRuntime('llm',this.llmService,false)){
-            return this.streamRequest({
-                messages,
-                structuredOutput,
-                localOnly:false,
-                onChunk:streamHandler,
-                onComplete:streamComplete,
-                onDataChunk,
-                onDataResult,
-                tools,
-                toolChoice:tool_choice,
-                onToolCall:earlyFunctionTrigger,
-                onRequest:requestHandler,
-                parallelToolCalls:parallel_tool_calls,
-                id,
-                seeThinking,
-                signal
-            });
-        }
-
-        return this.#streamBuiltInMessage(
-            messages,
-            streamHandler,
-            streamComplete,
-            tools,
-            tool_choice,
-            earlyFunctionTrigger,
-            parallel_tool_calls,
-            id,
-            seeThinking,
-            signal,
-            requestHandler,
-            structuredOutput,
-            true,
-            returnCompletion,
-            onDataChunk,
-            onDataResult
-        );
-    }
-
     async #streamBuiltInMessage(
         messages=[],
         streamHandler=function ignoreStreamChunk(){},
-        streamComplete=function finishIgnoredStream(){},
         tools=[],
         tool_choice='auto',
-        earlyFunctionTrigger=function ignoreEarlyFunction(){},
         parallel_tool_calls,
         id=Date.now(),
         seeThinking=false,
         signal=null,
         requestHandler=function ignoreStreamRequest(){},
         structuredOutput=false,
-        finishSpeech=true,
-        returnCompletion=false,
         dataChunkHandler=function ignoreBuiltInStreamDataChunk(){},
         dataResultHandler=function ignoreBuiltInStreamDataResult(){},
         reasoningEffort
@@ -4828,20 +4759,11 @@ class AI {
                 tool_choice
             );
             await dataResultHandler(nativeCompletion,id);
-            for(const call of structuralToolCalls){
-                if(signal?.aborted){
-                    throw normalizeAIRequestAbort();
-                }
-                await earlyFunctionTrigger(call,`M-${id}`);
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort();
             }
-
-            const nativeResult=this.#providerCompletionOutput(nativeCompletion);
-            if(finishSpeech){
-                this.finishTTS();
-            }
-            await streamComplete(nativeResult,`M-${id}`,isThinking);
             speechTurnCompleted=true;
-            return returnCompletion?nativeCompletion:nativeResult;
+            return nativeCompletion;
         }
 
         await this.#reportRequest(requestHandler,request,id,{
@@ -5312,21 +5234,11 @@ class AI {
             'The built-in HTTP stream'
         );
         await dataResultHandler(completion,id);
-        for(const call of terminalToolCalls){
-            if(signal?.aborted){
-                throw normalizeAIRequestAbort();
-            }
-            await earlyFunctionTrigger(call,`M-${id}`);
+        if(signal?.aborted){
+            throw normalizeAIRequestAbort();
         }
-        const streamResult=this.#providerCompletionOutput(completion);
-        if(finishSpeech){
-            this.finishTTS();
-        }
-        await streamComplete(streamResult, `M-${id}`,isThinking);
-
-        //sync
         speechTurnCompleted=true;
-        return returnCompletion?completion:streamResult;
+        return completion;
         }catch(error){
             if(isAIRequestAbort(error,signal)){
                 throw normalizeAIRequestAbort(error);
@@ -5437,45 +5349,6 @@ class AI {
             onRequest,
             signal,
             normalizedReasoningEffort
-        );
-    }
-
-    async fetch(
-        messages=[],
-        responseHandler=function ignoreFetchResponse(){},
-        structuredOutput=false,
-        tools=[],
-        tool_choice='auto',
-        parallel_tool_calls,
-        id=Date.now(),
-        requestHandler=function ignoreFetchRequest(){},
-        signal=null
-    ){
-        if(this.#shouldUseProviderRuntime('llm',this.llmService,false)){
-            return this.fetchRequest({
-                messages,
-                structuredOutput,
-                localOnly:false,
-                tools,
-                toolChoice:tool_choice,
-                parallelToolCalls:parallel_tool_calls,
-                id,
-                signal,
-                onRequest:requestHandler,
-                onResponse:responseHandler
-            });
-        }
-
-        return this.#fetchBuiltIn(
-            messages,
-            responseHandler,
-            structuredOutput,
-            tools,
-            tool_choice,
-            parallel_tool_calls,
-            id,
-            requestHandler,
-            signal
         );
     }
 

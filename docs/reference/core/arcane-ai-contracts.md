@@ -132,7 +132,7 @@ No other message fields are accepted.
 | `model` | `string` | Yes | Effective configured model | Model used by provider-neutral chat. |
 | `configured` | `boolean` | Yes | - | Required provider configuration is present. |
 | `local` | `boolean` | Yes | `true` only for Ollama | Whether inference remains local. |
-| `responseLength` | `"low" \| "medium" \| "high"` | Yes | Legacy invalid/missing state resolves to `"medium"` | Conversational response target, not a provider token limit. |
+| `responseLength` | `"low" \| "medium" \| "high"` | Yes | Invalid/missing state resolves to `"medium"` | Conversational response target, not a provider token limit. |
 
 An OpenAI profile is returned only after Arcane proves a protected credential
 exists and the configured model is available to that account.
@@ -620,7 +620,6 @@ The wrapper supplies the validated `model` field.
 | `format` | JSON value | No | Text, JSON, or schema format | Output format. |
 | `options` | object | No | Provider-native; `num_ctx` is 1,024-262,144 when supplied | Runtime options. |
 | `system`, `template` | `string` | No | Provider-native | Prompt controls. |
-| `context` | `array` | No | Provider-native | Legacy context tokens. |
 | `raw` | `boolean` | No | Provider-native | Raw prompt mode. |
 | `keep_alive` | `string \| number` | No | Provider-native | Residency. |
 | `think`, `logprobs`, `top_logprobs` | JSON value | No | Provider-native | Reasoning/log-probability controls. |

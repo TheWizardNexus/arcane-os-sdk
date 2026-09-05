@@ -516,7 +516,7 @@ recorded binding/security metadata, `canRestoreShell`,
 `shellRecoveryPrepared`, `accountMutationPhase`, and `activationRequired`.
 
 Microsoft NT records include `username`, `sid`, `enabled`, `profile`, `shell`,
-both policy and legacy shell values/presence flags, `shellAssigned`,
+both policy and Winlogon shell values/presence flags, `shellAssigned`,
 `shellBindingVersion`, `assignmentMode`, `verification`, and `source`. Linux
 records include `username`, optional `uid`, `enabled`, `profile`, `shell`,
 `shellAssigned`, `verification`, and `source`. Nullable or recorded-only values
@@ -824,7 +824,7 @@ Provisioner type, elevation, and the exclusive Core mutation boundary. It does
 not delete the account or change its password, but it materially changes what
 starts at the user's next sign-in.
 
-Microsoft NT restores both prior policy and legacy shell bindings, including
+Microsoft NT restores both prior policy and Winlogon shell bindings, including
 their recorded absence. Linux restores the recorded login shell after checking
 the exact uid and ensuring the prior executable still exists. The host refuses
 to overwrite a value changed outside the recorded transaction.

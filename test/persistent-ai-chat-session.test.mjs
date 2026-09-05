@@ -38,7 +38,7 @@ windowTarget.ai={ready:false};
 globalThis.window=windowTarget;
 globalThis.dbopfs=db;
 let memoryFetchCount=0;
-globalThis.ai={fetch:async()=>{
+globalThis.ai={fetchRequest:async function requestMemory(){
     memoryFetchCount++;
     return {choices:[{message:{content:''}}]};
 }};

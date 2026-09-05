@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+- Remove the superseded positional `AI.fetch(...)` and `AI.streamMessage(...)`
+  methods and their unreachable private streaming modes. Use
+  `AI.fetchRequest({messages, ...options})` and
+  `AI.streamRequest({messages, ...options})`. SDK chat-memory defaults now use
+  `fetchRequest`; current provider responses, prompts, persistence, streaming,
+  tool calls, cancellation, and speech ownership are unchanged by this cleanup.
+- This is a source API break. Before adopting it, consumers must move positional
+  arguments to the object request fields, including `onResponse`, `onChunk`,
+  `onComplete`, `tools`, `toolChoice`, `parallelToolCalls`, `structuredOutput`,
+  `onToolCall`, `onRequest`, `onDataChunk`, `onDataResult`, `id`, `seeThinking`,
+  and `signal` when used. Use `onResponse` or `onDataResult` for complete streaming
+  response objects; `streamRequest` resolves the current output form.
+- Update maintained SDK references and their generated pages to expose only
+  current AI request APIs, omit obsolete provider context-token guidance, and
+  describe current native defaults and Winlogon bindings without treating them
+  as retired SDK APIs. Native Core implementations and upstream dependencies
+  are not changed by this SDK cleanup.
+
 ## 0.5.11
 
 - Default browser Kokoro TTS to four concurrent synthesis slots in both the

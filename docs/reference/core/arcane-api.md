@@ -128,7 +128,7 @@ directly.
 | `Arcane.ollama.saveServiceSettings(settings)` | `settings`: [`OllamaServiceSettingsInput`](arcane-ai-contracts.md#ollama-service-settings-input) | [`Promise<OllamaServiceSettingsResult>`](arcane-ai-contracts.md#ollama-service-settings-result) | Saves managed service settings. |
 
 The native AI profile always returns `responseLength` as `"low"`, `"medium"`,
-or `"high"`; missing or invalid legacy persisted values safely resolve to
+or `"high"`; missing or invalid persisted values safely resolve to
 `"medium"`. New saves reject any other value. Conversational applications may
 use this target to augment their system prompt, but specific user requests and
 required application, structured-output, tool, safety, evidence, warning, or
@@ -537,9 +537,9 @@ exclusive-mutation boundary. Native set results must match the requested name,
 protection decision, and exact ordinary value or protected five-bullet mask
 before Core returns them.
 Microsoft NT rejects a protected-record/plaintext-registry shadow. Linux binds
-new protected values to a random Secret Service generation in a namespace that
-does not overlap legacy entries, fsyncs the metadata file and directory before
-cleaning the prior generation, and keeps legacy lookup compatibility.
+new protected values to a random Secret Service generation and fsyncs the
+metadata file and directory before cleaning the prior generation. Native
+storage implementation details belong to Arcane Core, not the SDK.
 Failure to verify candidate, prior-generation, or deletion cleanup rejects with
 `ENVIRONMENT_PROTECTED_CLEANUP_FAILED`. Linux post-rename durability ambiguity
 rejects with `ENVIRONMENT_METADATA_COMMIT_UNCERTAIN`. Native code retains
@@ -579,7 +579,7 @@ Native storage and preferences resolve below
 cannot provide a different identity. Browser OPFS follows
 `apps/<application-id>/...`, DBLS fallback keys use
 `arcane.apps.<application-id>:`, and native browser profiles are also app-owned.
-Unowned legacy global data is preserved but not guessed into an app. The complete
+Unowned global data is preserved but not guessed into an app. The complete
 layout and same-origin browser limitation are maintained in the repository-only
 [Application data isolation](https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/docs/application-data-isolation.md); see the public [repository-access boundary](https://github.com/TheWizardNexus/ARCANE-OS/blob/567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e/apps/docs/guides/repository-access.md#private-developer-material).
 

@@ -394,7 +394,7 @@ recorded binding/security metadata, <code>canRestoreShell</code>,
 <code>restoreRequiresElevatedVerification</code>, <code>shellMutationPhase</code>,
 <code>shellRecoveryPrepared</code>, <code>accountMutationPhase</code>, and <code>activationRequired</code>.</p>
 <p>Microsoft NT records include <code>username</code>, <code>sid</code>, <code>enabled</code>, <code>profile</code>, <code>shell</code>,
-both policy and legacy shell values/presence flags, <code>shellAssigned</code>,
+both policy and Winlogon shell values/presence flags, <code>shellAssigned</code>,
 <code>shellBindingVersion</code>, <code>assignmentMode</code>, <code>verification</code>, and <code>source</code>. Linux
 records include <code>username</code>, optional <code>uid</code>, <code>enabled</code>, <code>profile</code>, <code>shell</code>,
 <code>shellAssigned</code>, <code>verification</code>, and <code>source</code>. Nullable or recorded-only values
@@ -622,7 +622,7 @@ captured before Arcane assigned its login shell. It requires <code>users.manage<
 Provisioner type, elevation, and the exclusive Core mutation boundary. It does
 not delete the account or change its password, but it materially changes what
 starts at the user&#39;s next sign-in.</p>
-<p>Microsoft NT restores both prior policy and legacy shell bindings, including
+<p>Microsoft NT restores both prior policy and Winlogon shell bindings, including
 their recorded absence. Linux restores the recorded login shell after checking
 the exact uid and ensuring the prior executable still exists. The host refuses
 to overwrite a value changed outside the recorded transaction.</p>

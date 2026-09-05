@@ -36,6 +36,13 @@ settles it: an exact matching executed, declined, cancelled, or not-executed
   commit when a release is explicitly selected. That release-only identity is
   not an ordinary application, development, package, or runtime gate.
 - Use plain JavaScript and web standards. Do not introduce TypeScript or TSX.
+- Do not retain superseded SDK APIs or fallback paths for pre-release backward
+  support. Trace their purpose and consumers, move SDK callers to the current
+  owner, and remove obsolete code together with its maintained reference and
+  generated documentation. Relabeling an obsolete API as current is not removal.
+  Preserve required behavior mislabeled as old, historical release records,
+  upstream dependency code, and recent unrelated work. Document breaking API
+  removals so consumers can migrate before adopting the changed SDK.
 - Keep the CLI and graphical clients on one shared headless toolchain contract.
 - Every potentially blocking CLI operation must acknowledge first, own its work, stream progress or heartbeat events, support safe cancellation, and surface a nonzero exit status on failure.
 - Default build cardinality is one workspace, one app, one target, one architecture, one format, and one signing profile. Never add implicit all-app or all-target loops.

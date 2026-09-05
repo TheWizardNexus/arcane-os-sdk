@@ -11,7 +11,7 @@ export const REFERENCE_CONTRACT_SCHEMA_VERSION=1;
 export const RUNTIME_DOCUMENTED_CALLABLE_MEMBERS={
     'AI.js':[
         'setAI','configureProviders','transitionAI','transitionProviders',
-        'startProviders','setSpeechMuted','streamRequest','streamMessage','fetchRequest','fetch',
+        'startProviders','setSpeechMuted','streamRequest','fetchRequest',
         'configureTTSSegmentation','streamTTS','finishTTS','fetchSTT',
         'stopAudio','resumeAudio','playAudio'
     ],
