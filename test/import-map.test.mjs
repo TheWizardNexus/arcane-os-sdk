@@ -161,7 +161,10 @@ test('complete runtime inventory produces a mutable named import map without rea
         'event-pubsub':'./arcane/sdk/dependencies/event-pubsub/index.js'
     };
     for(const target of Object.values(expected))expected[target]=target;
-    for(const specifier of Object.keys(expected))expected[specifier]+=`?arcaneVersion=${SDK_VERSION}`;
+    for(const specifier of Object.keys(expected)){
+        expected[specifier]+=`?arcaneVersion=${SDK_VERSION}`;
+        if(specifier.startsWith('./'))expected[`${specifier}?arcaneVersion=${SDK_VERSION}`]=expected[specifier];
+    }
     assert.deepEqual(result.imports,expected);
     assert.deepEqual(result.excludedModules,[]);
     result.imports['fixture/mutable']='./fixture.js';

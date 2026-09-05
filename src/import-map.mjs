@@ -844,8 +844,7 @@ function applyReferenceEdits(source,edits){
     return result;
 }
 
-function stringReferenceEdit(source,token,version){
-    const urlEdits=assetUrlVersionEdits(token.value,version);
+function stringReferenceEdit(source,token,version,urlEdits=assetUrlVersionEdits(token.value,version)){
     if(urlEdits.length===0)return null;
     const quote=source[token.start];
     const positions=[];
@@ -1091,31 +1090,67 @@ function importMapReferenceEdits(source,version,onReference){
             const valueIndex=cursor+2;
             const value=tokens[valueIndex];
             if(!value)return [];
-            properties.push({key:key.value,valueIndex,value});
             let end=valueIndex;
             if(value.type==='punctuator'&&(value.value==='{'||value.value==='[')){
                 end=matchingToken(tokens,valueIndex,value.value,value.value==='{'?'}':']');
                 if(end<0)return [];
             }
+            properties.push({key:key.value,keyToken:key,valueIndex,value,end:tokens[end].end});
             cursor=end+1;
             if(tokens[cursor]?.value===',')cursor+=1;
             else if(tokens[cursor]?.value!=='}')return [];
         }
         return properties;
     }
+    function addAlias(property,keys,value,aliases,alias=versionImportMapSpecifier(property.key,version)){
+        if(alias===property.key||keys.has(alias))return;
+        const keyEdit=stringReferenceEdit(source,property.keyToken,version,importMapUrlVersionEdits(property.key,version));
+        if(!keyEdit)return;
+        keys.add(alias);
+        aliases.push(`${keyEdit.value}: ${value}`);
+    }
+    function prependAliases(start,aliases,selectedEdits){
+        if(aliases.length===0)return;
+        // Authored keys retain priority even when different spellings normalize to one URL.
+        const offset=tokens[start].end;
+        selectedEdits.push({start:offset,end:offset,value:`${aliases.join(', ')}, `});
+    }
     function addImports(start){
-        for(const property of objectProperties(start)){
+        const selectedEdits=[];
+        const aliases=[];
+        const properties=objectProperties(start);
+        const keys=new Set(properties.map(function importKey(property){return property.key;}));
+        for(const property of properties){
+            if(property.value.value==='null'&&property.value.type==='identifier'){
+                addAlias(property,keys,'null',aliases);
+                continue;
+            }
             if(property.value.type!=='string')continue;
-            if(property.key.endsWith('/')||property.value.value.split(/[?#]/u)[0].endsWith('/'))continue;
+            if(property.key.endsWith('/'))continue;
             reportAssetReference(onReference,property.value.value,'import');
-            const edit=stringReferenceEdit(source,property.value,version);
-            if(edit)edits.push(edit);
+            const edit=property.value.value.split(/[?#]/u)[0].endsWith('/')
+                ?null:stringReferenceEdit(source,property.value,version);
+            if(edit)selectedEdits.push(edit);
+            addAlias(property,keys,edit?.value??source.slice(property.value.start,property.value.end),aliases);
         }
+        prependAliases(start,aliases,selectedEdits);
+        return selectedEdits;
     }
     for(const property of objectProperties(0)){
-        if(property.key==='imports')addImports(property.valueIndex);
+        if(property.key==='imports')edits.push(...addImports(property.valueIndex));
         if(property.key==='scopes'){
-            for(const scope of objectProperties(property.valueIndex))addImports(scope.valueIndex);
+            const scopes=objectProperties(property.valueIndex);
+            const aliases=[];
+            const keys=new Set(scopes.map(function scopeKey(scope){return scope.key;}));
+            for(const scope of scopes){
+                const scopeEdits=addImports(scope.valueIndex);
+                edits.push(...scopeEdits);
+                const value=applyReferenceEdits(source.slice(scope.value.start,scope.end),scopeEdits.map(function scopeRelativeEdit(edit){
+                    return {...edit,start:edit.start-scope.value.start,end:edit.end-scope.value.start};
+                }));
+                if(!scope.key.endsWith('/'))addAlias(scope,keys,value,aliases,versionImportMapUrl(scope.key,version));
+            }
+            prependAliases(property.valueIndex,aliases,edits);
         }
     }
     return edits;
@@ -1136,6 +1171,24 @@ export function rewriteAssetReferences(source,{filePath,version=SDK_VERSION,onRe
 
 function registerSpecifier(registry,specifier,target){
     registry.set(specifier,{specifier,target});
+}
+
+function versionImportMapSpecifier(specifier,version){
+    if(specifier.endsWith('/')||!/^(?:\.{1,2}\/|\/|[A-Za-z][A-Za-z0-9+.-]*:\/\/)/u.test(specifier))return specifier;
+    return versionImportMapUrl(specifier,version);
+}
+
+function versionImportMapUrl(value,version){
+    return applyReferenceEdits(value,importMapUrlVersionEdits(value,version));
+}
+
+function importMapUrlVersionEdits(value,version){
+    // Absolute map keys can match a relative import resolved against the document.
+    const authority=/^(?:[A-Za-z][A-Za-z0-9+.-]*:)?\/\/[^/?#]*/u.exec(value)?.[0];
+    const offset=authority?.length??0;
+    return assetUrlVersionEdits(value.slice(offset),version).map(function absoluteKeyEdit(edit){
+        return {...edit,start:edit.start+offset,end:edit.end+offset};
+    });
 }
 
 function validateInventory(files){
@@ -1215,7 +1268,9 @@ export async function buildImportMap({files,signal,version=SDK_VERSION}={}){
     }
     const imports={};
     for(const entry of [...namedRegistry.values()].sort((left,right)=>compareText(left.specifier,right.specifier))){
-        imports[entry.specifier]=versionAssetUrl(entry.target,version);
+        const target=versionAssetUrl(entry.target,version);
+        imports[entry.specifier]=target;
+        imports[versionImportMapSpecifier(entry.specifier,version)]=target;
     }
     return {
         imports,

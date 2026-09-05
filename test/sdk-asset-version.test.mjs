@@ -9,6 +9,7 @@ import {
     generateImportMap,
     readWorkspaceAssetVersion,
     rewriteAssetReferences,
+    scanModuleImports,
     versionAssetUrl
 } from '../src/import-map.mjs';
 import {temporaryDirectory} from './helpers.mjs';
@@ -189,9 +190,113 @@ test('generated URL keys share the package-selected module targets',async functi
     });
     assert.deepEqual(result.imports,{
         './arcane/modules/State.js':'./arcane/modules/State.js?arcaneVersion=2.3.4',
+        './arcane/modules/State.js?arcaneVersion=2.3.4':'./arcane/modules/State.js?arcaneVersion=2.3.4',
         './arcane/modules/nested/helper.mjs':'./arcane/modules/nested/helper.mjs?arcaneVersion=2.3.4',
+        './arcane/modules/nested/helper.mjs?arcaneVersion=2.3.4':'./arcane/modules/nested/helper.mjs?arcaneVersion=2.3.4',
         'arcane/State':'./arcane/modules/State.js?arcaneVersion=2.3.4'
     });
+});
+
+test('versioned module imports retain generated URL redirects from document and module bases',async function versionedUrlAliasResolution(){
+    const version='2.3.4';
+    const base='https://example.test/';
+    const result=await buildImportMap({files:['modules/DBOPFS.js','dependencies/strong-type/index.js'],version});
+    const imports=new Map(Object.entries(result.imports).map(function normalizedEntry([specifier,target]){
+        return [new URL(specifier,base).href,new URL(target,base).href];
+    }));
+    for(const [specifier,importer] of [
+        ['./node_modules/strong-type/index.js',base],
+        ['../../node_modules/strong-type/index.js',`${base}arcane/modules/DBOPFS.js`],
+        ['/node_modules/strong-type/index.js',`${base}apps/fixture/entry.js`]
+    ]){
+        const source=`import Is from ${JSON.stringify(specifier)};`;
+        const transformed=rewriteAssetReferences(source,{filePath:'entry.js',version});
+        const rewritten=scanModuleImports(transformed,{importer:'entry.js'}).imports[0].specifier;
+        const target=`${base}arcane/dependencies/strong-type/index.js?arcaneVersion=${version}`;
+        assert.equal(imports.get(new URL(rewritten,importer).href),target);
+        assert.equal(imports.get(new URL(specifier,importer).href),target);
+    }
+    for(const [specifier,target] of Object.entries(result.imports)){
+        if(specifier.startsWith('./'))assert.equal(result.imports[versionAssetUrl(specifier,version)],target);
+    }
+});
+
+test('authored URL redirects and exact scopes retain versioned aliases without replacing authored entries',function authoredUrlAliases(){
+    const map={
+        imports:{
+            './alias.js':'./actual.js?mode=a%20b#part',
+            '../helper.mjs?mode=a+b#part':'./helper.mjs',
+            '/remote.js':'https://example.test/remote.js',
+            '/unavailable.js':null,
+            './directory-alias.js':'./directory/',
+            'https://example.test/absolute.js':'./absolute-target.js',
+            '//example.test/network.js':'./network-target.js',
+            './pkg/':'./packages/',
+            'bare':'./bare.js',
+            './chosen.js':'./default.js',
+            './chosen.js?arcaneVersion=2.3.4':'./selected.js'
+        },
+        scopes:{
+            './scope/':{'./alias.js':'./scoped.js','./pkg/':'./scoped-package/'},
+            './entry.js':{'./alias.js':'./exact-scoped.js'},
+            'entry-without-dot.js':{'./alias.js':'./relative-scoped.js'},
+            'https://example.test/absolute-entry.js':{'./alias.js':'./absolute-scoped.js'}
+        },
+        data:{content:'./payload.js'}
+    };
+    const source=`<script type="importmap">${JSON.stringify(map)}</script>`;
+    const transformed=rewriteAssetReferences(source,{filePath:'index.html',version:'2.3.4'});
+    const actual=JSON.parse(transformed.slice(transformed.indexOf('>')+1,transformed.lastIndexOf('</script>')));
+    for(const key of ['./alias.js','../helper.mjs?mode=a+b#part','/remote.js','/unavailable.js']){
+        const target=versionAssetUrl(map.imports[key],'2.3.4');
+        assert.equal(actual.imports[key],target);
+        assert.equal(actual.imports[versionAssetUrl(key,'2.3.4')],target);
+    }
+    assert.equal(actual.imports['./chosen.js?arcaneVersion=2.3.4'],'./selected.js?arcaneVersion=2.3.4');
+    assert.equal(actual.imports['bare?arcaneVersion=2.3.4'],undefined);
+    assert.equal(actual.imports['./pkg/'],'./packages/');
+    assert.equal(actual.imports['./pkg/?arcaneVersion=2.3.4'],undefined);
+    assert.equal(actual.imports['./directory-alias.js?arcaneVersion=2.3.4'],'./directory/');
+    assert.equal(actual.imports['https://example.test/absolute.js?arcaneVersion=2.3.4'],'./absolute-target.js?arcaneVersion=2.3.4');
+    assert.equal(actual.imports['//example.test/network.js?arcaneVersion=2.3.4'],'./network-target.js?arcaneVersion=2.3.4');
+    assert.deepEqual(actual.data,map.data);
+    assert.equal(actual.scopes['./scope/']['./alias.js?arcaneVersion=2.3.4'],'./scoped.js?arcaneVersion=2.3.4');
+    assert.equal(actual.scopes['./scope/']['./pkg/'],'./scoped-package/');
+    assert.equal(actual.scopes['./scope/?arcaneVersion=2.3.4'],undefined);
+    assert.deepEqual(actual.scopes['./entry.js?arcaneVersion=2.3.4'],actual.scopes['./entry.js']);
+    assert.equal(actual.scopes['./entry.js']['./alias.js?arcaneVersion=2.3.4'],'./exact-scoped.js?arcaneVersion=2.3.4');
+    assert.deepEqual(actual.scopes['entry-without-dot.js?arcaneVersion=2.3.4'],actual.scopes['entry-without-dot.js']);
+    assert.deepEqual(actual.scopes['https://example.test/absolute-entry.js?arcaneVersion=2.3.4'],actual.scopes['https://example.test/absolute-entry.js']);
+    assert.equal(rewriteAssetReferences(transformed,{filePath:'index.html',version:'2.3.4'}),transformed);
+});
+
+test('authored normalized aliases and scopes take priority over generated companions',function normalizedAuthoredPriority(){
+    const map={
+        imports:{
+            './alias.js?arcaneVersion=2.3.4':'./selected.js',
+            '/alias.js':'./default.js',
+            './other.js':'./other-default.js',
+            './nested/../other.js?arcaneVersion=2.3.4':'./other-selected.js'
+        },
+        scopes:{
+            './entry.js?arcaneVersion=2.3.4':{chosen:'./selected.js'},
+            '/entry.js':{chosen:'./default.js'}
+        }
+    };
+    const source=`<script type="importmap">${JSON.stringify(map)}</script>`;
+    const transformed=rewriteAssetReferences(source,{filePath:'index.html',version:'2.3.4'});
+    const actual=JSON.parse(transformed.slice(transformed.indexOf('>')+1,transformed.lastIndexOf('</script>')));
+    const base='https://example.test/';
+    const imports=new Map(Object.entries(actual.imports).map(function normalizedImport([key,value]){
+        return [new URL(key,base).href,new URL(value,base).href];
+    }));
+    assert.equal(imports.get(`${base}alias.js?arcaneVersion=2.3.4`),`${base}selected.js?arcaneVersion=2.3.4`);
+    assert.equal(imports.get(`${base}other.js?arcaneVersion=2.3.4`),`${base}other-selected.js?arcaneVersion=2.3.4`);
+    const scopes=new Map(Object.entries(actual.scopes).map(function normalizedScope([key,value]){
+        return [new URL(key,base).href,value];
+    }));
+    assert.equal(scopes.get(`${base}entry.js?arcaneVersion=2.3.4`).chosen,'./selected.js?arcaneVersion=2.3.4');
+    assert.equal(rewriteAssetReferences(transformed,{filePath:'index.html',version:'2.3.4'}),transformed);
 });
 
 test('workspace version drives generated document and map while test paths retain URL queries',async function workspaceVersionProjection(t){
