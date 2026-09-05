@@ -3,14 +3,9 @@
   "source": {
     "authority": "sdk-canonical",
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
-    "commit": "9e657b31f758a2c7943446533fe87afda206ac49",
+    "branch": "main",
     "path": "runtime/arcane/components",
-    "sdkVersion": "0.3.4",
-    "legacyProjection": {
-      "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
-      "commit": "c540014afe69f14cf5ae60493b7295f36dbcec64",
-      "bundleVersion": "0.8.12"
-    }
+    "sdkVersion": "0.5.11"
   },
   "componentCount": 39,
   "loader": "/arcane/modules/HTMLImport.js",
@@ -176,7 +171,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "UI/runtime state, honest model progress, complete timestamped transcript including ui_hidden legacy records, user-facing structural arguments.message, nonblank all-ID tool-result restoration, collapsed complete raw inspection, ordered parallel-call replay validation, per-choice streamed/terminal complete-envelope correlation, complete nonstructural stream rendering, generic visible failure outcomes with complete console diagnostics, atomic executed/declined/cancelled/not-executed result batches with one continuation, plural pending-call reload recovery, reentrant terminal-event ownership, and BFCache-preserving page lifecycle are normalized; destroy aborts observation and returns true once/false thereafter; AI/storage/media behavior remains mixed"
+      "normalization": "UI/runtime state, honest model progress, complete timestamped transcript including ui_hidden stored records, user-facing structural arguments.message, nonblank all-ID tool-result restoration, collapsed complete raw inspection, ordered parallel-call replay validation, per-choice streamed/terminal complete-envelope correlation, complete nonstructural stream rendering, generic visible failure outcomes with complete console diagnostics, atomic executed/declined/cancelled/not-executed result batches with one continuation, plural pending-call reload recovery, reentrant terminal-event ownership, and BFCache-preserving page lifecycle are normalized; destroy aborts observation and returns true once/false thereafter; AI/storage/media behavior remains mixed"
     },
     {
       "file": "runtime/arcane/components/conversation-view.html",
@@ -405,7 +400,7 @@
     {
       "file": "runtime/arcane/components/header.html",
       "name": "header.html",
-      "purpose": "Legacy title bar with history, reload, online marker, presentation labels, and 988 link.",
+      "purpose": "Shared title bar with history, reload, online marker, presentation labels, and 988 link.",
       "methods": [],
       "events": [],
       "slots": [],
@@ -741,7 +736,6 @@
       "purpose": "Coordinates explicit speech-to-text activation, request cancellation, speech controls, transcription completion, mute state, and microphone availability.",
       "methods": [
         "configure()",
-        "setAvailability()",
         "setMuted()",
         "reportTTSError()",
         "requestSTTActivation()",
@@ -771,7 +765,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "UI/runtime state, explicit STT activation intent, request-owned cancellation, capture generation/operation correlation, and BFCache-preserving page lifecycle are normalized; pending release retires only its generation and stale permission settlement cannot clear a newer retry; persisted pageshow resynchronizes mute state and rerenders retained controls/status, while nonpersisted pagehide destroys; positive compatibility booleans cannot manufacture provider readiness; provider/model authority and media behavior remain external"
+      "normalization": "UI/runtime state, explicit STT activation intent, request-owned cancellation, capture generation/operation correlation, and BFCache-preserving page lifecycle are normalized; pending release retires only its generation and stale permission settlement cannot clear a newer retry; persisted pageshow resynchronizes mute state and rerenders retained controls/status, while nonpersisted pagehide destroys; provider/model authority and media behavior remain external"
     },
     {
       "file": "runtime/arcane/components/summary-strip.html",

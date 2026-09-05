@@ -2,6 +2,18 @@
 
 This is a source example inside the canonical Arcane SDK repository. It consumes this checkout's live `/src`, `/browser-runtime`, and `/runtime` trees. It contains no copied SDK modules, generated runtime projection, Ollama integration, or separate local AI service.
 
+For the smallest first request, start with the [browser speech quick start](../../docs/reference/ai/browser-speech.md) or [TWiN Cloud quick start](../../docs/reference/ai/twin-cloud.md). This example adds the shared Chat/Speech components, local LLM selection, persistence, and retrieval to those public APIs.
+
+## Speech defaults and inspection
+
+The demo deliberately omits `tts.execution` in `speechConfiguration(dbopfs)` so it consumes the SDK default `{device:'auto',maxConcurrentRequests:4}`. Change that application's TTS record to `execution:{device:'wasm',maxConcurrentRequests:1}` to use less memory, or choose `webgpu` explicitly. Allowed capacities are 1 through 4; Whisper and the LLM retain capacity one.
+
+Capacity 4 means up to four segments synthesize at once. Segment 5 and later wait in the SDK's FIFO queue; they are not dropped. Synthesis may finish out of order, but playback waits for earlier segments and plays exact input order. Each slot owns a Worker/model session, so raising capacity trades memory for latency.
+
+Use the shared Speech component to load/unmute speech, then select **Inspect speech execution** below Chat. The button reads `ai.providerRuntime.status('tts',{execution:true}).execution` and displays requested device, selected device, capacity, active requests, and automatic WASM fallback. It is a snapshot at the moment clicked. `selectedDevice:null` means no pool is selected; `webgpu` reports the upstream execution-provider selection and does not prove physical GPU kernel overlap or audio quality. Auto may fall back to WASM with the same selected model/dtype; explicit WebGPU reports an error when it cannot load.
+
+Shared Speech still owns mute, stop, and voice controls. The example's status button inspects the public report without loading a model or reaching into private providers.
+
 ## Ownership
 
 The Arcane SDK owns the shared behavior:
@@ -40,6 +52,16 @@ General uses the selected model's local-browser identity prompt. PreCrisis loads
 From the canonical SDK repository root:
 
     node .\examples\wasm-ai-demo\server.mjs
+
+The npm package includes this same maintained source. From an application with
+the exact SDK installed, run:
+
+    node ./node_modules/arcane-os/examples/wasm-ai-demo/server.mjs
+
+For the installed copy, set `ARCANE_WASM_MODEL_ROOT` to your existing model
+directory; do not store model downloads inside `node_modules`. The installed
+server resolves `/src`, `/browser-runtime`, and `/runtime` inside its selected
+SDK package. It does not require an SDK or Arcane OS source checkout.
 
 Use this repository-root command rather than a generic Live Server extension. A server rooted at the example directory cannot expose the SDK checkout's live source routes.
 

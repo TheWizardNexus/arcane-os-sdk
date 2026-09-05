@@ -21,7 +21,7 @@ const TTS_SAMPLE_RATE = 24_000;
 const TTS_RESPONSE_FORMAT = "wav";
 const TTS_EXECUTION_DEVICES = new Set(["auto", "webgpu", "wasm"]);
 const DEFAULT_TTS_EXECUTION_DEVICE = "auto";
-const DEFAULT_TTS_MAX_CONCURRENT_REQUESTS = 2;
+const DEFAULT_TTS_MAX_CONCURRENT_REQUESTS = 4;
 const MAX_TTS_CONCURRENT_REQUESTS = 4;
 const ROLE_REQUEST_REASON = completeValue({
   stt: "stt-transcription-cancelled",

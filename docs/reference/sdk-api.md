@@ -18,7 +18,7 @@ This table is the Node `package.json#exports` map: it defines package
 entrypoints for SDK/tooling code. It is distinct from the generated browser
 import map that resolves application-facing `arcane/*` modules and the focused
 EventManager entry. See [browser runtime delivery](protocols.md#browser-runtime-delivery)
-for the installed-inventory-derived physical-runtime contract in SDK `0.3.4`.
+for the installed-inventory-derived physical-runtime contract in SDK `0.5.11`.
 
 | Specifier | Purpose |
 | --- | --- |
@@ -748,7 +748,7 @@ deterministic map. The package root also contains the public
 {
   schemaVersion: 1,
   kind: 'arcane-app-runtime-projection',
-  sdkVersion: '0.3.4',
+  sdkVersion: '0.5.11',
   pathPrefix: 'arcane/',
   files: [{path}]
 }
@@ -2667,7 +2667,7 @@ The import-map operation also reports the stable operation-specific strings
 `ARCANE_IMPORT_MAP_INVALID`, `ARCANE_IMPORT_MAP_UNRESOLVED`, and
 `ARCANE_IMPORT_MAP_COLLISION`; package assembly can additionally report
 `ARCANE_IMPORT_MAP_CLEANUP_FAILED`. They are normalized `ArcaneError.code`
-values, but are not properties added to this general registry in SDK `0.3.4`.
+values, but are not properties added to this general registry in SDK `0.5.11`.
 
 ### Value and import
 
@@ -3437,7 +3437,7 @@ workspace it additionally returns the exact installed package authority:
     packageSource,
     canonicalPackageRoot,
     packageName: 'arcane-os',
-    packageVersion: '0.3.4',
+    packageVersion: '0.5.11',
     runtimeRoot,
     browserRuntimeRoot
   }
@@ -3445,9 +3445,9 @@ workspace it additionally returns the exact installed package authority:
 ```
 
 The dependency can be named `arcane-os` or be one exact npm alias for
-`npm:arcane-os@0.3.4`. The selected installation must still be one direct,
+`npm:arcane-os@0.5.11`. The selected installation must still be one direct,
 physical, non-link package directory whose manifest identifies exactly as
-`arcane-os@0.3.4`; duplicate canonical/alias declarations reject.
+`arcane-os@0.5.11`; duplicate canonical/alias declarations reject.
 `allowMissingManagedImportMap` is an internal packaging/development seam. An
 ordinary caller should leave it `false`.
 
@@ -6310,7 +6310,7 @@ createBrowserKokoroProvider(options={})
 
 The recognized options are
 `{id='arcane-browser-kokoro',localOnly=true,graph,model,runtime,appSecurity,
-security,store,offline=false,execution={device:'auto',maxConcurrentRequests:2}}`.
+security,store,offline=false,execution={device:'auto',maxConcurrentRequests:4}}`.
 `execution.device` is `auto`, `webgpu`, or `wasm`; its capacity is an integer
 from 1 through 4. `graph` is mutually exclusive with `model` and `runtime`. The
 mutable result is
@@ -6336,8 +6336,22 @@ WebGPU and falls back by replacing the complete candidate pool with WASM when
 WebGPU model loading rejects. Explicit `webgpu` does not fall back. Every slot
 loads the same caller-selected model and dtype in a distinct Worker so the
 selected adapter's per-isolate inference serialization does not serialize the
-pool. `status().execution` reports requested device, selected device, capacity,
-and active count.
+pool. Direct provider `status().execution` reports `requestedDevice`,
+`selectedDevice`, `maxConcurrentRequests`, and `activeRequestCount`.
+`selectedDevice` is `null` before load and after unload. For a provider created
+by `AI.configureBrowserSpeech()`, use
+`ai.providerRuntime.status('tts', {execution:true}).execution`. Requested
+`auto` with selected `wasm` means automatic fallback occurred. Inspection
+errors propagate; the default runtime `status()` remains a sticky lifecycle
+read. These fields do not prove physical GPU kernel overlap.
+
+Capacity 4 means up to four segments synthesize at once. Segment 5 and later
+wait in the SDK's provider-neutral FIFO queue; they are not dropped. Synthesis
+may finish out of order, but high-level playback waits for earlier segments and
+plays exact input order. Each slot owns a Worker/model session, so raising
+capacity trades memory for latency. Direct provider callers supply their own
+admission/playback orchestration; use [high-level AI speech](ai/browser-speech.md)
+to obtain the SDK queue and ordered playback together.
 
 Lifecycle/status, coalesced load, capacity-busy, unload, Worker-failure, and
 disposal behavior otherwise matches the Whisper provider. Cancellation after
@@ -6364,11 +6378,14 @@ added. Provider objects are not event targets; managed `AIProviderRuntime` and
 ```javascript
 import {createBrowserKokoroProvider} from 'arcane-os/ai/browser-speech';
 
+// applicationProviderOptions is your application-owned model/runtime/store
+// configuration. The browser speech quick start shows the high-level setup.
+const {model, runtime, store: speechStore} = applicationProviderOptions;
 const kokoro = createBrowserKokoroProvider({
     model,
     runtime,
     store:speechStore,
-    execution:{device:'auto',maxConcurrentRequests:2}
+    execution:{device:'auto',maxConcurrentRequests:4}
 });
 async function synthesizeAfterUserChoice() {
     await kokoro.load({

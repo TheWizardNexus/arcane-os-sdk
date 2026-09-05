@@ -12,6 +12,22 @@ The default path is capability-first. Transport and implementation detail is
 kept in the [protocol and host architecture guide](protocols.md), and every
 high-level page links to the relevant deep section instead of repeating it.
 
+## Start with one working request
+
+Install the SDK in your application:
+
+```sh
+npm install --save-exact arcane-os@0.5.11
+```
+
+For your first AI call, follow the [TWiN Cloud quick start](ai/twin-cloud.md).
+For on-device speech, follow the [browser speech quick start](ai/browser-speech.md)
+and the complete [browser AI demo](https://github.com/TheWizardNexus/arcane-os-sdk/tree/main/examples/wasm-ai-demo).
+Each guide names the application configuration you supply and shows the public
+call, response, cancellation, and error handling. Browser module imports use
+the SDK's [materialized import map](cli.md#arcane-import-map); installing npm
+alone does not make bare module names resolve in a browser.
+
 ## Reference map
 
 | Need | Start here |
@@ -29,6 +45,7 @@ high-level page links to the relevant deep section instead of repeating it.
 | Use provider-neutral AI lifecycle, chat, speech, persistence, or document context | [Normalized AI](#normalized-ai) |
 | Run a caller-selected local LLM in the browser | [Browser-WASM local AI](ai/browser-wasm.md) |
 | Run caller-selected Whisper or Kokoro in the browser | [Browser speech providers](ai/browser-speech.md) |
+| Send one TWiN Cloud request or migrate saved LLM preferences | [TWiN Cloud quick start](ai/twin-cloud.md) |
 | Use Arcane Ollama | [Arcane Ollama guide](arcane-ollama.md) |
 | Understand transports and protocol switching | [Protocol and host architecture](protocols.md) |
 | Run contract and behavior tests | [Behavioral testing](behavioral-testing.md) |
@@ -39,9 +56,9 @@ This repository contains explicitly versioned surfaces with different owners:
 
 | Surface | Source identity | Meaning |
 | --- | --- | --- |
-| SDK and CLI | `arcane-os` `0.3.4` | The Node.js toolchain, portable `arcane-os/event-manager`, `arcane-os/mail`, `arcane-os/preference-store`, and `arcane-os/speech-playback` entrypoints, plus the browser-only `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints in this checkout. |
-| Browser runtime | SDK `0.3.4`, protocol `arcane/1`, `runtime/` | The SDK-canonical runtime tree. `listRuntimeFiles()`, `readRuntimeFile()`, and `loadRuntimeRelease()` derive its current inventory directly from the selected directory. |
-| Browser SDK runtime | SDK `0.3.4`, `browser-runtime/` | The browser closure for events, Wllama, and Browser Speech mechanisms. `listSdkBrowserRuntimeFiles()`, `readSdkBrowserRuntimeFile()`, and `loadSdkBrowserRuntimeRelease()` derive its current inventory directly from the selected directory. |
+| SDK and CLI | `arcane-os` `0.5.11` | The Node.js toolchain, portable `arcane-os/event-manager`, `arcane-os/mail`, `arcane-os/preference-store`, and `arcane-os/speech-playback` entrypoints, plus the browser-only `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints in this checkout. |
+| Browser runtime | SDK `0.5.11`, protocol `arcane/1`, `runtime/` | The SDK-canonical runtime tree. `listRuntimeFiles()`, `readRuntimeFile()`, and `loadRuntimeRelease()` derive its current inventory directly from the selected directory. |
+| Browser SDK runtime | SDK `0.5.11`, `browser-runtime/` | The browser closure for events, Wllama, and Browser Speech mechanisms. `listSdkBrowserRuntimeFiles()`, `readSdkBrowserRuntimeFile()`, and `loadSdkBrowserRuntimeRelease()` derive its current inventory directly from the selected directory. |
 | Core reference snapshot | Arcane OS commit `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, protocol `arcane/1` | The application-facing Core contract imported into `docs/reference/core/`, with SDK-local links and package-boundary notes added explicitly. |
 
 The SDK runtime source and Core reference have different owners. A browser
@@ -54,21 +71,34 @@ functional compatibility.
 See the [Core reference source notes](core/README.md) for the imported inventory
 and the distinction between a documentation snapshot and the selected runtime.
 
-## Published 0.3.4
+## Installed documentation and release identity
 
-The published package is `arcane-os@0.3.4` from package-source commit
-`9e657b31f758a2c7943446533fe87afda206ac49`. The npm `latest` dist-tag resolves
-to `0.3.4`.
+This reference accompanies `arcane-os@0.5.11`. The installed package includes
+the maintained `docs/` tree and `examples/wasm-ai-demo/` source alongside
+README and CHANGELOG. Open `node_modules/arcane-os/docs/reference/README.md`
+for the matching local reference. The generated website and test suites remain
+repository surfaces.
 
-This package includes the portable preference-store and speech-playback
-entrypoints, the browser runtime providers, optional trailing physical-workspace
-`security` route compatibility, and the Speech capture retry-state correction.
-Examples, general documentation, tests, and generated reference-site output are
-repository surfaces and are not included in the npm package.
+Read the installed version and current registry channel separately:
+
+```sh
+npm list arcane-os
+npm view arcane-os@latest version
+```
+
+The [changelog](../../CHANGELOG.md) records changes by version; the
+[GitHub releases](https://github.com/TheWizardNexus/arcane-os-sdk/releases)
+identify the corresponding published package source. A newer website does not
+change the version installed in your application.
+
+### Historical 0.3.4 publication record
+
+The following records describe that earlier release only. They do not identify
+the current registry channel or the package covered by this reference.
 
 | Release boundary | Exact value |
 | --- | --- |
-| npm package | `arcane-os@0.3.4`; `latest=0.3.4` |
+| npm package | `arcane-os@0.3.4` |
 | Package source | `9e657b31f758a2c7943446533fe87afda206ac49` |
 | GitHub release | [`0.3.4`](https://github.com/TheWizardNexus/arcane-os-sdk/releases/tag/0.3.4) (tag and title are both exactly `0.3.4`) |
 | Selected package run | [Check run 33268940871](https://github.com/TheWizardNexus/arcane-os-sdk/actions/runs/33268940871) |

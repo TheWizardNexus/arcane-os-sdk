@@ -23,7 +23,7 @@ const DEFAULT_TTS_SEGMENTATION={
 };
 const DEFAULT_BROWSER_TTS_EXECUTION={
     device:'auto',
-    maxConcurrentRequests:2
+    maxConcurrentRequests:4
 };
 const BROWSER_TTS_EXECUTION_DEVICES=new Set(['auto','webgpu','wasm']);
 const MAX_BROWSER_TTS_CONCURRENT_REQUESTS=4;

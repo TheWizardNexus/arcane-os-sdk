@@ -214,7 +214,7 @@ portable runtime subpaths such as `arcane-os/preference-store` and
 modules. The result reports the complete map written to the selected
 application; no fixed entry count is a release contract.
 
-SDK `0.3.4` preserves the physical workspace route count and ordered include
+SDK `0.5.11` preserves the physical workspace route count and ordered include
 list. External and modern integrated routes require `components`, `css`,
 `dependencies`, `entities`, `img`, `modules`, and `sdk`; a physical workspace
 may omit only an optional trailing `security` include. The external license

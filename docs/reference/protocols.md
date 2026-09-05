@@ -159,7 +159,7 @@ imports such as:
 import ollama from 'arcane/Ollama';
 ```
 
-The physical-v1 tree lives entirely beneath `arcane/`. SDK `0.3.4` projects the
+The physical-v1 tree lives entirely beneath `arcane/`. SDK `0.5.11` projects the
 complete canonical runtime and browser runtime selected by the installed SDK
 package. Runtime dependencies stay under
 `arcane/dependencies/`; the SDK event and browser-AI closure stays under
@@ -174,7 +174,7 @@ integrated physical route uses the same ordered include list in its one route.
 Omitting only that final optional entry is compatible. Removing, reordering, or
 renaming any preceding entry changes the physical contract.
 
-The `0.3.4` map derives its complete entries from the selected runtime graph;
+The `0.5.11` map derives its complete entries from the selected runtime graph;
 application source imports do not select a fixed entry count. The operation
 result reports `imports`, `entryCount`, and `excludedModules`; reached-file
 traversal remains internal. The
@@ -239,8 +239,8 @@ exactly `dependencyName`, `packageSource`,
 `canonicalPackageRoot`, `packageName`, `packageVersion`, `runtimeRoot`,
 and `browserRuntimeRoot`. A
 workspace may use the canonical dependency name or one exact npm alias such as
-`npm:arcane-os@0.3.4`; the physical package manifest must still identify
-exactly as `arcane-os@0.3.4`. Canonical-plus-alias duplicates, multiple aliases,
+`npm:arcane-os@0.5.11`; the physical package manifest must still identify
+exactly as `arcane-os@0.5.11`. Canonical-plus-alias duplicates, multiple aliases,
 links/junctions, indirect package roots, or version drift are reported.
 
 For external workspaces, `arcane dev` serves the projected `arcane/` root,
@@ -351,7 +351,7 @@ does not silently delete the app-owned cache. A complete whole member supersedes
 its current resumable fragments. Cleanup failure is warned without hiding the
 usable model.
 
-SDK `0.3.4` requires WebGPU. Load requests full offload and waits for the runtime
+SDK `0.5.11` requires WebGPU. Load requests full offload and waits for the runtime
 to report a loaded model. `navigator.gpu` presence alone is
 not readiness. There is no CPU fallback, partial-offload success mode, or
 silent switch to native/Core/cloud inference.
@@ -413,11 +413,26 @@ shapes report distinct `*-unavailable` and
 `*-assignment-rejected` reasons for each setting; the Worker never
 substitutes a different namespace. The caller also owns dtype, STT input sample
 rate, TTS output sample rate, default voice, and the complete voice inventory.
-Kokoro execution defaults to `{device:'auto',maxConcurrentRequests:2}` and may
+Kokoro execution defaults to `{device:'auto',maxConcurrentRequests:4}` and may
 be overridden with `webgpu` or `wasm` and an integer capacity from 1 through 4.
 Automatic selection attempts a complete WebGPU pool only when WebGPU is exposed,
 then tears it down and forms a complete WASM pool if WebGPU loading rejects. It
 does not change the selected runtime, model, dtype, or voice.
+
+Each capacity slot owns one Worker/model session. The provider-neutral runtime
+admits the first four requests and retains segment 5 and later in its FIFO
+queue without dropping content. Synthesis may finish out of order; high-level
+AI playback waits for earlier segments and schedules the contiguous ready
+prefix in exact input order. More sessions trade memory for latency, without
+promising physical GPU kernel overlap.
+
+Applications using `AI.configureBrowserSpeech()` can read
+`ai.providerRuntime.status('tts', {execution:true}).execution` instead of
+reaching into provider internals. The optional provider snapshot exposes
+Kokoro's `requestedDevice`, `selectedDevice`, `maxConcurrentRequests`, and
+`activeRequestCount`. The default `status()` retains its original sticky-state
+behavior; explicit execution inspection does not load a provider or emit a
+state event. See [browser speech](ai/browser-speech.md) for complete examples.
 
 The SDK is not the distributor of the selected upstream speech packages or
 provider assets and does not republish their legal/source payloads. Package,

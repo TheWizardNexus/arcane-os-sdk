@@ -279,7 +279,7 @@ paths are withheld from the native provider. The provider copies the complete
 selected release rather than accepting an unrelated source path. Verification
 is a separate explicit operation for a selected release artifact.
 
-The SDK `0.3.3` runtime requires Arcane `0.8.12` or newer. Compatibility
+The SDK `0.5.11` runtime requires Arcane `0.8.12` or newer. Compatibility
 is contractual rather than exact-version pinning: the prepared Core must meet
 the highest minimum declared by the runtime, selected app, and bundled app
 dependencies; keep each app's Arcane protocol generation; and provide every

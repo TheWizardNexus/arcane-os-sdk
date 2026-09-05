@@ -19,7 +19,7 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This checkout defines the `0.5.10` SDK contract. Applications pin one exact npm
+This checkout defines the `0.5.11` SDK contract. Applications pin one exact npm
 version and lockfile; registry state is deliberately not baked into application
 artifacts.
 
@@ -29,16 +29,99 @@ The app repository's exact dependency and lockfile select the SDK; changing that
 selection is an explicit repository update. Tests and checks run only when the
 user expressly selects them, or when required for a selected release output.
 
+## Beginner quick start
+
+Create one browser application, install its pinned SDK, and start its source
+server:
+
+```bash
+npx arcane-os@0.5.11 new hello-speech --path ./hello-speech --target browser
+cd hello-speech
+npm install
+npm run dev
+```
+
+Open the URL printed by the server. The generated page owns its import map and
+Arcane theme; its application module is `apps/hello-speech/modules/App.js`.
+`arcane/AI` is a managed **browser import**, not an npm-exported Node inference
+module.
+
+For a first spoken sentence, copy the application-owned
+[`speech-selection.js` configuration from the speech quick start](https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/ai/browser-speech.md#quick-start-say-one-sentence)
+beside `App.js`, then use this module. That one configuration file defines the
+upstream runtime, model, dtype, and voice. This module creates the application's
+DBOPFS store; the SDK creates and manages its speech providers and Workers.
+
+```javascript
+import arcaneThemeReady from 'arcane/ThemeBootstrap';
+import AI, { AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL } from 'arcane/AI';
+import DBOPFS from 'arcane/DBOPFS';
+import { speechSelection } from './speech-selection.js';
+
+await arcaneThemeReady;
+const dbopfs = new DBOPFS();
+await dbopfs.readyPromise;
+const ai = new AI();
+await ai.configureBrowserSpeech({
+  protocol: AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+  id: 'hello-speech',
+  dbopfs,
+  tts: {
+    providerId: 'hello-kokoro',
+    model: speechSelection.model,
+    runtime: speechSelection.runtime,
+    offline: false
+  }
+});
+
+const button = document.createElement('button');
+button.textContent = 'Load voice and say hello';
+document.body.append(button);
+button.addEventListener('click', async function sayHello() {
+  button.disabled = true;
+  try {
+    await ai.setSpeechMuted(false);
+    console.log(ai.providerRuntime.status('tts', { execution: true }).execution);
+    const prepared = await ai.streamTTS('Hello from Arcane. ', true);
+    console.log('Speech preparation completed:', prepared);
+  } catch (error) {
+    console.error(error.code, error.message);
+  } finally {
+    button.disabled = false;
+  }
+});
+```
+
+The button explicitly loads/unmutes the selected model and requests speech.
+The first load can download the app-selected runtime/model/voice; the browser
+may need another audio-unlock gesture after a long load. Keep the complete
+visual response available alongside speech.
+
+Capacity 4 means up to four segments synthesize at once. Segment 5 and later
+wait in the SDK's FIFO queue; they are not dropped. Synthesis may finish out of
+order, but playback waits for earlier segments and plays exact input order.
+Each slot owns a Worker/model session, so raising capacity trades memory for
+latency.
+
+Continue with [streaming chunks, device selection, cancellation, status, and cleanup](https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/ai/browser-speech.md),
+the [tiny TWiN Cloud request and saved-preference migration](https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/ai/twin-cloud.md),
+or the [maintained WASM voice-chat example](https://github.com/TheWizardNexus/arcane-os-sdk/tree/main/examples/wasm-ai-demo).
+The installed package also includes `docs/` and the maintained example source:
+open `node_modules/arcane-os/docs/reference/ai/browser-speech.md`,
+`node_modules/arcane-os/docs/reference/ai/twin-cloud.md`, or
+`node_modules/arcane-os/examples/wasm-ai-demo/README.md` locally. Public links
+above work from both npm and GitHub.
+
 ## Developer API reference
 
-Start with the [capability-first developer reference](docs/reference/README.md).
+Start with the [capability-first developer reference](https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/README.md).
 It follows Arcane's MDN-style model and covers every public package export, CLI
 command, synchronized runtime module, entity, component, Arcane Core member,
-and Arcane Ollama method. Use the [availability and normalization matrix](docs/reference/availability-and-normalization.md)
+and Arcane Ollama method. Use the [availability and normalization matrix](https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/availability-and-normalization.md)
 to distinguish Node, browser, native, cloud, and cross-host behavior; protocol
-mechanics are kept in the folded/deep-linked [protocol guide](docs/reference/protocols.md).
-The [behavioral-testing guide](docs/reference/behavioral-testing.md) explains the
-executable contract, while the [machine-readable inventories](docs/reference/inventory/)
+mechanics are kept in the folded/deep-linked [protocol guide](https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/protocols.md).
+The [behavioral-testing guide](https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/behavioral-testing.md) explains the
+executable contract, while the [machine-readable inventories](https://github.com/TheWizardNexus/arcane-os-sdk/tree/main/docs/reference/inventory/)
 make completeness independently checkable.
 
 ## Central event instrumentation
@@ -54,7 +137,7 @@ off-by-default diagnostic option.
 
 Recording is off by default. Once explicitly enabled, a session retains its
 complete recorded content until the caller clears it or disables recording.
-Review [the EventManager guide](docs/event-manager.md)
+Review [the EventManager guide](https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/event-manager.md)
 before enabling DOM values, node content, event details, source stacks, or live
 event redispatch. Password targets, text-entry details, clipboard data, URL
 attributes, and common credential keys are excluded or redacted by default.
@@ -90,10 +173,18 @@ Kokoro (`LOCAL_SPEACH` / `kokoro`) owns speech synthesis. Neither audio route
 uses the TWiN key, and neither requires a cloud audio key.
 
 The built-in provider and default-model preference sentinel are both `TWIN`.
-Applications upgrading saved `OPENAI` LLM selections must explicitly update
-those app-owned settings to `TWIN`. The SDK provides no built-in `OPENAI` alias
-and does not rewrite saved preferences. Actual upstream model identifiers remain
-unchanged.
+Applications upgrading saved preference tuples must replace only uppercase
+`OPENAI` in slot 0 (LLM provider) and slot 3 (default-model sentinel) with
+`TWIN` through the existing application preference owner before importing
+`AI.js` or any module that imports it, and before AI preference hydration.
+Use dynamic import after migration; module evaluation can instantiate AI
+immediately when the user is already ready. Keep every other
+value unchanged, including `openai-gpt-oss-120b` and `openai-gpt-oss-20b`.
+The SDK provides no built-in `OPENAI` alias and does not rewrite saved
+preferences. OpenAI-compatible wire terminology and the separate Core
+`provider:'openai'` contract are unchanged. The
+[TWiN quick start and migration recipe](https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/ai/twin-cloud.md)
+show the exact application-owned operation.
 
 `fetchRequest()` and `streamRequest()` accept the provider-neutral
 `reasoningEffort` option with `none`, `low`, `medium`, `high`, or `max`. TWiN
@@ -110,6 +201,8 @@ profile. Each descriptor uses one ordered `files` array, so monolithic and
 split GGUF models share the same contract:
 
 ```js
+import { createBrowserModelSource } from 'arcane-os/ai/browser-wasm';
+
 const source=createBrowserModelSource({
     id:'app-model',
     files:[
@@ -157,7 +250,7 @@ provider factories. The package contains the plain-JavaScript provider and
 Worker machinery, not speech runtimes, models, voices, or a CDN default. An app
 must supply each runtime/model selection explicitly. Speech roles
 load, cancel, unload, fail, and recover independently, so speech failure never
-silently falls back or prevents text chat. Kokoro defaults to a two-slot Worker
+silently falls back or prevents text chat. Kokoro defaults to a four-slot Worker
 and model-session pool: it selects WebGPU when the browser can load the complete
 pool and otherwise recreates that pool on WASM. Apps may select `webgpu` or
 `wasm` explicitly and may set the bounded TTS capacity from one through four.
@@ -204,10 +297,9 @@ uses the same controller for automatic memory extraction.
 Create a new repository-shaped Arcane application with the exact stable SDK:
 
 ```bash
-npx arcane-os@0.5.10 new my-app --path ./my-app --target portable --git
+npx arcane-os@0.5.11 new my-app --path ./my-app --target portable --git
 cd my-app
 npm install
-npm run check
 npm run dev
 ```
 
@@ -215,7 +307,7 @@ To enroll an existing repository, install the exact SDK and initialize only
 missing Arcane files:
 
 ```bash
-npm install --save-dev --save-exact arcane-os@0.5.10
+npm install --save-dev --save-exact arcane-os@0.5.11
 npm exec -- arcane init my-app --target portable
 ```
 
@@ -231,7 +323,7 @@ npm exec -- arcane-os targets
 No global SDK install or standalone Arcane CLI is required. The application
 repository's exact npm dependency and lockfile own the CLI and toolchain version.
 
-Use `npx arcane-os@0.5.10` for the initial bootstrap because it names this npm
+Use `npx arcane-os@0.5.11` for the initial bootstrap because it names this npm
 package explicitly; bare `npx arcane` outside an installed project could resolve
 a different package. Both installed commands invoke the same headless toolchain.
 Project-local npm scripts use the SDK pinned by that app's `package-lock.json`,
@@ -246,14 +338,12 @@ tarball install in the app's package manifest and lock:
 ```bash
 # From the arcane-os-sdk checkout
 npm ci
-npm run check
 npm run pack:local
 node ./bin/arcane.mjs new local-app --path ../local-app --target portable --git
 
 # From the generated app repository
 cd ../local-app
-npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.5.10.tgz
-npm run check
+npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.5.11.tgz
 npm ci
 ```
 
@@ -262,7 +352,7 @@ same location. The lockfile retains the selected package dependency while
 Arcane uses the installed package name and version. Local directory `file:` dependencies are not
 accepted because npm may install them as links; use a packed `.tgz`. A GitHub
 runner also needs that tarball at the locked path. After publication, replace
-the local declaration with the exact `arcane-os@0.5.10` registry package and
+the local declaration with the exact `arcane-os@0.5.11` registry package and
 commit the regenerated lock.
 
 Generated repositories use `npm ci --ignore-scripts` in CI. Run dependency
@@ -393,14 +483,15 @@ npm run test:integration
 npm run test:regression
 ```
 
-Use a named set while iterating or `npm test` for the complete suite. Large
+Run a named set or `npm test` only when explicitly selecting that verification,
+or when required for a selected release output. Large
 fixtures stay inside one isolated file process and expose smaller nested cases,
 so the report shows the individual behaviors without repeating setup, builds,
 package installation, or assertions.
 
 ## Current target support
 
-Version `0.5.10` exposes one browser target and five explicitly paired
+Version `0.5.11` exposes one browser target and five explicitly paired
 native development targets: a non-runnable portable directory, a
 Windows x64 unsigned-local-test EXE bundle, Linux x64 and Linux ARM64
 unsigned-local-test DEBs, and an Android development-signed APK. The
@@ -502,11 +593,11 @@ artifact. Portable output is never represented as an executable, and unsigned
 or development-signed evidence is never represented as production signing or
 release acceptance.
 
-See [docs/platform-targets.md](docs/platform-targets.md) for the matrix and
-[docs/architecture.md](docs/architecture.md) for the boundary. The exact
+See [docs/platform-targets.md](https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/platform-targets.md) for the matrix and
+[docs/architecture.md](https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/architecture.md) for the boundary. The exact
 minimum-version and required-contract compatibility rule is documented in
-[docs/compatibility.md](docs/compatibility.md). The issue-ready
-extraction sequence is tracked in [docs/roadmap.md](docs/roadmap.md).
+[docs/compatibility.md](https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/compatibility.md). The issue-ready
+extraction sequence is tracked in [docs/roadmap.md](https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/roadmap.md).
 
 ## Canonical app descriptor
 

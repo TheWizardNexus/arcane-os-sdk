@@ -16,7 +16,11 @@ import {temporaryDirectory} from './helpers.mjs';
 
 const REQUIRED_FILES=[
     'CHANGELOG.md','COMMERCIAL-LICENSE.md','LICENSE','NOTICE','README.md',
-    'bin/arcane-test.mjs','bin/arcane.mjs','src/index.mjs','src/testing.mjs'
+    'bin/arcane-test.mjs','bin/arcane.mjs','src/index.mjs','src/testing.mjs',
+    'docs/reference/README.md','docs/reference/ai/browser-speech.md',
+    'docs/reference/ai/twin-cloud.md','examples/wasm-ai-demo/README.md',
+    'examples/wasm-ai-demo/index.html','examples/wasm-ai-demo/app.js',
+    'examples/wasm-ai-demo/server.mjs'
 ];
 
 // These offsets are tar transport framing, not Arcane package policy.
@@ -57,6 +61,9 @@ test('npm release verification enforces only the public package boundary',async 
         assert.equal(verified.version,'0.3.2');
         assert.equal(verified.packageDocument.name,'arcane-os');
         assert.ok(verified.paths.includes('runtime/arcane/modules/example.js'));
+        assert.ok(verified.paths.includes('docs/reference/ai/browser-speech.md'));
+        assert.ok(verified.paths.includes('docs/reference/ai/twin-cloud.md'));
+        assert.ok(verified.paths.includes('examples/wasm-ai-demo/server.mjs'));
     });
 
     await t.test('rejects an unexpected package version',async()=>{
@@ -72,7 +79,7 @@ test('npm release verification enforces only the public package boundary',async 
     await t.test('rejects repository-only paths',async()=>{
         const root=await temporaryDirectory(t,{prefix:'arcane-npm-release-path-'});
         const tarballPath=path.join(root,'arcane-os-0.3.2.tgz');
-        await writeFile(tarballPath,packageTarball({extraFiles:[['docs/private.md','not shipped\n']]}));
+        await writeFile(tarballPath,packageTarball({extraFiles:[['tools/private.mjs','not shipped\n']]}));
         await assert.rejects(
             verifyNpmReleaseArtifact({tarballPath}),
             /outside the published package boundary/u
@@ -84,6 +91,13 @@ test('npm release verification enforces only the public package boundary',async 
         const tarballPath=path.join(root,'arcane-os-0.3.2.tgz');
         await writeFile(tarballPath,packageTarball({omit:['NOTICE']}));
         await assert.rejects(verifyNpmReleaseArtifact({tarballPath}),/NOTICE/u);
+    });
+
+    await t.test('requires the installed beginner speech guide',async function requiresSpeechGuide(){
+        const root=await temporaryDirectory(t,{prefix:'arcane-npm-release-docs-'});
+        const tarballPath=path.join(root,'arcane-os-0.3.2.tgz');
+        await writeFile(tarballPath,packageTarball({omit:['docs/reference/ai/browser-speech.md']}));
+        await assert.rejects(verifyNpmReleaseArtifact({tarballPath}),/docs\/reference\/ai\/browser-speech\.md/u);
     });
 });
 

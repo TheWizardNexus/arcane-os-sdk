@@ -3,19 +3,14 @@
   "source": {
     "authority": "sdk-canonical",
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
-    "commit": "9e657b31f758a2c7943446533fe87afda206ac49",
+    "branch": "main",
     "path": "runtime/arcane",
-    "sdkVersion": "0.3.4",
-    "legacyProjection": {
-      "repository": "https://github.com/TheWizardNexus/ARCANE-OS.git",
-      "commit": "c540014afe69f14cf5ae60493b7295f36dbcec64",
-      "bundleVersion": "0.8.12"
-    },
+    "sdkVersion": "0.5.11",
     "protocol": "arcane/1"
   },
   "artifactCount": 84,
   "javascriptArtifactCount": 82,
-  "esmExportCount": 351,
+  "esmExportCount": 353,
   "artifacts": [
     {
       "file": "runtime/arcane/modules/AI.js",
@@ -34,8 +29,8 @@
       "summary": "Owns provider-selectable chat and the one-time caller-authority browser STT/TTS configuration, lifecycle, synthesis, transcription, and playback boundary.",
       "availability": "Browser + native bridge + TWiN Cloud",
       "protocol": "arcane-ai-browser-speech-configuration/1, AIProviderRuntime arcane-ai-provider/2 routes, globalThis.arcaneEvents, TWiN Cloud HTTPS, Arcane.ollama, Arcane.speech, Android WebView bridge",
-      "normalization": "Complete mutable caller-owned browser speech authority, SDK-owned provider registration/replacement/disposal, explicit STT/TTS activation, sticky readiness, canonical window.user readiness without compatibility-event object-identity admission or polling, exact ordered structural calls with required arguments.message, atomic nonblank all-ID tool-result sequencing, complete all-choice streaming/data validation, native Ollama structural adaptation, complete-response then all validated tool callbacks then completion ordering, observed async callbacks, Blob/File transcription, playable audio, active-generation TTS operation-failure routing, mute, and cancellation are normalized; provider/model/runtime/voice policy remains caller-owned.",
-      "surface": "Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; configure/dispose speech, route lifecycle, declaration-validated chat/stream requests with exact ordered calls, synthesis/transcription, and playback controls; initializes from current canonical user readiness, installs `window.ai`, and projects `ai-ready` plus active-generation `ai-tts-failure`."
+      "normalization": "Complete mutable caller-owned browser speech authority, SDK-owned provider registration/replacement/disposal, explicit STT/TTS activation, normalized Kokoro TTS execution with default capacity 4, explicit provider-neutral execution snapshots through status(role,{execution:true}), sticky readiness, canonical window.user readiness without compatibility-event object-identity admission or polling, exact ordered structural calls with required arguments.message, atomic nonblank all-ID tool-result sequencing, complete all-choice streaming/data validation, native Ollama structural adaptation, complete-response then all validated tool callbacks then completion ordering, observed async callbacks, Blob/File transcription, immediate exact-segment synthesis, ordered audio-clock scheduling, playable audio, active-generation TTS operation-failure routing, mute, and cancellation are normalized; provider/model/runtime/voice policy remains caller-owned.",
+      "surface": "Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; explicit `providerRuntime.status(role,{execution:true})` snapshots; configure/dispose speech, route lifecycle, declaration-validated chat/stream requests with exact ordered calls, synthesis/transcription, and playback controls; initializes from current canonical user readiness, installs `window.ai`, and projects `ai-ready` plus active-generation `ai-tts-failure`."
     },
     {
       "file": "runtime/arcane/modules/AIPreferenceRuntime.js",
@@ -81,7 +76,7 @@
       "summary": "Provider-neutral selection, lifecycle, routing, startup, request, streaming, cancellation, and independent LLM/STT/TTS state.",
       "availability": "Cross-host in-process runtime; registered providers remain browser, native, or cloud specific",
       "protocol": "arcane-ai-runtime/2, arcane-ai-provider/2, arcane-ai-model-authority/1",
-      "normalization": "Normalizes mutable complete per-role routes, lifecycle/status, cancellation, streaming cleanup, uncapped FIFO request lanes, local-only selection, direct LLM history/declaration/terminal structural contracts, complete all-choice content/reasoning FIFO iteration, private automatic provider draining with result-first buffering, terminal-only structural calls, exact per-choice observed/terminal correlation, and a separate complete validated terminal result without creating a fallback.",
+      "normalization": "Normalizes mutable complete per-role routes, lifecycle/status, cancellation, streaming cleanup, capacity-1 FIFO LLM/STT lanes, bounded provider-declared parallel TTS requests with FIFO overflow, local-only selection, direct LLM history/declaration/terminal structural contracts, complete all-choice content/reasoning FIFO iteration, private automatic provider draining with result-first buffering, terminal-only structural calls, exact per-choice observed/terminal correlation, and a separate complete validated terminal result without creating a fallback.",
       "surface": "Protocol constants; singleton-only `AIProviderRuntime`; `aiProviderRuntime`; `getAIProviderRuntime()`; provider registration/identity/selection, closed three-role and STT/TTS-only validation/configuration/replacement, status/catalog/inspection, startup, per-role load/unload/dispose/cancel, dispose-all, request/stream/speech aliases, and mute controls."
     },
     {
@@ -95,11 +90,11 @@
         "applyAIResponseLength",
         "normalizeAIResponseLength"
       ],
-      "summary": "Preserves legacy low/medium/high preference selectors as inert compatibility metadata while leaving complete prompts unchanged.",
+      "summary": "Normalizes low/medium/high response-preference selectors while leaving complete prompts unchanged.",
       "availability": "Cross-host",
       "protocol": "In-process only",
-      "normalization": "Legacy selectors normalize to low, medium, or high; every label is Complete, the instruction is empty, and prompt content remains unchanged.",
-      "surface": "Inert compatibility constants plus `normalizeAIResponseLength()`, `aiResponseLengthInstruction()`, and `applyAIResponseLength()`."
+      "normalization": "Selectors normalize to low, medium, or high; every label is Complete, the instruction is empty, and prompt content remains unchanged.",
+      "surface": "Response-preference constants plus `normalizeAIResponseLength()`, `aiResponseLengthInstruction()`, and `applyAIResponseLength()`."
     },
     {
       "file": "runtime/arcane/modules/AIResponseURLPolicy.js",
@@ -128,7 +123,6 @@
         "AI_RUNTIME_STARTUP_EVENT",
         "AI_RUNTIME_STATES",
         "AI_RUNTIME_STATE_EVENT",
-        "aiRuntimeEvents",
         "getAIRuntimeState",
         "publishAIRuntimeRoleState",
         "publishAIRuntimeRolesState",
@@ -139,9 +133,9 @@
       ],
       "summary": "Sticky mutable LLM, speech-to-text, and text-to-speech lifecycle snapshots, intents, subscriptions, and startup-settlement barriers.",
       "availability": "Cross-host in-process state contract; actual role readiness remains provider specific",
-      "protocol": "arcane-ai-runtime-state/1 over the per-realm globalThis.arcaneEvents authority; deprecated state-free EventTarget compatibility view",
+      "protocol": "arcane-ai-runtime-state/1 over the per-realm globalThis.arcaneEvents authority",
       "normalization": "Closed monotonic sticky role snapshots, transient lifecycle intents, synchronous current-state replay, AbortSignal cleanup, and startup settlement are normalized; events report state but grant no authority.",
-      "surface": "Protocol/event/role/state constants; deprecated `aiRuntimeEvents` compatibility view; snapshot, state subscribe/publish, intent request/subscribe, and `startAIRuntime({startMuted,startTranscription,signal})` returning `{barrier,settled,cancel}`."
+      "surface": "Protocol/event/role/state constants; snapshot, state subscribe/publish, intent request/subscribe, and `startAIRuntime({startMuted,startTranscription,signal})` returning `{barrier,settled,cancel}`."
     },
     {
       "file": "runtime/arcane/modules/AnsiText.js",
@@ -306,8 +300,8 @@
       "summary": "Evaluates complete arithmetic expressions, powers, constants, and common functions without `eval`.",
       "availability": "Cross-host",
       "protocol": "arcane-event-source/1 on the per-realm globalThis.arcaneEvents authority",
-      "normalization": "Mutable complete canonical result/error details, source-instance operation IDs, exact parser/evaluation error codes, and state-free EventTarget compatibility.",
-      "surface": "CALCULATOR_ENGINE_ERROR_CODES; default CalculatorEngine with calculate(), EventTarget/on compatibility, dispose()/destroy(); evaluateExpression()."
+      "normalization": "Mutable complete canonical result/error details, source-instance operation IDs, and exact parser/evaluation error codes.",
+      "surface": "CALCULATOR_ENGINE_ERROR_CODES; default CalculatorEngine with calculate() and dispose()/destroy(); evaluateExpression()."
     },
     {
       "file": "runtime/arcane/modules/ChartLibrary.js",
@@ -327,13 +321,15 @@
       "name": "ChatRecords.js",
       "kind": "esm",
       "exports": [
-        "hasUserEntry"
+        "hasConversationEntry",
+        "hasUserEntry",
+        "recurringChatMessages"
       ],
-      "summary": "Detects whether a chat record contains a meaningful user entry.",
+      "summary": "Detects conversation entries and projects retained state into provider-safe recurring chat context.",
       "availability": "Cross-host",
       "protocol": "In-process only",
-      "normalization": "Boolean normalized result.",
-      "surface": "`hasUserEntry()`."
+      "normalization": "Boolean conversation-entry results and recurring provider context are normalized.",
+      "surface": "`hasUserEntry()`, `hasConversationEntry()`, and `recurringChatMessages(chat,{settleCompleteToolTail=false}={})`; the optional flag settles a completed restored tail that has no active provider continuation."
     },
     {
       "file": "runtime/arcane/modules/CommunicationAppController.js",
@@ -434,11 +430,11 @@
         "normalizeStructuralToolCall",
         "default"
       ],
-      "summary": "Owns complete in-memory AI turns, context construction, provider response preservation, and atomic history commit.",
+      "summary": "Owns complete ordinary visible recurring AI turns, one active structural continuation, context construction, provider response preservation, and atomic history commit.",
       "availability": "Native bridge by default; cross-host with injected chat",
       "protocol": "Arcane.ai.chat or injected provider",
-      "normalization": "Complete mutable session/result; declarations and emitted calls require nonempty user-facing arguments.message; ordered parallel calls, exact IDs/names/arguments, and extension fields are preserved; one atomic result batch must settle every pending ID; per-turn request options cannot replace session-owned messages or signal; persisted sequencing has stable coded failures; and provider rejection remains visible.",
-      "surface": "default `ConfiguredAIChatSession`, named `normalizeStructuralToolCall`; constructor accepts complete initial messages and ordered structural tool-call arrays; history/clear/prepare/send; per-turn request overrides preserve session-owned messages/signal; every pending ID requires exactly one matching nonblank role=tool result in the same request batch."
+      "normalization": "Complete mutable session/result; declarations and emitted calls require nonempty user-facing arguments.message; ordered parallel calls and their exact IDs/names/arguments/extensions remain raw only through the active matching tool continuation, then settled recurrence becomes complete ordinary visible content; one atomic result batch must settle every pending ID; per-turn request options cannot replace session-owned messages or signal; persisted sequencing has stable coded failures; and provider rejection remains visible.",
+      "surface": "default `ConfiguredAIChatSession`, named `normalizeStructuralToolCall`; constructor accepts complete initial messages and one unresolved ordered structural-call tail; history/clear/prepare/send; per-turn request overrides preserve session-owned messages/signal; every pending ID requires exactly one matching nonblank role=tool result in the same request batch; settled raw protocol does not recur."
     },
     {
       "file": "runtime/arcane/modules/ConversationActionItems.js",
@@ -536,6 +532,7 @@
       "kind": "esm",
       "exports": [
         "clearEmptyChatsAndMemories",
+        "hasConversationEntry",
         "hasMemoryContent",
         "hasUserEntry"
       ],
@@ -680,15 +677,14 @@
         "GLOBAL_ERROR_EVENT_TYPES",
         "GLOBAL_ERROR_REASONS",
         "default",
-        "fingerprintIncident",
         "normalizeErrorEvent",
         "normalizeRejectionEvent"
       ],
-      "summary": "Normalizes global errors/rejections, fingerprints and deduplicates incidents, persists a ledger, and performs bounded delivery.",
+      "summary": "Normalizes global errors/rejections, assigns occurrence identifiers, persists a ledger, and performs bounded delivery.",
       "availability": "Browser / native WebView hybrid",
       "protocol": "Window error input, DBOPFS, Mail, and per-realm globalThis.arcaneEvents authority",
       "normalization": "Incident records normalized; storage/mail failures isolated.",
-      "surface": "Global error event/code/reason constants; default `Errors`; event normalizers/fingerprint plus lifecycle, capture, delivery, state-free compatibility observation, and teardown methods."
+      "surface": "Global error event/code/reason constants; default `Errors`; event normalizers plus lifecycle, capture, delivery, state-free compatibility observation, and teardown methods."
     },
     {
       "file": "runtime/arcane/modules/GifEncoder.js",
@@ -817,7 +813,6 @@
       "name": "MailTransport.mjs",
       "kind": "esm",
       "exports": [
-        "DEFAULT_MAIL_REQUEST_TIMEOUT_MS",
         "MailTransportError",
         "normalizeMailEndpoint",
         "serializeMailReport",
@@ -827,7 +822,7 @@
       "availability": "Browser/server with fetch + cloud",
       "protocol": "HTTP(S) fetch + AbortController",
       "normalization": "Endpoint, timeout, cancellation, network, HTTP, and response-contract errors are normalized.",
-      "surface": "Timeout constant, `MailTransportError`, `normalizeMailEndpoint()`, `serializeMailReport()`, and `sendMailReport()`."
+      "surface": "`MailTransportError`, `normalizeMailEndpoint()`, `serializeMailReport()`, and `sendMailReport()`."
     },
     {
       "file": "runtime/arcane/modules/Marked.min.js",
@@ -990,7 +985,7 @@
       "summary": "Composes complete configured chat with an existing ChatEntity so each user, assistant, and structural tool turn has an explicit persistence and transport policy.",
       "availability": "Browser or native WebView with the projected ChatEntity, DBOPFS, and a configured chat function or normalized Arcane.ai surface",
       "protocol": "Existing ChatEntity/DBOPFS methods plus provider-neutral chat request/result records",
-      "normalization": "Preserves provider-safe history, complete optional assistant reasoning, every timestamped UI transcript record including legacy ui_hidden metadata, and arbitrary nonempty caller-owned chat file names; commits live context atomically; falls back from optional streaming to configured non-stream transport; carries per-turn generation options while owning lifecycle callbacks; exposes complete data callbacks; accepts terminal-only structural calls; correlates every observed per-choice call against the exact validated terminal envelope before callback/persistence; atomically settles every pending ID once; and keeps malformed legacy records readable without inventing or rewriting messages.",
+      "normalization": "Preserves complete ordinary visible recurring provider history, one active raw structural continuation, every sanitized timestamped transcript record, and arbitrary nonempty caller-owned chat file names; commits live context atomically; falls back from optional streaming to configured non-stream transport; carries per-turn generation options while owning lifecycle callbacks; exposes complete data callbacks; accepts terminal-only structural calls; correlates every observed per-choice call against the exact validated terminal envelope before callback/persistence; atomically settles every pending ID once; and keeps malformed stored records readable without inventing or rewriting messages.",
       "surface": "Default/named `PersistentAIChatSession`, `createPersistentAIChatSession()`; `create()`, `ai`, `chatEntity`, `fileName`, `ready()`, `history()`, `transcript()`, `settleMemory()`, `send()`, and `stream()`."
     },
     {
@@ -1154,8 +1149,6 @@
       "kind": "esm",
       "exports": [
         "SPEECH_PLAYBACK_STATE_EVENT",
-        "SPEECH_VOICE_ALIASES",
-        "SPEECH_VOICE_OPTIONS",
         "SpeechPlayback",
         "default",
         "splitSpeechText"
@@ -1164,7 +1157,7 @@
       "availability": "Browser + compatible AI/native bridge",
       "protocol": "AI.fetchTTS or compatible Arcane.speech.synthesize, globalThis.arcaneEvents, Blob URLs, audio element",
       "normalization": "Exact nonblank split/part input strings are preserved in mutable records while playback policy, cancellation, Blob results, and lifecycle state are normalized; provider failures remain external.",
-      "surface": "SpeechPlayback class/default, `SPEECH_PLAYBACK_STATE_EVENT`, voice aliases/options, `splitSpeechText()`, caller-configured playback lifecycle, cancellation, and destroy APIs."
+      "surface": "SpeechPlayback class/default, `SPEECH_PLAYBACK_STATE_EVENT`, `splitSpeechText()`, canonical playback lifecycle events, cancellation, and destroy APIs."
     },
     {
       "file": "runtime/arcane/modules/StaticDocumentCatalog.js",

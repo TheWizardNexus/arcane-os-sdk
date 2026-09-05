@@ -109,10 +109,16 @@ function assertPackageMetadata(packageDocument){
         fail(`package.json publishConfig must use the public npm registry and the ${expectedTag} tag.`);
     }
 
-    const requiredPublishedPaths=['bin/','browser-runtime/','src/','runtime/','schemas/'];
+    const requiredPublishedPaths=[
+        'bin/','browser-runtime/','src/','runtime/','schemas/','docs/',
+        'examples/wasm-ai-demo/README.md','examples/wasm-ai-demo/index.html',
+        'examples/wasm-ai-demo/app.js','examples/wasm-ai-demo/server.mjs',
+        'examples/wasm-ai-demo/profile-tools.js','examples/wasm-ai-demo/rag.js',
+        'examples/wasm-ai-demo/profiles/','examples/wasm-ai-demo/rag/'
+    ];
     if(!Array.isArray(packageDocument.files)
         ||requiredPublishedPaths.some(required=>!packageDocument.files.includes(required))){
-        fail('package.json files must include bin/, browser-runtime/, src/, runtime/, and schemas/.');
+        fail('package.json files must include the SDK runtime, maintained docs/, and browser AI demo source.');
     }
 
     const requiredExports=[

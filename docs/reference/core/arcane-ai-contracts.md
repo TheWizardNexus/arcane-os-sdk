@@ -9,7 +9,7 @@ They are not TypeScript declarations.
 
 ## Portable SDK AI and Core AI
 
-The SDK `0.3.4` has two related but separate normalized boundaries:
+The SDK `0.5.11` has two related but separate normalized boundaries:
 
 | Boundary | Use | Host |
 |---|---|---|

@@ -3,16 +3,16 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.3.4",
+    "sdk": "0.5.11",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
   "counts": {
-    "markdownPages": 27,
+    "markdownPages": 28,
     "collectionPages": 2,
     "generatedPages": 86,
     "runtimeModulePages": 84,
-    "htmlPages": 115,
+    "htmlPages": 116,
     "inventories": 4
   },
   "pages": [
@@ -32,6 +32,12 @@
       "source": "docs/reference/ai/browser-wasm.md",
       "output": "site/reference/ai/browser-wasm/index.html",
       "route": "reference/ai/browser-wasm/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/ai/twin-cloud.md",
+      "output": "site/reference/ai/twin-cloud/index.html",
+      "route": "reference/ai/twin-cloud/",
       "kind": "markdown"
     },
     {
@@ -278,7 +284,7 @@
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
-        "exports": 14,
+        "exports": 13,
         "reviewedCallables": 7,
         "publicMembers": 0,
         "literalCustomEvents": 0,
@@ -294,8 +300,8 @@
       "moduleClassification": "public-first-party",
       "contractCounts": {
         "exports": 8,
-        "reviewedCallables": 16,
-        "publicMembers": 37,
+        "reviewedCallables": 17,
+        "publicMembers": 36,
         "literalCustomEvents": 0,
         "directCodedFailures": 36,
         "exportedErrorSubclasses": 0
@@ -445,7 +451,7 @@
       "contractCounts": {
         "exports": 3,
         "reviewedCallables": 2,
-        "publicMembers": 7,
+        "publicMembers": 3,
         "literalCustomEvents": 0,
         "directCodedFailures": 0,
         "exportedErrorSubclasses": 0
@@ -473,8 +479,8 @@
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
-        "exports": 1,
-        "reviewedCallables": 1,
+        "exports": 3,
+        "reviewedCallables": 3,
         "publicMembers": 0,
         "literalCustomEvents": 0,
         "directCodedFailures": 0,
@@ -565,7 +571,7 @@
       "contractCounts": {
         "exports": 2,
         "reviewedCallables": 5,
-        "publicMembers": 4,
+        "publicMembers": 5,
         "literalCustomEvents": 0,
         "directCodedFailures": 0,
         "exportedErrorSubclasses": 0
@@ -638,7 +644,7 @@
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
-        "exports": 3,
+        "exports": 4,
         "reviewedCallables": 1,
         "publicMembers": 0,
         "literalCustomEvents": 0,
@@ -773,9 +779,9 @@
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
-        "exports": 7,
+        "exports": 6,
         "reviewedCallables": 0,
-        "publicMembers": 21,
+        "publicMembers": 20,
         "literalCustomEvents": 0,
         "directCodedFailures": 0,
         "exportedErrorSubclasses": 0
@@ -893,7 +899,7 @@
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
-        "exports": 5,
+        "exports": 4,
         "reviewedCallables": 2,
         "publicMembers": 0,
         "literalCustomEvents": 0,
@@ -1060,7 +1066,7 @@
       "contractCounts": {
         "exports": 3,
         "reviewedCallables": 8,
-        "publicMembers": 10,
+        "publicMembers": 11,
         "literalCustomEvents": 0,
         "directCodedFailures": 0,
         "exportedErrorSubclasses": 0
@@ -1223,7 +1229,7 @@
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
-        "exports": 6,
+        "exports": 4,
         "reviewedCallables": 1,
         "publicMembers": 28,
         "literalCustomEvents": 0,

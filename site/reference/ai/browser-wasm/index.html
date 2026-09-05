@@ -13,9 +13,9 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../">Overview</a><a href="../../../guides/">Guides</a><a href="../../../examples/">Examples</a><a href="../../../playground/">Playground</a><a href="../../../testing/">Testing</a><a href="../../" aria-current="page">Reference</a><a class="repo-link" href="../../sdk-api/">API</a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">Browser-WASM local AI</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="browser-wasm-local-ai">Browser-WASM local AI</h1><p class="doc-lead">Use this browser-only entrypoint when an application deliberately owns a local GGUF model authority and wants provider-neutral LLM lifecycle, chat, streaming, cancellation, and structural tool-call results without an Arcane Core host. For ordinary hosted applications, start with the Arcane AI contracts and globalThis.Arcane.ai. This page is the focused local-browser path beneath the normalized AI decision guide.</p><div class="doc-meta"><span>SDK 0.3.4</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">Browser-WASM local AI</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="browser-wasm-local-ai">Browser-WASM local AI</h1><p class="doc-lead">Use this browser-only entrypoint when an application deliberately owns a local GGUF model authority and wants provider-neutral LLM lifecycle, chat, streaming, cancellation, and structural tool-call results without an Arcane Core host. For ordinary hosted applications, start with the Arcane AI contracts and globalThis.Arcane.ai. This page is the focused local-browser path beneath the normalized AI decision guide.</p><div class="doc-meta"><span>SDK 0.5.11</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
-      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../">Normalized AI</a><a href="./" aria-current="page">Browser-WASM AI</a><a href="../browser-speech/">Browser speech</a><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../core/">Core map</a><a href="../../core/arcane-api/">Arcane API</a><a href="../../core/capabilities/">Capabilities and admission</a><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../../core/arcane-events/">Events</a><a href="../../core/arcane-ai-contracts/">AI contracts</a><a href="../../core/arcane-entities/">Entity exports</a><a href="../../core/ollama-module/">Ollama internals (advanced)</a><a href="../../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../">Normalized AI</a><a href="../twin-cloud/">TWiN Cloud quick start</a><a href="./" aria-current="page">Browser-WASM AI</a><a href="../browser-speech/">Browser speech</a><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../core/">Core map</a><a href="../../core/arcane-api/">Arcane API</a><a href="../../core/capabilities/">Capabilities and admission</a><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../../core/arcane-events/">Events</a><a href="../../core/arcane-ai-contracts/">AI contracts</a><a href="../../core/arcane-entities/">Entity exports</a><a href="../../core/ollama-module/">Ollama internals (advanced)</a><a href="../../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/ai/browser-wasm.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#lifecycle-at-a-glance">Lifecycle at a glance</a><a href="#model-selection-optional-hardening-and-cache">Model selection, optional hardening, and cache</a><a href="#streaming-cancellation-and-tools">Streaming, cancellation, and tools</a><a href="#errors-and-unavailable-states">Errors and unavailable states</a><a href="#browserwasmruntimeauthority">BROWSERWASMRUNTIMEAUTHORITY</a><a href="#completevaluetext">completeValueText()</a><a href="#createarcaneai">createArcaneAI()</a><a href="#createbrowsermodelsource">createBrowserModelSource()</a><a href="#createbrowserwasmllmprovider">createBrowserWasmLlmProvider()</a><a href="#createdbopfsmodelstore">createDbopfsModelStore()</a><a href="#adaptv1llmprovider">adaptV1LlmProvider()</a><a href="#related-reference">Related reference</a></nav></details><p>Use this browser-only entrypoint when an application deliberately owns a local
 GGUF model authority and wants provider-neutral LLM lifecycle, chat, streaming,
 cancellation, and structural tool-call results without an Arcane Core host.
@@ -51,7 +51,7 @@ const dbopfs = globalThis.dbopfs || new DBOPFS({applicationId:&#39;my-app&#39;})
 await dbopfs.readyPromise;
 const source = createBrowserModelSource(MODEL);
 const store = createDbopfsModelStore({dbopfs});
-const provider = createBrowserWasmLlmProvider({source, store});
+const provider = createBrowserWasmLlmProvider({sources:[source], store});
 const ai = createArcaneAI({
     provider,
     loadPolicy:&#39;manual&#39;
@@ -145,7 +145,7 @@ additional transferred content.</p>
 <p>The DBOPFS store uses one bounded transfer axis. Ordered multi-file GGUF sets
 download several members concurrently and preserve completed shards across a
 retry. Each active member negotiates HTTP Range support. A split member uses at
-most one Range worker while a one-file source may use up to
+most one Range worker while a single-member source may use up to
 <code>downloadConcurrency</code> Range workers (four by default), so file and Range
 workers are never multiplied. A usable total from <code>Content-Range</code> or the
 optional descriptor <code>bytes</code> divides that member into deterministic contiguous
@@ -153,19 +153,14 @@ parts of roughly 4 MB each, up to 4,096 parts. Each exact completed part is
 committed separately in OPFS, so retry or refresh fetches only the small
 in-flight parts plus any other missing parts; the ordered parts are exposed to
 Wllama as one logical model Blob. Range offsets remain transport-local; only
-aggregate transfer telemetry is public.
-An incomplete cache written by 0.5.3 keeps each completed legacy part and
-subdivides only its missing legacy intervals into current small parts. The
-result preserves existing progress and limits loss on later refreshes.</p>
+aggregate transfer telemetry is public.</p>
 <h2 id="model-selection-optional-hardening-and-cache">Model selection, optional hardening, and cache</h2>
 <p>The canonical model descriptor is
 <code>{id, files:[{name?,url,bytes?},...]}</code>. The ordered <code>files</code> array is nonempty;
 names and URLs are unique. Each URL must be absolute HTTPS without credentials
 or a fragment. An optional positive safe-integer <code>bytes</code> value is used only for
 progress and HTTP Range planning. Missing or unusable metadata never blocks a
-download, and a declared value is not a content-length check. The legacy
-one-file <code>{id,url,bytes?}</code> shape remains accepted and normalizes to one ordered
-member.</p>
+download, and a declared value is not a content-length check.</p>
 <p>Fetch follows HTTPS redirects and records the requested and final HTTPS URL. A
 redirect that leaves HTTPS is rejected as an unavoidable transport-safety
 boundary.</p>
@@ -190,19 +185,36 @@ cached entry or rejects with <code>ARCANE_AI_MODEL_OFFLINE_MISS</code>.</p>
 console.log(security.secure); // false unless explicitly selected
 console.log(cache);
 </code></pre></div>
-<p>For one-file compatibility, older descriptors can supply <code>immutableUrl</code> as the
-URL alias and <code>name</code> as a cache-filename hint. If both <code>url</code> and
-<code>immutableUrl</code> are present, they must match. Legacy <code>licenseSpdx</code> and
-<code>sourceRevision</code> properties are not canonical descriptor fields. Applications
-remain responsible for model selection and license compliance.</p>
+<p>Applications remain responsible for model selection and license compliance.</p>
 <p><code>localOnly:true</code> describes inference after load. It does not mean a cache miss
 cannot download. Source downloads use CORS, omit credentials and referrer,
 disable HTTP caching, and honor <code>AbortSignal</code>.</p>
-<p>On Chrome, observing a lower-power Intel WebGPU adapter may open
-<code>chrome://flags/#force-high-performance-gpu</code> in a new tab and show an alert
-explaining that Chrome must be completely restarted after changing the flag.
-The notice is advisory; it does not change browser settings, prove a faster
-adapter exists, or make a failed load succeed.</p>
+<p>On Windows desktop Chromium browsers, observing a WebGPU adapter may open one
+flags page and show one advisory per page session. The notice names only
+<strong>Force High Performance GPU</strong> (<code>#force-high-performance-gpu</code>), conditional on
+the computer having multiple GPUs, and asks the user to completely close and
+reopen their browser after enabling it. It applies to any observed GPU vendor;
+an Intel identity alone does not establish that an adapter is integrated or
+slower, and the browser does not expose a reliable machine-wide GPU count.</p>
+<p>An identified Microsoft Edge, Brave, Opera, or Vivaldi receives its own
+<code>edge://</code>, <code>brave://</code>, <code>opera://</code>, or <code>vivaldi://</code> flags address. Chrome,
+Chromium, and browsers that conceal their brand receive
+<code>about://flags/#force-high-performance-gpu</code>, which the browser rewrites to its
+own flags page, with neutral browser wording. Only the current browser&#39;s one
+address appears. Firefox, Safari, non-Windows platforms, and mobile browsers
+receive no flag notice. The notice does not suggest unrelated WebGPU, ANGLE,
+Vulkan, rasterization, or blocklist flags.</p>
+<p>The Windows selection workaround is documented by
+<a href="https://developer.chrome.com/docs/web-platform/webgpu/troubleshooting-tips#Windows-specific_limitations" target="_blank" rel="noreferrer">Chrome</a>.
+Other Chromium browsers inherit that flag; the per-vendor addresses and generic
+<code>about://</code> rewrite follow the
+<a href="https://developer.chrome.com/blog/browser-flags/" target="_blank" rel="noreferrer">Chromium browser-flags guide</a>.
+<a href="https://help.vivaldi.com/developers/web/vivaldi-user-agent-and-client-hints-user-agent/" target="_blank" rel="noreferrer">Vivaldi masks its browser identity by default</a>,
+so a Chrome user-agent token is not proof that the current browser is Chrome.
+This source-based guidance is not a live GPU-selection test of every browser
+release. The advisory does not change settings, prove another or faster adapter
+exists, inspect the flag&#39;s current value, or make a failed load succeed. If the
+browser blocks opening an internal page, the alert retains the copyable address.</p>
 <h2 id="streaming-cancellation-and-tools">Streaming, cancellation, and tools</h2>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function streamLocalSummaryAfterUserChoice(cancelButton) {
     // The selected browser-WASM model must already be ready.
@@ -433,14 +445,13 @@ provider.</p>
 <h2 id="createbrowsermodelsource">createBrowserModelSource()</h2>
 <h3 id="overview-3">Overview</h3>
 <p>Validates a caller-owned canonical ordered multi-file descriptor and creates
-the cancellable HTTPS download source accepted by this provider. A legacy
-one-file descriptor normalizes to one ordered member.</p>
+the cancellable HTTPS download source accepted by this provider.</p>
 <h3 id="signature-and-result-2">Signature and result</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createBrowserModelSource(descriptor, { fetchImpl=null }={})
 </code></pre></div>
 <p>The mutable source includes <code>kind</code>, the canonical descriptor fields,
-<code>descriptor</code>, and <code>open(memberIndex,{signal})</code>. <code>open()</code> requires a member
-index for multi-file sources and returns the complete readable response body,
+<code>descriptor</code>, and <code>open(memberIndex=0,{signal})</code>. An omitted index selects the
+first member. The method returns the complete readable response body,
 requested/final URLs, nullable observed <code>contentLength</code>, and <code>cancel()</code>; caching
 and the store&#39;s private per-member Range negotiation remain store-owned.</p>
 <h3 id="availability-and-normalization-3">Availability and normalization</h3>
@@ -457,12 +468,11 @@ console.log(source.id, source.files);
 <p>Creates the local-only Wllama provider from genuine source and store objects
 created by this module. Structural lookalikes are rejected.</p>
 <h3 id="signature-and-result-3">Signature and result</h3>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createBrowserWasmLlmProvider({ source, sources, store, loadDefaults={}, security, logger=console }={})
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createBrowserWasmLlmProvider({ sources, store, loadDefaults={}, security, logger=console }={})
 </code></pre></div>
-<p><code>sources</code> is a nonempty array of unique SDK-created model sources. Optional
-legacy <code>source</code> identifies the default and must be one member of <code>sources</code>; when
-<code>sources</code> is omitted, <code>source</code> supplies the one-model catalog. The mutable
-result exposes protocol and provider identity, default model metadata,
+<p><code>sources</code> is a nonempty array of unique SDK-created model sources. Its first
+entry is the default model. The mutable result exposes protocol and provider
+identity, default model metadata,
 <code>catalog</code>, <code>capabilities</code>, <code>status</code>, <code>load</code>, <code>unload</code>, <code>chat</code>, <code>stream</code>,
 <code>streamChat</code>, <code>use</code>, <code>probe</code>, and <code>dispose</code>. Direct provider <code>load()</code> selects a
 catalog model and returns <code>{model,status}</code>;
@@ -490,7 +500,7 @@ console.log(provider.status().state); // unloaded
 <h2 id="createdbopfsmodelstore">createDbopfsModelStore()</h2>
 <h3 id="overview-5">Overview</h3>
 <p>Adapts an existing DBOPFS instance without renaming or replacing its public
-methods. The adapter owns model-file, cache, and completion behavior.</p>
+methods. The adapter owns model-file caching and complete-set exposure.</p>
 <h3 id="signature-and-result-4">Signature and result</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createDbopfsModelStore({ dbopfs, tableName=&#39;arcane_ai_browser_models&#39;, estimateStorage=null, downloadConcurrency=4 }={})
 </code></pre></div>
@@ -524,13 +534,8 @@ contradictory exposed Range response, or incorrectly framed Range body fails
 rather than silently assembling a partial model. A transfer failure lets peer
 transfers settle; explicit cancellation stops active transfers. Both preserve
 completed members and exact Range parts for retry, while unfinished active
-parts restart after refresh. Completed 0.5.3 Range parts remain in the active
-plan, while only missing legacy intervals are subdivided. A zero-length current whole
-entry or incomplete current Range set cannot shadow a complete legacy cache;
-the complete legacy file is reused and the store attempts to remove abandoned
-replacement fragments. After
-a replacement completes, the store attempts to remove its exact legacy
-duplicate. A complete whole member similarly supersedes its Range fragments.
+parts restart after refresh. A complete whole member supersedes its current
+Range fragments.
 Cleanup failure is warned without replacing a usable model. Zero-length abandoned entries are removed
 because Wllama cannot consume an empty model Blob or File.</p>
 <h3 id="availability-and-normalization-5">Availability and normalization</h3>
@@ -611,6 +616,6 @@ and <a href="../../sdk-api/#createdbopfsmodelstore"><code>createDbopfsModelStore
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#lifecycle-at-a-glance">Lifecycle at a glance</a><a href="#model-selection-optional-hardening-and-cache">Model selection, optional hardening, and cache</a><a href="#streaming-cancellation-and-tools">Streaming, cancellation, and tools</a><a href="#errors-and-unavailable-states">Errors and unavailable states</a><a href="#browserwasmruntimeauthority">BROWSERWASMRUNTIMEAUTHORITY</a><a href="#completevaluetext">completeValueText()</a><a href="#createarcaneai">createArcaneAI()</a><a href="#createbrowsermodelsource">createBrowserModelSource()</a><a href="#createbrowserwasmllmprovider">createBrowserWasmLlmProvider()</a><a href="#createdbopfsmodelstore">createDbopfsModelStore()</a><a href="#adaptv1llmprovider">adaptV1LlmProvider()</a><a href="#related-reference">Related reference</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.3.4, runtime bundle 0.8.12, and protocol arcane/1; the latest published package is 0.3.4.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.5.11, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

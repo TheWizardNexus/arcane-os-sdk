@@ -455,13 +455,13 @@ test("speech Worker preserves complete synthesis text", async () => {
   delete globalThis.__arcaneCompleteSynthesisText;
 });
 
-test("Kokoro defaults to automatic GPU selection and a two-Worker pool", async (t) => {
+test("Kokoro defaults to automatic GPU selection and a four-Worker pool", async function defaultKokoroWorkerPool(t) {
   const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
   Object.defineProperty(globalThis, "navigator", {
     configurable: true,
     value: { gpu: {} },
   });
-  t.after(() => {
+  t.after(function restoreNavigatorAfterDefaultKokoroPool() {
     if (navigatorDescriptor) {
       Object.defineProperty(globalThis, "navigator", navigatorDescriptor);
     } else {
@@ -471,9 +471,10 @@ test("Kokoro defaults to automatic GPU selection and a two-Worker pool", async (
 
   const { store } = createMemoryStore(["tts"]);
   const workers = [];
-  installContractWorker(t, () => {
+  installContractWorker(t, function createDefaultKokoroWorker() {
     const contract = createSpeechWorkerContract({
       role: "tts",
+      holdUse: true,
       workerId: workers.length,
     });
     workers.push(contract);
@@ -481,27 +482,51 @@ test("Kokoro defaults to automatic GPU selection and a two-Worker pool", async (
   });
   const kokoro = createBrowserKokoroProvider(providerOptions("tts", store));
 
-  assert.equal(kokoro.maxConcurrentRequests, 2);
+  assert.equal(kokoro.maxConcurrentRequests, 4);
   assert.deepEqual(kokoro.status().execution, {
     requestedDevice: "auto",
     selectedDevice: null,
-    maxConcurrentRequests: 2,
+    maxConcurrentRequests: 4,
     activeRequestCount: 0,
   });
   const ready = await kokoro.load({ role: "tts", selection: selection(kokoro) });
-  assert.equal(workers.length, 2);
-  assert.ok(workers.every((contract) => contract.posted.find(
-    (message) => message.op === "load",
-  )?.payload.configuration.execution.device === "webgpu"));
+  assert.equal(workers.length, 4);
+  assert.ok(workers.every(function defaultWorkerSelectedWebGpu(contract) {
+    return contract.posted.find(
+      function findDefaultWorkerLoad(message) { return message.op === "load"; },
+    )?.payload.configuration.execution.device === "webgpu";
+  }));
   assert.deepEqual(ready.execution, {
     requestedDevice: "auto",
     selectedDevice: "webgpu",
-    maxConcurrentRequests: 2,
+    maxConcurrentRequests: 4,
     activeRequestCount: 0,
   });
 
+  const useArrivals = workers.map(function waitForDefaultSlotUse(contract) {
+    return contract.waitForUse();
+  });
+  const requests = workers.map(function synthesizeInDefaultSlot(contract, index) {
+    return kokoro.request({
+      role: "tts",
+      operation: "synthesize",
+      payload: { text: `Segment ${index + 1}.`, voice: "af_heart", speed: 1 },
+    });
+  });
+  const uses = await Promise.all(useArrivals);
+  assert.equal(kokoro.status().execution.activeRequestCount, 4);
+  for (let index = workers.length - 1; index >= 0; index -= 1) {
+    assert.equal(uses[index].payload.text, `Segment ${index + 1}.`);
+    assert.equal(workers[index].releaseUse(uses[index].id), true);
+    await requests[index];
+  }
+  await Promise.all(requests);
+  assert.equal(kokoro.status().execution.activeRequestCount, 0);
+
   await kokoro.unload();
-  assert.ok(workers.every((contract) => contract.terminated));
+  assert.ok(workers.every(function defaultWorkerTerminated(contract) {
+    return contract.terminated;
+  }));
 });
 
 test("automatic Kokoro execution replaces a rejected WebGPU pool with WASM", async (t) => {
@@ -543,7 +568,7 @@ test("automatic Kokoro execution replaces a rejected WebGPU pool with WASM", asy
   const kokoro = createBrowserKokoroProvider(providerOptions("tts", store));
 
   const ready = await kokoro.load({ role: "tts", selection: selection(kokoro) });
-  assert.equal(workers.length, 3);
+  assert.equal(workers.length, 5);
   assert.equal(materialized.length, 2, "GPU fallback must reuse one prepared artifact set.");
   assert.equal(workers[0].terminated, true);
   assert.ok(workers.slice(1).every(function replacementWorkerSelectedWasm(contract) {
@@ -598,6 +623,14 @@ test("speech execution options retain one STT slot and bounded TTS capacity", ()
     maxConcurrentRequests: 1,
     activeRequestCount: 0,
   });
+  for (const maxConcurrentRequests of [2, 3, 4]) {
+    const configuredKokoro = createBrowserKokoroProvider({
+      ...kokoroOptions,
+      execution: { device: "wasm", maxConcurrentRequests },
+    });
+    assert.equal(configuredKokoro.maxConcurrentRequests, maxConcurrentRequests);
+    assert.equal(configuredKokoro.status().execution.maxConcurrentRequests, maxConcurrentRequests);
+  }
 });
 
 test("ordinary artifact graph routing preserves native imports and local bindings", async () => {
@@ -849,7 +882,7 @@ test("Whisper and Kokoro use independent ordinary Workers and mutable complete r
   await whisper.load({ role: "stt", selection: selection(whisper) });
   await kokoro.load({ role: "tts", selection: selection(kokoro) });
   assert.equal(workers.stt.length, 1);
-  assert.equal(workers.tts.length, 2);
+  assert.equal(workers.tts.length, 4);
   assert.notEqual(workers.stt[0].worker, workers.tts[0].worker);
   assert.notEqual(workers.tts[0].worker, workers.tts[1].worker);
   assert.equal(

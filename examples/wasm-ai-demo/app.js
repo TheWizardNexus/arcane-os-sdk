@@ -135,6 +135,8 @@ const profileSelect = document.getElementById("profile-select");
 const ragFileInput = document.getElementById("rag-file-input");
 const ragImportButton = document.getElementById("rag-import-button");
 const ragStatus = document.getElementById("rag-status");
+const speechExecutionButton = document.getElementById("speech-execution-button");
+const speechExecutionStatus = document.getElementById("speech-execution-status");
 const chat = document.getElementById("chat");
 
 const preferenceStore = new PreferenceStore({
@@ -432,6 +434,7 @@ function speechConfiguration(dbopfs) {
       offline: false,
     },
     tts: {
+      // Omit execution to use the SDK's auto device and four synthesis slots.
       providerId: "wasm-ai-demo-browser-kokoro",
       model: {
         id: "onnx-community/Kokoro-82M-v1.0-ONNX",
@@ -492,6 +495,27 @@ function synchronizeRuntime(snapshot) {
     setPageStatus("loading", `Stopping ${selectedModel.shortLabel}…`);
   } else {
     setPageStatus("ready", "SDK ready · start the model in chat");
+  }
+}
+
+function inspectSpeechExecution() {
+  if (!ai) {
+    speechExecutionStatus.textContent = "Speech configuration is not ready yet.";
+    return;
+  }
+  try {
+    const status = ai.providerRuntime.status("tts", { execution: true });
+    const execution = status.execution;
+    if (!execution) {
+      speechExecutionStatus.textContent = `TTS ${status.state}; no execution report is available.`;
+      return;
+    }
+    const fallback = execution.requestedDevice === "auto" && execution.selectedDevice === "wasm";
+    speechExecutionStatus.textContent = `TTS ${status.state}; requested ${execution.requestedDevice}; selected ${execution.selectedDevice ?? "not loaded"}; synthesis capacity ${execution.maxConcurrentRequests}; active ${execution.activeRequestCount}${fallback ? "; automatic WASM fallback" : ""}.`;
+    console.log("Arcane SDK TTS execution snapshot:", execution);
+  } catch (error) {
+    speechExecutionStatus.textContent = `${error.code ?? "ERROR"}: ${error.message}`;
+    console.error(error.code, error.message);
   }
 }
 
@@ -667,6 +691,7 @@ async function initializeApplication() {
 
 modelSelect.addEventListener("change", changeModel);
 profileSelect.addEventListener("change", changeProfile);
+speechExecutionButton.addEventListener("click", inspectSpeechExecution);
 ragImportButton.addEventListener("click", function chooseKnowledgeFiles() {
   if (!ragImporting) ragFileInput.click();
 });

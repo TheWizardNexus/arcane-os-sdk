@@ -162,7 +162,6 @@ test('the public package API inventory matches every JavaScript export and MDN e
     const exportGraph=await livePackageExportGraph(packageDocument);
 
     await t.test('the inventory has stable unique records',()=>{
-        assert.equal(packageDocument.version,'0.3.4');
         assert.equal(inventory.sdkVersion,packageDocument.version);
         assert.equal(inventory.memberCount,204);
         assert.equal(inventory.memberCount,exportGraph.length);

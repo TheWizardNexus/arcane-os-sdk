@@ -142,12 +142,21 @@ status, and error state. The SDK supplies neither speech adapter runtime nor
 model/voice content; every selected file is application-owned and stored
 through the SDK-created DBOPFS adapter.
 
-Kokoro defaults to `{device:'auto',maxConcurrentRequests:2}`. Automatic
+Kokoro defaults to `{device:'auto',maxConcurrentRequests:4}`. Automatic
 selection attempts the complete Worker/session pool on WebGPU when exposed and
 recreates the complete pool on WASM if WebGPU loading rejects. Explicit
 `webgpu` or `wasm` disables that fallback. Each accepted synthesis owns one
 pool slot, and provider-neutral FIFO backpressure preserves later requests.
 Whisper remains one WASM Worker.
+
+For high-level speech, read
+`ai.providerRuntime.status('tts', {execution:true}).execution` after load.
+Kokoro reports `requestedDevice`, `selectedDevice`, `maxConcurrentRequests`,
+and `activeRequestCount`; requested `auto` with selected `wasm` identifies
+fallback. `selectedDevice` is `null` while unloaded. The default `status()`
+remains the sticky lifecycle snapshot; execution is an explicit provider read,
+and inspection errors propagate. Neither state proves physical GPU kernel
+overlap. See the [copyable speech quick start](ai/browser-speech.md).
 
 Materialized speech graphs use their file inventory as a routing table, not an
 admission policy. Known downloaded imports, fetches, Workers, and cache reads

@@ -306,7 +306,11 @@
         ></html-import>
       </section>
 
-      <p class="note">No Ollama daemon or local AI service is used. This page consumes this checkout's live Arcane SDK source; selected models persist through SDK DBOPFS and only one runs in memory at a time.</p>
+      <p class="note">No Ollama daemon or local AI service is used. This page consumes this checkout's live Arcane SDK source. Models persist through SDK DBOPFS; one LLM runs at a time, and Kokoro uses four Worker/model sessions by default.</p>
+      <p class="note">
+        <button id="speech-execution-button" class="knowledge-button" type="button">Inspect speech execution</button>
+        <span id="speech-execution-status" role="status" aria-live="polite">Load or unmute speech, then inspect its requested and selected device.</span>
+      </p>
     </main>
 
     <script type="importmap">

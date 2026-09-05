@@ -13,9 +13,9 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../">Overview</a><a href="../../guides/">Guides</a><a href="../../examples/">Examples</a><a href="../../playground/">Playground</a><a href="../../testing/">Testing</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="../sdk-api/">API</a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Protocol and host architecture</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="protocol-and-host-architecture">Protocol and host architecture</h1><p class="doc-lead">This is the deep reference behind the compact availability notes elsewhere. Application developers should start with the availability and normalization guide, call one documented API, and treat the protocols below as implementation detail.</p><div class="doc-meta"><span>SDK 0.3.4</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Protocol and host architecture</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="protocol-and-host-architecture">Protocol and host architecture</h1><p class="doc-lead">This is the deep reference behind the compact availability notes elsewhere. Application developers should start with the availability and normalization guide, call one documented API, and treat the protocols below as implementation detail.</p><div class="doc-meta"><span>SDK 0.5.11</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
-      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="./" aria-current="page">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="./" aria-current="page">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/protocols.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#layer-map">Layer map</a><a href="#sdk-package-and-cli-protocols">SDK package and CLI protocols</a><a href="#installed-sdk-runtime-materialization">Installed SDK runtime materialization</a><a href="#central-events-and-time-travel-data">Central events and time-travel data</a><a href="#browser-runtime-delivery">Browser runtime delivery</a><a href="#portable-ai-provider-runtime">Portable AI provider runtime</a><a href="#arcane-application-protocol">Arcane application protocol</a><a href="#native-host-transports">Native host transports</a><a href="#development-and-remote-http-transport">Development and remote HTTP transport</a><a href="#core-dispatch-and-capability-admission">Core dispatch and capability admission</a><a href="#arcane-ollama-protocol-path">Arcane Ollama protocol path</a><a href="#explicit-cloud-provider-path">Explicit cloud provider path</a><a href="#events-streaming-and-cancellation">Events, streaming, and cancellation</a><a href="#cross-kernel-normalization-boundary">Cross-kernel normalization boundary</a><a href="#complete-content-boundary">Complete-content boundary</a></nav></details><p>This is the deep reference behind the compact availability notes elsewhere.
 Application developers should start with the
 <a href="../availability-and-normalization/">availability and normalization guide</a>, call
@@ -64,16 +64,17 @@ the selected descriptor&#39;s directly navigable admitted <code>.html</code>/<co
 through the package include/exclude rules and writes one canonical map to the
 artifact plus every such document. The current marker is exactly one matching
 <code>meta[name=&quot;arcane-app-id&quot;]</code>; an unmarked secondary page with an active <code>base</code>
-remains admitted for patch compatibility. Wrong or duplicate explicit identity
-fails, and the selected page then must pass exact path-relative base validation.
+remains admitted under the current secondary-document rule. Wrong or duplicate
+explicit identity fails, and the selected page then must pass exact path-relative
+base validation.
 Included HTML with neither signal is a component fragment and remains a
 complete package file.
 <code>arcane-os/preference-store</code> and
 <code>arcane-os/speech-playback</code> are the two portable runtime subpaths: Node package
 exports and managed browser keys both resolve directly to the canonical runtime
 module namespaces, while <code>arcane/PreferenceStore</code> and
-<code>arcane/SpeechPlayback</code> remain browser compatibility names. There is no exported
-<code>importMapApplication()</code> function, <code>generateImportMap()</code> function, or
+<code>arcane/SpeechPlayback</code> are the established browser import-map names. There is
+no exported <code>importMapApplication()</code> function, <code>generateImportMap()</code> function, or
 <code>arcane-os/import-map</code> package subpath.</p>
 <p>The application dependency boundary is conditional. Only an application that
 actually consumes Arcane declares one exact published <code>arcane-os</code> version in
@@ -146,7 +147,7 @@ classic scripts, and module preloads, so application code can use stable named
 imports such as:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import ollama from &#39;arcane/Ollama&#39;;
 </code></pre></div>
-<p>The physical-v1 tree lives entirely beneath <code>arcane/</code>. SDK <code>0.3.4</code> projects the
+<p>The physical-v1 tree lives entirely beneath <code>arcane/</code>. SDK <code>0.5.11</code> projects the
 complete canonical runtime and browser runtime selected by the installed SDK
 package. Runtime dependencies stay under
 <code>arcane/dependencies/</code>; the SDK event and browser-AI closure stays under
@@ -159,7 +160,7 @@ directory exists; its external license route remains second. The modern
 integrated physical route uses the same ordered include list in its one route.
 Omitting only that final optional entry is compatible. Removing, reordering, or
 renaming any preceding entry changes the physical contract.</p>
-<p>The <code>0.3.4</code> map derives its complete entries from the selected runtime graph;
+<p>The <code>0.5.11</code> map derives its complete entries from the selected runtime graph;
 application source imports do not select a fixed entry count. The operation
 result reports <code>imports</code>, <code>entryCount</code>, and <code>excludedModules</code>; reached-file
 traversal remains internal. The
@@ -218,8 +219,8 @@ without data URLs, copied modules, or a consumer-owned loader.</p>
 <p><code>generateImportMap()</code> is an internal toolchain operation, not a package export.
 The shared app-document owner derives the configured entry plus the
 deterministic admitted <code>.html</code>/<code>.htm</code> inventory from the descriptor&#39;s package
-include/exclude rules. <code>import-map</code>, development, upgrade, and packaging all
-reuse that discovery. One transaction writes the artifact and the same managed
+include/exclude rules. <code>import-map</code>, development, and packaging all reuse that
+discovery. One transaction writes the artifact and the same managed
 JSON into every selected document. The result reports
 <code>documentPaths</code>, <code>documentCount</code>, and <code>files</code>: artifact first, configured entry
 second, then additional documents as <code>role:&quot;document&quot;</code>. The public CLI keeps
@@ -243,8 +244,8 @@ exactly <code>dependencyName</code>, <code>packageSource</code>,
 <code>canonicalPackageRoot</code>, <code>packageName</code>, <code>packageVersion</code>, <code>runtimeRoot</code>,
 and <code>browserRuntimeRoot</code>. A
 workspace may use the canonical dependency name or one exact npm alias such as
-<code>npm:arcane-os@0.3.4</code>; the physical package manifest must still identify
-exactly as <code>arcane-os@0.3.4</code>. Canonical-plus-alias duplicates, multiple aliases,
+<code>npm:arcane-os@0.5.11</code>; the physical package manifest must still identify
+exactly as <code>arcane-os@0.5.11</code>. Canonical-plus-alias duplicates, multiple aliases,
 links/junctions, indirect package roots, or version drift are reported.</p>
 <p>For external workspaces, <code>arcane dev</code> serves the projected <code>arcane/</code> root,
 including <code>arcane/sdk</code> and <code>arcane/dependencies</code>, alongside the selected
@@ -255,12 +256,9 @@ path and does not rewrite the installed projection.</p>
 client of <code>globalThis.Arcane</code>. Import-map resolution is not a new Arcane wire
 protocol, Core capability, network authority, or provider fallback. Import
 transport and host RPC remain separate layers.</p>
-<p>The canonical integrated-legacy Arcane OS root is the documented exception. It
-retains its physical <code>/arcane</code> and <code>/node_modules/strong-type</code> routes, returns
-an <code>integrated-legacy</code> skip result, and does not create the managed map pair.</p>
 <details><summary>Refresh lifecycle and managed-file commit behavior</summary>
 <p>Scaffolding (<code>new</code> and <code>init</code>) creates the map. <code>dev</code> refreshes once before
-binding. <code>import-map</code> and <code>upgrade</code> refresh every admitted document explicitly.
+binding. <code>import-map</code> refreshes every admitted document explicitly.
 Non-dry-run <code>package</code>, browser <code>build</code>, and paired native packaging refresh
 before collecting source. Packaging does not run tests or checks automatically.
 Explicit <code>test</code> and <code>check</code> operations read the existing map without rewriting it;
@@ -291,7 +289,7 @@ heartbeat is event telemetry only and never regenerates browser state.</p>
 The exported
 <a href="../runtime-modules/#aiproviderruntimejs"><code>getAIProviderRuntime()</code> singleton</a>
 comes from the selected runtime and owns independent <code>llm</code>, <code>stt</code>, and
-<code>tts</code> selections. SDK <code>0.5.4</code> ships browser-WASM LLM and browser
+<code>tts</code> selections. This SDK release ships browser-WASM LLM and browser
 speech provider/2 adapters and also adapts selected TWiN Cloud LLM,
 Core-backed Ollama LLM, on-device Whisper STT, and on-device Kokoro TTS routes
 into provider/2. There is no cloud speech route;
@@ -333,19 +331,16 @@ directly before reusing the original response as its single-fetch fallback.
 Confirmed support uses deterministic OPFS Range parts of roughly 4 MB each, up
 to 4,096 parts per member, with bounded active workers; completed parts and
 split-model members survive interruption so a retry fetches only missing work.
-An incomplete 0.5.3 cache keeps its completed coarse parts and subdivides only
-the missing intervals into current small parts. Only unfinished active parts
-restart after refresh. Without usable range support
+Only unfinished active parts restart after refresh. Without usable range support
 or an observable or declared total it falls back to one full fetch. A normal
 cache miss may fetch only the
 caller-supplied HTTPS sources; <code>offline:true</code> performs no model request and uses
 only a compatible completed cache, otherwise it rejects with
 <code>ARCANE_AI_MODEL_OFFLINE_MISS</code>. Unload releases the active Wllama session but
-does not silently delete the app-owned cache. When a complete current model
-replaces the exact legacy cache entry, the store attempts to remove the legacy
-duplicate; a complete whole member likewise supersedes its resumable fragments.
-Cleanup failure is warned without hiding the usable model.</p>
-<p>SDK <code>0.3.4</code> requires WebGPU. Load requests full offload and waits for the runtime
+does not silently delete the app-owned cache. A complete whole member supersedes
+its current resumable fragments. Cleanup failure is warned without hiding the
+usable model.</p>
+<p>SDK <code>0.5.11</code> requires WebGPU. Load requests full offload and waits for the runtime
 to report a loaded model. <code>navigator.gpu</code> presence alone is
 not readiness. There is no CPU fallback, partial-offload success mode, or
 silent switch to native/Core/cloud inference.</p>
@@ -374,8 +369,8 @@ rejects with code <code>ARCANE_AI_INVALID_REQUEST</code>, message
 <code>The speech worker operation is not part of its protocol.</code>, and role-specific
 reason <code>stt-worker-operation-unknown</code> or <code>tts-worker-operation-unknown</code>.
 Failures use the separate
-<code>arcane-ai-speech-worker-error/1</code> envelope. The legacy form has the four data
-properties <code>code,message,protocol,reason</code>; the current form may add one <code>cause</code>
+<code>arcane-ai-speech-worker-error/1</code> envelope. Its cause-free form has the four data
+properties <code>code,message,protocol,reason</code>; the diagnostic form may add one <code>cause</code>
 data property containing the complete serialized diagnostic, including cycles.
 The protocol, registered code, nonempty message, reason, role, and operation
 must agree. A foreign, incomplete, extra-keyed, accessor-bearing, cross-role,
@@ -384,30 +379,56 @@ Nested module Workers use
 <code>arcane-ai-browser-speech-artifact-module-worker/1</code> and report bootstrap
 rejection only as <code>artifact-module-worker-bootstrap-rejected</code>.</p>
 <p>If the platform cannot clone an exotic <code>cause</code>, the Worker keeps the complete
-raw failure in its console diagnostics and retries settlement with the legacy
-four-field envelope. Nested Workers are terminated during role teardown.</p>
-<p>Kokoro is configured through <code>namespace.env.wasmPaths</code>; Transformers is
-configured through <code>namespace.env.backends.onnx.wasm.wasmPaths</code>. Ordinary mode
-may use a caller-selected version-pinned upstream directory and preserves
-the runtime&#39;s browser cache. Optional <code>numThreads</code> is caller-owned and
+raw failure in its console diagnostics and retries settlement with the
+cause-free four-field envelope. Nested Workers are terminated during role teardown.</p>
+<p>Kokoro receives the exact selected <code>webgpu</code> or <code>wasm</code> device through
+<code>KokoroTTS.from_pretrained()</code> and retains the caller-selected dtype. Its WASM
+path is configured through <code>namespace.env.wasmPaths</code>; Transformers is configured
+through <code>namespace.env.backends.onnx.wasm.wasmPaths</code>. Ordinary mode may use a
+caller-selected version-pinned upstream directory and preserves the runtime&#39;s
+browser cache. Optional <code>numThreads</code> is caller-owned and
 Transformers-STT-only; a Kokoro declaration rejects with
 <code>ARCANE_AI_KOKORO_ENV_NUM_THREADS_FIELD_NOT_EXPOSED</code> /
 <code>kokoro-env-num-threads-field-not-exposed</code>. Missing or rejected namespace
 shapes report distinct <code>*-unavailable</code> and
 <code>*-assignment-rejected</code> reasons for each setting; the Worker never
 substitutes a different namespace. The caller also owns dtype, STT input sample
-rate, TTS output sample rate, default voice, and the complete voice inventory;
-the SDK selects no hardware default, runtime, model, or fallback.</p>
+rate, TTS output sample rate, default voice, and the complete voice inventory.
+Kokoro execution defaults to <code>{device:&#39;auto&#39;,maxConcurrentRequests:4}</code> and may
+be overridden with <code>webgpu</code> or <code>wasm</code> and an integer capacity from 1 through 4.
+Automatic selection attempts a complete WebGPU pool only when WebGPU is exposed,
+then tears it down and forms a complete WASM pool if WebGPU loading rejects. It
+does not change the selected runtime, model, dtype, or voice.</p>
+<p>Each capacity slot owns one Worker/model session. The provider-neutral runtime
+admits the first four requests and retains segment 5 and later in its FIFO
+queue without dropping content. Synthesis may finish out of order; high-level
+AI playback waits for earlier segments and schedules the contiguous ready
+prefix in exact input order. More sessions trade memory for latency, without
+promising physical GPU kernel overlap.</p>
+<p>Applications using <code>AI.configureBrowserSpeech()</code> can read
+<code>ai.providerRuntime.status(&#39;tts&#39;, {execution:true}).execution</code> instead of
+reaching into provider internals. The optional provider snapshot exposes
+Kokoro&#39;s <code>requestedDevice</code>, <code>selectedDevice</code>, <code>maxConcurrentRequests</code>, and
+<code>activeRequestCount</code>. The default <code>status()</code> retains its original sticky-state
+behavior; explicit execution inspection does not load a provider or emit a
+state event. See <a href="../ai/browser-speech/">browser speech</a> for complete examples.</p>
 <p>The SDK is not the distributor of the selected upstream speech packages or
 provider assets and does not republish their legal/source payloads. Package,
 model, voice, and version selection belongs to each consuming application, not
 to a shared SDK component ledger or execution/publication gate.</p>
 <p>Whisper <code>stt</code> and Kokoro <code>tts</code> each own catalog, inspect, status, load, request,
 unload, and dispose state. They load, cancel, unload, fail, and recover
-independently from the LLM and from one another. Cancellation after Worker use
-begins terminates that role&#39;s Worker slot and returns the provider to unloaded;
-a later use must load it again. If shared STT <code>Blob</code> decoding is cancelled
-before Worker use, the request rejects while the loaded provider remains ready.
+independently from the LLM and from one another. Whisper owns one Worker and one
+request. Kokoro owns a bounded pool of distinct Workers and loaded model
+sessions because the selected browser adapter serializes inference inside one
+JavaScript isolate. Pool loading first completes one model session, then loads
+the remaining Worker sessions concurrently against the same prepared artifact
+selection. One Kokoro request cancellation suppresses only that result and
+sends the targeted Worker cancel control; upstream may still finish work
+already inside <code>generate()</code>. Kokoro unload terminates the whole pool. Whisper
+cancellation after Worker use begins retains destructive Worker teardown. If
+shared STT <code>Blob</code> decoding is cancelled before Worker use, the request rejects
+while the loaded provider remains ready.
 Speech failure neither disables text chat nor retries through another local,
 native, or cloud provider. The provider/Worker layer is event-neutral: it
 exposes promises, <code>AbortSignal</code>, and precise lifecycle/status records, but owns
@@ -430,32 +451,52 @@ persisting its bodies.
 A chat session never searches the corpus unless the application
 deliberately wires a document context builder into the request; generated
 document context remains labeled untrusted.</p>
-<p>Persistent chat maintains complete live model context plus <code>ChatEntity</code>
-history/memory according to the caller&#39;s persistence choice. A turn with
-<code>persist:false</code> remains coherent in the live session without entering durable
-history or memory. <code>createArcaneAI(...).createChatSession(options)</code> binds the
-session and automatic memory work to that same selected LLM controller; it does
-not select a second provider or storage fallback.</p>
+<p>Persistent chat maintains recurring model context plus a sanitized <code>ChatEntity</code>
+transcript according to the caller&#39;s persistence choice. Structural calls, IDs,
+argument envelopes, and raw results exist only through the one active provider
+continuation that requires them. When that continuation settles, recurring
+model context replaces the protocol exchange with its complete user-facing call
+messages, any supplied public result messages, and the model&#39;s visible response.
+Reasoning, request metadata, raw protocol, and raw tool returns do not recur.
+Durable user and assistant turns retain only role, complete visible content, and
+timestamp.
+Durable tool turns retain only role, the required user-facing message as
+content, and optional public name and result status. System prompts remain in
+the live session only. Existing stored files are not rewritten on load. A turn
+with <code>persist:false</code> participates in its one request and response only, then
+remains absent from subsequent model context, the retained transcript, memory
+extraction, and DBOPFS.</p>
+<p>For an automatic model-authored conversation opening, the application calls the
+persistent session&#39;s <code>open()</code> operation with its internal bootstrap message.
+That bootstrap participates in the one provider request only. The operation
+durably appends only the complete nonblank assistant response, so the opening
+survives reload without a fabricated or retained user turn. A system prompt by
+itself is not a retained conversation turn; an existing retained user,
+assistant, or tool sequence prevents another opening.</p>
 <h3 id="cancellation-and-structural-tools">Cancellation and structural tools</h3>
 <p>Cancellation is part of the provider lifecycle, not just a UI decision.
 <code>AbortSignal</code>, the normalized role cancel operation, and stream-handle
 <code>cancel(reason)</code> propagate to the selected provider. Browser-WASM inference
 requires positive llama cancellation acknowledgement when cancellation is
-required. Browser speech cancellation terminates a Worker only after Worker use
-has begun; cancellation during shared browser decoding leaves the loaded Worker
-ready. Unload always cancels active role work before releasing that role&#39;s
-execution state, and superseded late results are rejected rather than committed
-or retried through another provider.</p>
-<p>Interactive requests enter an uncapped FIFO lane independently for each role.
-A new valid request neither aborts nor discards the active request; it starts
-after every earlier request settles. A caller signal cancels only its own queued
-or active request, while explicit role cancellation targets only the active
-request. Request-specific generations prevent canceled or superseded callbacks
-from clearing or restoring newer state. The runtime revalidates
-selected-provider readiness and never reloads, switches, or falls back
-implicitly. Generic provider-promise settlement is not a claim that underlying
-work stopped; only a provider&#39;s documented positive acknowledgement or
-destructive worker teardown can prove that stronger fact.</p>
+required. Browser Whisper cancellation terminates its Worker after Worker use
+begins. Browser Kokoro uses request-targeted cancellation so one synthesis does
+not terminate sibling pool slots; delivery suppression is immediate, while
+engine preemption remains upstream-cooperative. Cancellation during shared
+browser decoding leaves the loaded Worker ready. Unload always cancels every
+active role request before releasing that role&#39;s execution state, and
+superseded late results are rejected rather than committed or retried through
+another provider.</p>
+<p>Interactive requests enter a FIFO lane independently for each role. Provider
+capacity defaults to 1. A TTS provider may declare a positive safe-integer
+<code>maxConcurrentRequests</code>; the runtime admits that many oldest requests and queues
+overflow without discarding content. LLM and STT remain capacity 1. A caller
+signal cancels only its own queued or active request, while explicit role
+cancellation targets the oldest active request. Request-specific ownership
+prevents canceled or superseded callbacks from clearing or restoring sibling
+state. The runtime revalidates selected-provider readiness and never reloads,
+switches, or falls back implicitly. Generic provider-promise settlement is not
+a claim that underlying work stopped; only a provider&#39;s documented positive
+acknowledgement or destructive worker teardown can prove that stronger fact.</p>
 <p><code>startAIRuntime({startLanguageModel:false,startTranscription:false})</code> is the
 explicit startup boundary for browser-WASM LLM and default STT activation. It
 leaves the selected LLM unloaded until the shared chat control publishes an
@@ -485,7 +526,7 @@ an <code>initialMuted:false</code> component configuration preserves that intent
 unselected or loading TTS route and exposes unmuted state only after readiness;
 mute calls <code>AI.setSpeechMuted(true)</code>, cancels active synthesis, and unloads TTS.
 The selected local TTS model catalog owns <code>defaultVoice</code>. AI.js never forwards
-a retired OpenAI voice to Core or browser Kokoro.</p>
+a saved OpenAI-route voice to Core or browser Kokoro.</p>
 <p>LLM tool calls are structural result data only. The SDK never executes a
 handler. The application owns schema validation, authorization, side-effect
 policy, dispatch, and the matching tool-result turn.</p>
@@ -517,7 +558,7 @@ browser-WASM component protocol is <code>arcane-ai-browser-wasm/2</code>; its
 direct controller adapter uses <code>arcane-ai-adapter/1</code>, and
 <code>adaptV1LlmProvider()</code> projects that surface into the provider/2 LLM role.
 Browser speech stores identify themselves as
-<code>arcane-ai-browser-speech-artifacts/1</code>. Legacy authorities retain
+<code>arcane-ai-browser-speech-artifacts/1</code>. Direct authorities use
 <code>arcane-ai-model-authority/1</code>. Optional browser-speech graphs use
 <code>arcane-ai-browser-speech-artifact-graph/1</code>, kind
 <code>browser-speech-authenticated-artifact-graph</code>. Those identifiers describe
@@ -635,6 +676,6 @@ protocol requirements, and host platform safety remain in effect.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#layer-map">Layer map</a><a href="#sdk-package-and-cli-protocols">SDK package and CLI protocols</a><a href="#installed-sdk-runtime-materialization">Installed SDK runtime materialization</a><a href="#central-events-and-time-travel-data">Central events and time-travel data</a><a href="#browser-runtime-delivery">Browser runtime delivery</a><a href="#portable-ai-provider-runtime">Portable AI provider runtime</a><a href="#arcane-application-protocol">Arcane application protocol</a><a href="#native-host-transports">Native host transports</a><a href="#development-and-remote-http-transport">Development and remote HTTP transport</a><a href="#core-dispatch-and-capability-admission">Core dispatch and capability admission</a><a href="#arcane-ollama-protocol-path">Arcane Ollama protocol path</a><a href="#explicit-cloud-provider-path">Explicit cloud provider path</a><a href="#events-streaming-and-cancellation">Events, streaming, and cancellation</a><a href="#cross-kernel-normalization-boundary">Cross-kernel normalization boundary</a><a href="#complete-content-boundary">Complete-content boundary</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.3.4, runtime bundle 0.8.12, and protocol arcane/1; the latest published package is 0.3.4.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.5.11, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

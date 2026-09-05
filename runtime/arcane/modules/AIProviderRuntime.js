@@ -2415,12 +2415,33 @@ export class AIProviderRuntime {
         return this.configure(selections);
     }
 
-    status(role = null) {
-        if (role === null) {
-            return getAIRuntimeState();
+    status(role = null, options = {}) {
+        if (role !== null) {
+            assertRole(role);
         }
-        assertRole(role);
-        return getAIRuntimeState().roles[role];
+        const snapshot = getAIRuntimeState();
+        if (options?.execution !== true) {
+            return role === null ? snapshot : snapshot.roles[role];
+        }
+
+        // Live provider inspection is explicit so ordinary lifecycle reads
+        // retain their sticky snapshot identity and never call a provider.
+        const roles = {...snapshot.roles};
+        for (const selectedRole of role === null ? AI_RUNTIME_ROLES : [role]) {
+            const provider = this.#providerFor(this.#slots[selectedRole]);
+            if (!provider) {
+                continue;
+            }
+            const providerStatus = validateProviderStatus(provider.status());
+            if (providerStatus.execution == null) {
+                continue;
+            }
+            roles[selectedRole] = {
+                ...roles[selectedRole],
+                execution: {...providerStatus.execution}
+            };
+        }
+        return role === null ? {...snapshot, roles} : roles[role];
     }
 
     catalog(role) {

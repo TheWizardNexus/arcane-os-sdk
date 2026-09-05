@@ -16,14 +16,36 @@ const repositoryRoot=path.resolve(path.dirname(scriptPath),'..');
 const referenceSourceRoot=path.join(repositoryRoot,'docs','reference');
 const referenceOutputRoot=path.join(repositoryRoot,'site','reference');
 const canonicalRoot='https://thewizardnexus.github.io/arcane-os-sdk/';
+const packageDocument = JSON.parse(
+    await readFile(path.join(repositoryRoot, 'package.json'), 'utf8')
+);
 const publishedVersions={
-    sdk:'0.3.4',
+    sdk:packageDocument.version,
     runtime:'0.8.12',
     protocol:'arcane/1'
 };
 const manifestOutput='site/reference/reference-manifest.json';
 const referenceCssOutput='site/reference/reference.css';
 const referenceScriptOutput='site/reference/reference.js';
+const authoredVersionPages = [
+    'site/index.html',
+    'site/quick-start/index.html',
+    'site/guides/index.html',
+    'site/guides/external-app/index.html',
+    'site/guides/native-builds/index.html'
+];
+
+function currentPackageVersionText(contents) {
+    // These authored guides describe the current SDK. Historical release records
+    // remain in Markdown and are never rewritten by this presentation update.
+    const versioned = contents.replace(
+        /(arcane-os(?:@| )|Published SDK · |version <code>)\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/gu,
+        function replaceCurrentVersion(match, prefix) {
+            return `${prefix}${publishedVersions.sdk}`;
+        }
+    );
+    return versioned;
+}
 
 const referenceCss=String.raw`.reference-prose {
   min-width: 0;
@@ -571,6 +593,7 @@ const navigationGroups=[
         title:'Runtime',
         items:[
             ['Normalized AI','@reference/ai'],
+            ['TWiN Cloud quick start','docs/reference/ai/twin-cloud.md'],
             ['Browser-WASM AI','docs/reference/ai/browser-wasm.md'],
             ['Browser speech','docs/reference/ai/browser-speech.md'],
             ['Modules','docs/reference/runtime-modules.md'],
@@ -1477,7 +1500,7 @@ function renderPage({
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p>${tableOfContentsHtml(tableOfContents)}</aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="${escapeHtml(siteHome)}" aria-label="Arcane OS SDK documentation home"><img src="${escapeHtml(icon)}" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK ${publishedVersions.sdk}, runtime bundle ${publishedVersions.runtime}, and protocol ${publishedVersions.protocol}; the latest published package is ${publishedVersions.sdk}.</p><nav aria-label="Footer navigation"><a href="${escapeHtml(architecture)}">Architecture</a><a href="${escapeHtml(compatibility)}">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="${escapeHtml(siteHome)}" aria-label="Arcane OS SDK documentation home"><img src="${escapeHtml(icon)}" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK ${publishedVersions.sdk}, Core reference ${publishedVersions.runtime}, and protocol ${publishedVersions.protocol}. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="${escapeHtml(architecture)}">Architecture</a><a href="${escapeHtml(compatibility)}">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>
 `;
@@ -1543,18 +1566,20 @@ function moduleExample(record){
     const examples={
         'AI.js':`import AI from '/arcane/modules/AI.js';
 
-async function summarizeScreenAfterUserChoice() {
-    const ai = globalThis.ai?.ready
-        ? globalThis.ai
-        : await new Promise(resolve => {
-            globalThis.addEventListener('ai-ready', event => resolve(event.detail.db), {once: true});
-        });
-
-    if (!(ai instanceof AI)) throw new TypeError('The AI runtime did not initialize.');
-    const answer = await ai.fetchRequest({
-        messages: [{role: 'user', content: 'Summarize this screen in one sentence.'}]
-    });
-    console.info(answer);
+// The application supplies this runtime argument; never put its key in source.
+async function sayHello(applicationRuntime) {
+    const ai = new AI();
+    ai.twinKey = applicationRuntime.twinKey;
+    try {
+        const response = await ai.fetchRequest(
+            {
+                messages: [{role: 'user', content: 'Hello!'}]
+            }
+        );
+        console.log(JSON.stringify(response, null, 2));
+    } catch (error) {
+        console.error(error.code, error.message);
+    }
 }`,
         'ConfiguredAIChatSession.js':`import ConfiguredAIChatSession from '/arcane/modules/ConfiguredAIChatSession.js';
 
@@ -1955,7 +1980,7 @@ function renderRuntimeModulePage(record,{
 
 function baseAIDecisionBody({output,targets}){
     const link=(source,label,fragment='')=>`<a href="${escapeHtml(`${relativeOutputHref(output,targets.get(source))}${fragment}`)}">${escapeHtml(label)}</a>`;
-    return `<aside class="callout callout-info"><strong>Application default.</strong> Start with normalized AI. Provider selection, model choice, protected credentials, and host transport remain behind the application contract.</aside><h2 id="choose-the-normalized-surface">Choose the normalized surface</h2><div class="table-wrap" data-columns="3" role="region" aria-label="Normalized AI surface choices" tabindex="0"><table><thead><tr><th>Need</th><th>Use</th><th>Contract</th></tr></thead><tbody><tr><td>Renderer chat, streaming, speech, tools, or structured output</td><td>${link('@reference/module/ai','AI.js')}</td><td>Default import; installs <code>globalThis.ai</code> after user initialization and emits <code>ai-ready</code>.</td></tr><tr><td>Provider-neutral Core chat</td><td>${link('docs/reference/core/reference/arcane-api/ai-and-ollama.md','Arcane.ai.chat()','#arcaneaichat')}</td><td>One normalized result through the selected provider; no automatic fallback.</td></tr><tr><td>Caller-configured browser-local text inference</td><td>${link('docs/reference/ai/browser-wasm.md','arcane-os/ai/browser-wasm')}</td><td>Browser-only Wllama lifecycle with a caller-owned ordered multi-file descriptor <code>{id, files:[{name?,url},...]}</code>, complete DBOPFS caching, streaming, cancellation, and structural tool results.</td></tr><tr><td>Bounded conversational history</td><td>${link('@reference/module/configured-ai-chat-session','ConfiguredAIChatSession.js')}</td><td>Defaults to <code>Arcane.ai.chat()</code>; owns context limits and atomic turn commit.</td></tr><tr><td>Speech playback</td><td>${link('@reference/module/speech-playback','SpeechPlayback.js')}</td><td>Normalized chunks and playback over available native speech or browser media.</td></tr><tr><td>Local readiness and catalog</td><td>${link('@reference/module/local-ai-readiness','LocalAIReadiness.js')}</td><td>Feature-detected readiness; does not grant lifecycle or model-management authority.</td></tr></tbody></table></div><h2 id="runtime-ai-module">Runtime AI module</h2><p><code>AI.js</code> has one export: its default <code>AI</code> class. Import the default binding for explicit use, or load the module for its lifecycle and wait for <code>ai-ready</code> before reading <code>globalThis.ai</code>.</p>${referenceCodeBlock('JavaScript',moduleExample({name:'AI.js'}))}<h2 id="core-ai-chat">Core Arcane.ai</h2><p><code>globalThis.Arcane.ai</code> is a distinct provider-neutral Core surface. Ordinary applications call <code>profile()</code> and <code>chat()</code>; Settings-only provider mutation remains separately available.</p>${referenceCodeBlock('JavaScript',`async function explainActiveModelAfterUserChoice() {
+    return `<aside class="callout callout-info"><strong>Application default.</strong> Start with normalized AI. Provider selection, model choice, protected credentials, and host transport remain behind the application contract.</aside><h2 id="choose-the-normalized-surface">Choose the normalized surface</h2><div class="table-wrap" data-columns="3" role="region" aria-label="Normalized AI surface choices" tabindex="0"><table><thead><tr><th>Need</th><th>Use</th><th>Contract</th></tr></thead><tbody><tr><td>Renderer chat, streaming, speech, tools, or structured output</td><td>${link('@reference/module/ai','AI.js')}</td><td>Default import; installs <code>globalThis.ai</code> after user initialization and emits <code>ai-ready</code>.</td></tr><tr><td>Provider-neutral Core chat</td><td>${link('docs/reference/core/reference/arcane-api/ai-and-ollama.md','Arcane.ai.chat()','#arcaneaichat')}</td><td>One normalized result through the selected provider; no automatic fallback.</td></tr><tr><td>Caller-configured browser-local text inference</td><td>${link('docs/reference/ai/browser-wasm.md','arcane-os/ai/browser-wasm')}</td><td>Browser-only Wllama lifecycle with a caller-owned ordered multi-file descriptor <code>{id, files:[{name?,url},...]}</code>, complete DBOPFS caching, streaming, cancellation, and structural tool results.</td></tr><tr><td>Bounded conversational history</td><td>${link('@reference/module/configured-ai-chat-session','ConfiguredAIChatSession.js')}</td><td>Defaults to <code>Arcane.ai.chat()</code>; owns context limits and atomic turn commit.</td></tr><tr><td>Speech playback</td><td>${link('@reference/module/speech-playback','SpeechPlayback.js')}</td><td>Normalized chunks and playback over available native speech or browser media.</td></tr><tr><td>Local readiness and catalog</td><td>${link('@reference/module/local-ai-readiness','LocalAIReadiness.js')}</td><td>Feature-detected readiness; does not grant lifecycle or model-management authority.</td></tr></tbody></table></div><h2 id="runtime-ai-module">Runtime AI module</h2><p><code>AI.js</code> provides the default <code>AI</code> class and named browser-speech and lifecycle constants. Import the default binding for explicit use, or load the module for its lifecycle and wait for <code>ai-ready</code> before reading <code>globalThis.ai</code>.</p>${referenceCodeBlock('JavaScript',moduleExample({name:'AI.js'}))}<h2 id="core-ai-chat">Core Arcane.ai</h2><p><code>globalThis.Arcane.ai</code> is a distinct provider-neutral Core surface. Ordinary applications call <code>profile()</code> and <code>chat()</code>; Settings-only provider mutation remains separately available.</p>${referenceCodeBlock('JavaScript',`async function explainActiveModelAfterUserChoice() {
     const profile = await globalThis.Arcane.ai.profile();
     const result = await globalThis.Arcane.ai.chat({
         expectedProvider: profile.provider,
@@ -1969,7 +1994,7 @@ function aiDecisionBody({output,targets}){
     const link=(source,label,fragment='')=>`<a href="${escapeHtml(`${relativeOutputHref(output,targets.get(source))}${fragment}`)}">${escapeHtml(label)}</a>`;
     const choiceRows=`<tr><td>Provider registration, normalized lifecycle, and per-role state</td><td>${link('@reference/module/ai-provider-runtime','AIProviderRuntime.js')} and ${link('@reference/module/ai-runtime-state','AIRuntimeState.js')}</td><td>One application-owned runtime validates selections, publishes independent LLM/STT/TTS state, and routes requests without silent fallback.</td></tr><tr><td>Visible selected-model activation request</td><td>${link('docs/reference/runtime-components.md','chat.html','#chathtml')}</td><td>Send remains disabled for a selected unloaded LLM; a keyboard-operable Start/Try again or Cancel loading control emits a cancelable public request before the host callback. The provider/runtime owner decides whether and how to execute the resulting intent.</td></tr><tr><td>Caller-configured browser-local speech</td><td>${link('docs/reference/ai/browser-speech.md','arcane-os/ai/browser-speech')}</td><td>Browser-only Whisper STT and Kokoro TTS providers over caller-owned, pinned model and adapter closures; no bundled model or runtime assets.</td></tr><tr><td>Durable chat history and document retrieval</td><td>${link('@reference/module/persistent-ai-chat-session','PersistentAIChatSession.js')} and ${link('@reference/module/dbopfs-document-library','DBOPFSDocumentLibrary.js')}</td><td>Explicit persistence plus bounded lexical retrieval or caller-source evaluation; provider choice and application policy remain outside the storage helpers.</td></tr>`;
     const lifecycle=`<h2 id="provider-runtime-and-state">Provider runtime and normalized state</h2><p>${link('@reference/module/ai-provider-runtime','AIProviderRuntime.js')} owns admitted provider registration, configuration, lifecycle, cancellation, speech mute state, and normalized request routing. ${link('@reference/module/ai-runtime-state','AIRuntimeState.js')} publishes the normalized aggregate and independent <code>llm</code>, <code>stt</code>, and <code>tts</code> role states. Applications should consume those state records instead of inferring readiness from a loaded module or protocol label.</p>`;
-    const browserSpeech=`<h2 id="browser-speech-providers">Browser speech providers</h2><p>${link('docs/reference/ai/browser-speech.md','Browser speech')} is the explicit browser-only choice for caller-supplied Whisper speech-to-text and Kokoro text-to-speech runtimes. It implements <code>arcane-ai-provider/2</code>, downloads nothing on import, and ships no model weights, adapter runtime assets, voices, URLs, catalog, or cloud fallback.</p>`;
+    const browserSpeech=`<h2 id="browser-speech-providers">Browser speech providers</h2><p>${link('docs/reference/ai/browser-speech.md','Browser speech')} is the explicit browser-only choice for caller-supplied Whisper speech-to-text and Kokoro text-to-speech runtimes. It implements <code>arcane-ai-provider/2</code>, downloads nothing on import, and ships no model weights, adapter runtime assets, voices, URLs, catalog, or cloud fallback.</p><p>Capacity 4 means up to four segments synthesize at once. Segment 5 and later wait in the SDK’s FIFO queue; they are not dropped. Synthesis may finish out of order, but playback waits for earlier segments and plays exact input order. Each slot owns a Worker/model session, so raising capacity trades memory for latency.</p><p>Use <code>ai.providerRuntime.status(&#39;tts&#39;, {execution:true}).execution</code> to read the selected device after load. Requested <code>auto</code> with selected <code>wasm</code> identifies fallback; it is not evidence of physical GPU kernel overlap.</p>`;
     const durable=`<h2 id="durable-chat-and-retrieval">Durable chat and retrieval</h2><p>${link('@reference/module/persistent-ai-chat-session','PersistentAIChatSession.js')} makes chat persistence explicit. ${link('@reference/module/dbopfs-document-library','DBOPFSDocumentLibrary.js')} and ${link('@reference/module/document-lexical-search','DocumentLexicalSearch.js')} provide bounded document storage, caller-source evaluation, context construction, and lexical ranking without assuming a provider or copying provider runtime assets.</p>`;
     return baseAIDecisionBody({output,targets})
         .replace(
@@ -2337,6 +2362,10 @@ export async function createReferenceSite(){
 
     expectedFiles.set(referenceCssOutput,referenceCss);
     expectedFiles.set(referenceScriptOutput,referenceScript);
+    for (const output of authoredVersionPages) {
+        const contents = await readFile(safeRepositoryPath(output), 'utf8');
+        expectedFiles.set(output, currentPackageVersionText(contents));
+    }
     const assets=[outputRecord({
         source:'tools/build-reference-site.mjs#reference-css',
         output:referenceCssOutput,

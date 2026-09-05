@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="TWiN Cloud is the high-level AI.js default remote LLM service, named TWIN. Speech stays on device and does not use the TWiN access key. This guide uses the same managed browser imports as the browser speech quick start.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/twin-cloud/"><link rel="icon" type="image/png" href="../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../styles.css"><link rel="stylesheet" href="../../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="TWiN Cloud: one request · Arcane OS SDK"><meta property="og:description" content="TWiN Cloud is the high-level AI.js default remote LLM service, named TWIN. Speech stays on device and does not use the TWiN access key. This guide uses the same managed browser imports as the browser speech quick start."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/twin-cloud/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="TWiN Cloud: one request · Arcane OS SDK"><meta name="twitter:description" content="TWiN Cloud is the high-level AI.js default remote LLM service, named TWIN. Speech stays on device and does not use the TWiN access key. This guide uses the same managed browser imports as the browser speech quick start."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>TWiN Cloud: one request | Arcane OS SDK</title><script src="../../../app.js" defer></script><script src="../../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../">Overview</a><a href="../../../guides/">Guides</a><a href="../../../examples/">Examples</a><a href="../../../playground/">Playground</a><a href="../../../testing/">Testing</a><a href="../../" aria-current="page">Reference</a><a class="repo-link" href="../../sdk-api/">API</a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">TWiN Cloud: one request</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="twin-cloud-one-request">TWiN Cloud: one request</h1><p class="doc-lead">TWiN Cloud is the high-level AI.js default remote LLM service, named TWIN. Speech stays on device and does not use the TWiN access key. This guide uses the same managed browser imports as the browser speech quick start.</p><div class="doc-meta"><span>SDK 0.5.11</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../">Normalized AI</a><a href="./" aria-current="page">TWiN Cloud quick start</a><a href="../browser-wasm/">Browser-WASM AI</a><a href="../browser-speech/">Browser speech</a><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../core/">Core map</a><a href="../../core/arcane-api/">Arcane API</a><a href="../../core/capabilities/">Capabilities and admission</a><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../../core/arcane-events/">Events</a><a href="../../core/arcane-ai-contracts/">AI contracts</a><a href="../../core/arcane-entities/">Entity exports</a><a href="../../core/ollama-module/">Ollama internals (advanced)</a><a href="../../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/ai/twin-cloud.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#install-and-import">Install and import</a><a href="#supply-the-key-at-runtime-and-display-the-response">Supply the key at runtime and display the response</a><a href="#migrate-saved-preference-tuples-before-using-them">Migrate saved preference tuples before using them</a><a href="#related">Related</a></nav></details><p>TWiN Cloud is the high-level <code>AI.js</code> default remote LLM service, named <code>TWIN</code>.
+Speech stays on device and does not use the TWiN access key. This guide uses the
+same managed browser imports as the <a href="../browser-speech/">browser speech quick start</a>.</p>
+<h2 id="install-and-import">Install and import</h2>
+<p>Create an application and start its source server:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npx arcane-os@0.5.11 new hello-twin --path ./hello-twin --target browser
+cd hello-twin
+npm install
+npm run dev
+</code></pre></div>
+<p>Keep the generated Arcane theme and import map. Place the JavaScript below in
+<code>apps/hello-twin/modules/App.js</code>. Run it in the served browser page, not Node.
+This first example is for the new application created above. An existing
+application must complete the saved-preference migration below before importing
+<code>arcane/AI</code> or any module that imports it.</p>
+<h2 id="supply-the-key-at-runtime-and-display-the-response">Supply the key at runtime and display the response</h2>
+<p><code>applicationRuntime</code> is the <strong>one application-supplied placeholder</strong> in this
+example. It represents the authenticated host/application configuration that
+supplies a <code>twinKey</code> at runtime. Replace the placeholder with your existing
+configuration source; do not put a real key in this module, Git, or diagnostics.
+The SDK also reads <code>globalThis.arcane.config.twinCloud.accessKey</code> when present.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import arcaneThemeReady from &#39;arcane/ThemeBootstrap&#39;;
+
+await arcaneThemeReady;
+// In an upgrade bootstrap, the existing preference owner&#39;s migration must
+// already be complete before this dynamic import evaluates AI.js.
+const { default: AI } = await import(&#39;arcane/AI&#39;);
+const applicationRuntime = globalThis.applicationRuntime;
+const ai = new AI();
+ai.twinKey = applicationRuntime.twinKey;
+
+const button = document.createElement(&#39;button&#39;);
+button.textContent = &#39;Ask TWiN&#39;;
+const output = document.createElement(&#39;pre&#39;);
+output.style.whiteSpace = &#39;pre-wrap&#39;;
+document.body.append(button, output);
+
+button.addEventListener(&#39;click&#39;, async function askTwin() {
+  button.disabled = true;
+  output.textContent = &#39;Thinking&#39;;
+  try {
+    const response = await ai.fetchRequest({
+      messages: [{ role: &#39;user&#39;, content: &#39;Say hello in one sentence.&#39; }]
+    });
+    output.textContent = JSON.stringify(response, null, 2);
+  } catch (error) {
+    output.textContent = `${error.code ?? &#39;ERROR&#39;}\n${error.message}`;
+  } finally {
+    button.disabled = false;
+  }
+});
+</code></pre></div>
+<p>The example displays the complete returned response so its actual fields are
+visible. It makes one <code>fetchRequest()</code> per click. A normal <code>new AI()</code> selects
+TWiN Cloud and its default model, <code>openai-gpt-oss-120b</code>; assigning <code>twinKey</code>
+reconciles that remote route&#39;s readiness. No browser speech model is loaded by
+this request. <code>ai.license</code> remains an alias of <code>ai.twinKey</code> for existing callers.</p>
+<p>For an application-owned cancellation control, pass a fresh
+<code>AbortController</code>&#39;s <code>signal</code> to <code>fetchRequest({messages,signal})</code> and call that
+controller&#39;s <code>abort()</code> when the operation is cancelled or its page detaches.
+<code>streamRequest()</code> is the corresponding object-form streaming API. See the
+<a href="../../runtime-modules/#aijs">AI module reference</a> for its complete options.</p>
+<h2 id="migrate-saved-preference-tuples-before-using-them">Migrate saved preference tuples before using them</h2>
+<p>The six tuple slots consumed by <code>ai.setAI(...tuple)</code> are:</p>
+<div class="table-wrap" data-columns="3" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Slot</th>
+<th>Meaning</th>
+<th>Migration</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0</td>
+<td>LLM provider</td>
+<td>Exact uppercase <code>OPENAI</code> becomes <code>TWIN</code>.</td>
+</tr>
+<tr>
+<td>1</td>
+<td>STT provider</td>
+<td>Preserve.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>TTS provider</td>
+<td>Preserve.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>LLM model or default-model sentinel</td>
+<td>Exact uppercase <code>OPENAI</code> becomes <code>TWIN</code>.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>TTS model</td>
+<td>Preserve.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>STT model</td>
+<td>Preserve.</td>
+</tr></tbody>
+</table>
+</div>
+<p>Use this narrow transformation in the application&#39;s existing preference loader:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">function migrateSavedAISelection(savedTuple) {
+  return savedTuple.map(function migrateProviderOrDefault(value, slot) {
+    return (slot === 0 || slot === 3) &amp;&amp; value === &#39;OPENAI&#39; ? &#39;TWIN&#39; : value;
+  });
+}
+
+const savedTuple = [
+  &#39;OPENAI&#39;, &#39;LOCAL_SPEACH&#39;, &#39;LOCAL_SPEACH&#39;,
+  &#39;OPENAI&#39;, &#39;LOCAL_SPEACH&#39;, &#39;LOCAL_SPEACH&#39;
+];
+const migratedTuple = migrateSavedAISelection(savedTuple);
+console.log(migratedTuple);
+// [&#39;TWIN&#39;, &#39;LOCAL_SPEACH&#39;, &#39;LOCAL_SPEACH&#39;, &#39;TWIN&#39;, &#39;LOCAL_SPEACH&#39;, &#39;LOCAL_SPEACH&#39;]
+</code></pre></div>
+<p>In the application&#39;s upgrade bootstrap, read saved settings, run this
+transformation, and complete the write through the <strong>existing application
+preference owner before importing <code>AI.js</code> or any module that imports it</strong>.
+Ensure that owner also exposes the migrated tuple to the current page before
+continuing. Use the application&#39;s actual storage/readiness operations; the SDK
+does not supply a new migration storage API.</p>
+<p>This ordering matters during module evaluation: <code>AI.js</code> installs its
+user-readiness handler immediately. If <code>window.user.ready</code> is already true, it
+can immediately read that user&#39;s preference tuple and construct <code>window.ai</code>.
+Waiting until a later <code>setAI()</code>, provider-startup call, or button click is too
+late. A static <code>import AI from &#39;arcane/AI&#39;</code> evaluates before the surrounding
+module body, even if its text appears below migration code. Keep AI and its
+importing modules out of the bootstrap&#39;s static import graph, finish the
+existing owner&#39;s migration, then cross the dynamic-import boundary:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">// Place these lines after the application&#39;s existing preference migration
+// has finished writing and exposing migratedTuple, not before that operation.
+const { default: AI } = await import(&#39;arcane/AI&#39;);
+const ai = new AI(...migratedTuple);
+</code></pre></div>
+<p>Here <code>migratedTuple</code> is the result of the exact transformation shown above,
+using the real saved tuple in the application&#39;s bootstrap. Configure browser
+speech only after this initialization. Migration belongs to upgrade startup;
+do not inject it into an in-flight request. For later changes to an already
+valid active selection, <code>await ai.transitionAI(...migratedTuple)</code> remains the
+asynchronous lifecycle; it unloads roles and disposes SDK-owned browser speech,
+so configure desired speech afterward. It is not a substitute for migration
+before the first AI import.</p>
+<p>The SDK deliberately has no built-in <code>OPENAI</code> alias and performs no saved-data
+migration. This guide does not instruct a rewrite of chat history or unrelated
+settings. Preserve every tuple value except those two exact sentinel matches.
+In particular, do not change:</p>
+<ul>
+<li><code>openai-gpt-oss-120b</code> or <code>openai-gpt-oss-20b</code>: actual upstream model IDs;</li>
+<li>OpenAI-compatible chat-completion wire terminology; or</li>
+<li>Core&#39;s separate <code>provider:&#39;openai&#39;</code> behavior and public native contract.</li>
+</ul>
+<p>TWiN&#39;s default-model sentinel <code>TWIN</code> resolves to <code>openai-gpt-oss-120b</code>.
+An explicitly saved <code>openai-gpt-oss-20b</code> in slot 3 stays that exact model.</p>
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="../browser-speech/">Browser speech quick start and streaming</a></li>
+<li><a href="../../overview/#normalized-ai">Normalized AI and readiness</a></li>
+<li><a href="../../core/arcane-ai-contracts/">Core AI contracts</a></li>
+</ul>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#install-and-import">Install and import</a><a href="#supply-the-key-at-runtime-and-display-the-response">Supply the key at runtime and display the response</a><a href="#migrate-saved-preference-tuples-before-using-them">Migrate saved preference tuples before using them</a><a href="#related">Related</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.5.11, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

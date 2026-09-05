@@ -6,6 +6,336 @@ provides artifact storage, live module routing, role Workers, provider/2
 adapters, bounded parallel TTS synthesis, audio normalization, cancellation,
 and cleanup.
 
+## Quick start: say one sentence
+
+Use this in a browser application served by `arcane dev`, where the generated
+import map resolves `arcane/AI` and `arcane/DBOPFS`. These browser modules are
+not Node inference APIs. To create an application:
+
+```bash
+npx arcane-os@0.5.11 new hello-speech --path ./hello-speech --target browser
+cd hello-speech
+npm install
+npm run dev
+```
+
+Keep the generated page's Arcane theme and import map. The examples below go in
+`apps/hello-speech/modules/App.js` and the adjacent `speech-selection.js`.
+Follow the development server's printed URL. Installing the SDK supplies its
+provider, storage, and Worker code; it does not install a speech model or choose
+an upstream speech runtime for your application.
+
+First create **`speech-selection.js`**, the one application-owned configuration
+file used throughout this guide. This concrete selection is also used by the
+[maintained WASM voice-chat example](https://github.com/TheWizardNexus/arcane-os-sdk/tree/main/examples/wasm-ai-demo).
+Your application owns these runtime/model versions, URLs, dtype, and voice.
+Loading this selection uses those upstream publishers' downloads and caches.
+
+```javascript
+export const speechSelection = {
+  model: {
+    id: 'onnx-community/Kokoro-82M-v1.0-ONNX',
+    repository: 'onnx-community/Kokoro-82M-v1.0-ONNX',
+    revision: '1939ad2a8e416c0acfeecc08a694d14ef25f2231',
+    dtype: 'q8',
+    defaultVoice: 'af_heart'
+  },
+  runtime: {
+    adapter: 'kokoro-js',
+    version: '1.2.1',
+    revision: '664c76a704021239ba59c84dcbaa4d3dece01fe9',
+    entry: 'kokoro.web.js',
+    wasmPaths: 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1/dist/',
+    files: [{
+      path: 'kokoro.web.js',
+      url: 'https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js',
+      mediaType: 'text/javascript'
+    }]
+  }
+};
+```
+
+Then use this **`App.js`**. The application creates and owns the DBOPFS
+instance. Configuration selects the provider without loading it; the button
+explicitly loads and unmutes TTS before requesting speech.
+
+```javascript
+import arcaneThemeReady from 'arcane/ThemeBootstrap';
+import AI, { AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL } from 'arcane/AI';
+import DBOPFS from 'arcane/DBOPFS';
+import { speechSelection } from './speech-selection.js';
+
+await arcaneThemeReady;
+const dbopfs = new DBOPFS();
+await dbopfs.readyPromise;
+const ai = new AI();
+
+await ai.configureBrowserSpeech({
+  protocol: AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+  id: 'hello-speech',
+  dbopfs,
+  tts: {
+    providerId: 'hello-kokoro',
+    model: speechSelection.model,
+    runtime: speechSelection.runtime,
+    offline: false
+  }
+});
+
+const speakButton = document.createElement('button');
+speakButton.textContent = 'Load voice and say hello';
+document.body.append(speakButton);
+speakButton.addEventListener('click', async function sayHello() {
+  speakButton.disabled = true;
+  try {
+    await ai.setSpeechMuted(false); // Loads the selected TTS provider.
+    const complete = await ai.streamTTS('Hello from Arcane. ', true);
+    console.log('Speech preparation completed:', complete);
+  } catch (error) {
+    console.error(error.code, error.message);
+  } finally {
+    speakButton.disabled = false;
+  }
+});
+```
+
+The first user action may download the selected runtime, model, and voice.
+The browser may require another audio-unlock gesture after a long load; the SDK
+retains prepared audio for that gesture. `streamTTS()` prepares and schedules
+playback; its promise is not proof that a listener heard the sound. It returns
+`false` for muted, stopped, or failed work, and the SDK reports full synthesis
+or playback failures in its console diagnostics and `ai-tts-failure` event.
+
+To display complete high-level playback errors in this page, observe its
+existing event. The listener belongs to this example's one `ai` instance:
+
+```javascript
+const speechEvents = new AbortController();
+window.addEventListener('ai-tts-failure', function reportSpeechFailure(event) {
+  if (event.detail.ai !== ai) return;
+  console.error(event.detail.error.code, event.detail.error.message);
+}, { signal: speechEvents.signal });
+```
+
+Call `speechEvents.abort()` when disposing that interface to remove the listener.
+
+## Four synthesis slots and exact-order playback
+
+Capacity 4 means up to four segments synthesize at once. Segment 5 and later
+wait in the SDK's FIFO queue; they are not dropped. Synthesis may finish out of
+order, but playback waits for earlier segments and plays exact input order.
+Each slot owns a Worker/model session, so raising capacity trades memory for
+latency.
+
+The high-level `AI` route owns the FIFO queue. Calling a low-level Kokoro
+provider directly beyond its capacity returns `ARCANE_AI_PROVIDER_BUSY`.
+Ready adjacent audio buffers use contiguous AudioContext scheduling. Browser
+audio scheduling and selected WebGPU status do not prove physical GPU kernel
+overlap or audio quality. LLM and Whisper/STT capacity remains one.
+
+## Stream chunks as they arrive
+
+Use the configured `ai` created above. Run this snippet from an owned user
+action, such as your Speak button, and catch errors with the earlier
+`error.code` / `error.message` pattern. First load/unmute, then accept chunks.
+Call `streamTTS(chunk)` inside the producer's chunk callback immediately;
+waiting for each speech promise there would serialize synthesis. This tiny
+example uses three arriving chunks. Replace the three `onTextChunk(...)` calls
+with your actual text stream callback, and flush after that producer ends.
+
+```javascript
+await ai.setSpeechMuted(false);
+const pendingSpeech = [];
+
+function onTextChunk(chunk) {
+  const pending = ai.streamTTS(chunk);
+  // Attach both handlers immediately, so later failure cannot be unhandled.
+  pendingSpeech.push(pending.then(
+    function speechPrepared(value) { return { status: 'fulfilled', value }; },
+    function speechRejected(reason) { return { status: 'rejected', reason }; }
+  ));
+}
+
+onTextChunk('First sentence. ');
+onTextChunk('Second sentence. ');
+onTextChunk('Third sentence.');
+
+// After the text producer ends, flush trailing text and settle every call.
+const finalPrepared = await ai.finishTTS();
+const outcomes = await Promise.all(pendingSpeech);
+for (const outcome of outcomes) {
+  if (outcome.status === 'rejected') {
+    console.error(outcome.reason.code, outcome.reason.message);
+  } else if (outcome.value === false) {
+    console.log('Speech was muted, stopped, or failed; inspect SDK diagnostics.');
+  }
+}
+if (finalPrepared === false) {
+  console.log('Final speech was muted, stopped, or failed; inspect SDK diagnostics.');
+}
+```
+
+The segmentation default uses sentence punctuation. To submit smaller complete
+segments, call `ai.configureTTSSegmentation({punctuation:'any',wordCadence:4})`
+before feeding the stream. Chunk boundaries themselves do not force a sentence
+boundary; `finishTTS()` flushes any remaining text. It is not a playback-ended
+notification. Do not mute or dispose immediately after it if playback should
+continue.
+
+## Choose a device or reduce memory use
+
+Omitting `tts.execution` selects `{device:'auto',maxConcurrentRequests:4}`.
+These are three alternative configurations, not a sequence of required loads:
+
+```javascript
+async function selectSpeechExecution(execution) {
+  await ai.configureBrowserSpeech({
+    protocol: AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+    id: 'hello-speech',
+    dbopfs,
+    tts: {
+      providerId: 'hello-kokoro',
+      model: speechSelection.model,
+      runtime: speechSelection.runtime,
+      offline: false,
+      execution
+    }
+  });
+}
+
+// Choose and call one from your application settings action:
+// await selectSpeechExecution({ device: 'auto' });
+// await selectSpeechExecution({ device: 'webgpu' });
+// await selectSpeechExecution({ device: 'wasm', maxConcurrentRequests: 1 });
+```
+
+The override accepts integers 1, 2, 3, or 4. `auto` tries a complete WebGPU pool
+when available, then recreates a complete WASM pool if that load cannot finish.
+Explicit `webgpu` reports a load error when unavailable; explicit `wasm` never
+attempts WebGPU. The same application-selected model and dtype apply on both
+devices. A configuration change leaves TTS muted; explicitly load/unmute again.
+
+## Inspect the requested and selected device
+
+Request the execution projection on the existing public runtime status after
+loading. This explicitly reads the selected provider's current report; ordinary
+`status()` retains its existing sticky snapshot and identity. There is no
+separate execution-state event subscription.
+
+```javascript
+function printSpeechStatus() {
+  const status = ai.providerRuntime.status('tts', { execution: true });
+  const execution = status.execution;
+  console.log('TTS state:', status.state);
+  if (execution) {
+    console.log('Requested device:', execution.requestedDevice);
+    console.log('Selected device:', execution.selectedDevice);
+    console.log('Capacity:', execution.maxConcurrentRequests);
+    console.log('Active synthesis requests:', execution.activeRequestCount);
+    console.log('Automatic WASM fallback:',
+      execution.requestedDevice === 'auto' && execution.selectedDevice === 'wasm');
+  }
+}
+```
+
+Call `printSpeechStatus()` after the load in `sayHello()` or from your status
+button. The same projection is at
+`ai.providerRuntime.status(null, {execution:true}).roles.tts.execution`.
+`selectedDevice` is `null`
+until a pool is selected and returns to `null` on unload. Providers without an
+execution report omit `execution`; do not infer a device from `navigator.gpu`
+or a configured preference alone. An explicit inspection can throw a provider
+status error; handle it with the same `error.code` / `error.message` pattern.
+
+## Stop, mute, cancel, and release
+
+These are actions for your own controls, using the same `ai` instance:
+
+```javascript
+function stopSpeech() {
+  ai.stopAudio(); // Cancels queued speech and stops scheduled/playing audio.
+}
+
+async function muteSpeech() {
+  await ai.setSpeechMuted(true); // Stops audio and unloads TTS.
+}
+
+async function unmuteSpeech() {
+  await ai.setSpeechMuted(false); // Loads TTS and permits playback.
+}
+
+async function unloadSpeech() {
+  ai.stopAudio();
+  await ai.providerRuntime.unload('tts'); // Keeps the provider configured.
+}
+
+async function disposeSpeech() {
+  await ai.disposeBrowserSpeech(); // Releases SDK-owned speech providers.
+}
+```
+
+STT has its own `ai.providerRuntime.load('stt')` and `unload('stt')` lifecycle
+when configured; muting TTS does not unload STT or the LLM. A directly created
+provider similarly exposes `load()`, `unload()`, and final `dispose()`.
+`disposeBrowserSpeech()` leaves application-owned DBOPFS and stored artifacts
+in place; it does not erase the application's data.
+
+For a cancellable individual synthesis, unmute first. A fresh browser speech
+configuration is muted, so calling `providerRuntime.load('tts')` directly at
+that point rejects with `ARCANE_AI_TTS_MUTED`. `fetchTTS()` accepts an
+`AbortSignal` as its second argument and returns a WAV `Blob` without playing it:
+
+```javascript
+const synthesisController = new AbortController();
+
+async function synthesizeOneSentence() {
+  try {
+    await ai.setSpeechMuted(false);
+    const result = await ai.fetchTTS({
+      input: 'This request can be cancelled.',
+      responseFormat: 'wav'
+    }, synthesisController.signal);
+    console.log(result); // The complete WAV Blob, with type 'audio/wav'.
+    return result;
+  } catch (error) {
+    console.error(error.code, error.message); // Keep the complete message.
+    throw error;
+  }
+}
+
+function cancelSynthesis() {
+  synthesisController.abort();
+}
+```
+
+Call `synthesizeOneSentence()` from an owned UI action and catch its rejection;
+wire `cancelSynthesis()` to its Cancel control. The controller cancels the
+individual `fetchTTS()` request; it does not control the preceding
+`setSpeechMuted(false)` load/unmute lifecycle. Use a fresh controller for each
+new operation. Configuration accepts `configureBrowserSpeech(configuration,
+{signal})`; disposal accepts `disposeBrowserSpeech({signal})`. The streaming
+playback methods do not accept a caller signal; wire
+your stream's abort action to `ai.stopAudio()` as well as aborting its producer.
+Cancellation suppresses late results, but upstream Kokoro may finish active
+engine work before the affected slot is reusable.
+
+```javascript
+const textStreamController = new AbortController();
+textStreamController.signal.addEventListener('abort', function stopStreamAudio() {
+  ai.stopAudio();
+}, { once: true });
+
+function cancelTextAndSpeech() {
+  textStreamController.abort();
+}
+```
+
+Pass that same `textStreamController.signal` to your text producer's supported
+signal option. Connect `cancelTextAndSpeech()` to Cancel; use a new controller
+for the next stream.
+
+## Advanced provider and artifact reference
+
 The SDK does not choose a runtime, model, voice, catalog, prompt, or product
 policy. Applications keep those choices. Nothing is downloaded or activated
 until the application explicitly calls `load()`.
@@ -283,7 +613,7 @@ const kokoro = createBrowserKokoroProvider({
   store,
   execution: {
     device: 'auto',
-    maxConcurrentRequests: 2
+    maxConcurrentRequests: 4
   }
 });
 ```
@@ -295,7 +625,7 @@ SDK-created DBOPFS speech artifact store. `localOnly` remains `true`.
 Kokoro additionally accepts the exact `execution` record
 `{device,maxConcurrentRequests}`. `device` is `auto`, `webgpu`, or `wasm`;
 `maxConcurrentRequests` is an integer from 1 through 4. Omission defaults to
-`{device:'auto',maxConcurrentRequests:2}`. `auto` attempts a complete WebGPU
+`{device:'auto',maxConcurrentRequests:4}`. `auto` attempts a complete WebGPU
 Worker pool only when the browser exposes WebGPU. If that pool cannot load, the
 SDK tears it down and creates a complete WASM pool with the same caller-selected
 model and dtype. Explicit `webgpu` rejects when WebGPU cannot load; explicit
@@ -375,9 +705,10 @@ const result = await kokoro.request({
 
 The voice belongs to the caller-selected inventory; omission uses that model's
 default voice. The provider-native result is
-`{audio:Float32Array,sampleRate,voice}`. The shared AI form accepts
+`{audio:Float32Array,sampleRate,voice}`. The provider/2 shared request form accepts
 `{model,input,responseFormat:'wav',voice?,speed?}` and returns
-`{audio:Uint8Array,contentType:'audio/wav'}`. Returned records remain ordinary
+`{audio:Uint8Array,contentType:'audio/wav'}`. High-level `AI.fetchTTS()` wraps
+that provider result in a WAV `Blob`. Returned provider records remain ordinary
 mutable values.
 
 ## Lifecycle and cancellation

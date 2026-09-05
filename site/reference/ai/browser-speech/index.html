@@ -2,24 +2,307 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
-  <meta name="description" content="arcane-os/ai/browser-speech is the browser-only SDK boundary for caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It provides artifact storage, live module routing, role Workers, provider/2 adapters, audio normalization, cancellation, and cleanup.">
+  <meta name="description" content="arcane-os/ai/browser-speech is the browser-only SDK boundary for caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It provides artifact storage, live module routing, role Workers, provider/2 adapters, bounded parallel TTS synthesis, audio normalization, cancellation, and cleanup.">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
   <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-speech/"><link rel="icon" type="image/png" href="../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../styles.css"><link rel="stylesheet" href="../../reference.css">
-  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Browser speech providers · Arcane OS SDK"><meta property="og:description" content="arcane-os/ai/browser-speech is the browser-only SDK boundary for caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It provides artifact storage, live module routing, role Workers, provider/2 adapters, audio normalization, cancellation, and cleanup."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-speech/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Browser speech providers · Arcane OS SDK"><meta name="twitter:description" content="arcane-os/ai/browser-speech is the browser-only SDK boundary for caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It provides artifact storage, live module routing, role Workers, provider/2 adapters, audio normalization, cancellation, and cleanup."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Browser speech providers · Arcane OS SDK"><meta property="og:description" content="arcane-os/ai/browser-speech is the browser-only SDK boundary for caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It provides artifact storage, live module routing, role Workers, provider/2 adapters, bounded parallel TTS synthesis, audio normalization, cancellation, and cleanup."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-speech/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Browser speech providers · Arcane OS SDK"><meta name="twitter:description" content="arcane-os/ai/browser-speech is the browser-only SDK boundary for caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It provides artifact storage, live module routing, role Workers, provider/2 adapters, bounded parallel TTS synthesis, audio normalization, cancellation, and cleanup."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
   <title>Browser speech providers | Arcane OS SDK</title><script src="../../../app.js" defer></script><script src="../../reference.js" type="module"></script>
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../">Overview</a><a href="../../../guides/">Guides</a><a href="../../../examples/">Examples</a><a href="../../../playground/">Playground</a><a href="../../../testing/">Testing</a><a href="../../" aria-current="page">Reference</a><a class="repo-link" href="../../sdk-api/">API</a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">Browser speech providers</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="browser-speech-providers">Browser speech providers</h1><p class="doc-lead">arcane-os/ai/browser-speech is the browser-only SDK boundary for caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It provides artifact storage, live module routing, role Workers, provider/2 adapters, audio normalization, cancellation, and cleanup.</p><div class="doc-meta"><span>SDK 0.3.4</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">Browser speech providers</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="browser-speech-providers">Browser speech providers</h1><p class="doc-lead">arcane-os/ai/browser-speech is the browser-only SDK boundary for caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It provides artifact storage, live module routing, role Workers, provider/2 adapters, bounded parallel TTS synthesis, audio normalization, cancellation, and cleanup.</p><div class="doc-meta"><span>SDK 0.5.11</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
-      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../">Normalized AI</a><a href="../browser-wasm/">Browser-WASM AI</a><a href="./" aria-current="page">Browser speech</a><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../core/">Core map</a><a href="../../core/arcane-api/">Arcane API</a><a href="../../core/capabilities/">Capabilities and admission</a><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../../core/arcane-events/">Events</a><a href="../../core/arcane-ai-contracts/">AI contracts</a><a href="../../core/arcane-entities/">Entity exports</a><a href="../../core/ollama-module/">Ollama internals (advanced)</a><a href="../../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/ai/browser-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-compatibility">Protocol compatibility</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#ordinary-module-routing">Ordinary module routing</a><a href="#onnx-runtime-configuration">ONNX runtime configuration</a><a href="#providers">Providers</a><a href="#lifecycle-and-cancellation">Lifecycle and cancellation</a><a href="#errors">Errors</a><a href="#ownership">Ownership</a><a href="#related">Related</a></nav></details><p><code>arcane-os/ai/browser-speech</code> is the browser-only SDK boundary for
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../">Normalized AI</a><a href="../twin-cloud/">TWiN Cloud quick start</a><a href="../browser-wasm/">Browser-WASM AI</a><a href="./" aria-current="page">Browser speech</a><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../core/">Core map</a><a href="../../core/arcane-api/">Arcane API</a><a href="../../core/capabilities/">Capabilities and admission</a><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../../core/arcane-events/">Events</a><a href="../../core/arcane-ai-contracts/">AI contracts</a><a href="../../core/arcane-entities/">Entity exports</a><a href="../../core/ollama-module/">Ollama internals (advanced)</a><a href="../../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/ai/browser-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#quick-start-say-one-sentence">Quick start: say one sentence</a><a href="#four-synthesis-slots-and-exact-order-playback">Four synthesis slots and exact-order playback</a><a href="#stream-chunks-as-they-arrive">Stream chunks as they arrive</a><a href="#choose-a-device-or-reduce-memory-use">Choose a device or reduce memory use</a><a href="#inspect-the-requested-and-selected-device">Inspect the requested and selected device</a><a href="#stop-mute-cancel-and-release">Stop, mute, cancel, and release</a><a href="#advanced-provider-and-artifact-reference">Advanced provider and artifact reference</a><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-identifiers">Protocol identifiers</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#ordinary-module-routing">Ordinary module routing</a><a href="#onnx-runtime-configuration">ONNX runtime configuration</a><a href="#providers">Providers</a><a href="#lifecycle-and-cancellation">Lifecycle and cancellation</a><a href="#errors">Errors</a><a href="#ownership">Ownership</a><a href="#related">Related</a></nav></details><p><code>arcane-os/ai/browser-speech</code> is the browser-only SDK boundary for
 caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It
 provides artifact storage, live module routing, role Workers, provider/2
-adapters, audio normalization, cancellation, and cleanup.</p>
+adapters, bounded parallel TTS synthesis, audio normalization, cancellation,
+and cleanup.</p>
+<h2 id="quick-start-say-one-sentence">Quick start: say one sentence</h2>
+<p>Use this in a browser application served by <code>arcane dev</code>, where the generated
+import map resolves <code>arcane/AI</code> and <code>arcane/DBOPFS</code>. These browser modules are
+not Node inference APIs. To create an application:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npx arcane-os@0.5.11 new hello-speech --path ./hello-speech --target browser
+cd hello-speech
+npm install
+npm run dev
+</code></pre></div>
+<p>Keep the generated page&#39;s Arcane theme and import map. The examples below go in
+<code>apps/hello-speech/modules/App.js</code> and the adjacent <code>speech-selection.js</code>.
+Follow the development server&#39;s printed URL. Installing the SDK supplies its
+provider, storage, and Worker code; it does not install a speech model or choose
+an upstream speech runtime for your application.</p>
+<p>First create <strong><code>speech-selection.js</code></strong>, the one application-owned configuration
+file used throughout this guide. This concrete selection is also used by the
+maintained WASM voice-chat example.
+Your application owns these runtime/model versions, URLs, dtype, and voice.
+Loading this selection uses those upstream publishers&#39; downloads and caches.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">export const speechSelection = {
+  model: {
+    id: &#39;onnx-community/Kokoro-82M-v1.0-ONNX&#39;,
+    repository: &#39;onnx-community/Kokoro-82M-v1.0-ONNX&#39;,
+    revision: &#39;1939ad2a8e416c0acfeecc08a694d14ef25f2231&#39;,
+    dtype: &#39;q8&#39;,
+    defaultVoice: &#39;af_heart&#39;
+  },
+  runtime: {
+    adapter: &#39;kokoro-js&#39;,
+    version: &#39;1.2.1&#39;,
+    revision: &#39;664c76a704021239ba59c84dcbaa4d3dece01fe9&#39;,
+    entry: &#39;kokoro.web.js&#39;,
+    wasmPaths: &#39;https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1/dist/&#39;,
+    files: [{
+      path: &#39;kokoro.web.js&#39;,
+      url: &#39;https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js&#39;,
+      mediaType: &#39;text/javascript&#39;
+    }]
+  }
+};
+</code></pre></div>
+<p>Then use this <strong><code>App.js</code></strong>. The application creates and owns the DBOPFS
+instance. Configuration selects the provider without loading it; the button
+explicitly loads and unmutes TTS before requesting speech.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import arcaneThemeReady from &#39;arcane/ThemeBootstrap&#39;;
+import AI, { AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL } from &#39;arcane/AI&#39;;
+import DBOPFS from &#39;arcane/DBOPFS&#39;;
+import { speechSelection } from &#39;./speech-selection.js&#39;;
+
+await arcaneThemeReady;
+const dbopfs = new DBOPFS();
+await dbopfs.readyPromise;
+const ai = new AI();
+
+await ai.configureBrowserSpeech({
+  protocol: AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+  id: &#39;hello-speech&#39;,
+  dbopfs,
+  tts: {
+    providerId: &#39;hello-kokoro&#39;,
+    model: speechSelection.model,
+    runtime: speechSelection.runtime,
+    offline: false
+  }
+});
+
+const speakButton = document.createElement(&#39;button&#39;);
+speakButton.textContent = &#39;Load voice and say hello&#39;;
+document.body.append(speakButton);
+speakButton.addEventListener(&#39;click&#39;, async function sayHello() {
+  speakButton.disabled = true;
+  try {
+    await ai.setSpeechMuted(false); // Loads the selected TTS provider.
+    const complete = await ai.streamTTS(&#39;Hello from Arcane. &#39;, true);
+    console.log(&#39;Speech preparation completed:&#39;, complete);
+  } catch (error) {
+    console.error(error.code, error.message);
+  } finally {
+    speakButton.disabled = false;
+  }
+});
+</code></pre></div>
+<p>The first user action may download the selected runtime, model, and voice.
+The browser may require another audio-unlock gesture after a long load; the SDK
+retains prepared audio for that gesture. <code>streamTTS()</code> prepares and schedules
+playback; its promise is not proof that a listener heard the sound. It returns
+<code>false</code> for muted, stopped, or failed work, and the SDK reports full synthesis
+or playback failures in its console diagnostics and <code>ai-tts-failure</code> event.</p>
+<p>To display complete high-level playback errors in this page, observe its
+existing event. The listener belongs to this example&#39;s one <code>ai</code> instance:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const speechEvents = new AbortController();
+window.addEventListener(&#39;ai-tts-failure&#39;, function reportSpeechFailure(event) {
+  if (event.detail.ai !== ai) return;
+  console.error(event.detail.error.code, event.detail.error.message);
+}, { signal: speechEvents.signal });
+</code></pre></div>
+<p>Call <code>speechEvents.abort()</code> when disposing that interface to remove the listener.</p>
+<h2 id="four-synthesis-slots-and-exact-order-playback">Four synthesis slots and exact-order playback</h2>
+<p>Capacity 4 means up to four segments synthesize at once. Segment 5 and later
+wait in the SDK&#39;s FIFO queue; they are not dropped. Synthesis may finish out of
+order, but playback waits for earlier segments and plays exact input order.
+Each slot owns a Worker/model session, so raising capacity trades memory for
+latency.</p>
+<p>The high-level <code>AI</code> route owns the FIFO queue. Calling a low-level Kokoro
+provider directly beyond its capacity returns <code>ARCANE_AI_PROVIDER_BUSY</code>.
+Ready adjacent audio buffers use contiguous AudioContext scheduling. Browser
+audio scheduling and selected WebGPU status do not prove physical GPU kernel
+overlap or audio quality. LLM and Whisper/STT capacity remains one.</p>
+<h2 id="stream-chunks-as-they-arrive">Stream chunks as they arrive</h2>
+<p>Use the configured <code>ai</code> created above. Run this snippet from an owned user
+action, such as your Speak button, and catch errors with the earlier
+<code>error.code</code> / <code>error.message</code> pattern. First load/unmute, then accept chunks.
+Call <code>streamTTS(chunk)</code> inside the producer&#39;s chunk callback immediately;
+waiting for each speech promise there would serialize synthesis. This tiny
+example uses three arriving chunks. Replace the three <code>onTextChunk(...)</code> calls
+with your actual text stream callback, and flush after that producer ends.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">await ai.setSpeechMuted(false);
+const pendingSpeech = [];
+
+function onTextChunk(chunk) {
+  const pending = ai.streamTTS(chunk);
+  // Attach both handlers immediately, so later failure cannot be unhandled.
+  pendingSpeech.push(pending.then(
+    function speechPrepared(value) { return { status: &#39;fulfilled&#39;, value }; },
+    function speechRejected(reason) { return { status: &#39;rejected&#39;, reason }; }
+  ));
+}
+
+onTextChunk(&#39;First sentence. &#39;);
+onTextChunk(&#39;Second sentence. &#39;);
+onTextChunk(&#39;Third sentence.&#39;);
+
+// After the text producer ends, flush trailing text and settle every call.
+const finalPrepared = await ai.finishTTS();
+const outcomes = await Promise.all(pendingSpeech);
+for (const outcome of outcomes) {
+  if (outcome.status === &#39;rejected&#39;) {
+    console.error(outcome.reason.code, outcome.reason.message);
+  } else if (outcome.value === false) {
+    console.log(&#39;Speech was muted, stopped, or failed; inspect SDK diagnostics.&#39;);
+  }
+}
+if (finalPrepared === false) {
+  console.log(&#39;Final speech was muted, stopped, or failed; inspect SDK diagnostics.&#39;);
+}
+</code></pre></div>
+<p>The segmentation default uses sentence punctuation. To submit smaller complete
+segments, call <code>ai.configureTTSSegmentation({punctuation:&#39;any&#39;,wordCadence:4})</code>
+before feeding the stream. Chunk boundaries themselves do not force a sentence
+boundary; <code>finishTTS()</code> flushes any remaining text. It is not a playback-ended
+notification. Do not mute or dispose immediately after it if playback should
+continue.</p>
+<h2 id="choose-a-device-or-reduce-memory-use">Choose a device or reduce memory use</h2>
+<p>Omitting <code>tts.execution</code> selects <code>{device:&#39;auto&#39;,maxConcurrentRequests:4}</code>.
+These are three alternative configurations, not a sequence of required loads:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function selectSpeechExecution(execution) {
+  await ai.configureBrowserSpeech({
+    protocol: AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+    id: &#39;hello-speech&#39;,
+    dbopfs,
+    tts: {
+      providerId: &#39;hello-kokoro&#39;,
+      model: speechSelection.model,
+      runtime: speechSelection.runtime,
+      offline: false,
+      execution
+    }
+  });
+}
+
+// Choose and call one from your application settings action:
+// await selectSpeechExecution({ device: &#39;auto&#39; });
+// await selectSpeechExecution({ device: &#39;webgpu&#39; });
+// await selectSpeechExecution({ device: &#39;wasm&#39;, maxConcurrentRequests: 1 });
+</code></pre></div>
+<p>The override accepts integers 1, 2, 3, or 4. <code>auto</code> tries a complete WebGPU pool
+when available, then recreates a complete WASM pool if that load cannot finish.
+Explicit <code>webgpu</code> reports a load error when unavailable; explicit <code>wasm</code> never
+attempts WebGPU. The same application-selected model and dtype apply on both
+devices. A configuration change leaves TTS muted; explicitly load/unmute again.</p>
+<h2 id="inspect-the-requested-and-selected-device">Inspect the requested and selected device</h2>
+<p>Request the execution projection on the existing public runtime status after
+loading. This explicitly reads the selected provider&#39;s current report; ordinary
+<code>status()</code> retains its existing sticky snapshot and identity. There is no
+separate execution-state event subscription.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">function printSpeechStatus() {
+  const status = ai.providerRuntime.status(&#39;tts&#39;, { execution: true });
+  const execution = status.execution;
+  console.log(&#39;TTS state:&#39;, status.state);
+  if (execution) {
+    console.log(&#39;Requested device:&#39;, execution.requestedDevice);
+    console.log(&#39;Selected device:&#39;, execution.selectedDevice);
+    console.log(&#39;Capacity:&#39;, execution.maxConcurrentRequests);
+    console.log(&#39;Active synthesis requests:&#39;, execution.activeRequestCount);
+    console.log(&#39;Automatic WASM fallback:&#39;,
+      execution.requestedDevice === &#39;auto&#39; &amp;&amp; execution.selectedDevice === &#39;wasm&#39;);
+  }
+}
+</code></pre></div>
+<p>Call <code>printSpeechStatus()</code> after the load in <code>sayHello()</code> or from your status
+button. The same projection is at
+<code>ai.providerRuntime.status(null, {execution:true}).roles.tts.execution</code>.
+<code>selectedDevice</code> is <code>null</code>
+until a pool is selected and returns to <code>null</code> on unload. Providers without an
+execution report omit <code>execution</code>; do not infer a device from <code>navigator.gpu</code>
+or a configured preference alone. An explicit inspection can throw a provider
+status error; handle it with the same <code>error.code</code> / <code>error.message</code> pattern.</p>
+<h2 id="stop-mute-cancel-and-release">Stop, mute, cancel, and release</h2>
+<p>These are actions for your own controls, using the same <code>ai</code> instance:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">function stopSpeech() {
+  ai.stopAudio(); // Cancels queued speech and stops scheduled/playing audio.
+}
+
+async function muteSpeech() {
+  await ai.setSpeechMuted(true); // Stops audio and unloads TTS.
+}
+
+async function unmuteSpeech() {
+  await ai.setSpeechMuted(false); // Loads TTS and permits playback.
+}
+
+async function unloadSpeech() {
+  ai.stopAudio();
+  await ai.providerRuntime.unload(&#39;tts&#39;); // Keeps the provider configured.
+}
+
+async function disposeSpeech() {
+  await ai.disposeBrowserSpeech(); // Releases SDK-owned speech providers.
+}
+</code></pre></div>
+<p>STT has its own <code>ai.providerRuntime.load(&#39;stt&#39;)</code> and <code>unload(&#39;stt&#39;)</code> lifecycle
+when configured; muting TTS does not unload STT or the LLM. A directly created
+provider similarly exposes <code>load()</code>, <code>unload()</code>, and final <code>dispose()</code>.
+<code>disposeBrowserSpeech()</code> leaves application-owned DBOPFS and stored artifacts
+in place; it does not erase the application&#39;s data.</p>
+<p>For a cancellable individual synthesis, unmute first. A fresh browser speech
+configuration is muted, so calling <code>providerRuntime.load(&#39;tts&#39;)</code> directly at
+that point rejects with <code>ARCANE_AI_TTS_MUTED</code>. <code>fetchTTS()</code> accepts an
+<code>AbortSignal</code> as its second argument and returns a WAV <code>Blob</code> without playing it:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const synthesisController = new AbortController();
+
+async function synthesizeOneSentence() {
+  try {
+    await ai.setSpeechMuted(false);
+    const result = await ai.fetchTTS({
+      input: &#39;This request can be cancelled.&#39;,
+      responseFormat: &#39;wav&#39;
+    }, synthesisController.signal);
+    console.log(result); // The complete WAV Blob, with type &#39;audio/wav&#39;.
+    return result;
+  } catch (error) {
+    console.error(error.code, error.message); // Keep the complete message.
+    throw error;
+  }
+}
+
+function cancelSynthesis() {
+  synthesisController.abort();
+}
+</code></pre></div>
+<p>Call <code>synthesizeOneSentence()</code> from an owned UI action and catch its rejection;
+wire <code>cancelSynthesis()</code> to its Cancel control. The controller cancels the
+individual <code>fetchTTS()</code> request; it does not control the preceding
+<code>setSpeechMuted(false)</code> load/unmute lifecycle. Use a fresh controller for each
+new operation. Configuration accepts <code>configureBrowserSpeech(configuration, {signal})</code>; disposal accepts <code>disposeBrowserSpeech({signal})</code>. The streaming
+playback methods do not accept a caller signal; wire
+your stream&#39;s abort action to <code>ai.stopAudio()</code> as well as aborting its producer.
+Cancellation suppresses late results, but upstream Kokoro may finish active
+engine work before the affected slot is reusable.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const textStreamController = new AbortController();
+textStreamController.signal.addEventListener(&#39;abort&#39;, function stopStreamAudio() {
+  ai.stopAudio();
+}, { once: true });
+
+function cancelTextAndSpeech() {
+  textStreamController.abort();
+}
+</code></pre></div>
+<p>Pass that same <code>textStreamController.signal</code> to your text producer&#39;s supported
+signal option. Connect <code>cancelTextAndSpeech()</code> to Cancel; use a new controller
+for the next stream.</p>
+<h2 id="advanced-provider-and-artifact-reference">Advanced provider and artifact reference</h2>
 <p>The SDK does not choose a runtime, model, voice, catalog, prompt, or product
 policy. Applications keep those choices. Nothing is downloaded or activated
 until the application explicitly calls <code>load()</code>.</p>
@@ -74,8 +357,8 @@ one role does not disable the other role or authorize a fallback provider.</p>
 </code></pre></div>
 <p>Importing this entrypoint downloads nothing, opens no cache, creates no Worker,
 and publishes no event.</p>
-<h2 id="protocol-compatibility">Protocol compatibility</h2>
-<p>These exact strings remain public compatibility discriminators:</p>
+<h2 id="protocol-identifiers">Protocol identifiers</h2>
+<p>These exact strings identify the current public contracts:</p>
 <div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
 <tr>
@@ -121,10 +404,9 @@ and publishes no event.</p>
 </tr></tbody>
 </table>
 </div>
-<p>The word <code>authenticated</code> in the existing graph discriminator is historical. It
-does not activate an authentication, admission, or isolation stage. Changing
-that string would break existing consumers, so the SDK retains it only as a
-protocol value.</p>
+<p>The word <code>authenticated</code> in the graph discriminator does not activate an
+authentication, admission, or isolation stage. It is the current protocol
+value.</p>
 <h2 id="createbrowserspeechartifactgraph"><code>createBrowserSpeechArtifactGraph()</code></h2>
 <p>An artifact graph describes the caller-selected runtime, model, voice, and
 supporting files that the SDK stores and materializes. It is a routing and
@@ -206,8 +488,7 @@ hardware. Kokoro does not expose that field.</p>
   license?,
   mediaType,
   sourceMediaType?,
-  runtimeRequestUrls?,
-  redirectFinalOrigins?
+  runtimeRequestUrls?
 }
 </code></pre></div>
 <p><code>path</code> is a normalized relative path. <code>sourceUrl</code> is the caller-selected source
@@ -225,21 +506,8 @@ runtime materialization never treats it as capability or admission data.</p>
 <code>model-tokenizer-json</code>, <code>model-opaque-data</code>, and <code>voice-style-binary</code>.</p>
 <p>Graph construction requires paths and route aliases to be unambiguous so one
 known URL maps to at most one stored file. The runtime router is independently
-permissive: if ambiguous compatibility metadata nevertheless reaches it, that
+permissive: if ambiguous routing metadata nevertheless reaches it, that
 URL is left unmapped and uses the native browser operation.</p>
-<h3 id="legacy-metadata-is-inert">Legacy metadata is inert</h3>
-<p><code>edges</code>, <code>transforms</code>, and <code>runtime.negativeRuntimeRequestUrls</code> remain accepted
-and projected for compatibility with existing descriptors. They are inert
-metadata:</p>
-<ul>
-<li>they do not authorize or reject an import, fetch, Worker, or Cache operation;</li>
-<li>they do not limit methods, target files, branches, or Cache names;</li>
-<li>they do not install a guard capability or runtime isolation; and</li>
-<li>a missing, extra, or stale declaration does not block ordinary execution.</li>
-</ul>
-<p>New descriptors may omit <code>edges</code> and <code>transforms</code>. The normalized negative-route
-array is empty. Unknown routes use native browser behavior instead of a local
-synthetic response.</p>
 <h2 id="createdbopfsspeechartifactstore"><code>createDbopfsSpeechArtifactStore()</code></h2>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const store = createDbopfsSpeechArtifactStore({
   dbopfs,
@@ -260,16 +528,15 @@ SDK-created artifact graph or upstream-package authority. <code>offline:true</co
 only existing DBOPFS state. Preparation returns the selected runtime/model
 configuration, <code>cache</code> as <code>installed</code> or <code>cached</code>, object URLs, and a <code>release()</code>
 function that revokes the materialized URLs.</p>
-<p><code>security</code> is an intent-only compatibility seam. Ordinary preparation does not
+<p><code>security</code> records caller intent only. Ordinary preparation does not
 forward a security payload to the Worker and performs no security work. Passing
-<code>{secure:true}</code> does not activate the dormant implementation. Any future
-hardening stage requires a separate user review and an explicit implementation
-change before it may execute.</p>
+<code>{secure:true}</code> does not activate hardening. Any future hardening stage requires
+a separate user review and an explicit implementation change before it may execute.</p>
 <h2 id="ordinary-module-routing">Ordinary module routing</h2>
 <p>Artifact-graph preparation reads each stored JavaScript module, discovers
 ordinary module operations, and materializes the complete stored files as
 object URLs. The prepared runtime retains the existing
-<code>browser-speech-authenticated-artifact-graph</code> discriminator for compatibility.</p>
+<code>browser-speech-authenticated-artifact-graph</code> discriminator.</p>
 <p>The Worker installs one private module router before importing the entrypoint:</p>
 <ul>
 <li>a static import whose target is a known stored file uses that file&#39;s
@@ -299,15 +566,14 @@ cannot interpret a module, that module is left unchanged and follows its native
 URLs. A static-import cycle may likewise retain an original source URL where a
 target has not yet been materialized. These fallbacks preserve functionality;
 they do not silently convert into a rejection policy.</p>
-<p>Older private guard, declared-edge, closed-module, typed-array, dynamic-code,
-and Cache-isolation helpers remain dormant source for later review. The ordinary
-load path never calls them. They must not be activated, including for
-<code>secure:true</code>, without a separate explicit review with the user.</p>
 <h2 id="onnx-runtime-configuration">ONNX runtime configuration</h2>
 <p>The Worker applies only the selected runtime settings needed to run the chosen
 provider:</p>
 <ul>
-<li>Kokoro uses <code>namespace.env.wasmPaths = {mjs,wasm}</code>.</li>
+<li>Kokoro forwards the pool&#39;s selected <code>webgpu</code> or <code>wasm</code> device to
+<code>KokoroTTS.from_pretrained()</code>. Its configured dtype remains exactly the
+caller-selected dtype on both paths. The WASM path also uses
+<code>namespace.env.wasmPaths = {mjs,wasm}</code>.</li>
 <li>Transformers uses
 <code>namespace.env.backends.onnx.wasm.wasmPaths = {mjs,wasm}</code>, keeps remote model
 loading enabled, and applies caller-selected <code>numThreads</code> when present.</li>
@@ -327,18 +593,32 @@ runtime selection remains with the application and upstream publisher.</p>
 const kokoro = createBrowserKokoroProvider({
   id: &#39;my-kokoro&#39;,
   graph: kokoroGraph,
-  store
+  store,
+  execution: {
+    device: &#39;auto&#39;,
+    maxConcurrentRequests: 4
+  }
 });
 </code></pre></div>
 <p>The constructors also accept ordinary <code>model</code> and <code>runtime</code> descriptors instead
 of <code>graph</code>; the two forms are mutually exclusive. Both forms require an
 SDK-created DBOPFS speech artifact store. <code>localOnly</code> remains <code>true</code>.</p>
+<p>Kokoro additionally accepts the exact <code>execution</code> record
+<code>{device,maxConcurrentRequests}</code>. <code>device</code> is <code>auto</code>, <code>webgpu</code>, or <code>wasm</code>;
+<code>maxConcurrentRequests</code> is an integer from 1 through 4. Omission defaults to
+<code>{device:&#39;auto&#39;,maxConcurrentRequests:4}</code>. <code>auto</code> attempts a complete WebGPU
+Worker pool only when the browser exposes WebGPU. If that pool cannot load, the
+SDK tears it down and creates a complete WASM pool with the same caller-selected
+model and dtype. Explicit <code>webgpu</code> rejects when WebGPU cannot load; explicit
+<code>wasm</code> never attempts GPU. Whisper remains one WASM Worker and does not accept
+this option.</p>
 <p>Each constructor returns an <code>arcane-ai-provider/2</code> object with:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">{
   protocol,
   role,
   id,
   localOnly,
+  maxConcurrentRequests,
   catalog,
   inspect,
   status,
@@ -391,28 +671,47 @@ same mono input. The SDK preserves the complete returned transcript.</p>
 </code></pre></div>
 <p>The voice belongs to the caller-selected inventory; omission uses that model&#39;s
 default voice. The provider-native result is
-<code>{audio:Float32Array,sampleRate,voice}</code>. The shared AI form accepts
+<code>{audio:Float32Array,sampleRate,voice}</code>. The provider/2 shared request form accepts
 <code>{model,input,responseFormat:&#39;wav&#39;,voice?,speed?}</code> and returns
-<code>{audio:Uint8Array,contentType:&#39;audio/wav&#39;}</code>. Returned records remain ordinary
+<code>{audio:Uint8Array,contentType:&#39;audio/wav&#39;}</code>. High-level <code>AI.fetchTTS()</code> wraps
+that provider result in a WAV <code>Blob</code>. Returned provider records remain ordinary
 mutable values.</p>
 <h2 id="lifecycle-and-cancellation">Lifecycle and cancellation</h2>
 <p>Provider states are <code>unloaded</code>, <code>loading</code>, <code>ready</code>, <code>unloading</code>, <code>error</code>, and
 <code>disposed</code>. <code>status()</code> includes role, provider/model ids, state, lifecycle
 status and reason, active operation, loaded/busy flags, generation, error code,
-cache state, and warnings. A security field is absent in ordinary mode.</p>
+cache state, and warnings. Kokoro status also includes an <code>execution</code> record
+with requested and selected device, request limit, and active request count. A
+successful <code>selectedDevice:&#39;webgpu&#39;</code> reports the execution provider selected by
+the upstream model load; it does not claim that browser, driver, or GPU kernels
+overlap physically. A security field is absent in ordinary mode.</p>
 <p>The provider/2 load context accepts an optional progress callback for interface
 compatibility, but the current browser-speech artifact and Worker transport
 publishes no progress records. Consumers present the explicit lifecycle states
 instead of inventing a numeric total.</p>
-<p>Compatible concurrent loads share one underlying preparation and Worker load
+<p>Compatible concurrent loads share one underlying preparation and pool load
 while each caller retains its own cancellation signal. One observer cannot
 cancel another still-active observer; cancellation of the final observer stops
 the shared load.</p>
-<p>Only one role request runs at a time. Cancellation after Worker use begins
-terminates that role Worker, rejects its pending operations, releases nested
-Workers and object URLs, and returns the provider to <code>unloaded</code>. A later request
-requires another explicit <code>load()</code>. Late results cannot settle a superseded
-operation.</p>
+<p>Whisper retains one active role request. Kokoro admits synthesis requests up to
+its declared capacity and rejects a direct over-capacity call with
+<code>ARCANE_AI_PROVIDER_BUSY</code>; the provider-neutral runtime keeps overflow in FIFO
+order. Each Kokoro slot owns a distinct Worker and loaded model session because
+the selected browser adapter serializes inference inside one JavaScript
+isolate. The SDK prepares the artifact URLs once and shares that same prepared
+selection across the bounded pool. Pool activation completes the first model
+session before it starts the remaining Workers, then loads those remaining
+sessions concurrently. This avoids multiplying simultaneous cold artifact
+acquisition while still making the configured synthesis capacity ready in
+parallel.</p>
+<p>Cancellation of one active Kokoro synthesis suppresses only that request and
+sends the Worker&#39;s targeted cancel control. The selected upstream Kokoro
+version may finish already-running engine work before that slot can run its
+next request; the SDK does not claim stronger per-call preemption. Whisper
+cancellation and role unload/dispose retain destructive Worker teardown.
+Kokoro unload/dispose abort every active request, terminates every pool Worker,
+and releases materialized URLs once. Late results cannot settle a cancelled or
+superseded operation.</p>
 <p>The provider owns no event bus. Applications may project promises and status
 into the SDK&#39;s shared event/state owner. Mute and unmute are likewise
 application state: mute may await <code>unload()</code>, and unmute may explicitly call
@@ -424,10 +723,10 @@ the browser AI runtime.</p>
 record. It preserves complete nested messages, stacks, codes, reasons, details,
 own properties, and cycles without a depth or content cap. Worker and client
 sources must come from the same SDK revision so their <code>/1</code> envelope shape is
-updated atomically; a current client still accepts the legacy four-field form.
+updated atomically; a current client still accepts the cause-free four-field form.
 If the platform cannot clone an exotic diagnostic value, the Worker keeps the
 complete raw failure in its console diagnostics and retries the response with
-that legacy four-field envelope so the caller still receives an error.</p>
+that cause-free four-field envelope so the caller still receives an error.</p>
 <p>Representative stable codes include:</p>
 <ul>
 <li><code>ARCANE_AI_INVALID_REQUEST</code></li>
@@ -445,12 +744,13 @@ that legacy four-field envelope so the caller still receives an error.</p>
 </ul>
 <p>Malformed selected descriptors, missing required files, unreadable responses,
 unsupported provider namespace shapes, and unavailable browser APIs reject at
-their functional owner. Runtime operations are not rejected because a route,
-edge, transform, capability, or legacy security declaration is absent.</p>
+their functional owner. An unmapped runtime route retains the native browser
+operation.</p>
 <h2 id="ownership">Ownership</h2>
 <ul>
 <li>Applications own model, runtime, dtype, sample-rate, voice, profile, prompt,
-catalog, activation, and presentation policy.</li>
+catalog, activation, optional TTS execution override, and presentation
+policy.</li>
 <li>Upstream publishers own their runtime, model, voice, and license delivery.</li>
 <li>The SDK owns storage, materialization, routing, Worker lifecycle, normalized
 provider contracts, cancellation, and cleanup.</li>
@@ -467,9 +767,9 @@ this entrypoint.</li>
 <li><a href="../../protocols/#portable-ai-provider-runtime">Protocol architecture</a></li>
 </ul>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-compatibility">Protocol compatibility</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#ordinary-module-routing">Ordinary module routing</a><a href="#onnx-runtime-configuration">ONNX runtime configuration</a><a href="#providers">Providers</a><a href="#lifecycle-and-cancellation">Lifecycle and cancellation</a><a href="#errors">Errors</a><a href="#ownership">Ownership</a><a href="#related">Related</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#quick-start-say-one-sentence">Quick start: say one sentence</a><a href="#four-synthesis-slots-and-exact-order-playback">Four synthesis slots and exact-order playback</a><a href="#stream-chunks-as-they-arrive">Stream chunks as they arrive</a><a href="#choose-a-device-or-reduce-memory-use">Choose a device or reduce memory use</a><a href="#inspect-the-requested-and-selected-device">Inspect the requested and selected device</a><a href="#stop-mute-cancel-and-release">Stop, mute, cancel, and release</a><a href="#advanced-provider-and-artifact-reference">Advanced provider and artifact reference</a><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-identifiers">Protocol identifiers</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#ordinary-module-routing">Ordinary module routing</a><a href="#onnx-runtime-configuration">ONNX runtime configuration</a><a href="#providers">Providers</a><a href="#lifecycle-and-cancellation">Lifecycle and cancellation</a><a href="#errors">Errors</a><a href="#ownership">Ownership</a><a href="#related">Related</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes published SDK 0.3.4, runtime bundle 0.8.12, and protocol arcane/1; the latest published package is 0.3.4.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-or-later · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.5.11, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

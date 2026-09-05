@@ -3,9 +3,9 @@
   "source": {
     "authority": "sdk-canonical",
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
-    "commit": "9e657b31f758a2c7943446533fe87afda206ac49",
+    "branch": "main",
     "path": "runtime/arcane/components",
-    "sdkVersion": "0.3.4"
+    "sdkVersion": "0.5.11"
   },
   "componentCount": 39,
   "loader": "/arcane/modules/HTMLImport.js",

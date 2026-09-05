@@ -177,8 +177,15 @@ OpenAI-route voice is never forwarded to another provider route.
 
 The TWiN Cloud built-in provider and default-model preference sentinel are
 `TWIN`. Applications upgrading saved `OPENAI` LLM selections must explicitly
-update their own settings to `TWIN`; the SDK supplies no built-in alias and
-does not rewrite persisted preferences. The upstream model names remain intact.
+replace only the exact uppercase `OPENAI` value in tuple slot 0 (LLM provider)
+and slot 3 (default-model sentinel) with `TWIN`, before importing `AI.js` or any module that imports it,
+hydrating a ready `window.user`, applying saved preferences, or starting
+providers. Importing `AI.js` can immediately consume a ready user's saved tuple.
+Keep every other tuple value unchanged.
+The SDK supplies no built-in alias and does not rewrite persisted preferences.
+Preserve `openai-gpt-oss-120b`, `openai-gpt-oss-20b`, OpenAI-compatible wire
+terminology, and the separate Core `provider:'openai'` contract. See the
+[complete migration example](ai/twin-cloud.md).
 
 `fetchRequest()` and `streamRequest()` accept `reasoningEffort` as a
 provider-neutral request option. Its exact values are `none`, `low`, `medium`,
@@ -214,8 +221,23 @@ TTS route reaches ready; a failed load leaves the public state muted. In contras
 `setSpeechMuted(true)` cancels active TTS work and unloads that role.
 The optional browser-speech `tts.execution` record selects
 `device:'auto'|'webgpu'|'wasm'` and a `maxConcurrentRequests` integer from 1
-through 4. Omission uses GPU-first automatic selection with two bounded Kokoro
+through 4. Omission uses GPU-first automatic selection with four bounded Kokoro
 Worker/session slots; STT remains one WASM Worker.
+Capacity 4 means up to four segments synthesize at once. Segment 5 and later
+wait in the SDK's FIFO queue; they are not dropped. Synthesis may finish out
+of order, but playback waits for earlier segments and plays exact input order.
+Each slot owns a Worker/model session, so raising capacity trades memory for
+latency. This capacity does not establish physical GPU kernel overlap.
+
+After configuration, explicitly inspect execution through
+`ai.providerRuntime.status('tts', {execution:true}).execution`. When supplied
+by the selected provider, this read returns its execution snapshot. Kokoro
+reports `requestedDevice`, `selectedDevice`, `maxConcurrentRequests`, and
+`activeRequestCount`. `selectedDevice` is `null` before load and after unload.
+`requestedDevice === 'auto' && selectedDevice === 'wasm'` identifies automatic
+WASM fallback after a successful load. Calling `status()` without options keeps
+the existing sticky lifecycle snapshot and does not inspect provider execution.
+Provider inspection failures are surfaced to the caller.
 `fetchTTS({model,voice,input,responseFormat,speed},signal)` accepts the public
 provider-neutral synthesis shape, requires any explicit model to match the
 selected route, and fills an omitted voice only from the selected model
@@ -299,13 +321,19 @@ call that changes or disappears at terminal settlement is rejected with
 #### Browser speech configuration
 
 The caller constructs a mutable authority record for one or both roles and
-retains ownership of it. This example configures both:
+retains ownership of it. Start with the [complete beginner speech example](ai/browser-speech.md)
+to define your DBOPFS, runtime, model, and voice selections. In this advanced
+example, `applicationSpeech` is the application-supplied object containing its
+`dbopfs`, `sttGraph`, and `ttsGraph`; every other variable is defined below.
 
 ```javascript
 import AI, {
   AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL
 } from '/arcane/modules/AI.js';
 
+const {dbopfs, sttGraph, ttsGraph} = applicationSpeech;
+const controller = new AbortController();
+const signal = controller.signal;
 const speechConfiguration = {
   protocol: AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
   id: 'app-speech-authority',
@@ -322,12 +350,12 @@ const speechConfiguration = {
     offline: false,
     execution: {
       device: 'auto',
-      maxConcurrentRequests: 2
+      maxConcurrentRequests: 4
     }
   }
 };
 
-const ai = new AI(/* existing application AI preferences */);
+const ai = new AI();
 const descriptor = await ai.configureBrowserSpeech(
   speechConfiguration,
   {signal}
@@ -467,7 +495,30 @@ Arcane.speech, and the Android WebView bridge. [Deep protocol details](protocols
 
 ### Example
 
-The configuration example above is the minimal one-time application flow.
+This function sends one TWiN request. `applicationRuntime` is the one
+application-supplied argument: it provides a runtime `twinKey`. Call the
+function from your application's send action; do not commit a key in source.
+
+```javascript
+import AI from '/arcane/modules/AI.js';
+
+async function sayHello(applicationRuntime) {
+    const ai = new AI();
+    ai.twinKey = applicationRuntime.twinKey;
+    try {
+        const response = await ai.fetchRequest(
+            {
+                messages: [{role: 'user', content: 'Hello!'}]
+            }
+        );
+        console.log(JSON.stringify(response, null, 2));
+    } catch (error) {
+        console.error(error.code, error.message);
+    }
+}
+```
+
+For on-device TTS, use the [browser speech quick start](ai/browser-speech.md).
 
 ## AIPreferenceRuntime.js
 
@@ -542,7 +593,7 @@ The singleton exposes read-only `protocol`, `configured`, and `speechMuted`;
 `configure(value)`; `configureSpeech(value)`;
 `replaceSpeechProvider(role,value)`; `replaceSpeechProviders(value)`;
 `configureFromTuple(tuple)`;
-`status(role=null)`; `catalog(role)`;
+`status(role=null,options={})`; `catalog(role)`;
 `inspect(role,options={})`; `start(options)`; `load(role,options={})`;
 `unload(role,options={})`; `dispose(role,options={})`;
 `disposeAll(options={})`; `cancel(role)`; `request(role,options={})`;
@@ -572,6 +623,17 @@ while `catalog()` synchronously returns mutable provider/model entries and
 never loads or downloads a model. `load()` forwards provider progress into the
 sticky role record; `unload()` and `dispose()` abort owned work, await exposed
 settlement, and verify provider status before publishing terminal state.
+
+`status('tts', {execution:true})` explicitly reads the selected provider and
+adds its optional `execution` snapshot to a copy of the role record.
+`status(null, {execution:true})` provides the equivalent projection under
+`roles.llm`, `roles.stt`, and `roles.tts`. Providers that do not supply execution
+omit that field. No provider load or sticky-state event is triggered; default
+`status()` keeps its existing identity and behavior. A provider inspection
+error propagates. Kokoro's execution contains `requestedDevice`,
+`selectedDevice` (`null` while unloaded), `maxConcurrentRequests`, and
+`activeRequestCount`; these describe provider execution, not physical GPU
+kernel overlap.
 
 `validateSpeechConfiguration(value)` returns one mutable two-role selection
 record without committing it, where `value` is the closed `{stt,tts}` record.
@@ -1599,7 +1661,7 @@ and `read`, filters source metadata before calling
 **Browser or compatible host with an injected DBOPFS adapter.** The adapter
 keeps the existing `get`, `set`, `getAllKeys`, and `delete` method names; Node
 can use the same class only through an explicitly imported runtime module and a
-compatible storage adapter; SDK `0.3.4` publishes no Node package subpath or
+compatible storage adapter; SDK `0.5.11` publishes no Node package subpath or
 Node storage implementation for it. Bootstrap uses a concurrent
 generation, commits its manifest last, cleans partial data on failure, and
 rejects case-colliding IDs. Search

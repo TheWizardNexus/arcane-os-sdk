@@ -322,9 +322,9 @@ test('Pages routes are semantic, canonical, and project-path safe',async t=>{
     const pageRoutes=new Map([...canonicalPageRoutes,...compatibilityPageRoutes]);
     const actualPages=(await listHtmlFiles()).sort();
     assert.equal(staticPageRoutes.size,12);
-    assert.equal(canonicalPageRoutes.size,127);
+    assert.equal(canonicalPageRoutes.size,128);
     assert.equal(compatibilityPageRoutes.size,1);
-    assert.equal(pageRoutes.size,128);
+    assert.equal(pageRoutes.size,129);
     assert.equal(canonicalPageRoutes.get('examples/index.html'),'examples/');
     assert.equal(canonicalPageRoutes.has('examples/hello-world/index.html'),false);
     assert.equal(compatibilityPageRoutes.get('examples/hello-world/index.html'),'examples/');
@@ -384,27 +384,28 @@ test('Pages-owned primary navigation has one responsive global information archi
 
 test('the complete API reference is a first-party generated Pages corpus',async t=>{
     const manifest=await loadReferenceManifest();
+    const packageDocument=await readJson(path.join(repositoryRoot,'package.json'));
     assert.equal(manifest.schema,'arcane-reference-site/1');
     assert.deepEqual(manifest.versions,{
-        sdk:'0.3.1',
+        sdk:packageDocument.version,
         runtime:'0.8.12',
         protocol:'arcane/1'
     });
     assert.deepEqual(manifest.counts,{
-        markdownPages:27,
+        markdownPages:28,
         collectionPages:2,
-        generatedPages:88,
-        runtimeModulePages:86,
-        htmlPages:117,
+        generatedPages:86,
+        runtimeModulePages:84,
+        htmlPages:116,
         inventories:4
     });
-    assert.equal(manifest.pages.filter(page=>page.kind==='markdown').length,27);
+    assert.equal(manifest.pages.filter(page=>page.kind==='markdown').length,28);
     assert.equal(manifest.pages.filter(page=>page.kind==='collection').length,2);
-    assert.equal(manifest.pages.filter(page=>page.kind==='runtime-module').length,86);
+    assert.equal(manifest.pages.filter(page=>page.kind==='runtime-module').length,84);
     assert.equal(manifest.pages.filter(page=>page.kind==='generated').length,2);
-    assert.equal(new Set(manifest.pages.map(page=>page.source)).size,117);
-    assert.equal(new Set(manifest.pages.map(page=>page.output)).size,117);
-    assert.equal(new Set(manifest.pages.map(page=>page.route)).size,117);
+    assert.equal(new Set(manifest.pages.map(page=>page.source)).size,116);
+    assert.equal(new Set(manifest.pages.map(page=>page.output)).size,116);
+    assert.equal(new Set(manifest.pages.map(page=>page.route)).size,116);
     const browserWasmPages=manifest.pages.filter(page=>
         page.source==='docs/reference/ai/browser-wasm.md'
     );
@@ -728,8 +729,8 @@ test('the complete API reference is a first-party generated Pages corpus',async 
             sdk,
             /There is no exported\s+<code>importMapApplication\(\)<\/code> or <code>generateImportMap\(\)<\/code> binding/u
         );
-        assert.equal(packageApi.sdkVersion,'0.3.1');
-        assert.equal(packageApi.memberCount,200);
+        assert.equal(packageApi.sdkVersion,packageDocument.version);
+        assert.equal(packageApi.memberCount,204);
         assert.deepEqual(
             packageApi.members
                 .filter(member=>member.primaryImport==='arcane-os/ai/browser-speech')
@@ -1360,7 +1361,7 @@ test('maintained Hello World example is a flat current-source greeting',async t=
     });
 });
 
-test('authored reference follows the public 0.3.4 functional boundary',async()=>{
+test('authored reference follows the selected package functional boundary',async()=>{
     const [overview,protocols,sdkApi,runtimeComponents,packageApi]=await Promise.all([
         readFile(path.join(repositoryRoot,'docs','reference','README.md'),'utf8'),
         readFile(path.join(repositoryRoot,'docs','reference','protocols.md'),'utf8'),
@@ -1368,7 +1369,8 @@ test('authored reference follows the public 0.3.4 functional boundary',async()=>
         readFile(path.join(repositoryRoot,'docs','reference','runtime-components.md'),'utf8'),
         readJson(path.join(repositoryRoot,'docs','reference','inventory','package-api.json'))
     ]);
-    assert.match(overview,/arcane-os@0[.]3[.]4/u);
+    const packageDocument=await readJson(path.join(repositoryRoot,'package.json'));
+    assert.ok(overview.includes(`arcane-os@${packageDocument.version}`));
     assert.match(overview,/arcane-os\/preference-store/u);
     assert.match(overview,/arcane-os\/speech-playback/u);
     assert.doesNotMatch(
@@ -1379,7 +1381,7 @@ test('authored reference follows the public 0.3.4 functional boundary',async()=>
     assert.match(protocols,/including `arcane\/sdk` and `arcane\/dependencies`/u);
     assert.match(runtimeComponents,/one capture generation and one operation id/u);
     assert.match(runtimeComponents,/stale request[\s\S]*newer press, status, operation id, or retry/u);
-    assert.equal(packageApi.sdkVersion,'0.3.4');
+    assert.equal(packageApi.sdkVersion,packageDocument.version);
     const entrypoints=new Set(packageApi.members.map(member=>member.primaryImport));
     assert.equal(entrypoints.has('arcane-os/preference-store'),true);
     assert.equal(entrypoints.has('arcane-os/speech-playback'),true);
@@ -1393,22 +1395,20 @@ test('Pages workflow deploys one authenticated main static artifact',async t=>{
         readSiteFile('robots.txt'),
         readSiteFile('sitemap.xml')
     ]);
-    await t.test('uses least privilege and one successful canonical main check',()=>{
+    await t.test('runs only for the explicitly selected canonical main source',()=>{
         assert.match(workflow,/permissions:\s*\{\}/u);
-        assert.match(workflow,/actions:\s*read/u);
         assert.match(workflow,/contents:\s*read/u);
         assert.match(workflow,/pages:\s*write/u);
         assert.match(workflow,/id-token:\s*write/u);
         assert.match(workflow,/github[.]repository == 'TheWizardNexus\/arcane-os-sdk'/u);
-        assert.match(workflow,/workflow_run[.]event == 'push'/u);
-        assert.match(workflow,/workflow_run[.]conclusion == 'success'/u);
-        assert.match(workflow,/head_branch == 'main'/u);
+        assert.match(workflow,/workflow_dispatch:/u);
+        assert.match(workflow,/github[.]ref == 'refs\/heads\/main'/u);
+        assert.doesNotMatch(workflow,/workflow_run:|\n\s+push:|npm (?:test|run)|build-reference-site/u);
     });
-    await t.test('checks out, authenticates, and deploys the resolved revision',()=>{
-        assert.match(workflow,/actions\/workflows\/check[.]yml\/runs/u);
-        assert.match(workflow,/-f branch=main/u);
-        assert.match(workflow,/actions\/checkout@v7[\s\S]*ref: \$\{\{ steps[.]check[.]outputs[.]checked_sha \}\}/u);
-        assert.match(workflow,/git rev-parse HEAD/u);
+    await t.test('checks out and deploys the selected static artifact',()=>{
+        assert.match(workflow,/actions\/checkout@v7/u);
+        assert.match(workflow,/persist-credentials: false/u);
+        assert.doesNotMatch(workflow,/actions\/workflows\/check[.]yml\/runs|checked_sha/u);
         assert.match(workflow,/actions\/configure-pages@v6/u);
         assert.match(workflow,/test -f site\/reference\/reference-manifest[.]json/u);
         assert.match(workflow,/test -f site\/reference\/sdk-api\/index[.]html/u);
@@ -1424,8 +1424,8 @@ test('Pages workflow deploys one authenticated main static artifact',async t=>{
         assert.equal(packageDocument.files.some(entry=>entry.startsWith('site')),false);
         assert.match(robots,/Sitemap: https:\/\/thewizardnexus[.]github[.]io\/arcane-os-sdk\/sitemap[.]xml/u);
         const locations=[...sitemap.matchAll(/<loc>([^<]+)<\/loc>/gu)].map(match=>match[1]).sort();
-        assert.equal(locations.length,127);
-        assert.equal(new Set(locations).size,127);
+        assert.equal(locations.length,128);
+        assert.equal(new Set(locations).size,128);
         assert.equal(locations.filter(url=>url===`${canonicalRoot}examples/`).length,1);
         assert.equal(locations.includes(`${canonicalRoot}examples/hello-world/`),false);
         assert.equal(
@@ -1437,7 +1437,7 @@ test('Pages workflow deploys one authenticated main static artifact',async t=>{
             1
         );
         const pageRoutes=await loadPageRoutes();
-        assert.equal(pageRoutes.size,127);
+        assert.equal(pageRoutes.size,128);
         const expected=[...pageRoutes.values()].map(route=>`${canonicalRoot}${route}`).sort();
         assert.deepEqual(locations,expected);
     });

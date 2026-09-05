@@ -1542,17 +1542,19 @@ test(
             id,
             localOnly,
             response,
-            {maxConcurrentRequests}={}
+            {maxConcurrentRequests,execution}={}
         ) {
             const counters = {
                 load: 0,
                 request: 0,
+                status: 0,
                 unload: 0,
                 dispose: 0
             };
             let state = 'unloaded';
             let loaded = false;
             let requestError = null;
+            let statusError = null;
             let heldLoad = null;
             const heldRequests = [];
             let activeRequestCount = 0;
@@ -1569,6 +1571,9 @@ test(
                 requests,
                 failNextRequest: function failNextTestProviderRequest(error) {
                     requestError = error;
+                },
+                failNextStatus: function failNextTestProviderStatus(error) {
+                    statusError = error;
                 },
                 holdNextLoad: function holdNextTestProviderLoad() {
                     let markStarted;
@@ -1612,10 +1617,23 @@ test(
                     };
                 },
                 status: function statusTestProvider() {
+                    counters.status += 1;
+                    if (statusError) {
+                        const error = statusError;
+                        statusError = null;
+                        throw error;
+                    }
                     return {
                         state,
                         loaded,
-                        busy: activeRequestCount>0
+                        busy: activeRequestCount>0,
+                        ...(execution ? {
+                            execution: {
+                                ...execution,
+                                selectedDevice: loaded ? execution.selectedDevice : null,
+                                activeRequestCount
+                            }
+                        } : {})
                     };
                 },
                 load: async function loadTestProvider({progress, signal}) {
@@ -1746,7 +1764,14 @@ test(
             'local-tts',
             true,
             new Uint8Array([1]),
-            {maxConcurrentRequests:2}
+            {
+                maxConcurrentRequests:2,
+                execution:{
+                    requestedDevice:'auto',
+                    selectedDevice:'wasm',
+                    maxConcurrentRequests:2
+                }
+            }
         );
         runtime.register(localLLM);
         runtime.register(cloudLLM);
@@ -1836,6 +1861,31 @@ test(
         assert.equal(runtime.status('stt').providerId, 'local-stt');
         assert.equal(runtime.status('tts').providerId, 'local-tts');
 
+        const stickyTTSStatus = runtime.status('tts');
+        const providerStatusReads = localTTS.counters.status;
+        assert.equal(runtime.status('tts'), stickyTTSStatus);
+        assert.equal(runtime.status('tts', {execution:false}), stickyTTSStatus);
+        assert.equal(localTTS.counters.status, providerStatusReads);
+        const unloadedExecution = runtime.status('tts', {execution:true}).execution;
+        assert.deepEqual(unloadedExecution, {
+            requestedDevice:'auto',
+            selectedDevice:null,
+            maxConcurrentRequests:2,
+            activeRequestCount:0
+        });
+        assert.equal(localTTS.counters.status, providerStatusReads + 1);
+        unloadedExecution.selectedDevice = 'caller annotation';
+        assert.equal(runtime.status('tts', {execution:true}).execution.selectedDevice, null);
+        assert.equal(Object.hasOwn(stickyTTSStatus, 'execution'), false);
+        assert.equal(Object.hasOwn(runtime.status('stt', {execution:true}), 'execution'), false);
+        assert.equal(runtime.status(null, {execution:true}).roles.tts.execution.requestedDevice, 'auto');
+        const inspectionError = new Error('Complete provider status inspection failure.');
+        inspectionError.code = 'ARCANE_AI_PROVIDER_REQUEST_FAILED';
+        localTTS.failNextStatus(inspectionError);
+        assert.equal(runtime.status('tts'), stickyTTSStatus);
+        assert.throws(function inspectFailedProviderExecution() {
+            runtime.status('tts', {execution:true});
+        }, inspectionError);
         const invalidStartupOptions = {};
         Object.defineProperty(
             invalidStartupOptions,
@@ -1967,6 +2017,10 @@ test(
         assert.equal(localTTS.counters.load, 1);
         assert.equal(runtime.status('tts').state, 'ready');
 
+        const readyExecution = runtime.status('tts', {execution:true}).execution;
+        assert.equal(readyExecution.requestedDevice, 'auto');
+        assert.equal(readyExecution.selectedDevice, 'wasm');
+
         const requestCountBeforeParallelTTS=localTTS.counters.request;
         const parallelTTSGates=[
             localTTS.holdNextRequest(),
@@ -1994,6 +2048,7 @@ test(
             requestCountBeforeParallelTTS+2,
             'TTS must start exactly the provider-declared capacity.'
         );
+        assert.equal(runtime.status('tts', {execution:true}).execution.activeRequestCount, 2);
         assert.deepEqual(
             localTTS.requests.slice(-2),
             parallelTTSPayloads.slice(0,2),
@@ -2016,6 +2071,7 @@ test(
         parallelTTSGates[2].release();
         parallelTTSGates[3].release();
         await Promise.all(parallelTTSRequests);
+        assert.equal(runtime.status('tts', {execution:true}).execution.activeRequestCount, 0);
 
         const targetedTTSGates=[
             localTTS.holdNextRequest(),
@@ -3152,7 +3208,13 @@ test(
             assert.equal(initialDescriptor.tts.providerId,'browser-tts-a');
             assert.deepEqual(initialDescriptor.tts.execution,{
                 device:'auto',
-                maxConcurrentRequests:2
+                maxConcurrentRequests:4
+            });
+            assert.deepEqual(ai.providerRuntime.status('tts',{execution:true}).execution,{
+                requestedDevice:'auto',
+                selectedDevice:null,
+                maxConcurrentRequests:4,
+                activeRequestCount:0
             });
             assert.equal(runtime.selection('stt').providerId,'browser-stt-a');
             assert.equal(runtime.selection('tts').providerId,'browser-tts-a');
@@ -3213,6 +3275,12 @@ test(
                 device:'wasm',
                 maxConcurrentRequests:3
             });
+            assert.deepEqual(ai.providerRuntime.status(null,{execution:true}).roles.tts.execution,{
+                requestedDevice:'wasm',
+                selectedDevice:null,
+                maxConcurrentRequests:3,
+                activeRequestCount:0
+            });
             assert.deepEqual(
                 runtime.providerIdentity('stt','browser-stt-b'),
                 retainedSTTIdentity
@@ -3231,6 +3299,7 @@ test(
             assert.equal(runtime.selection('tts'),null);
             assert.equal(runtime.providerIdentity('stt','browser-stt-b'),null);
             assert.equal(runtime.providerIdentity('tts','browser-tts-b'),null);
+            assert.equal(Object.hasOwn(runtime.status('tts',{execution:true}),'execution'),false);
             assert.deepEqual(dbopfsReads,[]);
             ai.configureProviders({
                 llm:{default:null,localOnly:null},

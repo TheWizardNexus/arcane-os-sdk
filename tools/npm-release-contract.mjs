@@ -11,11 +11,15 @@ const ROOT_PACKAGE_FILES=new Set([
 ]);
 const PACKAGE_PREFIXES=[
     'bin/','browser-runtime/','node_modules/event-pubsub/','node_modules/strong-type/',
-    'runtime/','schemas/','src/'
+    'runtime/','schemas/','src/','docs/','examples/wasm-ai-demo/'
 ];
 const REQUIRED_PACKAGE_FILES=[
     'CHANGELOG.md','COMMERCIAL-LICENSE.md','LICENSE','NOTICE','README.md',
-    'bin/arcane-test.mjs','bin/arcane.mjs','package.json','src/index.mjs','src/testing.mjs'
+    'bin/arcane-test.mjs','bin/arcane.mjs','package.json','src/index.mjs','src/testing.mjs',
+    'docs/reference/README.md','docs/reference/ai/browser-speech.md',
+    'docs/reference/ai/twin-cloud.md','examples/wasm-ai-demo/README.md',
+    'examples/wasm-ai-demo/index.html','examples/wasm-ai-demo/app.js',
+    'examples/wasm-ai-demo/server.mjs'
 ];
 
 function fail(message){

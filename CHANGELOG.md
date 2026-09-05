@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.5.11
+
+- Default browser Kokoro TTS to four concurrent synthesis slots in both the
+  high-level AI configuration and direct provider. Explicit capacities 1–4
+  remain supported; LLM and Whisper/STT capacity remains one. Overflow waits
+  in the provider-neutral FIFO queue, and playback retains exact input order
+  with contiguous AudioContext scheduling. Each slot owns a Worker/model
+  session, trading memory for latency without promising physical GPU overlap.
+- Add opt-in live execution details through
+  `ai.providerRuntime.status('tts', {execution: true}).execution`, including
+  requested and selected device, capacity, and active requests. Existing
+  no-option status snapshots keep their behavior; automatic WASM fallback is
+  observable without private provider access.
+- Front-load basic browser speech and TWiN examples, document exact saved
+  preference migration, refresh current reference inventories and generated
+  site content, and include maintained `docs/` and the browser AI demo source
+  in the installed package. Documentation deployment now uses an explicit
+  selected-main Pages workflow.
+
 ## 0.5.10
 
 - Show one Windows performance-GPU flag advisory for the current Chromium
