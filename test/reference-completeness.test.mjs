@@ -539,7 +539,7 @@ test('the public package API inventory matches every JavaScript export and MDN e
             'AIRuntimeState'
         ])assert.match(browserSpeechGuide,new RegExp(escapeRegExp(value),'u'),value);
         assert.match(browserSpeechGuide,/does not choose a runtime, model, voice, catalog, prompt, or product[\s\S]*Nothing is downloaded or activated[\s\S]*explicitly calls `load\(\)`/u);
-        assert.match(browserSpeechGuide,/Applications own model, runtime, dtype, sample-rate, voice, profile, prompt,[\s\S]*activation, and presentation policy/u);
+        assert.match(browserSpeechGuide,/Applications own model, runtime, dtype, sample-rate, voice, profile, prompt,[\s\S]*catalog, activation, optional TTS execution override, and presentation\s+policy/u);
         assert.match(browserSpeechGuide,/A failure or cancellation in[\s\S]*does not disable the other role or authorize a fallback provider/u);
         assert.doesNotMatch(browserSpeechGuide,/automatically (?:downloads|selects) (?:a )?(?:model|voice|provider)/iu);
     });
@@ -869,8 +869,8 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
             'AIProviderRuntime.js',
             ['Overview','Public surface','Availability and normalization','Example']
         );
-        assert.match(providerRuntime,/start\(options\)[\s\S]*\{startMuted=true,startTranscription=false,signal=null\}[\s\S]*\{barrier,settled,cancel\}/u);
-        assert.match(providerRuntime,/uncapped FIFO lane per role[\s\S]*does not abort or discard the active request[\s\S]*each request starts after earlier work settles/u);
+        assert.match(providerRuntime,/start\(options\)[\s\S]*\{startLanguageModel=true,startMuted=true,startTranscription=false,signal=null\}[\s\S]*\{barrier,settled,cancel\}/u);
+        assert.match(providerRuntime,/FIFO lane per role[\s\S]*omit[\s\S]*maxConcurrentRequests[\s\S]*capacity 1[\s\S]*TTS provider may declare a[\s\S]*capacity[\s\S]*oldest requests[\s\S]*later work in FIFO order[\s\S]*LLM and STT remain capacity 1/u);
         assert.match(providerRuntime,/AI_LOCAL_MODEL_REQUIRED/u);
 
         const configuredSession=requireGuideSection(

@@ -295,7 +295,7 @@ Application code should select a normalized role, not an internal protocol.
 The exported
 [`getAIProviderRuntime()` singleton](runtime-modules.md#aiproviderruntimejs)
 comes from the selected runtime and owns independent `llm`, `stt`, and
-`tts` selections. SDK `0.5.4` ships browser-WASM LLM and browser
+`tts` selections. This SDK release ships browser-WASM LLM and browser
 speech provider/2 adapters and also adapts selected TWiN Cloud LLM,
 Core-backed Ollama LLM, on-device Whisper STT, and on-device Kokoro TTS routes
 into provider/2. There is no cloud speech route;
@@ -400,18 +400,24 @@ If the platform cannot clone an exotic `cause`, the Worker keeps the complete
 raw failure in its console diagnostics and retries settlement with the
 cause-free four-field envelope. Nested Workers are terminated during role teardown.
 
-Kokoro is configured through `namespace.env.wasmPaths`; Transformers is
-configured through `namespace.env.backends.onnx.wasm.wasmPaths`. Ordinary mode
-may use a caller-selected version-pinned upstream directory and preserves
-the runtime's browser cache. Optional `numThreads` is caller-owned and
+Kokoro receives the exact selected `webgpu` or `wasm` device through
+`KokoroTTS.from_pretrained()` and retains the caller-selected dtype. Its WASM
+path is configured through `namespace.env.wasmPaths`; Transformers is configured
+through `namespace.env.backends.onnx.wasm.wasmPaths`. Ordinary mode may use a
+caller-selected version-pinned upstream directory and preserves the runtime's
+browser cache. Optional `numThreads` is caller-owned and
 Transformers-STT-only; a Kokoro declaration rejects with
 `ARCANE_AI_KOKORO_ENV_NUM_THREADS_FIELD_NOT_EXPOSED` /
 `kokoro-env-num-threads-field-not-exposed`. Missing or rejected namespace
 shapes report distinct `*-unavailable` and
 `*-assignment-rejected` reasons for each setting; the Worker never
 substitutes a different namespace. The caller also owns dtype, STT input sample
-rate, TTS output sample rate, default voice, and the complete voice inventory;
-the SDK selects no hardware default, runtime, model, or fallback.
+rate, TTS output sample rate, default voice, and the complete voice inventory.
+Kokoro execution defaults to `{device:'auto',maxConcurrentRequests:2}` and may
+be overridden with `webgpu` or `wasm` and an integer capacity from 1 through 4.
+Automatic selection attempts a complete WebGPU pool only when WebGPU is exposed,
+then tears it down and forms a complete WASM pool if WebGPU loading rejects. It
+does not change the selected runtime, model, dtype, or voice.
 
 The SDK is not the distributor of the selected upstream speech packages or
 provider assets and does not republish their legal/source payloads. Package,
@@ -420,10 +426,17 @@ to a shared SDK component ledger or execution/publication gate.
 
 Whisper `stt` and Kokoro `tts` each own catalog, inspect, status, load, request,
 unload, and dispose state. They load, cancel, unload, fail, and recover
-independently from the LLM and from one another. Cancellation after Worker use
-begins terminates that role's Worker slot and returns the provider to unloaded;
-a later use must load it again. If shared STT `Blob` decoding is cancelled
-before Worker use, the request rejects while the loaded provider remains ready.
+independently from the LLM and from one another. Whisper owns one Worker and one
+request. Kokoro owns a bounded pool of distinct Workers and loaded model
+sessions because the selected browser adapter serializes inference inside one
+JavaScript isolate. Pool loading first completes one model session, then loads
+the remaining Worker sessions concurrently against the same prepared artifact
+selection. One Kokoro request cancellation suppresses only that result and
+sends the targeted Worker cancel control; upstream may still finish work
+already inside `generate()`. Kokoro unload terminates the whole pool. Whisper
+cancellation after Worker use begins retains destructive Worker teardown. If
+shared STT `Blob` decoding is cancelled before Worker use, the request rejects
+while the loaded provider remains ready.
 Speech failure neither disables text chat nor retries through another local,
 native, or cloud provider. The provider/Worker layer is event-neutral: it
 exposes promises, `AbortSignal`, and precise lifecycle/status records, but owns
@@ -479,22 +492,26 @@ Cancellation is part of the provider lifecycle, not just a UI decision.
 `AbortSignal`, the normalized role cancel operation, and stream-handle
 `cancel(reason)` propagate to the selected provider. Browser-WASM inference
 requires positive llama cancellation acknowledgement when cancellation is
-required. Browser speech cancellation terminates a Worker only after Worker use
-has begun; cancellation during shared browser decoding leaves the loaded Worker
-ready. Unload always cancels active role work before releasing that role's
-execution state, and superseded late results are rejected rather than committed
-or retried through another provider.
+required. Browser Whisper cancellation terminates its Worker after Worker use
+begins. Browser Kokoro uses request-targeted cancellation so one synthesis does
+not terminate sibling pool slots; delivery suppression is immediate, while
+engine preemption remains upstream-cooperative. Cancellation during shared
+browser decoding leaves the loaded Worker ready. Unload always cancels every
+active role request before releasing that role's execution state, and
+superseded late results are rejected rather than committed or retried through
+another provider.
 
-Interactive requests enter an uncapped FIFO lane independently for each role.
-A new valid request neither aborts nor discards the active request; it starts
-after every earlier request settles. A caller signal cancels only its own queued
-or active request, while explicit role cancellation targets only the active
-request. Request-specific generations prevent canceled or superseded callbacks
-from clearing or restoring newer state. The runtime revalidates
-selected-provider readiness and never reloads, switches, or falls back
-implicitly. Generic provider-promise settlement is not a claim that underlying
-work stopped; only a provider's documented positive acknowledgement or
-destructive worker teardown can prove that stronger fact.
+Interactive requests enter a FIFO lane independently for each role. Provider
+capacity defaults to 1. A TTS provider may declare a positive safe-integer
+`maxConcurrentRequests`; the runtime admits that many oldest requests and queues
+overflow without discarding content. LLM and STT remain capacity 1. A caller
+signal cancels only its own queued or active request, while explicit role
+cancellation targets the oldest active request. Request-specific ownership
+prevents canceled or superseded callbacks from clearing or restoring sibling
+state. The runtime revalidates selected-provider readiness and never reloads,
+switches, or falls back implicitly. Generic provider-promise settlement is not
+a claim that underlying work stopped; only a provider's documented positive
+acknowledgement or destructive worker teardown can prove that stronger fact.
 
 `startAIRuntime({startLanguageModel:false,startTranscription:false})` is the
 explicit startup boundary for browser-WASM LLM and default STT activation. It

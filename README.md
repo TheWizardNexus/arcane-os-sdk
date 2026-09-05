@@ -19,7 +19,7 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This checkout defines the `0.5.8` SDK contract. Applications pin one exact npm
+This checkout defines the `0.5.9` SDK contract. Applications pin one exact npm
 version and lockfile; registry state is deliberately not baked into application
 artifacts.
 
@@ -151,7 +151,10 @@ provider factories. The package contains the plain-JavaScript provider and
 Worker machinery, not speech runtimes, models, voices, or a CDN default. An app
 must supply each runtime/model selection explicitly. Speech roles
 load, cancel, unload, fail, and recover independently, so speech failure never
-silently falls back or prevents text chat.
+silently falls back or prevents text chat. Kokoro defaults to a two-slot Worker
+and model-session pool: it selects WebGPU when the browser can load the complete
+pool and otherwise recreates that pool on WASM. Apps may select `webgpu` or
+`wasm` explicitly and may set the bounded TTS capacity from one through four.
 
 Applications that need faster spoken-response onset can configure the shared
 TTS stream without taking over synthesis or playback:
@@ -165,7 +168,10 @@ ai.configureTTSSegmentation({
 
 The compatibility default remains sentence punctuation with no word cadence.
 The configured stream preserves every character and punctuation mark, chooses
-the earliest complete boundary, and keeps synthesis and playback sequential.
+the earliest complete boundary, begins synthesis as each segment becomes
+available, and plays the completed audio in exact segment order. Ready adjacent
+buffers are scheduled consecutively on the browser audio clock rather than
+waiting for an `ended` callback before the next start.
 Any-punctuation mode recognizes boundaries without requiring whitespace while
 keeping apostrophes, commas, and hyphens that join Unicode letters or numbers
 inside the same segment.
@@ -192,7 +198,7 @@ uses the same controller for automatic memory extraction.
 Create a new repository-shaped Arcane application with the exact stable SDK:
 
 ```bash
-npx arcane-os@0.5.8 new my-app --path ./my-app --target portable --git
+npx arcane-os@0.5.9 new my-app --path ./my-app --target portable --git
 cd my-app
 npm install
 npm run check
@@ -203,7 +209,7 @@ To enroll an existing repository, install the exact SDK and initialize only
 missing Arcane files:
 
 ```bash
-npm install --save-dev --save-exact arcane-os@0.5.8
+npm install --save-dev --save-exact arcane-os@0.5.9
 npm exec -- arcane init my-app --target portable
 ```
 
@@ -219,7 +225,7 @@ npm exec -- arcane-os targets
 No global SDK install or standalone Arcane CLI is required. The application
 repository's exact npm dependency and lockfile own the CLI and toolchain version.
 
-Use `npx arcane-os@0.5.8` for the initial bootstrap because it names this npm
+Use `npx arcane-os@0.5.9` for the initial bootstrap because it names this npm
 package explicitly; bare `npx arcane` outside an installed project could resolve
 a different package. Both installed commands invoke the same headless toolchain.
 Project-local npm scripts use the SDK pinned by that app's `package-lock.json`,
@@ -240,7 +246,7 @@ node ./bin/arcane.mjs new local-app --path ../local-app --target portable --git
 
 # From the generated app repository
 cd ../local-app
-npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.5.8.tgz
+npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.5.9.tgz
 npm run check
 npm ci
 ```
@@ -250,7 +256,7 @@ same location. The lockfile retains the selected package dependency while
 Arcane uses the installed package name and version. Local directory `file:` dependencies are not
 accepted because npm may install them as links; use a packed `.tgz`. A GitHub
 runner also needs that tarball at the locked path. After publication, replace
-the local declaration with the exact `arcane-os@0.5.8` registry package and
+the local declaration with the exact `arcane-os@0.5.9` registry package and
 commit the regenerated lock.
 
 Generated repositories use `npm ci --ignore-scripts` in CI. Run dependency
@@ -388,7 +394,7 @@ package installation, or assertions.
 
 ## Current target support
 
-Version `0.5.8` exposes one browser target and five explicitly paired
+Version `0.5.9` exposes one browser target and five explicitly paired
 native development targets: a non-runnable portable directory, a
 Windows x64 unsigned-local-test EXE bundle, Linux x64 and Linux ARM64
 unsigned-local-test DEBs, and an Android development-signed APK. The

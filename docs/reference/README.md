@@ -132,7 +132,7 @@ Ollama, Wllama, Whisper, Kokoro, native, or cloud transport:
 | Offer explicit selected-model start/cancel UI | [`chat.html`](runtime-components.md#chathtml), [`speech.html`](runtime-components.md#speechhtml), and [`voice-transcription.html`](runtime-components.md#voice-transcriptionhtml) | Browser/native WebView components; user activation emits a cancelable request before any LLM or STT load intent, and recording stays disabled without sticky ready STT. |
 | Use Core-normalized chat | [`globalThis.Arcane.ai`](core/arcane-ai-contracts.md) | Native/Core only when separately admitted. |
 | Run a caller-selected GGUF LLM locally | [`arcane-os/ai/browser-wasm`](ai/browser-wasm.md) | Browser secure context with WebGPU full-offload availability, WebAssembly, and OPFS/DBOPFS. |
-| Run caller-selected Whisper/Kokoro locally | [`arcane-os/ai/browser-speech`](ai/browser-speech.md) | Browser with DBOPFS, Web Locks, Workers, and caller-supplied runtime and model sources. |
+| Run caller-selected Whisper/Kokoro locally | [`arcane-os/ai/browser-speech`](ai/browser-speech.md) | Browser with DBOPFS, Web Locks, Workers, and caller-supplied runtime and model sources; Kokoro supports bounded Worker/session concurrency with automatic WebGPU-first execution and complete WASM-pool fallback. |
 | Add bounded persistent history and memory | [`PersistentAIChatSession.js`](runtime-modules.md#persistentaichatsessionjs) | Browser/native WebView runtime with ChatEntity/DBOPFS and a configured chat function. |
 | Add explicit document search/context | [`DBOPFSDocumentLibrary.js`](runtime-modules.md#dbopfsdocumentlibraryjs) | Existing DBOPFS-style adapter; search occurs only after the app calls it or deliberately wires its context builder into chat. |
 

@@ -40,7 +40,7 @@ own asynchronous work, cancellation, and backpressure.
 
 | Module | Kind | Capability | Availability | Normalization |
 | --- | --- | --- | --- | --- |
-| [`AI.js`](#aijs) | esm | Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structured output, streaming, and queued audio playback. | Browser + native bridge + cloud | High-level chat/speech behavior and active TTS operation failures are normalized; provider diagnostics remain mixed. |
+| [`AI.js`](#aijs) | esm | Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structured output, streaming, bounded synthesis, and ordered audio-clock playback. | Browser + native bridge + cloud | High-level chat/speech behavior and active TTS operation failures are normalized; provider diagnostics remain mixed. |
 | [`AIPreferenceRuntime.js`](#aipreferenceruntimejs) | esm | Applies and reads non-persistent per-user AI preference overrides. | Cross-host | Normalized six-slot preference state. |
 | [`AIPreferenceTuple.js`](#aipreferencetuplejs) | esm | Normalizes and compares the six provider/model preference slots. | Cross-host | Fully normalized frozen tuple. |
 | [`AIProviderRuntime.js`](#aiproviderruntimejs) | esm | Owns provider-neutral selection, lifecycle, routing, startup, requests, streaming, cancellation, and independent LLM/STT/TTS state. | Cross-host runtime; provider-specific availability | Normalized required provider members plus route/status contracts, with explicit local-only selection and no implicit fallback. |
@@ -129,7 +129,9 @@ own asynchronous work, cancellation, and backpressure.
 
 ### Overview
 
-Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structured output, streaming, and queued audio playback.
+Provider-selectable chat, speech-to-text, text-to-speech, tool calling,
+structured output, streaming, bounded synthesis, and ordered audio-clock
+playback.
 
 ### Public surface
 
@@ -205,6 +207,10 @@ user activation intent exposed by the shared speech component.
 `setSpeechMuted(false)` records the public unmuted state only after the selected
 TTS route reaches ready; a failed load leaves the public state muted. In contrast,
 `setSpeechMuted(true)` cancels active TTS work and unloads that role.
+The optional browser-speech `tts.execution` record selects
+`device:'auto'|'webgpu'|'wasm'` and a `maxConcurrentRequests` integer from 1
+through 4. Omission uses GPU-first automatic selection with two bounded Kokoro
+Worker/session slots; STT remains one WASM Worker.
 `fetchTTS({model,voice,input,responseFormat,speed},signal)` accepts the public
 provider-neutral synthesis shape, requires any explicit model to match the
 selected route, and fills an omitted voice only from the selected model
@@ -226,9 +232,15 @@ numbers. A potentially joining mark at the current end of an incremental stream
 waits for the next character or terminal flush before the boundary is decided;
 `wordCadence` completes one after that many whole words. The earliest available
 boundary wins. Segmentation preserves every character, including punctuation
-and whitespace, while the existing queue synthesizes and plays segments in
-order. Mute, stop, provider transition, and cancellation retain authority over
-the complete queue.
+and whitespace. Every completed segment enters synthesis immediately; provider
+capacity supplies FIFO backpressure while allowing bounded TTS work to overlap.
+A later segment may finish synthesis first, but playback schedules only the
+contiguous ready prefix in original order. Decoded buffers with known duration
+are placed consecutively on the `AudioContext` clock, so callback latency does
+not add a seam between ready chunks. A genuine synthesis underrun begins the
+next buffer at the current audio time. Mute, stop, provider transition, and
+cancellation retain authority over the complete queue and already scheduled
+sources.
 Every active-generation, non-abort synthesis, decode, playback-start, or
 playback-resume failure emits `ai-tts-failure` with the complete `Error`, exact
 operation boundary, generation, and stable reason. Muting, explicit
@@ -302,7 +314,11 @@ const speechConfiguration = {
   tts: {
     providerId: 'app-kokoro',
     graph: ttsGraph,
-    offline: false
+    offline: false,
+    execution: {
+      device: 'auto',
+      maxConcurrentRequests: 2
+    }
   }
 };
 
@@ -322,9 +338,10 @@ await ai.disposeBrowserSpeech({signal});
 
 The record is a mutable plain data record with exactly
 `{protocol,id,dbopfs,tableName?,stt?,tts?}` and at least one role. Each supplied
-mutable role is exactly `{providerId,graph,security?,offline}` or
-`{providerId,model,runtime,security?,offline}`. The graph and direct authority
-forms are mutually exclusive; `providerId` and `id` are nonblank exact strings,
+mutable STT role is exactly `{providerId,graph,security?,offline}` or
+`{providerId,model,runtime,security?,offline}`. TTS accepts the corresponding
+shape plus optional `execution:{device,maxConcurrentRequests}`. The graph and
+direct authority forms are mutually exclusive; `providerId` and `id` are nonblank exact strings,
 `graph` is the role-matching graph returned by the SDK browser
 speech artifact API, and `offline` is boolean. The direct form forwards its
 caller-selected model and runtime descriptors to the shared
@@ -347,7 +364,7 @@ or reproduce DBOPFS cache logic.
 The returned descriptor is exactly `{protocol,configurationId,stt,tts}`; an
 external, unmanaged role is `null`. A managed STT descriptor is
 `{role:'stt',providerId,modelId,artifactGraphId?,offline}`; TTS adds
-`defaultVoice`. `artifactGraphId` is present only for the graph form.
+`defaultVoice` and the normalized `execution` record. `artifactGraphId` is present only for the graph form.
 `browserSpeechConfiguration` returns the exact caller-owned record when no
 managed role is carried. After a partial replacement that carries another
 managed role, it returns a mutable merged record with the replacement call's
@@ -589,15 +606,18 @@ and settled promises describe only requested provider-startup work;
 cancellation remains cooperative through the supplied signal and returned
 control.
 
-Interactive requests enter an uncapped FIFO lane per role. A newer request does
-not abort or discard the active request; each request starts after earlier work
-settles. A caller `AbortSignal` cancels only its own queued or active request,
-while `cancel(role)` targets only the active request. Explicit unload and dispose
-reject queued work and cancel active ownership as part of lifecycle cleanup.
-Load and configuration remain unavailable while that role owns active or queued
-request work. Promise settlement proves only that the provider's exposed request
-promise completed; provider-specific cancellation acknowledgement remains the
-selected provider's boundary.
+Interactive requests enter a FIFO lane per role. Providers omit
+`maxConcurrentRequests` to retain capacity 1. A TTS provider may declare a
+positive safe-integer capacity; the runtime starts that many oldest requests
+and retains later work in FIFO order. LLM and STT remain capacity 1. A newer
+request does not abort or discard earlier work. A caller `AbortSignal` cancels
+only its own queued or active request, while `cancel(role)` targets the oldest
+active request. Explicit unload and dispose reject queued work, cancel every
+active request, await settlement, and then clean the provider. Load and
+configuration remain unavailable while that role owns active or queued request
+work. Promise settlement proves only that the provider's exposed request promise
+completed; provider-specific cancellation acknowledgement remains the selected
+provider's boundary.
 
 Direct LLM `request()`, `chat()`, and `stream()` use the same message history,
 tool-declaration, emitted-call, all-choice, and ordered parallel-call contracts

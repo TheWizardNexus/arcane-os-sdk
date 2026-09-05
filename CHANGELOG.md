@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.9
+
+- Restored immediate streamed-speech synthesis admission with bounded,
+  provider-declared TTS concurrency and FIFO overflow while retaining exact
+  chunk text, cancellation, lifecycle ownership, and original playback order.
+- Added a bounded Kokoro Worker/model-session pool with GPU-first WebGPU loading,
+  explicit WebGPU or WASM selection, and an honest automatic WASM fallback that
+  preserves the caller-selected model, dtype, and voice.
+- Scheduled each contiguous ready audio buffer directly after its predecessor
+  on the `AudioContext` clock, removing callback-added stitching gaps without
+  trimming, crossfading, resampling, merging, or rewriting speech content.
+
 ## 0.5.8
 
 - Added provider-neutral `reasoningEffort` to `AI.fetchRequest()` and

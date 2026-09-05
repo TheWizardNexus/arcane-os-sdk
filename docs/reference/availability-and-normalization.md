@@ -31,7 +31,7 @@ version; WebKitGTK availability must not be generalized to macOS.
 | Build browser UI and app-local behavior | `/arcane/modules/*.js`, shared entities, and components | **Browser**; many modules also run inside every native renderer | Pure modules own their result contracts. Modules that call `Arcane` inherit the bridge boundary described below. |
 | Select and observe independent LLM/STT/TTS roles | `/arcane/modules/AIProviderRuntime.js` and `AIRuntimeState.js` | **Cross-host** controller/state; registered providers retain their own host requirements | Required/projected provider members, route/configuration records, and status fields; per-role lifecycle, cancellation, stream cleanup, sticky state, and startup barriers are normalized. `localOnly` creates no fallback. |
 | Run a caller-selected local LLM entirely in a browser renderer | `arcane-os/ai/browser-wasm` through `createArcaneAI()` | **Browser** only; secure context, WebAssembly, OPFS/DBOPFS, WebGPU, and requested full offload are required; no CPU fallback | The public AI API module normalizes multi-model lifecycle, status, complete all-choice streaming, cancellation, exact ordered structural tool-call visibility, and session persistence. Model sources are canonical ordered file descriptors; licenses and model choice remain application policy. |
-| Run caller-selected Whisper or Kokoro in a browser renderer | `arcane-os/ai/browser-speech` registered with `AIProviderRuntime` | **Browser** only; DBOPFS, Web Locks, Workers, Fetch/object URLs, and a caller-supplied self-contained runtime/model closure are required | STT/TTS use independent provider/2 lifecycle and status. Complete model/runtime selection, offline behavior, cancellation, Worker teardown, and request/result shapes are normalized. No runtime/model content or cloud fallback is supplied. |
+| Run caller-selected Whisper or Kokoro in a browser renderer | `arcane-os/ai/browser-speech` registered with `AIProviderRuntime` | **Browser** only; DBOPFS, Web Locks, Workers, Fetch/object URLs, and a caller-supplied self-contained runtime/model closure are required | STT/TTS use independent provider/2 lifecycle and status. Kokoro adds bounded Worker/session concurrency and explicit `auto`, `webgpu`, or `wasm` execution. Complete model/runtime selection, offline behavior, cancellation, Worker teardown, and request/result shapes are normalized. No runtime/model content or cloud fallback is supplied. |
 | Preserve complete chat history and memory | `/arcane/modules/PersistentAIChatSession.js` | **Browser / native WebView** with ChatEntity/DBOPFS and a configured chat function | Existing DBOPFS names and memory semantics are preserved. Live-context commit is atomic; durable persistence is explicit and coherent across user/assistant turns and atomic all-ID tool-result batches. |
 | Search an app-owned document corpus for explicit chat context | `/arcane/modules/DBOPFSDocumentLibrary.js` | **Browser** or compatible injected DBOPFS adapter | Generation/manifest completion, complete lexical search, partial read failures, and untrusted context labels are normalized. Construction does not search; an explicitly wired context builder performs retrieval for each prepared chat send. |
 | Read host identity, capabilities, storage, preferences, appearance, or platform state | `globalThis.Arcane` | **Cross-host** where the method is implemented and admitted | Promise behavior and `Arcane.Error` are normalized. Result fields are normalized unless the method explicitly documents a platform-dependent snapshot. |
@@ -141,6 +141,13 @@ provider has its own load, use, cancellation, unload, dispose, cache, Worker,
 status, and error state. The SDK supplies neither speech adapter runtime nor
 model/voice content; every selected file is application-owned and stored
 through the SDK-created DBOPFS adapter.
+
+Kokoro defaults to `{device:'auto',maxConcurrentRequests:2}`. Automatic
+selection attempts the complete Worker/session pool on WebGPU when exposed and
+recreates the complete pool on WASM if WebGPU loading rejects. Explicit
+`webgpu` or `wasm` disables that fallback. Each accepted synthesis owns one
+pool slot, and provider-neutral FIFO backpressure preserves later requests.
+Whisper remains one WASM Worker.
 
 Materialized speech graphs use their file inventory as a routing table, not an
 admission policy. Known downloaded imports, fetches, Workers, and cache reads

@@ -1336,6 +1336,16 @@ function validateProvider(provider) {
     if (typeof provider.localOnly !== 'boolean') {
         fail('AI provider.localOnly must be a boolean.');
     }
+    const maxConcurrentRequests = provider.maxConcurrentRequests === undefined
+        ? 1
+        : provider.maxConcurrentRequests;
+    if (!Number.isSafeInteger(maxConcurrentRequests)
+        || maxConcurrentRequests < 1) {
+        fail('AI provider.maxConcurrentRequests must be a positive safe integer.');
+    }
+    if (provider.role !== 'tts' && maxConcurrentRequests !== 1) {
+        fail('Only TTS providers may process more than one concurrent request.');
+    }
     for (const method of PROVIDER_METHODS) {
         if (typeof provider[method] !== 'function') {
             fail(`AI provider.${method} must be a function.`);
@@ -1345,7 +1355,8 @@ function validateProvider(provider) {
         protocol: AI_PROVIDER_PROTOCOL,
         role: provider.role,
         id: provider.id,
-        localOnly: provider.localOnly
+        localOnly: provider.localOnly,
+        maxConcurrentRequests
     };
     for (const method of PROVIDER_METHODS) {
         record[method] = provider[method].bind(provider);
@@ -1650,7 +1661,7 @@ function createRoleSlot(role) {
         unloadPromise: null,
         disposePromise: null,
         requestQueue: [],
-        request: null,
+        activeRequests: new Map(),
         disposed: false,
         ready: false
     };
@@ -2591,7 +2602,7 @@ export class AIProviderRuntime {
                 )
             );
         }
-        if (slot.request || slot.requestQueue.length) {
+        if (slot.activeRequests.size || slot.requestQueue.length) {
             return Promise.reject(
                 operationError(
                     `AI role ${role} cannot load during active request ownership.`,
@@ -2831,10 +2842,11 @@ export class AIProviderRuntime {
             return Promise.resolve(before);
         }
         const providerOwned = slot.ready
+            || slot.activeRequests.size > 0
             || providerStatus?.loaded === true
             || providerStatus?.busy === true;
         if (!slot.loadPromise
-            && !slot.request
+            && slot.activeRequests.size === 0
             && slot.requestQueue.length === 0
             && !providerOwned
             && (!provider || providerStatus)) {
@@ -2858,10 +2870,16 @@ export class AIProviderRuntime {
             'ARCANE_AI_REQUEST_ABORTED'
         );
         this.#rejectQueuedRoleRequests(slot, requestCancellation);
-        slot.request?.controller.abort(requestCancellation);
+        const capturedRequestRecords = [...slot.activeRequests.values()];
+        for (const requestRecord of capturedRequestRecords) {
+            requestRecord.controller.abort(requestCancellation);
+        }
         const capturedLoad = slot.loadPromise;
-        const capturedRequestRecord = slot.request;
-        const capturedRequest = capturedRequestRecord?.promise ?? null;
+        const capturedRequests = capturedRequestRecords.map(
+            function selectAIProviderRequestPromise(requestRecord) {
+                return requestRecord.promise;
+            }
+        ).filter(Boolean);
         const unloadOperationId = providerOwned
             ? this.#nextOperationId(slot, 'unload')
             : null;
@@ -2871,15 +2889,22 @@ export class AIProviderRuntime {
                 if (signal?.aborted) {
                     throw normalizedAbort();
                 }
-                if (capturedRequestRecord?.cancel) {
-                    try {
-                        await capturedRequestRecord.cancel(requestCancellation);
-                    } catch {
-                        // Provider unload below remains the authoritative cleanup.
-                    }
-                }
                 await Promise.allSettled(
-                    [capturedLoad, capturedRequest].filter(Boolean)
+                    capturedRequestRecords.map(
+                        function cancelActiveAIProviderRequest(requestRecord) {
+                            if (!requestRecord.cancel) {
+                                return undefined;
+                            }
+                            return Promise.resolve().then(
+                                function invokeActiveAIProviderRequestCancellation() {
+                                    return requestRecord.cancel(requestCancellation);
+                                }
+                            );
+                        }
+                    )
+                );
+                await Promise.allSettled(
+                    [capturedLoad, ...capturedRequests].filter(Boolean)
                 );
                 if (signal?.aborted) {
                     throw normalizedAbort();
@@ -2926,6 +2951,7 @@ export class AIProviderRuntime {
                     {
                         state: 'unloading',
                         loaded: true,
+                        busy: capturedRequestRecords.length > 0,
                         operationId: unloadOperationId
                     }
                 )
@@ -3105,7 +3131,7 @@ export class AIProviderRuntime {
                 slot.unloadPromise = null;
                 slot.disposePromise = null;
                 slot.requestQueue = [];
-                slot.request = null;
+                slot.activeRequests.clear();
                 slot.ready = false;
                 slot.disposed = true;
             }
@@ -3136,6 +3162,10 @@ export class AIProviderRuntime {
     }
 
     request(role, options = {}) {
+        return this.#requestRole(role, options, false);
+    }
+
+    #requestRole(role, options, queued) {
         this.#assertOpen();
         this.#assertNotConfiguring();
         assertRole(role);
@@ -3234,13 +3264,16 @@ export class AIProviderRuntime {
                 )
             );
         }
-        if (slot.request) {
+        const maxConcurrentRequests = this.#providerRequestCapacity(provider);
+        if ((!queued && slot.requestQueue.length)
+            || slot.activeRequests.size >= maxConcurrentRequests) {
             return this.#enqueueRoleRequest(slot, options);
         }
         if (!slot.ready
             || providerStatus.state !== 'ready'
             || providerStatus.loaded !== true
-            || providerStatus.busy !== false) {
+            || (providerStatus.busy !== false
+                && slot.activeRequests.size === 0)) {
             slot.ready = false;
             return Promise.reject(
                 operationError(
@@ -3258,29 +3291,22 @@ export class AIProviderRuntime {
         const runtime = this;
         const requestRecord = {
             controller,
+            operationId,
             requestSequence,
             promise: null,
             cancel: null
         };
-        slot.request = requestRecord;
-        publishAIRuntimeRoleState(
-            role,
-            roleRecord(
-                role,
-                slot.selection,
-                {
-                    state: 'ready',
-                    loaded: true,
-                    busy: true,
-                    operationId
-                }
-            )
-        );
+        slot.activeRequests.set(requestSequence, requestRecord);
+        this.#publishRoleRequestState(slot);
 
         function restoreAIProviderRoleAfterRequest(error) {
             if (slot.generation !== generation
-                || slot.requestSequence !== requestSequence
                 || slot.unloadPromise) {
+                return;
+            }
+            if (slot.activeRequests.size || slot.requestQueue.length) {
+                slot.ready = true;
+                runtime.#publishRoleRequestState(slot);
                 return;
             }
             let providerState = null;
@@ -3398,8 +3424,8 @@ export class AIProviderRuntime {
                     cancelAbortedAIProviderStream
                 );
                 detachSignal();
-                if (slot.request === requestRecord) {
-                    slot.request = null;
+                if (slot.activeRequests.get(requestSequence) === requestRecord) {
+                    slot.activeRequests.delete(requestSequence);
                 }
                 runtime.#drainRoleRequestQueue(slot);
                 if (error) {
@@ -3592,6 +3618,7 @@ export class AIProviderRuntime {
                         slot,
                         generation,
                         requestSequence,
+                        requestRecord,
                         controller.signal
                     );
                     privateStreamObservation = (
@@ -3603,6 +3630,7 @@ export class AIProviderRuntime {
                                         slot,
                                         generation,
                                         requestSequence,
+                                        requestRecord,
                                         controller.signal
                                     );
                                     if (result.done) {
@@ -3643,6 +3671,7 @@ export class AIProviderRuntime {
                                     slot,
                                     generation,
                                     requestSequence,
+                                    requestRecord,
                                     controller.signal
                                 );
                                 const terminalValue = role === 'llm'
@@ -3773,6 +3802,7 @@ export class AIProviderRuntime {
                     slot,
                     generation,
                     requestSequence,
+                    requestRecord,
                     controller.signal
                 );
                 return role === 'llm'
@@ -3786,18 +3816,15 @@ export class AIProviderRuntime {
                     ? normalizedAbort(error)
                     : error;
                 requestError = normalized;
-                restoreAIProviderRoleAfterRequest(normalized);
                 throw normalized;
             } finally {
                 detachSignal();
-                if (slot.request === requestRecord) {
-                    slot.request = null;
+                if (slot.activeRequests.get(requestSequence) === requestRecord) {
+                    slot.activeRequests.delete(requestSequence);
                 }
                 runtime.#drainRoleRequestQueue(slot);
-                if (!requestError
-                    && slot.generation === generation
-                    && !slot.unloadPromise) {
-                    restoreAIProviderRoleAfterRequest(null);
+                if (slot.generation === generation && !slot.unloadPromise) {
+                    restoreAIProviderRoleAfterRequest(requestError);
                 }
             }
         })();
@@ -3823,10 +3850,10 @@ export class AIProviderRuntime {
     cancel(role) {
         assertRole(role);
         const slot = this.#slots[role];
-        if (!slot.request) {
+        const requestRecord = slot.activeRequests.values().next().value ?? null;
+        if (!requestRecord) {
             return false;
         }
-        const requestRecord = slot.request;
         const reason = operationError(
             `AI role ${role} request was cancelled.`,
             'ARCANE_AI_REQUEST_ABORTED'
@@ -3958,39 +3985,37 @@ export class AIProviderRuntime {
                 };
             }
             slot.requestQueue.push(entry);
+            runtime.#publishRoleRequestState(slot);
             runtime.#drainRoleRequestQueue(slot);
         });
     }
 
     #drainRoleRequestQueue(slot) {
-        if (slot.request
-            || slot.unloadPromise
+        if (slot.unloadPromise
             || slot.disposePromise
             || slot.disposed) {
             return;
         }
-        const entry = slot.requestQueue.shift();
-        if (!entry) {
-            return;
-        }
-        entry.detachSignal?.();
-        if (entry.options.signal?.aborted) {
-            entry.reject(normalizedAbort(entry.options.signal.reason));
-            this.#drainRoleRequestQueue(slot);
-            return;
-        }
+        const provider = this.#providerFor(slot);
+        const maxConcurrentRequests = this.#providerRequestCapacity(provider);
         const runtime = this;
-        Promise.resolve().then(
-            function runQueuedAIProviderRoleRequest() {
-                return runtime.request(slot.role, entry.options);
+        while (slot.requestQueue.length
+            && slot.activeRequests.size < maxConcurrentRequests) {
+            const entry = slot.requestQueue.shift();
+            entry.detachSignal?.();
+            if (entry.options.signal?.aborted) {
+                entry.reject(normalizedAbort(entry.options.signal.reason));
+                continue;
             }
-        ).then(entry.resolve, entry.reject).finally(
-            function continueAIProviderRoleRequestQueue() {
-                if (!slot.request) {
-                    runtime.#drainRoleRequestQueue(slot);
-                }
+            let operation;
+            try {
+                operation = runtime.#requestRole(slot.role, entry.options, true);
+            } catch (error) {
+                entry.reject(error);
+                continue;
             }
-        );
+            Promise.resolve(operation).then(entry.resolve, entry.reject);
+        }
     }
 
     #rejectQueuedRoleRequests(slot, error) {
@@ -4039,7 +4064,7 @@ export class AIProviderRuntime {
             slot.loadPromise
             || slot.unloadPromise
             || slot.disposePromise
-            || slot.request
+            || slot.activeRequests.size > 0
             || slot.requestQueue.length > 0
             || slot.ready
         );
@@ -4086,14 +4111,47 @@ export class AIProviderRuntime {
         }
     }
 
-    #assertCurrentRequest(slot, generation, requestSequence, signal) {
+    #assertCurrentRequest(
+        slot,
+        generation,
+        requestSequence,
+        requestRecord,
+        signal
+    ) {
         this.#assertCurrentOperation(slot, generation, signal);
-        if (slot.requestSequence !== requestSequence) {
+        if (slot.activeRequests.get(requestSequence) !== requestRecord) {
             throw operationError(
                 `AI role ${slot.role} no longer owns the active provider request.`,
                 'ARCANE_AI_REQUEST_STALE'
             );
         }
+    }
+
+    #providerRequestCapacity(provider) {
+        return provider?.role === 'tts'
+            ? provider.maxConcurrentRequests
+            : 1;
+    }
+
+    #publishRoleRequestState(slot) {
+        const requestRecord = slot.activeRequests.values().next().value ?? null;
+        if (!requestRecord && slot.requestQueue.length === 0) {
+            return false;
+        }
+        publishAIRuntimeRoleState(
+            slot.role,
+            roleRecord(
+                slot.role,
+                slot.selection,
+                {
+                    state: 'ready',
+                    loaded: true,
+                    busy: true,
+                    operationId: requestRecord?.operationId ?? null
+                }
+            )
+        );
+        return true;
     }
 
     #forwardAbort(signal, controller) {
@@ -4133,6 +4191,7 @@ export class AIProviderRuntime {
     }
 
     #publishRoleError(slot, error, loaded) {
+        const requestRecord = slot.activeRequests.values().next().value ?? null;
         publishAIRuntimeRoleState(
             slot.role,
             roleRecord(
@@ -4141,6 +4200,8 @@ export class AIProviderRuntime {
                 {
                     state: 'error',
                     loaded,
+                    busy: Boolean(requestRecord || slot.requestQueue.length),
+                    operationId: requestRecord?.operationId ?? null,
                     error: stateError(
                         error,
                         'ARCANE_AI_PROVIDER_OPERATION_FAILED'

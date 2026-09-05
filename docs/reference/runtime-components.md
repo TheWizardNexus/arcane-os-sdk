@@ -363,6 +363,12 @@ event and forwards its complete Error and exact operation boundary to
 settle after `streamTTS()` has already resolved. Runtime mute, cancellation,
 permission waiting, and stale generations remain non-errors.
 
+Each visible model chunk is still forwarded to `AI.streamTTS()` in arrival
+order. The AI owner preserves exact segmentation, admits completed segments to
+bounded synthesis immediately, and schedules the contiguous ready audio prefix
+on the audio clock. Chat neither creates a second queue nor reorders, combines,
+or rewrites speech text.
+
 Events: `chat-ready`, `chat-session-bound`, `chat-session-message`,
 `chat-session-error`, `chat-send-message`, `chat-send-error`,
 `chat-file-uploaded`, `chat-file-upload-error`, `chat-language-changed`,

@@ -21,6 +21,12 @@ const DEFAULT_TTS_SEGMENTATION={
     punctuation:'sentence',
     wordCadence:null
 };
+const DEFAULT_BROWSER_TTS_EXECUTION={
+    device:'auto',
+    maxConcurrentRequests:2
+};
+const BROWSER_TTS_EXECUTION_DEVICES=new Set(['auto','webgpu','wasm']);
+const MAX_BROWSER_TTS_CONCURRENT_REQUESTS=4;
 const TTS_PUNCTUATION_MODES=new Set(['sentence','any','none']);
 // A complete punctuation run is a boundary unless the whole run consists of
 // apostrophe, comma, or dash punctuation joining Unicode letters or numbers.
@@ -803,11 +809,46 @@ function browserSpeechIdentifier(value,label){
     return value;
 }
 
+function normalizeBrowserTTSExecution(value){
+    if(value===undefined){
+        return completeValue({...DEFAULT_BROWSER_TTS_EXECUTION});
+    }
+    const descriptors=closedRecord(
+        value,
+        ['device','maxConcurrentRequests'],
+        [],
+        'AI browser speech tts.execution'
+    );
+    const device=descriptors.device
+        ?descriptors.device.value
+        :DEFAULT_BROWSER_TTS_EXECUTION.device;
+    const maxConcurrentRequests=descriptors.maxConcurrentRequests
+        ?descriptors.maxConcurrentRequests.value
+        :DEFAULT_BROWSER_TTS_EXECUTION.maxConcurrentRequests;
+    if(typeof device!=='string'||!BROWSER_TTS_EXECUTION_DEVICES.has(device)){
+        throw aiBrowserSpeechError(
+            AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+            AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+            'AI browser speech tts.execution.device must be auto, webgpu, or wasm.'
+        );
+    }
+    if(!Number.isSafeInteger(maxConcurrentRequests)
+        ||maxConcurrentRequests<1
+        ||maxConcurrentRequests>MAX_BROWSER_TTS_CONCURRENT_REQUESTS){
+        throw aiBrowserSpeechError(
+            AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+            AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+            `AI browser speech tts.execution.maxConcurrentRequests must be an integer from 1 through ${MAX_BROWSER_TTS_CONCURRENT_REQUESTS}.`
+        );
+    }
+    return completeValue({device,maxConcurrentRequests});
+}
+
 function normalizeBrowserSpeechRole(value,role){
     const label=`AI browser speech ${role}`;
     const descriptors=closedRecord(
         value,
-        ['providerId','graph','model','runtime','security','offline'],
+        ['providerId','graph','model','runtime','security','offline','execution'],
         ['providerId','offline'],
         label
     );
@@ -868,6 +909,13 @@ function normalizeBrowserSpeechRole(value,role){
             `${label}.offline must be a boolean.`
         );
     }
+    if(role==='stt'&&descriptors.execution){
+        throw aiBrowserSpeechError(
+            AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+            AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
+            'AI browser speech execution policy is available only for TTS.'
+        );
+    }
     return completeValue({
         providerId,
         ...(hasGraph
@@ -880,7 +928,12 @@ function normalizeBrowserSpeechRole(value,role){
                 runtime:descriptors.runtime.value,
                 ...(secure?{security:{secure:true}}:{})
             }),
-        offline:descriptors.offline.value
+        offline:descriptors.offline.value,
+        ...(role==='tts'
+            ?{execution:normalizeBrowserTTSExecution(
+                descriptors.execution?.value
+            )}
+            :{})
     });
 }
 
@@ -1943,7 +1996,9 @@ class AI {
     speechPlaybackStarting=false;
     speechResumeAttempt=0;
     speechResumePending=false;
-    speechSynthesisTail=Promise.resolve();
+    speechScheduleGeneration=0;
+    speechScheduleContext=null;
+    speechScheduleTime=0;
     speechUnlockHandler=null;
 
     #nextPreferenceTuple(values){
@@ -2658,7 +2713,12 @@ class AI {
                     ?{artifactGraphId:catalog.artifactGraphId}
                     :{}),
                 offline:configured.offline,
-                ...(role==='tts'?{defaultVoice:catalog.defaultVoice}:{})
+                ...(role==='tts'
+                    ?{
+                        defaultVoice:catalog.defaultVoice,
+                        execution:configured.execution
+                    }
+                    :{})
             });
         }
         const roles={};
@@ -3027,7 +3087,8 @@ class AI {
                             runtime:configured.runtime
                         }),
                     store,
-                    offline:configured.offline
+                    offline:configured.offline,
+                    ...(role==='tts'?{execution:configured.execution}:{})
                 });
             }
             providers=completeValue({...candidateProviders});
@@ -5800,18 +5861,21 @@ class AI {
     #queueSpeechJob(text,generation){
         const job={
             abortController:null,
+            audioBuffer:null,
+            audioContext:null,
             generation,
+            scheduledEnd:null,
+            scheduledStart:null,
             sourceNode:null,
             state:'queued',
             text
         };
         const runtime=this;
-        const previous=this.speechSynthesisTail;
 
         this.speechJobs.push(job);
 
-        const synthesis=previous.then(
-            function synthesizeQueuedSpeech(){
+        return Promise.resolve().then(
+            function synthesizeAvailableSpeech(){
                 return runtime.#prepareSpeechJob(job);
             }
         ).catch(
@@ -5823,14 +5887,6 @@ class AI {
                 );
             }
         );
-
-        this.speechSynthesisTail=synthesis.then(
-            function releaseSpeechSynthesisSlot(){
-                return undefined;
-            }
-        );
-
-        return synthesis;
     }
 
     async #prepareSpeechJob(job){
@@ -6230,6 +6286,9 @@ class AI {
         this.speechGeneration+=1;
         this.speechResumeAttempt+=1;
         this.speechResumePending=false;
+        this.speechScheduleGeneration=this.speechGeneration;
+        this.speechScheduleContext=null;
+        this.speechScheduleTime=0;
         this.audioMessageChunks='';
         this.#clearSpeechUnlock();
 
@@ -6285,7 +6344,7 @@ class AI {
             }
 
             if(typeof context.resume!=='function'){
-                this.#waitForSpeechGesture();
+                this.#waitForSpeechGesture(null,context);
                 return false;
             }
 
@@ -6312,7 +6371,7 @@ class AI {
             if(attempt===this.speechResumeAttempt){
                 this.speechResumePending=false;
             }
-            this.#waitForSpeechGesture(error);
+            this.#waitForSpeechGesture(error,context);
             if(error?.name!=='NotAllowedError'){
                 this.#publishTTSFailure(error,{
                     boundary:'playback-resume',
@@ -6322,7 +6381,7 @@ class AI {
             return false;
         }
 
-        this.#waitForSpeechGesture();
+        this.#waitForSpeechGesture(null,context);
         return false;
     }
 
@@ -6335,7 +6394,11 @@ class AI {
     ){
         const job=speechJob||{
             abortController:null,
+            audioBuffer:null,
+            audioContext:null,
             generation:this.speechGeneration,
+            scheduledEnd:null,
+            scheduledStart:null,
             sourceNode:null,
             state:'decoding',
             text:''
@@ -6351,7 +6414,9 @@ class AI {
 
         try{
             job.state='decoding';
-            const playbackContext=audioContext||this.#getSpeechAudioContext();
+            const playbackContext=sourceNode?.context
+                ||audioContext
+                ||this.#getSpeechAudioContext();
             const audioBlob=new Blob(audioChunks,{type:audioType});
             const arrayBuffer=await audioBlob.arrayBuffer();
             const audioBuffer=await playbackContext.decodeAudioData(arrayBuffer);
@@ -6369,6 +6434,8 @@ class AI {
             preparedSource.onended=function finishQueuedSpeechSource(){
                 runtime.nextSentance(job);
             };
+            job.audioBuffer=audioBuffer;
+            job.audioContext=preparedSource.context||playbackContext;
             job.sourceNode=preparedSource;
             job.state='ready';
             this.sourceNodes.push(preparedSource);
@@ -6394,7 +6461,7 @@ class AI {
     }
 
     async #pumpSpeechPlayback(){
-        if(this.speechPlaybackStarting||this.isSpeaking||this.muted){
+        if(this.speechPlaybackStarting||this.muted){
             return false;
         }
 
@@ -6402,12 +6469,21 @@ class AI {
         let activeJob=null;
 
         try{
-            while(!this.isSpeaking&&!this.muted){
-                const job=this.speechJobs[0];
+            if(this.speechScheduleGeneration!==this.speechGeneration){
+                this.speechScheduleGeneration=this.speechGeneration;
+                this.speechScheduleContext=null;
+                this.speechScheduleTime=0;
+            }
+
+            let index=0;
+            let scheduled=false;
+
+            while(index<this.speechJobs.length&&!this.muted){
+                const job=this.speechJobs[index];
                 activeJob=job||null;
 
                 if(!job){
-                    return false;
+                    break;
                 }
 
                 if(job.generation!==this.speechGeneration||['cancelled','failed'].includes(job.state)){
@@ -6415,25 +6491,32 @@ class AI {
                     continue;
                 }
 
-                if(job.state!=='ready'||!job.sourceNode?.buffer){
-                    return false;
+                if(!['ready','scheduled'].includes(job.state)||!job.sourceNode?.buffer){
+                    break;
                 }
 
-                const audioContext=this.#getSpeechAudioContext();
+                const audioContext=job.sourceNode.context||job.audioContext;
 
                 if(audioContext.state!=='running'){
-                    this.#waitForSpeechGesture();
+                    this.#waitForSpeechGesture(null,audioContext);
 
                     if(!this.speechResumePending){
                         this.resumeAudio(audioContext,false);
                     }
 
-                    return false;
+                    return scheduled;
+                }
+
+                if(job.state==='scheduled'){
+                    if(job.scheduledEnd===null){
+                        break;
+                    }
+                    index+=1;
+                    continue;
                 }
 
                 if(
                     this.muted
-                    ||job!==this.speechJobs[0]
                     ||job.generation!==this.speechGeneration
                     ||job.state!=='ready'
                 ){
@@ -6441,18 +6524,47 @@ class AI {
                 }
 
                 try{
-                    job.state='playing';
+                    const duration=Number(job.audioBuffer?.duration);
+                    const hasKnownDuration=Number.isFinite(duration)&&duration>0;
+                    const currentTime=Number(audioContext.currentTime)||0;
+                    const previousContext=this.speechScheduleContext;
+                    const remainingDelay=previousContext
+                        ?Math.max(
+                            0,
+                            this.speechScheduleTime
+                                -(Number(previousContext.currentTime)||0)
+                        )
+                        :0;
+                    const scheduledStart=Math.max(
+                        currentTime,
+                        previousContext===audioContext
+                            ?this.speechScheduleTime
+                            :currentTime+remainingDelay
+                    );
+                    job.state='scheduled';
+                    job.scheduledStart=scheduledStart;
+                    job.scheduledEnd=hasKnownDuration
+                        ?scheduledStart+duration
+                        :null;
                     job.sourceNode.__arcaneStarted=true;
-                    this.currentSpeechJob=job;
+                    if(!this.currentSpeechJob){
+                        this.currentSpeechJob=job;
+                    }
                     this.isSpeaking=true;
-                    await job.sourceNode.start(0);
-                    return true;
+                    job.sourceNode.start(scheduledStart);
+                    scheduled=true;
+                    this.speechScheduleContext=audioContext;
+                    if(job.scheduledEnd===null){
+                        this.speechScheduleTime=0;
+                        break;
+                    }
+                    this.speechScheduleTime=job.scheduledEnd;
+                    index+=1;
                 }catch(error){
-                    this.currentSpeechJob=null;
-                    this.isSpeaking=false;
                     this.#failSpeechJob(job,error,'playback-start');
                 }
             }
+            return scheduled;
         }catch(error){
             if(activeJob){
                 this.#failSpeechJob(activeJob,error,'playback-start');
@@ -6464,11 +6576,20 @@ class AI {
             this.speechPlaybackStarting=false;
 
             if(
-                !this.isSpeaking
-                &&!this.muted
+                !this.muted
                 &&!this.speechAwaitingGesture
                 &&!this.speechResumePending
-                &&this.speechJobs[0]?.state==='ready'
+                &&!this.speechJobs.some(
+                    function hasScheduledSpeechWithoutDuration(job){
+                        return job.state==='scheduled'
+                            &&job.scheduledEnd===null;
+                    }
+                )
+                &&this.speechJobs.find(
+                    function findFirstUnscheduledSpeechJob(job){
+                        return job.state!=='scheduled';
+                    }
+                )?.state==='ready'
             ){
                 this.#requestSpeechPlayback();
             }
@@ -6490,9 +6611,17 @@ class AI {
         this.#removeSpeechJob(job);
 
         if(this.currentSpeechJob===job){
-            this.currentSpeechJob=null;
-            this.isSpeaking=false;
+            this.currentSpeechJob=this.speechJobs.find(
+                function findNextScheduledSpeechJob(candidate){
+                    return candidate.state==='scheduled';
+                }
+            )||null;
         }
+        this.isSpeaking=this.speechJobs.some(
+            function hasScheduledSpeechJob(candidate){
+                return candidate.state==='scheduled';
+            }
+        );
 
         this.#requestSpeechPlayback();
         return true;
@@ -6582,9 +6711,17 @@ class AI {
         this.#removeSpeechJob(job);
 
         if(this.currentSpeechJob===job){
-            this.currentSpeechJob=null;
-            this.isSpeaking=false;
+            this.currentSpeechJob=this.speechJobs.find(
+                function findRemainingScheduledSpeechJob(candidate){
+                    return candidate.state==='scheduled';
+                }
+            )||null;
         }
+        this.isSpeaking=this.speechJobs.some(
+            function hasRemainingScheduledSpeechJob(candidate){
+                return candidate.state==='scheduled';
+            }
+        );
 
         this.#requestSpeechPlayback();
         return false;
@@ -6606,7 +6743,7 @@ class AI {
         job.sourceNode?.disconnect?.();
     }
 
-    #waitForSpeechGesture(error=null){
+    #waitForSpeechGesture(error=null,audioContext=null){
         if(this.speechUnlockHandler){
             return false;
         }
@@ -6617,7 +6754,7 @@ class AI {
         this.speechAwaitingGesture=true;
         this.speechUnlockHandler=function unlockSpeechFromUserGesture(){
             runtime.#clearSpeechUnlock();
-            runtime.resumeAudio();
+            return runtime.resumeAudio(audioContext);
         };
 
         target.addEventListener?.(

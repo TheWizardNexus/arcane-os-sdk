@@ -1537,7 +1537,13 @@ test(
             'arcane-ai-model-authority/1'
         );
 
-        function createProvider(role, id, localOnly, response) {
+        function createProvider(
+            role,
+            id,
+            localOnly,
+            response,
+            {maxConcurrentRequests}={}
+        ) {
             const counters = {
                 load: 0,
                 request: 0,
@@ -1548,14 +1554,17 @@ test(
             let loaded = false;
             let requestError = null;
             let heldLoad = null;
-            let heldRequest = null;
-            let requestBusy = false;
+            const heldRequests = [];
+            let activeRequestCount = 0;
             const requests = [];
             return {
                 protocol: AI_PROVIDER_PROTOCOL,
                 role,
                 id,
                 localOnly,
+                ...(maxConcurrentRequests===undefined
+                    ?{}
+                    :{maxConcurrentRequests}),
                 counters,
                 requests,
                 failNextRequest: function failNextTestProviderRequest(error) {
@@ -1582,10 +1591,11 @@ test(
                     const released = new Promise(function createHeldRequestRelease(resolve) {
                         release = resolve;
                     });
-                    heldRequest = {
+                    const heldRequest = {
                         markStarted,
                         released
                     };
+                    heldRequests.push(heldRequest);
                     return {started, release};
                 },
                 catalog: function catalogTestProvider() {
@@ -1605,7 +1615,7 @@ test(
                     return {
                         state,
                         loaded,
-                        busy: requestBusy
+                        busy: activeRequestCount>0
                     };
                 },
                 load: async function loadTestProvider({progress, signal}) {
@@ -1656,16 +1666,15 @@ test(
                 request: async function requestTestProvider({payload, signal}) {
                     counters.request += 1;
                     requests.push(payload);
-                    requestBusy = true;
+                    activeRequestCount += 1;
                     try {
                         if (signal.aborted) {
                             const error = new Error('cancelled');
                             error.name = 'AbortError';
                             throw error;
                         }
-                        if (heldRequest) {
-                            const gate = heldRequest;
-                            heldRequest = null;
+                        if (heldRequests.length) {
+                            const gate = heldRequests.shift();
                             gate.markStarted();
                             await gate.released;
                         }
@@ -1681,7 +1690,7 @@ test(
                         }
                         return response;
                     } finally {
-                        requestBusy = false;
+                        activeRequestCount -= 1;
                     }
                 },
                 unload: async function unloadTestProvider() {
@@ -1714,10 +1723,31 @@ test(
             }
         );
         const runtime = getAIProviderRuntime();
+        assert.throws(
+            function rejectParallelSTTProvider(){
+                runtime.register(createProvider(
+                    'stt',
+                    'parallel-stt',
+                    true,
+                    {text:'unreachable'},
+                    {maxConcurrentRequests:2}
+                ));
+            },
+            function isParallelSTTContractError(error){
+                return error?.code==='ARCANE_AI_PROVIDER_RUNTIME_INVALID'
+                    &&/Only TTS providers/u.test(error.message);
+            }
+        );
         const localLLM = createProvider('llm', 'local-llm', true, 'local result');
         const cloudLLM = createProvider('llm', 'cloud-llm', false, 'cloud result');
         const localSTT = createProvider('stt', 'local-stt', true, {text: 'hello'});
-        const localTTS = createProvider('tts', 'local-tts', true, new Uint8Array([1]));
+        const localTTS = createProvider(
+            'tts',
+            'local-tts',
+            true,
+            new Uint8Array([1]),
+            {maxConcurrentRequests:2}
+        );
         runtime.register(localLLM);
         runtime.register(cloudLLM);
 
@@ -1936,6 +1966,120 @@ test(
         await runtime.setSpeechMuted(false);
         assert.equal(localTTS.counters.load, 1);
         assert.equal(runtime.status('tts').state, 'ready');
+
+        const requestCountBeforeParallelTTS=localTTS.counters.request;
+        const parallelTTSGates=[
+            localTTS.holdNextRequest(),
+            localTTS.holdNextRequest(),
+            localTTS.holdNextRequest(),
+            localTTS.holdNextRequest()
+        ];
+        const parallelTTSPayloads=[
+            {input:'  first exact TTS input\n'},
+            {input:'second exact TTS input  '},
+            {input:'third FIFO TTS input'},
+            {input:'fourth FIFO TTS input'}
+        ];
+        const parallelTTSRequests=parallelTTSPayloads.map(
+            function startParallelTTSRequest(payload){
+                return runtime.synthesize(payload,{localOnly:true});
+            }
+        );
+        await Promise.all([
+            parallelTTSGates[0].started,
+            parallelTTSGates[1].started
+        ]);
+        assert.equal(
+            localTTS.counters.request,
+            requestCountBeforeParallelTTS+2,
+            'TTS must start exactly the provider-declared capacity.'
+        );
+        assert.deepEqual(
+            localTTS.requests.slice(-2),
+            parallelTTSPayloads.slice(0,2),
+            'The runtime must preserve the exact original TTS payloads.'
+        );
+        parallelTTSGates[1].release();
+        await parallelTTSGates[2].started;
+        assert.deepEqual(
+            localTTS.requests.slice(-3),
+            parallelTTSPayloads.slice(0,3),
+            'The oldest overflow request must start first.'
+        );
+        parallelTTSGates[0].release();
+        await parallelTTSGates[3].started;
+        assert.deepEqual(
+            localTTS.requests.slice(-4),
+            parallelTTSPayloads,
+            'FIFO order must survive capacity becoming available out of order.'
+        );
+        parallelTTSGates[2].release();
+        parallelTTSGates[3].release();
+        await Promise.all(parallelTTSRequests);
+
+        const targetedTTSGates=[
+            localTTS.holdNextRequest(),
+            localTTS.holdNextRequest()
+        ];
+        const cancelledTTS=runtime.synthesize(
+            {input:'cancel only this active TTS request'},
+            {localOnly:true}
+        );
+        const siblingTTS=runtime.synthesize(
+            {input:'retain this active TTS sibling'},
+            {localOnly:true}
+        );
+        await Promise.all(targetedTTSGates.map(
+            function awaitTargetedTTSStart(gate){return gate.started;}
+        ));
+        assert.equal(runtime.cancel('tts'),true);
+        const cancelledTTSAssertion=assert.rejects(
+            cancelledTTS,
+            function isTargetedTTSAbort(error){
+                return error?.code==='ARCANE_AI_REQUEST_ABORTED';
+            }
+        );
+        targetedTTSGates[0].release();
+        await cancelledTTSAssertion;
+        assert.equal(runtime.status('tts').busy,true);
+        targetedTTSGates[1].release();
+        assert.deepEqual(await siblingTTS,new Uint8Array([1]));
+        assert.equal(runtime.status('tts').busy,false);
+
+        const unloadTTSGates=[
+            localTTS.holdNextRequest(),
+            localTTS.holdNextRequest()
+        ];
+        const unloadTTSRequests=[
+            runtime.synthesize({input:'active unload one'},{localOnly:true}),
+            runtime.synthesize({input:'active unload two'},{localOnly:true}),
+            runtime.synthesize({input:'queued unload overflow'},{localOnly:true})
+        ];
+        const unloadTTSSettlements=Promise.allSettled(unloadTTSRequests);
+        await Promise.all(unloadTTSGates.map(
+            function awaitUnloadTTSStart(gate){return gate.started;}
+        ));
+        const requestCountAtTTSUnload=localTTS.counters.request;
+        const unloadingTTS=runtime.unload('tts');
+        unloadTTSGates[0].release();
+        unloadTTSGates[1].release();
+        const unloadedTTSResults=await unloadTTSSettlements;
+        assert.ok(unloadedTTSResults.every(
+            function isCancelledTTSUnloadResult(result){
+                return result.status==='rejected'
+                    &&result.reason?.code==='ARCANE_AI_REQUEST_ABORTED';
+            }
+        ));
+        assert.equal(
+            localTTS.counters.request,
+            requestCountAtTTSUnload,
+            'Queued overflow must not start once unload owns the role.'
+        );
+        await unloadingTTS;
+        assert.equal(runtime.status('tts').state,'unloaded');
+        await runtime.setSpeechMuted(false);
+        assert.equal(runtime.status('tts').state,'ready');
+
         const replacementSTT = createProvider(
             'stt',
             'replacement-stt',
@@ -2489,12 +2633,48 @@ test(
             await runtime.unload('llm');
             const ttsRequests=[];
             const ttsSignals=[];
+            const deferredTTSResponses=[];
+            const decodedTTSIds=new Set();
+            const decodedTTSWaiters=new Map();
+            const speechStarts=[];
+            const speechDurations=new Map();
             let ttsState='unloaded';
+
+            function deferTTSResponse(id,duration){
+                let markStarted;
+                let release;
+                const started=new Promise(function createDeferredTTSStart(resolve){
+                    markStarted=resolve;
+                });
+                const released=new Promise(function createDeferredTTSRelease(resolve){
+                    release=resolve;
+                });
+                speechDurations.set(id,duration);
+                deferredTTSResponses.push({id,markStarted,released});
+                return {
+                    started,
+                    release:function releaseDeferredTTSResponse(){
+                        release({
+                            audio:new Uint8Array([id]),
+                            contentType:'audio/wav'
+                        });
+                    }
+                };
+            }
+
+            function waitForDecodedTTS(id){
+                if(decodedTTSIds.has(id))return Promise.resolve();
+                return new Promise(function awaitDecodedTTS(resolve){
+                    decodedTTSWaiters.set(id,resolve);
+                });
+            }
+
             const ttsProvider={
                 protocol:AI_PROVIDER_PROTOCOL,
                 role:'tts',
                 id:'catalog-tts',
                 localOnly:true,
+                maxConcurrentRequests:2,
                 catalog(){
                     return [{
                         id:'catalog-tts-model',
@@ -2528,6 +2708,11 @@ test(
                 async request(context){
                     ttsRequests.push(context.payload);
                     ttsSignals.push(context.signal);
+                    const deferred=deferredTTSResponses.shift();
+                    if(deferred){
+                        deferred.markStarted();
+                        return deferred.released;
+                    }
                     return {audio:new Uint8Array([1,2,3,4]),contentType:'audio/wav'};
                 },
                 async unload(){ttsState='unloaded';},
@@ -2546,13 +2731,29 @@ test(
             windowTarget.AudioContext=class ContractAudioContext{
                 state='running';
                 destination={};
-                async decodeAudioData(){return {};}
+                currentTime=10;
+                async decodeAudioData(buffer){
+                    const id=new Uint8Array(buffer)[0];
+                    const decoded={
+                        id,
+                        duration:speechDurations.get(id)??0.5
+                    };
+                    decodedTTSIds.add(id);
+                    decodedTTSWaiters.get(id)?.();
+                    decodedTTSWaiters.delete(id);
+                    return decoded;
+                }
                 createBufferSource(){
                     return {
+                        buffer:null,
+                        context:this,
+                        stopped:false,
                         connect(){},
                         disconnect(){},
-                        start(){},
-                        stop(){}
+                        start(time){
+                            speechStarts.push({id:this.buffer.id,time});
+                        },
+                        stop(){this.stopped=true;}
                     };
                 }
             };
@@ -2600,6 +2801,112 @@ test(
                 punctuation:'sentence',
                 wordCadence:null
             });
+
+            const firstDeferredSpeech=deferTTSResponse(41,1.25);
+            const secondDeferredSpeech=deferTTSResponse(42,0.75);
+            const completeSpeechText=
+                '  First complete chunk.\nSecond complete chunk?  ';
+            const parallelSpeech=ai.streamTTS(completeSpeechText,true);
+            await Promise.all([
+                firstDeferredSpeech.started,
+                secondDeferredSpeech.started
+            ]);
+            assert.equal(
+                ttsRequests.length,
+                3,
+                'Both available chunks must enter synthesis immediately.'
+            );
+            assert.equal(
+                ttsRequests.slice(1,3).map(
+                    function selectExactSpeechInput(request){return request.input;}
+                ).join(''),
+                completeSpeechText,
+                'Speech segmentation must preserve every original character.'
+            );
+            secondDeferredSpeech.release();
+            await waitForDecodedTTS(42);
+            assert.deepEqual([...decodedTTSIds],[42]);
+            assert.deepEqual(
+                speechStarts,
+                [],
+                'A later completed synthesis must wait for the earlier chunk.'
+            );
+            firstDeferredSpeech.release();
+            assert.equal(await parallelSpeech,true);
+            assert.deepEqual(speechStarts.slice(0,2),[
+                {id:41,time:10},
+                {id:42,time:11.25}
+            ]);
+            assert.equal(
+                speechStarts[1].time,
+                speechStarts[0].time+speechDurations.get(41),
+                'Consecutive buffers must use AudioBuffer.duration without a callback seam.'
+            );
+
+            ai.stopAudio();
+            const clockStartOffset=speechStarts.length;
+            const runtimeAudioContext=ai.audioContext;
+            const suppliedAudioContext=new windowTarget.AudioContext();
+            runtimeAudioContext.currentTime=120;
+            suppliedAudioContext.currentTime=5;
+            speechDurations.set(61,2);
+            speechDurations.set(62,1.5);
+            speechDurations.set(63,0.75);
+            const suppliedSource=suppliedAudioContext.createBufferSource();
+            await ai.playAudio(
+                [new Uint8Array([61])],
+                suppliedAudioContext,
+                suppliedSource
+            );
+            assert.equal(ai.speechJobs[0].sourceNode,suppliedSource);
+            assert.equal(ai.audioContext,runtimeAudioContext);
+            runtimeAudioContext.currentTime=120.5;
+            suppliedAudioContext.currentTime=5.5;
+            await ai.playAudio([new Uint8Array([62])],runtimeAudioContext);
+            runtimeAudioContext.currentTime=121;
+            suppliedAudioContext.currentTime=6;
+            await ai.playAudio([new Uint8Array([63])],suppliedAudioContext);
+            assert.deepEqual(speechStarts.slice(clockStartOffset),[
+                {id:61,time:5},
+                {id:62,time:122},
+                {id:63,time:8.5}
+            ],'Cross-context scheduling must convert only the remaining queue delay.');
+            const clockSources=[...ai.sourceNodes];
+            ai.stopAudio();
+            assert.ok(clockSources.every(function stoppedClockSource(source){
+                return source.stopped;
+            }));
+
+            const suspendedStartOffset=speechStarts.length;
+            suppliedAudioContext.state='suspended';
+            let allowSuppliedResume=false;
+            suppliedAudioContext.resume=async function resumeSuppliedSpeechContext(){
+                if(!allowSuppliedResume){
+                    const error=new Error('A user gesture is required.');
+                    error.name='NotAllowedError';
+                    throw error;
+                }
+                this.state='running';
+            };
+            await ai.playAudio([new Uint8Array([64])],suppliedAudioContext);
+            await ai.playAudio([new Uint8Array([65])],runtimeAudioContext);
+            assert.equal(speechStarts.length,suspendedStartOffset);
+            assert.equal(ai.speechAwaitingGesture,true);
+            allowSuppliedResume=true;
+            await ai.speechUnlockHandler();
+            assert.deepEqual(speechStarts.slice(suspendedStartOffset),[
+                {id:64,time:6},
+                {id:65,time:121.5}
+            ],'The gesture must resume the blocked context before later queue entries.');
+            const resumedSources=[...ai.sourceNodes];
+            await ai.setSpeechMuted(true);
+            assert.ok(resumedSources.every(function mutedClockSource(source){
+                return source.stopped;
+            }));
+            assert.equal(ai.speechJobs.length,0);
+            assert.equal(ai.speechUnlockHandler,null);
+            await ai.setSpeechMuted(false);
+
             assert.deepEqual(
                 ai.configureTTSSegmentation({
                     punctuation:'any',
@@ -2617,7 +2924,7 @@ test(
                 ),
                 true
             );
-            assert.equal(ttsRequests.length,1);
+            assert.equal(ttsRequests.length,3);
             assert.equal(
                 await ai.streamTTS(
                     'enter,version2。Next words arrive now ',
@@ -2625,27 +2932,27 @@ test(
                 ),
                 true
             );
-            assert.equal(ttsRequests.length,3);
-            assert.deepEqual(ttsRequests[1],{
+            assert.equal(ttsRequests.length,5);
+            assert.deepEqual(ttsRequests[3],{
                 model:'catalog-tts-model',
                 voice:'provider_voice',
                 input:'Don\'t re-enter,version2。',
                 responseFormat:'wav',
                 speed:1
             });
-            assert.deepEqual(ttsRequests[2],{
+            assert.deepEqual(ttsRequests[4],{
                 model:'catalog-tts-model',
                 voice:'provider_voice',
-                input:'second third fourth fifth ',
+                input:'Next words arrive now ',
                 responseFormat:'wav',
                 speed:1
             });
             assert.equal(await ai.streamTTS('Close）Next',false),true);
-            assert.equal(ttsRequests.length,4);
-            assert.equal(ttsRequests[3].input,'Close）');
+            assert.equal(ttsRequests.length,6);
+            assert.equal(ttsRequests[5].input,'Close）');
             assert.equal(await ai.finishTTS(),true);
-            assert.equal(ttsRequests.length,5);
-            assert.equal(ttsRequests[4].input,'Next');
+            assert.equal(ttsRequests.length,7);
+            assert.equal(ttsRequests[6].input,'Next');
             ai.stopAudio();
             await ai.setSpeechMuted(true);
             ai.configureProviders({
@@ -2841,6 +3148,10 @@ test(
             assert.equal(ai.browserSpeechConfiguration,initial);
             assert.equal(initialDescriptor.stt.providerId,'browser-stt-a');
             assert.equal(initialDescriptor.tts.providerId,'browser-tts-a');
+            assert.deepEqual(initialDescriptor.tts.execution,{
+                device:'auto',
+                maxConcurrentRequests:2
+            });
             assert.equal(runtime.selection('stt').providerId,'browser-stt-a');
             assert.equal(runtime.selection('tts').providerId,'browser-tts-a');
             assert.equal(runtime.status('stt').state,'unloaded');
@@ -2889,9 +3200,17 @@ test(
                 dbopfs,
                 tts:browserSpeechRole('tts','browser-tts-b','b')
             };
+            ttsOnly.tts.execution={
+                device:'wasm',
+                maxConcurrentRequests:3
+            };
             const ttsDescriptor=await ai.configureBrowserSpeech(ttsOnly);
             assert.equal(ttsDescriptor.stt,retainedSTTDescriptor);
             assert.equal(ttsDescriptor.tts.providerId,'browser-tts-b');
+            assert.deepEqual(ttsDescriptor.tts.execution,{
+                device:'wasm',
+                maxConcurrentRequests:3
+            });
             assert.deepEqual(
                 runtime.providerIdentity('stt','browser-stt-b'),
                 retainedSTTIdentity
