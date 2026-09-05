@@ -1,7 +1,7 @@
 # Arcane OS SDK JavaScript API
 
 The npm package exposes a Node.js ESM control plane, the portable
-`arcane-os/event-manager`, `arcane-os/mail`, `arcane-os/preference-store`, and
+`arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`, `arcane-os/preference-store`, and
 `arcane-os/speech-playback` entrypoints, and the browser-only
 `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints.
 Those package subpaths are distinct from application-facing projection modules
@@ -18,7 +18,7 @@ This table is the Node `package.json#exports` map: it defines package
 entrypoints for SDK/tooling code. It is distinct from the generated browser
 import map that resolves application-facing `arcane/*` modules and the focused
 EventManager entry. See [browser runtime delivery](protocols.md#browser-runtime-delivery)
-for the installed-inventory-derived physical-runtime contract in SDK `0.5.12`.
+for the installed-inventory-derived physical-runtime contract in SDK `0.5.14`.
 
 | Specifier | Purpose |
 | --- | --- |
@@ -33,6 +33,7 @@ for the installed-inventory-derived physical-runtime contract in SDK `0.5.12`.
 | `arcane-os/packager` | Low-level browser app packager. |
 | `arcane-os/release-bundle` | Deterministic external release bundles. |
 | `arcane-os/event-manager` | Central synchronous events, complete time-travel history, playback, and optional DOM instrumentation. |
+| `arcane-os/logging` | Shared console diagnostics controlled by the existing `user.developer` preference. |
 | `arcane-os/preference-store` | Portable preference records and injected storage adapters. |
 | `arcane-os/speech-playback` | Portable speech preparation, playback state, and injected media adapters. |
 | `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, complete DBOPFS model storage, streaming, cancellation, and structural tool-call results. |
@@ -52,7 +53,7 @@ Protocol mechanics are intentionally kept in the [deep protocol guide](protocols
 
 ## Canonical member inventory
 
-The current JavaScript member total is derived mechanically from every `.mjs`
+The current JavaScript member total is derived mechanically from every JavaScript
 entrypoint in `package.json#exports`. Records are grouped by export name and
 `Object.is()` binding identity, then retain the sorted entrypoints that expose
 that binding; `memberCount` in
@@ -259,6 +260,8 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `resolveMailConfig()` | function | `arcane-os/mail` | Portable Mail | Node with explicit configuration, or browser/native WebView with optional document and location defaults |
 | `sendMailReport()` | function | `arcane-os/mail` | Portable Mail | Node and browser with Fetch and AbortController, or an explicit fetch implementation |
 | `serializeMailReport()` | function | `arcane-os/mail` | Portable Mail | Node and browser |
+| `arcaneLogging` | singleton | `arcane-os/logging` | Shared logging | Node and browser |
+| `readArcaneDeveloperMode()` | function | `arcane-os/logging` | Shared logging | Node and browser |
 
 # Packaging and release bundles
 
@@ -748,7 +751,7 @@ deterministic map. The package root also contains the public
 {
   schemaVersion: 1,
   kind: 'arcane-app-runtime-projection',
-  sdkVersion: '0.5.12',
+  sdkVersion: '0.5.14',
   pathPrefix: 'arcane/',
   files: [{path}]
 }
@@ -2667,7 +2670,7 @@ The import-map operation also reports the stable operation-specific strings
 `ARCANE_IMPORT_MAP_INVALID`, `ARCANE_IMPORT_MAP_UNRESOLVED`, and
 `ARCANE_IMPORT_MAP_COLLISION`; package assembly can additionally report
 `ARCANE_IMPORT_MAP_CLEANUP_FAILED`. They are normalized `ArcaneError.code`
-values, but are not properties added to this general registry in SDK `0.5.12`.
+values, but are not properties added to this general registry in SDK `0.5.14`.
 
 ### Value and import
 
@@ -3437,7 +3440,7 @@ workspace it additionally returns the exact installed package authority:
     packageSource,
     canonicalPackageRoot,
     packageName: 'arcane-os',
-    packageVersion: '0.5.12',
+    packageVersion: '0.5.14',
     runtimeRoot,
     browserRuntimeRoot
   }
@@ -3445,9 +3448,9 @@ workspace it additionally returns the exact installed package authority:
 ```
 
 The dependency can be named `arcane-os` or be one exact npm alias for
-`npm:arcane-os@0.5.12`. The selected installation must still be one direct,
+`npm:arcane-os@0.5.14`. The selected installation must still be one direct,
 physical, non-link package directory whose manifest identifies exactly as
-`arcane-os@0.5.12`; duplicate canonical/alias declarations reject.
+`arcane-os@0.5.14`; duplicate canonical/alias declarations reject.
 `allowMissingManagedImportMap` is an internal packaging/development seam. An
 ordinary caller should leave it `false`.
 
@@ -6726,6 +6729,89 @@ non-serializable reports.
 ```js
 import {serializeMailReport} from 'arcane-os/mail';
 const body = serializeMailReport(report);
+```
+
+# Shared logging
+
+## arcaneLogging
+
+### Overview
+
+Shared console owner for Arcane runtime and application diagnostics. Available
+in SDK `0.5.14`, it reads the existing `user.developer` preference on every
+diagnostic emission after the shared user is ready. Enable developer mode in
+the application's profile settings. There is no separate verbosity setting.
+See [speech developer diagnostics](ai/browser-speech.md#developer-diagnostics)
+for API calls, generation queue state, and playback events.
+
+### Signature and result
+
+```text
+const arcaneLogging
+arcaneLogging.enabled
+arcaneLogging.log(...args)
+arcaneLogging.info(...args)
+arcaneLogging.debug(...args)
+arcaneLogging.warn(...args)
+arcaneLogging.error(...args)
+arcaneLogging.trace(...args)
+```
+
+`enabled` is a boolean getter for the current shared preference, not another
+setting. `log`, `info`, and `debug` forward to `console.info` when enabled, so
+diagnostics appear at the console's normal Info level. `warn`, `error`, and
+failure `trace` calls forward to their corresponding console methods in either
+mode. Each method returns `undefined`; a console failure does not change the
+operation being observed.
+
+### Availability and normalization
+
+**Node and browser.** Imports reuse the same realm-local owner through
+`Symbol.for('arcane.logging')`, also exposed as `globalThis.arcaneLogging`.
+Arguments pass to the host console unchanged, including complete object
+references. The logger does not serialize content, retain diagnostic history,
+write storage, or send network requests. Diagnostics remain disabled while
+the shared user is not ready. The logger does not select a language or change
+speech generation and playback behavior.
+
+### Example
+
+```javascript
+import {arcaneLogging} from 'arcane-os/logging';
+
+arcaneLogging.info('AI request', request);
+arcaneLogging.info('AI response', parsedResponse);
+```
+
+## readArcaneDeveloperMode()
+
+### Overview
+
+Reads the same developer-mode preference used by `arcaneLogging`, preserving
+the unloaded-user state without creating or changing a setting.
+
+### Signature and result
+
+```text
+readArcaneDeveloperMode(target=globalThis)
+```
+
+`target` supplies the shared `user`. The result is `null` until
+`target.user.ready === true`, then `true` only when
+`target.user.developer === true`; other loaded preference values return
+`false`. If preference access throws, the reader returns `false`.
+
+### Availability and normalization
+
+**Node and browser.** Reads the supplied target synchronously. It performs no
+subscription, write, or logging, and does not cache the preference.
+
+### Example
+
+```javascript
+import {readArcaneDeveloperMode} from 'arcane-os/logging';
+
+const developerMode=readArcaneDeveloperMode();
 ```
 
 ## Data export subpaths

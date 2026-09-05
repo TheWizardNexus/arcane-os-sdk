@@ -12,6 +12,11 @@
   responses, decoded audio, scheduled playback, natural completion,
   cancellation, and failure under that same developer preference. Preserve
   caller text, voice, speed, language selection, and playback behavior.
+- Preserve complete cloud AI error responses and retry HTTP 429 overload
+  responses after three seconds with the original request and cancellation
+  signal. Keep partial streams and tool callbacks outside the retry path.
+- Preserve exact URL import-map aliases while adding matching versioned
+  aliases, including authored imports, scopes, and generated dependency paths.
 
 ## 0.5.13
 

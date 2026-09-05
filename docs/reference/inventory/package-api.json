@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.5.12",
+  "sdkVersion": "0.5.14",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 204,
+  "memberCount": 198,
   "members": [
     {
       "id": "root:APP_BUNDLE_DESCRIPTOR_NAME",
@@ -3189,6 +3189,34 @@
       "availability": "Node and browser",
       "protocol": "Arcane Mail HTTP transport",
       "normalization": "Returns compact JSON and rejects non-object or non-serializable reports"
+    },
+    {
+      "id": "logging:arcaneLogging",
+      "name": "arcaneLogging",
+      "displayName": "arcaneLogging",
+      "kind": "singleton",
+      "signature": "const arcaneLogging",
+      "entrypoints": ["arcane-os/logging"],
+      "primaryImport": "arcane-os/logging",
+      "group": "Shared logging",
+      "summary": "Shared console owner controlled by the existing user.developer preference.",
+      "availability": "Node and browser",
+      "protocol": "Shared user.developer preference and host console",
+      "normalization": "Reads developer mode on every diagnostic emission; log, info, and debug use console.info only when enabled; warn, error, and failure trace remain visible in either mode; arguments pass through unchanged without retained history"
+    },
+    {
+      "id": "logging:readArcaneDeveloperMode",
+      "name": "readArcaneDeveloperMode",
+      "displayName": "readArcaneDeveloperMode()",
+      "kind": "function",
+      "signature": "readArcaneDeveloperMode(target=globalThis)",
+      "entrypoints": ["arcane-os/logging"],
+      "primaryImport": "arcane-os/logging",
+      "group": "Shared logging",
+      "summary": "Reads the existing developer-mode preference without creating or changing a setting.",
+      "availability": "Node and browser",
+      "protocol": "Shared user.developer preference",
+      "normalization": "Returns null until target.user.ready is true, then whether target.user.developer is exactly true; returns false if preference access throws"
     }
   ]
 }

@@ -13,7 +13,7 @@ import map resolves `arcane/AI` and `arcane/DBOPFS`. These browser modules are
 not Node inference APIs. To create an application:
 
 ```bash
-npx arcane-os@0.5.12 new hello-speech --path ./hello-speech --target browser
+npx arcane-os@0.5.14 new hello-speech --path ./hello-speech --target browser
 cd hello-speech
 npm install
 npm run dev
@@ -122,6 +122,8 @@ window.addEventListener('ai-tts-failure', function reportSpeechFailure(event) {
 Call `speechEvents.abort()` when disposing that interface to remove the listener.
 
 ## Developer diagnostics
+
+The shared logging API and speech traces are available in SDK `0.5.14`.
 
 Arcane uses the existing shared `user.developer` preference for diagnostic
 logging. Enable **developer mode** in the application's profile settings; the
