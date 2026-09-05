@@ -1,4 +1,5 @@
 import {arcaneLogging} from 'arcane-os/logging';
+import {stripSpeechFormatting} from 'arcane-os/speech-text';
 import {
     AI_RUNTIME_ROLES,
     getAIRuntimeState,
@@ -3343,14 +3344,14 @@ export class AIProviderRuntime {
         return this.#disposeAllPromise;
     }
 
-    request(role, options = {}) {
+    request(role, options = {}, {speechInputPrepared = false} = {}) {
         if (SPEECH_ROLES.includes(role)) {
             arcaneLogging.debug('[Arcane speech runtime] request', role, options);
         }
-        return this.#requestRole(role, options, false);
+        return this.#requestRole(role, options, false, speechInputPrepared);
     }
 
-    #requestRole(role, options, queued) {
+    #requestRole(role, options, queued, speechInputPrepared = false) {
         this.#assertOpen();
         this.#assertNotConfiguring();
         assertRole(role);
@@ -3378,6 +3379,24 @@ export class AIProviderRuntime {
         }
         if (options.signal?.aborted) {
             return Promise.reject(normalizedAbort());
+        }
+        if (role === 'tts' && !queued && speechInputPrepared !== true) {
+            const payload = options.payload;
+            const field = Object.hasOwn(payload ?? {}, 'input') ? 'input' : 'text';
+            const text = Object.getOwnPropertyDescriptor(payload ?? {}, field)?.value;
+            if (typeof text === 'string') {
+                const input = stripSpeechFormatting(text);
+                if (input !== text) {
+                    const payloadProperties = Object.getOwnPropertyDescriptors(payload);
+                    payloadProperties[field] = {...payloadProperties[field], value: input};
+                    const requestProperties = Object.getOwnPropertyDescriptors(options);
+                    requestProperties.payload = {
+                        ...requestProperties.payload,
+                        value: Object.create(Object.getPrototypeOf(payload), payloadProperties)
+                    };
+                    options = Object.create(Object.getPrototypeOf(options), requestProperties);
+                }
+            }
         }
         const slot = this.#slots[role];
         if (slot.disposed) {
@@ -4001,7 +4020,9 @@ export class AIProviderRuntime {
                 if (SPEECH_ROLES.includes(role)) {
                     arcaneLogging.debug('[Arcane speech runtime] provider.request', {generation, requestSequence, operationId}, providerRequest);
                 }
-                const result = await provider.request(providerRequest);
+                const result = role === 'tts'
+                    ? await provider.request(providerRequest, {speechInputPrepared: true})
+                    : await provider.request(providerRequest);
                 if (SPEECH_ROLES.includes(role)) {
                     arcaneLogging.debug('[Arcane speech runtime] provider.request.result', {role, generation, requestSequence, operationId}, result);
                 }
@@ -4065,9 +4086,9 @@ export class AIProviderRuntime {
         return this.#roleRequestAlias('stt', 'transcribe', payload, options);
     }
 
-    synthesize(payload, options = {}) {
+    synthesize(payload, options = {}, preparation = {}) {
         arcaneLogging.debug('[Arcane speech runtime] synthesize', payload, options);
-        return this.#roleRequestAlias('tts', 'synthesize', payload, options);
+        return this.#roleRequestAlias('tts', 'synthesize', payload, options, preparation);
     }
 
     cancel(role) {
@@ -4159,7 +4180,7 @@ export class AIProviderRuntime {
         ) ?? null;
     }
 
-    #roleRequestAlias(role, operation, payload, options) {
+    #roleRequestAlias(role, operation, payload, options, preparation = {}) {
         assertPlainObject(options, `AI ${operation} options`);
         for (const key of Reflect.ownKeys(options)) {
             if (key !== 'localOnly' && key !== 'signal') {
@@ -4179,7 +4200,8 @@ export class AIProviderRuntime {
                 payload,
                 localOnly,
                 signal
-            }
+            },
+            preparation
         );
     }
 

@@ -13,7 +13,7 @@ import {
 } from './AIProviderRuntime.js';
 import {normalizeOllamaModelIdentifier} from './OllamaModelIdentifier.js';
 import {arcaneLogging} from 'arcane-os/logging';
-import {MarkdownSpeech} from './MarkdownSpeech.js';
+import {MarkdownSpeech,stripSpeechFormatting} from 'arcane-os/speech-text';
 
 const completeValue=(value)=>value;
 
@@ -2030,7 +2030,6 @@ class AI {
     }
 
     audioMessageChunks='';
-    #speechTextFormat='plain';
     #markdownSpeech=new MarkdownSpeech();
     sourceNodes=[];
     isSpeaking=false;
@@ -5734,7 +5733,6 @@ class AI {
         if(this.muted){
             if(end){
                 this.audioMessageChunks='';
-                this.#speechTextFormat='plain';
                 this.#markdownSpeech.reset();
             }
             this.#traceSpeech('streamTTS.result',{callId,result:false,reason:'muted'});
@@ -5747,24 +5745,12 @@ class AI {
             throw new RangeError('Speech pauses must be a nonnegative number of milliseconds.');
         }
 
-        const textFormat=options.textFormat??this.#speechTextFormat;
-        if(textFormat!=='plain'&&textFormat!=='markdown'){
-            throw new TypeError('Speech textFormat must be plain or markdown.');
-        }
-        let speechText='';
-        if(textFormat!==this.#speechTextFormat){
-            speechText=this.#markdownSpeech.append('',true);
-        }
-        const incomingText=String(text||'');
-        speechText+=textFormat==='markdown'
-            ?this.#markdownSpeech.append(incomingText,end)
-            :incomingText;
-        this.#speechTextFormat=end?'plain':textFormat;
+        const speechText=this.#markdownSpeech.append(String(text||''),end);
         this.audioMessageChunks+=speechText;
         const outputs=this.#extractSpeechSegments(end);
         this.#traceSpeech('streamTTS.segments',{
             callId,segments:outputs,remainder:this.audioMessageChunks,
-            segmentation:this.ttsSegmentation,textFormat,speechText
+            segmentation:this.ttsSegmentation,speechText
         });
 
         if(!outputs.length){
@@ -6040,7 +6026,8 @@ class AI {
         this.#traceSpeechJob('generation.request',job,{payload,selection});
         const response=await this.fetchTTS(
             payload,
-            job.abortController.signal
+            job.abortController.signal,
+            {speechInputPrepared:true}
         );
         return this.#normalizeProviderSpeechAudio(response);
     }
@@ -6189,7 +6176,7 @@ class AI {
         return this.audioContext;
     }
 
-    async fetchTTS(payload={},signal=null){
+    async fetchTTS(payload={},signal=null,{speechInputPrepared=false}={}){
         const callId=this.#traceSpeech('fetchTTS.call',{payload,aborted:signal?.aborted});
         try{
             this.#assertServiceConfigured(this.ttsService,'tts');
@@ -6233,12 +6220,15 @@ class AI {
                 throw normalizeAIRequestAbort(signal.reason);
             }
 
-            const input=descriptors.input?.value;
-            if(typeof input!=='string'||!input.trim()){
+            const suppliedInput=descriptors.input?.value;
+            if(typeof suppliedInput!=='string'||!suppliedInput.trim()){
                 const error=new TypeError('AI.fetchTTS input must be nonempty text.');
                 error.code='ARCANE_AI_TTS_INPUT_INVALID';
                 throw error;
             }
+            const input=speechInputPrepared===true
+                ?suppliedInput
+                :stripSpeechFormatting(suppliedInput);
             const selection=this.#providerRuntime.selection('tts');
             const requestedModel=descriptors.model?.value;
             if(requestedModel!==undefined
@@ -6329,7 +6319,8 @@ class AI {
                         payload:{model,voice,input,responseFormat,speed},
                         localOnly:false,
                         signal
-                    }
+                    },
+                    {speechInputPrepared:true}
                 );
                 this.#traceSpeech('fetchTTS.providerResult',{callId,response});
                 if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
@@ -6432,7 +6423,6 @@ class AI {
         this.speechScheduleContext=null;
         this.speechScheduleTime=0;
         this.audioMessageChunks='';
-        this.#speechTextFormat='plain';
         this.#markdownSpeech.reset();
         this.#clearSpeechUnlock();
 

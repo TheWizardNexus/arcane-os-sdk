@@ -20,6 +20,7 @@ const STATIC_RUNTIME_PACKAGE_IMPORTS=new Map([
 const SDK_BROWSER_SELF_IMPORTS=new Map([
     ['arcane-os/event-manager',SDK_BROWSER_ENTRY],
     ['arcane-os/logging','sdk/logging.mjs'],
+    ['arcane-os/speech-text','sdk/speech-text.mjs'],
     ['arcane-os/ai/browser-wasm',SDK_BROWSER_AI_ENTRY],
     ['arcane-os/ai/browser-speech',SDK_BROWSER_SPEECH_ENTRY]
 ]);

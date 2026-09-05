@@ -1,6 +1,34 @@
 import assert from 'node:assert/strict';
 import test from '../src/testing.mjs';
 import {MarkdownSpeech} from '../runtime/arcane/modules/MarkdownSpeech.js';
+import {
+    MarkdownSpeech as SharedMarkdownSpeech,
+    stripSpeechFormatting
+} from '../browser-runtime/speech-text.mjs';
+
+test('the existing Markdown speech module re-exports the shared class',function sharedSpeechOwner(){
+    assert.equal(MarkdownSpeech,SharedMarkdownSpeech);
+});
+
+test('complete speech removes every repeated formatting run with one replacement pass',function completeFormattingReplacement(){
+    const source='## Heading\n**bold** __text__ ``code`` ~~words~~ ***more***';
+    assert.equal(stripSpeechFormatting(source),' Heading\nbold text code words more');
+    const literal='  Café — 東京。 مرحبا! # * _ ` ~ ... Really?! "Yes!"\n';
+    assert.equal(stripSpeechFormatting(literal),literal);
+    assert.equal(stripSpeechFormatting(),'');
+});
+
+test('one pass preserves single markers brought together by removing another run',function singlePassMarkerCollision(){
+    assert.equal(stripSpeechFormatting('*##*'),'**');
+    assert.equal(new MarkdownSpeech().append('*##*',true),'**');
+    const speech=new MarkdownSpeech();
+    let narration='';
+    for(const character of '*##*'){
+        narration+=speech.append(character);
+    }
+    narration+=speech.append('',true);
+    assert.equal(narration,'**');
+});
 
 test('speech omits repeated formatting markers across single-character chunks',function fragmentedFormattingRuns(){
     const speech=new MarkdownSpeech();
