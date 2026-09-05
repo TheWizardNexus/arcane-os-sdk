@@ -121,6 +121,49 @@ window.addEventListener('ai-tts-failure', function reportSpeechFailure(event) {
 
 Call `speechEvents.abort()` when disposing that interface to remove the listener.
 
+## Developer diagnostics
+
+Arcane uses the existing shared `user.developer` preference for diagnostic
+logging. Enable **developer mode** in the application's profile settings; the
+logger reads that preference on every emission after the shared user is ready.
+There is no separate speech verbosity or language setting. Ordinary warnings
+and errors remain visible with developer mode disabled.
+
+Applications can use the same owner for their complete AI requests and parsed
+responses:
+
+```javascript
+import { arcaneLogging } from 'arcane-os/logging';
+
+arcaneLogging.info('AI request', request);
+arcaneLogging.info('AI response', response);
+```
+
+`arcaneLogging.log`, `.info`, and `.debug` use the developer preference and
+appear at the browser console's normal Info level. `.warn`, `.error`, and
+failure `.trace` calls remain visible in either mode. The same logger is
+available as `globalThis.arcaneLogging`; it stores no diagnostic history.
+
+Speech diagnostics include complete API inputs and results, selected provider
+and model, exact segment text, voice and speed, generation queue state, Worker
+request IDs and responses, and decoding/playback events. Worker requests are
+copied only for developer diagnostics before native transfer detaches their
+audio buffers; the original request still goes to the Worker unchanged.
+
+Follow a speech `jobId` through `queue.add`, `generation.request`,
+`generation.result`, `decode.result`, `playback.scheduled`, `playback.ended`,
+and `queue.complete`. Cancellation and failure appear as `queue.cancelled`
+and `queue.failed`. Each playback record includes the audio clock,
+sample rate, duration, playback rate, and scheduled start/end when available.
+For ready adjacent buffers, `gapSeconds` is zero on the same audio clock;
+`audioEnd` marks the end of audio and `scheduledEnd` includes the caller's
+requested pause. A positive gap can expose generation arriving too late to
+fill the audio clock continuously. A scheduled event alone does not establish
+that the buffer finished; use its `playback.ended` event.
+
+Diagnostics do not change text, voice, speed, language selection, segmentation,
+generation capacity, or playback scheduling. They stay outside chat history.
+
 ## Four synthesis slots and exact-order playback
 
 Capacity 4 means up to four segments synthesize at once. Segment 5 and later

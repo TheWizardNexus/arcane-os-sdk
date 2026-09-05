@@ -60,6 +60,8 @@
 </section>
 
 <script type="module">
+    const {arcaneLogging}=await import('arcane-os/logging');
+
     const completeValue=(value)=>value;
     const {
         createArcaneEventSource,
@@ -347,7 +349,7 @@
                 return false;
             }
             releaseMicrophone();
-            console.error('Unable to start recording:',error);
+            arcaneLogging.error('Unable to start recording:',error);
             setState('error',options.messages.startError);
             return false;
         }
@@ -497,7 +499,7 @@
                     if(!isCurrentVoiceOperation(generation,'saving')){
                         return false;
                     }
-                    console.error('Unable to save transcription:',error);
+                    arcaneLogging.error('Unable to save transcription:',error);
                     setState('error',options.messages.saveError);
                     return false;
                 }
@@ -526,7 +528,7 @@
                 );
                 return false;
             }
-            console.error('Unable to transcribe recording:',error);
+            arcaneLogging.error('Unable to transcribe recording:',error);
             setState('error',options.messages.transcribeError);
             return false;
         }finally{
@@ -634,7 +636,7 @@
     function recordingError(event){
         setState('error',options.messages.interrupted);
         releaseMicrophone();
-        console.error('Audio recorder error:',event.error||event);
+        arcaneLogging.error('Audio recorder error:',event.error||event);
     }
 
     async function completeStream(){
@@ -679,7 +681,7 @@
             if(!isCurrentVoiceOperation(generation,'completing')){
                 return false;
             }
-            console.error('Unable to complete transcription:',error);
+            arcaneLogging.error('Unable to complete transcription:',error);
             setState('error',options.messages.completeError);
             return false;
         }
@@ -822,7 +824,7 @@
         const previousRole=sttRole;
         sttRole=snapshot.roles.stt;
         if(sttRole.state==='error'&&previousRole.state!=='error'){
-            console.error('Arcane transcription runtime failed.',sttRole.error);
+            arcaneLogging.error('Arcane transcription runtime failed.',sttRole.error);
         }
         sttActivationController.synchronize(sttRole);
         if(previousRole.state==='ready'&&sttRole.state!=='ready'){

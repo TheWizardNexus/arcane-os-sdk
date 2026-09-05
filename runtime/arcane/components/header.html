@@ -78,6 +78,8 @@
 </header>
 
 <script type="module">
+    const {arcaneLogging}=await import('arcane-os/logging');
+
     import('../entities/User.js');
     
     const host=this;
@@ -123,17 +125,17 @@
             if (skin) {
                 document.body.className = skin;
             } else {
-                console.log('No saved skin found. Using default.');
+                arcaneLogging.log('No saved skin found. Using default.');
             }
         } catch (err) {
-            console.error('Failed to set global saved skin', err);
+            arcaneLogging.error('Failed to set global saved skin', err);
         }
     }
 
     // Check if user can connect to the internet (make sure the cloud can be reached)
     async function checkInternet() {
         const online = navigator.onLine;
-        console.log(`Internet status: ${online ? 'Online' : 'Offline'}`);
+        arcaneLogging.log(`Internet status: ${online ? 'Online' : 'Offline'}`);
         host.shadowRoot.querySelector('.internet-status')
             .classList
             .toggle('online', online);

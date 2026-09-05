@@ -211,6 +211,8 @@
 </section>
 
 <script type="module">
+    const {arcaneLogging}=await import('arcane-os/logging');
+
     const host=this;
     host.ready=false;
 
@@ -883,7 +885,7 @@
             Promise.resolve(options.onNavigate(detail,{signal:lifecycleController.signal,operationId})).catch(
                 error=>{
                     if(!destroyed){
-                        console.error('Markdown document navigation callback failed.',error);
+                        arcaneLogging.error('Markdown document navigation callback failed.',error);
                     }
                 }
             );

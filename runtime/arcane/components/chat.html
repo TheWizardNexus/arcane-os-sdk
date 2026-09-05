@@ -832,7 +832,9 @@
     </section>
 </section>
 
-<script type="module"> 
+<script type="module">
+    const {arcaneLogging}=await import('arcane-os/logging');
+ 
     const {
         createArcaneEventSource,
         projectArcaneDOMEvent
@@ -1059,7 +1061,7 @@
             return value||fallback;
         }
         if(value&&typeof value==='object'){
-            console.error(`Arcane chat progress ${field} is not text.`,value);
+            arcaneLogging.error(`Arcane chat progress ${field} is not text.`,value);
             return visibleErrorMessage(value,fallback);
         }
         if(value!==undefined&&value!==null&&value!==''){
@@ -1067,7 +1069,7 @@
                 `Arcane chat progress ${field} must be text.`,
                 {cause:value}
             );
-            console.error(`Arcane chat progress ${field} is not text.`,error);
+            arcaneLogging.error(`Arcane chat progress ${field} is not text.`,error);
         }
         return fallback;
     }
@@ -1394,7 +1396,7 @@
             const serialized=JSON.stringify(value,null,2);
             if(serialized!==undefined) return serialized;
         }catch(error){
-            console.error('Arcane saved chat record could not be serialized as JSON.',error);
+            arcaneLogging.error('Arcane saved chat record could not be serialized as JSON.',error);
         }
         return String(value);
     }
@@ -1506,7 +1508,7 @@
                 recoveryNeeded=true;
                 actionable=false;
                 restoredPendingToolCalls.clear();
-                console.error(`Arcane saved chat record ${index+1} is not actionable.`,error);
+                arcaneLogging.error(`Arcane saved chat record ${index+1} is not actionable.`,error);
                 item=createSavedRecordFallback(message,index);
             }
             fragment.append(item);
@@ -1617,7 +1619,7 @@
         }catch(error){
             if(!destroyed&&generation===sessionBindingGeneration){
                 const internalProtocolFailure=internalStructuralToolFailure(error);
-                console.error('Arcane saved chat could not be opened.',error);
+                arcaneLogging.error('Arcane saved chat could not be opened.',error);
                 const message=internalProtocolFailure
                     ?'This saved chat could not be opened.'
                     :visibleErrorMessage(error,'The chat session could not be opened.');
@@ -1738,11 +1740,11 @@
     }
 
     host.sendMessage=host.sendMessage||async function(text=''){
-        console.warn('html-import chat.html `host.sendMessage` method not implemented.\n\nThis can also be done by listening for the "chat-send-message" event.\n\nIt is still best practice to implement the `.sendMessage` method atleast with an empty function.\n\n')
+        arcaneLogging.warn('html-import chat.html `host.sendMessage` method not implemented.\n\nThis can also be done by listening for the "chat-send-message" event.\n\nIt is still best practice to implement the `.sendMessage` method atleast with an empty function.\n\n')
     }
 
     host.languageChanged=host.languageChanged||async function(text=''){
-        console.warn('html-import chat.html `host.languageChanged` method not implemented.\n\nThis can also be done by listening for the "chat-language-changed" event.\n\nIt is still best practice to implement the `.languageChanged` method atleast with an empty function.\n\n')
+        arcaneLogging.warn('html-import chat.html `host.languageChanged` method not implemented.\n\nThis can also be done by listening for the "chat-language-changed" event.\n\nIt is still best practice to implement the `.languageChanged` method atleast with an empty function.\n\n')
     }
 
     host.requestAIActivation=host.requestAIActivation||function requestAIActivation(intent){
@@ -2381,7 +2383,7 @@
                     `The language model ${action} request failed.`
                 );
                 requestError=message;
-                console.error('Arcane language model activation request failed.',error);
+                arcaneLogging.error('Arcane language model activation request failed.',error);
                 publish(
                     'chat-ai-activation-error',
                     {request,error,message},
@@ -2420,7 +2422,7 @@
                 &&nextRole.error
                 &&nextRole.error!==role?.error
             ){
-                console.error('Arcane language model runtime failed.',nextRole.error);
+                arcaneLogging.error('Arcane language model runtime failed.',nextRole.error);
             }
             if(role?.state!==nextRole.state
                 ||role?.providerId!==nextRole.providerId
@@ -2501,7 +2503,7 @@
         try{
             controller.start();
         }catch(error){
-            console.error('Arcane conversation timebox could not start.',error);
+            arcaneLogging.error('Arcane conversation timebox could not start.',error);
             conversationTimeboxStatus.textContent='The elapsed timer could not start.';
             conversationTimeboxPanel.dataset.error='true';
             conversationTimeboxUnsubscribe?.();
@@ -2694,7 +2696,7 @@
                         }
                     }
                 );
-                console.error('The conversation timebox message could not be sent.',error);
+                arcaneLogging.error('The conversation timebox message could not be sent.',error);
                 return false;
             }
         );
@@ -2746,7 +2748,7 @@
     async function streamMessage(text='', id='', isThinking){
         if(typeof text!=='string'){
             if(text instanceof Error){
-                console.error('Arcane chat stream delivered an Error as content.',text);
+                arcaneLogging.error('Arcane chat stream delivered an Error as content.',text);
                 throw text;
             }
             const error=new TypeError(
@@ -2754,11 +2756,11 @@
                 {cause:text}
             );
             error.code='ARCANE_CHAT_STREAM_CONTENT_INVALID';
-            console.error('Arcane chat stream delivered invalid content.',error);
+            arcaneLogging.error('Arcane chat stream delivered invalid content.',error);
             throw error;
         }
         if(!id){
-            console.warn('Streaming messages require ids, none specified.')
+            arcaneLogging.warn('Streaming messages require ids, none specified.')
             return false;
         }
 
@@ -2949,7 +2951,7 @@
                 return;
             }
             host.language=language;
-            console.info("Language changed to:",host.language);
+            arcaneLogging.info("Language changed to:",host.language);
             let result;
             try{result=host.languageChanged(host.language);}
             catch(error){result=Promise.reject(error);}
@@ -3266,13 +3268,13 @@
                 }else{
                     restoreRejectedStructuralDraft(messageId,context.operationId,text);
                 }
-                console.error('Arcane structural tool protocol failure.',error);
+                arcaneLogging.error('Arcane structural tool protocol failure.',error);
                 setSessionStatus(
                     pendingStructuralToolCalls.length?'tool':'ready',
                     pendingStructuralToolMessage||'Chat ready.'
                 );
             }else if(!destroyed&&bindingGeneration===sessionBindingGeneration){
-                console.error('Arcane chat request failed.',error);
+                arcaneLogging.error('Arcane chat request failed.',error);
                 if(sessionRequestMessages.every(message=>message.role==='tool')){
                     const requestMessages=[...chatOutput.children].filter(
                         candidate=>candidate.dataset.operationId===context.operationId
@@ -3541,7 +3543,7 @@
                 if(destroyed||context.signal.aborted){
                     return false;
                 }
-                console.error(
+                arcaneLogging.error(
                     internalStructuralToolFailure(error)
                         ?'Arcane structural tool protocol failure.'
                         :'The chat message could not be submitted.',
@@ -3751,7 +3753,7 @@
                 }
             }
         );
-        console.error('Speech synthesis failed.',error);
+        arcaneLogging.error('Speech synthesis failed.',error);
         return false;
     }
 

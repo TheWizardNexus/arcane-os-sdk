@@ -1,3 +1,4 @@
+import { arcaneLogging } from 'arcane-os/logging';
 import ArcaneCommunicationBridge from './ArcaneCommunicationBridge.js';
 import CommunicationHub from './CommunicationHub.js?v=2';
 import CommunicationPreferences from './CommunicationPreferences.js';
@@ -360,7 +361,7 @@ export default class CommunicationAppController{
                 hub.dispose();
             }
         }catch(error){
-            console.error('The communication hub could not be disposed cleanly.',error);
+            arcaneLogging.error('The communication hub could not be disposed cleanly.',error);
         }
     }
 

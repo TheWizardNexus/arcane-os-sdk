@@ -10,6 +10,8 @@
 <html-import id="configModal" class="modal" href="./arcane/components/modal.html?v=13"></html-import>
 
 <script type="module">
+    const {arcaneLogging}=await import('arcane-os/logging');
+
     const host=this;
     const {default:waitForComponent}=await import('../modules/WaitForComponent.js');
     const {
@@ -65,7 +67,7 @@
         ()=>openConfig().catch(
             error=>{
                 if(!destroyed){
-                    console.error('Unable to configure dashboard:',error);
+                    arcaneLogging.error('Unable to configure dashboard:',error);
                 }
             }
         ),

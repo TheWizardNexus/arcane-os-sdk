@@ -1,3 +1,4 @@
+import { arcaneLogging } from '../logging.mjs';
 import { createArcaneEventSource } from "arcane-os/event-manager";
 
 export const ARCANE_AI_ADAPTER_PROTOCOL = "arcane-ai-adapter/1";
@@ -1372,7 +1373,7 @@ export class ModelController {
           Promise.resolve().then(()=>value.cancel(
             "The provider returned an invalid stream handle.",
           )).catch(function reportInvalidModelStreamCleanupFailure(error){
-            console.error("Arcane invalid model stream cleanup failed.",error);
+            arcaneLogging.error("Arcane invalid model stream cleanup failed.",error);
           });
         }
         throw new ArcaneAIError(
@@ -1386,7 +1387,7 @@ export class ModelController {
       }catch(error){
         Promise.resolve().then(()=>value.cancel(error)).catch(
           function reportRejectedModelIteratorCleanupFailure(cleanupError){
-            console.error("Arcane rejected model stream iterator cleanup failed.",cleanupError);
+            arcaneLogging.error("Arcane rejected model stream iterator cleanup failed.",cleanupError);
           },
         );
         throw error;
@@ -1395,7 +1396,7 @@ export class ModelController {
         Promise.resolve().then(()=>value.cancel(
           "The provider returned an invalid stream iterator.",
         )).catch(function reportInvalidModelIteratorCleanupFailure(error){
-          console.error("Arcane invalid model stream iterator cleanup failed.",error);
+          arcaneLogging.error("Arcane invalid model stream iterator cleanup failed.",error);
         });
         throw new ArcaneAIError(
           "ARCANE_AI_INVALID_PROVIDER_RESULT",
@@ -1468,7 +1469,7 @@ export class ModelController {
             const value = opened ?? await openPromise;
             await value.cancel?.(reason);
           } catch (error) {
-            console.error("Arcane model provider cancellation failed.",error);
+            arcaneLogging.error("Arcane model provider cancellation failed.",error);
           }
           try {
             await result;
@@ -1491,7 +1492,7 @@ export class ModelController {
         Promise.resolve().then(()=>this.cancel(
           "The stream consumer stopped before completion.",
         )).catch(function reportModelStreamReturnCancellationFailure(error){
-          console.error("Arcane model stream early-return cancellation failed.",error);
+          arcaneLogging.error("Arcane model stream early-return cancellation failed.",error);
         });
         return { value, done: true };
       },

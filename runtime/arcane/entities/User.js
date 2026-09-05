@@ -1,3 +1,4 @@
+import { arcaneLogging } from 'arcane-os/logging';
 import Is from '../../node_modules/strong-type/index.js';
 import DBLS from '../modules/DBLS.js';
 import {
@@ -818,7 +819,7 @@ class UserEntity {
             try {
                 this[key] = src[key];
             } catch(e){
-                console.warn(`UserEntity.explicit setter skipping invalid field ${key}: ${e.message}`);
+                arcaneLogging.warn(`UserEntity.explicit setter skipping invalid field ${key}: ${e.message}`);
             }
         }
 

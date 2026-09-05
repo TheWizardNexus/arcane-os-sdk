@@ -220,6 +220,8 @@
 </nav>
 
 <script type="module">
+    const {arcaneLogging}=await import('arcane-os/logging');
+
     const host=this;
     const root=host.shadowRoot;
     const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
@@ -349,7 +351,7 @@
         try{
             setNavigation(JSON.parse(source));
         }catch(error){
-            console.warn('Unable to parse app-bar data-navigation.',error);
+            arcaneLogging.warn('Unable to parse app-bar data-navigation.',error);
             setNavigation([]);
         }
     }

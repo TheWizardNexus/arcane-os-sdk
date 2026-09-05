@@ -1,4 +1,5 @@
 import EventPubSub from 'event-pubsub';
+import {arcaneLogging} from './logging.mjs';
 import {createDOMInstrumentation} from './dom-event-instrumentation.mjs';
 
 export {
@@ -1368,7 +1369,7 @@ function createArcaneEventAuthority(){
                 return;
             }
         }catch{}
-        try{globalThis.console?.error?.('Arcane event listener failed.',error);}
+        try{arcaneLogging.error('Arcane event listener failed.',error);}
         catch{}
     }
 

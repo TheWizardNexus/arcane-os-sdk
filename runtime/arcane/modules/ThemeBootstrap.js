@@ -1,3 +1,4 @@
+import { arcaneLogging } from 'arcane-os/logging';
 import {loadAndApplyTheme} from './ThemeManager.js';
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 
@@ -43,7 +44,7 @@ function installAppearanceListener(ready){
             Promise.resolve(ready).then(function reloadTheme(result){
                 return result?.manager?.load?.();
             }).catch(function reportThemeReloadFailure(error){
-                console.warn(
+                arcaneLogging.warn(
                     '[Arcane theme] Unable to apply the changed host appearance.',
                     error
                 );
@@ -80,7 +81,7 @@ export function bootstrapArcaneTheme(options={}){
     }
 
     const ready=loadAndApplyTheme(options).catch(error=>{
-        console.warn('[Arcane theme] Unable to load the saved appearance; using the system theme.',error);
+        arcaneLogging.warn('[Arcane theme] Unable to load the saved appearance; using the system theme.',error);
         return {manager:null,state:null,error};
     });
 

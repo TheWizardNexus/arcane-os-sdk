@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.5.14
+
+- Add the shared `arcane-os/logging` console owner using the existing
+  `user.developer` preference. Route first-party runtime diagnostics and
+  default model loggers through this owner; preserve warnings and errors
+  when developer mode is disabled.
+- Trace complete speech API inputs, generation queues, Worker requests and
+  responses, decoded audio, scheduled playback, natural completion,
+  cancellation, and failure under that same developer preference. Preserve
+  caller text, voice, speed, language selection, and playback behavior.
+
 ## 0.5.13
 
 - Derive local browser resource queries from the selected SDK package version

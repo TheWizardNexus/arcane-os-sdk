@@ -1,10 +1,11 @@
+import { arcaneLogging } from 'arcane-os/logging';
 function parseArguments(value,name=''){
     let parsed=value;
     if(typeof parsed==='string'){
         try{
             parsed=JSON.parse(parsed);
         }catch(error){
-            console.warn(error);
+            arcaneLogging.warn(error);
             throw new Error(`Tool ${name} returned invalid JSON arguments.`);
         }
     }

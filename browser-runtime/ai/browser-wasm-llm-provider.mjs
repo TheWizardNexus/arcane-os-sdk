@@ -1,3 +1,4 @@
+import { arcaneLogging } from '../logging.mjs';
 import {
   ARCANE_AI_ADAPTER_PROTOCOL,
   ArcaneAIError,
@@ -1148,7 +1149,7 @@ export function createDbopfsModelStore({
     try {
       await removeMemberRangeParts(modelName, { total });
     } catch (error) {
-      globalThis.console?.warn?.(
+      arcaneLogging.warn?.(
         "Arcane could not remove superseded browser model range parts.",
         error,
       );
@@ -1163,7 +1164,7 @@ export function createDbopfsModelStore({
         total: ranges[0]?.total ?? null,
       });
     } catch (error) {
-      globalThis.console?.warn?.(
+      arcaneLogging.warn?.(
         "Arcane could not remove superseded browser model range parts.",
         error,
       );
@@ -1195,7 +1196,7 @@ export function createDbopfsModelStore({
         await removeMemberRangeParts(modelName, { total });
       }
     } catch (error) {
-      globalThis.console?.warn?.(
+      arcaneLogging.warn?.(
         "Arcane could not remove superseded browser model range parts.",
         error,
       );
@@ -2404,7 +2405,7 @@ function callbackStreamHandle({ runtime, request, signal, onSettled }) {
       Promise.resolve().then(() => this.cancel(
         "The stream consumer stopped before completion.",
       )).catch(function reportBrowserWasmStreamReturnCancellationFailure(error) {
-        console.error("Arcane browser-WASM stream early-return cancellation failed.", error);
+        arcaneLogging.error("Arcane browser-WASM stream early-return cancellation failed.", error);
       });
       return { value, done: true };
     },
@@ -2432,7 +2433,7 @@ function validatedV1StreamHandle(opened, request) {
       Promise.resolve().then(function cancelInvalidV1StreamHandle() {
         return opened.cancel("The v1 provider returned an invalid stream handle.");
       }).catch(function reportInvalidV1StreamCleanupFailure(error) {
-        console.error("Arcane invalid v1 stream cleanup failed.", error);
+        arcaneLogging.error("Arcane invalid v1 stream cleanup failed.", error);
       });
     }
     throw fail(
@@ -2447,7 +2448,7 @@ function validatedV1StreamHandle(opened, request) {
     Promise.resolve().then(function cancelRejectedV1Iterator() {
       return opened.cancel(error);
     }).catch(function reportRejectedV1IteratorCleanupFailure(cleanupError) {
-      console.error("Arcane rejected v1 stream iterator cleanup failed.", cleanupError);
+      arcaneLogging.error("Arcane rejected v1 stream iterator cleanup failed.", cleanupError);
     });
     throw error;
   }
@@ -2455,7 +2456,7 @@ function validatedV1StreamHandle(opened, request) {
     Promise.resolve().then(function cancelInvalidV1Iterator() {
       return opened.cancel("The v1 provider returned an invalid stream iterator.");
     }).catch(function reportInvalidV1IteratorCleanupFailure(error) {
-      console.error("Arcane invalid v1 stream iterator cleanup failed.", error);
+      arcaneLogging.error("Arcane invalid v1 stream iterator cleanup failed.", error);
     });
     throw fail(
       "ARCANE_AI_INVALID_PROVIDER_RESULT",
@@ -2539,13 +2540,13 @@ function validatedV1StreamHandle(opened, request) {
         Promise.resolve().then(function returnUnderlyingV1Stream() {
           return iterator.return(value);
         }).catch(function reportUnderlyingV1StreamReturnFailure(error) {
-          console.error("Arcane v1 stream iterator return failed.", error);
+          arcaneLogging.error("Arcane v1 stream iterator return failed.", error);
         });
       }
       Promise.resolve().then(function cancelReturnedV1Stream() {
         return opened.cancel("The stream consumer stopped before completion.");
       }).catch(function reportReturnedV1StreamCancellationFailure(error) {
-        console.error("Arcane v1 stream early-return cancellation failed.", error);
+        arcaneLogging.error("Arcane v1 stream early-return cancellation failed.", error);
       });
       return { value, done: true };
     },
@@ -2778,7 +2779,7 @@ export function createBrowserWasmLlmProvider({
   store,
   loadDefaults = {},
   security,
-  logger = console,
+  logger = arcaneLogging,
 } = {}) {
   const configuredModels = providerModelSources(sources);
   const modelSources = configuredModels.sources;

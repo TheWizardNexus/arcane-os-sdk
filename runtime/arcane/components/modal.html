@@ -156,6 +156,8 @@
 </dialog>
 
 <script type="module">
+    const {arcaneLogging}=await import('arcane-os/logging');
+
     const host=this;
     const shadowRoot=host.shadowRoot;
     const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
@@ -384,7 +386,7 @@
             }catch(error){
                 rows[index].row.dataset.status='failed';
                 rows[index].status.innerText='Unable to complete';
-                console.error(`Unable to complete ${job.name}:`,error);
+                arcaneLogging.error(`Unable to complete ${job.name}:`,error);
                 throw error;
             }
         }));

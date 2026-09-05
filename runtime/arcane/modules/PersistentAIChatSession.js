@@ -1,3 +1,4 @@
+import { arcaneLogging } from 'arcane-os/logging';
 import ChatEntity from '../entities/Chat.js';
 import ConfiguredAIChatSession,{
     normalizeStructuralToolCall
@@ -475,7 +476,7 @@ class PersistentAIChatSession{
                 error instanceof Error?error:new Error('The saved chat history is invalid.'),
                 'AI_CHAT_INCOHERENT_PERSISTENCE',
             );
-            console.error('Arcane saved chat history is readable but not actionable.',error);
+            arcaneLogging.error('Arcane saved chat history is readable but not actionable.',error);
         }
         const storedSystem=storedMessages.find(message=>message.role==='system');
         const initialMessages=storedMessages

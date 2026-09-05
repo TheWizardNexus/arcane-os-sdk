@@ -1,3 +1,4 @@
+import { arcaneLogging } from 'arcane-os/logging';
 import {
     createArcaneEventSource,
     projectArcaneDOMEvent
@@ -713,7 +714,7 @@ function createSTTActivationController({
                 try{
                     onChange();
                 }catch(error){
-                    console.error('Unable to render STT activation state:',error);
+                    arcaneLogging.error('Unable to render STT activation state:',error);
                 }
             }
         }
@@ -724,7 +725,7 @@ function createSTTActivationController({
         if(nextAction){
             void request(nextAction).catch(
                 function reportSTTActivationRequestFailure(error){
-                    console.error('The STT activation request could not settle.',error);
+                    arcaneLogging.error('The STT activation request could not settle.',error);
                 }
             );
         }

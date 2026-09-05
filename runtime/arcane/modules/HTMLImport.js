@@ -1,3 +1,4 @@
+import { arcaneLogging } from 'arcane-os/logging';
 import {
   createArcaneEventSource,
   projectArcaneDOMEvent
@@ -299,7 +300,7 @@ class HTMLImport extends HTMLElement {
     let resolvedHref='';
     const operationId=`html-import-load-${this.#events.instanceId}-${generation}`;
     if(!href){
-      console.log('no href provided for html-import tag',this);
+      arcaneLogging.log('no href provided for html-import tag',this);
       this.#loadController=null;
       return;
     }
@@ -319,7 +320,7 @@ class HTMLImport extends HTMLElement {
         await this.#destroyImportedHost();
         return;
       }
-      console.error('Error loading HTML component:',err);
+      arcaneLogging.error('Error loading HTML component:',err);
       const detail={
           code:'HTML_IMPORT_FAILED',
           href,
@@ -369,7 +370,7 @@ class HTMLImport extends HTMLElement {
   }
 
   #reportImportedDestroyError(error,{events,href,operationId}){
-    console.error('Error destroying imported HTML component:',error);
+    arcaneLogging.error('Error destroying imported HTML component:',error);
     if(!events||events.disposed)return;
     const detail={
       code:'HTML_IMPORT_IMPORTED_COMPONENT_DESTROY_REJECTED',

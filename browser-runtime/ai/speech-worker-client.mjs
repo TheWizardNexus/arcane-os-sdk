@@ -3,8 +3,10 @@ import {
   normalizeSpeechWorkerErrorEnvelope,
   SPEECH_WORKER_PROTOCOL,
 } from "./speech-worker-runtime.mjs";
+import { arcaneLogging } from "../logging.mjs";
 
 const completeValue = (value) => value;
+let nextSpeechWorkerClientId = 0;
 
 const PUBLIC_WORKER_OPERATIONS = new Set([
   "load",
@@ -57,6 +59,7 @@ const WORKER_CLIENTS = new WeakSet();
  * Workers remain available.
  */
 class SpeechWorkerClient {
+  #diagnosticId = ++nextSpeechWorkerClientId;
   #role;
   #createWorker;
   #worker = null;
@@ -84,6 +87,29 @@ class SpeechWorkerClient {
     });
     this.#onTermination = onTermination;
     WORKER_CLIENTS.add(this);
+    this.#trace("created", { workerUrl: workerUrl.href });
+  }
+
+  #trace(phase, detail = {}, beforeTransfer = false) {
+    if (!arcaneLogging.enabled) return;
+    let snapshot = detail;
+    if (beforeTransfer) {
+      try {
+        // Preserve complete request content before postMessage transfers it.
+        snapshot = structuredClone(detail);
+      } catch {
+        // Retain the complete original if native cloning cannot represent it.
+      }
+    }
+    arcaneLogging.debug("[Arcane speech worker]", {
+      clientId: this.#diagnosticId,
+      role: this.#role,
+      phase,
+      timestamp: new Date().toISOString(),
+      timeMs: globalThis.performance?.now?.() ?? Date.now(),
+      pendingRequests: this.#pending.size,
+      ...snapshot,
+    });
   }
 
   #listen(target, type, listener) {
@@ -103,6 +129,7 @@ class SpeechWorkerClient {
     }
     const worker = validateWorker(this.#createWorker());
     this.#worker = worker;
+    this.#trace("started");
     this.#listen(worker, "message", (event) => {
       this.#handleMessage(event.data);
     });
@@ -126,6 +153,7 @@ class SpeechWorkerClient {
   }
 
   #handleMessage(message) {
+    this.#trace("response", { message });
     if (message?.protocol !== SPEECH_WORKER_PROTOCOL) {
       void this.terminate(clientError(
         "ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH",
@@ -177,7 +205,9 @@ class SpeechWorkerClient {
   }
 
   request(op, payload, { signal = null } = {}) {
+    this.#trace("request.call", { op, payload, aborted: signal?.aborted });
     if (!PUBLIC_WORKER_OPERATIONS.has(op)) {
+      this.#trace("request.rejected", { op, reason: "unknown-operation" });
       return Promise.reject(clientError(
         "ARCANE_AI_INVALID_REQUEST",
         "The speech worker operation is not part of its protocol.",
@@ -185,12 +215,16 @@ class SpeechWorkerClient {
         `${this.#role}-worker-operation-unknown`,
       ));
     }
-    if (signal?.aborted) return Promise.reject(abortError(signal, this.#role, op));
+    if (signal?.aborted) {
+      this.#trace("request.cancelled", { op, reason: signal.reason });
+      return Promise.reject(abortError(signal, this.#role, op));
+    }
     let worker;
     try {
       worker = this.#start();
       this.#transport = worker;
     } catch (error) {
+      this.#trace("request.error", { op, error });
       return Promise.reject(error);
     }
     const id = this.#nextId;
@@ -206,6 +240,7 @@ class SpeechWorkerClient {
       function onAbort() {
         const pending = client.#pending.get(id);
         if (!pending) return;
+        client.#trace("request.cancelled", { id, op, reason: signal?.reason });
         if (client.#role === "tts" && op === "use") {
           client.#pending.delete(id);
           pending.cleanup();
@@ -213,13 +248,16 @@ class SpeechWorkerClient {
           const cancelId = client.#nextId;
           client.#nextId += 1;
           try {
-            client.#transport.postMessage({
+            const cancellation = {
               protocol: SPEECH_WORKER_PROTOCOL,
               id: cancelId,
               op: "cancel",
               payload: { targetId: id },
-            });
+            };
+            client.#trace("request.dispatch", { message: cancellation }, true);
+            client.#transport.postMessage(cancellation);
           } catch (error) {
+            client.#trace("request.error", { id: cancelId, op: "cancel", error });
             const failure = clientError(
               "ARCANE_AI_WORKER_MESSAGE_ERROR",
               "Unable to cancel an operation in the speech Worker.",
@@ -251,8 +289,10 @@ class SpeechWorkerClient {
       };
       const transfers = collectSpeechTransferables(payload);
       try {
+        client.#trace("request.dispatch", { message }, true);
         client.#transport.postMessage(message, transfers);
       } catch (error) {
+        client.#trace("request.error", { id, op, error });
         client.#pending.delete(id);
         cleanup();
         const failure = clientError(
@@ -272,6 +312,7 @@ class SpeechWorkerClient {
   }
 
   async terminate(reason = null, { intentional = true } = {}) {
+    this.#trace("terminate.call", { reason, intentional });
     if (typeof intentional !== "boolean") {
       throw new TypeError("Speech Worker termination intent must be a boolean.");
     }
@@ -303,6 +344,7 @@ class SpeechWorkerClient {
       if (termination && typeof termination.then === "function") await termination;
     } finally {
       for (const pending of pendingOperations) pending.reject(terminationReason);
+      this.#trace("terminated", { reason: terminationReason, intentional });
       this.#onTermination(completeValue({ reason: terminationReason, intentional }));
     }
   }

@@ -1,3 +1,4 @@
+import { arcaneLogging } from 'arcane-os/logging';
 import { marked } from './Marked.min.js';
 import Is from '../../node_modules/strong-type/index.js';
 
@@ -45,7 +46,7 @@ class MD {
 
     set raw(value=''){
         if(!is.string(value)){
-            console.trace('MD.raw must be a string.');
+            arcaneLogging.trace('MD.raw must be a string.');
             return this.#raw;
         }
         this.#raw = value;
@@ -55,7 +56,7 @@ class MD {
 
     append(value=''){
         if(!is.string(value)){
-            console.trace('MD.append must be a string.');
+            arcaneLogging.trace('MD.append must be a string.');
             return this.#raw;
         }
         this.#raw += value;

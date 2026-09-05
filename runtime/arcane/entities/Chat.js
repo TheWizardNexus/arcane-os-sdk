@@ -1,3 +1,4 @@
+import { arcaneLogging } from 'arcane-os/logging';
 import Is from '../../node_modules/strong-type/index.js';
 import '../modules/DBOPFS.js';
 import '../modules/AI.js';
@@ -114,7 +115,7 @@ function structuralToolMessage(call){
 function storedStructuralToolCalls(value){
     if(value===undefined) return [];
     if(!Array.isArray(value)){
-        console.error('Arcane stored assistant tool calls were not an array and were not retained.');
+        arcaneLogging.error('Arcane stored assistant tool calls were not an array and were not retained.');
         return [];
     }
     const result=[];
@@ -122,7 +123,7 @@ function storedStructuralToolCalls(value){
         try{
             result.push(copyToolCalls([call])[0]);
         }catch(error){
-            console.error(
+            arcaneLogging.error(
                 `Arcane stored assistant tool call ${index+1} had no usable user-facing message and was not retained.`,
                 error
             );
@@ -840,7 +841,7 @@ class ChatEntity{
                     try{
                         return JSON.parse(row);
                     }catch(error){
-                        console.error(
+                        arcaneLogging.error(
                             `Arcane saved chat row ${index+1} could not be parsed.`,
                             error,
                             row
@@ -951,7 +952,7 @@ ${JSON.stringify(transcript)}`
             .map(message=>copyCompleteValue(message));
         const queued=this.#memoryQueue.then(()=>this.#writeMemory(snapshot,request));
         this.#memoryQueue=queued.catch(()=>{
-            console.warn('Unable to update chat memory.');
+            arcaneLogging.warn('Unable to update chat memory.');
             return false;
         });
         return this.#memoryQueue;

@@ -1,3 +1,4 @@
+import { arcaneLogging } from 'arcane-os/logging';
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 import GifEncoder from './GifEncoder.js';
 
@@ -252,7 +253,7 @@ function supportedRecorderType(Recorder){
 
 function reportDetachedError(error){
     if(typeof globalThis.reportError==='function')globalThis.reportError(error);
-    else globalThis.console?.error?.(error);
+    else arcaneLogging.error?.(error);
 }
 
 function monotonicNow(){

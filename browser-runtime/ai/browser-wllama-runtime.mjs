@@ -1,3 +1,4 @@
+import { arcaneLogging } from '../logging.mjs';
 import { Wllama } from "./wllama/index.mjs";
 
 const completeValue = (value) => value;
@@ -276,7 +277,7 @@ function initialEvidence() {
  * network or browser side effects until load() is called. Runtime URLs are
  * fixed relative to this module for npm and materialized /arcane/sdk trees.
  */
-export function createPackagedWllamaRuntime({ logger = console } = {}) {
+export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
   let engine = null;
   let pending = null;
   let inferenceActive = false;

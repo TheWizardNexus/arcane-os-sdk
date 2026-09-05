@@ -74,6 +74,8 @@
 </section>
 
 <script type="module">
+    const {arcaneLogging}=await import('arcane-os/logging');
+
     const host=this;
     const {default:MD}=await import('../modules/MD.js?v=2');
     const {
@@ -229,7 +231,7 @@
         emit('markdown-editor-change',detail,detail);
         if(options.onChange){
             Promise.resolve(options.onChange(detail)).catch(
-                error=>console.error('Markdown change callback failed:',error)
+                error=>arcaneLogging.error('Markdown change callback failed:',error)
             );
         }
     }
@@ -329,7 +331,7 @@
                 return false;
             }
             status.innerText=options.labels.saveError;
-            console.error('Unable to save Markdown content:',error);
+            arcaneLogging.error('Unable to save Markdown content:',error);
             return false;
         }finally{
             if(saveController===controller){

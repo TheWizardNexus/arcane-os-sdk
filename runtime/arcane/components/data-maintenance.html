@@ -13,6 +13,8 @@
 <html-import id="maintenanceModal" class="modal" href="./arcane/components/modal.html?v=13"></html-import>
 
 <script type="module">
+    const {arcaneLogging}=await import('arcane-os/logging');
+
     const host=this;
     const openButton=host.shadowRoot.querySelector('#openMaintenance');
     const maintenanceModal=host.shadowRoot.querySelector('#maintenanceModal');
@@ -36,7 +38,7 @@
         ()=>openMaintenance().catch(
             error=>{
                 if(!destroyed){
-                    console.error('Unable to open maintenance:',error);
+                    arcaneLogging.error('Unable to open maintenance:',error);
                 }
             }
         ),
@@ -127,7 +129,7 @@
                         return;
                     }
                     status.innerText='Unable to complete data maintenance.';
-                    console.error('Unable to clear empty chats and memories:',error);
+                    arcaneLogging.error('Unable to clear empty chats and memories:',error);
                 }finally{
                     if(!destroyed&&generation===clearGeneration){
                         clearButton.disabled=false;

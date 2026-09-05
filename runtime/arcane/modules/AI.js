@@ -12,6 +12,7 @@ import {
     getAIProviderRuntime
 } from './AIProviderRuntime.js';
 import {normalizeOllamaModelIdentifier} from './OllamaModelIdentifier.js';
+import {arcaneLogging} from 'arcane-os/logging';
 
 const completeValue=(value)=>value;
 
@@ -1177,8 +1178,49 @@ class AI {
     #builtInSpeechReadiness=Promise.resolve(null);
     #speechControlGeneration=0;
     #speechFailureSequence=0;
+    #speechDiagnosticSequence=0;
+    #speechJobSequence=0;
     #stopOllamaReady=null;
     #ttsSegmentation={...DEFAULT_TTS_SEGMENTATION};
+
+    #traceSpeech(phase,detail={}){
+        if(!arcaneLogging.enabled)return null;
+        const diagnosticId=++this.#speechDiagnosticSequence;
+        arcaneLogging.debug('[Arcane speech]',{
+            diagnosticId,
+            phase,
+            timestamp:new Date().toISOString(),
+            timeMs:globalThis.performance?.now?.()??Date.now(),
+            instanceId:this.#events?.instanceId,
+            generation:this.speechGeneration,
+            muted:this.muted,
+            ...detail
+        });
+        return diagnosticId;
+    }
+
+    #traceSpeechJob(phase,job,detail={}){
+        if(!arcaneLogging.enabled)return;
+        this.#traceSpeech(phase,{
+            jobId:job.diagnosticId,
+            callId:job.diagnosticCallId,
+            jobGeneration:job.generation,
+            state:job.state,
+            text:job.text,
+            voice:job.voice,
+            speed:job.speed,
+            pauseAfterMs:job.pauseAfterMs??0,
+            scheduledStart:job.scheduledStart,
+            scheduledEnd:job.scheduledEnd,
+            audioTime:job.audioContext?.currentTime,
+            audioContextState:job.audioContext?.state,
+            duration:job.audioBuffer?.duration,
+            sampleRate:job.audioBuffer?.sampleRate,
+            channels:job.audioBuffer?.numberOfChannels,
+            playbackRate:job.sourceNode?.playbackRate?.value,
+            ...detail
+        });
+    }
     #preferenceTuple=completeValue([
         'TWIN',
         'LOCAL_SPEACH',
@@ -2309,6 +2351,7 @@ class AI {
     }
 
     configureSpeechProviders(selections){
+        this.#traceSpeech('configureSpeechProviders.call',{selections});
         const prepared=this.#providerRuntime.validateSpeechConfiguration(selections);
         this.#assertDeviceSpeechConfiguration(prepared);
         this.#assertSynchronousBrowserSpeechSupersession(
@@ -2337,6 +2380,7 @@ class AI {
         );
         this.muted=true;
         this.stopAudio();
+        this.#traceSpeech('configureSpeechProviders.result',{configured});
         return configured;
     }
 
@@ -2408,6 +2452,7 @@ class AI {
     }
 
     async transitionSpeechProviders(selections){
+        this.#traceSpeech('transitionSpeechProviders.call',{selections});
         const prepared=this.#providerRuntime.validateSpeechConfiguration(selections);
         this.#assertDeviceSpeechConfiguration(prepared);
         await this.#supersedeBrowserSpeechForRouteChange();
@@ -2432,6 +2477,7 @@ class AI {
         });
         await this.#reconcileBuiltInSpeechReadiness();
         this.muted=true;
+        this.#traceSpeech('transitionSpeechProviders.result',{configured});
         return configured;
     }
 
@@ -2650,6 +2696,7 @@ class AI {
             ...(error?{error}:{}),
             reason
         });
+        this.#traceSpeech(type,{operationId,...compatibilityDetail});
         return this.#events.dispatch(
             type,
             compatibilityDetail,
@@ -3367,6 +3414,7 @@ class AI {
     }
 
     configureBrowserSpeech(configuration,options={}){
+        this.#traceSpeech('configureBrowserSpeech.call',{configuration,options});
         const normalized=normalizeBrowserSpeechConfiguration(configuration);
         const operation=normalizeBrowserSpeechOperationOptions(
             options,
@@ -3391,6 +3439,10 @@ class AI {
             )
             &&this.#browserSpeechRetiredRecords.size===0
             &&!this.#browserSpeechController){
+            this.#traceSpeech('configureBrowserSpeech.result',{
+                descriptor:this.#browserSpeechConfigurationRecord.descriptor,
+                reused:true
+            });
             return Promise.resolve(this.#browserSpeechConfigurationRecord.descriptor);
         }
         const operationId=this.#browserSpeechOperationId('configure-browser-speech');
@@ -3457,6 +3509,7 @@ class AI {
     }
 
     disposeBrowserSpeech(options={}){
+        this.#traceSpeech('disposeBrowserSpeech.call',{options});
         const operation=normalizeBrowserSpeechOperationOptions(
             options,
             'AI.disposeBrowserSpeech'
@@ -3687,6 +3740,7 @@ class AI {
     }
 
     async setSpeechMuted(muted){
+        const callId=this.#traceSpeech('setSpeechMuted.call',{requestedMuted:muted});
         if(typeof muted!=='boolean'){
             throw new TypeError('AI speech muted state must be a boolean.');
         }
@@ -3697,6 +3751,7 @@ class AI {
         }
         if(!this.#usesProviderRuntime('tts',this.ttsService)){
             if(generation===this.#speechControlGeneration)this.muted=muted;
+            this.#traceSpeech('setSpeechMuted.result',{callId,result:true});
             return true;
         }
         await this.#providerRuntime.setSpeechMuted(muted);
@@ -3706,6 +3761,7 @@ class AI {
                 ||status.state!=='ready'
                 ||status.loaded!==true;
         }
+        this.#traceSpeech('setSpeechMuted.result',{callId,result:true});
         return true;
     }
 
@@ -5174,7 +5230,7 @@ class AI {
             }
             if(receivedSseDone){
                 await reader.cancel('[DONE]').catch(
-                    error=>console.error('Arcane SSE reader cleanup failed.',error)
+                    error=>arcaneLogging.error('Arcane SSE reader cleanup failed.',error)
                 );
             }else{
                 sseBuffer+=decoder.decode();
@@ -5664,11 +5720,14 @@ class AI {
     }
 
     configureTTSSegmentation(options={}){
+        this.#traceSpeech('configureTTSSegmentation.call',{options});
         this.#ttsSegmentation=normalizeTTSSegmentation(
             options,
             this.#ttsSegmentation
         );
-        return this.ttsSegmentation;
+        const result=this.ttsSegmentation;
+        this.#traceSpeech('configureTTSSegmentation.result',{result});
+        return result;
     }
 
     streamTTS(
@@ -5676,10 +5735,12 @@ class AI {
         end=false,
         options={}
     ){
+        const callId=this.#traceSpeech('streamTTS.call',{text,end,options});
         if(this.muted){
             if(end){
                 this.audioMessageChunks='';
             }
+            this.#traceSpeech('streamTTS.result',{callId,result:false,reason:'muted'});
             return Promise.resolve(false);
         }
 
@@ -5691,14 +5752,20 @@ class AI {
 
         this.audioMessageChunks+=String(text||'');
         const outputs=this.#extractSpeechSegments(end);
+        this.#traceSpeech('streamTTS.segments',{
+            callId,segments:outputs,remainder:this.audioMessageChunks,
+            segmentation:this.ttsSegmentation
+        });
 
         if(!outputs.length){
+            this.#traceSpeech('streamTTS.result',{callId,result:true,reason:'buffered'});
             return Promise.resolve(true);
         }
 
         try{
             this.#assertServiceConfigured(this.ttsService,'tts');
         }catch(error){
+            this.#traceSpeech('streamTTS.error',{callId,error});
             this.#publishTTSFailure(error,{
                 boundary:'synthesis',
                 generation:this.speechGeneration
@@ -5708,9 +5775,11 @@ class AI {
 
         const generation=this.speechGeneration;
         const jobs=[];
+        const runtime=this;
 
         for(const [index,output] of outputs.entries()){
             jobs.push(this.#queueSpeechJob(output,generation,{
+                diagnosticCallId:callId,
                 voice,
                 speed,
                 waitForPlayback,
@@ -5720,12 +5789,17 @@ class AI {
 
         return Promise.all(jobs).then(
             function reportQueuedSpeechResult(results){
-                return results.every(Boolean);
+                const result=results.every(Boolean);
+                runtime.#traceSpeech('streamTTS.result',{
+                    callId,result,results,waitForPlayback
+                });
+                return result;
             }
         );
     }
 
     finishTTS(){
+        this.#traceSpeech('finishTTS.call');
         return this.streamTTS('',true);
     }
 
@@ -5871,6 +5945,8 @@ class AI {
 
     #queueSpeechJob(text,generation,options={}){
         const job={
+            diagnosticId:++this.#speechJobSequence,
+            diagnosticCallId:options.diagnosticCallId,
             abortController:null,
             audioBuffer:null,
             audioContext:null,
@@ -5893,6 +5969,7 @@ class AI {
             :null;
 
         this.speechJobs.push(job);
+        this.#traceSpeechJob('queue.add',job,{queuePosition:this.speechJobs.length-1});
 
         const preparation=Promise.resolve().then(
             function synthesizeAvailableSpeech(){
@@ -5916,7 +5993,9 @@ class AI {
         }
 
         job.state='synthesizing';
+        this.#traceSpeechJob('generation.start',job);
         const audio=await this.#requestSpeechAudio(job);
+        this.#traceSpeechJob('generation.result',job,{audio});
 
         if(job.generation!==this.speechGeneration||this.muted){
             return this.#cancelSpeechJob(job);
@@ -5939,16 +6018,18 @@ class AI {
         const voice=job.voice===undefined
             ?(selection?this.#providerSpeechVoice():null)
             :job.voice;
+        const payload={
+            model:selection?.modelId||this.modelTTS,
+            input:job.text,
+            ...(job.voice!==undefined||voice?{voice}:{}),
+            responseFormat:selection
+                ?this.#providerSpeechResponseFormat()
+                :this.audioFormat,
+            speed:job.speed===undefined?this.voiceSpeed:job.speed
+        };
+        this.#traceSpeechJob('generation.request',job,{payload,selection});
         const response=await this.fetchTTS(
-            {
-                model:selection?.modelId||this.modelTTS,
-                input:job.text,
-                ...(job.voice!==undefined||voice?{voice}:{}),
-                responseFormat:selection
-                    ?this.#providerSpeechResponseFormat()
-                    :this.audioFormat,
-                speed:job.speed===undefined?this.voiceSpeed:job.speed
-            },
+            payload,
             job.abortController.signal
         );
         return this.#normalizeProviderSpeechAudio(response);
@@ -6099,213 +6180,241 @@ class AI {
     }
 
     async fetchTTS(payload={},signal=null){
-        this.#assertServiceConfigured(this.ttsService,'tts');
-        if(!payload
-            ||typeof payload!=='object'
-            ||Array.isArray(payload)
-            ||![Object.prototype,null].includes(Object.getPrototypeOf(payload))){
-            const error=new TypeError('AI.fetchTTS requires a speech request object.');
-            error.code='ARCANE_AI_TTS_REQUEST_INVALID';
-            throw error;
-        }
-        const descriptors=Object.getOwnPropertyDescriptors(payload);
-        const acceptedKeys=new Set([
-            'model',
-            'voice',
-            'input',
-            'responseFormat',
-            'speed'
-        ]);
-        for(const key of Reflect.ownKeys(descriptors)){
-            if(typeof key==='symbol'
-                ||!acceptedKeys.has(key)
-                ||!Object.hasOwn(descriptors[key],'value')){
-                const error=new TypeError(
-                    'AI.fetchTTS accepts only model, voice, input, responseFormat, and speed data properties.'
-                );
+        const callId=this.#traceSpeech('fetchTTS.call',{payload,aborted:signal?.aborted});
+        try{
+            this.#assertServiceConfigured(this.ttsService,'tts');
+            if(!payload
+                ||typeof payload!=='object'
+                ||Array.isArray(payload)
+                ||![Object.prototype,null].includes(Object.getPrototypeOf(payload))){
+                const error=new TypeError('AI.fetchTTS requires a speech request object.');
                 error.code='ARCANE_AI_TTS_REQUEST_INVALID';
                 throw error;
             }
-        }
-        if(signal&&(
-            typeof signal.aborted!=='boolean'
-            ||typeof signal.addEventListener!=='function'
-            ||typeof signal.removeEventListener!=='function'
-        )){
-            const error=new TypeError('AI.fetchTTS signal must be an AbortSignal.');
-            error.code='ARCANE_AI_TTS_SIGNAL_INVALID';
-            throw error;
-        }
-        if(signal?.aborted){
-            throw normalizeAIRequestAbort(signal.reason);
-        }
-
-        const input=descriptors.input?.value;
-        if(typeof input!=='string'||!input.trim()){
-            const error=new TypeError('AI.fetchTTS input must be nonempty text.');
-            error.code='ARCANE_AI_TTS_INPUT_INVALID';
-            throw error;
-        }
-        const selection=this.#providerRuntime.selection('tts');
-        const requestedModel=descriptors.model?.value;
-        if(requestedModel!==undefined
-            &&(typeof requestedModel!=='string'
-                ||requestedModel.trim()!==requestedModel
-                ||!requestedModel)){
-            const error=new TypeError(
-                'AI.fetchTTS model must be a nonempty trimmed string when provided.'
-            );
-            error.code='ARCANE_AI_TTS_MODEL_INVALID';
-            throw error;
-        }
-        const model=requestedModel
-            ||selection?.modelId
-            ||this.modelTTS
-            ||'';
-        if(!model){
-            const error=new TypeError('AI.fetchTTS model must be selected explicitly.');
-            error.code='ARCANE_AI_TTS_MODEL_REQUIRED';
-            throw error;
-        }
-        if(selection&&model!==selection.modelId){
-            const error=new TypeError(
-                'AI.fetchTTS model must match the admitted TTS route.'
-            );
-            error.code='ARCANE_AI_TTS_MODEL_SELECTION_MISMATCH';
-            throw error;
-        }
-        const requestedVoice=descriptors.voice?.value;
-        if(requestedVoice!==undefined
-            &&(typeof requestedVoice!=='string'
-                ||requestedVoice.trim()!==requestedVoice
-                ||!requestedVoice)){
-            const error=new TypeError(
-                'AI.fetchTTS voice must be a nonempty trimmed string when provided.'
-            );
-            error.code='ARCANE_AI_TTS_VOICE_INVALID';
-            throw error;
-        }
-        const voice=requestedVoice
-            ?requestedVoice
-            :selection
-                ?this.#providerSpeechVoice()
-                :this.#builtInSpeechDefaultVoice('tts',this.ttsService);
-        if(!voice){
-            const error=new TypeError(
-                'AI.fetchTTS requires a caller- or model-catalog-admitted voice.'
-            );
-            error.code='ARCANE_AI_TTS_VOICE_REQUIRED';
-            throw error;
-        }
-        const requestedResponseFormat=descriptors.responseFormat?.value;
-        if(requestedResponseFormat!==undefined
-            &&(typeof requestedResponseFormat!=='string'
-                ||requestedResponseFormat.trim()!==requestedResponseFormat
-                ||!requestedResponseFormat)){
-            const error=new TypeError(
-                'AI.fetchTTS responseFormat must be a nonempty trimmed string when provided.'
-            );
-            error.code='ARCANE_AI_TTS_RESPONSE_FORMAT_INVALID';
-            throw error;
-        }
-        const responseFormat=requestedResponseFormat
-            ||(selection?this.#providerSpeechResponseFormat():this.audioFormat)
-            ||'';
-        if(!responseFormat){
-            const error=new TypeError('AI.fetchTTS responseFormat must be nonempty.');
-            error.code='ARCANE_AI_TTS_RESPONSE_FORMAT_INVALID';
-            throw error;
-        }
-        const speed=descriptors.speed
-            ?Number(descriptors.speed.value)
-            :this.voiceSpeed;
-        if(!Number.isFinite(speed)||speed<=0){
-            const error=new RangeError('AI.fetchTTS speed must be a positive number.');
-            error.code='ARCANE_AI_TTS_SPEED_INVALID';
-            throw error;
-        }
-
-        if(selection){
-            const response=await this.#providerRuntime.request(
-                'tts',
-                {
-                    operation:'synthesize',
-                    payload:{model,voice,input,responseFormat,speed},
-                    localOnly:false,
-                    signal
+            const descriptors=Object.getOwnPropertyDescriptors(payload);
+            const acceptedKeys=new Set([
+                'model',
+                'voice',
+                'input',
+                'responseFormat',
+                'speed'
+            ]);
+            for(const key of Reflect.ownKeys(descriptors)){
+                if(typeof key==='symbol'
+                    ||!acceptedKeys.has(key)
+                    ||!Object.hasOwn(descriptors[key],'value')){
+                    const error=new TypeError(
+                        'AI.fetchTTS accepts only model, voice, input, responseFormat, and speed data properties.'
+                    );
+                    error.code='ARCANE_AI_TTS_REQUEST_INVALID';
+                    throw error;
                 }
-            );
-            if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
-            const audio=await this.#normalizeProviderSpeechBlob(response);
-            if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
-            return audio;
-        }
+            }
+            if(signal&&(
+                typeof signal.aborted!=='boolean'
+                ||typeof signal.addEventListener!=='function'
+                ||typeof signal.removeEventListener!=='function'
+            )){
+                const error=new TypeError('AI.fetchTTS signal must be an AbortSignal.');
+                error.code='ARCANE_AI_TTS_SIGNAL_INVALID';
+                throw error;
+            }
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort(signal.reason);
+            }
 
-        return this.#requestBuiltInSpeechSynthesis(
-            {model,voice,input,responseFormat,speed},
-            signal
-        );
+            const input=descriptors.input?.value;
+            if(typeof input!=='string'||!input.trim()){
+                const error=new TypeError('AI.fetchTTS input must be nonempty text.');
+                error.code='ARCANE_AI_TTS_INPUT_INVALID';
+                throw error;
+            }
+            const selection=this.#providerRuntime.selection('tts');
+            const requestedModel=descriptors.model?.value;
+            if(requestedModel!==undefined
+                &&(typeof requestedModel!=='string'
+                    ||requestedModel.trim()!==requestedModel
+                    ||!requestedModel)){
+                const error=new TypeError(
+                    'AI.fetchTTS model must be a nonempty trimmed string when provided.'
+                );
+                error.code='ARCANE_AI_TTS_MODEL_INVALID';
+                throw error;
+            }
+            const model=requestedModel
+                ||selection?.modelId
+                ||this.modelTTS
+                ||'';
+            if(!model){
+                const error=new TypeError('AI.fetchTTS model must be selected explicitly.');
+                error.code='ARCANE_AI_TTS_MODEL_REQUIRED';
+                throw error;
+            }
+            if(selection&&model!==selection.modelId){
+                const error=new TypeError(
+                    'AI.fetchTTS model must match the admitted TTS route.'
+                );
+                error.code='ARCANE_AI_TTS_MODEL_SELECTION_MISMATCH';
+                throw error;
+            }
+            const requestedVoice=descriptors.voice?.value;
+            if(requestedVoice!==undefined
+                &&(typeof requestedVoice!=='string'
+                    ||requestedVoice.trim()!==requestedVoice
+                    ||!requestedVoice)){
+                const error=new TypeError(
+                    'AI.fetchTTS voice must be a nonempty trimmed string when provided.'
+                );
+                error.code='ARCANE_AI_TTS_VOICE_INVALID';
+                throw error;
+            }
+            const voice=requestedVoice
+                ?requestedVoice
+                :selection
+                    ?this.#providerSpeechVoice()
+                    :this.#builtInSpeechDefaultVoice('tts',this.ttsService);
+            if(!voice){
+                const error=new TypeError(
+                    'AI.fetchTTS requires a caller- or model-catalog-admitted voice.'
+                );
+                error.code='ARCANE_AI_TTS_VOICE_REQUIRED';
+                throw error;
+            }
+            const requestedResponseFormat=descriptors.responseFormat?.value;
+            if(requestedResponseFormat!==undefined
+                &&(typeof requestedResponseFormat!=='string'
+                    ||requestedResponseFormat.trim()!==requestedResponseFormat
+                    ||!requestedResponseFormat)){
+                const error=new TypeError(
+                    'AI.fetchTTS responseFormat must be a nonempty trimmed string when provided.'
+                );
+                error.code='ARCANE_AI_TTS_RESPONSE_FORMAT_INVALID';
+                throw error;
+            }
+            const responseFormat=requestedResponseFormat
+                ||(selection?this.#providerSpeechResponseFormat():this.audioFormat)
+                ||'';
+            if(!responseFormat){
+                const error=new TypeError('AI.fetchTTS responseFormat must be nonempty.');
+                error.code='ARCANE_AI_TTS_RESPONSE_FORMAT_INVALID';
+                throw error;
+            }
+            const speed=descriptors.speed
+                ?Number(descriptors.speed.value)
+                :this.voiceSpeed;
+            if(!Number.isFinite(speed)||speed<=0){
+                const error=new RangeError('AI.fetchTTS speed must be a positive number.');
+                error.code='ARCANE_AI_TTS_SPEED_INVALID';
+                throw error;
+            }
+
+            if(selection){
+                this.#traceSpeech('fetchTTS.dispatch',{
+                    callId,selection,payload:{model,voice,input,responseFormat,speed}
+                });
+                const response=await this.#providerRuntime.request(
+                    'tts',
+                    {
+                        operation:'synthesize',
+                        payload:{model,voice,input,responseFormat,speed},
+                        localOnly:false,
+                        signal
+                    }
+                );
+                this.#traceSpeech('fetchTTS.providerResult',{callId,response});
+                if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
+                const audio=await this.#normalizeProviderSpeechBlob(response);
+                if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
+                this.#traceSpeech('fetchTTS.result',{callId,audio});
+                return audio;
+            }
+
+            this.#traceSpeech('fetchTTS.dispatch',{
+                callId,service:this.ttsService,payload:{model,voice,input,responseFormat,speed}
+            });
+            const audio=await this.#requestBuiltInSpeechSynthesis(
+                {model,voice,input,responseFormat,speed},
+                signal
+            );
+            this.#traceSpeech('fetchTTS.result',{callId,audio});
+            return audio;
+        }catch(error){
+            this.#traceSpeech('fetchTTS.error',{callId,error});
+            throw error;
+        }
     }
 
     async fetchSTT(audioFile,signal=null){
-        this.#assertServiceConfigured(this.sttService,'stt');
-        if(signal&&(
-            typeof signal.aborted!=='boolean'
-            ||typeof signal.addEventListener!=='function'
-            ||typeof signal.removeEventListener!=='function'
-        )){
-            const error=new TypeError('AI.fetchSTT signal must be an AbortSignal.');
-            error.code='ARCANE_AI_STT_SIGNAL_INVALID';
-            throw error;
-        }
-        if(signal?.aborted){
-            throw normalizeAIRequestAbort(signal.reason);
-        }
-
-        if(this.#usesProviderRuntime('stt',this.sttService)){
-            const response=await this.#providerRuntime.request(
-                'stt',
-                {
-                    operation:'transcribe',
-                    payload:{
-                        audio:audioFile,
-                        mimeType:typeof Blob==='function'
-                            &&audioFile instanceof Blob
-                            ?String(audioFile.type||'audio/webm')
-                            :'audio/webm',
-                        model:this.#providerRuntime.selection('stt')?.modelId
-                    },
-                    localOnly:false,
-                    signal
-                }
-            );
-            const text=typeof response==='string'
-                ?response
-                :response?.text;
-            if(typeof text!=='string'){
-                const error=new TypeError(
-                    'Arcane returned an invalid provider speech transcription.'
-                );
-                error.code='ARCANE_AI_STT_PROVIDER_TRANSCRIPT_INVALID';
+        const callId=this.#traceSpeech('fetchSTT.call',{audioFile,aborted:signal?.aborted});
+        try{
+            this.#assertServiceConfigured(this.sttService,'stt');
+            if(signal&&(
+                typeof signal.aborted!=='boolean'
+                ||typeof signal.addEventListener!=='function'
+                ||typeof signal.removeEventListener!=='function'
+            )){
+                const error=new TypeError('AI.fetchSTT signal must be an AbortSignal.');
+                error.code='ARCANE_AI_STT_SIGNAL_INVALID';
                 throw error;
             }
-            if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
-            return text;
-        }
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort(signal.reason);
+            }
 
-        const text=await this.#requestBuiltInSpeechTranscription(
-            {
-                audio:audioFile,
-                mimeType:String(audioFile?.type||'audio/webm'),
-                model:this.modelSTT
-            },
-            signal
-        );
-        if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
-        return text;
+            if(this.#usesProviderRuntime('stt',this.sttService)){
+                const response=await this.#providerRuntime.request(
+                    'stt',
+                    {
+                        operation:'transcribe',
+                        payload:{
+                            audio:audioFile,
+                            mimeType:typeof Blob==='function'
+                                &&audioFile instanceof Blob
+                                ?String(audioFile.type||'audio/webm')
+                                :'audio/webm',
+                            model:this.#providerRuntime.selection('stt')?.modelId
+                        },
+                        localOnly:false,
+                        signal
+                    }
+                );
+                this.#traceSpeech('fetchSTT.providerResult',{callId,response});
+                const text=typeof response==='string'
+                    ?response
+                    :response?.text;
+                if(typeof text!=='string'){
+                    const error=new TypeError(
+                        'Arcane returned an invalid provider speech transcription.'
+                    );
+                    error.code='ARCANE_AI_STT_PROVIDER_TRANSCRIPT_INVALID';
+                    throw error;
+                }
+                if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
+                this.#traceSpeech('fetchSTT.result',{callId,text});
+                return text;
+            }
+
+            const text=await this.#requestBuiltInSpeechTranscription(
+                {
+                    audio:audioFile,
+                    mimeType:String(audioFile?.type||'audio/webm'),
+                    model:this.modelSTT
+                },
+                signal
+            );
+            if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
+            this.#traceSpeech('fetchSTT.result',{callId,text});
+            return text;
+        }catch(error){
+            this.#traceSpeech('fetchSTT.error',{callId,error});
+            throw error;
+        }
     }
 
     stopAudio(){
+        const callId=this.#traceSpeech('stopAudio.call',{
+            remainder:this.audioMessageChunks,queuedJobs:this.speechJobs.length
+        });
         this.speechGeneration+=1;
         this.speechResumeAttempt+=1;
         this.speechResumePending=false;
@@ -6318,6 +6427,7 @@ class AI {
         for(const job of this.speechJobs){
             job.abortController?.abort();
             job.state='cancelled';
+            this.#traceSpeechJob('queue.cancelled',job,{reason:'stopAudio',callId});
             job.resolvePlayback?.(false);
             job.resolvePlayback=null;
 
@@ -6333,7 +6443,7 @@ class AI {
                 try{
                     sourceNode.stop();
                 }catch(error){
-                    console.warn('AI audio could not be stopped cleanly.');
+                    arcaneLogging.warn('AI audio could not be stopped cleanly.',error);
                 }
             }
 
@@ -6344,11 +6454,16 @@ class AI {
         this.sourceNodes.splice(0);
         this.currentSpeechJob=null;
         this.isSpeaking=false;
+        this.#traceSpeech('stopAudio.result',{callId,result:true});
         return true;
     }
 
     async resumeAudio(audioContext=null,fromUserGesture=true){
+        const callId=this.#traceSpeech('resumeAudio.call',{
+            fromUserGesture,audioContextState:audioContext?.state
+        });
         if(this.muted){
+            this.#traceSpeech('resumeAudio.result',{callId,result:false,reason:'muted'});
             return false;
         }
 
@@ -6361,23 +6476,37 @@ class AI {
 
         try{
             context=audioContext||this.#getSpeechAudioContext();
+            this.#traceSpeech('resumeAudio.context',{
+                callId,state:context.state,audioTime:context.currentTime,
+                sampleRate:context.sampleRate
+            });
 
             if(context.state==='running'){
                 this.#clearSpeechUnlock();
                 this.#requestSpeechPlayback();
+                this.#traceSpeech('resumeAudio.result',{callId,result:true});
                 return true;
             }
 
             if(typeof context.resume!=='function'){
                 this.#waitForSpeechGesture(null,context);
+                this.#traceSpeech('resumeAudio.result',{
+                    callId,result:false,reason:'resume-unavailable'
+                });
                 return false;
             }
 
             attempt=++this.speechResumeAttempt;
             this.speechResumePending=true;
             await context.resume();
+            this.#traceSpeech('resumeAudio.resumed',{
+                callId,state:context.state,audioTime:context.currentTime
+            });
 
             if(attempt!==this.speechResumeAttempt){
+                this.#traceSpeech('resumeAudio.result',{
+                    callId,result:context.state==='running',reason:'superseded'
+                });
                 return context.state==='running';
             }
 
@@ -6386,9 +6515,11 @@ class AI {
             if(context.state==='running'){
                 this.#clearSpeechUnlock();
                 this.#requestSpeechPlayback();
+                this.#traceSpeech('resumeAudio.result',{callId,result:true});
                 return true;
             }
         }catch(error){
+            this.#traceSpeech('resumeAudio.error',{callId,error,state:context?.state});
             if(attempt&&attempt!==this.speechResumeAttempt){
                 return context?.state==='running';
             }
@@ -6423,6 +6554,9 @@ class AI {
         }
 
         this.#waitForSpeechGesture(null,context);
+        this.#traceSpeech('resumeAudio.result',{
+            callId,result:false,reason:'waiting-for-gesture',state:context?.state
+        });
         return false;
     }
 
@@ -6433,7 +6567,11 @@ class AI {
         audioType=this.audioType,
         speechJob=null
     ){
+        this.#traceSpeech('playAudio.call',{
+            audioChunks,audioType,jobId:speechJob?.diagnosticId
+        });
         const job=speechJob||{
+            diagnosticId:++this.#speechJobSequence,
             abortController:null,
             audioBuffer:null,
             audioContext:null,
@@ -6461,6 +6599,10 @@ class AI {
             const audioBlob=new Blob(audioChunks,{type:audioType});
             const arrayBuffer=await audioBlob.arrayBuffer();
             const audioBuffer=await playbackContext.decodeAudioData(arrayBuffer);
+            this.#traceSpeechJob('decode.result',job,{
+                duration:audioBuffer.duration,sampleRate:audioBuffer.sampleRate,
+                channels:audioBuffer.numberOfChannels,audioBuffer
+            });
 
             if(this.muted||job.generation!==this.speechGeneration){
                 return this.#cancelSpeechJob(job);
@@ -6473,12 +6615,14 @@ class AI {
             preparedSource.connect(playbackContext.destination);
             preparedSource.__arcaneStarted=false;
             preparedSource.onended=function finishQueuedSpeechSource(){
+                runtime.#traceSpeechJob('playback.ended',job);
                 runtime.nextSentance(job);
             };
             job.audioBuffer=audioBuffer;
             job.audioContext=preparedSource.context||playbackContext;
             job.sourceNode=preparedSource;
             job.state='ready';
+            this.#traceSpeechJob('queue.ready',job);
             this.sourceNodes.push(preparedSource);
             this.#requestSpeechPlayback();
             return true;
@@ -6496,7 +6640,7 @@ class AI {
                     runtime.#failSpeechJob(job,error,'playback-start');
                     return;
                 }
-                console.error('AI audio playback failed without an active speech job.',error);
+                arcaneLogging.error('AI audio playback failed without an active speech job.',error);
             }
         );
     }
@@ -6593,6 +6737,13 @@ class AI {
                     }
                     this.isSpeaking=true;
                     job.sourceNode.start(scheduledStart);
+                    this.#traceSpeechJob('playback.scheduled',job,{
+                        audioEnd:hasKnownDuration?scheduledStart+duration:null,
+                        previousScheduledEnd:this.speechScheduleTime,
+                        sameAudioContext:previousContext===audioContext,
+                        gapSeconds:previousContext===audioContext
+                            ?scheduledStart-this.speechScheduleTime:null
+                    });
                     scheduled=true;
                     this.speechScheduleContext=audioContext;
                     if(job.scheduledEnd===null){
@@ -6610,7 +6761,7 @@ class AI {
             if(activeJob){
                 this.#failSpeechJob(activeJob,error,'playback-start');
             }else if(!this.muted&&!isAIRequestAbort(error)){
-                console.error('AI audio playback failed without an active speech job.',error);
+                arcaneLogging.error('AI audio playback failed without an active speech job.',error);
             }
             return false;
         }finally{
@@ -6640,6 +6791,7 @@ class AI {
     }
 
     nextSentance(job=this.currentSpeechJob){
+        this.#traceSpeech('nextSentance.call',{jobId:job?.diagnosticId});
         if(!job||job.generation!==this.speechGeneration){
             return false;
         }
@@ -6654,6 +6806,7 @@ class AI {
                 (Number(job.audioContext?.currentTime)||0)+job.pauseAfterMs/1000;
         }
         job.state='complete';
+        this.#traceSpeechJob('queue.complete',job);
         this.#removeSpeechJob(job);
 
         if(this.currentSpeechJob===job){
@@ -6676,6 +6829,7 @@ class AI {
     #cancelSpeechJob(job){
         job.abortController?.abort();
         job.state='cancelled';
+        this.#traceSpeechJob('queue.cancelled',job);
         this.#removeSpeechJob(job);
         return false;
     }
@@ -6705,7 +6859,7 @@ class AI {
         const operationId=
             `${this.#events.instanceId}:tts-failure:${(++this.#speechFailureSequence).toString(36)}`;
 
-        console.error(`AI speech ${normalizedBoundary} failed.`,error);
+        arcaneLogging.error(`AI speech ${normalizedBoundary} failed.`,error);
 
         try{
             const {occurrence}=this.#events.dispatch(
@@ -6729,7 +6883,7 @@ class AI {
             );
             projectArcaneDOMEvent(window,occurrence);
         }catch(reportingError){
-            console.error(
+            arcaneLogging.error(
                 'AI speech failure could not be published to the runtime event boundary.',
                 reportingError
             );
@@ -6744,6 +6898,7 @@ class AI {
         }
 
         job.state='failed';
+        this.#traceSpeechJob('queue.failed',job,{boundary,error});
 
         this.#publishTTSFailure(error,{
             boundary,
@@ -6795,6 +6950,9 @@ class AI {
         if(this.speechUnlockHandler){
             return false;
         }
+        this.#traceSpeech('playback.waitingForGesture',{
+            error,audioContextState:audioContext?.state
+        });
 
         const runtime=this;
         const target=window;
@@ -6817,7 +6975,7 @@ class AI {
         );
 
         if(error?.name&&error.name!=='NotAllowedError'){
-            console.info('AI speech is waiting for audio playback permission.');
+            arcaneLogging.info('AI speech is waiting for audio playback permission.');
         }
 
         return true;

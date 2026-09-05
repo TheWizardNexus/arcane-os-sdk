@@ -1,3 +1,4 @@
+import {arcaneLogging} from 'arcane-os/logging';
 import {
     AI_RUNTIME_ROLES,
     getAIRuntimeState,
@@ -1708,6 +1709,7 @@ export class AIProviderRuntime {
     }
 
     get speechMuted() {
+        arcaneLogging.debug('[Arcane speech runtime] speechMuted', this.#speechMuted);
         return this.#speechMuted;
     }
 
@@ -1719,6 +1721,9 @@ export class AIProviderRuntime {
         this.#assertOpen();
         this.#assertNotConfiguring();
         const admitted = validateProvider(provider);
+        if (SPEECH_ROLES.includes(admitted.role)) {
+            arcaneLogging.debug('[Arcane speech runtime] register', provider);
+        }
         const key = providerKey(admitted.role, admitted.id);
         const existing = this.#providers.get(key);
         if (existing && existing !== admitted) {
@@ -1785,10 +1790,17 @@ export class AIProviderRuntime {
             }
         }
 
-        return this.#createProviderUnregisterHandle(admitted);
+        const unregister = this.#createProviderUnregisterHandle(admitted);
+        if (SPEECH_ROLES.includes(admitted.role)) {
+            arcaneLogging.debug('[Arcane speech runtime] register.result', admitted.role, admitted.id, unregister);
+        }
+        return unregister;
     }
 
     unregister(role, providerId, expectedProvider = null) {
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] unregister', role, providerId, expectedProvider);
+        }
         this.#assertOpen();
         this.#assertNotConfiguring();
         assertRole(role);
@@ -1796,6 +1808,9 @@ export class AIProviderRuntime {
         const key = providerKey(role, providerId);
         const provider = this.#providers.get(key);
         if (!provider || (expectedProvider && provider !== expectedProvider)) {
+            if (SPEECH_ROLES.includes(role)) {
+                arcaneLogging.debug('[Arcane speech runtime] unregister.result', role, providerId, false);
+            }
             return false;
         }
 
@@ -1809,16 +1824,29 @@ export class AIProviderRuntime {
         }
         this.#providers.delete(key);
         this.#disposeAllCompletedProviders.delete(provider);
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] unregister.result', role, providerId, true);
+        }
         return true;
     }
 
     hasProvider(role, providerId) {
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] hasProvider', role, providerId);
+        }
         assertRole(role);
         assertIdentifier(providerId, 'AI provider id');
-        return this.#providers.has(providerKey(role, providerId));
+        const result = this.#providers.has(providerKey(role, providerId));
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] hasProvider.result', role, providerId, result);
+        }
+        return result;
     }
 
     ownsProvider(role, expectedProvider) {
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] ownsProvider', role, expectedProvider);
+        }
         if (!ROLE_SET.has(role)) {
             throw speechProviderReplacementError(
                 'ARCANE_AI_PROVIDER_IDENTITY_ROLE_INVALID',
@@ -1846,17 +1874,27 @@ export class AIProviderRuntime {
             );
         }
 
-        return this.#providers.get(providerKey(role, admitted.id)) === admitted;
+        const result = this.#providers.get(providerKey(role, admitted.id)) === admitted;
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] ownsProvider.result', role, admitted.id, result);
+        }
+        return result;
     }
 
     providerIdentity(role, providerId) {
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] providerIdentity', role, providerId);
+        }
         assertRole(role);
         assertIdentifier(providerId, 'AI provider id');
         const provider = this.#providers.get(providerKey(role, providerId)) ?? null;
         if (!provider) {
+            if (SPEECH_ROLES.includes(role)) {
+                arcaneLogging.debug('[Arcane speech runtime] providerIdentity.result', role, providerId, null);
+            }
             return null;
         }
-        return completeValue(
+        const result = completeValue(
             {
                 protocol: provider.protocol,
                 role: provider.role,
@@ -1864,9 +1902,16 @@ export class AIProviderRuntime {
                 localOnly: provider.localOnly
             }
         );
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] providerIdentity.result', role, providerId, result);
+        }
+        return result;
     }
 
     selection(role, options = {}) {
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] selection', role, options);
+        }
         assertRole(role);
         assertPlainObject(options, 'AI provider route options');
         for (const key of Reflect.ownKeys(options)) {
@@ -1881,16 +1926,28 @@ export class AIProviderRuntime {
             fail('AI provider route localOnly must be a boolean.');
         }
         const slot = this.#slots[role];
-        return localOnly ? slot.routes.localOnly : slot.routes.default;
+        const selection = localOnly ? slot.routes.localOnly : slot.routes.default;
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] selection.result', role, selection);
+        }
+        return selection;
     }
 
     ownsSelection(role, providerId, options = {}) {
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] ownsSelection', role, providerId, options);
+        }
         assertRole(role);
         assertIdentifier(providerId, 'AI provider id');
-        return this.selection(role, options)?.providerId === providerId;
+        const result = this.selection(role, options)?.providerId === providerId;
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] ownsSelection.result', role, providerId, result);
+        }
+        return result;
     }
 
     validateConfiguration(value) {
+        arcaneLogging.debug('[Arcane speech runtime] validateConfiguration', value);
         this.#assertOpen();
         const selections = immutableSelections(value);
         for (const role of AI_RUNTIME_ROLES) {
@@ -1910,10 +1967,12 @@ export class AIProviderRuntime {
                 }
             }
         }
+        arcaneLogging.debug('[Arcane speech runtime] validateConfiguration.result', selections);
         return selections;
     }
 
     validateSpeechConfiguration(value) {
+        arcaneLogging.debug('[Arcane speech runtime] validateSpeechConfiguration', value);
         this.#assertOpen();
         const selections = immutableSpeechSelections(value);
         for (const role of SPEECH_ROLES) {
@@ -1933,10 +1992,12 @@ export class AIProviderRuntime {
                 }
             }
         }
+        arcaneLogging.debug('[Arcane speech runtime] validateSpeechConfiguration.result', selections);
         return selections;
     }
 
     configure(value) {
+        arcaneLogging.debug('[Arcane speech runtime] configure', value);
         this.#assertOpen();
         if (this.#configuring) {
             throw operationError(
@@ -1977,10 +2038,12 @@ export class AIProviderRuntime {
         } finally {
             this.#configuring = false;
         }
+        arcaneLogging.debug('[Arcane speech runtime] configure.result', selections);
         return selections;
     }
 
     configureSpeech(value) {
+        arcaneLogging.debug('[Arcane speech runtime] configureSpeech', value);
         this.#assertOpen();
         if (this.#configuring) {
             throw operationError(
@@ -2022,10 +2085,12 @@ export class AIProviderRuntime {
         } finally {
             this.#configuring = false;
         }
+        arcaneLogging.debug('[Arcane speech runtime] configureSpeech.result', selections);
         return selections;
     }
 
     replaceSpeechProvider(role, value) {
+        arcaneLogging.debug('[Arcane speech runtime] replaceSpeechProvider', role, value);
         this.#assertOpen();
         if (this.#configuring) {
             throw speechProviderReplacementError(
@@ -2036,7 +2101,9 @@ export class AIProviderRuntime {
         }
         this.#configuring = true;
         try {
-            return this.#commitSpeechProviderRoleReplacement(role, value);
+            const result = this.#commitSpeechProviderRoleReplacement(role, value);
+            arcaneLogging.debug('[Arcane speech runtime] replaceSpeechProvider.result', role, result);
+            return result;
         } finally {
             this.#configuring = false;
         }
@@ -2191,6 +2258,7 @@ export class AIProviderRuntime {
     }
 
     replaceSpeechProviders(value) {
+        arcaneLogging.debug('[Arcane speech runtime] replaceSpeechProviders', value);
         this.#assertOpen();
         if (this.#configuring) {
             throw speechProviderReplacementError(
@@ -2201,7 +2269,9 @@ export class AIProviderRuntime {
         }
         this.#configuring = true;
         try {
-            return this.#commitSpeechProviderReplacement(value);
+            const result = this.#commitSpeechProviderReplacement(value);
+            arcaneLogging.debug('[Arcane speech runtime] replaceSpeechProviders.result', result);
+            return result;
         } finally {
             this.#configuring = false;
         }
@@ -2366,6 +2436,7 @@ export class AIProviderRuntime {
     }
 
     configureFromTuple(tuple) {
+        arcaneLogging.debug('[Arcane speech runtime] configureFromTuple', tuple);
         if (!Array.isArray(tuple) || tuple.length !== 6) {
             fail('AI preference tuple must contain exactly six entries.');
         }
@@ -2416,12 +2487,19 @@ export class AIProviderRuntime {
     }
 
     status(role = null, options = {}) {
+        if (role === null || SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] status', role, options);
+        }
         if (role !== null) {
             assertRole(role);
         }
         const snapshot = getAIRuntimeState();
         if (options?.execution !== true) {
-            return role === null ? snapshot : snapshot.roles[role];
+            const result = role === null ? snapshot : snapshot.roles[role];
+            if (role === null || SPEECH_ROLES.includes(role)) {
+                arcaneLogging.debug('[Arcane speech runtime] status.result', role, result);
+            }
+            return result;
         }
 
         // Live provider inspection is explicit so ordinary lifecycle reads
@@ -2433,6 +2511,9 @@ export class AIProviderRuntime {
                 continue;
             }
             const providerStatus = validateProviderStatus(provider.status());
+            if (SPEECH_ROLES.includes(selectedRole)) {
+                arcaneLogging.debug('[Arcane speech runtime] provider.status.result', selectedRole, providerStatus);
+            }
             if (providerStatus.execution == null) {
                 continue;
             }
@@ -2441,10 +2522,17 @@ export class AIProviderRuntime {
                 execution: {...providerStatus.execution}
             };
         }
-        return role === null ? {...snapshot, roles} : roles[role];
+        const result = role === null ? {...snapshot, roles} : roles[role];
+        if (role === null || SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] status.result', role, result);
+        }
+        return result;
     }
 
     catalog(role) {
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] catalog', role);
+        }
         assertRole(role);
         const entries = [];
         for (const provider of this.#providers.values()) {
@@ -2452,6 +2540,9 @@ export class AIProviderRuntime {
                 continue;
             }
             const providerCatalog = provider.catalog();
+            if (SPEECH_ROLES.includes(role)) {
+                arcaneLogging.debug('[Arcane speech runtime] provider.catalog.result', role, provider.id, providerCatalog);
+            }
             if (!Array.isArray(providerCatalog)) {
                 fail('AI provider.catalog() must synchronously return an array.');
             }
@@ -2465,10 +2556,16 @@ export class AIProviderRuntime {
                 )
             );
         }
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] catalog.result', role, entries);
+        }
         return completeValue(entries);
     }
 
     async inspect(role, options = {}) {
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] inspect', role, options);
+        }
         this.#assertOpen();
         this.#assertNotConfiguring();
         assertRole(role);
@@ -2482,25 +2579,29 @@ export class AIProviderRuntime {
         const generation = slot.generation;
         const selection = this.selection(role, {localOnly});
         if (!selection) {
-            return completeValue(
-                {
-                    available: false,
-                    code: 'ARCANE_AI_ROLE_NOT_SELECTED',
-                    message: `No ${role} provider and model are selected.`
-                }
-            );
+            const result = completeValue({
+                available: false,
+                code: 'ARCANE_AI_ROLE_NOT_SELECTED',
+                message: `No ${role} provider and model are selected.`
+            });
+            if (SPEECH_ROLES.includes(role)) {
+                arcaneLogging.debug('[Arcane speech runtime] inspect.result', role, result);
+            }
+            return result;
         }
         const provider = this.#providers.get(
             providerKey(role, selection.providerId)
         ) ?? null;
         if (!provider) {
-            return completeValue(
-                {
-                    available: false,
-                    code: 'ARCANE_AI_PROVIDER_UNAVAILABLE',
-                    message: `The selected ${role} provider is not registered.`
-                }
-            );
+            const result = completeValue({
+                available: false,
+                code: 'ARCANE_AI_PROVIDER_UNAVAILABLE',
+                message: `The selected ${role} provider is not registered.`
+            });
+            if (SPEECH_ROLES.includes(role)) {
+                arcaneLogging.debug('[Arcane speech runtime] inspect.result', role, result);
+            }
+            return result;
         }
 
         let inspection;
@@ -2512,11 +2613,20 @@ export class AIProviderRuntime {
                 selection,
                 {role, signal}
             );
+            if (SPEECH_ROLES.includes(role)) {
+                arcaneLogging.debug('[Arcane speech runtime] provider.inspect.result', role, selection, inspection);
+            }
             if (signal?.aborted) {
                 throw normalizedAbort();
             }
         } catch (error) {
+            if (SPEECH_ROLES.includes(role)) {
+                arcaneLogging.debug('[Arcane speech runtime] inspect.error', role, error);
+            }
             if (isAbort(error, signal)) {
+                if (SPEECH_ROLES.includes(role)) {
+                    arcaneLogging.debug('[Arcane speech runtime] inspect.cancelled', role, error);
+                }
                 throw normalizedAbort(error);
             }
             this.#assertOpen();
@@ -2526,36 +2636,47 @@ export class AIProviderRuntime {
                 error,
                 'ARCANE_AI_PROVIDER_AUTHORITY_BLOCKED'
             );
-            return completeValue(
-                {
-                    available: false,
-                    code: unavailable.code,
-                    message: unavailable.message
-                }
-            );
+            const result = completeValue({
+                available: false,
+                code: unavailable.code,
+                message: unavailable.message
+            });
+            if (SPEECH_ROLES.includes(role)) {
+                arcaneLogging.debug('[Arcane speech runtime] inspect.result', role, result);
+            }
+            return result;
         }
         this.#assertOpen();
         this.#assertNotConfiguring();
         this.#assertCurrentOperation(slot, generation, signal);
         try {
             validateInspection(inspection, selection);
+            if (SPEECH_ROLES.includes(role)) {
+                arcaneLogging.debug('[Arcane speech runtime] inspect.result', role, inspection);
+            }
             return inspection;
         } catch (error) {
+            if (SPEECH_ROLES.includes(role)) {
+                arcaneLogging.debug('[Arcane speech runtime] inspect.error', role, error);
+            }
             const unavailable = stateError(
                 error,
                 'ARCANE_AI_PROVIDER_AUTHORITY_BLOCKED'
             );
-            return completeValue(
-                {
-                    available: false,
-                    code: unavailable.code,
-                    message: unavailable.message
-                }
-            );
+            const result = completeValue({
+                available: false,
+                code: unavailable.code,
+                message: unavailable.message
+            });
+            if (SPEECH_ROLES.includes(role)) {
+                arcaneLogging.debug('[Arcane speech runtime] inspect.result', role, result);
+            }
+            return result;
         }
     }
 
     async start(options) {
+        arcaneLogging.debug('[Arcane speech runtime] start', options);
         this.#assertOpen();
         this.#assertNotConfiguring();
         if (!this.#configured) {
@@ -2589,6 +2710,9 @@ export class AIProviderRuntime {
     }
 
     load(role, options = {}) {
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] load', role, options);
+        }
         this.#assertOpen();
         this.#assertNotConfiguring();
         assertRole(role);
@@ -2747,25 +2871,36 @@ export class AIProviderRuntime {
                         slot.selection,
                         {role, signal: controller.signal}
                     );
+                    if (SPEECH_ROLES.includes(role)) {
+                        arcaneLogging.debug('[Arcane speech runtime] load.inspection', role, slot.selection, inspection);
+                    }
                     validateInspection(inspection, slot.selection);
                     runtime.#assertCurrentOperation(slot, generation, controller.signal);
-                    await provider.load(
-                        {
-                            role,
-                            selection: slot.selection,
-                            signal: controller.signal,
-                            progress: function publishAIProviderLoadProgress(progress) {
-                                runtime.#publishLoadProgress(
-                                    slot,
-                                    generation,
-                                    operationId,
-                                    progress
-                                );
-                            }
+                    const loadRequest = {
+                        role,
+                        selection: slot.selection,
+                        signal: controller.signal,
+                        progress: function publishAIProviderLoadProgress(progress) {
+                            runtime.#publishLoadProgress(
+                                slot,
+                                generation,
+                                operationId,
+                                progress
+                            );
                         }
-                    );
+                    };
+                    if (SPEECH_ROLES.includes(role)) {
+                        arcaneLogging.debug('[Arcane speech runtime] provider.load', {generation, operationId}, loadRequest);
+                    }
+                    const loadResult = await provider.load(loadRequest);
+                    if (SPEECH_ROLES.includes(role)) {
+                        arcaneLogging.debug('[Arcane speech runtime] provider.load.result', {role, generation, operationId}, loadResult);
+                    }
                     runtime.#assertCurrentOperation(slot, generation, controller.signal);
                     const providerStatus = validateProviderStatus(provider.status());
+                    if (SPEECH_ROLES.includes(role)) {
+                        arcaneLogging.debug('[Arcane speech runtime] load.status', {role, generation, operationId}, providerStatus);
+                    }
                     if (providerStatus.state !== 'ready'
                         || providerStatus.loaded !== true
                         || providerStatus.busy !== false) {
@@ -2794,6 +2929,9 @@ export class AIProviderRuntime {
                     const normalized = isAbort(error, controller.signal)
                         ? normalizedAbort(error)
                         : error;
+                    if (SPEECH_ROLES.includes(role)) {
+                        arcaneLogging.debug('[Arcane speech runtime] load.error', {role, generation, operationId}, error);
+                    }
                     if (slot.generation === generation && !slot.unloadPromise) {
                         slot.ready = false;
                         if (role === 'tts') {
@@ -2834,6 +2972,9 @@ export class AIProviderRuntime {
     }
 
     unload(role, options = {}) {
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] unload', role, options);
+        }
         this.#assertNotConfiguring();
         assertRole(role);
         assertPlainObject(options, 'AI provider unload options');
@@ -2931,14 +3072,18 @@ export class AIProviderRuntime {
                     throw normalizedAbort();
                 }
                 if (provider) {
-                    await provider.unload(
-                        {
-                            role,
-                            selection: slot.selection,
-                            signal
-                        }
-                    );
+                    const unloadRequest = {role, selection: slot.selection, signal};
+                    if (SPEECH_ROLES.includes(role)) {
+                        arcaneLogging.debug('[Arcane speech runtime] provider.unload', {generation, operationId: unloadOperationId}, unloadRequest);
+                    }
+                    const unloadResult = await provider.unload(unloadRequest);
+                    if (SPEECH_ROLES.includes(role)) {
+                        arcaneLogging.debug('[Arcane speech runtime] provider.unload.result', {role, generation, operationId: unloadOperationId}, unloadResult);
+                    }
                     const unloadedStatus = validateProviderStatus(provider.status());
+                    if (SPEECH_ROLES.includes(role)) {
+                        arcaneLogging.debug('[Arcane speech runtime] unload.status', role, unloadedStatus);
+                    }
                     if (unloadedStatus.loaded || unloadedStatus.busy) {
                         throw operationError(
                             `The selected ${role} provider remained loaded after unload.`,
@@ -2954,6 +3099,9 @@ export class AIProviderRuntime {
                 }
                 return runtime.status(role);
             } catch (error) {
+                if (SPEECH_ROLES.includes(role)) {
+                    arcaneLogging.debug('[Arcane speech runtime] unload.error', {role, generation, operationId: unloadOperationId}, error);
+                }
                 if (slot.generation === generation) {
                     runtime.#publishRoleError(slot, error, providerOwned);
                 }
@@ -2982,6 +3130,9 @@ export class AIProviderRuntime {
     }
 
     dispose(role, options = {}) {
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] dispose', role, options);
+        }
         this.#assertNotConfiguring();
         assertRole(role);
         assertPlainObject(options, 'AI provider dispose options');
@@ -3006,14 +3157,18 @@ export class AIProviderRuntime {
             try {
                 await runtime.unload(role, {signal});
                 if (provider) {
-                    await provider.dispose(
-                        {
-                            role,
-                            selection: slot.selection,
-                            signal
-                        }
-                    );
+                    const disposeRequest = {role, selection: slot.selection, signal};
+                    if (SPEECH_ROLES.includes(role)) {
+                        arcaneLogging.debug('[Arcane speech runtime] provider.dispose', disposeRequest);
+                    }
+                    const disposeResult = await provider.dispose(disposeRequest);
+                    if (SPEECH_ROLES.includes(role)) {
+                        arcaneLogging.debug('[Arcane speech runtime] provider.dispose.result', role, disposeResult);
+                    }
                     const disposedStatus = validateProviderStatus(provider.status());
+                    if (SPEECH_ROLES.includes(role)) {
+                        arcaneLogging.debug('[Arcane speech runtime] dispose.status', role, disposedStatus);
+                    }
                     if (disposedStatus.loaded || disposedStatus.busy) {
                         throw operationError(
                             `The selected ${role} provider remained active after disposal.`,
@@ -3035,6 +3190,9 @@ export class AIProviderRuntime {
                 );
                 return runtime.status(role);
             } catch (error) {
+                if (SPEECH_ROLES.includes(role)) {
+                    arcaneLogging.debug('[Arcane speech runtime] dispose.error', role, error);
+                }
                 runtime.#publishRoleError(slot, error, runtime.status(role).loaded);
                 throw error;
             } finally {
@@ -3046,6 +3204,7 @@ export class AIProviderRuntime {
     }
 
     disposeAll(options = {}) {
+        arcaneLogging.debug('[Arcane speech runtime] disposeAll', options);
         this.#assertNotConfiguring();
         assertPlainObject(options, 'AI provider dispose-all options');
         for (const key of Reflect.ownKeys(options)) {
@@ -3171,10 +3330,12 @@ export class AIProviderRuntime {
         })();
         this.#disposeAllPromise = disposing.then(
             function releaseCompletedAIProviderRuntimeDisposal(result) {
+                arcaneLogging.debug('[Arcane speech runtime] disposeAll.result', result);
                 runtime.#disposeAllPromise = null;
                 return result;
             },
             function releaseFailedAIProviderRuntimeDisposal(error) {
+                arcaneLogging.debug('[Arcane speech runtime] disposeAll.error', error);
                 runtime.#disposeAllPromise = null;
                 throw error;
             }
@@ -3183,6 +3344,9 @@ export class AIProviderRuntime {
     }
 
     request(role, options = {}) {
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] request', role, options);
+        }
         return this.#requestRole(role, options, false);
     }
 
@@ -3286,6 +3450,18 @@ export class AIProviderRuntime {
             );
         }
         const maxConcurrentRequests = this.#providerRequestCapacity(provider);
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] request.state', {
+                role,
+                generation: slot.generation,
+                selection: slot.selection,
+                ready: slot.ready,
+                activeRequests: slot.activeRequests.size,
+                queuedRequests: slot.requestQueue.length,
+                maxConcurrentRequests,
+                queued
+            }, providerStatus);
+        }
         if ((!queued && slot.requestQueue.length)
             || slot.activeRequests.size >= maxConcurrentRequests) {
             return this.#enqueueRoleRequest(slot, options);
@@ -3744,7 +3920,7 @@ export class AIProviderRuntime {
                                 )
                             ).catch(
                                 function reportReturnedAIProviderStreamCancellationFailure(error) {
-                                    console.error(
+                                    arcaneLogging.error(
                                         'Arcane AI provider stream early-return cancellation failed.',
                                         error
                                     );
@@ -3799,6 +3975,9 @@ export class AIProviderRuntime {
         }
 
         requestRecord.cancel = async function cancelAIProviderRequest(reason) {
+            if (SPEECH_ROLES.includes(role)) {
+                arcaneLogging.debug('[Arcane speech runtime] provider.request.cancel', {role, generation, requestSequence, operationId}, reason);
+            }
             controller.abort(reason);
             await requestRecord.promise?.catch(
                 function retainCancelledAIProviderRequest() {}
@@ -3810,15 +3989,20 @@ export class AIProviderRuntime {
                 if (controller.signal.aborted) {
                     throw normalizedAbort();
                 }
-                const result = await provider.request(
-                    {
-                        role,
-                        selection: slot.selection,
-                        operation: options.operation,
-                        payload: options.payload,
-                        signal: controller.signal
-                    }
-                );
+                const providerRequest = {
+                    role,
+                    selection: slot.selection,
+                    operation: options.operation,
+                    payload: options.payload,
+                    signal: controller.signal
+                };
+                if (SPEECH_ROLES.includes(role)) {
+                    arcaneLogging.debug('[Arcane speech runtime] provider.request', {generation, requestSequence, operationId}, providerRequest);
+                }
+                const result = await provider.request(providerRequest);
+                if (SPEECH_ROLES.includes(role)) {
+                    arcaneLogging.debug('[Arcane speech runtime] provider.request.result', {role, generation, requestSequence, operationId}, result);
+                }
                 runtime.#assertCurrentRequest(
                     slot,
                     generation,
@@ -3836,12 +4020,26 @@ export class AIProviderRuntime {
                 const normalized = isAbort(error, controller.signal)
                     ? normalizedAbort(error)
                     : error;
+                if (SPEECH_ROLES.includes(role)) {
+                    arcaneLogging.debug('[Arcane speech runtime] provider.request.error', {role, generation, requestSequence, operationId}, error);
+                }
                 requestError = normalized;
                 throw normalized;
             } finally {
                 detachSignal();
                 if (slot.activeRequests.get(requestSequence) === requestRecord) {
                     slot.activeRequests.delete(requestSequence);
+                }
+                if (SPEECH_ROLES.includes(role)) {
+                    arcaneLogging.debug('[Arcane speech runtime] request.settled', {
+                        role,
+                        generation,
+                        currentGeneration: slot.generation,
+                        requestSequence,
+                        operationId,
+                        activeRequests: slot.activeRequests.size,
+                        queuedRequests: slot.requestQueue.length
+                    }, requestError);
                 }
                 runtime.#drainRoleRequestQueue(slot);
                 if (slot.generation === generation && !slot.unloadPromise) {
@@ -3861,18 +4059,26 @@ export class AIProviderRuntime {
     }
 
     transcribe(payload, options = {}) {
+        arcaneLogging.debug('[Arcane speech runtime] transcribe', payload, options);
         return this.#roleRequestAlias('stt', 'transcribe', payload, options);
     }
 
     synthesize(payload, options = {}) {
+        arcaneLogging.debug('[Arcane speech runtime] synthesize', payload, options);
         return this.#roleRequestAlias('tts', 'synthesize', payload, options);
     }
 
     cancel(role) {
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] cancel', role);
+        }
         assertRole(role);
         const slot = this.#slots[role];
         const requestRecord = slot.activeRequests.values().next().value ?? null;
         if (!requestRecord) {
+            if (SPEECH_ROLES.includes(role)) {
+                arcaneLogging.debug('[Arcane speech runtime] cancel.result', role, false);
+            }
             return false;
         }
         const reason = operationError(
@@ -3882,10 +4088,14 @@ export class AIProviderRuntime {
         requestRecord?.controller.abort(reason);
         const cancellation = requestRecord?.cancel?.(reason);
         cancellation?.catch(function retainAIProviderCancelFailureInState() {});
+        if (SPEECH_ROLES.includes(role)) {
+            arcaneLogging.debug('[Arcane speech runtime] cancel.result', role, true, requestRecord.operationId);
+        }
         return true;
     }
 
     async setSpeechMuted(muted) {
+        arcaneLogging.debug('[Arcane speech runtime] setSpeechMuted', muted);
         this.#assertOpen();
         this.#assertNotConfiguring();
         if (typeof muted !== 'boolean') {
@@ -3924,6 +4134,7 @@ export class AIProviderRuntime {
                     }
                     if (runtime.#speechDesiredMuted === desiredMuted) {
                         runtime.#speechMuted = desiredMuted;
+                        arcaneLogging.debug('[Arcane speech runtime] setSpeechMuted.settled', desiredMuted);
                         return runtime.status('tts');
                     }
                 }
@@ -3971,6 +4182,15 @@ export class AIProviderRuntime {
     }
 
     #enqueueRoleRequest(slot, options) {
+        if (SPEECH_ROLES.includes(slot.role)) {
+            arcaneLogging.debug('[Arcane speech runtime] queue.enqueue', {
+                role: slot.role,
+                generation: slot.generation,
+                selection: slot.selection,
+                activeRequests: slot.activeRequests.size,
+                queuedRequests: slot.requestQueue.length
+            }, options);
+        }
         const runtime = this;
         return new Promise(function queueAIProviderRoleRequest(resolve, reject) {
             const entry = {
@@ -3986,6 +4206,13 @@ export class AIProviderRuntime {
                 }
                 slot.requestQueue.splice(index, 1);
                 entry.detachSignal?.();
+                if (SPEECH_ROLES.includes(slot.role)) {
+                    arcaneLogging.debug('[Arcane speech runtime] queue.cancelled', {
+                        role: slot.role,
+                        generation: slot.generation,
+                        queuedRequests: slot.requestQueue.length
+                    }, options, options.signal?.reason);
+                }
                 reject(normalizedAbort(options.signal?.reason));
             }
             if (options.signal) {
@@ -4024,6 +4251,15 @@ export class AIProviderRuntime {
             && slot.activeRequests.size < maxConcurrentRequests) {
             const entry = slot.requestQueue.shift();
             entry.detachSignal?.();
+            if (SPEECH_ROLES.includes(slot.role)) {
+                arcaneLogging.debug('[Arcane speech runtime] queue.dispatch', {
+                    role: slot.role,
+                    generation: slot.generation,
+                    activeRequests: slot.activeRequests.size,
+                    queuedRequests: slot.requestQueue.length,
+                    maxConcurrentRequests
+                }, entry.options);
+            }
             if (entry.options.signal?.aborted) {
                 entry.reject(normalizedAbort(entry.options.signal.reason));
                 continue;
@@ -4032,6 +4268,9 @@ export class AIProviderRuntime {
             try {
                 operation = runtime.#requestRole(slot.role, entry.options, true);
             } catch (error) {
+                if (SPEECH_ROLES.includes(slot.role)) {
+                    arcaneLogging.debug('[Arcane speech runtime] queue.error', slot.role, entry.options, error);
+                }
                 entry.reject(error);
                 continue;
             }
@@ -4043,6 +4282,9 @@ export class AIProviderRuntime {
         const queued = slot.requestQueue.splice(0);
         for (const entry of queued) {
             entry.detachSignal?.();
+            if (SPEECH_ROLES.includes(slot.role)) {
+                arcaneLogging.debug('[Arcane speech runtime] queue.rejected', slot.role, entry.options, error);
+            }
             entry.reject(error);
         }
     }
@@ -4156,6 +4398,16 @@ export class AIProviderRuntime {
 
     #publishRoleRequestState(slot) {
         const requestRecord = slot.activeRequests.values().next().value ?? null;
+        if (SPEECH_ROLES.includes(slot.role)) {
+            arcaneLogging.debug('[Arcane speech runtime] queue.state', {
+                role: slot.role,
+                generation: slot.generation,
+                selection: slot.selection,
+                operationId: requestRecord?.operationId ?? null,
+                activeRequests: slot.activeRequests.size,
+                queuedRequests: slot.requestQueue.length
+            });
+        }
         if (!requestRecord && slot.requestQueue.length === 0) {
             return false;
         }
@@ -4193,6 +4445,15 @@ export class AIProviderRuntime {
     }
 
     #publishLoadProgress(slot, generation, operationId, progress) {
+        if (SPEECH_ROLES.includes(slot.role)) {
+            arcaneLogging.debug('[Arcane speech runtime] load.progress', {
+                role: slot.role,
+                generation,
+                currentGeneration: slot.generation,
+                operationId,
+                aborted: slot.loadController?.signal.aborted
+            }, progress);
+        }
         if (slot.generation !== generation || slot.loadController?.signal.aborted) {
             return false;
         }
@@ -4213,6 +4474,17 @@ export class AIProviderRuntime {
 
     #publishRoleError(slot, error, loaded) {
         const requestRecord = slot.activeRequests.values().next().value ?? null;
+        if (SPEECH_ROLES.includes(slot.role)) {
+            arcaneLogging.debug('[Arcane speech runtime] role.error', {
+                role: slot.role,
+                generation: slot.generation,
+                selection: slot.selection,
+                operationId: requestRecord?.operationId ?? null,
+                loaded,
+                activeRequests: slot.activeRequests.size,
+                queuedRequests: slot.requestQueue.length
+            }, error);
+        }
         publishAIRuntimeRoleState(
             slot.role,
             roleRecord(
@@ -4237,6 +4509,9 @@ export class AIProviderRuntime {
             return;
         }
         const slot = this.#slots[intent.role];
+        if (SPEECH_ROLES.includes(intent.role)) {
+            arcaneLogging.debug('[Arcane speech runtime] intent', intent);
+        }
         if (!slot.selection) {
             return;
         }

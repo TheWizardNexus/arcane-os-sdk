@@ -132,6 +132,8 @@
 <button id="muteButton" type="button" class="mute" aria-pressed="true" aria-label="Voice unavailable" disabled>Voice unavailable</button>
 
 <script type="module">
+    const {arcaneLogging}=await import('arcane-os/logging');
+
     const completeValue = (value) => value;
     const {
         createArcaneEventSource,
@@ -140,7 +142,7 @@
 
     void import('../modules/DBLS.js').catch(
         function reportDBLSImportFailure(error) {
-            console.error('The shared database runtime could not load.');
+            arcaneLogging.error('The shared database runtime could not load.');
         }
     );
     const aiModuleImport = import('../modules/AI.js');
@@ -365,7 +367,7 @@
             if (destroyed) {
                 return;
             }
-            console.error('The shared AI runtime could not load.');
+            arcaneLogging.error('The shared AI runtime could not load.');
         }
     );
 
@@ -476,10 +478,10 @@
         sttRole = snapshot.roles.stt;
         ttsRole = snapshot.roles.tts;
         if (sttRole.state === 'error' && previousSTTRole.state !== 'error') {
-            console.error('Arcane transcription runtime failed.', sttRole.error);
+            arcaneLogging.error('Arcane transcription runtime failed.', sttRole.error);
         }
         if (ttsRole.state === 'error' && previousTTSRole.state !== 'error') {
-            console.error('Arcane voice runtime failed.', ttsRole.error);
+            arcaneLogging.error('Arcane voice runtime failed.', ttsRole.error);
         }
         clearSettledTTSIntent();
         applyRoleTransitions(previousSTTRole, previousTTSRole);
@@ -1048,7 +1050,7 @@
             `ARCANE_SPEECH_TTS_${action.toUpperCase()}_REJECTED`
         );
         const reason = `tts-${action}-rejected`;
-        console.error(`Arcane voice ${action} request failed.`, error);
+        arcaneLogging.error(`Arcane voice ${action} request failed.`, error);
         dispatchSpeechEvent(
             'speech-tts-lifecycle-error',
             {
@@ -1113,7 +1115,7 @@
             tone: 'error'
         };
         const errorFields = publicSpeechErrorFields(error, failure.code);
-        console.error(`Arcane ${normalizedBoundary} speech operation failed.`, error);
+        arcaneLogging.error(`Arcane ${normalizedBoundary} speech operation failed.`, error);
         dispatchSpeechEvent(
             'speech-synthesis-error',
             {
@@ -1535,7 +1537,7 @@
             'ARCANE_SPEECH_STT_TRANSCRIPTION_REQUEST_REJECTED'
         );
         const reason = 'stt-transcription-rejected';
-        console.error('Arcane speech transcription failed.', error);
+        arcaneLogging.error('Arcane speech transcription failed.', error);
         dispatchSpeechEvent(
             'speech-transcription-error',
             {
@@ -1642,7 +1644,7 @@
         if (session.audioContext.state !== 'closed') {
             void session.audioContext.close().catch(
                 function reportAudioContextCloseFailure(error) {
-                    console.warn('The microphone audio context could not close.');
+                    arcaneLogging.warn('The microphone audio context could not close.');
                 }
             );
         }

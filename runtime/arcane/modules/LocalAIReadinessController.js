@@ -1,3 +1,4 @@
+import { arcaneLogging } from 'arcane-os/logging';
 import {
     checkLocalAIReadiness,
     deriveLocalAIRequirements
@@ -287,7 +288,7 @@ export function createLocalAIReadinessController({
     function retry(){
         void check().catch(function ignoreDestroyedLocalAIRetry(error){
             if(error?.name!=='AbortError'){
-                console.error('Local AI readiness retry failed.',error);
+                arcaneLogging.error('Local AI readiness retry failed.',error);
             }
         });
     }

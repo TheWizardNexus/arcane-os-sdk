@@ -1,4 +1,5 @@
 import waitForComponent from './WaitForComponent.js';
+import { arcaneLogging,readArcaneDeveloperMode } from 'arcane-os/logging';
 import {
     arcaneEvents,
     createArcaneEventSource
@@ -152,18 +153,6 @@ async function sendWithWindowMail(target,...args){
     }
 
     return target.mail.send(...args);
-}
-
-function defaultDeveloperModeStatus(target){
-    try{
-        if(target?.user?.ready!==true){
-            return null;
-        }
-
-        return target.user.developer===true;
-    }catch{
-        return false;
-    }
 }
 
 function appendDeveloperDetail(document,list,label,value){
@@ -340,7 +329,7 @@ class Errors {
         this.now=options.now||Date.now;
         this.schedule=options.schedule||globalThis.setTimeout.bind(globalThis);
         this.cancel=options.cancel||globalThis.clearTimeout.bind(globalThis);
-        this.logger=options.logger||globalThis.console;
+        this.logger=options.logger||arcaneLogging;
         this.storage=options.storage===undefined
             ? defaultStorage(target)
             : options.storage;
@@ -352,7 +341,7 @@ class Errors {
             || sendWithWindowMail.bind(null,target);
         this.isDeveloperMode=typeof options.isDeveloperMode==='function'
             ? options.isDeveloperMode
-            : defaultDeveloperModeStatus.bind(null,target);
+            : readArcaneDeveloperMode.bind(null,target);
         this.presentDeveloperIncident=typeof options.presentDeveloperIncident==='function'
             ? options.presentDeveloperIncident
             : presentDeveloperIncidentModal.bind(null,target);

@@ -1,3 +1,4 @@
+import { arcaneLogging } from 'arcane-os/logging';
 export const MAIL_OUTBOX_PROTOCOL='arcane-mail-outbox/1';
 export const MAIL_OUTBOX_TABLE='mail_outbox';
 export const MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS=24*60*60*1000;
@@ -34,7 +35,7 @@ function reportMailOutboxObserverError(error){
             return;
         }
     }catch{}
-    try{globalThis.console?.error?.(error);}catch{}
+    try{arcaneLogging.error?.(error);}catch{}
 }
 
 function fail(message,code='MAIL_OUTBOX_INVALID',ErrorType=Error,cause){

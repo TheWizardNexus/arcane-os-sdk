@@ -1,3 +1,4 @@
+import { arcaneLogging } from 'arcane-os/logging';
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 
 const CONVERSATION_TIMEBOX_TOOL_NAME='conversation_timebox';
@@ -168,7 +169,7 @@ function conversationTimeboxSubmissionKey(context={}){
 }
 
 function reportConversationTimeboxListenerError(error){
-    console.error('A conversation timebox listener failed.',error);
+    arcaneLogging.error('A conversation timebox listener failed.',error);
 }
 
 function conversationTimeboxError(message,code,reason,ErrorType=Error){

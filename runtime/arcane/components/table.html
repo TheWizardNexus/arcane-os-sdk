@@ -17,6 +17,8 @@
 </table>
 
 <script type="module">
+    const {arcaneLogging}=await import('arcane-os/logging');
+
     const host = this;
     const shadowRoot=this.shadowRoot;
     const {createArcaneEventSource,projectArcaneDOMEvent}=
@@ -68,7 +70,7 @@
         tableBody.innerHTML = '';
 
         tableArray.forEach(
-            (row)=>{ console.log('row',row);
+            (row)=>{ arcaneLogging.log('row',row);
                 const tr = tableBody.insertRow();
                 row.forEach(
                     (cellValue)=>{

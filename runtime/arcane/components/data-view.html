@@ -14,6 +14,8 @@
 <html-import id="dataModal" class="modal" href="./arcane/components/modal.html?v=13"></html-import>
 
 <script type="module">
+    const {arcaneLogging}=await import('arcane-os/logging');
+
     const host=this;
     const openButton=host.shadowRoot.querySelector('#openData');
     const dataModal=host.shadowRoot.querySelector('#dataModal');
@@ -39,7 +41,7 @@
         ()=>openData().catch(
             error=>{
                 if(!destroyed){
-                    console.error('Unable to open data view:',error);
+                    arcaneLogging.error('Unable to open data view:',error);
                 }
             }
         ),

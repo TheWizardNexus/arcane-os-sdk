@@ -30,6 +30,8 @@
 </div>
 
 <script type="module">
+    const {arcaneLogging}=await import('arcane-os/logging');
+
     const host=this;
     const root=host.shadowRoot;
     const {default:DirectoryPicker}=await import('../modules/DirectoryPicker.js');
@@ -67,7 +69,7 @@
     choose.addEventListener(
         'click',
         ()=>select().catch(
-            error=>console.error('Unable to select a directory:',error)
+            error=>arcaneLogging.error('Unable to select a directory:',error)
         ),
         {signal:lifecycleController.signal}
     );
