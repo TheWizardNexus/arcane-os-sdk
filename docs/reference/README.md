@@ -17,7 +17,7 @@ high-level page links to the relevant deep section instead of repeating it.
 Install the SDK in your application:
 
 ```sh
-npm install --save-exact arcane-os@0.5.15
+npm install --save-exact arcane-os@0.5.16
 ```
 
 For your first AI call, follow the [TWiN Cloud quick start](ai/twin-cloud.md).
@@ -58,9 +58,9 @@ This repository contains explicitly versioned surfaces with different owners:
 
 | Surface | Source identity | Meaning |
 | --- | --- | --- |
-| SDK and CLI | `arcane-os` `0.5.15` | The Node.js toolchain, portable `arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`, `arcane-os/preference-store`, and `arcane-os/speech-playback` entrypoints, plus the browser-only `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints in this checkout. |
-| Browser runtime | SDK `0.5.15`, protocol `arcane/1`, `runtime/` | The SDK-canonical runtime tree. `listRuntimeFiles()`, `readRuntimeFile()`, and `loadRuntimeRelease()` derive its current inventory directly from the selected directory. |
-| Browser SDK runtime | SDK `0.5.15`, `browser-runtime/` | The browser closure for events, shared logging, Wllama, and Browser Speech mechanisms. `listSdkBrowserRuntimeFiles()`, `readSdkBrowserRuntimeFile()`, and `loadSdkBrowserRuntimeRelease()` derive its current inventory directly from the selected directory. |
+| SDK and CLI | `arcane-os` `0.5.16` | The Node.js toolchain, portable `arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`, `arcane-os/preference-store`, and `arcane-os/speech-playback` entrypoints, plus the browser-only `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints in this checkout. |
+| Browser runtime | SDK `0.5.16`, protocol `arcane/1`, `runtime/` | The SDK-canonical runtime tree. `listRuntimeFiles()`, `readRuntimeFile()`, and `loadRuntimeRelease()` derive its current inventory directly from the selected directory. |
+| Browser SDK runtime | SDK `0.5.16`, `browser-runtime/` | The browser closure for events, shared logging, Wllama, and Browser Speech mechanisms. `listSdkBrowserRuntimeFiles()`, `readSdkBrowserRuntimeFile()`, and `loadSdkBrowserRuntimeRelease()` derive its current inventory directly from the selected directory. |
 | Core reference snapshot | Arcane OS commit `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, protocol `arcane/1` | The application-facing Core contract imported into `docs/reference/core/`, with SDK-local links and package-boundary notes added explicitly. |
 
 The SDK runtime source and Core reference have different owners. A browser
@@ -75,7 +75,7 @@ and the distinction between a documentation snapshot and the selected runtime.
 
 ## Installed documentation and release identity
 
-This reference accompanies `arcane-os@0.5.15`. The installed package includes
+This reference accompanies `arcane-os@0.5.16`. The installed package includes
 the maintained `docs/` tree and `examples/wasm-ai-demo/` source alongside
 README and CHANGELOG. Open `node_modules/arcane-os/docs/reference/README.md`
 for the matching local reference. The generated website and test suites remain

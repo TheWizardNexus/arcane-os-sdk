@@ -18,7 +18,7 @@ This table is the Node `package.json#exports` map: it defines package
 entrypoints for SDK/tooling code. It is distinct from the generated browser
 import map that resolves application-facing `arcane/*` modules and the focused
 EventManager entry. See [browser runtime delivery](protocols.md#browser-runtime-delivery)
-for the installed-inventory-derived physical-runtime contract in SDK `0.5.15`.
+for the installed-inventory-derived physical-runtime contract in SDK `0.5.16`.
 
 | Specifier | Purpose |
 | --- | --- |
@@ -751,7 +751,7 @@ deterministic map. The package root also contains the public
 {
   schemaVersion: 1,
   kind: 'arcane-app-runtime-projection',
-  sdkVersion: '0.5.15',
+  sdkVersion: '0.5.16',
   pathPrefix: 'arcane/',
   files: [{path}]
 }
@@ -3463,7 +3463,7 @@ workspace it additionally returns the exact installed package authority:
     packageSource,
     canonicalPackageRoot,
     packageName: 'arcane-os',
-    packageVersion: '0.5.15',
+    packageVersion: '0.5.16',
     runtimeRoot,
     browserRuntimeRoot
   }
@@ -3471,9 +3471,9 @@ workspace it additionally returns the exact installed package authority:
 ```
 
 The dependency can be named `arcane-os` or be one exact npm alias for
-`npm:arcane-os@0.5.15`. The selected installation must still be one direct,
+`npm:arcane-os@0.5.16`. The selected installation must still be one direct,
 physical, non-link package directory whose manifest identifies exactly as
-`arcane-os@0.5.15`; duplicate canonical/alias declarations reject.
+`arcane-os@0.5.16`; duplicate canonical/alias declarations reject.
 `allowMissingManagedImportMap` is an internal packaging/development seam. An
 ordinary caller should leave it `false`.
 

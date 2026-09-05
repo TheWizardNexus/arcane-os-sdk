@@ -19,7 +19,7 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This checkout defines the `0.5.15` SDK contract. Applications pin one exact npm
+This checkout defines the `0.5.16` SDK contract. Applications pin one exact npm
 version and lockfile; registry state is deliberately not baked into application
 artifacts.
 
@@ -35,7 +35,7 @@ Create one browser application, install its pinned SDK, and start its source
 server:
 
 ```bash
-npx arcane-os@0.5.15 new hello-speech --path ./hello-speech --target browser
+npx arcane-os@0.5.16 new hello-speech --path ./hello-speech --target browser
 cd hello-speech
 npm install
 npm run dev
@@ -334,7 +334,7 @@ uses the same controller for automatic memory extraction.
 Create a new repository-shaped Arcane application with the exact stable SDK:
 
 ```bash
-npx arcane-os@0.5.15 new my-app --path ./my-app --target portable --git
+npx arcane-os@0.5.16 new my-app --path ./my-app --target portable --git
 cd my-app
 npm install
 npm run dev
@@ -344,7 +344,7 @@ To enroll an existing repository, install the exact SDK and initialize only
 missing Arcane files:
 
 ```bash
-npm install --save-dev --save-exact arcane-os@0.5.15
+npm install --save-dev --save-exact arcane-os@0.5.16
 npm exec -- arcane init my-app --target portable
 ```
 
@@ -360,7 +360,7 @@ npm exec -- arcane-os targets
 No global SDK install or standalone Arcane CLI is required. The application
 repository's exact npm dependency and lockfile own the CLI and toolchain version.
 
-Use `npx arcane-os@0.5.15` for the initial bootstrap because it names this npm
+Use `npx arcane-os@0.5.16` for the initial bootstrap because it names this npm
 package explicitly; bare `npx arcane` outside an installed project could resolve
 a different package. Both installed commands invoke the same headless toolchain.
 Project-local npm scripts use the SDK pinned by that app's `package-lock.json`,
@@ -380,7 +380,7 @@ node ./bin/arcane.mjs new local-app --path ../local-app --target portable --git
 
 # From the generated app repository
 cd ../local-app
-npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.5.15.tgz
+npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.5.16.tgz
 npm ci
 ```
 
@@ -389,7 +389,7 @@ same location. The lockfile retains the selected package dependency while
 Arcane uses the installed package name and version. Local directory `file:` dependencies are not
 accepted because npm may install them as links; use a packed `.tgz`. A GitHub
 runner also needs that tarball at the locked path. After publication, replace
-the local declaration with the exact `arcane-os@0.5.15` registry package and
+the local declaration with the exact `arcane-os@0.5.16` registry package and
 commit the regenerated lock.
 
 Generated repositories use `npm ci --ignore-scripts` in CI. Run dependency
@@ -528,7 +528,7 @@ package installation, or assertions.
 
 ## Current target support
 
-Version `0.5.15` exposes one browser target and five explicitly paired
+Version `0.5.16` exposes one browser target and five explicitly paired
 native development targets: a non-runnable portable directory, a
 Windows x64 unsigned-local-test EXE bundle, Linux x64 and Linux ARM64
 unsigned-local-test DEBs, and an Android development-signed APK. The

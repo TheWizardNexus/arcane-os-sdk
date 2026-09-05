@@ -275,7 +275,7 @@ rejected. It propagates the caller-owned signal and returns a playable `Blob`;
 it does not independently choose a provider, cloud fallback, model, runtime, or
 voice policy for the application. `streamTTS(text='',end=false,options={})` and
 `finishTTS()` use this same request boundary. The third-argument options below
-are available in SDK `0.5.12`:
+are available in SDK `0.5.12`, with `textFormat` added in SDK `0.5.16`:
 
 | Field | Default | Meaning |
 | --- | --- | --- |

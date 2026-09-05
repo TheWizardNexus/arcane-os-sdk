@@ -5,7 +5,7 @@
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
     "branch": "main",
     "path": "runtime/arcane",
-    "sdkVersion": "0.5.15",
+    "sdkVersion": "0.5.16",
     "protocol": "arcane/1"
   },
   "artifactCount": 85,

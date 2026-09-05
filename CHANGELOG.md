@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.5.16
+
 - Add optional Markdown narration filtering before `AI.streamTTS()`
   segmentation. Omit repeated same formatting marks across streamed chunks,
   preserve single marks and ordinary punctuation, and clear formatting state

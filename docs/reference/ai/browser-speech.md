@@ -13,7 +13,7 @@ import map resolves `arcane/AI` and `arcane/DBOPFS`. These browser modules are
 not Node inference APIs. To create an application:
 
 ```bash
-npx arcane-os@0.5.15 new hello-speech --path ./hello-speech --target browser
+npx arcane-os@0.5.16 new hello-speech --path ./hello-speech --target browser
 cd hello-speech
 npm install
 npm run dev
