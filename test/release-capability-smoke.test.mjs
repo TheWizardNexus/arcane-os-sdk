@@ -207,6 +207,7 @@ import * as browserWasm from 'arcane-os/ai/browser-wasm';
 import * as mail from 'arcane-os/mail';
 import PreferenceStore from 'arcane-os/preference-store';
 import SpeechPlayback,{SPEECH_VOICE_ALIASES,SPEECH_VOICE_OPTIONS} from 'arcane-os/speech-playback';
+import {MarkdownSpeech,stripSpeechFormatting} from 'arcane-os/speech-text';
 
 test('installed public SDK entrypoints and runtime materialization are functional',async()=>{
     assert.equal(SDK_VERSION,${JSON.stringify(verified.version)});
@@ -215,6 +216,8 @@ test('installed public SDK entrypoints and runtime materialization are functiona
     assert.equal(typeof mail.Mail,'function');
     assert.equal(typeof PreferenceStore,'function');
     assert.equal(typeof SpeechPlayback,'function');
+    assert.equal(typeof MarkdownSpeech,'function');
+    assert.equal(stripSpeechFormatting('**Installed speech.**'),'Installed speech.');
     const speechVoiceValues=SPEECH_VOICE_OPTIONS.map(
         function speechVoiceValue(option){return option.value;}
     );

@@ -61,11 +61,13 @@ explicit identity fails, and the selected page then must pass exact path-relativ
 base validation.
 Included HTML with neither signal is a component fragment and remains a
 complete package file.
-`arcane-os/preference-store` and
-`arcane-os/speech-playback` are the two portable runtime subpaths: Node package
-exports and managed browser keys both resolve directly to the canonical runtime
-module namespaces, while `arcane/PreferenceStore` and
-`arcane/SpeechPlayback` are the established browser import-map names. There is
+`arcane-os/preference-store` and `arcane-os/speech-playback` are the two
+portable subpaths that resolve directly to canonical runtime-module namespaces
+from both Node package exports and managed browser keys;
+`arcane/PreferenceStore` and `arcane/SpeechPlayback` remain their established
+browser import-map names. The additional portable `arcane-os/speech-text`
+subpath owns shared dependency-free speech-input cleanup and has the same
+managed browser key. There is
 no exported `importMapApplication()` function, `generateImportMap()` function, or
 `arcane-os/import-map` package subpath.
 
@@ -159,7 +161,7 @@ imports such as:
 import ollama from 'arcane/Ollama';
 ```
 
-The physical-v1 tree lives entirely beneath `arcane/`. SDK `0.5.16` projects the
+The physical-v1 tree lives entirely beneath `arcane/`. SDK `0.5.17` projects the
 complete canonical runtime and browser runtime selected by the installed SDK
 package. Runtime dependencies stay under
 `arcane/dependencies/`; the SDK event and browser-AI closure stays under
@@ -174,13 +176,13 @@ integrated physical route uses the same ordered include list in its one route.
 Omitting only that final optional entry is compatible. Removing, reordering, or
 renaming any preceding entry changes the physical contract.
 
-The `0.5.16` map derives its complete entries from the selected runtime graph;
+The `0.5.17` map derives its complete entries from the selected runtime graph;
 application source imports do not select a fixed entry count. The operation
 result reports `imports`, `entryCount`, and `excludedModules`; reached-file
 traversal remains internal. The
 managed graph exposes `arcane-os/event-manager`, `arcane-os/ai/browser-wasm`,
 `arcane-os/ai/browser-speech`, `arcane-os/preference-store`, and
-`arcane-os/speech-playback`; dependency compatibility mappings are added when
+`arcane-os/speech-playback` plus `arcane-os/speech-text`; dependency compatibility mappings are added when
 runtime or SDK root traversal observes them.
 
 The focused physical targets remain stable when their bindings are reached:
@@ -190,6 +192,7 @@ The focused physical targets remain stable when their bindings are reached:
 | `arcane-os/event-manager` | `./arcane/sdk/event-manager.mjs` |
 | `arcane-os/ai/browser-wasm` | `./arcane/sdk/ai/browser-wasm.mjs` |
 | `arcane-os/ai/browser-speech` | `./arcane/sdk/ai/browser-speech.mjs` |
+| `arcane-os/speech-text` | `./arcane/sdk/speech-text.mjs` |
 | `arcane-os/preference-store` | `./arcane/modules/PreferenceStore.js` |
 | `arcane-os/speech-playback` | `./arcane/modules/SpeechPlayback.js` |
 | `event-pubsub` | `./arcane/sdk/dependencies/event-pubsub/index.js` |
@@ -202,8 +205,9 @@ invented package bindings. Development serves the selected app plus the
 complete selected tree.
 Packaging copies the same map, app entry, and physical content into `dist/<id>`;
 targets never resolve through the consumer workspace's root `node_modules/`.
-The two lowercase static runtime package specifiers above are also exact npm
-package exports, so Node and managed-browser source can share those specifiers
+The two lowercase static runtime package specifiers above and the shared
+speech-text helper are exact npm package exports, so Node and managed-browser
+source can share those specifiers
 without data URLs, copied modules, or a consumer-owned loader.
 
 `generateImportMap()` is an internal toolchain operation, not a package export.
@@ -239,8 +243,8 @@ exactly `dependencyName`, `packageSource`,
 `canonicalPackageRoot`, `packageName`, `packageVersion`, `runtimeRoot`,
 and `browserRuntimeRoot`. A
 workspace may use the canonical dependency name or one exact npm alias such as
-`npm:arcane-os@0.5.16`; the physical package manifest must still identify
-exactly as `arcane-os@0.5.16`. Canonical-plus-alias duplicates, multiple aliases,
+`npm:arcane-os@0.5.17`; the physical package manifest must still identify
+exactly as `arcane-os@0.5.17`. Canonical-plus-alias duplicates, multiple aliases,
 links/junctions, indirect package roots, or version drift are reported.
 
 For external workspaces, `arcane dev` serves the projected `arcane/` root,
@@ -351,7 +355,7 @@ does not silently delete the app-owned cache. A complete whole member supersedes
 its current resumable fragments. Cleanup failure is warned without hiding the
 usable model.
 
-SDK `0.5.16` requires WebGPU. Load requests full offload and waits for the runtime
+SDK `0.5.17` requires WebGPU. Load requests full offload and waits for the runtime
 to report a loaded model. `navigator.gpu` presence alone is
 not readiness. There is no CPU fallback, partial-offload success mode, or
 silent switch to native/Core/cloud inference.

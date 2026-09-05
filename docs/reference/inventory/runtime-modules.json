@@ -5,12 +5,12 @@
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
     "branch": "main",
     "path": "runtime/arcane",
-    "sdkVersion": "0.5.16",
+    "sdkVersion": "0.5.17",
     "protocol": "arcane/1"
   },
   "artifactCount": 85,
   "javascriptArtifactCount": 83,
-  "esmExportCount": 354,
+  "esmExportCount": 356,
   "artifacts": [
     {
       "file": "runtime/arcane/modules/AI.js",
@@ -29,8 +29,8 @@
       "summary": "Owns provider-selectable chat and the one-time caller-authority browser STT/TTS configuration, lifecycle, synthesis, transcription, and playback boundary.",
       "availability": "Browser + native bridge + TWiN Cloud",
       "protocol": "arcane-ai-browser-speech-configuration/1, AIProviderRuntime arcane-ai-provider/2 routes, globalThis.arcaneEvents, TWiN Cloud HTTPS, Arcane.ollama, Arcane.speech, Android WebView bridge",
-      "normalization": "Complete mutable caller-owned browser speech authority, SDK-owned provider registration/replacement/disposal, explicit STT/TTS activation, normalized Kokoro TTS execution with default capacity 4, explicit provider-neutral execution snapshots through status(role,{execution:true}), sticky readiness, canonical window.user readiness without compatibility-event object-identity admission or polling, exact ordered structural calls with required arguments.message, atomic nonblank all-ID tool-result sequencing, complete all-choice streaming/data validation, native Ollama structural adaptation, complete-response then all validated tool callbacks then completion ordering, observed async callbacks, Blob/File transcription, immediate exact-segment synthesis, per-call voice/speed capture, optional final-segment pause on the existing audio clock, optional per-call terminal playback completion, ordered audio-clock scheduling, playable audio, active-generation TTS operation-failure routing, mute, and cancellation are normalized; provider/model/runtime/voice policy remains caller-owned.",
-      "surface": "Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; explicit `providerRuntime.status(role,{execution:true})` snapshots; `streamTTS(text,end,options={})` with optional voice, speed, pauseAfterMs, waitForPlayback, and speech-only textFormat plain/markdown; configure/dispose speech, route lifecycle, declaration-validated chat/stream requests with exact ordered calls, synthesis/transcription, and playback controls; initializes from current canonical user readiness, installs `window.ai`, and projects `ai-ready` plus active-generation `ai-tts-failure`."
+      "normalization": "Complete mutable caller-owned browser speech authority, SDK-owned provider registration/replacement/disposal, explicit STT/TTS activation, normalized Kokoro TTS execution with default capacity 4, explicit provider-neutral execution snapshots through status(role,{execution:true}), sticky readiness, canonical window.user readiness without compatibility-event object-identity admission or polling, exact ordered structural calls with required arguments.message, atomic nonblank all-ID tool-result sequencing, complete all-choice streaming/data validation, native Ollama structural adaptation, complete-response then all validated tool callbacks then completion ordering, observed async callbacks, Blob/File transcription, automatic repeated-formatting-mark removal from cloned outbound TTS input while caller and visible content stays exact, immediate exact-segment synthesis, per-call voice/speed capture, optional final-segment pause on the existing audio clock, optional per-call terminal playback completion, ordered audio-clock scheduling, playable audio, active-generation TTS operation-failure routing, mute, and cancellation are normalized; provider/model/runtime/voice policy remains caller-owned.",
+      "surface": "Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; explicit `providerRuntime.status(role,{execution:true})` snapshots; `streamTTS(text,end,options={})` with optional voice, speed, pauseAfterMs, and waitForPlayback; automatic speech-input cleanup with SDK-internal preparation metadata; configure/dispose speech, route lifecycle, declaration-validated chat/stream requests with exact ordered calls, synthesis/transcription, and playback controls; initializes from current canonical user readiness, installs `window.ai`, and projects `ai-ready` plus active-generation `ai-tts-failure`."
     },
     {
       "file": "runtime/arcane/modules/AIPreferenceRuntime.js",
@@ -76,8 +76,8 @@
       "summary": "Provider-neutral selection, lifecycle, routing, startup, request, streaming, cancellation, and independent LLM/STT/TTS state.",
       "availability": "Cross-host in-process runtime; registered providers remain browser, native, or cloud specific",
       "protocol": "arcane-ai-runtime/2, arcane-ai-provider/2, arcane-ai-model-authority/1",
-      "normalization": "Normalizes mutable complete per-role routes, lifecycle/status, cancellation, streaming cleanup, capacity-1 FIFO LLM/STT lanes, bounded provider-declared parallel TTS requests with FIFO overflow, local-only selection, direct LLM history/declaration/terminal structural contracts, complete all-choice content/reasoning FIFO iteration, private automatic provider draining with result-first buffering, terminal-only structural calls, exact per-choice observed/terminal correlation, and a separate complete validated terminal result without creating a fallback.",
-      "surface": "Protocol constants; singleton-only `AIProviderRuntime`; `aiProviderRuntime`; `getAIProviderRuntime()`; provider registration/identity/selection, closed three-role and STT/TTS-only validation/configuration/replacement, status/catalog/inspection, startup, per-role load/unload/dispose/cancel, dispose-all, request/stream/speech aliases, and mute controls."
+      "normalization": "Normalizes mutable complete per-role routes, lifecycle/status, cancellation, streaming cleanup, capacity-1 FIFO LLM/STT lanes, bounded provider-declared parallel TTS requests with FIFO overflow, automatic repeated-formatting-mark removal from cloned direct TTS payloads, local-only selection, direct LLM history/declaration/terminal structural contracts, complete all-choice content/reasoning FIFO iteration, private automatic provider draining with result-first buffering, terminal-only structural calls, exact per-choice observed/terminal correlation, and a separate complete validated terminal result without creating a fallback.",
+      "surface": "Protocol constants; singleton-only `AIProviderRuntime`; `aiProviderRuntime`; `getAIProviderRuntime()`; provider registration/identity/selection, closed three-role and STT/TTS-only validation/configuration/replacement, status/catalog/inspection, startup, per-role load/unload/dispose/cancel, dispose-all, request/stream/speech aliases, SDK-internal speech-input preparation metadata, and mute controls."
     },
     {
       "file": "runtime/arcane/modules/AIResponseLength.js",
@@ -831,10 +831,10 @@
       "exports": [
         "MarkdownSpeech"
       ],
-      "summary": "Removes repeated same Markdown formatting marks from streamed narration before speech segmentation.",
+      "summary": "Re-exports the shared MarkdownSpeech class that removes repeated same formatting marks from streamed narration before speech segmentation.",
       "availability": "Cross-host",
-      "protocol": "In-process only",
-      "normalization": "Speech-only filtering of repeated *, #, _, backtick, and ~ runs across chunks; single marks and all other characters remain literal; terminal flush and reset clear pending formatting state.",
+      "protocol": "Shared arcane-os/speech-text package entrypoint",
+      "normalization": "The runtime projection and public package subpath share dependency-free speech-only filtering of repeated *, #, _, backtick, and ~ runs across chunks; single marks and all other characters remain literal; terminal flush and reset clear pending formatting state.",
       "surface": "`MarkdownSpeech`; `append(text='',end=false)`, `reset()`."
     },
     {
@@ -1162,15 +1162,17 @@
       "kind": "esm",
       "exports": [
         "SPEECH_PLAYBACK_STATE_EVENT",
+        "SPEECH_VOICE_ALIASES",
+        "SPEECH_VOICE_OPTIONS",
         "SpeechPlayback",
         "default",
         "splitSpeechText"
       ],
-      "summary": "Preserves exact nonblank segment text without trimming, splitting, or freezing it; eagerly submits complete parts to a capacity-advertising fetchTTS provider while keeping playback indexed, and retains serialized one-segment lookahead for other clients.",
+      "summary": "Preserves exact nonblank stored segment text; removes repeated formatting marks from only each outbound synthesis copy; eagerly submits complete parts to a capacity-advertising fetchTTS provider while keeping playback indexed; and retains serialized one-segment lookahead for other clients.",
       "availability": "Browser + compatible AI/native bridge",
       "protocol": "AI.fetchTTS plus providerRuntime TTS execution capacity, or compatible serialized Arcane.speech.synthesize; globalThis.arcaneEvents, Blob URLs, audio element",
-      "normalization": "Exact nonblank split/part input strings are preserved in mutable records. A capable provider receives complete segments immediately and owns bounded FIFO admission; URLs and playback stay in exact input order. Native/custom clients remain serialized. Cancellation, Replay recovery, Blob results, and lifecycle state are normalized; provider failures remain external.",
-      "surface": "SpeechPlayback class/default, `SPEECH_PLAYBACK_STATE_EVENT`, `splitSpeechText()`, canonical playback lifecycle events, cancellation, and destroy APIs."
+      "normalization": "Exact nonblank split/part input strings are preserved in mutable records. Each synthesis request clones that part, removes repeated formatting marks from only the outbound input, and carries SDK-internal preparation metadata to prevent a second cleanup pass. A capable provider receives complete segments immediately and owns bounded FIFO admission; URLs and playback stay in exact input order. Native/custom clients remain serialized. Canonical state dispatch precedes the optional synchronous onState callback. Cancellation, Replay recovery, Blob results, and lifecycle state are normalized; provider failures remain external.",
+      "surface": "SpeechPlayback class/default, mutable `SPEECH_VOICE_OPTIONS` records, mutable `SPEECH_VOICE_ALIASES` membership, `SPEECH_PLAYBACK_STATE_EVENT`, optional constructor `onState(detail)`, `splitSpeechText()`, canonical playback lifecycle events, cancellation, and destroy APIs."
     },
     {
       "file": "runtime/arcane/modules/StaticDocumentCatalog.js",

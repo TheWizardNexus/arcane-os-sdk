@@ -1,4 +1,5 @@
 import {createArcaneEventSource} from 'arcane-os/event-manager';
+import {stripSpeechFormatting} from 'arcane-os/speech-text';
 
 const SPEECH_VOICE_OPTIONS=[
     {value:'alloy',label:'Alloy'},
@@ -593,8 +594,10 @@ class SpeechPlayback{
     }
 
     async requestSpeech(part,signal){
+        const input=stripSpeechFormatting(part.input);
+        const preparation={speechInputPrepared:true};
         const payload={
-            input:part.input,
+            input,
             speed:part.speed,
             ...(this.model?{model:this.model}:{}),
             ...(part.voice?{voice:part.voice}:{}),
@@ -602,12 +605,12 @@ class SpeechPlayback{
         };
         if(typeof this.speech?.fetchTTS==='function'){
             return playableSpeechBlob(
-                await this.speech.fetchTTS(payload,signal)
+                await this.speech.fetchTTS(payload,signal,preparation)
             );
         }
         if(typeof this.speech?.synthesize==='function'){
             return playableSpeechBlob(
-                await this.speech.synthesize(payload,{signal})
+                await this.speech.synthesize(payload,{signal},preparation)
             );
         }
         const error=new Error(this.message('unavailable'));

@@ -5,7 +5,7 @@
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
     "branch": "main",
     "path": "runtime/arcane/components",
-    "sdkVersion": "0.5.15"
+    "sdkVersion": "0.5.17"
   },
   "componentCount": 39,
   "loader": "/arcane/modules/HTMLImport.js",
@@ -171,7 +171,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "UI/runtime state, honest model progress, complete timestamped transcript including ui_hidden stored records, user-facing structural arguments.message, nonblank all-ID tool-result restoration, collapsed complete raw inspection, ordered parallel-call replay validation, per-choice streamed/terminal complete-envelope correlation, complete nonstructural stream rendering, generic visible failure outcomes with complete console diagnostics, atomic executed/declined/cancelled/not-executed result batches with one continuation, plural pending-call reload recovery, reentrant terminal-event ownership, and BFCache-preserving page lifecycle are normalized; destroy aborts observation and returns true once/false thereafter; AI/storage/media behavior remains mixed"
+      "normalization": "UI/runtime state, honest model progress, complete timestamped transcript including ui_hidden stored records, user-facing structural arguments.message, nonblank all-ID tool-result restoration, collapsed complete raw inspection, ordered parallel-call replay validation, per-choice streamed/terminal complete-envelope correlation, complete nonstructural stream rendering, automatic repeated-formatting-mark removal from only the outbound speech-input copy while displayed and stored Markdown stays exact, generic visible failure outcomes with complete console diagnostics, atomic executed/declined/cancelled/not-executed result batches with one continuation, plural pending-call reload recovery, reentrant terminal-event ownership, and BFCache-preserving page lifecycle are normalized; destroy aborts observation and returns true once/false thereafter; AI/storage/media behavior remains mixed"
     },
     {
       "file": "runtime/arcane/components/conversation-view.html",

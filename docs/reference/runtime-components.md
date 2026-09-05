@@ -366,14 +366,15 @@ terminal result of the segments submitted by one invocation; Chat continues
 to feed chunks without waiting for playback. Runtime mute, cancellation,
 permission waiting, and stale generations remain non-errors.
 
-Each visible model chunk is forwarded to
-`AI.streamTTS(text,false,{textFormat:'markdown'})` in arrival order. The AI
-owner removes repeated Markdown formatting marks from narration before the
+Each visible model chunk is forwarded to `AI.streamTTS(text)` in arrival
+order. The AI owner automatically removes repeated formatting marks from an
+outbound speech-input copy before the
 configured segmentation, admits completed segments to bounded synthesis
 immediately, and schedules the contiguous ready audio prefix on the audio
 clock. Chat retains the original Markdown for display and storage and owns no
-second speech queue. Single punctuation, ordinary repeated punctuation,
-language, and voice retain their existing behavior.
+second speech queue. No app option selects or disables this cleanup. Single
+punctuation, ordinary repeated punctuation, language, and voice retain their
+existing behavior.
 
 Events: `chat-ready`, `chat-session-bound`, `chat-session-message`,
 `chat-session-error`, `chat-send-message`, `chat-send-error`,

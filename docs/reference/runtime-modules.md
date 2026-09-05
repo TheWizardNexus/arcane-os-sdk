@@ -109,7 +109,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`ScamRiskPolicy.js`](#scamriskpolicyjs) | esm | Combines deterministic scam signals with optional Arcane blocked-domain evidence and safety guidance. | Cross-host | Complete mutable results; blocked-domain policy requires `secure:true`. |
 | [`ScopedOPFSCache.js`](#scopedopfscachejs) | esm | Provides a narrow exact-key JSON cache inside one app-owned OPFS namespace. | Browser / native WebView | Filename-safe keys, complete JSON values, and malformed-cache cleanup normalized; storage errors mixed. |
 | [`ScreenCapture.js`](#screencapturejs) | esm | Captures a display surface as image, video, or GIF with explicit lifecycle events. | Browser / native WebView | State/events normalized; permission and codec errors mixed. |
-| [`SpeechPlayback.js`](#speechplaybackjs) | esm | Preserves exact nonblank text as one speech segment, queues latest-request synthesis, and controls lookahead HTML audio playback. | Browser + native bridge | Exact input text and state normalized; provider/media failures mixed. |
+| [`SpeechPlayback.js`](#speechplaybackjs) | esm | Admits complete speech segments to a capacity-advertising provider immediately, retains serialized native/custom lookahead, and plays every result in exact indexed order. | Browser + native bridge | Stored part text stays exact; the outbound speech-input copy receives automatic formatting-mark cleanup; provider/media failures remain mixed. |
 | [`StaticDocumentCatalog.js`](#staticdocumentcatalogjs) | esm | Loads a positive static document inventory with cache, search, and complete context. | Browser / native WebView / server with fetch | Mutable complete catalog/content normalization; malformed data and transport failures remain visible. |
 | [`SystemAppearance.js`](#systemappearancejs) | esm | Reads or applies native appearance, returning an explicit unsupported browser state when no bridge exists. | Browser/native hybrid | Absent bridge normalized; native result/error preserved. |
 | [`SystemPlatformPresentation.js`](#systemplatformpresentationjs) | classic-script | Maps kernel names to presentation labels/classes without granting platform authority. | Browser / native WebView classic script | Fully normalized presentation only. |
@@ -263,7 +263,7 @@ reports `requestedDevice`, `selectedDevice`, `maxConcurrentRequests`, and
 WASM fallback after a successful load. Calling `status()` without options keeps
 the existing sticky lifecycle snapshot and does not inspect provider execution.
 Provider inspection failures are surfaced to the caller.
-`fetchTTS({model,voice,input,responseFormat,speed},signal)` accepts the public
+`fetchTTS({model,voice,input,responseFormat,speed},signal,preparation={})` accepts the public
 provider-neutral synthesis shape, requires any explicit model to match the
 selected route, and fills an omitted voice only from the selected model
 catalog's `defaultVoice`. An omitted response format preserves the instance's
@@ -273,9 +273,14 @@ the setting is the instance's `opus` default and the model rejects it, the catal
 `speech.defaultResponseFormat` is used, while any other unsupported setting is
 rejected. It propagates the caller-owned signal and returns a playable `Blob`;
 it does not independently choose a provider, cloud fallback, model, runtime, or
-voice policy for the application. `streamTTS(text='',end=false,options={})` and
+voice policy for the application. Every call removes repeated same formatting
+marks from a cloned outbound input before delegation; the caller's payload stays
+unchanged. The third `preparation` argument is reserved for SDK-internal
+delegation, where `{speechInputPrepared:true}` prevents a second cleanup pass;
+applications omit it. `streamTTS(text='',end=false,options={})` and
 `finishTTS()` use this same request boundary. The third-argument options below
-are available in SDK `0.5.12`, with `textFormat` added in SDK `0.5.16`:
+are available in SDK `0.5.12`. The `textFormat` compatibility extra added in
+SDK `0.5.16` is ignored beginning in `0.5.17`:
 
 | Field | Default | Meaning |
 | --- | --- | --- |
@@ -283,24 +288,23 @@ are available in SDK `0.5.12`, with `textFormat` added in SDK `0.5.16`:
 | `speed` | Current `ai.voiceSpeed` | A supplied positive speed is captured for those segments and forwarded to `fetchTTS()`. It does not change `ai.voiceSpeed`. |
 | `pauseAfterMs` | `0` | Finite, nonnegative milliseconds placed after the final extracted segment on the existing audio clock. Invalid values throw `RangeError`; no pause is inserted between this call's other segments. |
 | `waitForPlayback` | `false` | Omission retains the preparation promise. With `true`, the promise resolves after every extracted segment reaches a terminal playback state: `true` when all naturally end, or `false` after terminal cancellation or failure. |
-| `textFormat` | `plain` for a new stream | `markdown` removes repeated same formatting marks (`*`, `#`, `_`, backtick, `~`) before segmentation. Single marks and ordinary punctuation remain literal. The selected format lasts through this producer's terminal flush. |
+| `textFormat` | Ignored compatibility extra | Repeated same formatting marks are removed automatically from every TTS call. This value no longer selects or disables cleanup. |
 
 The voice and speed use the existing `fetchTTS()` validation and error path.
-Plain mode preserves the submitted text. Markdown mode changes narration only;
-it leaves displayed, stored, and model content untouched. It is a narrow
+The automatic cleanup changes only the outbound speech-input copy; displayed,
+stored, model, and caller-owned content remains exact. It is a narrow
 formatting-mark filter, not a full Markdown parser: links, code contents, list
-text, and other characters remain literal. A trailing candidate mark waits for
-the next character so a repeated run split across chunks is still omitted.
-Ordinary prose streams immediately. `end:true`, `finishTTS()`, muted terminal
-calls, and `stopAudio()` clear the formatting state. An explicit format change
-flushes pending formatting marks under the preceding mode before accepting
-the next text. `fetchTTS()` retains its exact-text contract.
+text, single marks, ordinary punctuation, and other characters remain literal.
+A trailing candidate mark waits for the next character so a repeated run split
+across chunks is still omitted. Ordinary prose streams immediately.
+`end:true`, `finishTTS()`, muted terminal calls, and `stopAudio()` clear pending
+formatting state. `textFormat` is not an opt-out.
 
 Voice, speed, pause, and playback overrides belong to the segments
 extracted in that invocation, including any text buffered by an earlier call.
 Those overrides are not retained with an unfinished `end:false` remainder; a
 later call supplies its own options, and `finishTTS()` uses their defaults
-while retaining the active text format. Use `end:true`
+while flushing any pending formatting mark. Use `end:true`
 for a complete passage. A call extracting no segments resolves
 `true` without waiting for earlier jobs; `finishTTS()` remains a preparation
 flush, not a queue-wide playback barrier. A muted call resolves `false`.
@@ -324,8 +328,9 @@ commas, and hyphens remain inside a segment when they join Unicode letters or
 numbers. A potentially joining mark at the current end of an incremental stream
 waits for the next character or terminal flush before the boundary is decided;
 `wordCadence` completes one after that many whole words. The earliest available
-boundary wins. Segmentation preserves every character, including punctuation
-and whitespace. Every completed segment enters synthesis immediately; provider
+boundary wins. Segmentation preserves every character of the already prepared
+speech text, including punctuation and whitespace. Every completed segment
+enters synthesis immediately; provider
 capacity supplies FIFO backpressure while allowing bounded TTS work to overlap.
 A later segment may finish synthesis first, but playback schedules only the
 contiguous ready prefix in original order. Decoded buffers with known duration
@@ -662,9 +667,11 @@ The singleton exposes read-only `protocol`, `configured`, and `speechMuted`;
 `status(role=null,options={})`; `catalog(role)`;
 `inspect(role,options={})`; `start(options)`; `load(role,options={})`;
 `unload(role,options={})`; `dispose(role,options={})`;
-`disposeAll(options={})`; `cancel(role)`; `request(role,options={})`;
+`disposeAll(options={})`; `cancel(role)`;
+`request(role,options={},preparation={})`;
 `chat(payload,options={})`; `stream(payload,options={})`;
-`transcribe(payload,options={})`; `synthesize(payload,options={})`; and
+`transcribe(payload,options={})`;
+`synthesize(payload,options={},preparation={})`; and
 `setSpeechMuted(muted)`. Provider payloads must be data-only; callbacks,
 accessors, symbols, and cycles are rejected at the provider boundary.
 
@@ -679,6 +686,14 @@ records are the closed `{llm,stt,tts}`, `{stt,tts}`, or
 `{provider,routes,expectedProvider}` and
 `{providers,routes,expectedProviders}` shapes described below.
 `configureFromTuple()` accepts exactly six provider/model preference entries.
+
+Every direct TTS `request()` or `synthesize()` call removes repeated same
+formatting marks from a cloned outbound payload's `input` or `text` field. The
+caller's payload and request records remain unchanged. The optional
+`preparation` argument is reserved for SDK-owned delegation;
+`{speechInputPrepared:true}` prevents a second pass after another SDK speech
+boundary has already cleaned the copy. Applications omit that argument. LLM
+and STT payloads are unaffected.
 
 `register()` returns the provider's single unregister closure; caller-
 registered providers remain caller-owned. The high-level
@@ -2261,11 +2276,12 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Filters repeated same Markdown formatting marks from narration before speech
-segmentation. The filter recognizes `*`, `#`, `_`, backtick, and `~` runs of two
-or more, including runs arriving across separate chunks. Single marks,
-ellipses, quoted sentence endings, whitespace, and all other text remain
-literal. It neither interprets links nor changes language or voice.
+Re-exports the streaming `MarkdownSpeech` filter from the shared
+`arcane-os/speech-text` package entrypoint. The filter removes repeated runs of
+`*`, `#`, `_`, backtick, and `~` before speech segmentation, including runs
+arriving across separate chunks. Single marks, ellipses, quoted sentence
+endings, whitespace, and all other text remain literal. It neither interprets
+links nor changes language or voice.
 
 ### Public surface
 
@@ -2275,7 +2291,8 @@ Exact exports: `MarkdownSpeech`.
 
 ### Availability and normalization
 
-**Cross-host.** Plain JavaScript with no dependencies. `append()` returns only
+**Cross-host.** The runtime projection and public package entrypoint share the
+same dependency-free implementation. `append()` returns only
 the newly available narration. Only a trailing candidate marker and whether
 it repeats are retained; ordinary text is emitted immediately. Terminal
 `append(text,true)` flushes a single pending mark and resets state. `reset()`
@@ -2899,15 +2916,17 @@ console.log(Object.keys(module));
 
 Preserves exact nonblank text, admits complete speech segments according to the
 selected client's advertised capacity, and plays indexed HTML audio in exact
-input order.
+input order. Stored parts remain exact; only each outbound synthesis payload
+copy receives automatic formatting-mark cleanup.
 
 ### Public surface
 
-`SpeechPlayback` class/default, `SPEECH_PLAYBACK_STATE_EVENT`,
-`splitSpeechText()`, and playback lifecycle APIs.
+`SpeechPlayback` class/default, the shared voice compatibility catalogs,
+`SPEECH_PLAYBACK_STATE_EVENT`, `splitSpeechText()`, the optional constructor
+state callback, and playback lifecycle APIs.
 
-Exact exports: `SPEECH_PLAYBACK_STATE_EVENT`, `SpeechPlayback`, `default`, and
-`splitSpeechText`.
+Exact exports: `SPEECH_PLAYBACK_STATE_EVENT`, `SPEECH_VOICE_ALIASES`,
+`SPEECH_VOICE_OPTIONS`, `SpeechPlayback`, `default`, and `splitSpeechText`.
 
 ```text
 new SpeechPlayback({
@@ -2917,6 +2936,7 @@ new SpeechPlayback({
   voice=null,
   responseFormat=null,
   speed=1,
+  onState=()=>{},
   createObjectURL,
   revokeObjectURL,
   delay,
@@ -2925,17 +2945,28 @@ new SpeechPlayback({
 ```
 
 `speech` must expose either `fetchTTS(payload, signal)` or
-`synthesize(payload, {signal})`. `prepare({key,parts,model,voice,responseFormat,
+`synthesize(payload, {signal})`. `SpeechPlayback` also supplies a third
+SDK-internal preparation object; existing two-argument clients may ignore it.
+`prepare({key,parts,model,voice,responseFormat,
 speed,autoplay=true})` uses only caller-supplied model, voice, and response-format
 values; those three omitted values remain omitted so the selected AI/model
 catalog may provide its documented defaults. Speed defaults to `1`, is normalized
-as a positive number, and is always sent. There is no
-hard-coded model, response format, voice, or cloud/browser fallback.
+as a positive number, and is always sent. `SPEECH_VOICE_OPTIONS` is the ordered
+mutable compatibility array `{value,label}` for `alloy`, `ash`, `ballad`,
+`coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, and `shimmer`;
+`SPEECH_VOICE_ALIASES` is the mutable `Set` of those values. The class does not
+select either catalog or promise that a selected provider supports its values.
+There is no hard-coded model, response format, voice, or cloud/browser fallback.
 `splitSpeechText(value)` uses trimming only to detect blank input, then returns
 the caller's exact string in one mutable array without trimming, splitting, or
 freezing it. `prepare()` likewise preserves each nonblank part's exact `input`
 string while normalizing its other playback fields into a new mutable record.
-The class applies no part-count, character-count, pause, or input upper cap.
+At synthesis time, `requestSpeech()` copies that record, removes repeated same
+formatting marks from only the outbound `input`, and delegates with the
+SDK-internal `{speechInputPrepared:true}` argument so downstream SDK boundaries
+do not apply the non-idempotent filter again. Original part objects, stored
+parts, displayed text, and all non-input payload fields remain unchanged. The
+class applies no part-count, character-count, pause, or input upper cap.
 
 ### Admission and playback order
 
@@ -2961,8 +2992,13 @@ Every preparation owns an operation ID and one AbortController for each active
 synthesis segment or playback delay. Replacement,
 `stop()`, `cancel()`, and `destroy()` abort their owned signals, suppress stale
 settlement, release Blob URLs, and publish synchronous
-`speech-playback-state` occurrences through `globalThis.arcaneEvents`.
-Subscribers receive mutable public state detail. The detail contains
+`speech-playback-state` occurrences through `globalThis.arcaneEvents` before
+calling the optional `onState(detail)` function synchronously. Canonical
+subscribers and the callback observe the same public field values at dispatch
+time, but object identity is not promised. Both surfaces expose mutable public
+state detail. A callback failure is reported through `globalThis.reportError`
+when available, otherwise `console.error`, and does not replace playback
+settlement. The detail contains
 `state`, `message`, `key`, `index`, `total`, `producing`, `buffered`, `hasAudio`,
 `operationId`, `code`, and `reason`; a first-segment provider rejection remains
 preserved to the `prepare()` caller. Later failures surface when ordered
@@ -3004,7 +3040,10 @@ const audio = document.body.appendChild(document.createElement('audio'));
 audio.controls = true;
 const speech = new SpeechPlayback({
   audio,
-  speech: globalThis.ai
+  speech: globalThis.ai,
+  onState(detail) {
+    console.log('Speech state:', detail.state);
+  }
 });
 const button = document.body.appendChild(document.createElement('button'));
 button.textContent = 'Speak';
@@ -3018,6 +3057,19 @@ button.addEventListener('click', async function speakCompleteSegments() {
     autoplay: true
   });
 });
+```
+
+The shared compatibility catalogs are also available directly. They do not
+select a voice for `SpeechPlayback`:
+
+```javascript
+import {
+  SPEECH_VOICE_ALIASES,
+  SPEECH_VOICE_OPTIONS
+} from '/arcane/modules/SpeechPlayback.js';
+
+console.log(SPEECH_VOICE_OPTIONS[0]); // {value: 'alloy', label: 'Alloy'}
+console.log(SPEECH_VOICE_ALIASES.has('alloy')); // true
 ```
 
 With the default browser speech configuration, both parts enter its capacity-4

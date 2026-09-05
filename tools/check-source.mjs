@@ -133,6 +133,7 @@ function assertPackageMetadata(packageDocument){
         './packager',
         './preference-store',
         './speech-playback',
+        './speech-text',
         './ai/browser-wasm',
         './ai/browser-speech',
         './testing',

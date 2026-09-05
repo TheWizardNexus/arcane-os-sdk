@@ -163,13 +163,13 @@ test('the public package API inventory matches every JavaScript export and MDN e
 
     await t.test('the inventory has stable unique records',()=>{
         assert.equal(inventory.sdkVersion,packageDocument.version);
-        assert.equal(inventory.memberCount,204);
+        assert.equal(inventory.memberCount,202);
         assert.equal(inventory.memberCount,exportGraph.length);
         assert.equal(
             Object.values(packageDocument.exports).filter(target=>
                 typeof target==='string'&&/[.](?:mjs|js)$/u.test(target)
             ).length,
-            16
+            18
         );
         assert.equal(inventory.members.length,inventory.memberCount);
         assert.equal(new Set(inventory.members.map(member=>member.id)).size,inventory.memberCount);
@@ -276,6 +276,13 @@ test('the public package API inventory matches every JavaScript export and MDN e
                     'SpeechPlayback',
                     'default',
                     'splitSpeechText'
+                ]
+            }],
+            ['arcane-os/speech-text',{
+                target:'./browser-runtime/speech-text.mjs',
+                names:[
+                    'MarkdownSpeech',
+                    'stripSpeechFormatting'
                 ]
             }]
         ]);

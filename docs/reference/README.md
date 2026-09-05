@@ -17,7 +17,7 @@ high-level page links to the relevant deep section instead of repeating it.
 Install the SDK in your application:
 
 ```sh
-npm install --save-exact arcane-os@0.5.16
+npm install --save-exact arcane-os@0.5.17
 ```
 
 For your first AI call, follow the [TWiN Cloud quick start](ai/twin-cloud.md).
@@ -58,9 +58,9 @@ This repository contains explicitly versioned surfaces with different owners:
 
 | Surface | Source identity | Meaning |
 | --- | --- | --- |
-| SDK and CLI | `arcane-os` `0.5.16` | The Node.js toolchain, portable `arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`, `arcane-os/preference-store`, and `arcane-os/speech-playback` entrypoints, plus the browser-only `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints in this checkout. |
-| Browser runtime | SDK `0.5.16`, protocol `arcane/1`, `runtime/` | The SDK-canonical runtime tree. `listRuntimeFiles()`, `readRuntimeFile()`, and `loadRuntimeRelease()` derive its current inventory directly from the selected directory. |
-| Browser SDK runtime | SDK `0.5.16`, `browser-runtime/` | The browser closure for events, shared logging, Wllama, and Browser Speech mechanisms. `listSdkBrowserRuntimeFiles()`, `readSdkBrowserRuntimeFile()`, and `loadSdkBrowserRuntimeRelease()` derive its current inventory directly from the selected directory. |
+| SDK and CLI | `arcane-os` `0.5.17` | The Node.js toolchain, portable `arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`, `arcane-os/preference-store`, `arcane-os/speech-playback`, and `arcane-os/speech-text` entrypoints, plus the browser-only `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints in this checkout. |
+| Browser runtime | SDK `0.5.17`, protocol `arcane/1`, `runtime/` | The SDK-canonical runtime tree. `listRuntimeFiles()`, `readRuntimeFile()`, and `loadRuntimeRelease()` derive its current inventory directly from the selected directory. |
+| Browser SDK runtime | SDK `0.5.17`, `browser-runtime/` | The browser closure for events, shared logging, speech-text cleanup, Wllama, and Browser Speech mechanisms. `listSdkBrowserRuntimeFiles()`, `readSdkBrowserRuntimeFile()`, and `loadSdkBrowserRuntimeRelease()` derive its current inventory directly from the selected directory. |
 | Core reference snapshot | Arcane OS commit `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, protocol `arcane/1` | The application-facing Core contract imported into `docs/reference/core/`, with SDK-local links and package-boundary notes added explicitly. |
 
 The SDK runtime source and Core reference have different owners. A browser
@@ -75,7 +75,7 @@ and the distinction between a documentation snapshot and the selected runtime.
 
 ## Installed documentation and release identity
 
-This reference accompanies `arcane-os@0.5.16`. The installed package includes
+This reference accompanies `arcane-os@0.5.17`. The installed package includes
 the maintained `docs/` tree and `examples/wasm-ai-demo/` source alongside
 README and CHANGELOG. Open `node_modules/arcane-os/docs/reference/README.md`
 for the matching local reference. The generated website and test suites remain
@@ -124,11 +124,11 @@ Public reference entries follow the established Arcane documentation model:
 
 ## Public runtime inventory
 
-The package exposes 198 semantic JavaScript records across 17 JavaScript
+The package exposes 202 semantic JavaScript records across 18 JavaScript
 entrypoints, plus eight JSON Schemas and package metadata. Ten entrypoints are
 Node.js control-plane surfaces,
 `arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`, `arcane-os/preference-store`, and
-`arcane-os/speech-playback` run in Node and browsers, and
+`arcane-os/speech-playback` plus `arcane-os/speech-text` run in Node and browsers, and
 `arcane-os/ai/browser-wasm` plus `arcane-os/ai/browser-speech` are browser-only.
 The [machine-readable package
 inventory](inventory/package-api.json) and [SDK member reference](sdk-api.md)
@@ -139,7 +139,7 @@ download, install, or self-update.
 
 The synchronized browser payload exposes:
 
-- 82 JavaScript module artifacts under `runtime/arcane/modules/`, including
+- 83 JavaScript module artifacts under `runtime/arcane/modules/`, including
   ESM modules, classic vendor globals, one worker protocol, and one Node-oriented
   mail transport;
 - 14 shared entity modules under `runtime/arcane/entities/`;

@@ -19,7 +19,7 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This checkout defines the `0.5.16` SDK contract. Applications pin one exact npm
+This checkout defines the `0.5.17` SDK contract. Applications pin one exact npm
 version and lockfile; registry state is deliberately not baked into application
 artifacts.
 
@@ -35,7 +35,7 @@ Create one browser application, install its pinned SDK, and start its source
 server:
 
 ```bash
-npx arcane-os@0.5.16 new hello-speech --path ./hello-speech --target browser
+npx arcane-os@0.5.17 new hello-speech --path ./hello-speech --target browser
 cd hello-speech
 npm install
 npm run dev
@@ -115,7 +115,13 @@ import SpeechPlayback from 'arcane/SpeechPlayback';
 
 const audio = document.body.appendChild(document.createElement('audio'));
 audio.controls = true;
-const narration = new SpeechPlayback({audio, speech: ai});
+const narration = new SpeechPlayback({
+  audio,
+  speech: ai,
+  onState(detail) {
+    console.log('Speech state:', detail.state);
+  }
+});
 const speakAll = document.body.appendChild(document.createElement('button'));
 speakAll.textContent = 'Speak all segments';
 speakAll.addEventListener('click', async function speakAllSegments() {
@@ -131,6 +137,20 @@ With browser speech's default `auto` / 4 configuration, all three complete
 segments enter the provider queue immediately, up to four synthesize at once,
 and the audio still plays first, second, third. Native or custom speech without
 advertised provider execution capacity stays serialized with one lookahead.
+
+Existing speech controls can also import the shared compatibility catalogs.
+They list the ten existing value/label choices but do not choose a voice for
+the application or prove that a selected provider supports one:
+
+```javascript
+import {
+  SPEECH_VOICE_ALIASES,
+  SPEECH_VOICE_OPTIONS
+} from 'arcane/SpeechPlayback';
+
+console.log(SPEECH_VOICE_OPTIONS[0]); // {value: 'alloy', label: 'Alloy'}
+console.log(SPEECH_VOICE_ALIASES.has('alloy')); // true
+```
 
 Continue with [streaming chunks, device selection, cancellation, status, and cleanup](https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/ai/browser-speech.md),
 the [tiny TWiN Cloud request and saved-preference migration](https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/ai/twin-cloud.md),
@@ -290,13 +310,14 @@ TTS stream without taking over synthesis or playback:
 ```js
 ai.configureTTSSegmentation({
     punctuation:'any',
-    wordCadence:4
+    wordCadence:null
 });
 ```
 
 The compatibility default remains sentence punctuation with no word cadence.
-The configured stream preserves every character and punctuation mark, chooses
-the earliest complete boundary, begins synthesis as each segment becomes
+Within the already prepared speech text, the configured segmentation preserves
+every character and punctuation mark, chooses the earliest complete boundary,
+begins synthesis as each segment becomes
 available, and plays the completed audio in exact segment order. Ready adjacent
 buffers are scheduled consecutively on the browser audio clock rather than
 waiting for an `ended` callback before the next start.
@@ -305,13 +326,15 @@ keeping apostrophes, commas, and hyphens that join Unicode letters or numbers
 inside the same segment.
 Mute, stop, provider transition, and cancellation still govern the whole queue.
 
-For raw Markdown narration, use
-`ai.streamTTS(text,false,{textFormat:'markdown'})`. The SDK removes repeated
-same formatting marks (`*`, `#`, `_`, backtick, `~`) before segmentation,
-including runs split across chunks. Single punctuation and ordinary repeated
-punctuation remain literal. The format lasts through `finishTTS()`; new
-streams default to exact plain text. Shared chat selects Markdown mode while
-preserving original messages for display and storage.
+Every TTS call automatically removes repeated same formatting marks (`*`, `#`,
+`_`, backtick, `~`) from its outbound speech-input copy before synthesis.
+Streaming calls also recognize a run split across chunks. Single marks and
+ordinary repeated punctuation remain literal. No application option is needed;
+an existing `textFormat` extra is ignored and cannot disable cleanup. Original
+messages and caller payloads remain unchanged for display, storage, and model
+input. The dependency-free `arcane-os/speech-text` entrypoint exports the same
+`MarkdownSpeech` streaming class and `stripSpeechFormatting()` one-pass helper
+for code that needs the speech-only transformation directly.
 
 The SDK runtime also owns `DBOPFSDocumentLibrary`,
 `DocumentLexicalSearch`, and `PersistentAIChatSession`. Document bootstrap is
@@ -334,7 +357,7 @@ uses the same controller for automatic memory extraction.
 Create a new repository-shaped Arcane application with the exact stable SDK:
 
 ```bash
-npx arcane-os@0.5.16 new my-app --path ./my-app --target portable --git
+npx arcane-os@0.5.17 new my-app --path ./my-app --target portable --git
 cd my-app
 npm install
 npm run dev
@@ -344,7 +367,7 @@ To enroll an existing repository, install the exact SDK and initialize only
 missing Arcane files:
 
 ```bash
-npm install --save-dev --save-exact arcane-os@0.5.16
+npm install --save-dev --save-exact arcane-os@0.5.17
 npm exec -- arcane init my-app --target portable
 ```
 
@@ -360,7 +383,7 @@ npm exec -- arcane-os targets
 No global SDK install or standalone Arcane CLI is required. The application
 repository's exact npm dependency and lockfile own the CLI and toolchain version.
 
-Use `npx arcane-os@0.5.16` for the initial bootstrap because it names this npm
+Use `npx arcane-os@0.5.17` for the initial bootstrap because it names this npm
 package explicitly; bare `npx arcane` outside an installed project could resolve
 a different package. Both installed commands invoke the same headless toolchain.
 Project-local npm scripts use the SDK pinned by that app's `package-lock.json`,
@@ -380,7 +403,7 @@ node ./bin/arcane.mjs new local-app --path ../local-app --target portable --git
 
 # From the generated app repository
 cd ../local-app
-npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.5.16.tgz
+npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.5.17.tgz
 npm ci
 ```
 
@@ -389,7 +412,7 @@ same location. The lockfile retains the selected package dependency while
 Arcane uses the installed package name and version. Local directory `file:` dependencies are not
 accepted because npm may install them as links; use a packed `.tgz`. A GitHub
 runner also needs that tarball at the locked path. After publication, replace
-the local declaration with the exact `arcane-os@0.5.16` registry package and
+the local declaration with the exact `arcane-os@0.5.17` registry package and
 commit the regenerated lock.
 
 Generated repositories use `npm ci --ignore-scripts` in CI. Run dependency
@@ -528,7 +551,7 @@ package installation, or assertions.
 
 ## Current target support
 
-Version `0.5.16` exposes one browser target and five explicitly paired
+Version `0.5.17` exposes one browser target and five explicitly paired
 native development targets: a non-runnable portable directory, a
 Windows x64 unsigned-local-test EXE bundle, Linux x64 and Linux ARM64
 unsigned-local-test DEBs, and an Android development-signed APK. The

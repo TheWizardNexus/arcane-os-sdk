@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.5.15",
+  "sdkVersion": "0.5.17",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 198,
+  "memberCount": 202,
   "members": [
     {
       "id": "root:APP_BUNDLE_DESCRIPTOR_NAME",
@@ -1395,7 +1395,7 @@
       "summary": "Default binding for the canonical SpeechPlayback runtime class, with capability-gated eager provider submission and exact-order playback.",
       "availability": "Node with injected media adapters, or browser/native WebView media",
       "protocol": "SpeechPlayback runtime contract",
-      "normalization": "Binding identity and namespace come directly from the canonical runtime module; a fetchTTS client with positive advertised TTS execution capacity receives all complete segments immediately while its provider owns bounded admission and SpeechPlayback retains indexed order; other clients remain serialized"
+      "normalization": "Binding identity and namespace come directly from the canonical runtime module; stored part input remains exact while only each outbound synthesis copy receives automatic repeated-formatting-mark cleanup and SDK-internal preparation metadata; a fetchTTS client with positive advertised TTS execution capacity receives all complete segments immediately while its provider owns bounded admission and SpeechPlayback retains indexed order; other clients remain serialized; canonical state dispatch precedes the optional synchronous onState callback"
     },
     {
       "id": "speech-playback:SPEECH_PLAYBACK_STATE_EVENT",
@@ -1412,6 +1412,34 @@
       "normalization": "Exact immutable speech-playback-state event name"
     },
     {
+      "id": "speech-playback:SPEECH_VOICE_ALIASES",
+      "name": "SPEECH_VOICE_ALIASES",
+      "displayName": "SPEECH_VOICE_ALIASES",
+      "kind": "constant",
+      "signature": "const SPEECH_VOICE_ALIASES",
+      "entrypoints": ["arcane-os/speech-playback"],
+      "primaryImport": "arcane-os/speech-playback",
+      "group": "Portable runtime modules",
+      "summary": "Mutable compatibility membership set for the ten shared speech voice identifiers.",
+      "availability": "Node and browser",
+      "protocol": "SpeechPlayback runtime contract",
+      "normalization": "Derived once from SPEECH_VOICE_OPTIONS in published order; ordinary mutable Set containing alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, and shimmer; SpeechPlayback does not select it automatically"
+    },
+    {
+      "id": "speech-playback:SPEECH_VOICE_OPTIONS",
+      "name": "SPEECH_VOICE_OPTIONS",
+      "displayName": "SPEECH_VOICE_OPTIONS",
+      "kind": "constant",
+      "signature": "const SPEECH_VOICE_OPTIONS",
+      "entrypoints": ["arcane-os/speech-playback"],
+      "primaryImport": "arcane-os/speech-playback",
+      "group": "Portable runtime modules",
+      "summary": "Mutable ordered compatibility value/label records for existing speech controls.",
+      "availability": "Node and browser",
+      "protocol": "SpeechPlayback runtime contract",
+      "normalization": "Ordinary mutable array and mutable records ordered as Alloy, Ash, Ballad, Coral, Echo, Fable, Nova, Onyx, Sage, and Shimmer; provider support and selection remain caller-owned"
+    },
+    {
       "id": "speech-playback:SpeechPlayback",
       "name": "SpeechPlayback",
       "displayName": "SpeechPlayback",
@@ -1423,7 +1451,7 @@
       "summary": "Named binding for the same capability-aware, exact-order canonical class exposed as the subpath default.",
       "availability": "Node with injected media adapters, or browser/native WebView media",
       "protocol": "SpeechPlayback runtime contract",
-      "normalization": "Binding identity equals the default export; prepare preserves each nonblank part input exactly without trimming, splitting, or freezing it; provider-advertised capacity enables eager submission while the provider owns its bound, native and custom clients remain serialized, and media availability remains host-owned"
+      "normalization": "Binding identity equals the default export; prepare preserves each nonblank part input exactly without trimming, splitting, or freezing it; requestSpeech changes only the cloned outbound input through automatic repeated-formatting-mark cleanup and carries SDK-internal preparation metadata; provider-advertised capacity enables eager submission while the provider owns its bound, native and custom clients remain serialized, canonical state dispatch precedes optional synchronous onState delivery, and media availability remains host-owned"
     },
     {
       "id": "speech-playback:splitSpeechText",
@@ -1438,6 +1466,34 @@
       "availability": "Node and browser",
       "protocol": "SpeechPlayback runtime contract",
       "normalization": "Uses trimming only to detect blank input; nonblank text is returned unchanged in one mutable array without trimming, splitting, or freezing"
+    },
+    {
+      "id": "speech-text:MarkdownSpeech",
+      "name": "MarkdownSpeech",
+      "displayName": "MarkdownSpeech",
+      "kind": "class",
+      "signature": "new MarkdownSpeech()",
+      "entrypoints": ["arcane-os/speech-text"],
+      "primaryImport": "arcane-os/speech-text",
+      "group": "Portable runtime modules",
+      "summary": "Streams speech-only repeated-formatting-mark removal across input chunk boundaries.",
+      "availability": "Node and browser",
+      "protocol": "Speech text normalization",
+      "normalization": "append(text='',end=false) emits newly available narration, retains only a trailing candidate formatting mark across chunks, and resets after a terminal append; reset() discards that pending state; caller text remains unchanged"
+    },
+    {
+      "id": "speech-text:stripSpeechFormatting",
+      "name": "stripSpeechFormatting",
+      "displayName": "stripSpeechFormatting()",
+      "kind": "function",
+      "signature": "stripSpeechFormatting(text='')",
+      "entrypoints": ["arcane-os/speech-text"],
+      "primaryImport": "arcane-os/speech-text",
+      "group": "Portable runtime modules",
+      "summary": "Removes repeated runs of speech formatting marks from one complete text value.",
+      "availability": "Node and browser",
+      "protocol": "Speech text normalization",
+      "normalization": "Calls the supplied value's replace method and returns its result with runs of two or more identical *, #, _, backtick, or ~ marks removed; single marks and every other character remain literal; it does not parse Markdown or modify the supplied value; values without callable replace fail with the native TypeError"
     },
     {
       "id": "root:readRuntimeFile",

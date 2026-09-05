@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## 0.5.17
+
+- Restore the public `SPEECH_VOICE_OPTIONS` ordered records and
+  `SPEECH_VOICE_ALIASES` membership set used by existing speech controls. Both
+  remain ordinary mutable compatibility values, and `SpeechPlayback` does not
+  select a voice from them automatically.
+- Restore the optional `SpeechPlayback` constructor `onState(detail)` callback.
+  Canonical state dispatch remains first; callback failures are reported
+  without replacing playback settlement. Preserve capability-gated eager
+  submission, the provider-owned default capacity of four, indexed playback
+  order, native/custom serialization, cancellation, and Replay behavior.
+- Apply the shared repeated-formatting-mark cleanup automatically to every TTS
+  entry path, including direct fetch, provider-runtime synthesis, browser
+  Kokoro requests, streaming chunks, and `SpeechPlayback`. Export the shared
+  `MarkdownSpeech` and `stripSpeechFormatting()` owner from
+  `arcane-os/speech-text`; keep original caller records unchanged and use
+  operation-local SDK metadata to prevent a second cleanup pass. No application
+  option is required, and the prior `textFormat` extra no longer disables or
+  selects cleanup.
+
 ## 0.5.16
 
 - Add optional Markdown narration filtering before `AI.streamTTS()`

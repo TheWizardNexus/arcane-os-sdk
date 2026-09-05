@@ -9,7 +9,7 @@ same managed browser imports as the [browser speech quick start](browser-speech.
 Create an application and start its source server:
 
 ```bash
-npx arcane-os@0.5.16 new hello-twin --path ./hello-twin --target browser
+npx arcane-os@0.5.17 new hello-twin --path ./hello-twin --target browser
 cd hello-twin
 npm install
 npm run dev

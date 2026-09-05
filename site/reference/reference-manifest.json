@@ -3,16 +3,16 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.5.15",
+    "sdk": "0.5.17",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
   "counts": {
     "markdownPages": 29,
     "collectionPages": 2,
-    "generatedPages": 86,
-    "runtimeModulePages": 84,
-    "htmlPages": 117,
+    "generatedPages": 87,
+    "runtimeModulePages": 85,
+    "htmlPages": 118,
     "inventories": 4
   },
   "pages": [
@@ -929,6 +929,21 @@
       }
     },
     {
+      "source": "runtime/arcane/modules/MarkdownSpeech.js",
+      "output": "site/reference/runtime-modules/markdown-speech/index.html",
+      "route": "reference/runtime-modules/markdown-speech/",
+      "kind": "runtime-module",
+      "moduleClassification": "public-first-party",
+      "contractCounts": {
+        "exports": 1,
+        "reviewedCallables": 0,
+        "publicMembers": 0,
+        "literalCustomEvents": 0,
+        "directCodedFailures": 0,
+        "exportedErrorSubclasses": 0
+      }
+    },
+    {
       "source": "runtime/arcane/modules/Marked.min.js",
       "output": "site/reference/runtime-modules/marked-min/index.html",
       "route": "reference/runtime-modules/marked-min/",
@@ -1235,7 +1250,7 @@
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
-        "exports": 4,
+        "exports": 6,
         "reviewedCallables": 1,
         "publicMembers": 28,
         "literalCustomEvents": 0,

@@ -13,7 +13,7 @@ import map resolves `arcane/AI` and `arcane/DBOPFS`. These browser modules are
 not Node inference APIs. To create an application:
 
 ```bash
-npx arcane-os@0.5.16 new hello-speech --path ./hello-speech --target browser
+npx arcane-os@0.5.17 new hello-speech --path ./hello-speech --target browser
 cd hello-speech
 npm install
 npm run dev
@@ -288,7 +288,8 @@ That includes any text left in the same AI instance's partial-stream buffer;
 finish the previous producer before starting a separate complete passage.
 Voice, speed, pause, and playback options are not retained with an unfinished
 `end:false` remainder. A later call supplies its own options, and `finishTTS()`
-uses their defaults. The optional text format below lasts through that flush.
+uses their defaults while flushing any pending single formatting mark through
+the same automatic speech-input cleanup.
 A call extracting no segments returns `true` without waiting for earlier jobs.
 An already muted call returns `false`.
 
@@ -343,18 +344,19 @@ if (finalPrepared === false) {
 ```
 
 The segmentation default uses sentence punctuation. To submit smaller complete
-segments, call `ai.configureTTSSegmentation({punctuation:'any',wordCadence:4})`
+segments, call `ai.configureTTSSegmentation({punctuation:'any',wordCadence:null})`
 before feeding the stream. Chunk boundaries themselves do not force a sentence
 boundary; `finishTTS()` flushes any remaining text. It is not a playback-ended
 notification. Do not mute or dispose immediately after it if playback should
 continue.
 
-## Omit Markdown formatting marks from narration
+## Automatic speech-input formatting cleanup
 
-Select `textFormat:'markdown'` for raw model text that contains formatting:
+Every TTS entrypoint removes repeated same formatting marks from the outbound
+speech-input copy automatically. No application option is required:
 
 ```javascript
-ai.streamTTS('## Heading\n**Hello', false, {textFormat:'markdown'});
+ai.streamTTS('## Heading\n**Hello');
 ai.streamTTS('**. Next sentence.');
 await ai.finishTTS();
 ```
@@ -366,12 +368,30 @@ preserved. This is a small narration filter, not a full Markdown parser.
 Ordinary prose is forwarded immediately; only a trailing formatting candidate
 waits for its next character or the final flush.
 
-The format stays active until `end:true`, `finishTTS()`, or cancellation. New
-streams default to `plain`, which preserves exact submitted text. The shared
-chat component selects Markdown mode automatically. Applications already
-speaking visible DOM text can keep plain mode. Displayed messages, saved
-history, model input, language, voice, synthesis capacity, and playback timing
-are not changed by the filter.
+`end:true`, `finishTTS()`, or cancellation clears pending streaming formatting
+state. `fetchTTS()`, provider-runtime TTS requests, direct Kokoro provider
+requests, and `SpeechPlayback` apply the same cleanup to complete input. An
+existing `textFormat` extra is ignored and cannot disable or select cleanup.
+SDK-internal delegation carries `{speechInputPrepared:true}` outside the speech
+payload only after one cleanup pass, preventing a second non-idempotent pass.
+Applications omit that internal metadata. Displayed messages, saved history,
+model input, caller payload objects, language, voice, synthesis capacity, and
+playback timing are not changed by the filter.
+
+The dependency-free helper is public for code that needs the speech-only
+transformation directly:
+
+```javascript
+import {
+  MarkdownSpeech,
+  stripSpeechFormatting
+} from 'arcane-os/speech-text';
+
+console.log(stripSpeechFormatting('**Hello**')); // Hello
+const speechText = new MarkdownSpeech();
+console.log(speechText.append('## Head', false)); // ' Head'
+console.log(speechText.append('ing', true)); // ing
+```
 
 ## Choose a device or reduce memory use
 
@@ -476,7 +496,8 @@ in place; it does not erase the application's data.
 For a cancellable individual synthesis, unmute first. A fresh browser speech
 configuration is muted, so calling `providerRuntime.load('tts')` directly at
 that point rejects with `ARCANE_AI_TTS_MUTED`. `fetchTTS()` accepts an
-`AbortSignal` as its second argument and returns a WAV `Blob` without playing it:
+`AbortSignal` as its second argument, cleans repeated formatting marks from the
+outbound input copy, and returns a WAV `Blob` without playing it:
 
 ```javascript
 const synthesisController = new AbortController();

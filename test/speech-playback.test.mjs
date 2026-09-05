@@ -141,8 +141,8 @@ test(
             }
         );
         const speech = {
-            async fetchTTS(payload, signal) {
-                requests.push({payload, signal});
+            async fetchTTS(payload, signal, preparation) {
+                requests.push({payload, signal, preparation});
                 return minimalWavBlob();
             }
         };
@@ -175,9 +175,10 @@ test(
             }
         });
 
+        const formattedPart={input: '**Caller-selected speech.**'};
         const prepared = await playback.prepare({
             key: 'caller-narration',
-            parts: [{input: 'Caller-selected speech.'}],
+            parts: [formattedPart],
             autoplay: false
         });
         assert.deepEqual(prepared, {ready: true, played: false});
@@ -188,7 +189,9 @@ test(
             voice: 'caller-voice',
             responseFormat: 'wav'
         });
+        assert.deepEqual(requests[0].preparation,{speechInputPrepared:true});
         assert.equal(requests[0].signal instanceof AbortSignal, true);
+        assert.equal(formattedPart.input,'**Caller-selected speech.**');
         assert.equal(
             compatibilityStates.some(function compatibilityStateIsReady(state) {
                 return state.state==='ready';
@@ -473,9 +476,9 @@ test(
                     return {execution:{maxConcurrentRequests:4}};
                 }
             },
-            fetchTTS(payload,signal) {
+            fetchTTS(payload,signal,preparation) {
                 const deferred=deferredRequest();
-                const request={...deferred,payload,signal};
+                const request={...deferred,payload,signal,preparation};
                 requests.push(request);
                 return deferred.promise;
             }
@@ -510,6 +513,12 @@ test(
             {role:'tts',options:{execution:true}}
         ]);
         assert.equal(requests.every(request => request.signal instanceof AbortSignal),true);
+        assert.equal(
+            requests.every(request => (
+                request.preparation?.speechInputPrepared===true
+            )),
+            true
+        );
 
         resolveRequest(requests[2]);
         requests[1].reject(false);
@@ -609,9 +618,9 @@ test(
         const playback=new SpeechPlayback({
             audio,
             speech:{
-                synthesize(payload,options) {
+                synthesize(payload,options,preparation) {
                     const deferred=deferredRequest();
-                    const request={...deferred,payload,options};
+                    const request={...deferred,payload,options,preparation};
                     requests.push(request);
                     return deferred.promise;
                 }
@@ -627,8 +636,9 @@ test(
             request.resolve(blob);
         }
 
+        const nativeParts=['**Native first.**','Native second.','Native third.'];
         const preparation=playback.prepare({
-            parts:['Native first.','Native second.','Native third.'],
+            parts:nativeParts,
             autoplay:false
         });
         await waitForContract(
@@ -636,6 +646,9 @@ test(
             'Native synthesis should admit only the first segment initially.'
         );
         assert.equal(requests[0].options.signal instanceof AbortSignal,true);
+        assert.equal(requests[0].payload.input,'Native first.');
+        assert.deepEqual(requests[0].preparation,{speechInputPrepared:true});
+        assert.equal(nativeParts[0],'**Native first.**');
         resolveRequest(requests[0]);
         assert.deepEqual(await preparation,{ready:true,played:false});
         await waitForContract(

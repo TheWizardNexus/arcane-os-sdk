@@ -119,6 +119,20 @@ await outbox.start();`
 console.log(normalizeMailEndpoint('/v1/mail', 'https://mail.example.com/'));`
     },
     {
+        name:'MarkdownSpeech.js',
+        classification:'public-first-party',
+        lifecycleSideEffects:'Import re-exports the shared MarkdownSpeech class from arcane-os/speech-text and performs no work. Each instance retains only a trailing candidate formatting mark between append() calls; terminal append and reset clear that instance state.',
+        paramsResults:"new MarkdownSpeech(); append(text='',end=false) requires text to be a string and returns only newly available narration with repeated same *, #, _, backtick, and ~ runs removed. A trailing candidate formatting mark waits for the next chunk; a truthy end value flushes a pending single mark and resets state. reset() clears pending state and returns undefined. Single marks and every other character remain literal.",
+        events:[],
+        errors:['TypeError when append text is not a string.'],
+        capabilitiesCore:'None. The runtime projection and public arcane-os/speech-text package subpath share the same dependency-free implementation.',
+        example:String.raw`import {MarkdownSpeech} from '/arcane/modules/MarkdownSpeech.js';
+
+const speechText = new MarkdownSpeech();
+console.log(speechText.append('*'));
+console.log(speechText.append('*Hello.', true));`
+    },
+    {
         name:'Marked.min.js',
         classification:'vendor',
         lifecycleSideEffects:'ESM initialization only; later setOptions() and use() calls mutate the module-scoped vendor singleton.',
@@ -446,16 +460,21 @@ document.querySelector('button').addEventListener('click', async () => {
     {
         name:'SpeechPlayback.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Construction attaches ended/play/pause/error listeners to the supplied audio element. prepare() cancels prior work, creates indexed Blob URLs, and autoplays when allowed. A fetchTTS client with positive providerRuntime TTS execution capacity receives every complete part immediately; its provider queue owns bounded FIFO admission while playback waits for exact input order. Native and custom clients without that advertised capacity retain serialized synthesis and one-segment lookahead. Pause and Resume keep the same audio element. Replay preserves completed URLs and active provider work while retrying only failed missing provider segments. cancel/stop abort every owned request and release URLs; destroy() also removes listeners and disposes the event source.',
-        paramsResults:"splitSpeechText(value) returns [] for blank text or a mutable one-item array containing the exact input without trimming, splitting, or freezing it. prepare() preserves each nonblank part's exact input string in a new mutable record. new SpeechPlayback({audio,speech?,model?,voice?,responseFormat?,speed=1,createObjectURL?,revokeObjectURL?,delay?,messages?}); prepare({key,parts,model?,voice?,responseFormat?,speed?,autoplay=true}) resolves {ready,played}; available(), hasAudio(), play(), restart()/replay(), togglePause(), advance(), stop(), cancel(), releaseURLs(), destroy(). Browser/provider eager admission requires fetchTTS(payload,signal) plus providerRuntime.status('tts',{execution:true}).execution.maxConcurrentRequests as a positive safe integer; the provider, not SpeechPlayback, enforces that bound. Otherwise admission remains serialized. Omitted model, voice, and response format remain caller/catalog-owned. Exports the playback-state event.",
-        events:['SPEECH_PLAYBACK_STATE_EVENT publishes mutable details with idle, synthesizing, ready, playing, paused, pausing, buffering, ended, and error states.','Consumes audio ended/play/pause/error events.'],
-        errors:['TypeError or RangeError for missing audio or invalid/blank speech input, voice, speed, or pause.','Every first-segment provider rejection, including a falsy rejection value, propagates from prepare() while state becomes error; later indexed failure stops ordered playback without skipping and can be retried by Replay. Autoplay rejection becomes played:false.'],
+        lifecycleSideEffects:'Construction attaches ended/play/pause/error listeners to the supplied audio element and retains the optional onState callback. prepare() cancels prior work, creates indexed Blob URLs, and autoplays when allowed. A fetchTTS client with positive providerRuntime TTS execution capacity receives every complete part immediately; its provider queue owns bounded FIFO admission while playback waits for exact input order. Native and custom clients without that advertised capacity retain serialized synthesis and one-segment lookahead. Pause and Resume keep the same audio element. Replay preserves completed URLs and active provider work while retrying only failed missing provider segments. cancel/stop abort every owned request and release URLs; destroy() emits its final cancellation state, removes listeners, disposes the event source, and neutralizes the callback.',
+        paramsResults:"SPEECH_VOICE_OPTIONS is an ordered mutable compatibility array of ten {value,label} records, and SPEECH_VOICE_ALIASES is the mutable Set of those values; SpeechPlayback does not select either catalog. splitSpeechText(value) returns [] for blank text or a mutable one-item array containing the exact input without trimming, splitting, or freezing it. prepare() preserves each nonblank part's exact input string in a new mutable record. requestSpeech() clones that stored part, removes repeated same formatting marks from only the outbound input, and passes SDK-internal {speechInputPrepared:true} outside the payload so downstream SDK boundaries do not filter the copy twice; original part objects and every non-input payload field remain unchanged. new SpeechPlayback({audio,speech?,model?,voice?,responseFormat?,speed=1,onState=()=>{},createObjectURL?,revokeObjectURL?,delay?,messages?}); prepare({key,parts,model?,voice?,responseFormat?,speed?,autoplay=true}) resolves {ready,played}; available(), hasAudio(), play(), restart()/replay(), togglePause(), advance(), stop(), cancel(), releaseURLs(), destroy(). Browser/provider eager admission requires fetchTTS(payload,signal) plus providerRuntime.status('tts',{execution:true}).execution.maxConcurrentRequests as a positive safe integer; the provider, not SpeechPlayback, enforces that bound. SpeechPlayback supplies both fetchTTS and serialized synthesize clients a third SDK-internal preparation object, which existing two-argument clients may ignore. Otherwise admission remains serialized. Omitted model, voice, and response format remain caller/catalog-owned. Exports the two voice compatibility catalogs and playback-state event.",
+        events:['SPEECH_PLAYBACK_STATE_EVENT publishes mutable details with idle, synthesizing, ready, playing, paused, pausing, buffering, ended, and error states, then optional onState(detail) runs synchronously with the same public field values. Object identity between the canonical occurrence detail and callback detail is not promised.','Consumes audio ended/play/pause/error events.'],
+        errors:['TypeError or RangeError for missing audio or invalid/blank speech input, voice, speed, or pause. An onState callback failure is reported through globalThis.reportError or console.error without replacing playback settlement.','Every first-segment provider rejection, including a falsy rejection value, propagates from prepare() while state becomes error; later indexed failure stops ordered playback without skipping and can be retried by Replay. Autoplay rejection becomes played:false.'],
         capabilitiesCore:'Arcane.speech.synthesize uses ai.inference and remains serialized unless the supplied client explicitly advertises compatible fetchTTS provider execution capacity. Blob/audio playback still follows browser media and user-gesture policy.',
-        example:String.raw`import SpeechPlayback from '/arcane/modules/SpeechPlayback.js';
+        example:String.raw`import SpeechPlayback,{SPEECH_VOICE_OPTIONS} from '/arcane/modules/SpeechPlayback.js';
 
 const audio = document.body.appendChild(document.createElement('audio'));
 audio.controls = true;
-const speech = new SpeechPlayback({audio,speech:globalThis.ai});
+console.log(SPEECH_VOICE_OPTIONS[0]);
+const speech = new SpeechPlayback({
+    audio,
+    speech:globalThis.ai,
+    onState(detail){console.log(detail.state);}
+});
 const button = document.body.appendChild(document.createElement('button'));
 button.textContent = 'Speak';
 button.addEventListener('click', async function speakCompleteSegments() {

@@ -1,8 +1,9 @@
 # Arcane OS SDK JavaScript API
 
 The npm package exposes a Node.js ESM control plane, the portable
-`arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`, `arcane-os/preference-store`, and
-`arcane-os/speech-playback` entrypoints, and the browser-only
+`arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`,
+`arcane-os/preference-store`, `arcane-os/speech-playback`, and
+`arcane-os/speech-text` entrypoints, and the browser-only
 `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints.
 Those package subpaths are distinct from application-facing projection modules
 in the managed browser map, such as `arcane/AIProviderRuntime`,
@@ -18,7 +19,7 @@ This table is the Node `package.json#exports` map: it defines package
 entrypoints for SDK/tooling code. It is distinct from the generated browser
 import map that resolves application-facing `arcane/*` modules and the focused
 EventManager entry. See [browser runtime delivery](protocols.md#browser-runtime-delivery)
-for the installed-inventory-derived physical-runtime contract in SDK `0.5.16`.
+for the installed-inventory-derived physical-runtime contract in SDK `0.5.17`.
 
 | Specifier | Purpose |
 | --- | --- |
@@ -36,6 +37,7 @@ for the installed-inventory-derived physical-runtime contract in SDK `0.5.16`.
 | `arcane-os/logging` | Shared console diagnostics controlled by the existing `user.developer` preference. |
 | `arcane-os/preference-store` | Portable preference records and injected storage adapters. |
 | `arcane-os/speech-playback` | Portable speech preparation, playback state, and injected media adapters. |
+| `arcane-os/speech-text` | Dependency-free speech-input formatting cleanup for complete text and streamed chunks. |
 | `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, complete DBOPFS model storage, streaming, cancellation, and structural tool-call results. |
 | `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS provider mechanisms, ordinary upstream assets, materialized/native routing, Workers, and cancellation. |
 | `arcane-os/mail` | Portable Mail runtime, durable outbox, complete transport responses, and provider-neutral acceptance contracts. |
@@ -143,6 +145,7 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `loadSdkBrowserRuntimeRelease()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `materializeInstalledSdkRuntime()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `materializeWorkspaceRuntimeContent()` | function | `arcane-os` | Runtime and app descriptors | Node |
+| `MarkdownSpeech` | class | `arcane-os/speech-text` | Portable runtime modules | Node and browser |
 | `NATIVE_BUILD_PLAN_PROTOCOL` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `NATIVE_BUILDER_PROTOCOL` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `normalizeError()` | function | `arcane-os` | Errors | Node |
@@ -187,8 +190,11 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `selectApp()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node |
 | `SpeechPlayback default export` | class | `arcane-os/speech-playback` | Portable runtime modules | Node with injected media adapters, or browser/native WebView media |
 | `SPEECH_PLAYBACK_STATE_EVENT` | constant | `arcane-os/speech-playback` | Portable runtime modules | Node and browser |
+| `SPEECH_VOICE_ALIASES` | constant | `arcane-os/speech-playback` | Portable runtime modules | Node and browser |
+| `SPEECH_VOICE_OPTIONS` | constant | `arcane-os/speech-playback` | Portable runtime modules | Node and browser |
 | `SpeechPlayback` | class | `arcane-os/speech-playback` | Portable runtime modules | Node with injected media adapters, or browser/native WebView media |
 | `splitSpeechText()` | function | `arcane-os/speech-playback` | Portable runtime modules | Node and browser |
+| `stripSpeechFormatting()` | function | `arcane-os/speech-text` | Portable runtime modules | Node and browser |
 | `startDevServer()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node control plane; browser data plane |
 | `startSourceExampleServer()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node control plane; browser data plane |
 | `TARGET_ADAPTER_PROTOCOL` | constant | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
@@ -751,7 +757,7 @@ deterministic map. The package root also contains the public
 {
   schemaVersion: 1,
   kind: 'arcane-app-runtime-projection',
-  sdkVersion: '0.5.16',
+  sdkVersion: '0.5.17',
   pathPrefix: 'arcane/',
   files: [{path}]
 }
@@ -1507,6 +1513,16 @@ bounded FIFO queue (browser Kokoro defaults to four), while Blob URLs and
 playback remain in exact input order. A native or custom client without that
 advertised capacity stays serialized with one lookahead. Replay keeps completed
 URLs and pending requests while retrying failed missing provider segments.
+The optional constructor `onState(detail)` callback runs synchronously after
+the canonical state occurrence is dispatched; callback failures are reported
+without replacing playback settlement.
+
+`prepare()` keeps every nonblank stored part exact. At synthesis time,
+`SpeechPlayback` copies the part and automatically removes repeated formatting
+marks from only that outbound speech input. It passes SDK-internal preparation
+metadata so a downstream SDK speech boundary does not apply the filter again;
+applications do not supply that metadata. Original part objects, displayed or
+stored content, and every non-input payload field remain unchanged.
 
 ### Signature and result
 
@@ -1526,7 +1542,13 @@ runtime module; provider and media availability remain host-owned.
 import SpeechPlayback from 'arcane-os/speech-playback';
 
 const audio=document.body.appendChild(document.createElement('audio'));
-const playback=new SpeechPlayback({audio,speech:globalThis.ai});
+const playback=new SpeechPlayback({
+  audio,
+  speech:globalThis.ai,
+  onState(detail) {
+    console.log(detail.state);
+  }
+});
 const button=document.body.appendChild(document.createElement('button'));
 button.textContent='Speak';
 button.addEventListener('click',async function speakCompleteSegments(){
@@ -1561,18 +1583,91 @@ import {SPEECH_PLAYBACK_STATE_EVENT} from 'arcane-os/speech-playback';
 console.log(SPEECH_PLAYBACK_STATE_EVENT);
 ```
 
+## SPEECH_VOICE_ALIASES
+
+### Overview
+
+Mutable compatibility membership for the ten shared voice identifiers used by
+existing speech controls. `SpeechPlayback` does not select a voice from this
+set, and membership does not promise support from the selected provider.
+
+### Signature and result
+
+```text
+const SPEECH_VOICE_ALIASES
+```
+
+### Availability and normalization
+
+**Node and browser.** Ordinary mutable `Set`, derived once in
+`SPEECH_VOICE_OPTIONS` order, containing `alloy`, `ash`, `ballad`, `coral`,
+`echo`, `fable`, `nova`, `onyx`, `sage`, and `shimmer`.
+
+### Example
+
+```javascript
+import {SPEECH_VOICE_ALIASES} from 'arcane-os/speech-playback';
+console.log(SPEECH_VOICE_ALIASES.has('alloy')); // true
+```
+
+## SPEECH_VOICE_OPTIONS
+
+### Overview
+
+Mutable ordered compatibility records for existing speech voice controls.
+Each record has a lowercase `value` and matching title-case `label`. Provider
+support and voice selection remain caller-owned.
+
+### Signature and result
+
+```text
+const SPEECH_VOICE_OPTIONS
+```
+
+### Availability and normalization
+
+**Node and browser.** Ordinary mutable array and mutable `{value,label}`
+records ordered as Alloy, Ash, Ballad, Coral, Echo, Fable, Nova, Onyx, Sage,
+and Shimmer.
+
+### Example
+
+```javascript
+import {SPEECH_VOICE_OPTIONS} from 'arcane-os/speech-playback';
+console.log(SPEECH_VOICE_OPTIONS[0]); // {value: 'alloy', label: 'Alloy'}
+```
+
 ## SpeechPlayback
 
 ### Overview
 
 Named binding for the same capability-aware, exact-order canonical class exposed
 as the speech-playback default. `prepare()` preserves each nonblank part's exact
-input string without trimming, splitting, or freezing that content.
+input string without trimming, splitting, or freezing that content. An optional
+`onState(detail)` constructor callback receives every state synchronously after
+the canonical occurrence is dispatched. Both surfaces expose the same public
+field values at dispatch time; object identity is not promised. Callback
+failures are reported through `globalThis.reportError` when available,
+otherwise `console.error`, and do not replace playback settlement.
+Only the outbound synthesis copy receives automatic repeated-formatting-mark
+cleanup; the original part and stored preparation record stay exact.
 
 ### Signature and result
 
 ```text
-new SpeechPlayback(options={})
+new SpeechPlayback({
+  audio,
+  speech?,
+  model?,
+  voice?,
+  responseFormat?,
+  speed=1,
+  onState=()=>{},
+  createObjectURL?,
+  revokeObjectURL?,
+  delay?,
+  messages?
+})
 ```
 
 ### Availability and normalization
@@ -1586,7 +1681,15 @@ serialized, and media availability remains host-owned.
 
 ```javascript
 import SpeechPlayback,{SpeechPlayback as NamedSpeechPlayback} from 'arcane-os/speech-playback';
-console.log(SpeechPlayback===NamedSpeechPlayback);
+
+const audio=document.body.appendChild(document.createElement('audio'));
+const playback=new NamedSpeechPlayback({
+  audio,
+  onState(detail) {
+    console.log(detail.state);
+  }
+});
+console.log(playback instanceof SpeechPlayback); // true
 ```
 
 ## splitSpeechText()
@@ -1610,6 +1713,73 @@ splitSpeechText(value='')
 ```javascript
 import {splitSpeechText} from 'arcane-os/speech-playback';
 console.log(splitSpeechText('Hello world.'));
+```
+
+## MarkdownSpeech
+
+### Overview
+
+Streams the SDK's dependency-free speech formatting cleanup across input chunk
+boundaries. `append()` removes runs of two or more identical `*`, `#`, `_`,
+backtick, or `~` marks while retaining single marks and every other character.
+It is a narrow speech filter, not a Markdown parser. Normal SDK TTS calls use
+this cleanup automatically; applications do not need to construct this class
+or opt in.
+
+### Signature and result
+
+```text
+new MarkdownSpeech()
+```
+
+`append(text='',end=false)` returns only newly available narration. It retains
+one trailing candidate formatting mark across calls so a repeated run split
+between chunks is still removed. A terminal `end:true` append flushes any
+single pending mark and resets the instance. `reset()` discards pending state.
+
+### Availability and normalization
+
+**Node and browser.** The implementation has no runtime dependency. Caller
+strings remain unchanged. Non-string input throws `TypeError`.
+
+### Example
+
+```javascript
+import {MarkdownSpeech} from 'arcane-os/speech-text';
+
+const speechText=new MarkdownSpeech();
+console.log(speechText.append('*')); // '' (held for the next chunk)
+console.log(speechText.append('*Hello.',true)); // 'Hello.'
+```
+
+## stripSpeechFormatting()
+
+### Overview
+
+Removes repeated same formatting marks from one complete speech text value.
+Single marks, ordinary punctuation, links, code contents, and every other
+character remain literal. Normal SDK TTS calls already apply this function to
+an outbound copy; the public helper is available when another speech-text owner
+needs the same one-pass result.
+
+### Signature and result
+
+```text
+stripSpeechFormatting(text='')
+```
+
+### Availability and normalization
+
+**Node and browser.** Calls the supplied value's `replace()` method and returns
+its filtered result without modifying the supplied value. Pass a string;
+values without a callable `replace()` fail with the native `TypeError`.
+
+### Example
+
+```javascript
+import {stripSpeechFormatting} from 'arcane-os/speech-text';
+
+console.log(stripSpeechFormatting('**Hello**')); // 'Hello'
 ```
 
 ## projectNativeDescriptor()
@@ -3463,7 +3633,7 @@ workspace it additionally returns the exact installed package authority:
     packageSource,
     canonicalPackageRoot,
     packageName: 'arcane-os',
-    packageVersion: '0.5.16',
+    packageVersion: '0.5.17',
     runtimeRoot,
     browserRuntimeRoot
   }
@@ -3471,9 +3641,9 @@ workspace it additionally returns the exact installed package authority:
 ```
 
 The dependency can be named `arcane-os` or be one exact npm alias for
-`npm:arcane-os@0.5.16`. The selected installation must still be one direct,
+`npm:arcane-os@0.5.17`. The selected installation must still be one direct,
 physical, non-link package directory whose manifest identifies exactly as
-`arcane-os@0.5.16`; duplicate canonical/alias declarations reject.
+`arcane-os@0.5.17`; duplicate canonical/alias declarations reject.
 `allowMissingManagedImportMap` is an internal packaging/development seam. An
 ordinary caller should leave it `false`.
 

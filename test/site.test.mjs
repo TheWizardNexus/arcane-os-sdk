@@ -461,7 +461,7 @@ test('the complete API reference is a first-party generated Pages corpus',async 
         const decodedSdk=decodeReferenceHtml(sdk);
         assert.match(landing,/href="sdk-api\/">API<\/a>/u);
         assert.match(landing,/href="ai\/browser-wasm\/">Browser-WASM AI<\/a>/u);
-        assert.match(landing,/<strong>200<\/strong>[\s\S]*14 JavaScript package entrypoints/u);
+        assert.match(landing,/<strong>202<\/strong>[\s\S]*18 JavaScript package entrypoints/u);
         assert.match(normalized,/Application default[.][\s\S]*browser-wasm-local-text-inference/u);
         assert.match(decodedNormalized,/arcane-os\/ai\/browser-wasm/u);
         assert.match(decodedNormalized,/AIProviderRuntime[.]js[\s\S]*AIRuntimeState[.]js/u);
@@ -730,7 +730,7 @@ test('the complete API reference is a first-party generated Pages corpus',async 
             /There is no exported\s+<code>importMapApplication\(\)<\/code> or <code>generateImportMap\(\)<\/code> binding/u
         );
         assert.equal(packageApi.sdkVersion,packageDocument.version);
-        assert.equal(packageApi.memberCount,204);
+        assert.equal(packageApi.memberCount,202);
         assert.deepEqual(
             packageApi.members
                 .filter(member=>member.primaryImport==='arcane-os/ai/browser-speech')
