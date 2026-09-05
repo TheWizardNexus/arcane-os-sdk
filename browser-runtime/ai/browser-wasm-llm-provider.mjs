@@ -20,15 +20,12 @@ const AI_PROVIDER_PROTOCOL = "arcane-ai-provider/2";
 const AI_MODEL_AUTHORITY_PROTOCOL = "arcane-ai-model-authority/1";
 const WEBGPU_ADAPTER_SELECTED_EVENT = "arcane.ai.browser-wasm.webgpu.adapter.selected";
 const WEBGPU_ADAPTER_SELECTION_PROTOCOL = "arcane-ai-webgpu-adapter-selection/1";
-const CHROME_HIGH_PERFORMANCE_GPU_FLAG_URL =
-  "chrome://flags/#force-high-performance-gpu";
 const MODEL_LOAD_HEARTBEAT_MS = 5_000;
 const DEFAULT_MODEL_DOWNLOAD_CONCURRENCY = 4;
 const MODEL_DOWNLOAD_PROGRESS_INTERVAL_MS = 250;
 const MODEL_DOWNLOAD_SPEED_WINDOW_MS = 5_000;
 const MODEL_DOWNLOAD_MAX_RANGE_PARTS = 4_096;
 const MODEL_DOWNLOAD_TARGET_RANGE_BYTES = 4_000_000;
-const INTEL_VENDOR_ID = 0x8086;
 const CAPABILITY_POLICY_PROTOCOL = "arcane-ai-browser-capability-policy/1";
 let highPerformanceGpuNoticeShown = false;
 
@@ -263,44 +260,71 @@ function publicDescriptor(source) {
   return modelDescriptor(source);
 }
 
-function isChromeBrowser() {
-  const userAgent = String(globalThis.navigator?.userAgent ?? "");
-  return /\b(?:Chrome|Chromium)\//u.test(userAgent)
-    && !/\b(?:Edg|OPR)\//u.test(userAgent);
+function highPerformanceGpuBrowser() {
+    const navigatorObject = globalThis.navigator;
+    const userAgent = String(navigatorObject?.userAgent ?? "");
+    const clientHints = navigatorObject?.userAgentData;
+    const platform = String(clientHints?.platform || navigatorObject?.platform || userAgent);
+    if (
+        !/\b(?:Windows|Win32|Win64)\b/iu.test(platform)
+        || clientHints?.mobile === true
+        || /\b(?:Android|iPhone|iPad|iPod|Mobile)\b/iu.test(userAgent)
+    ) {
+        return null;
+    }
+
+    const brands = new Set();
+    for (const entry of clientHints?.brands ?? []) {
+        brands.add(entry.brand);
+    }
+    // Vivaldi can append its identity while also identifying as Edge or Chrome.
+    if (brands.has("Vivaldi") || /\bVivaldi\//u.test(userAgent)) {
+        return { name: "Vivaldi", url: "vivaldi://flags/#force-high-performance-gpu" };
+    }
+    if (brands.has("Brave") || typeof navigatorObject?.brave?.isBrave === "function") {
+        return { name: "Brave", url: "brave://flags/#force-high-performance-gpu" };
+    }
+    if (brands.has("Opera") || /\bOPR\//u.test(userAgent)) {
+        return { name: "Opera", url: "opera://flags/#force-high-performance-gpu" };
+    }
+    if (brands.has("Microsoft Edge") || /\bEdg\//u.test(userAgent)) {
+        return { name: "Microsoft Edge", url: "edge://flags/#force-high-performance-gpu" };
+    }
+    if (
+        brands.has("Chromium")
+        || brands.has("Google Chrome")
+        || /\b(?:Chrome|Chromium)\//u.test(userAgent)
+    ) {
+        // Some Chromium browsers mask their brand. about:// uses their own flags page.
+        return { name: "your browser", url: "about://flags/#force-high-performance-gpu" };
+    }
+    return null;
 }
 
-function isLowerPowerIntelAdapter(adapter) {
-  const identity = [
-    adapter.vendor,
-    adapter.architecture,
-    adapter.name,
-    adapter.description,
-  ].filter(Boolean).join(" ");
-  if (adapter?.vendorId !== INTEL_VENDOR_ID && !/\bintel\b/iu.test(identity)) return false;
-  return /(?:intel|integrated|xe-lp)/iu.test(identity);
-}
-
-function notifyChromeHighPerformanceGpu(adapter) {
-  if (
-    highPerformanceGpuNoticeShown
-    || !isChromeBrowser()
-    || !isLowerPowerIntelAdapter(adapter)
-  ) return;
-  highPerformanceGpuNoticeShown = true;
-  try {
-    globalThis.open?.(CHROME_HIGH_PERFORMANCE_GPU_FLAG_URL, "_blank", "noopener,noreferrer");
-  } catch {
-    // Chrome may reject internal-page navigation from web content.
-  }
-  const adapterName = adapter.description || adapter.name
-    || [adapter.vendor, adapter.architecture].filter(Boolean).join(" ")
-    || "a lower-power Intel adapter";
-  globalThis.alert?.(
-    `Arcane selected the lower-power WebGPU adapter: ${adapterName}.\n\n`
-    + "Enable “Force High Performance GPU” in the Chrome flags window. "
-    + "Then completely close every Chrome window and reopen Chrome before loading the model again.\n\n"
-    + `If the flags window did not open, paste ${CHROME_HIGH_PERFORMANCE_GPU_FLAG_URL} into Chrome.`,
-  );
+function notifyHighPerformanceGpu(adapter) {
+    if (highPerformanceGpuNoticeShown) {
+        return;
+    }
+    const browser = highPerformanceGpuBrowser();
+    if (!browser) {
+        return;
+    }
+    highPerformanceGpuNoticeShown = true;
+    try {
+        globalThis.open?.(browser.url, "_blank", "noopener,noreferrer");
+    } catch {
+        // Browsers may reject internal-page navigation from web content.
+    }
+    const adapterName = adapter.description || adapter.name
+        || [adapter.vendor, adapter.architecture].filter(Boolean).join(" ")
+        || "the available WebGPU adapter";
+    globalThis.alert?.(
+        `Selected WebGPU adapter: ${adapterName}.\n\n`
+        + `If this computer has multiple GPUs, enable “Force High Performance GPU” in ${browser.name} `
+        + "to request the high-performance GPU when available. "
+        + `Then completely close and reopen ${browser.name} before loading the model again.\n\n`
+        + `If the flags page did not open, paste ${browser.url} into the address bar.`,
+    );
 }
 
 function emitWebgpuAdapterSelection(source, runtime) {
@@ -322,7 +346,7 @@ function emitWebgpuAdapterSelection(source, runtime) {
       category: "capability",
     }));
   } finally {
-    notifyChromeHighPerformanceGpu(webgpu.adapter);
+    notifyHighPerformanceGpu(webgpu.adapter);
   }
 }
 

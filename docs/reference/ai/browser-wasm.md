@@ -166,11 +166,34 @@ Applications remain responsible for model selection and license compliance.
 cannot download. Source downloads use CORS, omit credentials and referrer,
 disable HTTP caching, and honor `AbortSignal`.
 
-On Chrome, observing a lower-power Intel WebGPU adapter may open
-`chrome://flags/#force-high-performance-gpu` in a new tab and show an alert
-explaining that Chrome must be completely restarted after changing the flag.
-The notice is advisory; it does not change browser settings, prove a faster
-adapter exists, or make a failed load succeed.
+On Windows desktop Chromium browsers, observing a WebGPU adapter may open one
+flags page and show one advisory per page session. The notice names only
+**Force High Performance GPU** (`#force-high-performance-gpu`), conditional on
+the computer having multiple GPUs, and asks the user to completely close and
+reopen their browser after enabling it. It applies to any observed GPU vendor;
+an Intel identity alone does not establish that an adapter is integrated or
+slower, and the browser does not expose a reliable machine-wide GPU count.
+
+An identified Microsoft Edge, Brave, Opera, or Vivaldi receives its own
+`edge://`, `brave://`, `opera://`, or `vivaldi://` flags address. Chrome,
+Chromium, and browsers that conceal their brand receive
+`about://flags/#force-high-performance-gpu`, which the browser rewrites to its
+own flags page, with neutral browser wording. Only the current browser's one
+address appears. Firefox, Safari, non-Windows platforms, and mobile browsers
+receive no flag notice. The notice does not suggest unrelated WebGPU, ANGLE,
+Vulkan, rasterization, or blocklist flags.
+
+The Windows selection workaround is documented by
+[Chrome](https://developer.chrome.com/docs/web-platform/webgpu/troubleshooting-tips#Windows-specific_limitations).
+Other Chromium browsers inherit that flag; the per-vendor addresses and generic
+`about://` rewrite follow the
+[Chromium browser-flags guide](https://developer.chrome.com/blog/browser-flags/).
+[Vivaldi masks its browser identity by default](https://help.vivaldi.com/developers/web/vivaldi-user-agent-and-client-hints-user-agent/),
+so a Chrome user-agent token is not proof that the current browser is Chrome.
+This source-based guidance is not a live GPU-selection test of every browser
+release. The advisory does not change settings, prove another or faster adapter
+exists, inspect the flag's current value, or make a failed load succeed. If the
+browser blocks opening an internal page, the alert retains the copyable address.
 
 ## Streaming, cancellation, and tools
 

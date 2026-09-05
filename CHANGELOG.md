@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.10
+
+- Show one Windows performance-GPU flag advisory for the current Chromium
+  browser, including Edge, Brave, Opera, and Vivaldi. Browsers that conceal
+  their identity use their own flags page through the generic `about://` address.
+- Make the notice conditional on having multiple GPUs, cover every observed
+  GPU vendor, and omit the notice on Firefox, Safari, mobile, and non-Windows
+  platforms. No additional GPU flags or automatic settings changes are included.
+
 ## 0.5.9
 
 - Renamed the built-in TWiN Cloud provider and default-model preference sentinel
