@@ -2,6 +2,10 @@
 
 ## 0.5.9
 
+- Renamed the built-in TWiN Cloud provider and default-model preference sentinel
+  to `TWIN`. Applications must explicitly update saved `OPENAI` LLM selections;
+  the SDK does not alias the old identifier or rewrite persisted preferences.
+  Real upstream model names, wire behavior, and on-device speech remain intact.
 - Restored immediate streamed-speech synthesis admission with bounded,
   provider-declared TTS concurrency and FIFO overflow while retaining exact
   chunk text, cancellation, lifecycle ownership, and original playback order.

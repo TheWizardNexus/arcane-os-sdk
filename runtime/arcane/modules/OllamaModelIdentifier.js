@@ -10,7 +10,7 @@ export function normalizeOllamaModelIdentifier(value){
     if(typeof value!=='string'||value!==value.trim()){
         return null;
     }
-    if(!OLLAMA_MODEL_IDENTIFIER.test(value)||value.toUpperCase()==='OPENAI'){
+    if(!OLLAMA_MODEL_IDENTIFIER.test(value)||value.toUpperCase()==='TWIN'){
         return null;
     }
     return value;

@@ -77,17 +77,23 @@ no OS-to-SDK synchronization command or migration-only runtime-source record.
 
 ## TWiN Cloud
 
-TWiN Cloud is the SDK's default remote language-model service. It sends
-OpenAI-compatible chat-completion requests to
+TWiN Cloud is the SDK's default remote language-model service, identified by
+`TWIN`. It sends chat-completion requests to
 `https://inference.do-ai.run/v1/chat/completions` with model
 `openai-gpt-oss-120b`. Supply the bearer credential through `ai.twinKey` or
 `globalThis.arcane.config.twinCloud.accessKey`. The established `ai.license`
-property and internal `OPENAI` route identifier are current runtime names;
-applications should present the service and credential as **TWiN Cloud** and
-**TWiN access key**. The TWiN key is used only for remote LLM chat. Audio stays
+property remains available. Applications should present the service and
+credential as **TWiN Cloud** and **TWiN access key**. The TWiN key is used only
+for remote LLM chat. Audio stays
 on device: Whisper (`LOCAL_SPEACH` / `whisper-small`) owns transcription and
 Kokoro (`LOCAL_SPEACH` / `kokoro`) owns speech synthesis. Neither audio route
-uses the TWiN key, and no OpenAI audio key is required.
+uses the TWiN key, and neither requires a cloud audio key.
+
+The built-in provider and default-model preference sentinel are both `TWIN`.
+Applications upgrading saved `OPENAI` LLM selections must explicitly update
+those app-owned settings to `TWIN`. The SDK provides no built-in `OPENAI` alias
+and does not rewrite saved preferences. Actual upstream model identifiers remain
+unchanged.
 
 `fetchRequest()` and `streamRequest()` accept the provider-neutral
 `reasoningEffort` option with `none`, `low`, `medium`, `high`, or `max`. TWiN

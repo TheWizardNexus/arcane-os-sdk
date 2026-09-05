@@ -47,7 +47,7 @@ async function ask({model, expectedModel, prompt, onPhase}) {
 
 const report = await checkLocalAIReadiness({
     preferences:[
-        'OPENAI','LOCAL_SPEACH','LOCAL_SPEACH','openai-gpt-oss-120b',
+        'TWIN','LOCAL_SPEACH','LOCAL_SPEACH','openai-gpt-oss-120b',
         'kokoro','whisper-small'
     ],
     runtime:'browser'
@@ -69,7 +69,7 @@ chat.setAIAvailability = value => console.log(value);
 const controller = createLocalAIReadinessController({
     chat,
     preferences:[
-        'OPENAI','LOCAL_SPEACH','LOCAL_SPEACH','openai-gpt-oss-120b',
+        'TWIN','LOCAL_SPEACH','LOCAL_SPEACH','openai-gpt-oss-120b',
         'kokoro','whisper-small'
     ],
     runtime:'browser'
@@ -216,7 +216,7 @@ async function chatWithAdmittedOllamaAfterUserChoice(){
         name:'OllamaModelIdentifier.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure syntax normalization; does not test installation, admission, ownership, or hardware.',
-        paramsResults:'normalizeOllamaModelIdentifier(value) returns the exact trimmed identifier or null; isOllamaModelIdentifier(value) returns boolean. OPENAI and malformed/over-limit identifiers are rejected.',
+        paramsResults:'normalizeOllamaModelIdentifier(value) returns the exact trimmed identifier or null; isOllamaModelIdentifier(value) returns boolean. The cloud default-model sentinel TWIN and malformed/over-limit identifiers are rejected.',
         events:[],
         errors:[],
         capabilitiesCore:'None.',

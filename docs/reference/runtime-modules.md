@@ -160,7 +160,7 @@ provider. `transitionAI()` and `transitionProviders()` are deliberate
 cross-role transitions: each stops queued audio, unloads the current LLM, STT,
 and TTS roles, then applies the replacement configuration. `transitionAI()`
 returns aggregate runtime status; `transitionProviders()` returns the configured
-three-role route configuration. Selected TWiN Cloud `OPENAI` LLM, `OLLAMA` LLM,
+three-role route configuration. Selected TWiN Cloud `TWIN` LLM, `OLLAMA` LLM,
 and Core `LOCAL_SPEACH` STT/TTS built-in routes expose truthful capability-only
 readiness through internal provider/2 adapters without probing, downloading, or
 hiding a load. Configured `OPENAI` speech preferences migrate to on-device
@@ -174,6 +174,11 @@ translate the existing AI.js STT `{audio:Blob|File,mimeType,model}` and TTS
 only WAV is accepted for the shared TTS result. TTS voice selection comes from
 the exact selected local provider/model catalog `defaultVoice`; a saved
 OpenAI-route voice is never forwarded to another provider route.
+
+The TWiN Cloud built-in provider and default-model preference sentinel are
+`TWIN`. Applications upgrading saved `OPENAI` LLM selections must explicitly
+update their own settings to `TWIN`; the SDK supplies no built-in alias and
+does not rewrite persisted preferences. The upstream model names remain intact.
 
 `fetchRequest()` and `streamRequest()` accept `reasoningEffort` as a
 provider-neutral request option. Its exact values are `none`, `low`, `medium`,

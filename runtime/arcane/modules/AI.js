@@ -35,7 +35,7 @@ const TTS_ANY_PUNCTUATION=/(?<!\p{P})(?:(?<![\p{L}\p{N}])\p{P}+(?!\p{P})(?=[\s\S
 const TTS_ANY_PUNCTUATION_AT_END=/(?<!\p{P})(?:(?<![\p{L}\p{N}])\p{P}+|\p{P}+(?![\p{L}\p{N}])|\p{P}*[^\P{P}'\u2019\uFF07,\u060C\u3001\uFF0C\p{Pd}]\p{P}*)(?!\p{P})/gu;
 credentials='omit';
 
-const BUILT_IN_AI_SERVICES=new Set(['OPENAI','OLLAMA','LOCAL_SPEACH']);
+const BUILT_IN_AI_SERVICES=new Set(['TWIN','OLLAMA','LOCAL_SPEACH']);
 const AI_REASONING_EFFORTS=new Set(['none','low','medium','high','max']);
 export const AI_READY_EVENT='ai-ready';
 const AI_TTS_FAILURE_EVENT='ai-tts-failure';
@@ -1027,9 +1027,8 @@ class AI {
     // This is the enum section for inference configuration
     #service = {
         baseURL: {
-            // OPENAI remains the established public route identifier;
-            // remote LLM chat is provided by TWiN Cloud.
-            OPENAI: 'https://inference.do-ai.run/v1'
+            // TWiN Cloud owns this remote LLM route.
+            TWIN: 'https://inference.do-ai.run/v1'
         },
         sttURL: {
             LOCAL_SPEACH: 'http://127.0.0.1:8011/v1'
@@ -1041,7 +1040,7 @@ class AI {
 
     #paths = {
         chat: {
-            OPENAI: '/chat/completions'
+            TWIN: '/chat/completions'
         },
         stt: {
             LOCAL_SPEACH: '/audio/transcriptions'
@@ -1052,7 +1051,7 @@ class AI {
     }
 
     #models = {
-        OPENAI:'openai-gpt-oss-120b'
+        TWIN:'openai-gpt-oss-120b'
     }
 
     #sttModels = {
@@ -1071,7 +1070,7 @@ class AI {
     // Note: if we expand cloud providers, simply add their expected JSON metadata here
     get #serviceHeaders(){
         return {
-            OPENAI: {
+            TWIN: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.twinKey}`
             }
@@ -1139,10 +1138,10 @@ class AI {
         );
 
         const preferences=[
-            llmService||'OPENAI',
+            llmService||'TWIN',
             sttService||'LOCAL_SPEACH',
             ttsService||'LOCAL_SPEACH',
-            model||'OPENAI',
+            model||'TWIN',
             modelTTS||'LOCAL_SPEACH',
             modelSTT||'LOCAL_SPEACH'
         ];
@@ -1181,10 +1180,10 @@ class AI {
     #stopOllamaReady=null;
     #ttsSegmentation={...DEFAULT_TTS_SEGMENTATION};
     #preferenceTuple=completeValue([
-        'OPENAI',
+        'TWIN',
         'LOCAL_SPEACH',
         'LOCAL_SPEACH',
-        'OPENAI',
+        'TWIN',
         'LOCAL_SPEACH',
         'LOCAL_SPEACH'
     ]);
@@ -1269,8 +1268,8 @@ class AI {
     }
 
     #builtInLLMCapability(providerId){
-        if(providerId==='OPENAI'){
-            return this.llmService==='OPENAI'
+        if(providerId==='TWIN'){
+            return this.llmService==='TWIN'
                 &&Boolean(this.model)
                 &&Boolean(this.license)
                 &&typeof globalThis.fetch==='function';
@@ -1737,7 +1736,7 @@ class AI {
     }
 
     #ensureBuiltInLLMProvider(providerId){
-        if(providerId!=='OPENAI'&&providerId!=='OLLAMA'){
+        if(providerId!=='TWIN'&&providerId!=='OLLAMA'){
             return false;
         }
         if(this.#providerRuntime.hasProvider('llm',providerId)){
@@ -1890,7 +1889,7 @@ class AI {
             return Boolean(this.model)&&Boolean(this.#nativeOllama());
         }
 
-        return this.llmService==='OPENAI'
+        return this.llmService==='TWIN'
             &&Boolean(this.model)
             &&Boolean(this.license);
     }
@@ -1942,7 +1941,7 @@ class AI {
             throw error;
         }
 
-        if(service==='OPENAI'&&role==='llm'&&Boolean(this.twinKey)){
+        if(service==='TWIN'&&role==='llm'&&Boolean(this.twinKey)){
             return true;
         }
 
@@ -2021,7 +2020,7 @@ class AI {
 
     #assertValidProviderTuple(tuple){
         if(tuple[0]==='OLLAMA'){
-            const mappedModel=tuple[3]==='OPENAI'?null:this.#models[tuple[3]];
+            const mappedModel=tuple[3]==='TWIN'?null:this.#models[tuple[3]];
             if(!mappedModel&&!normalizeOllamaModelIdentifier(tuple[3])){
                 const error=new TypeError('The Ollama model preference is invalid.');
                 error.code='AI_MODEL_INVALID';
@@ -2052,13 +2051,13 @@ class AI {
 
     #normalizedLLMModel(service,model){
         if(service==='OLLAMA'){
-            const mappedModel=model==='OPENAI'?null:this.#models[model];
+            const mappedModel=model==='TWIN'?null:this.#models[model];
             return mappedModel
                 ||normalizeOllamaModelIdentifier(model)
                 ||model;
         }
-        if(service==='OPENAI'){
-            return model==='OPENAI'?this.#models.OPENAI:model;
+        if(service==='TWIN'){
+            return model==='TWIN'?this.#models.TWIN:model;
         }
         return model;
     }
@@ -4684,7 +4683,7 @@ class AI {
 
         if(
             normalizedReasoningEffort
-            &&(this.llmService==='OPENAI'||this.llmService==='OLLAMA')
+            &&(this.llmService==='TWIN'||this.llmService==='OLLAMA')
         ){
             request.reasoning_effort=normalizedReasoningEffort;
         }
@@ -5530,7 +5529,7 @@ class AI {
 
         if(
             normalizedReasoningEffort
-            &&(this.llmService==='OPENAI'||this.llmService==='OLLAMA')
+            &&(this.llmService==='TWIN'||this.llmService==='OLLAMA')
         ){
             request.reasoning_effort=normalizedReasoningEffort;
         }

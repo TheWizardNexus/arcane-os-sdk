@@ -229,7 +229,7 @@ async function unloadAfterTheUserChooses(model) {
 | Android WebView | Narrow admitted chat/inference projection for configured user-managed loopback | No general desktop raw inventory | No desktop model/service management | `managedLocalAI` remains false; listener reachability is not management authority. |
 | Development HTTP bridge | Only when connected to an admitted Core-backed development host | Host/method dependent | Host/method dependent; never production authority | Development transport, not a standalone-browser upgrade. |
 | Standalone browser | No Arcane Ollama | No | No | `ARCANE_OLLAMA_UNAVAILABLE`. |
-| Cloud/OpenAI | Not through `Arcane.ollama` | No | No | Use an explicitly selected `AI.js` cloud profile; no automatic fallback. |
+| TWiN Cloud | Not through `Arcane.ollama` | No | No | Use an explicitly selected `AI.js` cloud profile; no automatic fallback. |
 
 ## Capabilities and policy
 

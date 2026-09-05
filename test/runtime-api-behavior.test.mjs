@@ -900,7 +900,7 @@ test('renderer model identifiers enforce their exact bounded contract',()=>{
         assert.equal(isOllamaModelIdentifier(value),true);
     }
     for(const value of [
-        '',null,' model','model ','OPENAI','openai','model:',
+        '',null,' model','model ','TWIN','twin','model:',
         'alpha:beta:tag',`${maximumBase}a`,`${maximumBase}:${maximumTag}b`
     ]){
         assert.equal(normalizeOllamaModelIdentifier(value),null);
@@ -2380,20 +2380,21 @@ test(
                 '../runtime/arcane/modules/AI.js?twin-cloud-device-speech-readiness'
             );
             const ai=new AI(
-                'OPENAI','OPENAI','OPENAI',
-                'OPENAI','OPENAI','OPENAI'
+                'TWIN','OPENAI','OPENAI',
+                'TWIN','OPENAI','OPENAI'
             );
             const runtime=ai.providerRuntime;
-            assert.equal(ai.llmService,'OPENAI');
+            assert.equal(ai.llmService,'TWIN');
             assert.equal(ai.sttService,'LOCAL_SPEACH');
             assert.equal(ai.ttsService,'LOCAL_SPEACH');
             assert.equal(ai.model,'openai-gpt-oss-120b');
             assert.equal(ai.modelSTT,'whisper-small');
             assert.equal(ai.modelTTS,'kokoro');
-            assert.deepEqual(runtime.providerIdentity('llm','OPENAI'),{
+            assert.equal(runtime.providerIdentity('llm','OPENAI'),null);
+            assert.deepEqual(runtime.providerIdentity('llm','TWIN'),{
                 protocol:AI_PROVIDER_PROTOCOL,
                 role:'llm',
-                id:'OPENAI',
+                id:'TWIN',
                 localOnly:false
             });
             assert.deepEqual(runtime.providerIdentity('stt','LOCAL_SPEACH'),{
@@ -2434,7 +2435,7 @@ test(
             assert.equal(ai.configured,true);
             assert.equal(requests.length,0,'Cloud readiness must not probe or download');
             assert.deepEqual(runtime.catalog('llm').find(
-                entry=>entry.providerId==='OPENAI'
+                entry=>entry.providerId==='TWIN'
             ).models,[{id:ai.model}]);
 
             const directCloud=await runtime.request('llm',{
@@ -2506,7 +2507,7 @@ test(
 
             await runtime.unload('llm');
             await ai.transitionAI(
-                'OPENAI',undefined,undefined,
+                'TWIN',undefined,undefined,
                 'openai-gpt-oss-20b',undefined,undefined
             );
             assert.equal(ai.model,'openai-gpt-oss-20b');
@@ -3066,7 +3067,7 @@ test(
                 default:AI,
                 AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL
             }=await import('../runtime/arcane/modules/AI.js?browser-speech-role-contract');
-            ai=new AI('OPENAI','OPENAI','OPENAI','OPENAI','OPENAI','OPENAI');
+            ai=new AI('TWIN','OPENAI','OPENAI','TWIN','OPENAI','OPENAI');
             const runtime=ai.providerRuntime;
             const initialLocalTTSSelection=runtime.selection('tts');
             const pendingSTTSelection={
@@ -3109,6 +3110,7 @@ test(
             }finally{
                 unsubscribeHydration();
             }
+            assert.equal(hydrationProviderIds.includes('TWIN'),false);
             assert.equal(hydrationProviderIds.includes('OPENAI'),false);
             assert.equal(
                 hydrationProviderIds.includes('browser-stt-direct'),
