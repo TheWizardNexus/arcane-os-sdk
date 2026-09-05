@@ -6227,8 +6227,9 @@ The recognized options are
 `{id='arcane-browser-whisper',localOnly=true,graph,model,runtime,appSecurity,
 security,store,offline=false}`. `graph` is mutually exclusive with `model` and
 `runtime`. The mutable result is
-`{protocol:'arcane-ai-provider/2',role:'stt',id,localOnly:true,catalog,inspect,
-status,load,request,unload,dispose}`. The only request operation is
+`{protocol:'arcane-ai-provider/2',role:'stt',id,localOnly:true,
+maxConcurrentRequests:1,catalog,inspect,status,load,request,unload,dispose}`.
+The only request operation is
 `transcribe`; its payload is `{audio:Float32Array,sampleRate:16000}`. The
 Worker-transferred result is a structured `{text}` record; the client does not
 re-freeze the cloned record.
@@ -6298,8 +6299,8 @@ async function transcribeAfterUserChoice(audioBlob) {
 ### Overview
 
 Creates a local-only Kokoro text-to-speech provider for the provider-neutral AI
-runtime. It owns one independent TTS lifecycle and never selects a cloud,
-native, or LLM fallback.
+runtime. It owns one independent, bounded Worker/session pool and never selects
+a cloud, native, or LLM fallback.
 
 ### Signature and result
 
@@ -6309,10 +6310,13 @@ createBrowserKokoroProvider(options={})
 
 The recognized options are
 `{id='arcane-browser-kokoro',localOnly=true,graph,model,runtime,appSecurity,
-security,store,offline=false}`. `graph` is mutually exclusive with `model` and
-`runtime`. The mutable result is
-`{protocol:'arcane-ai-provider/2',role:'tts',id,localOnly:true,catalog,inspect,
-status,load,request,unload,dispose}`. The only request operation is
+security,store,offline=false,execution={device:'auto',maxConcurrentRequests:2}}`.
+`execution.device` is `auto`, `webgpu`, or `wasm`; its capacity is an integer
+from 1 through 4. `graph` is mutually exclusive with `model` and `runtime`. The
+mutable result is
+`{protocol:'arcane-ai-provider/2',role:'tts',id,localOnly:true,
+maxConcurrentRequests,catalog,inspect,status,load,request,unload,dispose}`. The
+only request operation is
 `synthesize`; its payload is `{text,voice?,speed=1}`. Omitted `voice` uses the
 caller-supplied `model.defaultVoice`; `speed` is any finite number greater than
 zero. The Worker-transferred result is a structured
@@ -6327,10 +6331,19 @@ mono 16-bit PCM. Unsupported formats fail
 `ARCANE_AI_UNSUPPORTED_RESPONSE_FORMAT`; malformed adapter audio fails
 `ARCANE_AI_INVALID_PROVIDER_RESULT`. Unknown fields and accessors reject as malformed.
 
-Lifecycle/status, coalesced load, busy-request, unload, Worker-failure, and
-disposal behavior matches the Whisper provider. Cancellation after Worker use
-begins unloads that Worker; cancellation before Worker use rejects while the
-provider stays ready. Stable failures include
+Automatic execution attempts a complete WebGPU pool when the browser exposes
+WebGPU and falls back by replacing the complete candidate pool with WASM when
+WebGPU model loading rejects. Explicit `webgpu` does not fall back. Every slot
+loads the same caller-selected model and dtype in a distinct Worker so the
+selected adapter's per-isolate inference serialization does not serialize the
+pool. `status().execution` reports requested device, selected device, capacity,
+and active count.
+
+Lifecycle/status, coalesced load, capacity-busy, unload, Worker-failure, and
+disposal behavior otherwise matches the Whisper provider. Cancellation after
+Kokoro Worker use suppresses only that request and sends its targeted cancel
+control; already-running upstream engine work may finish. Unload terminates all
+pool Workers and cancels all active ownership. Stable failures include
 `ARCANE_AI_INVALID_REQUEST`, `ARCANE_AI_NOT_READY`,
 `ARCANE_AI_PROVIDER_DISPOSED`, `ARCANE_AI_OPERATION_SUPERSEDED`,
 `ARCANE_AI_WORKER_CRASHED`, `ARCANE_AI_WORKER_MESSAGE_ERROR`, and
@@ -6351,7 +6364,12 @@ added. Provider objects are not event targets; managed `AIProviderRuntime` and
 ```javascript
 import {createBrowserKokoroProvider} from 'arcane-os/ai/browser-speech';
 
-const kokoro = createBrowserKokoroProvider({model, runtime, store:speechStore});
+const kokoro = createBrowserKokoroProvider({
+    model,
+    runtime,
+    store:speechStore,
+    execution:{device:'auto',maxConcurrentRequests:2}
+});
 async function synthesizeAfterUserChoice() {
     await kokoro.load({
         role:'tts',

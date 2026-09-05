@@ -19,6 +19,10 @@ const ROLE_OPERATION = completeValue({ stt: "transcribe", tts: "synthesize" });
 const STT_SAMPLE_RATE = 16_000;
 const TTS_SAMPLE_RATE = 24_000;
 const TTS_RESPONSE_FORMAT = "wav";
+const TTS_EXECUTION_DEVICES = new Set(["auto", "webgpu", "wasm"]);
+const DEFAULT_TTS_EXECUTION_DEVICE = "auto";
+const DEFAULT_TTS_MAX_CONCURRENT_REQUESTS = 2;
+const MAX_TTS_CONCURRENT_REQUESTS = 4;
 const ROLE_REQUEST_REASON = completeValue({
   stt: "stt-transcription-cancelled",
   tts: "tts-synthesis-cancelled",
@@ -139,6 +143,62 @@ function requiredIdentifier(value, label) {
     throw new TypeError(`${label} must be a nonempty trimmed string.`);
   }
   return value.trim();
+}
+
+function normalizeSpeechExecution(role, execution) {
+  if (role === "stt") {
+    if (execution !== undefined) {
+      throw new TypeError("Browser Whisper does not accept an execution option.");
+    }
+    return completeValue({ device: "wasm", maxConcurrentRequests: 1 });
+  }
+  if (execution === undefined) {
+    return completeValue({
+      device: DEFAULT_TTS_EXECUTION_DEVICE,
+      maxConcurrentRequests: DEFAULT_TTS_MAX_CONCURRENT_REQUESTS,
+    });
+  }
+  if (!execution || typeof execution !== "object" || Array.isArray(execution)) {
+    throw new TypeError("Browser Kokoro execution must be a plain data record.");
+  }
+  const prototype = Object.getPrototypeOf(execution);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new TypeError("Browser Kokoro execution must be a plain data record.");
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(execution);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (
+      (key !== "device" && key !== "maxConcurrentRequests")
+      || !Object.hasOwn(descriptors[key], "value")
+    ) {
+      throw new TypeError("Browser Kokoro execution contains an unsupported or accessor field.");
+    }
+  }
+  const device = Object.hasOwn(descriptors, "device")
+    ? descriptors.device.value
+    : DEFAULT_TTS_EXECUTION_DEVICE;
+  const maxConcurrentRequests = Object.hasOwn(descriptors, "maxConcurrentRequests")
+    ? descriptors.maxConcurrentRequests.value
+    : DEFAULT_TTS_MAX_CONCURRENT_REQUESTS;
+  if (!TTS_EXECUTION_DEVICES.has(device)) {
+    throw new TypeError('Browser Kokoro execution.device must be "auto", "webgpu", or "wasm".');
+  }
+  if (
+    !Number.isSafeInteger(maxConcurrentRequests)
+    || maxConcurrentRequests < 1
+    || maxConcurrentRequests > MAX_TTS_CONCURRENT_REQUESTS
+  ) {
+    throw new TypeError("Browser Kokoro execution.maxConcurrentRequests must be a safe integer from 1 through 4.");
+  }
+  return completeValue({ device, maxConcurrentRequests });
+}
+
+function navigatorHasWebGpu() {
+  try {
+    return Boolean(globalThis.navigator?.gpu);
+  } catch {
+    return false;
+  }
 }
 
 function createProviderAuthority({
@@ -324,6 +384,7 @@ function publicStatus({
   cache,
   lifecycleReason,
   activeOperation,
+  execution,
   secureIntent,
   warnings,
 }) {
@@ -340,6 +401,7 @@ function publicStatus({
     generation,
     errorCode,
     cache,
+    ...(execution ? { execution } : {}),
     ...(secureIntent ? { security: secureIntent } : {}),
     warnings,
   });
@@ -1040,6 +1102,7 @@ function createBrowserSpeechProvider({
   graph,
   model,
   runtime,
+  execution,
   appSecurity,
   security,
   store,
@@ -1062,6 +1125,7 @@ function createBrowserSpeechProvider({
     model,
     runtime,
   });
+  const speechExecution = normalizeSpeechExecution(role, execution);
   const defaultSecureIntent = reportedSecureIntent(appSecurity, security);
   const operation = ROLE_OPERATION[role];
   const speech = role === "stt"
@@ -1097,7 +1161,8 @@ function createBrowserSpeechProvider({
   let loadOperation = null;
   let unloadOperation = null;
   let disposeOperation = null;
-  let requestOperation = null;
+  const requestOperations = new Set();
+  let selectedDevice = null;
   let lastWarnings = NO_PROVIDER_WARNINGS;
   let secureIntent = defaultSecureIntent;
 
@@ -1110,45 +1175,186 @@ function createBrowserSpeechProvider({
       id: providerId,
       authority,
       state,
-      busy: requestOperation !== null,
+      busy: requestOperations.size > 0,
       generation,
       errorCode,
       cache,
       lifecycleReason,
       activeOperation,
+      execution: role === "tts"
+        ? completeValue({
+          requestedDevice: speechExecution.device,
+          selectedDevice,
+          maxConcurrentRequests: speechExecution.maxConcurrentRequests,
+          activeRequestCount: requestOperations.size,
+        })
+        : null,
       secureIntent,
       warnings: providerWarnings(runtimeWarnings),
     });
   }
 
-  function releaseSlot(slot) {
-    if (!slot || slot.released) return;
-    slot.prepared.release();
-    slot.released = true;
+  function releasePreparation(preparation) {
+    if (!preparation || preparation.released) return;
+    preparation.released = true;
+    preparation.prepared.release();
   }
 
-  async function terminateSlot(slot, reason, { intentional = true } = {}) {
-    if (!slot) return;
-    if (!isSpeechWorkerClient(slot.client)) {
-      throw providerError(
-        "ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH",
-        "The browser speech Worker client is not SDK-owned.",
-        undefined,
-        `${role}-worker-client-authority-mismatch`,
-      );
-    }
+  async function terminatePool(
+    pool,
+    reason,
+    { intentional = true, releasePrepared = true } = {},
+  ) {
+    if (!pool) return;
     const trustedReason = trustedWorkerFailure(reason, role);
+    let terminationFailure = null;
     try {
-      await slot.client.terminate(trustedReason, { intentional });
+      if (!pool.terminationPromise) {
+        pool.terminating = true;
+        pool.terminationPromise = (async function terminateSpeechWorkerPool() {
+          const terminations = [];
+          for (const slot of pool.slots) {
+            if (!isSpeechWorkerClient(slot.client)) {
+              terminations.push(Promise.reject(providerError(
+                "ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH",
+                "The browser speech Worker client is not SDK-owned.",
+                undefined,
+                `${role}-worker-client-authority-mismatch`,
+              )));
+              continue;
+            }
+            terminations.push(slot.client.terminate(trustedReason, { intentional }));
+          }
+          const settlements = await Promise.allSettled(terminations);
+          for (const settlement of settlements) {
+            if (settlement.status === "rejected") throw settlement.reason;
+          }
+        })();
+      }
+      await pool.terminationPromise;
     } catch (error) {
-      throw trustedWorkerFailure(error, role);
+      terminationFailure = trustedWorkerFailure(error, role);
     } finally {
-      try {
-        releaseSlot(slot);
-      } catch (error) {
-        throw trustedWorkerFailure(error, role);
+      if (releasePrepared) {
+        try {
+          releasePreparation(pool.preparation);
+        } catch (error) {
+          terminationFailure = trustedWorkerFailure(error, role);
+        }
       }
     }
+    if (terminationFailure) throw terminationFailure;
+  }
+
+  function handlePoolTermination(pool, slot, { reason, intentional }) {
+    slot.terminated = true;
+    if (pool.terminating) return;
+    const trustedReason = trustedWorkerFailure(reason, role);
+    pool.failure = trustedReason;
+    const isActivePool = active === pool;
+    const terminationGeneration = generation;
+    if (isActivePool) {
+      active = null;
+      state = intentional ? "unloaded" : "error";
+      errorCode = intentional ? null : workerFailureCode(trustedReason);
+      lifecycleReason = intentional
+        ? `${role}-worker-terminated`
+        : trustedReason.reason ?? (errorCode === "ARCANE_AI_WORKER_MESSAGE_ERROR"
+          || errorCode === "ARCANE_AI_WORKER_MESSAGE_REJECTED"
+          ? `${role}-worker-message-rejected`
+          : errorCode === "ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH"
+            ? `${role}-worker-protocol-mismatch`
+            : `${role}-worker-crashed`);
+      activeOperation = null;
+      selectedDevice = null;
+    }
+    void terminatePool(pool, trustedReason, {
+      releasePrepared: isActivePool,
+    }).then(
+      function completeUnexpectedPoolTermination() {
+        if (active === pool) active = null;
+      },
+      function reportUnexpectedPoolTerminationFailure(error) {
+        if (active === pool) active = null;
+        if (
+          isActivePool
+          && generation === terminationGeneration
+          && state !== "disposed"
+          && state !== "unloading"
+        ) {
+          const failure = trustedWorkerFailure(error, role);
+          state = "error";
+          errorCode = failure.code;
+          lifecycleReason = failure.reason;
+          activeOperation = null;
+          selectedDevice = null;
+        }
+      },
+    );
+  }
+
+  function createWorkerPool(preparation, device, warnings) {
+    const pool = {
+      preparation,
+      device,
+      warnings,
+      slots: [],
+      failure: null,
+      terminating: false,
+      terminationPromise: null,
+    };
+    for (let index = 0; index < speechExecution.maxConcurrentRequests; index += 1) {
+      const slot = {
+        client: null,
+        requestOperation: null,
+        terminated: false,
+      };
+      slot.client = createSpeechWorkerClient({
+        role,
+        onTermination: function handleSpeechWorkerTermination(termination) {
+          handlePoolTermination(pool, slot, termination);
+        },
+      });
+      pool.slots.push(slot);
+    }
+    return pool;
+  }
+
+  async function loadWorkerPool(preparation, device, warnings, signal) {
+    const pool = createWorkerPool(preparation, device, warnings);
+    const configuration = completeValue({
+      role,
+      runtime: preparation.prepared.runtime,
+      model: preparation.prepared.model,
+      execution: completeValue({ device }),
+      ...(authority.graph ? {
+        artifactGraphProtocol: authority.graph.protocol,
+      } : {}),
+    });
+    let failure = pool.failure;
+    if (!failure) {
+      try {
+        await pool.slots[0].client.request("load", { configuration }, { signal });
+      } catch (error) {
+        failure = error;
+      }
+    }
+    if (!failure) {
+      const remainingLoads = [];
+      for (const slot of pool.slots.slice(1)) {
+        remainingLoads.push(slot.client.request("load", { configuration }, { signal }));
+      }
+      const settlements = await Promise.allSettled(remainingLoads);
+      failure = pool.failure;
+      for (const settlement of settlements) {
+        if (!failure && settlement.status === "rejected") failure = settlement.reason;
+      }
+    }
+    if (failure) {
+      await terminatePool(pool, failure, { releasePrepared: false });
+      throw failure;
+    }
+    return pool;
   }
 
   const provider = {
@@ -1156,6 +1362,7 @@ function createBrowserSpeechProvider({
     role,
     id: providerId,
     localOnly: true,
+    maxConcurrentRequests: speechExecution.maxConcurrentRequests,
 
     catalog() {
       return completeValue([catalogEntry]);
@@ -1282,27 +1489,37 @@ function createBrowserSpeechProvider({
         warnings: NO_PROVIDER_WARNINGS,
         observers: new Set(),
         settled: false,
-        abort: (
+        abort(
           reason = `${role}-load-cancelled`,
           code = "ARCANE_AI_REQUEST_ABORTED",
-        ) => linked.abort(reason, code),
+        ) {
+          linked.abort(reason, code);
+        },
       };
       lastWarnings = NO_PROVIDER_WARNINGS;
-      const promise = Promise.resolve().then(async () => {
+      selectedDevice = null;
+      const promise = Promise.resolve().then(async function loadBrowserSpeechProviderPool() {
         let prepared = null;
-        let slot = null;
+        let preparation = null;
+        let pool = null;
         try {
           prepared = await store.prepare(authority.graph ?? authority, {
             signal: linked.controller.signal,
             offline,
           });
+          preparation = {
+            prepared,
+            released: false,
+          };
           record.warnings = Array.isArray(prepared.warnings)
             ? completeValue([...prepared.warnings])
             : NO_PROVIDER_WARNINGS;
           lastWarnings = record.warnings;
           throwIfAborted(
             linked.controller.signal,
-            () => linked.reason(`${role}-load-cancelled`),
+            function browserSpeechLoadAbortReason() {
+              return linked.reason(`${role}-load-cancelled`);
+            },
           );
           if (operationGeneration !== generation) {
             throw providerError(
@@ -1312,68 +1529,40 @@ function createBrowserSpeechProvider({
               `${role}-load-superseded-by-unload`,
             );
           }
-          slot = {
-            prepared,
-            released: false,
-            client: null,
-            warnings: record.warnings,
-          };
-          slot.client = createSpeechWorkerClient({
-            role,
-            onTermination({ reason, intentional }) {
-              const trustedReason = trustedWorkerFailure(reason, role);
-              if (active === slot) {
-                active = null;
-                if (state !== "disposed" && state !== "unloading") {
-                  state = intentional ? "unloaded" : "error";
-                  errorCode = intentional ? null : workerFailureCode(trustedReason);
-                  lifecycleReason = intentional
-                    ? `${role}-worker-terminated`
-                    : trustedReason.reason ?? (errorCode === "ARCANE_AI_WORKER_MESSAGE_ERROR"
-                      || errorCode === "ARCANE_AI_WORKER_MESSAGE_REJECTED"
-                      ? `${role}-worker-message-rejected`
-                      : errorCode === "ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH"
-                        ? `${role}-worker-protocol-mismatch`
-                        : `${role}-worker-crashed`);
-                  activeOperation = null;
-                }
-                try {
-                  releaseSlot(slot);
-                } catch (error) {
-                  const releaseFailure = trustedWorkerFailure(error, role);
-                  if (state !== "disposed" && state !== "unloading") {
-                    state = "error";
-                    errorCode = releaseFailure.code;
-                    lifecycleReason = releaseFailure.reason;
-                    activeOperation = null;
-                  }
-                  throw releaseFailure;
-                }
-              }
-            },
-          });
-          if (!isSpeechWorkerClient(slot.client)) {
-            throw providerError(
-              "ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH",
-              "The browser speech Worker client is not SDK-owned.",
-              undefined,
-              `${role}-worker-client-authority-mismatch`,
+          const primaryDevice = role === "stt"
+            ? "wasm"
+            : speechExecution.device === "auto"
+              ? navigatorHasWebGpu() ? "webgpu" : "wasm"
+              : speechExecution.device;
+          try {
+            pool = await loadWorkerPool(
+              preparation,
+              primaryDevice,
+              record.warnings,
+              linked.controller.signal,
+            );
+          } catch (error) {
+            if (
+              role !== "tts"
+              || speechExecution.device !== "auto"
+              || primaryDevice !== "webgpu"
+              || linked.controller.signal.aborted
+              || operationGeneration !== generation
+            ) {
+              throw error;
+            }
+            pool = await loadWorkerPool(
+              preparation,
+              "wasm",
+              record.warnings,
+              linked.controller.signal,
             );
           }
-          const configuration = completeValue({
-            role,
-            runtime: prepared.runtime,
-            model: prepared.model,
-            ...(authority.graph ? {
-              artifactGraphProtocol: authority.graph.protocol,
-            } : {}),
-          });
-          await slot.client.request("load", { configuration }, {
-            signal: linked.controller.signal,
-          });
           throwIfAborted(
             linked.controller.signal,
-            () => linked.reason(`${role}-load-cancelled`),
+            function browserSpeechLoadedPoolAbortReason() {
+              return linked.reason(`${role}-load-cancelled`);
+            },
           );
           if (operationGeneration !== generation) {
             throw providerError(
@@ -1383,7 +1572,8 @@ function createBrowserSpeechProvider({
               `${role}-load-superseded-by-unload`,
             );
           }
-          active = slot;
+          active = pool;
+          selectedDevice = pool.device;
           cache = prepared.cache;
           state = "ready";
           lifecycleReason = `${role}-load-completed`;
@@ -1394,13 +1584,16 @@ function createBrowserSpeechProvider({
             ? linkedAbortFailure(linked, `${role}-load-cancelled`)
             : trustedLoadFailure(error, role);
           try {
-            if (slot) await terminateSlot(slot, failure);
-            else prepared?.release();
+            if (pool) {
+              await terminatePool(pool, failure, { releasePrepared: false });
+            }
+            releasePreparation(preparation);
           } catch (cleanupError) {
-            failure = slot
+            failure = pool
               ? trustedWorkerFailure(cleanupError, role)
               : trustedLoadFailure(cleanupError, role);
           }
+          selectedDevice = null;
           if (operationGeneration === generation && state !== "unloading" && state !== "disposed") {
             state = failure?.code === "ARCANE_AI_REQUEST_ABORTED"
               || failure?.code === "ARCANE_AI_OPERATION_SUPERSEDED"
@@ -1465,7 +1658,15 @@ function createBrowserSpeechProvider({
           `${role}-provider-request-not-ready`,
         );
       }
-      if (requestOperation) {
+      const pool = active;
+      let slot = null;
+      for (const candidate of pool.slots) {
+        if (!candidate.terminated && !candidate.requestOperation) {
+          slot = candidate;
+          break;
+        }
+      }
+      if (!slot) {
         throw providerError(
           "ARCANE_AI_PROVIDER_BUSY",
           "The browser speech provider is already processing a request.",
@@ -1483,32 +1684,44 @@ function createBrowserSpeechProvider({
         linked.release();
         throw linkedAbortFailure(linked, ROLE_REQUEST_REASON[role]);
       }
-      const slot = active;
       const requestGeneration = generation;
-      let workerRequestStarted = false;
       activeOperation = role === "stt"
         ? "stt-provider-transcription"
         : "tts-provider-synthesis";
       lifecycleReason = role === "stt"
         ? "stt-transcription-started"
         : "tts-synthesis-started";
-      const promise = (async () => {
+      const requestRecord = {
+        promise: null,
+        slot,
+        abort(
+          reason = ROLE_REQUEST_REASON[role],
+          code = "ARCANE_AI_REQUEST_ABORTED",
+        ) {
+          linked.abort(reason, code);
+        },
+      };
+      slot.requestOperation = requestRecord;
+      requestOperations.add(requestRecord);
+      function browserSpeechRequestAbortReason() {
+        return linked.reason(ROLE_REQUEST_REASON[role]);
+      }
+      const promise = Promise.resolve().then(async function runBrowserSpeechProviderRequest() {
         const normalized = await normalizeRequestPayload(
           role,
           context.payload,
           authority,
           linked.controller.signal,
-          () => linked.reason(ROLE_REQUEST_REASON[role]),
+          browserSpeechRequestAbortReason,
         );
         throwIfAborted(
           linked.controller.signal,
-          () => linked.reason(ROLE_REQUEST_REASON[role]),
+          browserSpeechRequestAbortReason,
         );
-        workerRequestStarted = true;
         const result = await slot.client.request("use", normalized.payload, {
           signal: linked.controller.signal,
         });
-        if (requestGeneration !== generation || active !== slot) {
+        if (requestGeneration !== generation || active !== pool || state !== "ready") {
           throw providerError(
             "ARCANE_AI_OPERATION_SUPERSEDED",
             "The browser speech result was superseded.",
@@ -1521,48 +1734,36 @@ function createBrowserSpeechProvider({
         return role === "tts" && normalized.shared
           ? encodeSharedSynthesisResult(result, authority)
           : result;
-      })();
-      requestOperation = completeValue({
-        promise,
-        abort: (
-          reason = ROLE_REQUEST_REASON[role],
-          code = "ARCANE_AI_REQUEST_ABORTED",
-        ) => linked.abort(reason, code),
       });
+      requestRecord.promise = promise;
       try {
         const result = await promise;
-        lifecycleReason = role === "stt"
-          ? "stt-transcription-completed"
-          : "tts-synthesis-completed";
+        if (requestGeneration === generation && state === "ready") {
+          lifecycleReason = role === "stt"
+            ? "stt-transcription-completed"
+            : "tts-synthesis-completed";
+        }
         return result;
       } catch (error) {
-        let failure = linked.controller.signal.aborted
+        const failure = linked.controller.signal.aborted
           && (error?.code === "ARCANE_AI_REQUEST_ABORTED"
             || linked.code() === "ARCANE_AI_OPERATION_SUPERSEDED")
           ? linkedAbortFailure(linked, ROLE_REQUEST_REASON[role])
           : trustedRequestFailure(error, role);
-        if (failure?.code === "ARCANE_AI_REQUEST_ABORTED"
-          && workerRequestStarted
-          && active === slot) {
-          active = null;
-          try {
-            releaseSlot(slot);
-          } catch (cleanupError) {
-            failure = trustedWorkerFailure(cleanupError, role);
-          }
-          state = "unloaded";
+        if (requestGeneration === generation && state !== "unloading" && state !== "disposed") {
+          lifecycleReason = failure?.reason
+            ?? (failure?.code === "ARCANE_AI_REQUEST_ABORTED"
+              ? ROLE_REQUEST_REASON[role]
+              : role === "stt"
+                ? "stt-transcription-engine-operation-rejected"
+                : "tts-synthesis-engine-operation-rejected");
         }
-        lifecycleReason = failure?.reason
-          ?? (failure?.code === "ARCANE_AI_REQUEST_ABORTED"
-            ? ROLE_REQUEST_REASON[role]
-            : role === "stt"
-              ? "stt-transcription-engine-operation-rejected"
-              : "tts-synthesis-engine-operation-rejected");
         throw failure;
       } finally {
         linked.release();
-        if (requestOperation?.promise === promise) requestOperation = null;
-        activeOperation = null;
+        if (slot.requestOperation === requestRecord) slot.requestOperation = null;
+        requestOperations.delete(requestRecord);
+        if (requestOperations.size === 0 && state === "ready") activeOperation = null;
       }
     },
 
@@ -1594,47 +1795,56 @@ function createBrowserSpeechProvider({
       errorCode = null;
       activeOperation = `${role}-provider-unload`;
       const capturedLoad = loadOperation?.promise ?? null;
-      const capturedRequest = requestOperation?.promise ?? null;
+      const capturedRequests = [];
+      for (const requestRecord of requestOperations) {
+        if (requestRecord.promise) capturedRequests.push(requestRecord.promise);
+      }
       if (loadOperation) {
         lifecycleReason = `${role}-load-superseded-by-unload`;
         loadOperation.abort(
           `${role}-load-superseded-by-unload`,
           "ARCANE_AI_OPERATION_SUPERSEDED",
         );
-      } else if (requestOperation) {
+      }
+      if (requestOperations.size > 0) {
         lifecycleReason = role === "stt"
           ? "stt-transcription-superseded-by-unload"
           : "tts-synthesis-superseded-by-unload";
-        requestOperation.abort(lifecycleReason, "ARCANE_AI_OPERATION_SUPERSEDED");
-      } else {
+        for (const requestRecord of requestOperations) {
+          requestRecord.abort(lifecycleReason, "ARCANE_AI_OPERATION_SUPERSEDED");
+        }
+      } else if (!loadOperation) {
         lifecycleReason = `${role}-unload-started`;
       }
-      const promise = (async () => {
-        await Promise.allSettled([
-          capturedLoad,
-          capturedRequest,
-        ].filter(Boolean));
-        const slot = active;
+      const promise = Promise.resolve().then(async function unloadBrowserSpeechProviderPool() {
+        const pendingOperations = [...capturedRequests];
+        if (capturedLoad) pendingOperations.unshift(capturedLoad);
+        await Promise.allSettled(pendingOperations);
+        const pool = active;
         active = null;
-        await terminateSlot(slot, providerError(
+        await terminatePool(pool, providerError(
           "ARCANE_AI_OPERATION_SUPERSEDED",
           "The browser speech Worker was terminated by unload().",
           undefined,
           `${role}-worker-terminated-by-unload`,
         ));
+        selectedDevice = null;
         cache = null;
         state = "unloaded";
         lifecycleReason = `${role}-unload-completed`;
         activeOperation = null;
         return status();
-      })();
-      const tracked = promise.then((value) => {
-        if (unloadOperation === tracked) unloadOperation = null;
-        return value;
-      }, (error) => {
-        if (unloadOperation === tracked) unloadOperation = null;
-        throw error;
       });
+      const tracked = promise.then(
+        function completeBrowserSpeechProviderUnload(value) {
+          if (unloadOperation === tracked) unloadOperation = null;
+          return value;
+        },
+        function rejectBrowserSpeechProviderUnload(error) {
+          if (unloadOperation === tracked) unloadOperation = null;
+          throw error;
+        },
+      );
       unloadOperation = tracked;
       return awaitAbortableSpeechOperation(
         tracked,

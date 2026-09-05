@@ -143,6 +143,7 @@ registerWorkerErrorReasons("ARCANE_AI_INVALID_REQUEST", BOTH_WORKER_ROLES, LOAD_
   "speech-runtime-entrypoint-not-materialized",
   "speech-worker-configuration-missing",
   "speech-worker-materialized-files-missing",
+  "speech-worker-execution-configuration-mismatch",
   "speech-worker-model-dtype-empty",
   "speech-worker-model-id-empty",
   "speech-worker-model-repository-empty",
@@ -704,6 +705,49 @@ function validateConfiguration(configuration, role) {
   requiredText(configuration.model?.repository, "Speech model repository", "speech-worker-model-repository-empty");
   requiredText(configuration.model?.revision, "Speech model revision", "speech-worker-model-revision-empty");
   requiredText(configuration.runtime?.entry, "Speech runtime entry", "speech-worker-runtime-entry-empty");
+  const execution = configuration.execution;
+  if (execution !== undefined) {
+    if (!execution || typeof execution !== "object" || Array.isArray(execution)) {
+      throw workerError(
+        "ARCANE_AI_INVALID_REQUEST",
+        "Speech worker execution must be a plain data record.",
+        undefined,
+        "speech-worker-execution-configuration-mismatch",
+      );
+    }
+    const prototype = Object.getPrototypeOf(execution);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw workerError(
+        "ARCANE_AI_INVALID_REQUEST",
+        "Speech worker execution must be a plain data record.",
+        undefined,
+        "speech-worker-execution-configuration-mismatch",
+      );
+    }
+    const descriptors = Object.getOwnPropertyDescriptors(execution);
+    let descriptorMismatch = false;
+    for (const key of Reflect.ownKeys(descriptors)) {
+      if (key !== "device" || !Object.hasOwn(descriptors[key], "value")) {
+        descriptorMismatch = true;
+        break;
+      }
+    }
+    if (
+      descriptorMismatch
+      || !Object.hasOwn(descriptors, "device")
+      || (role === "stt" && descriptors.device.value !== "wasm")
+      || (role === "tts"
+        && descriptors.device.value !== "wasm"
+        && descriptors.device.value !== "webgpu")
+    ) {
+      throw workerError(
+        "ARCANE_AI_INVALID_REQUEST",
+        "Speech worker execution device does not match the selected role.",
+        undefined,
+        "speech-worker-execution-configuration-mismatch",
+      );
+    }
+  }
   if (!Array.isArray(configuration.runtime?.files) || !Array.isArray(configuration.model?.files)) {
     throw workerError(
       "ARCANE_AI_INVALID_REQUEST",
@@ -1360,7 +1404,7 @@ async function createKokoroEngine(namespace, configuration, signal, report) {
   const synthesizer = await namespace.KokoroTTS.from_pretrained(
     configuration.model.repository,
     {
-      device: "wasm",
+      device: configuration.execution?.device ?? "wasm",
       dtype: configuration.model.dtype ?? "q8",
       revision: configuration.model.revision,
       progress_callback: report,

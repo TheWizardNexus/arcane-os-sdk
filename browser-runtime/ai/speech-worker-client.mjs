@@ -52,8 +52,9 @@ function validateWorker(worker) {
 const WORKER_CLIENTS = new WeakSet();
 
 /**
- * Owns exactly one role Worker. Cancellation terminates that Worker, which is
- * the only reliable preemption boundary for the third-party WASM engines.
+ * Owns exactly one role Worker. STT and lifecycle cancellation terminate that
+ * Worker. TTS use cancellation targets only the active request so sibling pool
+ * Workers remain available.
  */
 class SpeechWorkerClient {
   #role;
@@ -194,22 +195,54 @@ class SpeechWorkerClient {
     }
     const id = this.#nextId;
     this.#nextId += 1;
-    return new Promise((resolve, reject) => {
+    const client = this;
+    return new Promise(function requestSpeechWorkerOperation(resolve, reject) {
       let listening = true;
       const cleanup = () => {
         if (!listening) return;
         listening = false;
         signal?.removeEventListener?.("abort", onAbort);
       };
-      const onAbort = () => {
-        if (!this.#pending.has(id)) return;
-        void this.terminate(
-          abortError(signal, this.#role, op),
+      function onAbort() {
+        const pending = client.#pending.get(id);
+        if (!pending) return;
+        if (client.#role === "tts" && op === "use") {
+          client.#pending.delete(id);
+          pending.cleanup();
+          pending.reject(abortError(signal, client.#role, op));
+          const cancelId = client.#nextId;
+          client.#nextId += 1;
+          try {
+            client.#transport.postMessage({
+              protocol: SPEECH_WORKER_PROTOCOL,
+              id: cancelId,
+              op: "cancel",
+              payload: { targetId: id },
+            });
+          } catch (error) {
+            const failure = clientError(
+              "ARCANE_AI_WORKER_MESSAGE_ERROR",
+              "Unable to cancel an operation in the speech Worker.",
+              error,
+              `${operationSubject(client.#role, op)}-message-rejected`,
+            );
+            void client.terminate(failure, { intentional: false }).catch(
+              function ignoreCancellationTerminationFailure() {
+                return undefined;
+              },
+            );
+          }
+          return;
+        }
+        void client.terminate(
+          abortError(signal, client.#role, op),
           { intentional: true },
-        ).catch(() => undefined);
-      };
+        ).catch(function ignoreAbortTerminationFailure() {
+          return undefined;
+        });
+      }
       signal?.addEventListener?.("abort", onAbort, { once: true });
-      this.#pending.set(id, { resolve, reject, cleanup, op });
+      client.#pending.set(id, { resolve, reject, cleanup, op });
       const message = {
         protocol: SPEECH_WORKER_PROTOCOL,
         id,
@@ -218,18 +251,22 @@ class SpeechWorkerClient {
       };
       const transfers = collectSpeechTransferables(payload);
       try {
-        this.#transport.postMessage(message, transfers);
+        client.#transport.postMessage(message, transfers);
       } catch (error) {
-        this.#pending.delete(id);
+        client.#pending.delete(id);
         cleanup();
         const failure = clientError(
           "ARCANE_AI_WORKER_MESSAGE_ERROR",
           "Unable to send an operation to the speech Worker.",
           error,
-          `${operationSubject(this.#role, op)}-message-rejected`,
+          `${operationSubject(client.#role, op)}-message-rejected`,
         );
         reject(failure);
-        void this.terminate(failure, { intentional: false }).catch(() => undefined);
+        void client.terminate(failure, { intentional: false }).catch(
+          function ignoreRequestTerminationFailure() {
+            return undefined;
+          },
+        );
       }
     });
   }

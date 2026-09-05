@@ -243,6 +243,7 @@ function kokoroRuntimeSource(operationSource) {
     export const KokoroTTS = {
       async from_pretrained(_repository, options) {
         globalThis.__arcaneSelectedSpeechDtype = options.dtype;
+        globalThis.__arcaneSelectedSpeechDevice = options.device;
         ${operationSource}
       },
     };
@@ -410,18 +411,21 @@ test("speech Worker preserves complete synthesis text", async () => {
     id: 1,
     op: "load",
     payload: {
-      configuration: selfContainedWorkerConfiguration(
-        kokoroRuntimeSource(`
-          return {
-            async generate(input) {
-              globalThis.__arcaneCompleteSynthesisText = input;
-              return { audio: new Float32Array([0.25]), sampling_rate: 24_000 };
-            },
-            async dispose() {},
-          };
-        `),
-        "tts",
-      ),
+      configuration: {
+        ...selfContainedWorkerConfiguration(
+          kokoroRuntimeSource(`
+            return {
+              async generate(input) {
+                globalThis.__arcaneCompleteSynthesisText = input;
+                return { audio: new Float32Array([0.25]), sampling_rate: 24_000 };
+              },
+              async dispose() {},
+            };
+          `),
+          "tts",
+        ),
+        execution: { device: "webgpu" },
+      },
     },
   });
 
@@ -432,6 +436,7 @@ test("speech Worker preserves complete synthesis text", async () => {
     payload: { text, voice: "af_heart", speed: 1 },
   });
   assert.equal(globalThis.__arcaneSelectedSpeechDtype, "q8");
+  assert.equal(globalThis.__arcaneSelectedSpeechDevice, "webgpu");
   assert.equal(globalThis.__arcaneCompleteSynthesisText, text);
   assert.deepEqual(result, {
     audio: new Float32Array([0.25]),
@@ -446,7 +451,153 @@ test("speech Worker preserves complete synthesis text", async () => {
     payload: null,
   });
   delete globalThis.__arcaneSelectedSpeechDtype;
+  delete globalThis.__arcaneSelectedSpeechDevice;
   delete globalThis.__arcaneCompleteSynthesisText;
+});
+
+test("Kokoro defaults to automatic GPU selection and a two-Worker pool", async (t) => {
+  const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { gpu: {} },
+  });
+  t.after(() => {
+    if (navigatorDescriptor) {
+      Object.defineProperty(globalThis, "navigator", navigatorDescriptor);
+    } else {
+      delete globalThis.navigator;
+    }
+  });
+
+  const { store } = createMemoryStore(["tts"]);
+  const workers = [];
+  installContractWorker(t, () => {
+    const contract = createSpeechWorkerContract({
+      role: "tts",
+      workerId: workers.length,
+    });
+    workers.push(contract);
+    return contract;
+  });
+  const kokoro = createBrowserKokoroProvider(providerOptions("tts", store));
+
+  assert.equal(kokoro.maxConcurrentRequests, 2);
+  assert.deepEqual(kokoro.status().execution, {
+    requestedDevice: "auto",
+    selectedDevice: null,
+    maxConcurrentRequests: 2,
+    activeRequestCount: 0,
+  });
+  const ready = await kokoro.load({ role: "tts", selection: selection(kokoro) });
+  assert.equal(workers.length, 2);
+  assert.ok(workers.every((contract) => contract.posted.find(
+    (message) => message.op === "load",
+  )?.payload.configuration.execution.device === "webgpu"));
+  assert.deepEqual(ready.execution, {
+    requestedDevice: "auto",
+    selectedDevice: "webgpu",
+    maxConcurrentRequests: 2,
+    activeRequestCount: 0,
+  });
+
+  await kokoro.unload();
+  assert.ok(workers.every((contract) => contract.terminated));
+});
+
+test("automatic Kokoro execution replaces a rejected WebGPU pool with WASM", async (t) => {
+  const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { gpu: {} },
+  });
+  t.after(function restoreNavigatorAfterKokoroFallback() {
+    if (navigatorDescriptor) {
+      Object.defineProperty(globalThis, "navigator", navigatorDescriptor);
+    } else {
+      delete globalThis.navigator;
+    }
+  });
+
+  const rejectedLoad = {
+    protocol: "arcane-ai-speech-worker-error/1",
+    code: "ARCANE_AI_PROVIDER_REQUEST_FAILED",
+    message: "The speech engine operation was rejected.",
+    reason: "tts-worker-model-load-rejected",
+  };
+  const { store, materialized } = createMemoryStore(["tts"]);
+  const workers = [];
+  installContractWorker(t, function createWebGpuThenWasmWorker() {
+    const contract = createSpeechWorkerContract({
+      role: "tts",
+      workerId: workers.length,
+      responseError: function rejectOnlyWebGpuLoad(message) {
+        return message.op === "load"
+          && message.payload?.configuration.execution.device === "webgpu"
+          ? rejectedLoad
+          : null;
+      },
+    });
+    workers.push(contract);
+    return contract;
+  });
+  const kokoro = createBrowserKokoroProvider(providerOptions("tts", store));
+
+  const ready = await kokoro.load({ role: "tts", selection: selection(kokoro) });
+  assert.equal(workers.length, 3);
+  assert.equal(materialized.length, 2, "GPU fallback must reuse one prepared artifact set.");
+  assert.equal(workers[0].terminated, true);
+  assert.ok(workers.slice(1).every(function replacementWorkerSelectedWasm(contract) {
+    return contract.posted.find(function findReplacementLoad(message) {
+      return message.op === "load";
+    })?.payload.configuration.execution.device === "wasm";
+  }));
+  assert.equal(ready.execution.selectedDevice, "wasm");
+
+  await kokoro.unload();
+  assert.ok(workers.every(function allCandidateWorkersWereTerminated(contract) {
+    return contract.terminated;
+  }));
+});
+
+test("speech execution options retain one STT slot and bounded TTS capacity", () => {
+  const { store } = createMemoryStore(["stt", "tts"]);
+  const whisperOptions = providerOptions("stt", store);
+  const kokoroOptions = providerOptions("tts", store);
+
+  const whisper = createBrowserWhisperProvider(whisperOptions);
+  assert.equal(whisper.maxConcurrentRequests, 1);
+  assert.throws(
+    () => createBrowserWhisperProvider({
+      ...whisperOptions,
+      execution: { device: "wasm", maxConcurrentRequests: 1 },
+    }),
+    /does not accept an execution option/u,
+  );
+  assert.throws(
+    () => createBrowserKokoroProvider({
+      ...kokoroOptions,
+      execution: { device: "cpu", maxConcurrentRequests: 2 },
+    }),
+    /must be "auto", "webgpu", or "wasm"/u,
+  );
+  assert.throws(
+    () => createBrowserKokoroProvider({
+      ...kokoroOptions,
+      execution: { device: "wasm", maxConcurrentRequests: 5 },
+    }),
+    /safe integer from 1 through 4/u,
+  );
+  const singleKokoro = createBrowserKokoroProvider({
+    ...kokoroOptions,
+    execution: { device: "wasm", maxConcurrentRequests: 1 },
+  });
+  assert.equal(singleKokoro.maxConcurrentRequests, 1);
+  assert.deepEqual(singleKokoro.status().execution, {
+    requestedDevice: "wasm",
+    selectedDevice: null,
+    maxConcurrentRequests: 1,
+    activeRequestCount: 0,
+  });
 });
 
 test("ordinary artifact graph routing preserves native imports and local bindings", async () => {
@@ -698,8 +849,9 @@ test("Whisper and Kokoro use independent ordinary Workers and mutable complete r
   await whisper.load({ role: "stt", selection: selection(whisper) });
   await kokoro.load({ role: "tts", selection: selection(kokoro) });
   assert.equal(workers.stt.length, 1);
-  assert.equal(workers.tts.length, 1);
+  assert.equal(workers.tts.length, 2);
   assert.notEqual(workers.stt[0].worker, workers.tts[0].worker);
+  assert.notEqual(workers.tts[0].worker, workers.tts[1].worker);
   assert.equal(
     workers.stt[0].posted.find((message) => message.op === "load")
       .payload.configuration.model.dtype,
@@ -741,7 +893,7 @@ test("Whisper and Kokoro use independent ordinary Workers and mutable complete r
   await kokoro.unload();
   assert.equal(kokoro.status().state, "unloaded");
   assert.equal(whisper.status().state, "ready");
-  assert.equal(workers.tts[0].terminated, true);
+  assert.ok(workers.tts.every((contract) => contract.terminated));
   assert.equal(workers.stt[0].terminated, false);
   await whisper.dispose();
   await kokoro.dispose();
@@ -842,7 +994,9 @@ test("shared speech requests preserve complete text and platform capability erro
       speed: 1.25,
     },
   });
-  const sharedTtsUse = workers.tts[0].posted.find((message) => message.op === "use");
+  const sharedTtsUse = workers.tts
+    .flatMap((contract) => contract.posted)
+    .find((message) => message.op === "use");
   assert.deepEqual(sharedTtsUse.payload, {
     text: completeInput,
     voice: "af_heart",
@@ -938,7 +1092,106 @@ test("unload supersedes an in-flight ordinary artifact fetch", async () => {
   assert.equal((await unloading).lifecycleReason, "stt-unload-completed");
 });
 
-test("speech request cancellation terminates only the affected role Worker", async (t) => {
+test("Kokoro pool isolates one cancelled use and unloads every active slot", async (t) => {
+  const { store } = createMemoryStore(["tts"]);
+  const workers = [];
+  installContractWorker(t, () => {
+    const contract = createSpeechWorkerContract({
+      role: "tts",
+      holdUse: true,
+      workerId: workers.length,
+    });
+    workers.push(contract);
+    return contract;
+  });
+  const kokoro = createBrowserKokoroProvider({
+    ...providerOptions("tts", store),
+    execution: { device: "wasm", maxConcurrentRequests: 2 },
+  });
+  await kokoro.load({ role: "tts", selection: selection(kokoro) });
+  assert.equal(workers.length, 2);
+
+  const firstText = "  First complete synthesis text.\n";
+  const secondText = "Second complete synthesis text with trailing space.  ";
+  const firstController = new AbortController();
+  const firstUseArrival = workers[0].waitForUse();
+  const secondUseArrival = workers[1].waitForUse();
+  const firstRequest = kokoro.request({
+    role: "tts",
+    operation: "synthesize",
+    payload: { text: firstText, voice: "af_heart", speed: 1 },
+    signal: firstController.signal,
+  });
+  const secondRequest = kokoro.request({
+    role: "tts",
+    operation: "synthesize",
+    payload: { text: secondText, voice: "af_heart", speed: 1 },
+  });
+  const [firstUse, secondUse] = await Promise.all([
+    firstUseArrival,
+    secondUseArrival,
+  ]);
+  assert.equal(firstUse.payload.text, firstText);
+  assert.equal(secondUse.payload.text, secondText);
+  assert.deepEqual(kokoro.status().execution, {
+    requestedDevice: "wasm",
+    selectedDevice: "wasm",
+    maxConcurrentRequests: 2,
+    activeRequestCount: 2,
+  });
+  await assert.rejects(
+    kokoro.request({
+      role: "tts",
+      operation: "synthesize",
+      payload: { text: "Capacity overflow.", voice: "af_heart", speed: 1 },
+    }),
+    (error) => error?.code === "ARCANE_AI_PROVIDER_BUSY",
+  );
+
+  const firstCancellation = assert.rejects(
+    firstRequest,
+    (error) => error?.code === "ARCANE_AI_REQUEST_ABORTED"
+      && error?.reason === "tts-synthesis-cancelled"
+      && error?.cause === "cancel only the first synthesis",
+  );
+  firstController.abort("cancel only the first synthesis");
+  await firstCancellation;
+  assert.deepEqual(workers[0].cancelledUseIds, [firstUse.id]);
+  assert.equal(workers[0].terminated, false);
+  assert.equal(workers[1].terminated, false);
+  assert.deepEqual(workers[1].heldUseIds(), [secondUse.id]);
+  assert.equal(workers[1].releaseUse(secondUse.id), true);
+  const secondResult = await secondRequest;
+  assert.equal(secondResult.voice, "af_heart");
+  assert.equal(kokoro.status().execution.activeRequestCount, 0);
+
+  const unloadFirstArrival = workers[0].waitForUse();
+  const unloadSecondArrival = workers[1].waitForUse();
+  const unloadFirst = kokoro.request({
+    role: "tts",
+    operation: "synthesize",
+    payload: { text: "Unload the first active use.", voice: "af_heart", speed: 1 },
+  });
+  const unloadSecond = kokoro.request({
+    role: "tts",
+    operation: "synthesize",
+    payload: { text: "Unload the second active use.", voice: "af_heart", speed: 1 },
+  });
+  const [unloadFirstUse, unloadSecondUse] = await Promise.all([
+    unloadFirstArrival,
+    unloadSecondArrival,
+  ]);
+  const unloading = kokoro.unload();
+  const settlements = await Promise.allSettled([unloadFirst, unloadSecond]);
+  assert.ok(settlements.every((settlement) => settlement.status === "rejected"
+    && settlement.reason?.code === "ARCANE_AI_OPERATION_SUPERSEDED"));
+  assert.equal((await unloading).state, "unloaded");
+  assert.ok(workers[0].cancelledUseIds.includes(unloadFirstUse.id));
+  assert.ok(workers[1].cancelledUseIds.includes(unloadSecondUse.id));
+  assert.ok(workers.every((contract) => contract.terminated));
+});
+
+test("STT request cancellation terminates its role Worker", async (t) => {
   const { store } = createMemoryStore(["stt"]);
   const contract = createSpeechWorkerContract({ role: "stt", holdUse: true });
   installContractWorker(t, () => contract);

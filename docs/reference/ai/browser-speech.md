@@ -3,7 +3,8 @@
 `arcane-os/ai/browser-speech` is the browser-only SDK boundary for
 caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It
 provides artifact storage, live module routing, role Workers, provider/2
-adapters, audio normalization, cancellation, and cleanup.
+adapters, bounded parallel TTS synthesis, audio normalization, cancellation,
+and cleanup.
 
 The SDK does not choose a runtime, model, voice, catalog, prompt, or product
 policy. Applications keep those choices. Nothing is downloaded or activated
@@ -253,7 +254,10 @@ they do not silently convert into a rejection policy.
 The Worker applies only the selected runtime settings needed to run the chosen
 provider:
 
-- Kokoro uses `namespace.env.wasmPaths = {mjs,wasm}`.
+- Kokoro forwards the pool's selected `webgpu` or `wasm` device to
+  `KokoroTTS.from_pretrained()`. Its configured dtype remains exactly the
+  caller-selected dtype on both paths. The WASM path also uses
+  `namespace.env.wasmPaths = {mjs,wasm}`.
 - Transformers uses
   `namespace.env.backends.onnx.wasm.wasmPaths = {mjs,wasm}`, keeps remote model
   loading enabled, and applies caller-selected `numThreads` when present.
@@ -276,13 +280,27 @@ const whisper = createBrowserWhisperProvider({
 const kokoro = createBrowserKokoroProvider({
   id: 'my-kokoro',
   graph: kokoroGraph,
-  store
+  store,
+  execution: {
+    device: 'auto',
+    maxConcurrentRequests: 2
+  }
 });
 ```
 
 The constructors also accept ordinary `model` and `runtime` descriptors instead
 of `graph`; the two forms are mutually exclusive. Both forms require an
 SDK-created DBOPFS speech artifact store. `localOnly` remains `true`.
+
+Kokoro additionally accepts the exact `execution` record
+`{device,maxConcurrentRequests}`. `device` is `auto`, `webgpu`, or `wasm`;
+`maxConcurrentRequests` is an integer from 1 through 4. Omission defaults to
+`{device:'auto',maxConcurrentRequests:2}`. `auto` attempts a complete WebGPU
+Worker pool only when the browser exposes WebGPU. If that pool cannot load, the
+SDK tears it down and creates a complete WASM pool with the same caller-selected
+model and dtype. Explicit `webgpu` rejects when WebGPU cannot load; explicit
+`wasm` never attempts GPU. Whisper remains one WASM Worker and does not accept
+this option.
 
 Each constructor returns an `arcane-ai-provider/2` object with:
 
@@ -292,6 +310,7 @@ Each constructor returns an `arcane-ai-provider/2` object with:
   role,
   id,
   localOnly,
+  maxConcurrentRequests,
   catalog,
   inspect,
   status,
@@ -366,23 +385,42 @@ mutable values.
 Provider states are `unloaded`, `loading`, `ready`, `unloading`, `error`, and
 `disposed`. `status()` includes role, provider/model ids, state, lifecycle
 status and reason, active operation, loaded/busy flags, generation, error code,
-cache state, and warnings. A security field is absent in ordinary mode.
+cache state, and warnings. Kokoro status also includes an `execution` record
+with requested and selected device, request limit, and active request count. A
+successful `selectedDevice:'webgpu'` reports the execution provider selected by
+the upstream model load; it does not claim that browser, driver, or GPU kernels
+overlap physically. A security field is absent in ordinary mode.
 
 The provider/2 load context accepts an optional progress callback for interface
 compatibility, but the current browser-speech artifact and Worker transport
 publishes no progress records. Consumers present the explicit lifecycle states
 instead of inventing a numeric total.
 
-Compatible concurrent loads share one underlying preparation and Worker load
+Compatible concurrent loads share one underlying preparation and pool load
 while each caller retains its own cancellation signal. One observer cannot
 cancel another still-active observer; cancellation of the final observer stops
 the shared load.
 
-Only one role request runs at a time. Cancellation after Worker use begins
-terminates that role Worker, rejects its pending operations, releases nested
-Workers and object URLs, and returns the provider to `unloaded`. A later request
-requires another explicit `load()`. Late results cannot settle a superseded
-operation.
+Whisper retains one active role request. Kokoro admits synthesis requests up to
+its declared capacity and rejects a direct over-capacity call with
+`ARCANE_AI_PROVIDER_BUSY`; the provider-neutral runtime keeps overflow in FIFO
+order. Each Kokoro slot owns a distinct Worker and loaded model session because
+the selected browser adapter serializes inference inside one JavaScript
+isolate. The SDK prepares the artifact URLs once and shares that same prepared
+selection across the bounded pool. Pool activation completes the first model
+session before it starts the remaining Workers, then loads those remaining
+sessions concurrently. This avoids multiplying simultaneous cold artifact
+acquisition while still making the configured synthesis capacity ready in
+parallel.
+
+Cancellation of one active Kokoro synthesis suppresses only that request and
+sends the Worker's targeted cancel control. The selected upstream Kokoro
+version may finish already-running engine work before that slot can run its
+next request; the SDK does not claim stronger per-call preemption. Whisper
+cancellation and role unload/dispose retain destructive Worker teardown.
+Kokoro unload/dispose abort every active request, terminates every pool Worker,
+and releases materialized URLs once. Late results cannot settle a cancelled or
+superseded operation.
 
 The provider owns no event bus. Applications may project promises and status
 into the SDK's shared event/state owner. Mute and unmute are likewise
@@ -426,7 +464,8 @@ operation.
 ## Ownership
 
 - Applications own model, runtime, dtype, sample-rate, voice, profile, prompt,
-  catalog, activation, and presentation policy.
+  catalog, activation, optional TTS execution override, and presentation
+  policy.
 - Upstream publishers own their runtime, model, voice, and license delivery.
 - The SDK owns storage, materialization, routing, Worker lifecycle, normalized
   provider contracts, cancellation, and cleanup.
