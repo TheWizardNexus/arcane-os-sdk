@@ -89,8 +89,8 @@ speakButton.addEventListener('click', async function sayHello() {
   speakButton.disabled = true;
   try {
     await ai.setSpeechMuted(false); // Loads the selected TTS provider.
-    const complete = await ai.streamTTS('Hello from Arcane. ', true);
-    console.log('Speech preparation completed:', complete);
+    const prepared = await ai.streamTTS('Hello from Arcane. ', true);
+    console.log('Speech preparation completed:', prepared);
   } catch (error) {
     console.error(error.code, error.message);
   } finally {
@@ -101,10 +101,12 @@ speakButton.addEventListener('click', async function sayHello() {
 
 The first user action may download the selected runtime, model, and voice.
 The browser may require another audio-unlock gesture after a long load; the SDK
-retains prepared audio for that gesture. `streamTTS()` prepares and schedules
-playback; its promise is not proof that a listener heard the sound. It returns
-`false` for muted, stopped, or failed work, and the SDK reports full synthesis
-or playback failures in its console diagnostics and `ai-tts-failure` event.
+retains prepared audio for that gesture. The two-argument `streamTTS()` call
+resolves after preparing audio for scheduling; it does not wait for playback
+to end. It returns `false` when that preparation is muted, stopped, or fails.
+Later playback failures still reach the SDK's complete console diagnostics
+and `ai-tts-failure` event. Use the optional playback mode below when you need
+to wait for the submitted audio to end. Neither mode proves a listener heard it.
 
 To display complete high-level playback errors in this page, observe its
 existing event. The listener belongs to this example's one `ai` instance:
@@ -132,6 +134,71 @@ provider directly beyond its capacity returns `ARCANE_AI_PROVIDER_BUSY`.
 Ready adjacent audio buffers use contiguous AudioContext scheduling. Browser
 audio scheduling and selected WebGPU status do not prove physical GPU kernel
 overlap or audio quality. LLM and Whisper/STT capacity remains one.
+
+## Queue complete passages and wait for playback
+
+These options are available in current `main` source and are not yet in a
+published SDK package.
+
+For a complete page or passage, call
+`ai.streamTTS(text, true, {voice, speed, pauseAfterMs, waitForPlayback:true})`.
+The existing AI queue owns segmentation, concurrent synthesis, ordered
+playback, and cancellation. Supply the exact text; there is no need for an
+application sentence queue, audio cache, or playback scheduler.
+
+This function uses the configured `ai` above. Its application-supplied
+`passages` argument is an ordered array of `{text, voice?, speed?, pauseAfterMs?}`
+records. An omitted voice uses the selected model's default voice, an omitted
+speed uses `ai.voiceSpeed`, and an omitted pause is zero. Each supplied voice
+must be supported by the selected model; speed must be positive. A pause is
+finite, nonnegative milliseconds and applies only after that passage's final
+extracted segment. These options do not change the instance defaults.
+
+```javascript
+async function speakPassages(passages) {
+    await ai.setSpeechMuted(false);
+    const pending = passages.map(
+        function queuePassage(passage) {
+            return ai.streamTTS(
+                passage.text,
+                true,
+                {
+                    voice: passage.voice,
+                    speed: passage.speed,
+                    pauseAfterMs: passage.pauseAfterMs,
+                    waitForPlayback: true
+                }
+            );
+        }
+    );
+    return Promise.all(pending);
+}
+```
+
+Call `speakPassages(...)` from your owned user action and handle errors with
+the earlier `error.code` / `error.message` pattern. The `map` submits every
+passage synchronously before `Promise.all` waits, so synthesis can use the
+provider's available capacity. The returned array has one boolean per passage
+in input order: `true` after all its extracted audio buffers naturally end,
+or `false` after terminal cancellation or failure. `ai.stopAudio()` cancels
+all speech owned by that AI instance and settles pending playback results
+`false`.
+
+The selected voice and speed are captured for segments extracted by that call.
+That includes any text left in the same AI instance's partial-stream buffer;
+finish the previous producer before starting a separate complete passage.
+Options are not retained with an unfinished `end:false` remainder. A later
+call supplies its own options, and `finishTTS()` uses defaults.
+A call extracting no segments returns `true` without waiting for earlier jobs.
+An already muted call returns `false`.
+
+Autoplay permission waiting and recoverable audio-resume attempts leave the
+playback promise pending until playback completes or is stopped. A failed
+resume of a closed `AudioContext` terminates the affected jobs and settles
+their playback results `false`. A trailing
+pause delays the next queued audio on the existing `AudioContext` clock; it
+does not delay the preceding promise after that passage's last buffer ends.
+The promise is a playback result, not a listener acknowledgement.
 
 ## Stream chunks as they arrive
 

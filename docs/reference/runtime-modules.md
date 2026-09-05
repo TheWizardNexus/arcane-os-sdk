@@ -141,7 +141,8 @@ default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and
 `configureSpeechProviders()`, `transitionAI()`, `transitionProviders()`,
 `transitionSpeechProviders()`, `startProviders()`, `setSpeechMuted()`,
 `streamRequest()`, `fetchRequest()`,
-read-only `ttsSegmentation`, `configureTTSSegmentation()`, `streamTTS()`,
+read-only `ttsSegmentation`, `configureTTSSegmentation()`,
+`streamTTS(text='',end=false,options={})`,
 `finishTTS()`, `fetchTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`,
 `playAudio()`; consumes `user-entity-loaded` and `arcane-ollama-ready`,
 installs `window.ai`, and emits `ai-ready` and `ai-tts-failure`.
@@ -248,8 +249,37 @@ the setting is the instance's `opus` default and the model rejects it, the catal
 `speech.defaultResponseFormat` is used, while any other unsupported setting is
 rejected. It propagates the caller-owned signal and returns a playable `Blob`;
 it does not independently choose a provider, cloud fallback, model, runtime, or
-voice policy for the application. Existing `streamTTS()` and `finishTTS()` use
-this same request boundary. Streaming speech retains sentence
+voice policy for the application. `streamTTS(text='',end=false,options={})` and
+`finishTTS()` use this same request boundary. The third-argument options below
+are available in current `main` source and are not yet published:
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `voice` | Current selected model's default voice | A supplied voice is captured for every segment extracted by this call and forwarded unchanged to `fetchTTS()`. It does not change the instance or provider default. |
+| `speed` | Current `ai.voiceSpeed` | A supplied positive speed is captured for those segments and forwarded to `fetchTTS()`. It does not change `ai.voiceSpeed`. |
+| `pauseAfterMs` | `0` | Finite, nonnegative milliseconds placed after the final extracted segment on the existing audio clock. Invalid values throw `RangeError`; no pause is inserted between this call's other segments. |
+| `waitForPlayback` | `false` | Omission retains the preparation promise. With `true`, the promise resolves after every extracted segment reaches a terminal playback state: `true` when all naturally end, or `false` after terminal cancellation or failure. |
+
+The voice and speed use the existing `fetchTTS()` validation and error path.
+No option rewrites the submitted text. Overrides belong to the segments
+extracted in that invocation, including any text buffered by an earlier call.
+Options are not retained with an unfinished `end:false` remainder; a later
+call supplies its own options, and `finishTTS()` uses defaults. Use `end:true`
+for a complete passage. A call extracting no segments resolves
+`true` without waiting for earlier jobs; `finishTTS()` remains a preparation
+flush, not a queue-wide playback barrier. A muted call resolves `false`.
+
+Playback completion stays pending while the browser waits for an audio-unlock
+gesture or a recoverable resume attempt. If resuming a closed `AudioContext`
+fails, the affected jobs terminate and their playback results settle `false`.
+`stopAudio()` cancels all speech owned
+by this AI instance and settles pending playback promises `false`. A trailing
+pause delays the next queued audio; the preceding promise resolves when its
+last audio buffer ends, without waiting out that pause. Completion describes
+the playback lifecycle, not proof that a listener heard the sound. See the
+[complete-passage example](ai/browser-speech.md#queue-complete-passages-and-wait-for-playback).
+
+Streaming speech retains sentence
 segmentation by default. `configureTTSSegmentation({punctuation,wordCadence})`
 accepts `punctuation:'sentence'|'any'|'none'` and a `wordCadence` that is either
 `null` or a positive integer. `punctuation:'any'` completes a segment at a

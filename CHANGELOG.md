@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add optional `voice`, `speed`, `pauseAfterMs`, and `waitForPlayback` fields to
+  `AI.streamTTS(text, end, options)`. Complete passages can enter the existing
+  segmented generation queue immediately, retain their authored pauses on the
+  audio clock, and await their own playback completion. Existing calls still
+  return after preparation; stop and terminal failure settle playback waits
+  as `false`, while autoplay permission waiting remains pending.
 - Remove the superseded positional `AI.fetch(...)` and `AI.streamMessage(...)`
   methods and their unreachable private streaming modes. Use
   `AI.fetchRequest({messages, ...options})` and

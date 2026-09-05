@@ -5546,13 +5546,20 @@ class AI {
 
     streamTTS(
         text='',
-        end=false
+        end=false,
+        options={}
     ){
         if(this.muted){
             if(end){
                 this.audioMessageChunks='';
             }
             return Promise.resolve(false);
+        }
+
+        const {voice,speed,waitForPlayback=false}=options;
+        const pauseAfterMs=Number(options.pauseAfterMs??0);
+        if(!Number.isFinite(pauseAfterMs)||pauseAfterMs<0){
+            throw new RangeError('Speech pauses must be a nonnegative number of milliseconds.');
         }
 
         this.audioMessageChunks+=String(text||'');
@@ -5575,8 +5582,13 @@ class AI {
         const generation=this.speechGeneration;
         const jobs=[];
 
-        for(const output of outputs){
-            jobs.push(this.#queueSpeechJob(output,generation));
+        for(const [index,output] of outputs.entries()){
+            jobs.push(this.#queueSpeechJob(output,generation,{
+                voice,
+                speed,
+                waitForPlayback,
+                pauseAfterMs:index===outputs.length-1?pauseAfterMs:0
+            }));
         }
 
         return Promise.all(jobs).then(
@@ -5730,7 +5742,7 @@ class AI {
         return this.#speechAbbreviations.has(token);
     }
 
-    #queueSpeechJob(text,generation){
+    #queueSpeechJob(text,generation,options={}){
         const job={
             abortController:null,
             audioBuffer:null,
@@ -5740,13 +5752,22 @@ class AI {
             scheduledStart:null,
             sourceNode:null,
             state:'queued',
-            text
+            text,
+            voice:options.voice,
+            speed:options.speed,
+            pauseAfterMs:options.pauseAfterMs??0,
+            resolvePlayback:null
         };
         const runtime=this;
+        const playback=options.waitForPlayback===true
+            ?new Promise(function captureSpeechPlaybackCompletion(resolve){
+                job.resolvePlayback=resolve;
+            })
+            :null;
 
         this.speechJobs.push(job);
 
-        return Promise.resolve().then(
+        const preparation=Promise.resolve().then(
             function synthesizeAvailableSpeech(){
                 return runtime.#prepareSpeechJob(job);
             }
@@ -5759,6 +5780,7 @@ class AI {
                 );
             }
         );
+        return playback||preparation;
     }
 
     async #prepareSpeechJob(job){
@@ -5787,16 +5809,18 @@ class AI {
     async #requestSpeechAudio(job){
         job.abortController=new AbortController();
         const selection=this.#providerRuntime.selection('tts');
-        const voice=selection?this.#providerSpeechVoice():null;
+        const voice=job.voice===undefined
+            ?(selection?this.#providerSpeechVoice():null)
+            :job.voice;
         const response=await this.fetchTTS(
             {
                 model:selection?.modelId||this.modelTTS,
                 input:job.text,
-                ...(voice?{voice}:{}),
+                ...(job.voice!==undefined||voice?{voice}:{}),
                 responseFormat:selection
                     ?this.#providerSpeechResponseFormat()
                     :this.audioFormat,
-                speed:this.voiceSpeed
+                speed:job.speed===undefined?this.voiceSpeed:job.speed
             },
             job.abortController.signal
         );
@@ -6167,6 +6191,8 @@ class AI {
         for(const job of this.speechJobs){
             job.abortController?.abort();
             job.state='cancelled';
+            job.resolvePlayback?.(false);
+            job.resolvePlayback=null;
 
             if(job.sourceNode){
                 job.sourceNode.onended=null;
@@ -6242,6 +6268,22 @@ class AI {
 
             if(attempt===this.speechResumeAttempt){
                 this.speechResumePending=false;
+            }
+            if(context?.state==='closed'){
+                this.#clearSpeechUnlock();
+                const jobs=this.speechJobs.filter(function usesClosedSpeechContext(job){
+                    return job.audioContext===context;
+                });
+                if(!jobs.length){
+                    this.#publishTTSFailure(error,{
+                        boundary:'playback-resume',
+                        generation:this.speechGeneration
+                    });
+                }
+                for(const job of jobs){
+                    this.#failSpeechJob(job,error,'playback-resume');
+                }
+                return false;
             }
             this.#waitForSpeechGesture(error,context);
             if(error?.name!=='NotAllowedError'){
@@ -6416,7 +6458,7 @@ class AI {
                     job.state='scheduled';
                     job.scheduledStart=scheduledStart;
                     job.scheduledEnd=hasKnownDuration
-                        ?scheduledStart+duration
+                        ?scheduledStart+duration+(job.pauseAfterMs??0)/1000
                         :null;
                     job.sourceNode.__arcaneStarted=true;
                     if(!this.currentSpeechJob){
@@ -6479,6 +6521,11 @@ class AI {
             job.sourceNode.onended=null;
         }
 
+        if(job.scheduledEnd===null&&job.pauseAfterMs>0){
+            this.speechScheduleContext=job.audioContext;
+            this.speechScheduleTime=
+                (Number(job.audioContext?.currentTime)||0)+job.pauseAfterMs/1000;
+        }
         job.state='complete';
         this.#removeSpeechJob(job);
 
@@ -6600,6 +6647,8 @@ class AI {
     }
 
     #removeSpeechJob(job){
+        job.resolvePlayback?.(job.state==='complete');
+        job.resolvePlayback=null;
         const jobIndex=this.speechJobs.indexOf(job);
 
         if(jobIndex>=0){
