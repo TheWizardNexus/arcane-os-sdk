@@ -132,6 +132,9 @@
 <button id="muteButton" type="button" class="mute" aria-pressed="true" aria-label="Voice unavailable" disabled>Voice unavailable</button>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const {arcaneLogging}=await import('arcane-os/logging');
 
     const completeValue = (value) => value;
@@ -251,10 +254,10 @@
         let causeCode = '';
         let message = '';
         try {
-            causeCode = typeof error?.code === 'string'
+            causeCode = is.string(error?.code)
                 ? error.code
                 : '';
-            message = typeof error?.message === 'string'
+            message = is.string(error?.message)
                 ? error.message
                 : '';
         } catch {}
@@ -293,7 +296,7 @@
         return String(reason || 'stt-transcription-cancelled');
     }
 
-    const initialMutedWasHydrated = typeof host.initialMuted === 'boolean';
+    const initialMutedWasHydrated = is.boolean(host.initialMuted);
     host.initialMuted = initialMutedWasHydrated ? host.initialMuted : true;
     host.muted = true;
     host.configure = configure;
@@ -400,9 +403,9 @@
     }
 
     function selectedRole(role) {
-        return typeof role?.providerId === 'string'
+        return is.string(role?.providerId)
             && role.providerId.length > 0
-            && typeof role?.modelId === 'string'
+            && is.string(role?.modelId)
             && role.modelId.length > 0;
     }
 
@@ -411,7 +414,7 @@
             return host;
         }
         if (Object.prototype.hasOwnProperty.call(options, 'initialMuted')) {
-            const configuredMuted = typeof options.initialMuted === 'boolean'
+            const configuredMuted = is.boolean(options.initialMuted)
                 ? options.initialMuted
                 : true;
             host.initialMuted = configuredMuted;
@@ -445,7 +448,7 @@
         if (destroyed) {
             return host;
         }
-        if (typeof muted !== 'boolean') {
+        if (!is.boolean(muted)) {
             throw new TypeError('muted must be boolean');
         }
 
@@ -545,8 +548,8 @@
     function renderControls() {
         const transcriptionReady = sttRole.state === 'ready';
         const microphoneReady = host.availability.microphone
-            && typeof globalThis.MediaRecorder === 'function'
-            && typeof navigator.mediaDevices?.getUserMedia === 'function';
+            && is.function(globalThis.MediaRecorder)
+            && is.function(navigator.mediaDevices?.getUserMedia);
         const activationVisible = sttActivationController.visible;
         recordButton.hidden = activationVisible;
         recordButton.disabled = !transcriptionReady
@@ -611,9 +614,9 @@
     }
 
     function renderTTSControl() {
-        const providerSelected = typeof ttsRole.providerId === 'string'
+        const providerSelected = is.string(ttsRole.providerId)
             && ttsRole.providerId.length > 0
-            && typeof ttsRole.modelId === 'string'
+            && is.string(ttsRole.modelId)
             && ttsRole.modelId.length > 0;
         let disabled = destroyed;
         let label = host.muted ? 'Unmute' : 'Mute';
@@ -730,10 +733,10 @@
     function visibleErrorMessage(error, fallback) {
         try {
             if (error?.userSafe === true) {
-                const message = typeof error.userMessage === 'string'
+                const message = is.string(error.userMessage)
                     ? error.userMessage
                     : error.message;
-                if (typeof message === 'string' && message.trim()) {
+                if (is.string(message) && message.trim()) {
                     return message;
                 }
             }
@@ -912,9 +915,9 @@
         ) {
             return false;
         }
-        const providerSelected = typeof ttsRole.providerId === 'string'
+        const providerSelected = is.string(ttsRole.providerId)
             && ttsRole.providerId.length > 0
-            && typeof ttsRole.modelId === 'string'
+            && is.string(ttsRole.modelId)
             && ttsRole.modelId.length > 0;
         const canRequestLoad = ttsRole.state === 'ready'
             || (
@@ -995,7 +998,7 @@
             : action;
         let lifecycle;
         try {
-            if (typeof globalThis.ai?.setSpeechMuted === 'function') {
+            if (is.function(globalThis.ai?.setSpeechMuted)) {
                 lifecycle = globalThis.ai.setSpeechMuted(action === 'unload');
             } else {
                 lifecycle = requestAIRuntimeIntent(
@@ -1162,7 +1165,7 @@
 
     function resumeTTSPlayback() {
         const aiRuntime = globalThis.ai;
-        if (!aiRuntime || typeof aiRuntime.resumeAudio !== 'function') {
+        if (!aiRuntime || !is.function(aiRuntime.resumeAudio)) {
             return;
         }
 
@@ -1196,8 +1199,8 @@
             || sttRole.state !== 'ready'
             || sttRole.busy
             || !host.availability.microphone
-            || typeof globalThis.MediaRecorder !== 'function'
-            || typeof navigator.mediaDevices?.getUserMedia !== 'function'
+            || !is.function(globalThis.MediaRecorder)
+            || !is.function(navigator.mediaDevices?.getUserMedia)
             || recordingRequested
             || captureSession
             || transcriptionActive
@@ -1473,7 +1476,7 @@
                 );
                 return false;
             }
-            if (typeof aiRuntime?.fetchSTT !== 'function') {
+            if (!is.function(aiRuntime?.fetchSTT)) {
                 const error = new Error('The selected transcription service is unavailable.');
                 error.code = 'ARCANE_SPEECH_STT_RUNTIME_METHOD_UNAVAILABLE';
                 throw error;
@@ -1490,7 +1493,7 @@
             ) {
                 return false;
             }
-            if (typeof transcription !== 'string') {
+            if (!is.string(transcription)) {
                 throw new TypeError('The selected transcription service returned invalid text.');
             }
 

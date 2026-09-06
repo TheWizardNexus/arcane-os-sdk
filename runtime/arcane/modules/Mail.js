@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 import MailOutbox from './MailOutbox.mjs';
 import {
@@ -44,10 +47,10 @@ function codedError(message,code,ErrorType=Error){
 
 function validateMailSignal(signal){
     if(signal===null||signal===undefined) return null;
-    if(typeof signal!=='object'
-        ||typeof signal.aborted!=='boolean'
-        ||typeof signal.addEventListener!=='function'
-        ||typeof signal.removeEventListener!=='function'){
+    if(!is.object(signal)
+        ||!is.boolean(signal.aborted)
+        ||!is.function(signal.addEventListener)
+        ||!is.function(signal.removeEventListener)){
         throw new TypeError('Mail signal must be an AbortSignal');
     }
     return signal;
@@ -122,14 +125,14 @@ function waitForMailOperation(operation,signal){
 }
 
 function exactNativeMailResult(value){
-    if(!value||typeof value!=='object'||Array.isArray(value)
-        ||typeof value.requestId!=='string'
+    if(!value||!is.object(value)||is.array(value)
+        ||!is.string(value.requestId)
         ||!NATIVE_MAIL_REQUEST_ID_PATTERN.test(value.requestId)
         ||!Object.hasOwn(NATIVE_MAIL_RESPONSE_STATUS_CODES,value.status)
         ||value.statusCode!==NATIVE_MAIL_RESPONSE_STATUS_CODES[value.status]
-        ||typeof value.sent!=='boolean'
-        ||typeof value.partial!=='boolean'
-        ||typeof value.uncertain!=='boolean'
+        ||!is.boolean(value.sent)
+        ||!is.boolean(value.partial)
+        ||!is.boolean(value.uncertain)
         ||value.sent!==(value.status==='accepted')
         ||value.partial!==(value.status==='partially_accepted')
         ||value.uncertain!==(value.status==='delivery_uncertain')){
@@ -150,7 +153,7 @@ function normalizedNativeMailError(error){
     const retryable=uncertain||NATIVE_MAIL_RETRYABLE_ERROR_CODES.has(error?.code);
     if(!retryable) return error;
     const normalized=new Error(
-        typeof error?.message==='string'&&error.message
+        is.string(error?.message)&&error.message
             ?error.message
             :uncertain
                 ?'Native Arcane mail delivery has an uncertain outcome.'
@@ -162,7 +165,7 @@ function normalizedNativeMailError(error){
     normalized.retryable=true;
     normalized.uncertain=uncertain;
     const statusCode=Number(error?.statusCode??error?.status);
-    if(Number.isSafeInteger(statusCode)&&statusCode>=100&&statusCode<=599){
+    if(is.safeInteger(statusCode)&&statusCode>=100&&statusCode<=599){
         normalized.statusCode=statusCode;
     }
     return normalized;
@@ -178,7 +181,7 @@ async function loadRequiredMailStorage(){
         );
     }
     const storage=globalThis.dbopfs;
-    if(!storage||typeof storage!=='object'){
+    if(!storage||!is.object(storage)){
         throw codedError(
             'Mail outbox storage is unavailable.',
             'MAIL_OUTBOX_STORAGE_UNAVAILABLE'
@@ -245,17 +248,17 @@ export function resolveMailConfig(
     config=globalThis.arcane?.config?.mail||{},
     {document=globalThis.document,location=globalThis.location}={}
 ){
-    const supplied=config&&typeof config==='object'&&!Array.isArray(config)?config:{};
-    const appName=typeof supplied.appName==='string'&&supplied.appName.trim()
+    const supplied=config&&is.object(config)&&!is.array(config)?config:{};
+    const appName=is.string(supplied.appName)&&supplied.appName.trim()
         ? supplied.appName.trim()
         : declaredApplicationId(document);
     return completeResult({
         appName:ARCANE_APP_ID_PATTERN.test(appName) ? appName:'',
-        appKey:typeof supplied.appKey==='string' ? supplied.appKey:'',
-        endpoint:typeof supplied.endpoint==='string'&&supplied.endpoint.trim()
+        appKey:is.string(supplied.appKey) ? supplied.appKey:'',
+        endpoint:is.string(supplied.endpoint)&&supplied.endpoint.trim()
             ? supplied.endpoint.trim()
             : defaultMailEndpoint(location,supplied.baseDomain||declaredMailBaseDomain(document)),
-        requestTimeout:Number.isFinite(supplied.requestTimeout)
+        requestTimeout:is.finite(supplied.requestTimeout)
             ? supplied.requestTimeout
             : null,
     });
@@ -271,7 +274,7 @@ function escapeHtml(value){
 }
 
 function clonePayload(value){
-    if(typeof globalThis.structuredClone==='function'){
+    if(is.function(globalThis.structuredClone)){
         return globalThis.structuredClone(value);
     }
     return JSON.parse(JSON.stringify(value));
@@ -294,7 +297,7 @@ function serializePayload(value){
 let reportNonceSequence=0;
 
 function randomReportNonce(cryptoProvider){
-    if(typeof cryptoProvider?.randomUUID==='function'){
+    if(is.function(cryptoProvider?.randomUUID)){
         try{
             const value=cryptoProvider.randomUUID();
             if(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)){
@@ -311,12 +314,12 @@ function createReportKey(timestamp,cryptoProvider){
 }
 
 function normalizeRecipients(values){
-    if(!Array.isArray(values)){
+    if(!is.array(values)){
         throw new TypeError('Mail recipients must be an array');
     }
     const recipients=[];
     for(const value of values){
-        if(typeof value!=='string'){
+        if(!is.string(value)){
             throw new TypeError('Every mail recipient must be an email address');
         }
         const address=value.trim().toLowerCase();
@@ -331,17 +334,17 @@ function normalizeRecipients(values){
 function profileValue(user,key){
     try{
         const value=user?.[key];
-        return typeof value==='string'?value:'';
+        return is.string(value)?value:'';
     }catch{
         return '';
     }
 }
 
 function normalizedDeliveryResult(value){
-    if(!value||typeof value!=='object'||Array.isArray(value)) return value;
-    let status=typeof value.status==='string'?value.status:'';
+    if(!value||!is.object(value)||is.array(value)) return value;
+    let status=is.string(value.status)?value.status:'';
     if(!status&&value.sent===true) status='accepted';
-    let classification=typeof value.classification==='string'?value.classification:'';
+    let classification=is.string(value.classification)?value.classification:'';
     if(!classification){
         classification={
             accepted:'accepted',
@@ -352,9 +355,9 @@ function normalizedDeliveryResult(value){
         }[status]||'';
     }
     const retryAfterMilliseconds=Number(value.retryAfterMs);
-    const retryAfterSeconds=Number.isSafeInteger(value.retryAfterSeconds)
+    const retryAfterSeconds=is.safeInteger(value.retryAfterSeconds)
         ? value.retryAfterSeconds
-        : Number.isFinite(retryAfterMilliseconds)&&retryAfterMilliseconds>0
+        : is.finite(retryAfterMilliseconds)&&retryAfterMilliseconds>0
             ? Math.ceil(retryAfterMilliseconds/1000)
             : null;
     return {
@@ -390,7 +393,7 @@ function safeDrainDetail(summary){
 }
 
 function normalizeMailOptions(options){
-    if(!options||typeof options!=='object'||Array.isArray(options)){
+    if(!options||!is.object(options)||is.array(options)){
         throw new TypeError('Mail options must be an object');
     }
     const deliver=options.deliver;
@@ -399,29 +402,29 @@ function normalizeMailOptions(options){
         return globalThis.navigator?.onLine!==false;
     };
     const onlineTarget=options.onlineTarget===undefined
-        ?typeof globalThis.addEventListener==='function'?globalThis:null
+        ?is.function(globalThis.addEventListener)?globalThis:null
         :options.onlineTarget;
     const includeContext=options.includeContext??false;
     const cryptoProvider=Object.hasOwn(options,'crypto')
         ?options.crypto
         :globalThis.crypto;
-    if(deliver!==undefined&&typeof deliver!=='function'){
+    if(deliver!==undefined&&!is.function(deliver)){
         throw new TypeError('Mail deliver must be a function');
     }
-    if(typeof clock!=='function'||typeof isOnline!=='function'){
+    if(!is.function(clock)||!is.function(isOnline)){
         throw new TypeError('Mail clock and isOnline hooks must be functions');
     }
     if(onlineTarget!==null&&(
-        typeof onlineTarget?.addEventListener!=='function'
-        ||typeof onlineTarget?.removeEventListener!=='function'
+        !is.function(onlineTarget?.addEventListener)
+        ||!is.function(onlineTarget?.removeEventListener)
     )){
         throw new TypeError('Mail onlineTarget must be an EventTarget');
     }
-    if(typeof includeContext!=='boolean'){
+    if(!is.boolean(includeContext)){
         throw new TypeError('Mail includeContext must be boolean');
     }
     if(cryptoProvider!==null&&cryptoProvider!==undefined
-        &&typeof cryptoProvider!=='object'){
+        &&!is.object(cryptoProvider)){
         throw new TypeError('Mail crypto must be a Web Crypto provider');
     }
     return {
@@ -533,7 +536,7 @@ class Mail {
 
     #assertConfigured(){
         const hasTransport=this.#deliver!==undefined
-            ||typeof globalThis.Arcane?.mail?.send==='function'
+            ||is.function(globalThis.Arcane?.mail?.send)
             ||Boolean(this.endpoint);
         if(!this.appName||!hasTransport){
             throw codedError('Mail transport is not configured.','MAIL_NOT_CONFIGURED');
@@ -550,8 +553,8 @@ class Mail {
     #time(){
         const value=this.#clock();
         const milliseconds=value instanceof Date?value.getTime():Number(value);
-        if(!Number.isSafeInteger(milliseconds)||milliseconds<0
-            ||Number.isNaN(new Date(milliseconds).getTime())){
+        if(!is.safeInteger(milliseconds)||milliseconds<0
+            ||is.NaN(new Date(milliseconds).getTime())){
             throw codedError('Mail clock returned an invalid time.','MAIL_CLOCK_INVALID');
         }
         return milliseconds;
@@ -811,20 +814,20 @@ class Mail {
 
     async send(to=[], subject='', payload={}, messageStyle='', messageType='') {
         this.#assertActive();
-        if(typeof subject!=='string'){
+        if(!is.string(subject)){
             throw new TypeError('Mail subject must be a string');
         }
         const normalizedSubject=subject;
-        if(!payload||typeof payload!=='object'||Array.isArray(payload)){
+        if(!payload||!is.object(payload)||is.array(payload)){
             throw new TypeError('Mail payload must be an object');
         }
-        if(typeof messageStyle!=='string'){
+        if(!is.string(messageStyle)){
             throw new TypeError('Mail message style must be a string');
         }
-        if(!Array.isArray(to)){
+        if(!is.array(to)){
             throw new TypeError('Mail recipients must be an array');
         }
-        if(typeof messageType!=='string'||!MAIL_TYPES.has(messageType)){
+        if(!is.string(messageType)||!MAIL_TYPES.has(messageType)){
             throw new TypeError('Mail type must be error, report, or crisis_detected');
         }
 

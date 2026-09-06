@@ -161,6 +161,9 @@
 </section>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const host=this;
     const {default:loadChartLibrary}=await import('../modules/ChartLibrary.js');
     const {
@@ -245,7 +248,7 @@
         {signal:lifecycleController.signal}
     );
 
-    const resizeObserver=typeof ResizeObserver==='function'
+    const resizeObserver=is.function(globalThis.ResizeObserver)
         ?new ResizeObserver(scheduleResize)
         :null;
     resizeObserver?.observe(host);
@@ -447,7 +450,7 @@
             hooks:{
                 setCursor:[
                     instance=>{
-                        if(Number.isInteger(instance.cursor.idx)){
+                        if(is.integer(instance.cursor.idx)){
                             selectedIndex=instance.cursor.idx;
                             updateSelectedValue(selectedIndex,'hover');
                         }
@@ -455,7 +458,7 @@
                 ]
             }
         };
-        const supplied=typeof options.chartOptions==='function'
+        const supplied=is.function(options.chartOptions)
             ?options.chartOptions({
                 defaults:defaultOptions,
                 options:getOptions(),
@@ -463,7 +466,7 @@
             })
             :options.chartOptions;
         if(supplied!==null&&supplied!==undefined&&(
-            !supplied||typeof supplied!=='object'||Array.isArray(supplied)
+            !supplied||!is.object(supplied)||is.array(supplied)
         )){
             throw new TypeError('chartOptions must resolve to an object or null');
         }
@@ -504,7 +507,7 @@
             ...(supplied.cursor?.points||{})
         };
         merged.scales={...defaults.scales,...(supplied.scales||{})};
-        if(Array.isArray(supplied.series)){
+        if(is.array(supplied.series)){
             merged.series=defaults.series.map(
                 (series,index)=>({...series,...(supplied.series[index]||{})})
             );
@@ -513,8 +516,8 @@
         for(const [name,callbacks] of Object.entries(supplied.hooks||{})){
             merged.hooks[name]=[
                 ...(defaults.hooks[name]||[]),
-                ...(Array.isArray(callbacks)?callbacks:[callbacks])
-            ].filter(callback=>typeof callback==='function');
+                ...(is.array(callbacks)?callbacks:[callbacks])
+            ].filter(callback=>is.function(callback));
         }
         return merged;
     }
@@ -566,7 +569,7 @@
 
         chartValue.dataset.state=state;
         valueContext.innerText=contexts[state]||contexts.selected;
-        if(options.time&&Number.isFinite(new Date(row[0]).getTime())){
+        if(options.time&&is.finite(new Date(row[0]).getTime())){
             valueDate.dateTime=new Date(row[0]).toISOString();
         }else{
             valueDate.removeAttribute('datetime');
@@ -588,13 +591,13 @@
             return `${value}`;
         }
         const date=new Date(value);
-        return Number.isFinite(date.getTime())?date.toLocaleString():`${value}`;
+        return is.finite(date.getTime())?date.toLocaleString():`${value}`;
     }
 
     function formatValue(value=0){
         const formatted=options.formatValue
             ?`${options.formatValue(value)}`
-            :Number.isInteger(value)
+            :is.integer(value)
                 ?`${value}`
                 :value.toFixed(2).replace(/0+$/,'').replace(/\.$/,'');
         return options.unit?`${formatted} ${options.unit}`:formatted;
@@ -623,10 +626,10 @@
         return {
             ...options,
             labels:{...options.labels},
-            chartOptions:typeof options.chartOptions==='object'&&options.chartOptions!==null
+            chartOptions:is.object(options.chartOptions)&&options.chartOptions!==null
                 ?{...options.chartOptions}
                 :options.chartOptions,
-            data:Array.isArray(options.data)?options.data.slice():options.data
+            data:is.array(options.data)?options.data.slice():options.data
         };
     }
 

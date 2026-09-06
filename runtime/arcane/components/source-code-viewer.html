@@ -177,6 +177,9 @@
 </section>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const host=this;
     host.ready=false;
     const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
@@ -244,7 +247,7 @@
 
     function normalizedText(value,label,{optional=false}={}){
         if(optional&&(value===undefined||value===null||value===''))return '';
-        if(typeof value!=='string'||!value.trim()||/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(value)){
+        if(!is.string(value)||!value.trim()||/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(value)){
             throw new TypeError(`${label} must be text.`);
         }
         return value.trim();
@@ -266,11 +269,11 @@
     }
 
     function normalizeOptions(input={},previous=defaultOptions){
-        if(!input||typeof input!=='object'||Array.isArray(input)){
+        if(!input||!is.object(input)||is.array(input)){
             throw new TypeError('Source viewer options must be an object.');
         }
         const labelInput=input.labels===undefined?{}:input.labels;
-        if(!labelInput||typeof labelInput!=='object'||Array.isArray(labelInput)){
+        if(!labelInput||!is.object(labelInput)||is.array(labelInput)){
             throw new TypeError('Source viewer labels must be an object.');
         }
         const labels={...previous.labels};
@@ -283,7 +286,7 @@
     }
 
     function normalizeRenderOptions(input={}){
-        if(!input||typeof input!=='object'||Array.isArray(input)){
+        if(!input||!is.object(input)||is.array(input)){
             throw new TypeError('Source render options must be an object.');
         }
         return {
@@ -306,10 +309,10 @@
         const sequence=++loadSequence;
         transition('loading');
         try{
-            const pending=typeof source==='function'?source():source;
+            const pending=is.function(source)?source():source;
             const result=await pending;
             if(destroyed||sequence!==loadSequence)return false;
-            if(result&&typeof result==='object'&&!Array.isArray(result)){
+            if(result&&is.object(result)&&!is.array(result)){
                 return renderSource(result.text??result.value??'',{
                     ...renderOptions,
                     ...result
@@ -334,7 +337,7 @@
     }
 
     function renderSource(text='',renderOptions={}){
-        if(typeof text!=='string')throw new TypeError('Source content must be a string.');
+        if(!is.string(text))throw new TypeError('Source content must be a string.');
         const metadata=normalizeRenderOptions(renderOptions);
         const lines=text.replace(/\r\n?/g,'\n').split('\n');
 
@@ -398,7 +401,7 @@
 
     function focusLine(value){
         const line=Number(value);
-        if(!Number.isInteger(line)||line<1||line>current.lineCount)return false;
+        if(!is.integer(line)||line<1||line>current.lineCount)return false;
         const target=sourceLines.querySelector(`[data-line="${line}"]`);
         if(!target)return false;
         target.focus({preventScroll:true});
@@ -433,7 +436,7 @@
             state:`source-code-viewer-${state}`,
             reason,
             ...(state==='error'?{
-                code:typeof error?.code==='string'
+                code:is.string(error?.code)
                     ?error.code
                     :'ARCANE_SOURCE_CODE_VIEWER_RENDER_REJECTED'
             }:{})

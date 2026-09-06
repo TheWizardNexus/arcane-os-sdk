@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 import TerminalSession from '../entities/TerminalSession.js';
 
@@ -47,17 +50,17 @@ function terminalEventReason(type){
 
 function terminalPublicDetail(detail,type,reason){
     const id=detail?.session?.id??detail?.sessionId;
-    const output=typeof detail?.data==='string'?detail.data:'';
+    const output=is.string(detail?.data)?detail.data:'';
     const code=type==='error'
-        ?typeof detail?.code==='string'&&detail.code
+        ?is.string(detail?.code)&&detail.code
             ?detail.code
             :TERMINAL_CLIENT_ERROR_CODES.sessionHostError
         :null;
     return {
-        ...(typeof id==='string'&&id?{id}:{}),
-        ...(typeof detail?.stream==='string'?{stream:detail.stream}:{}),
-        ...(typeof detail?.data==='string'?{data:output}:{}),
-        ...(typeof detail?.session?.state==='string'?{status:detail.session.state}:{}),
+        ...(is.string(id)&&id?{id}:{}),
+        ...(is.string(detail?.stream)?{stream:detail.stream}:{}),
+        ...(is.string(detail?.data)?{data:output}:{}),
+        ...(is.string(detail?.session?.state)?{status:detail.session.state}:{}),
         ...(code?{code}:{}),
         reason
     };
@@ -93,8 +96,8 @@ export default class TerminalClient extends EventTarget{
                         type,
                         receiveTerminalHostEvent
                     );
-                    if(typeof unsubscribe!=='function'
-                        &&typeof unsubscribe?.dispose!=='function'){
+                    if(!is.function(unsubscribe)
+                        &&!is.function(unsubscribe?.dispose)){
                         throw terminalClientError(
                             TERMINAL_CLIENT_ERROR_CODES.hostEventSubscriptionInvalid,
                             TERMINAL_CLIENT_REASONS.hostEventSubscriptionInvalid,
@@ -144,7 +147,7 @@ export default class TerminalClient extends EventTarget{
 
     #assertCapability(method){
         this.#assertOpen();
-        if(typeof this.api?.[method]!=='function'){
+        if(!is.function(this.api?.[method])){
             throw terminalClientError(
                 TERMINAL_CLIENT_ERROR_CODES.capabilityUnavailable,
                 TERMINAL_CLIENT_REASONS.capabilityUnavailable,
@@ -163,7 +166,7 @@ export default class TerminalClient extends EventTarget{
         let firstError=null;
         for(const subscription of this.unsubscribe){
             try{
-                if(typeof subscription==='function')subscription();
+                if(is.function(subscription))subscription();
                 else subscription.dispose();
             }catch(error){
                 firstError??=error;
@@ -179,7 +182,7 @@ export default class TerminalClient extends EventTarget{
         const result=await this.api.start(options);
         if(this.#destroyed||generation!==this.#generation){
             let cleanupError=null;
-            if(typeof result?.id==='string'&&typeof this.api?.close==='function'){
+            if(is.string(result?.id)&&is.function(this.api?.close)){
                 try{
                     await this.api.close(result.id);
                 }catch(error){

@@ -1,3 +1,7 @@
+import Is from 'strong-type';
+
+const is = new Is(false);
+
 export const DOM_INTERACTION_EVENT='arcane.dom.interaction';
 export const DOM_MUTATION_EVENT='arcane.dom.mutation';
 export const DOM_OBSERVATION_STARTED_EVENT='arcane.dom.observation.started';
@@ -25,13 +29,13 @@ function capturedString(value){
 }
 
 function cssEscape(value){
-    if(typeof globalThis.CSS?.escape==='function')return globalThis.CSS.escape(value);
+    if(is.function(globalThis.CSS?.escape))return globalThis.CSS.escape(value);
     return String(value).replaceAll(/[^a-zA-Z0-9_-]/gu,character=>`\\${character.codePointAt(0).toString(16)} `);
 }
 
 function readAttribute(target,name){
     try{
-        return typeof target?.getAttribute==='function'?target.getAttribute(name):null;
+        return is.function(target?.getAttribute)?target.getAttribute(name):null;
     }catch{
         return null;
     }
@@ -67,7 +71,7 @@ function selectorSegment(target){
 }
 
 export function domSelector(target,root){
-    if(!target||typeof target!=='object')return null;
+    if(!target||!is.object(target))return null;
     if(target.nodeType===9)return ':document';
     if(target.nodeType===11)return ':shadow-root';
     if(target.nodeType===3)return domSelector(target.parentElement??target.parentNode,root);
@@ -111,7 +115,7 @@ export function domSelector(target,root){
 }
 
 export function describeDOMTarget(target,root){
-    if(!target||typeof target!=='object')return null;
+    if(!target||!is.object(target))return null;
     if(target.nodeType===9){
         return {kind:'document',selector:':document'};
     }
@@ -145,7 +149,7 @@ export function describeDOMTarget(target,root){
 }
 
 function targetValue(target){
-    if(!target||typeof target!=='object')return undefined;
+    if(!target||!is.object(target))return undefined;
     const type=String(target.type??'').toLowerCase();
     if(type==='checkbox'||type==='radio')return Boolean(target.checked);
     if(type==='file'){
@@ -156,24 +160,24 @@ function targetValue(target){
 }
 
 function safeEventDetail(value){
-    if(typeof value==='string')return capturedString(value);
-    if(value===null||typeof value==='number'||typeof value==='boolean')return value;
+    if(is.string(value))return capturedString(value);
+    if(value===null||is.number(value)||is.boolean(value))return value;
     return value;
 }
 
 function interactionRecord(event,root){
-    const path=typeof event?.composedPath==='function'?event.composedPath():[event?.target];
-    const target=path.find(item=>item&&typeof item==='object')??event?.target??null;
+    const path=is.function(event?.composedPath)?event.composedPath():[event?.target];
+    const target=path.find(item=>item&&is.object(item))??event?.target??null;
     const eventType=String(event?.type??'');
     const details={};
     const fields=new Set([
         ...EVENT_FIELDS,
-        ...Reflect.ownKeys(event??{}).filter(field=>typeof field==='string')
+        ...Reflect.ownKeys(event??{}).filter(field=>is.string(field))
     ]);
     for(const field of fields){
         let value;
         try{value=event?.[field];}catch{continue;}
-        if(value!==undefined&&typeof value!=='function'){
+        if(value!==undefined&&!is.function(value)){
             details[field]=safeEventDetail(value);
         }
     }
@@ -254,7 +258,7 @@ function collectOpenShadowRoots(root){
     const roots=[];
     const candidates=[];
     try{
-        if(typeof root?.querySelectorAll==='function')candidates.push(...root.querySelectorAll('*'));
+        if(is.function(root?.querySelectorAll))candidates.push(...root.querySelectorAll('*'));
     }catch{}
     for(const candidate of candidates){
         if(candidate?.shadowRoot)roots.push(candidate.shadowRoot,...collectOpenShadowRoots(candidate.shadowRoot));
@@ -270,18 +274,18 @@ export function createDOMInstrumentation({
     captureMutations=true,
     observeOpenShadowRoots=true
 }={}){
-    if(!eventManager||typeof eventManager.emit!=='function'){
+    if(!eventManager||!is.function(eventManager.emit)){
         throw new TypeError('DOM instrumentation requires an event manager.');
     }
-    if(!root||typeof root.addEventListener!=='function'||typeof root.removeEventListener!=='function'){
+    if(!root||!is.function(root.addEventListener)||!is.function(root.removeEventListener)){
         throw new TypeError('DOM instrumentation requires an EventTarget-compatible root.');
     }
-    if(!Array.isArray(eventTypes)||eventTypes.some(type=>typeof type!=='string'||!type)){
+    if(!is.array(eventTypes)||eventTypes.some(type=>!is.string(type)||!type)){
         throw new TypeError('DOM event types must be non-empty strings.');
     }
     eventTypes=[...new Set(eventTypes)];
     for(const [name,value] of Object.entries({captureMutations,observeOpenShadowRoots})){
-        if(typeof value!=='boolean')throw new TypeError(`${name} must be boolean.`);
+        if(!is.boolean(value))throw new TypeError(`${name} must be boolean.`);
     }
     const observedRoots=new Set();
     const listenerRegistrations=new Map();
@@ -351,7 +355,7 @@ export function createDOMInstrumentation({
 
     const publish=(type,payload,metadata)=>{
         const before=Number(eventManager.eventCount??0);
-        if(typeof eventManager.instrument==='function'){
+        if(is.function(eventManager.instrument)){
             eventManager.instrument(type,payload,{source:'dom',...metadata});
         }else{
             eventManager.emit(type,payload);
@@ -365,7 +369,7 @@ export function createDOMInstrumentation({
     const interaction=(event,observedRoot)=>{
         let path=[];
         try{
-            if(typeof event?.composedPath==='function')path=event.composedPath();
+            if(is.function(event?.composedPath))path=event.composedPath();
         }catch{}
         const outermostObservedRoot=path.reduce(
             (selected,item)=>observedRoots.has(item)?item:selected,
@@ -446,7 +450,7 @@ export function createDOMInstrumentation({
         if(active)return api;
         try{
             if(captureMutations){
-                if(typeof MutationObserverImpl!=='function'){
+                if(!is.function(MutationObserverImpl)){
                     throw new TypeError('MutationObserver is required when DOM mutation capture is enabled.');
                 }
                 observer=new MutationObserverImpl(mutations);
@@ -473,7 +477,7 @@ export function createDOMInstrumentation({
     }
 
     function stop({emitLifecycle=true}={}){
-        if(typeof emitLifecycle!=='boolean')throw new TypeError('emitLifecycle must be boolean.');
+        if(!is.boolean(emitLifecycle))throw new TypeError('emitLifecycle must be boolean.');
         if(!active)return api;
         const shouldEmitLifecycle=emitLifecycle&&lifecycleStarted;
         if(!emitLifecycle)lifecycleStarted=false;

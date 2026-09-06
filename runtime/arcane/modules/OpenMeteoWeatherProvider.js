@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 import ApiModelDatabase from './ApiModelDatabase.js';
 import {WeatherDay,WeatherLocation,WeatherObservation,WeatherSnapshot} from '../entities/Weather.js';
@@ -41,18 +44,18 @@ function signalLike(value){
     return value===undefined
         ||value===null
         ||(
-            typeof value==='object'
-            &&typeof value.aborted==='boolean'
-            &&typeof value.addEventListener==='function'
-            &&typeof value.removeEventListener==='function'
+            is.object(value)
+            &&is.boolean(value.aborted)
+            &&is.function(value.addEventListener)
+            &&is.function(value.removeEventListener)
         );
 }
 
 function defineWeatherError(error,contract,message){
-    const candidate=error&&(typeof error==='object'||typeof error==='function')
+    const candidate=error&&(is.object(error)||is.function(error))
         ?error
-        :new Error(typeof error==='string'&&error.trim()?error:message);
-    const priorCode=typeof candidate.code==='string'&&candidate.code?candidate.code:null;
+        :new Error(is.string(error)&&error.trim()?error:message);
+    const priorCode=is.string(candidate.code)&&candidate.code?candidate.code:null;
     try{
         if(priorCode&&priorCode!==contract.code&&!Object.hasOwn(candidate,'providerCode')){
             Object.defineProperty(candidate,'providerCode',{configurable:true,enumerable:false,value:priorCode,writable:true});
@@ -65,7 +68,7 @@ function defineWeatherError(error,contract,message){
         return candidate;
     }catch{
         const replacement=new Error(
-            typeof candidate.message==='string'&&candidate.message.trim()?candidate.message:message
+            is.string(candidate.message)&&candidate.message.trim()?candidate.message:message
         );
         replacement.code=contract.code;
         replacement.reason=contract.reason;
@@ -111,7 +114,7 @@ function normalizedOperationError(error,record){
 
 function operationOptions(value){
     if(value===undefined)return {signal:null};
-    if(!value||typeof value!=='object'||Array.isArray(value)){
+    if(!value||!is.object(value)||is.array(value)){
         throw invalidOptionsError('Open-Meteo operation options must be an object.');
     }
     if(!signalLike(value.signal)){
@@ -207,7 +210,7 @@ export default class OpenMeteoWeatherProvider extends EventTarget{
     }
 
     #releaseSignal(record){
-        if(!Array.isArray(record.cleanup))return;
+        if(!is.array(record.cleanup))return;
         for(const remove of record.cleanup.splice(0))remove();
     }
 
@@ -295,7 +298,7 @@ export default class OpenMeteoWeatherProvider extends EventTarget{
     #forwardRequest(kind,event){
         if(this.#disposed||this.#events.disposed)return;
         const operationId=event?.operationId??event?.detail?.requestId;
-        if(typeof operationId!=='string'||!operationId)return;
+        if(!is.string(operationId)||!operationId)return;
         const record=this.#operations.get(operationId);
         this.#dispatch(
             'request',
@@ -307,7 +310,7 @@ export default class OpenMeteoWeatherProvider extends EventTarget{
     #forwardError(kind,event){
         if(this.#disposed||this.#events.disposed)return;
         const operationId=event?.operationId??event?.detail?.requestId;
-        if(typeof operationId!=='string'||!operationId)return;
+        if(!is.string(operationId)||!operationId)return;
         const record=this.#operations.get(operationId);
         if(record){
             if(record.errorPublished)return;
@@ -394,7 +397,7 @@ export default class OpenMeteoWeatherProvider extends EventTarget{
             precipitationUnit='inch',
             forecastDays
         }=options;
-        if(forecastDays!==undefined&&(!Number.isSafeInteger(forecastDays)||forecastDays<=0)){
+        if(forecastDays!==undefined&&(!is.safeInteger(forecastDays)||forecastDays<=0)){
             throw invalidOptionsError('Open-Meteo forecastDays must be a positive integer when provided.');
         }
         const record=this.#startOperation('forecast-load',options.signal??null);
@@ -458,8 +461,8 @@ export default class OpenMeteoWeatherProvider extends EventTarget{
                 'The weather event type is invalid.'
             );
         }
-        const operationId=(typeof detail?.operationId==='string'&&detail.operationId)
-            ||(typeof detail?.requestId==='string'&&detail.requestId)
+        const operationId=(is.string(detail?.operationId)&&detail.operationId)
+            ||(is.string(detail?.requestId)&&detail.requestId)
             ||`${this.#events.instanceId}:emit:${(++this.#operationSequence).toString(36)}`;
         this.#dispatch(type,detail,operationId);
     }

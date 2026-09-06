@@ -1,6 +1,6 @@
 import { arcaneLogging } from 'arcane-os/logging';
 import { marked } from './Marked.min.js';
-import Is from '../../node_modules/strong-type/index.js';
+import Is from 'strong-type';
 
 marked.use(
     {

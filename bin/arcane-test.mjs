@@ -1,10 +1,13 @@
 #!/usr/bin/env node
+import Is from 'strong-type';
 import {spawn} from 'node:child_process';
 import {lstat,readdir,realpath} from 'node:fs/promises';
 import {register} from 'node:module';
 import path from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import test,{DEFAULT_TEST_TIMEOUT_MS,runRegisteredTests} from '../src/testing.mjs';
+
+const is = new Is(false);
 
 const SINGLE_FILE_ARGUMENT='--arcane-single-test-file';
 const RUNNER_PATH=fileURLToPath(import.meta.url);
@@ -27,7 +30,7 @@ const COORDINATOR_MANAGED_IMPORT_MAP=!ISOLATED_MODE
     &&MANAGED_IMPORT_MAP_SOURCE!==''
     ?MANAGED_IMPORT_MAP_SOURCE
     :undefined;
-const ISOLATED_SEND=ISOLATED_MODE&&typeof process.send==='function'
+const ISOLATED_SEND=ISOLATED_MODE&&is.function(process.send)
     ?process.send.bind(process)
     :null;
 delete process.env[MANAGED_IMPORT_MAP_ENV];
@@ -55,12 +58,12 @@ async function readManagedImportMapContext(source,signal,testFile){
     let context;
     try{context=JSON.parse(source);}
     catch(error){importMapFailure(`Managed import-map context is not valid JSON: ${error.message}`);}
-    if(context===null||typeof context!=='object'||Array.isArray(context)
+    if(context===null||!is.object(context)||is.array(context)
         ||context.protocol!==MANAGED_IMPORT_MAP_PROTOCOL
         ||!APPLICATION_MAP_BOUNDARIES.has(context.boundary)
-        ||typeof context.baseURL!=='string'
-        ||context.imports===null||typeof context.imports!=='object'
-        ||Array.isArray(context.imports)){
+        ||!is.string(context.baseURL)
+        ||context.imports===null||!is.object(context.imports)
+        ||is.array(context.imports)){
         importMapFailure('Managed import-map context is malformed.');
     }
     let suppliedBase;
@@ -281,8 +284,8 @@ function parseTaskkillTargets(output,leaderPid){
         const target=Number(matches[0][1]);
         const parent=matches.length===2?Number(matches[1][1]):null;
         if(
-            !Number.isSafeInteger(target)||target<=0
-            ||(parent!==null&&(!Number.isSafeInteger(parent)||parent<=0))
+            !is.safeInteger(target)||target<=0
+            ||(parent!==null&&(!is.safeInteger(parent)||parent<=0))
             ||/\d/u.test(line.replaceAll(/\bPID\s+\d+\b/giu,'PID'))
         )return null;
         entries.push({target,parent});
@@ -592,21 +595,21 @@ function runIsolatedFile(file,signal){
         const onMessage=message=>{
             if(
                 message?.protocol!==IPC_PROTOCOL
-                ||typeof message.type!=='string'
+                ||!is.string(message.type)
             )return;
             if(message.type==='phase'){
                 if(
                     completion!==null
                     ||watchdogFailure!==null
-                    ||typeof message.id!=='string'
+                    ||!is.string(message.id)
                     ||message.id===''
                 )return;
                 if(message.status==='started'){
                     if(
-                        typeof message.kind!=='string'
-                        ||typeof message.name!=='string'
+                        !is.string(message.kind)
+                        ||!is.string(message.name)
                         ||(message.timeoutMs!==null&&(
-                            !Number.isSafeInteger(message.timeoutMs)
+                            !is.safeInteger(message.timeoutMs)
                             ||message.timeoutMs<1
                             ||message.timeoutMs>3_600_000
                         ))
@@ -796,7 +799,7 @@ async function main(){
             ||message?.type!=='abort'
         )return;
         const error=new Error(
-            typeof message.reason==='string'?message.reason:'The coordinator cancelled the test file.'
+            is.string(message.reason)?message.reason:'The coordinator cancelled the test file.'
         );
         error.code='ARCANE_TEST_CANCELLED';
         controller.abort(error);

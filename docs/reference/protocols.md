@@ -66,7 +66,7 @@ portable subpaths that resolve directly to canonical runtime-module namespaces
 from both Node package exports and managed browser keys;
 `arcane/PreferenceStore` and `arcane/SpeechPlayback` remain their established
 browser import-map names. The additional portable `arcane-os/speech-text`
-subpath owns shared dependency-free speech-input cleanup and has the same
+subpath owns shared speech-input cleanup and has the same
 managed browser key. There is
 no exported `importMapApplication()` function, `generateImportMap()` function, or
 `arcane-os/import-map` package subpath.

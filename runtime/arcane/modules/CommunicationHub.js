@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 import CommunicationMessage from '../entities/CommunicationMessage.js';
 import CommunicationThread from '../entities/CommunicationThread.js';
@@ -90,17 +93,17 @@ function refreshFailureError(error){
 
 function isAbortSignal(value){
     return Boolean(value)
-        &&typeof value==='object'
-        &&typeof value.aborted==='boolean'
-        &&typeof value.addEventListener==='function'
-        &&typeof value.removeEventListener==='function';
+        &&is.object(value)
+        &&is.boolean(value.aborted)
+        &&is.function(value.addEventListener)
+        &&is.function(value.removeEventListener);
 }
 
 function normalizeRefreshOptions(value){
     if(value===undefined){
         return {signal:null};
     }
-    if(!value||typeof value!=='object'||Array.isArray(value)){
+    if(!value||!is.object(value)||is.array(value)){
         throw codedError(
             'Communication refresh options must be a plain record.',
             communicationHubErrorCodes.refreshOptionsInvalid,
@@ -119,7 +122,7 @@ function normalizeRefreshOptions(value){
 }
 
 function normalizeProviderThreads(provider,values){
-    if(!Array.isArray(values)){
+    if(!is.array(values)){
         throw new TypeError(`Communication provider ${provider.id} must return a thread array.`);
     }
     return values.map(function normalizeProviderThread(value){

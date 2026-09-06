@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const RAW_ID=/^[A-Za-z0-9_-]+$/;
 export function parseYouTubeMedia(value){
     const raw=String(value||'').trim();if(!raw)throw new TypeError('Enter a YouTube video or playlist URL.');let url;
@@ -14,4 +17,4 @@ export function parseYouTubeMedia(value){
     if(playlist)return {type:'playlist',id:playlist};
     throw new TypeError('The address does not contain a supported video or playlist id.');
 }
-export function youtubeEmbedUrl(locator,{privacyEnhanced=false}={}){const item=typeof locator==='string'?parseYouTubeMedia(locator):locator;const origin=privacyEnhanced?'https://www.youtube-nocookie.com':'https://www.youtube.com';if(item.type==='playlist')return `${origin}/embed?listType=playlist&list=${encodeURIComponent(item.id)}`;const url=new URL(`${origin}/embed/${encodeURIComponent(item.id)}`);if(item.playlist)url.searchParams.set('list',item.playlist);url.searchParams.set('playsinline','1');return url.href;}
+export function youtubeEmbedUrl(locator,{privacyEnhanced=false}={}){const item=is.string(locator)?parseYouTubeMedia(locator):locator;const origin=privacyEnhanced?'https://www.youtube-nocookie.com':'https://www.youtube.com';if(item.type==='playlist')return `${origin}/embed?listType=playlist&list=${encodeURIComponent(item.id)}`;const url=new URL(`${origin}/embed/${encodeURIComponent(item.id)}`);if(item.playlist)url.searchParams.set('list',item.playlist);url.searchParams.set('playsinline','1');return url.href;}

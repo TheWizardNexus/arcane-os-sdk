@@ -1,3 +1,4 @@
+import Is from 'strong-type';
 import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
 import {
     deleteMailCredential,
@@ -6,6 +7,8 @@ import {
     setMailCredential
 } from './mail-credentials.mjs';
 import {sendResendMail,startResendMailServer} from './mail-server.mjs';
+
+const is = new Is(false);
 
 export const MAIL_COMMAND_ACTIONS=[
     'key-set',
@@ -22,10 +25,10 @@ function usage(message){
 }
 
 function validateOptions(options){
-    if(!options||typeof options!=='object'||Array.isArray(options)){
+    if(!options||!is.object(options)||is.array(options)){
         usage('Mail command options must be an object.');
     }
-    if(typeof options.action!=='string'||!ACTION_SET.has(options.action)){
+    if(!is.string(options.action)||!ACTION_SET.has(options.action)){
         usage(`Mail action must be one of: ${MAIL_COMMAND_ACTIONS.join(', ')}.`);
     }
     return options;
@@ -33,26 +36,26 @@ function validateOptions(options){
 
 function dependency(options,name,fallback){
     const value=options[name]??fallback;
-    if(typeof value!=='function'){
+    if(!is.function(value)){
         usage(`${name} must be a function when supplied.`);
     }
     return value;
 }
 
 function recipientList(value,label){
-    if(value===undefined||value===null||value===''||(Array.isArray(value)&&value.length===0)){
+    if(value===undefined||value===null||value===''||(is.array(value)&&value.length===0)){
         return [];
     }
-    const entries=Array.isArray(value)
+    const entries=is.array(value)
         ? value
-        : typeof value==='string'
+        : is.string(value)
             ? value.split(',')
             : null;
     if(!entries||entries.length===0){
         usage(`${label} must contain at least one email address when supplied.`);
     }
     const result=entries.map(function normalizeMailRecipient(entry){
-        if(typeof entry!=='string'||!entry.trim()){
+        if(!is.string(entry)||!entry.trim()){
             usage(`${label} contains an empty email address.`);
         }
         return entry.trim();
@@ -66,9 +69,9 @@ function recipientList(value,label){
 }
 
 function originList(value){
-    const entries=Array.isArray(value)?value:[value];
+    const entries=is.array(value)?value:[value];
     if(entries.length===0||entries.some(function invalidOrigin(entry){
-        return typeof entry!=='string'||!entry.trim();
+        return !is.string(entry)||!entry.trim();
     })){
         usage('Mail serve requires at least one exact allowed origin.');
     }
@@ -115,9 +118,9 @@ async function deleteCredential(options){
 }
 
 function withoutMailCredentials(value,seen=new WeakMap()){
-    if(!value||typeof value!=='object')return value;
+    if(!value||!is.object(value))return value;
     if(seen.has(value))return seen.get(value);
-    const copy=Array.isArray(value)?[]:{};
+    const copy=is.array(value)?[]:{};
     seen.set(value,copy);
     for(const [key,entry] of Object.entries(value)){
         if(key==='apiKey'||key==='appKey')continue;
@@ -127,7 +130,7 @@ function withoutMailCredentials(value,seen=new WeakMap()){
 }
 
 function completeSendFailure(result){
-    if(!result||typeof result!=='object'||Array.isArray(result)){
+    if(!result||!is.object(result)||is.array(result)){
         return {provider:'resend',result:withoutMailCredentials(result)};
     }
     // Complete provider detail remains visible; only credential fields are omitted.
@@ -148,7 +151,7 @@ async function sendMail(options){
             `No Resend credential is configured for profile ${String(options.profile)}.`
         );
     }
-    if(typeof apiKey!=='string'||!apiKey){
+    if(!is.string(apiKey)||!apiKey){
         throw new ArcaneError(
             ERROR_CODES.operationFailed,
             'The configured Resend credential could not be read.'
@@ -195,7 +198,7 @@ async function serveMail(options){
             `No Resend credential is configured for profile ${String(options.profile)}.`
         );
     }
-    if(typeof apiKey!=='string'||!apiKey){
+    if(!is.string(apiKey)||!apiKey){
         throw new ArcaneError(
             ERROR_CODES.operationFailed,
             'The configured Resend credential could not be read.'
@@ -205,7 +208,7 @@ async function serveMail(options){
     try{
         throwIfAborted(options.signal);
         appKey=await readAppKey();
-        if(typeof appKey!=='string'||!appKey){
+        if(!is.string(appKey)||!appKey){
             throw new ArcaneError(
                 ERROR_CODES.operationFailed,
                 'The local Mail gateway app key could not be read.'

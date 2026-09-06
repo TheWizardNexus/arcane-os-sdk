@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const COMMAND_PATTERN=/^(?:[a-z][a-z0-9:_-]{0,63}|\?)$/;
 
 export function splitCommandLine(input=''){
@@ -28,7 +31,7 @@ export default class TerminalCommandRegistry{
     register({name,aliases=[],description='',usage='',run}={}){
         const normalized=String(name||'').trim().toLowerCase();
         if(!COMMAND_PATTERN.test(normalized)) throw new TypeError('Terminal command names must use lowercase command syntax.');
-        if(typeof run!=='function') throw new TypeError(`Terminal command ${normalized} requires a run function.`);
+        if(!is.function(run)) throw new TypeError(`Terminal command ${normalized} requires a run function.`);
         const record=Object.freeze({name:normalized,aliases:Object.freeze(aliases.map(alias=>String(alias).toLowerCase())),description:String(description),usage:String(usage||normalized),run});
         for(const key of [record.name,...record.aliases]){
             if(!COMMAND_PATTERN.test(key)||this.commands.has(key)) throw new TypeError(`Duplicate or invalid terminal command: ${key}`);

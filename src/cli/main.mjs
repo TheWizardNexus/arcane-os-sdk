@@ -1,3 +1,4 @@
+import Is from 'strong-type';
 import path from 'node:path';
 import {createReporter} from '../events.mjs';
 import {executeOperation} from '../toolchain.mjs';
@@ -5,6 +6,8 @@ import {ArcaneError,ERROR_CODES,normalizeError} from '../errors.mjs';
 import {CLI_NAME,SDK_NAME,SDK_VERSION,OUTPUT_MODES} from '../constants.mjs';
 import {loadArcaneNativeProvider} from '../native-provider-loader.mjs';
 import {APP_BUNDLE_EXTENSION} from '../release-bundle.mjs';
+
+const is = new Is(false);
 
 const VALUE_OPTIONS=new Set([
     'path',
@@ -169,7 +172,7 @@ function readPort(value,defaultValue){
         usage(`Invalid port: ${value}.`);
     }
     const port=Number(value);
-    if(!Number.isSafeInteger(port)||port<0||port>65535){
+    if(!is.safeInteger(port)||port<0||port>65535){
         usage(`Invalid port: ${value}.`);
     }
     return port;
@@ -181,7 +184,7 @@ function readRequestTimeout(value){
         usage(`Invalid request timeout: ${value}.`);
     }
     const timeout=Number(value);
-    if(!Number.isSafeInteger(timeout)||timeout<1||timeout>MAX_NODE_TIMER_DELAY_MS){
+    if(!is.safeInteger(timeout)||timeout<1||timeout>MAX_NODE_TIMER_DELAY_MS){
         usage(
             `Mail request timeout must be an integer from 1 through ${MAX_NODE_TIMER_DELAY_MS} `
             +'milliseconds, the Node timer range.'
@@ -253,7 +256,7 @@ function readPipedMailSecret(input,signal){
 }
 
 function readMaskedMailSecret(input,output,signal,label,stdinOption){
-    if(!input?.isTTY||typeof input.setRawMode!=='function'||typeof output?.write!=='function'){
+    if(!input?.isTTY||!is.function(input.setRawMode)||!is.function(output?.write)){
         usage(`Interactive mail credential entry requires a terminal; use ${stdinOption} for piped input.`);
     }
     return new Promise((resolve,reject)=>{
@@ -353,7 +356,7 @@ function readPipedMailReport(input,signal){
                 }catch{
                     usage('Mail report input must be one valid JSON object.');
                 }
-                if(!report||typeof report!=='object'||Array.isArray(report)){
+                if(!report||!is.object(report)||is.array(report)){
                     usage('Mail report input must be one valid JSON object.');
                 }
                 finish(resolve,report);
@@ -839,7 +842,7 @@ function serverSummary(result){
 
 async function waitForServer(result,signal,reporter){
     reporter.emit('server.ready',serverSummary(result),`Development server ready at ${result.url}`);
-    if(result.lifecycle&&typeof result.lifecycle.then==='function'){
+    if(result.lifecycle&&is.function(result.lifecycle.then)){
         const abort=()=>{
             void Promise.resolve().then(()=>result.close?.()).catch(()=>{});
         };

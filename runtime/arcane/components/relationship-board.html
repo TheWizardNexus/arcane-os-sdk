@@ -29,6 +29,9 @@
 </section>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
   const host=this;
   const board=host.shadowRoot.querySelector('[data-board]');
   const selectedTitle=host.shadowRoot.querySelector('[data-selected-title]');
@@ -64,22 +67,22 @@
   });
 
   function normalizeNode(value,index){
-    const item=value&&typeof value==='object'?value:{};
+    const item=value&&is.object(value)?value:{};
     if(!item.id) return null;
-    return {...item,id:String(item.id),label:String(item.label||item.title||item.id),summary:String(item.summary||''),lane:String(item.lane||item.kind||'Other'),order:Number.isFinite(Number(item.order))?Number(item.order):index};
+    return {...item,id:String(item.id),label:String(item.label||item.title||item.id),summary:String(item.summary||''),lane:String(item.lane||item.kind||'Other'),order:is.finite(Number(item.order))?Number(item.order):index};
   }
   function normalizeEdge(value,index,known){
-    const item=value&&typeof value==='object'?value:{};
+    const item=value&&is.object(value)?value:{};
     const from=String(item.from||''); const to=String(item.to||'');
     if(!from||!to||!known.has(from)||!known.has(to)) return null;
     return {...item,id:String(item.id||`edge-${index+1}`),from,to,label:String(item.label||'related to'),summary:String(item.summary||'')};
   }
 
   function setGraph(graph={},options={}){
-    nodes=(Array.isArray(graph.nodes)?graph.nodes:[]).map(normalizeNode).filter(Boolean);
+    nodes=(is.array(graph.nodes)?graph.nodes:[]).map(normalizeNode).filter(Boolean);
     const known=new Set(nodes.map(item=>item.id));
-    edges=(Array.isArray(graph.edges)?graph.edges:[]).map((item,index)=>normalizeEdge(item,index,known)).filter(Boolean);
-    const supplied=Array.isArray(options.lanes)?options.lanes:Array.isArray(graph.lanes)?graph.lanes:[];
+    edges=(is.array(graph.edges)?graph.edges:[]).map((item,index)=>normalizeEdge(item,index,known)).filter(Boolean);
+    const supplied=is.array(options.lanes)?options.lanes:is.array(graph.lanes)?graph.lanes:[];
     lanes=[...new Set([...supplied.map(String),...nodes.map(item=>item.lane)])];
     board.style.setProperty('--lane-count',String(Math.max(1,Math.min(6,lanes.length))));
     if(selectedId&&!known.has(selectedId)) selectedId='';

@@ -1,6 +1,9 @@
+import Is from './dependencies/strong-type/index.js';
 import EventPubSub from 'event-pubsub';
 import {arcaneLogging} from './logging.mjs';
 import {createDOMInstrumentation} from './dom-event-instrumentation.mjs';
+
+const is=new Is(false);
 
 export {
     createDOMInstrumentation,
@@ -146,7 +149,7 @@ function taggedSnapshot(type,entries=[]){
 function safeDataString(value,key,{fallback=''}={}){
     try{
         const current=Reflect.get(value,key);
-        if(typeof current==='string')return current;
+        if(is.string(current))return current;
     }catch{}
     return fallback;
 }
@@ -154,7 +157,7 @@ function safeDataString(value,key,{fallback=''}={}){
 function regexpFlags(value){
     let result='';
     for(const [flag,getter] of REGEXP_FLAG_GETTERS){
-        if(typeof getter==='function'&&getter.call(value))result+=flag;
+        if(is.function(getter)&&getter.call(value))result+=flag;
     }
     return result;
 }
@@ -166,7 +169,7 @@ function safeString(value){
 function safeErrorText(error){
     let text='Snapshot capture failed.';
     try{
-        if(error!==null&&(typeof error==='object'||typeof error==='function')){
+        if(error!==null&&(is.object(error)||is.function(error))){
             const message=safeDataString(error,'message');
             if(message)text=message;
         }else if(error!==undefined){
@@ -178,34 +181,34 @@ function safeErrorText(error){
 }
 
 function sessionIdentifier(){
-    if(typeof globalThis.crypto?.randomUUID==='function')return globalThis.crypto.randomUUID();
+    if(is.function(globalThis.crypto?.randomUUID))return globalThis.crypto.randomUUID();
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
 function clockDate(clock){
     const value=clock();
     const result=value instanceof Date?new Date(value.getTime()):new Date(value);
-    if(Number.isNaN(result.getTime()))throw new TypeError('The event clock returned an invalid timestamp.');
+    if(is.nan(result.getTime()))throw new TypeError('The event clock returned an invalid timestamp.');
     return result;
 }
 
 function monotonicValue(now){
     const value=Number(now());
-    if(!Number.isFinite(value)||value<0){
+    if(!is.finite(value)||value<0){
         throw new TypeError('The monotonic event clock returned an invalid value.');
     }
     return value;
 }
 
 function defaultMonotonicClock(){
-    return typeof globalThis.performance?.now==='function'
+    return is.function(globalThis.performance?.now)
         ?globalThis.performance.now()
         :Date.now();
 }
 
 function sourceStack(){
     const stack=new Error('Arcane event source').stack;
-    return typeof stack==='string'?stack:null;
+    return is.string(stack)?stack:null;
 }
 
 function snapshot(value,{
@@ -214,20 +217,20 @@ function snapshot(value,{
     depth=0,
     seen=new Map()
 }={}){
-    if(value===null||value===undefined||typeof value==='boolean')return value;
-    if(typeof value==='string')return safeString(value);
-    if(typeof value==='number')return Number.isFinite(value)
+    if(value===null||value===undefined||is.boolean(value))return value;
+    if(is.string(value))return safeString(value);
+    if(is.number(value))return is.finite(value)
         ?value
         :taggedSnapshot('number',[['value',String(value)]]);
-    if(typeof value==='bigint')return taggedSnapshot('bigint',[[
+    if(is.bigint(value))return taggedSnapshot('bigint',[[
         'value',safeString(value.toString())
     ]]);
-    if(typeof value==='symbol')return taggedSnapshot('symbol',[[
+    if(is.symbol(value))return taggedSnapshot('symbol',[[
         'value',value.description===undefined
             ?null
             :safeString(value.description)
     ]]);
-    if(typeof value==='function'){
+    if(is.function(value)){
         const name=safeDataString(value,'name');
         return taggedSnapshot('function',[[
             'name',name?safeString(name):null
@@ -276,7 +279,7 @@ function snapshot(value,{
         }
         return taggedSnapshot('error',entries);
     }
-    if(Array.isArray(value)){
+    if(is.array(value)){
         const result=[];
         for(let index=0;index<value.length;index+=1){
             let item;
@@ -307,7 +310,7 @@ function snapshot(value,{
         }
         return taggedSnapshot('set',[['values',values]]);
     }
-    if(ArrayBuffer.isView(value)){
+    if(is.arrayBufferView(value)){
         const dataView=value instanceof DataView;
         let values;
         let type='DataView';
@@ -335,7 +338,7 @@ function snapshot(value,{
 
     const result=snapshotObject();
     const properties=Reflect.ownKeys(value).filter(property=>{
-        if(typeof property!=='string')return false;
+        if(!is.string(property))return false;
         const descriptor=Object.getOwnPropertyDescriptor(value,property);
         return descriptor?.enumerable===true;
     });
@@ -372,13 +375,13 @@ function completeSnapshot(value,options){
 
 function completeErrorSnapshot(value,options){
     const captured=completeSnapshot(value,options);
-    if(captured&&typeof captured==='object'&&!Array.isArray(captured))return captured;
+    if(captured&&is.object(captured)&&!is.array(captured))return captured;
     return taggedSnapshot('thrown',[['value',captured]]);
 }
 
 function normalizeMetadata(metadata){
     if(metadata===undefined)return {};
-    if(metadata===null||typeof metadata!=='object'||Array.isArray(metadata)){
+    if(metadata===null||!is.object(metadata)||is.array(metadata)){
         throw new TypeError('Event instrumentation metadata must be an object.');
     }
     return metadata;
@@ -418,11 +421,11 @@ function invalidStack(label){
 
 function exactDataObject(value,expectedKeys,label){
     try{
-        if(!value||typeof value!=='object'||Array.isArray(value))invalidStack(label);
+        if(!value||!is.object(value)||is.array(value))invalidStack(label);
         const prototype=Object.getPrototypeOf(value);
         if(prototype!==Object.prototype&&prototype!==null)invalidStack(label);
         const keys=Reflect.ownKeys(value);
-        if(keys.length!==expectedKeys.length||keys.some(key=>typeof key!=='string')){
+        if(keys.length!==expectedKeys.length||keys.some(key=>!is.string(key))){
             invalidStack(label);
         }
         const expected=new Set(expectedKeys);
@@ -449,11 +452,11 @@ function exactDataObject(value,expectedKeys,label){
 
 function denseArrayValues(value,label){
     try{
-        if(!Array.isArray(value)||!Number.isSafeInteger(value.length)||value.length<0){
+        if(!is.array(value)||!is.safeInteger(value.length)||value.length<0){
             invalidStack(label);
         }
         const keys=Reflect.ownKeys(value);
-        if(keys.some(key=>typeof key!=='string'))invalidStack(label);
+        if(keys.some(key=>!is.string(key)))invalidStack(label);
         const expected=new Set(['length']);
         for(let index=0;index<value.length;index+=1)expected.add(String(index));
         if(keys.length!==expected.size||keys.some(key=>!expected.has(key)))invalidStack(label);
@@ -477,17 +480,17 @@ function cloneImportedValue(value,{
     depth=0,
     seen=new WeakSet()
 }){
-    if(value===null||typeof value==='boolean')return value;
-    if(typeof value==='number'){
-        if(!Number.isFinite(value))invalidStack(`Event stack value at ${path}`);
+    if(value===null||is.boolean(value))return value;
+    if(is.number(value)){
+        if(!is.finite(value))invalidStack(`Event stack value at ${path}`);
         return value;
     }
-    if(typeof value==='string')return value;
-    if(!value||typeof value!=='object')invalidStack(`Event stack value at ${path}`);
+    if(is.string(value))return value;
+    if(!value||!is.object(value))invalidStack(`Event stack value at ${path}`);
     if(seen.has(value))invalidStack(`Event stack value at ${path}`);
     seen.add(value);
 
-    if(Array.isArray(value)){
+    if(is.array(value)){
         const items=denseArrayValues(value,`Event stack array at ${path}`);
         return items.map((item,index)=>cloneImportedValue(item,{
             path:`${path}[${String(index)}]`,
@@ -505,7 +508,7 @@ function cloneImportedValue(value,{
         throw new TypeError(`Event stack value at ${path} is invalid.`,{cause:error});
     }
     if((prototype!==Object.prototype&&prototype!==null)
-        ||keys.some(key=>typeof key!=='string')){
+        ||keys.some(key=>!is.string(key))){
         invalidStack(`Event stack value at ${path}`);
     }
     const result=dataObject();
@@ -532,9 +535,9 @@ function cloneImportedValue(value,{
 }
 
 function canonicalTimestamp(value,label){
-    if(typeof value!=='string')invalidStack(label);
+    if(!is.string(value))invalidStack(label);
     const milliseconds=Date.parse(value);
-    if(!Number.isFinite(milliseconds)||new Date(milliseconds).toISOString()!==value){
+    if(!is.finite(milliseconds)||new Date(milliseconds).toISOString()!==value){
         invalidStack(label);
     }
     return milliseconds;
@@ -542,7 +545,7 @@ function canonicalTimestamp(value,label){
 
 function recordString(value,label,{nullable=false,empty=true}={}){
     if(nullable&&value===null)return null;
-    if(typeof value!=='string'||(!empty&&!value)){
+    if(!is.string(value)||(!empty&&!value)){
         invalidStack(label);
     }
     return value;
@@ -556,12 +559,12 @@ function validateRecord(record,index,{
     if(fields.protocol!==ARCANE_EVENT_STACK_PROTOCOL||fields.sessionId!==sessionId){
         invalidStack(label);
     }
-    if(!Number.isSafeInteger(fields.sequence)||fields.sequence<1
+    if(!is.safeInteger(fields.sequence)||fields.sequence<1
         ||fields.id!==`${sessionId}:${String(fields.sequence)}`){
         invalidStack(label);
     }
     const timestampMs=canonicalTimestamp(fields.timestamp,`${label} timestamp`);
-    if(typeof fields.monotonicMs!=='number'||!Number.isFinite(fields.monotonicMs)
+    if(!is.number(fields.monotonicMs)||!is.finite(fields.monotonicMs)
         ||fields.monotonicMs<0){
         invalidStack(`${label} monotonic timing`);
     }
@@ -577,11 +580,11 @@ function validateRecord(record,index,{
         nullable:true,empty:false
     });
     if(fields.parentSequence!==null
-        &&(!Number.isSafeInteger(fields.parentSequence)||fields.parentSequence<1
+        &&(!is.safeInteger(fields.parentSequence)||fields.parentSequence<1
             ||fields.parentSequence>=fields.sequence)){
         invalidStack(`${label} parent`);
     }
-    if(!Number.isSafeInteger(fields.depth)||fields.depth<0
+    if(!is.safeInteger(fields.depth)||fields.depth<0
         ||(fields.parentSequence===null)!==(fields.depth===0)){
         invalidStack(`${label} depth`);
     }
@@ -599,7 +602,7 @@ function validateRecord(record,index,{
         depth:0,
         seen:new WeakSet()
     });
-    if(!metadata||typeof metadata!=='object'||Array.isArray(metadata)){
+    if(!metadata||!is.object(metadata)||is.array(metadata)){
         invalidStack(`${label} metadata`);
     }
 
@@ -613,7 +616,7 @@ function validateRecord(record,index,{
     }else{
         const completedAtMs=canonicalTimestamp(fields.completedAt,`${label} completion timestamp`);
         if(completedAtMs<timestampMs
-            ||typeof fields.durationMs!=='number'||!Number.isFinite(fields.durationMs)
+            ||!is.number(fields.durationMs)||!is.finite(fields.durationMs)
             ||fields.durationMs<0){
             invalidStack(`${label} completion timing`);
         }
@@ -627,7 +630,7 @@ function validateRecord(record,index,{
                 depth:0,
                 seen:new WeakSet()
             });
-            if(!error||typeof error!=='object'||Array.isArray(error)){
+            if(!error||!is.object(error)||is.array(error)){
                 invalidStack(`${label} error`);
             }
         }
@@ -659,14 +662,14 @@ function validateRecord(record,index,{
 
 export function parseEventStack(source){
     let document=source;
-    if(typeof source==='string'){
+    if(is.string(source)){
         try{document=JSON.parse(source);}catch(error){
             throw new TypeError('The event stack is not valid JSON.',{cause:error});
         }
     }
     const fields=exactDataObject(document,DOCUMENT_KEYS,'The event stack document');
     if(fields.protocol!==ARCANE_EVENT_STACK_PROTOCOL
-        ||typeof fields.sessionId!=='string'||!fields.sessionId){
+        ||!is.string(fields.sessionId)||!fields.sessionId){
         invalidStack('The event stack document');
     }
     canonicalTimestamp(fields.createdAt,'The event stack creation timestamp');
@@ -716,13 +719,13 @@ export class EventManager{
         now=defaultMonotonicClock,
         sessionId=sessionIdentifier()
     }={}){
-        if(typeof timeTravel!=='boolean'){
+        if(!is.boolean(timeTravel)){
             throw new TypeError('EventManager flags must be boolean values.');
         }
-        if(typeof clock!=='function'||typeof now!=='function'){
+        if(!is.function(clock)||!is.function(now)){
             throw new TypeError('EventManager clocks must be functions.');
         }
-        if(typeof sessionId!=='string'||!sessionId){
+        if(!is.string(sessionId)||!sessionId){
             throw new TypeError('EventManager sessionId must be a non-empty string.');
         }
         this.#clock=clock;
@@ -784,14 +787,14 @@ export class EventManager{
     }
 
     forward(event,metadata={}){
-        if(!event||typeof event!=='object'||Array.isArray(event)||typeof event.type!=='string'){
+        if(!event||!is.object(event)||is.array(event)||!is.string(event.type)){
             throw new TypeError('Forwarded events must be objects with a string type.');
         }
         return this.instrument(event.type,event,metadata);
     }
 
     #dispatch(type,payload,metadata){
-        if(typeof type!=='string'){
+        if(!is.string(type)){
             this.#bus.emit(type,...payload);
             return this;
         }
@@ -804,8 +807,8 @@ export class EventManager{
                 startedMonotonic=monotonicValue(this.#now);
                 const payloadSnapshot=completeSnapshot(payload);
                 const metadataSnapshot=completeSnapshot(metadata);
-                const safeMetadata=metadataSnapshot&&typeof metadataSnapshot==='object'
-                    &&!Array.isArray(metadataSnapshot)
+                const safeMetadata=metadataSnapshot&&is.object(metadataSnapshot)
+                    &&!is.array(metadataSnapshot)
                     ?metadataSnapshot
                     :snapshotObject();
                 const sequence=this.#sequence+1;
@@ -824,23 +827,23 @@ export class EventManager{
                     timestamp,
                     monotonicMs:startedMonotonic,
                     type:safeString(type),
-                    source:typeof safeMetadata.source==='string'&&safeMetadata.source
+                    source:is.string(safeMetadata.source)&&safeMetadata.source
                         ?safeString(safeMetadata.source)
                         :'application',
-                    category:typeof safeMetadata.category==='string'&&safeMetadata.category
+                    category:is.string(safeMetadata.category)&&safeMetadata.category
                         ?safeString(safeMetadata.category)
                         :null,
-                    correlationId:typeof safeMetadata.correlationId==='string'
+                    correlationId:is.string(safeMetadata.correlationId)
                         &&safeMetadata.correlationId
                         ?safeString(safeMetadata.correlationId):null,
-                    causationId:typeof safeMetadata.causationId==='string'
+                    causationId:is.string(safeMetadata.causationId)
                         &&safeMetadata.causationId
                         ?safeString(safeMetadata.causationId)
                         :(parentSequence===null?null:`${this.#sessionId}:${parentSequence}`),
                     parentSequence,
                     depth:this.#activeDispatch.length,
                     stack,
-                    payload:Array.isArray(payloadSnapshot)
+                    payload:is.array(payloadSnapshot)
                         ?payloadSnapshot
                         :[payloadSnapshot],
                     metadata:safeMetadata,
@@ -945,7 +948,7 @@ export class EventManager{
             if(replacement.active||replacement.cleanupPending){
                 this.#domInstrumentation=replacement;
                 try{
-                    if(error&&(typeof error==='object'||typeof error==='function')){
+                    if(error&&(is.object(error)||is.function(error))){
                         Object.defineProperty(error,'domInstrumentation',{
                             value:replacement,
                             enumerable:false,
@@ -973,7 +976,7 @@ export class EventManager{
     }
 
     clearHistory({newSession=true}={}){
-        if(typeof newSession!=='boolean')throw new TypeError('newSession must be boolean.');
+        if(!is.boolean(newSession))throw new TypeError('newSession must be boolean.');
         if(this.#activeDispatch.length||this.#replaying){
             throw new Error('Event history cannot be cleared during dispatch or playback.');
         }
@@ -986,9 +989,9 @@ export class EventManager{
     }
 
     getEventStack({fromSequence=1,toSequence=Number.MAX_SAFE_INTEGER,type=null}={}){
-        if(!Number.isSafeInteger(fromSequence)||fromSequence<1
-            ||!Number.isSafeInteger(toSequence)||toSequence<fromSequence
-            ||(type!==null&&typeof type!=='string')){
+        if(!is.safeInteger(fromSequence)||fromSequence<1
+            ||!is.safeInteger(toSequence)||toSequence<fromSequence
+            ||(type!==null&&!is.string(type))){
             throw new TypeError('The event stack range is invalid.');
         }
         return this.#history.filter(record=>
@@ -998,7 +1001,7 @@ export class EventManager{
     }
 
     exportStack({space=2}={}){
-        if(!Number.isSafeInteger(space)||space<0||space>10){
+        if(!is.safeInteger(space)||space<0||space>10){
             throw new RangeError('Event stack JSON indentation must be from 0 through 10.');
         }
         return JSON.stringify({
@@ -1010,7 +1013,7 @@ export class EventManager{
     }
 
     seek(sequence){
-        if(!Number.isSafeInteger(sequence)||sequence<0||sequence>this.#sequence){
+        if(!is.safeInteger(sequence)||sequence<0||sequence>this.#sequence){
             throw new RangeError('The time-travel sequence is outside this event stack.');
         }
         this.#cursor=sequence;
@@ -1028,17 +1031,17 @@ export class EventManager{
         signal,
         onRecord
     }={}){
-        if(!Number.isSafeInteger(fromSequence)||fromSequence<1
-            ||!Number.isSafeInteger(toSequence)||toSequence<fromSequence){
+        if(!is.safeInteger(fromSequence)||fromSequence<1
+            ||!is.safeInteger(toSequence)||toSequence<fromSequence){
             throw new TypeError('The playback range is invalid.');
         }
-        if(typeof speed!=='number'||!Number.isFinite(speed)||speed<0){
+        if(!is.number(speed)||!is.finite(speed)||speed<0){
             throw new RangeError('Playback speed must be zero or a positive finite number.');
         }
         if(!['review','events','none'].includes(mode)){
             throw new TypeError('Playback mode must be review, events, or none.');
         }
-        if(onRecord!==undefined&&typeof onRecord!=='function'){
+        if(onRecord!==undefined&&!is.function(onRecord)){
             throw new TypeError('onRecord must be a function.');
         }
         if(this.#replaying)throw new Error('Event playback is already active.');
@@ -1066,13 +1069,13 @@ export class EventManager{
                 if(signal?.aborted)throw abortError(signal.reason);
                 if(speed>0&&(previousTimestamp!==null||previousMonotonic!==null)){
                     const monotonic=Number(record.monotonicMs);
-                    const difference=Number.isFinite(monotonic)&&previousMonotonic!==null
+                    const difference=is.finite(monotonic)&&previousMonotonic!==null
                         ?Math.max(0,monotonic-previousMonotonic)
                         :Math.max(0,Date.parse(record.timestamp)-previousTimestamp);
                     await wait(difference/speed,signal);
                 }
                 previousTimestamp=Date.parse(record.timestamp);
-                previousMonotonic=Number.isFinite(Number(record.monotonicMs))
+                previousMonotonic=is.finite(Number(record.monotonicMs))
                     ?Number(record.monotonicMs)
                     :null;
                 if(mode==='review')this.#bus.emit(PLAYBACK_RECORD_EVENT,record);
@@ -1119,7 +1122,7 @@ function eventAuthorityError(code,cause,ErrorType=Error){
 }
 
 function eventName(value,code='ARCANE_EVENT_SUBSCRIPTION_TYPE_INVALID'){
-    if(typeof value!=='string'
+    if(!is.string(value)
         ||value.trim()!==value
         ||value.length<1
         ||!ARCANE_EVENT_NAME_PATTERN.test(value)){
@@ -1130,7 +1133,7 @@ function eventName(value,code='ARCANE_EVENT_SUBSCRIPTION_TYPE_INVALID'){
 
 function eventDataOptions(value,allowed,code){
     if(value===undefined)return Object.create(null);
-    if(!value||typeof value!=='object'||Array.isArray(value)){
+    if(!value||!is.object(value)||is.array(value)){
         throw eventAuthorityError(code,undefined,TypeError);
     }
     const prototype=Object.getPrototypeOf(value);
@@ -1139,7 +1142,7 @@ function eventDataOptions(value,allowed,code){
     }
     const result=Object.create(null);
     for(const key of Reflect.ownKeys(value)){
-        if(typeof key!=='string'||!allowed.has(key)){
+        if(!is.string(key)||!allowed.has(key)){
             throw eventAuthorityError(code,undefined,TypeError);
         }
         const descriptor=Object.getOwnPropertyDescriptor(value,key);
@@ -1154,10 +1157,10 @@ function eventDataOptions(value,allowed,code){
 function eventSignal(value){
     if(value===undefined||value===null)return null;
     if(!value
-        ||typeof value!=='object'
-        ||typeof value.aborted!=='boolean'
-        ||typeof value.addEventListener!=='function'
-        ||typeof value.removeEventListener!=='function'){
+        ||!is.object(value)
+        ||!is.boolean(value.aborted)
+        ||!is.function(value.addEventListener)
+        ||!is.function(value.removeEventListener)){
         throw eventAuthorityError(
             'ARCANE_EVENT_SUBSCRIPTION_SIGNAL_INVALID',
             undefined,
@@ -1168,13 +1171,13 @@ function eventSignal(value){
 }
 
 function eventListener(value){
-    if(typeof value==='function'){
+    if(is.function(value)){
         return {
             identity:value,
             invoke(event,thisArg,...rest){return value.call(thisArg,event,...rest);}
         };
     }
-    if(value&&typeof value==='object'&&typeof value.handleEvent==='function'){
+    if(value&&is.object(value)&&is.function(value.handleEvent)){
         return {
             identity:value,
             invoke(event){return value.handleEvent(event);}
@@ -1188,13 +1191,13 @@ function eventListener(value){
 }
 
 function eventTargetListener(value){
-    if(typeof value==='function'){
+    if(is.function(value)){
         return {
             identity:value,
             invoke(event,thisArg,...rest){return value.call(thisArg,event,...rest);}
         };
     }
-    if(value&&typeof value==='object'&&typeof value.handleEvent==='function'){
+    if(value&&is.object(value)&&is.function(value.handleEvent)){
         return {
             identity:value,
             invoke(event){return value.handleEvent(event);}
@@ -1204,8 +1207,8 @@ function eventTargetListener(value){
 }
 
 function compatibilityDetail(value){
-    if(value===null||(typeof value!=='object'&&typeof value!=='function'))return value;
-    if(Array.isArray(value))return value.slice();
+    if(value===null||(!is.object(value)&&!is.function(value)))return value;
+    if(is.array(value))return value.slice();
     const prototype=Object.getPrototypeOf(value);
     if(prototype!==Object.prototype&&prototype!==null)return value;
     const copy=prototype===null?Object.create(null):{};
@@ -1227,7 +1230,7 @@ function compatibilityDetail(value){
 
 function eventTargetOptions(value){
     if(value===undefined)return {capture:false,once:false,signal:null};
-    if(typeof value==='boolean'){
+    if(is.boolean(value)){
         return {capture:value,once:false,signal:null};
     }
     const options=eventDataOptions(
@@ -1236,7 +1239,7 @@ function eventTargetOptions(value){
         'ARCANE_EVENT_SUBSCRIPTION_OPTIONS_INVALID'
     );
     for(const key of ['capture','once','passive']){
-        if(options[key]!==undefined&&typeof options[key]!=='boolean'){
+        if(options[key]!==undefined&&!is.boolean(options[key])){
             throw eventAuthorityError(
                 'ARCANE_EVENT_SUBSCRIPTION_OPTIONS_INVALID',
                 undefined,
@@ -1257,7 +1260,7 @@ function subscriptionOptions(value){
         new Set(['once','signal']),
         'ARCANE_EVENT_SUBSCRIPTION_OPTIONS_INVALID'
     );
-    if(options.once!==undefined&&typeof options.once!=='boolean'){
+    if(options.once!==undefined&&!is.boolean(options.once)){
         throw eventAuthorityError(
             'ARCANE_EVENT_SUBSCRIPTION_OPTIONS_INVALID',
             undefined,
@@ -1282,16 +1285,16 @@ function defineDisposable(unsubscribe){
 
 function eventLikeRecord(value){
     try{
-        if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError();
+        if(!value||!is.object(value)||is.array(value))throw new TypeError();
         const EventConstructor=globalThis.Event;
-        if(typeof EventConstructor==='function'&&value instanceof EventConstructor){
+        if(is.function(EventConstructor)&&value instanceof EventConstructor){
             if(!('detail' in value))throw new TypeError();
             return {
                 type:eventName(value.type,'ARCANE_EVENT_DISPATCH_EVENT_INVALID'),
                 detail:value.detail,
                 cancelable:value.cancelable===true,
                 defaultPrevented:value.defaultPrevented===true,
-                preventDefault:typeof value.preventDefault==='function'
+                preventDefault:is.function(value.preventDefault)
                     ?()=>value.preventDefault()
                     :null
             };
@@ -1311,7 +1314,7 @@ function eventLikeRecord(value){
             detail:detailDescriptor?.value,
             cancelable:cancelableDescriptor?.value===true,
             defaultPrevented:preventedDescriptor?.value===true,
-            preventDefault:typeof value.preventDefault==='function'
+            preventDefault:is.function(value.preventDefault)
                 ?()=>value.preventDefault()
                 :null
         };
@@ -1364,7 +1367,7 @@ function createArcaneEventAuthority(){
 
     function directListenerFailure(error){
         try{
-            if(typeof globalThis.reportError==='function'){
+            if(is.function(globalThis.reportError)){
                 globalThis.reportError(error);
                 return;
             }
@@ -1379,10 +1382,10 @@ function createArcaneEventAuthority(){
 
     function completeEventDetail(compatibility,publicDetail){
         if(publicDetail===undefined)return compatibility??{};
-        const compatibilityRecord=compatibility&&typeof compatibility==='object'
-            &&!Array.isArray(compatibility);
-        const publicRecord=publicDetail&&typeof publicDetail==='object'
-            &&!Array.isArray(publicDetail);
+        const compatibilityRecord=compatibility&&is.object(compatibility)
+            &&!is.array(compatibility);
+        const publicRecord=publicDetail&&is.object(publicDetail)
+            &&!is.array(publicDetail);
         if(compatibilityRecord&&publicRecord)return {...compatibility,...publicDetail};
         return {compatibility,publicDetail};
     }
@@ -1658,8 +1661,8 @@ function createArcaneEventAuthority(){
             throw eventAuthorityError('ARCANE_EVENT_SOURCE_EVENT_TYPE_UNDECLARED');
         }
         const detail=compatibilityDetail(admitted.detail);
-        const operationId=detail&&typeof detail==='object'
-            &&typeof detail.operationId==='string'
+        const operationId=detail&&is.object(detail)
+            &&is.string(detail.operationId)
             &&detail.operationId.trim()===detail.operationId
             &&detail.operationId
             ?detail.operationId
@@ -1680,7 +1683,7 @@ function createArcaneEventAuthority(){
     }
 
     function createSource(owner,options){
-        if(!owner||(typeof owner!=='object'&&typeof owner!=='function')){
+        if(!owner||(!is.object(owner)&&!is.function(owner))){
             throw eventAuthorityError('ARCANE_EVENT_SOURCE_INVALID',undefined,TypeError);
         }
         const admitted=eventDataOptions(
@@ -1689,7 +1692,7 @@ function createArcaneEventAuthority(){
             'ARCANE_EVENT_SOURCE_INVALID'
         );
         const source=eventName(admitted.source,'ARCANE_EVENT_SOURCE_INVALID');
-        if(!Array.isArray(admitted.eventTypes)
+        if(!is.array(admitted.eventTypes)
             ||admitted.eventTypes.length<1){
             throw eventAuthorityError('ARCANE_EVENT_SOURCE_INVALID',undefined,TypeError);
         }
@@ -1704,7 +1707,7 @@ function createArcaneEventAuthority(){
             eventTypes.push(normalized);
         }
         if(admitted.onListenerError!==undefined
-            &&typeof admitted.onListenerError!=='function'){
+            &&!is.function(admitted.onListenerError)){
             throw eventAuthorityError('ARCANE_EVENT_SOURCE_INVALID',undefined,TypeError);
         }
         const existing=sourceByOwner.get(owner);
@@ -1761,12 +1764,12 @@ function createArcaneEventAuthority(){
                 'ARCANE_EVENT_OCCURRENCE_INVALID'
             );
             const operationId=normalized.operationId??null;
-            if(operationId!==null&&(typeof operationId!=='string'
+            if(operationId!==null&&(!is.string(operationId)
                 ||operationId.trim()!==operationId
                 ||operationId.length<1)){
                 throw eventAuthorityError('ARCANE_EVENT_OCCURRENCE_INVALID',undefined,TypeError);
             }
-            if(normalized.cancelable!==undefined&&typeof normalized.cancelable!=='boolean'){
+            if(normalized.cancelable!==undefined&&!is.boolean(normalized.cancelable)){
                 throw eventAuthorityError('ARCANE_EVENT_OCCURRENCE_INVALID',undefined,TypeError);
             }
             return dispatchOccurrence({
@@ -1871,21 +1874,21 @@ function createArcaneEventAuthority(){
             ?occurrence.type
             :eventName(admitted.type,'ARCANE_EVENT_DOM_OPTIONS_INVALID');
         for(const key of ['bubbles','composed','cancelable']){
-            if(admitted[key]!==undefined&&typeof admitted[key]!=='boolean'){
+            if(admitted[key]!==undefined&&!is.boolean(admitted[key])){
                 throw eventAuthorityError('ARCANE_EVENT_DOM_OPTIONS_INVALID',undefined,TypeError);
             }
         }
-        if(!target||typeof target.dispatchEvent!=='function'
-            ||typeof globalThis.CustomEvent!=='function'){
+        if(!target||!is.function(target.dispatchEvent)
+            ||!is.function(globalThis.CustomEvent)){
             throw eventAuthorityError('ARCANE_EVENT_DOM_TARGET_INVALID',undefined,TypeError);
         }
         const compatibility=compatibilityByOccurrence.get(occurrence);
         let detail;
-        const compatibilityPrototype=compatibility&&typeof compatibility==='object'
+        const compatibilityPrototype=compatibility&&is.object(compatibility)
             ?Object.getPrototypeOf(compatibility)
             :undefined;
-        if(compatibility&&typeof compatibility==='object'
-            &&!Array.isArray(compatibility)
+        if(compatibility&&is.object(compatibility)
+            &&!is.array(compatibility)
             &&(compatibilityPrototype===Object.prototype||compatibilityPrototype===null)){
             detail={};
             for(const key of Reflect.ownKeys(compatibility)){
@@ -1934,7 +1937,7 @@ function createArcaneEventAuthority(){
     function safeDirectOn(type,handler,once=false){
         const admittedType=type==='*'?'*':eventName(type);
         const admitted=eventListener(handler);
-        if(typeof once!=='boolean'){
+        if(!is.boolean(once)){
             throw eventAuthorityError('ARCANE_EVENT_SUBSCRIPTION_OPTIONS_INVALID',undefined,TypeError);
         }
         const record={type:admittedType,identity:admitted.identity,wrapper:null};
@@ -2002,9 +2005,9 @@ function createArcaneEventAuthority(){
 
 function usableArcaneEventAuthority(value){
     return Boolean(value)
-        &&(typeof value==='object'||typeof value==='function')
+        &&(is.object(value)||is.function(value))
         &&value.protocol===ARCANE_EVENT_AUTHORITY_PROTOCOL
-        &&ARCANE_EVENT_REQUIRED_AUTHORITY_API.every(name=>typeof value[name]==='function');
+        &&ARCANE_EVENT_REQUIRED_AUTHORITY_API.every(name=>is.function(value[name]));
 }
 
 function installArcaneEventAuthority(){

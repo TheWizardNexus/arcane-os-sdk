@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 
 const RESULT_STATUSES=new Set(['fail','pass','skip']);
@@ -41,8 +44,8 @@ export const BROWSER_TEST_SUITE_REASONS={
 
 function isPlainRecord(value){
     return Boolean(value)
-        &&typeof value==='object'
-        &&!Array.isArray(value)
+        &&is.object(value)
+        &&!is.array(value)
         &&Object.getPrototypeOf(value)===Object.prototype;
 }
 
@@ -56,7 +59,7 @@ function fail(message,code,ErrorType=TypeError){
 }
 
 function descriptorText(value,label){
-    if(typeof value!=='string') fail(`${label} must be a string.`,'BROWSER_TEST_INVALID_DESCRIPTOR');
+    if(!is.string(value)) fail(`${label} must be a string.`,'BROWSER_TEST_INVALID_DESCRIPTOR');
     if(!value.trim()) fail(`${label} cannot be empty.`,'BROWSER_TEST_INVALID_DESCRIPTOR');
     return value;
 }
@@ -68,14 +71,14 @@ function resultMessage(value,fallback){
 }
 
 function normalizeTests(value){
-    if(!Array.isArray(value)) fail('tests must be an array.','BROWSER_TEST_INVALID_OPTIONS');
+    if(!is.array(value)) fail('tests must be an array.','BROWSER_TEST_INVALID_OPTIONS');
     const seen=new Set();
     return value.map((item,index)=>{
         if(!isPlainRecord(item)) fail(`Test descriptor ${index+1} must be a plain object.`,'BROWSER_TEST_INVALID_DESCRIPTOR');
         const id=descriptorText(item.id,`Test descriptor ${index+1} id`);
         if(seen.has(id)) fail(`Test descriptors contain a duplicate id: ${id}.`,'BROWSER_TEST_CASE_COLLISION');
         seen.add(id);
-        if(typeof item.run!=='function') fail(`Test descriptor ${index+1} run must be a function.`,'BROWSER_TEST_INVALID_DESCRIPTOR');
+        if(!is.function(item.run)) fail(`Test descriptor ${index+1} run must be a function.`,'BROWSER_TEST_INVALID_DESCRIPTOR');
         return {
             ...item,
             id,
@@ -92,7 +95,7 @@ function defaultNow(){
 function normalizeOptions(input){
     if(!isPlainRecord(input)) fail('Browser test suite options must be a plain object.','BROWSER_TEST_INVALID_OPTIONS');
     const now=input.now??defaultNow;
-    if(typeof now!=='function') fail('now must be a function.','BROWSER_TEST_INVALID_OPTIONS');
+    if(!is.function(now)) fail('now must be a function.','BROWSER_TEST_INVALID_OPTIONS');
     return {
         now,
         tests:normalizeTests(input.tests??[]),
@@ -103,23 +106,23 @@ function normalizeRunOptions(input){
     if(!isPlainRecord(input)) fail('Test run options must be a plain object.','BROWSER_TEST_INVALID_OPTIONS');
     const signal=input.signal??null;
     if(signal!==null&&(
-        typeof signal!=='object'
-        ||typeof signal.aborted!=='boolean'
-        ||typeof signal.addEventListener!=='function'
-        ||typeof signal.removeEventListener!=='function'
+        !is.object(signal)
+        ||!is.boolean(signal.aborted)
+        ||!is.function(signal.addEventListener)
+        ||!is.function(signal.removeEventListener)
     )) fail('signal must be an AbortSignal.','BROWSER_TEST_INVALID_OPTIONS');
     return {context:input.context,signal};
 }
 
 function elapsed(now,start){
     const end=Number(now());
-    if(!Number.isFinite(end)) fail('now() must return a finite number.','BROWSER_TEST_INVALID_CLOCK');
+    if(!is.finite(end)) fail('now() must return a finite number.','BROWSER_TEST_INVALID_CLOCK');
     return Math.max(0,end-start);
 }
 
 function startTime(now){
     const value=Number(now());
-    if(!Number.isFinite(value)) fail('now() must return a finite number.','BROWSER_TEST_INVALID_CLOCK');
+    if(!is.finite(value)) fail('now() must return a finite number.','BROWSER_TEST_INVALID_CLOCK');
     return value;
 }
 
@@ -195,7 +198,7 @@ function outcomeFromError(error){
     return {
         status:'fail',
         message:resultMessage(error?.message,'The check failed.'),
-        code:typeof error?.code==='string'?error.code:'BROWSER_TEST_ERROR',
+        code:is.string(error?.code)?error.code:'BROWSER_TEST_ERROR',
         errorName:resultMessage(error?.name,'Error'),
         error
     };
@@ -238,9 +241,9 @@ function browserTestResultReason(result){
 function browserTestPublicDetail(type,detail){
     const result=detail?.result;
     const test=detail?.test;
-    const testCount=Number.isSafeInteger(detail?.total)
+    const testCount=is.safeInteger(detail?.total)
         ?detail.total
-        :Number.isSafeInteger(detail?.totals?.total)
+        :is.safeInteger(detail?.totals?.total)
             ?detail.totals.total
             :null;
     if(type===BROWSER_TEST_SUITE_EVENT_TYPES.runStarted){
@@ -267,7 +270,7 @@ function browserTestPublicDetail(type,detail){
             testIndex:detail.index,
             testCount,
             status:result.status,
-            ...(typeof result.code==='string'?{code:result.code}:{})
+            ...(is.string(result.code)?{code:result.code}:{})
         };
     }
     const reason=detail.status==='aborted'

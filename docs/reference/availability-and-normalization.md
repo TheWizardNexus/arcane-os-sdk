@@ -3,6 +3,46 @@
 Use this page to choose an API by capability. The compact labels tell you where
 it runs; the [protocol guide](protocols.md) contains the implementation detail.
 
+## Shared type predicates
+
+SDK-owned JavaScript uses the declared `strong-type` dependency for type
+predicates. Node and managed renderer modules import `Is` from `strong-type`;
+browser providers and workers use their shipped relative dependency path.
+Component scripts import it within their own asynchronous component scope.
+Publication bootstrap tools import the shipped runtime dependency by relative
+path so they remain available before npm dependency installation.
+The dependency pin and both shipped projections use 2.0.1. Update them together
+through the published dependency workflow when another version is needed.
+
+Reuse one non-throwing instance per module or component:
+
+```javascript
+import Is from 'strong-type';
+
+const is=new Is(false);
+
+function requireText(value){
+    if(!is.string(value))throw new TypeError('Text is required.');
+    return value;
+}
+```
+
+The predicates classify values without coercing them. Existing API owners keep
+their defaults, domain constraints, complete payloads, and public error behavior.
+Use `number` for primitive numbers, `finite` for finite numbers, and `integer`
+or `safeInteger` for the corresponding integer contract. `object` includes null;
+retain a contract's separate null and array handling. `plainObject` is narrower
+than a general non-array object check and must not silently reject previously
+accepted class instances.
+
+Constructor identity checks, diagnostic type labels, foreign-language source,
+and isolated generated script bodies retain native operators where a replacement
+would change their contract or execution scope. `DBOPFSWorker.js` and
+`SystemPlatformPresentation.js` retain their few native predicates to preserve
+classic-script loading and synchronous availability. Upstream dependency source is
+consumed unchanged. Non-throwing strong-type array and constructor probes return
+false when a probe throws; SDK branching continues through its owning error path.
+
 ## Availability labels
 
 | Label | Meaning |

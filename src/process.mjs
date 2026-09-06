@@ -1,7 +1,10 @@
+import Is from 'strong-type';
 import {spawn} from 'node:child_process';
 import path from 'node:path';
 import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
 import {createEventQueue} from './event-queue.mjs';
+
+const is = new Is(false);
 
 const DEFAULT_TERMINATION_GRACE_MS=1500;
 
@@ -58,7 +61,7 @@ function childIsRunning(child){
 }
 
 function childHasPid(child){
-    return Number.isInteger(child?.pid)&&child.pid>0;
+    return is.integer(child?.pid)&&child.pid>0;
 }
 
 function terminateWindowsTree(child,{force=false}={}){
@@ -124,10 +127,10 @@ export async function runProcess(command,args=[],{
     input
 }={}){
     throwIfAborted(signal);
-    if(!Array.isArray(args)||args.some(argument=>typeof argument!=='string')){
+    if(!is.array(args)||args.some(argument=>!is.string(argument))){
         throw new ArcaneError(ERROR_CODES.usage,'Process arguments must be a fixed array of strings.');
     }
-    if(!Number.isInteger(terminationGraceMs)||terminationGraceMs<100||terminationGraceMs>30_000){
+    if(!is.integer(terminationGraceMs)||terminationGraceMs<100||terminationGraceMs>30_000){
         throw new ArcaneError(
             ERROR_CODES.usage,
             'terminationGraceMs must be an integer from 100 through 30000.'

@@ -1,14 +1,17 @@
+import Is from 'strong-type';
 import {lstat,readdir,realpath} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
 import {runProcess} from './process.mjs';
 
+const is = new Is(false);
+
 const TEST_RUNNER_PATH=fileURLToPath(new URL('../bin/arcane-test.mjs',import.meta.url));
 const MANAGED_IMPORT_MAP_ENV='ARCANE_TEST_IMPORT_MAP_CONTEXT';
 
 function normalizedTestOutput(value){
-    return typeof value==='string'?value:'';
+    return is.string(value)?value:'';
 }
 
 function captureFailedTest(testFile,result,workspaceRoot){

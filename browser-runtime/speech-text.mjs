@@ -1,3 +1,7 @@
+import Is from './dependencies/strong-type/index.js';
+
+const is=new Is(false);
+
 function stripSpeechFormatting(text=''){
     return text.replace(/([*#_`~])\1+/g,'');
 }
@@ -7,7 +11,7 @@ class MarkdownSpeech {
     #pending='';
 
     append(text='',end=false){
-        if(typeof text!=='string'){
+        if(!is.string(text)){
             throw new TypeError('Markdown speech input must be text.');
         }
 

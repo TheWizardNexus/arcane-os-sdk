@@ -45,6 +45,9 @@
 </section>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const host=this;
     const root=host.shadowRoot;
     const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
@@ -135,7 +138,7 @@
 
     function updateTask(id,update={}){
         if(destroyed)return null;
-        const index=typeof id==='number'?id:tasks.findIndex(task=>task.id===`${id}`);
+        const index=is.number(id)?id:tasks.findIndex(task=>task.id===`${id}`);
         if(index<0||index>=tasks.length){
             return null;
         }
@@ -203,7 +206,7 @@
         if(running){
             return activeRun;
         }
-        const runnable=Array.from(jobs||[]).filter(job=>job&&typeof job.task==='function');
+        const runnable=Array.from(jobs||[]).filter(job=>job&&is.function(job.task));
         if(!runnable.length){
             setTasks([]);
             return [];
@@ -244,7 +247,7 @@
                     'task-progress-error',
                     {error,id:tasks[index]?.id,index,task:{...tasks[index]}},
                     {
-                        code:typeof error?.code==='string'
+                        code:is.string(error?.code)
                             ?error.code
                             :'ARCANE_TASK_EXECUTION_REJECTED',
                         index,

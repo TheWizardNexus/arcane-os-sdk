@@ -1,7 +1,10 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import { arcaneLogging } from 'arcane-os/logging';
 function parseArguments(value,name=''){
     let parsed=value;
-    if(typeof parsed==='string'){
+    if(is.string(parsed)){
         try{
             parsed=JSON.parse(parsed);
         }catch(error){
@@ -9,15 +12,15 @@ function parseArguments(value,name=''){
             throw new Error(`Tool ${name} returned invalid JSON arguments.`);
         }
     }
-    const prototype=parsed&&typeof parsed==='object'
+    const prototype=parsed&&is.object(parsed)
         ?Object.getPrototypeOf(parsed)
         :undefined;
     if(
         !parsed
-        ||typeof parsed!=='object'
-        ||Array.isArray(parsed)
+        ||!is.object(parsed)
+        ||is.array(parsed)
         ||(prototype!==Object.prototype&&prototype!==null)
-        ||typeof parsed.message!=='string'
+        ||!is.string(parsed.message)
         ||!parsed.message.trim()
     ){
         const error=new Error(
@@ -32,7 +35,7 @@ function parseArguments(value,name=''){
 function getResponseCalls(response={}){
     const calls=response?.choices?.[0]?.message?.tool_calls;
 
-    if(!Array.isArray(calls)||!calls.length){
+    if(!is.array(calls)||!calls.length){
         throw new Error('AI response did not contain a tool call.');
     }
 
@@ -40,7 +43,7 @@ function getResponseCalls(response={}){
 }
 
 function dispatch(name='',argumentsValue='',handlers={}){
-    if(typeof handlers[name]!=='function'){
+    if(!is.function(handlers[name])){
         throw new Error(`No handler is registered for tool ${name}.`);
     }
 
@@ -75,7 +78,7 @@ async function handleResponse(response={},handlers={}){
 }
 
 async function handleStreamedCalls(calls={},handlers={}){
-    if(!calls||typeof calls!=='object'||Array.isArray(calls)){
+    if(!calls||!is.object(calls)||is.array(calls)){
         throw new Error('Streamed tool calls must be an object.');
     }
 

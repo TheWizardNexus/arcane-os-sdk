@@ -47,6 +47,9 @@
 </section>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const host=this;
     const shadow=host.shadowRoot;
     const tabs=[...shadow.querySelectorAll('[role="tab"]')];
@@ -117,7 +120,7 @@
         const url=new URL(sourceUrl(value));
         if(page===null||page===undefined||page==='') return url.href;
         const resolvedPage=Number(page);
-        if(!Number.isSafeInteger(resolvedPage)||resolvedPage<1) throw new TypeError('PDF page must be a positive integer.');
+        if(!is.safeInteger(resolvedPage)||resolvedPage<1) throw new TypeError('PDF page must be a positive integer.');
         url.searchParams.set('arcane-pdf-page',String(resolvedPage));
         url.hash=`page=${resolvedPage}`;
         return url.href;
@@ -202,7 +205,7 @@
         }));
         reviewStatus.value=String(config.review?.status||'not-reviewed');
         if(!reviewStatus.value&&reviewStatus.options.length) reviewStatus.selectedIndex=0;
-        const classificationOptions=Array.isArray(config.classificationOptions)?config.classificationOptions:[];
+        const classificationOptions=is.array(config.classificationOptions)?config.classificationOptions:[];
         classificationField.hidden=!classificationOptions.length;
         classificationLabel.textContent=String(config.classificationLabel||'Classification');
         reviewClassification.replaceChildren(...classificationOptions.map(option=>{
@@ -211,7 +214,7 @@
         reviewClassification.value=String(config.review?.classification||'unassigned');
         if(!reviewClassification.value&&reviewClassification.options.length) reviewClassification.selectedIndex=0;
         reviewFields.replaceChildren();
-        for(const definition of Array.isArray(config.reviewFields)?config.reviewFields:[]){
+        for(const definition of is.array(config.reviewFields)?config.reviewFields:[]){
             const key=String(definition.key||'').replace(/[^a-z0-9._-]/gi,'-');
             if(!key) continue;
             const label=document.createElement('label'); const caption=document.createElement('span'); caption.textContent=String(definition.label||key);

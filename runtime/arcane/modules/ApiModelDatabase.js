@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 import ApiModelRecord from '../entities/ApiModelRecord.js';
 
@@ -38,7 +41,7 @@ function endpoint(value){
 function appendParameters(url,parameters={}){
     for(const [key,value] of Object.entries(parameters||{})){
         if(value===undefined||value===null||value==='')continue;
-        url.searchParams.set(key,Array.isArray(value)?value.join(','):String(value));
+        url.searchParams.set(key,is.array(value)?value.join(','):String(value));
     }
     return url;
 }
@@ -55,21 +58,21 @@ function signalLike(value){
     return value===undefined
         ||value===null
         ||(
-            typeof value==='object'
-            &&typeof value.aborted==='boolean'
-            &&typeof value.addEventListener==='function'
-            &&typeof value.removeEventListener==='function'
+            is.object(value)
+            &&is.boolean(value.aborted)
+            &&is.function(value.addEventListener)
+            &&is.function(value.removeEventListener)
         );
 }
 
 function errorMessage(value,fallback){
-    if(typeof value?.message==='string'&&value.message.trim())return value.message;
-    if(typeof value==='string'&&value.trim())return value;
+    if(is.string(value?.message)&&value.message.trim())return value.message;
+    if(is.string(value)&&value.trim())return value;
     return fallback;
 }
 
 function defineErrorContract(error,contract,cause){
-    const priorCode=typeof error?.code==='string'&&error.code?error.code:null;
+    const priorCode=is.string(error?.code)&&error.code?error.code:null;
     try{
         if(priorCode&&priorCode!==contract.code&&!Object.hasOwn(error,'providerCode')){
             Object.defineProperty(error,'providerCode',{configurable:true,enumerable:false,value:priorCode,writable:true});
@@ -92,7 +95,7 @@ function defineErrorContract(error,contract,cause){
 }
 
 function apiModelError(error,contract,message){
-    const candidate=error&&(typeof error==='object'||typeof error==='function')
+    const candidate=error&&(is.object(error)||is.function(error))
         ?error
         :new Error(errorMessage(error,message));
     return defineErrorContract(candidate,contract,error!==candidate?error:undefined);
@@ -108,7 +111,7 @@ function disposedError(){
 
 function requestOptions(value){
     if(value===undefined)return {operationId:null,signal:null};
-    if(!value||typeof value!=='object'||Array.isArray(value)){
+    if(!value||!is.object(value)||is.array(value)){
         throw apiModelError(
             new TypeError('API model request options must be an object.'),
             apiModelErrors.requestOptionsInvalid,
@@ -124,7 +127,7 @@ function requestOptions(value){
     }
     const operationId=value.operationId??null;
     if(operationId!==null&&(
-        typeof operationId!=='string'
+        !is.string(operationId)
         ||operationId.trim()!==operationId
         ||operationId.length<1
     )){
@@ -156,10 +159,10 @@ function operationError(error,stage,signal){
     if(signal.aborted){
         const reason=signal.reason;
         if(reason
-            &&typeof reason==='object'
-            &&typeof reason.code==='string'
+            &&is.object(reason)
+            &&is.string(reason.code)
             &&reason.code
-            &&typeof reason.reason==='string'
+            &&is.string(reason.reason)
             &&reason.reason)return reason;
         return apiModelError(reason??error,apiModelErrors.requestAborted,'The API model request was aborted.');
     }
@@ -180,8 +183,8 @@ export default class ApiModelDatabase extends EventTarget{
     constructor({endpoint:source,parser=value=>value,fetchImpl=globalThis.fetch,cache=null,request={}}={}){
         super();
         this.endpoint=endpoint(source);
-        if(typeof parser!=='function')throw new TypeError('API model parser must be a function.');
-        if(typeof fetchImpl!=='function')throw new TypeError('API model fetch implementation must be a function.');
+        if(!is.function(parser))throw new TypeError('API model parser must be a function.');
+        if(!is.function(fetchImpl))throw new TypeError('API model fetch implementation must be a function.');
         this.parser=parser;
         this.fetchImpl=fetchImpl;
         this.cache=cache;
@@ -291,7 +294,7 @@ export default class ApiModelDatabase extends EventTarget{
             });
             if(operation.controller.signal.aborted)throw operation.controller.signal.reason;
             stage='response';
-            if(!response||typeof response!=='object'||typeof response.json!=='function'){
+            if(!response||!is.object(response)||!is.function(response.json)){
                 throw new TypeError('The API model fetch implementation returned an invalid response.');
             }
             stage='response-json';
@@ -299,9 +302,9 @@ export default class ApiModelDatabase extends EventTarget{
             if(operation.controller.signal.aborted)throw operation.controller.signal.reason;
             stage='response-status';
             if(!response.ok){
-                const reason=typeof raw?.reason==='string'&&raw.reason.trim()
+                const reason=is.string(raw?.reason)&&raw.reason.trim()
                     ?raw.reason
-                    :typeof raw?.error==='string'&&raw.error.trim()
+                    :is.string(raw?.error)&&raw.error.trim()
                         ?raw.error
                         :`API request failed (${response.status}).`;
                 throw new Error(reason);

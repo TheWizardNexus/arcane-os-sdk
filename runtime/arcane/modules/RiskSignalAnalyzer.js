@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const DEFAULT_LEVELS=[
     {minimum:70,id:'critical'},
     {minimum:40,id:'high'},
@@ -15,7 +18,7 @@ export function analyzeRiskSignals(input,{signals=[],levels=DEFAULT_LEVELS}={}){
     let score=0;
 
     for(const signal of signals){
-        if(!signal||typeof signal.id!=='string'||!(signal.pattern instanceof RegExp))continue;
+        if(!signal||!is.string(signal.id)||!(signal.pattern instanceof RegExp))continue;
         signal.pattern.lastIndex=0;
         if(!signal.pattern.test(text))continue;
         const weight=Math.max(0,Number(signal.weight)||0);

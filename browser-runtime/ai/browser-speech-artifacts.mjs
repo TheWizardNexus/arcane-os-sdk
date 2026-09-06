@@ -1,6 +1,9 @@
+import Is from "../dependencies/strong-type/index.js";
 import {
   normalizeModelSecurity,
 } from "./model-controller.mjs";
+
+const is = new Is(false);
 
 const completeValue = (value) => value;
 
@@ -20,10 +23,10 @@ const ARTIFACT_GRAPHS = new WeakSet();
 const ARTIFACT_GRAPH_METADATA = new WeakMap();
 const ARTIFACT_ERRORS = new WeakSet();
 const STORES = new WeakSet();
-const PLATFORM_CREATE_OBJECT_URL = typeof globalThis.URL?.createObjectURL === "function"
+const PLATFORM_CREATE_OBJECT_URL = is.function(globalThis.URL?.createObjectURL)
   ? globalThis.URL.createObjectURL.bind(globalThis.URL)
   : null;
-const PLATFORM_REVOKE_OBJECT_URL = typeof globalThis.URL?.revokeObjectURL === "function"
+const PLATFORM_REVOKE_OBJECT_URL = is.function(globalThis.URL?.revokeObjectURL)
   ? globalThis.URL.revokeObjectURL.bind(globalThis.URL)
   : null;
 const ARTIFACT_ERROR_REASONS = completeValue({
@@ -70,7 +73,7 @@ function speechError(code, message, cause, reason = ARTIFACT_ERROR_REASONS[code]
     : new Error(message, { cause });
   error.name = "ArcaneBrowserSpeechError";
   error.code = code;
-  if (typeof reason === "string" && reason) error.reason = reason;
+  if (is.string(reason) && reason) error.reason = reason;
   ARTIFACT_ERRORS.add(error);
   return error;
 }
@@ -104,7 +107,7 @@ function throwIfAborted(signal) {
 }
 
 function requiredText(value, label) {
-  if (typeof value !== "string" || !value.trim()) {
+  if (!is.string(value) || !value.trim()) {
     throw new TypeError(`${label} must be a nonempty string.`);
   }
   return value.trim();
@@ -115,7 +118,7 @@ function identifier(value, label) {
 }
 
 function artifactGraphText(value, label, reason = "artifact-graph-field-text-required") {
-  if (typeof value !== "string" || !value.trim()) {
+  if (!is.string(value) || !value.trim()) {
     throw artifactGraphTypeError(reason, `${label} must be a nonempty string.`);
   }
   return value.trim();
@@ -176,7 +179,7 @@ function graphPositiveInteger(
   label,
   reason = "artifact-graph-positive-safe-integer-required",
 ) {
-  if (!Number.isSafeInteger(value) || value < 1) {
+  if (!is.safeInteger(value) || value < 1) {
     throw artifactGraphTypeError(
       reason,
       `${label} must be a positive safe integer.`,
@@ -272,7 +275,7 @@ function lexicalCompare(left, right) {
 }
 
 function normalizeFile(value, kind, index) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (!value || !is.object(value) || is.array(value)) {
     throw new TypeError(`${kind} file ${String(index)} must be an object.`);
   }
   const path = requiredText(value.path ?? value.name, `${kind} file path`);
@@ -289,7 +292,7 @@ function normalizeFile(value, kind, index) {
     index,
     path,
     url,
-    mediaType: typeof value.mediaType === "string" && value.mediaType.trim()
+    mediaType: is.string(value.mediaType) && value.mediaType.trim()
       ? value.mediaType.trim()
       : kind === "runtime" && /\.(?:m?js)$/iu.test(path)
         ? "text/javascript"
@@ -300,7 +303,7 @@ function normalizeFile(value, kind, index) {
 function uniqueFiles(files, label, kind, {
   allowEmpty = false,
 } = {}) {
-  if (!Array.isArray(files) || (!allowEmpty && files.length < 1)) {
+  if (!is.array(files) || (!allowEmpty && files.length < 1)) {
     throw new TypeError(
       allowEmpty
         ? `${label} files must be an array.`
@@ -330,7 +333,7 @@ function publicFile(file) {
 }
 
 function normalizeArtifactGraphFile(value, index) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (!value || !is.object(value) || is.array(value)) {
     throw artifactGraphTypeError(
       "artifact-graph-file-descriptor-not-object",
       `Artifact graph file ${String(index)} must be an object.`,
@@ -398,7 +401,7 @@ function normalizeArtifactGraphFile(value, index) {
     );
   }
   const requestUrls = value.runtimeRequestUrls ?? [];
-  if (!Array.isArray(requestUrls)) {
+  if (!is.array(requestUrls)) {
     throw artifactGraphTypeError(
       "artifact-graph-runtime-request-routes-not-array",
       `Artifact graph file ${path} runtimeRequestUrls must be an array.`,
@@ -461,14 +464,14 @@ function normalizeGraphTargetPath(value, label, filesByPath, javascript = false)
 }
 
 function normalizeArtifactGraphVoices(value, defaultVoice, filesByPath) {
-  if (!Array.isArray(value) || value.length < 1) {
+  if (!is.array(value) || value.length < 1) {
     throw artifactGraphTypeError(
       "artifact-graph-voice-inventory-missing",
       "A TTS artifact graph requires a nonempty voices array.",
     );
   }
   const voices = value.map((voice, index) => {
-    if (!voice || typeof voice !== "object" || Array.isArray(voice)) {
+    if (!voice || !is.object(voice) || is.array(voice)) {
       throw artifactGraphTypeError(
         "artifact-graph-voice-descriptor-not-object",
         `Artifact graph voice ${String(index)} must be an object.`,
@@ -567,19 +570,19 @@ export function createBrowserSpeechArtifactGraph({
       "artifact-graph-provider-id-missing",
       "artifact-graph-provider-id-length-exceeded",
     );
-  if (!model || typeof model !== "object" || Array.isArray(model)) {
+  if (!model || !is.object(model) || is.array(model)) {
     throw artifactGraphTypeError(
       "artifact-graph-model-descriptor-missing",
       "Browser speech artifact graph model descriptor is required.",
     );
   }
-  if (!runtime || typeof runtime !== "object" || Array.isArray(runtime)) {
+  if (!runtime || !is.object(runtime) || is.array(runtime)) {
     throw artifactGraphTypeError(
       "artifact-graph-runtime-descriptor-missing",
       "Browser speech artifact graph runtime descriptor is required.",
     );
   }
-  if (!Array.isArray(files) || files.length < 1) {
+  if (!is.array(files) || files.length < 1) {
     throw artifactGraphTypeError(
       "artifact-graph-file-inventory-missing",
       "Browser speech artifact graph requires a nonempty files array.",
@@ -677,7 +680,7 @@ export function createBrowserSpeechArtifactGraph({
     );
   }
   const onnxWasm = runtime.onnxWasm;
-  if (!onnxWasm || typeof onnxWasm !== "object" || Array.isArray(onnxWasm)) {
+  if (!onnxWasm || !is.object(onnxWasm) || is.array(onnxWasm)) {
     throw artifactGraphTypeError(
       "artifact-graph-onnx-wasm-descriptor-missing",
       "Browser speech artifact graph runtime onnxWasm descriptor is required.",
@@ -880,10 +883,10 @@ export function createBrowserSpeechAuthority({
   if (role !== "stt" && role !== "tts") {
     throw new TypeError('Browser speech role must be "stt" or "tts".');
   }
-  if (!model || typeof model !== "object" || Array.isArray(model)) {
+  if (!model || !is.object(model) || is.array(model)) {
     throw new TypeError("Browser speech model descriptor is required.");
   }
-  if (!runtime || typeof runtime !== "object" || Array.isArray(runtime)) {
+  if (!runtime || !is.object(runtime) || is.array(runtime)) {
     throw new TypeError("Browser speech runtime descriptor is required.");
   }
   const normalizedSecurity = normalizeModelSecurity(
@@ -1084,14 +1087,14 @@ function storageNames(authority, files) {
 }
 
 async function* byteChunks(body, signal) {
-  if (body instanceof Uint8Array || body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
+  if (is.instanceCheck(body, Uint8Array) || is.instanceCheck(body, ArrayBuffer) || is.arrayBufferView(body)) {
     throwIfAborted(signal);
-    yield body instanceof Uint8Array
+    yield is.instanceCheck(body, Uint8Array)
       ? body
       : new Uint8Array(body.buffer ?? body, body.byteOffset ?? 0, body.byteLength);
     return;
   }
-  if (body && typeof body.getReader === "function") {
+  if (body && is.function(body.getReader)) {
     const reader = body.getReader();
     const abort = () => void reader.cancel(signal?.reason).catch(() => undefined);
     signal?.addEventListener?.("abort", abort, { once: true });
@@ -1100,7 +1103,7 @@ async function* byteChunks(body, signal) {
         throwIfAborted(signal);
         const { done, value } = await reader.read();
         if (done) return;
-        yield value instanceof Uint8Array ? value : new Uint8Array(value);
+        yield is.instanceCheck(value, Uint8Array) ? value : new Uint8Array(value);
       }
     } finally {
       signal?.removeEventListener?.("abort", abort);
@@ -1347,7 +1350,7 @@ function ordinaryArtifactUrl(value, base) {
 }
 
 function isBareModuleSpecifier(value) {
-  return typeof value === "string"
+  return is.string(value)
     && !value.startsWith("./")
     && !value.startsWith("../")
     && !value.startsWith("/")
@@ -1696,7 +1699,7 @@ async function createOrdinaryArtifactObjectUrls(
 ) {
   const create = objectUrlFactory?.create ?? PLATFORM_CREATE_OBJECT_URL;
   const revoke = objectUrlFactory?.revoke ?? PLATFORM_REVOKE_OBJECT_URL;
-  if (typeof create !== "function" || typeof revoke !== "function") {
+  if (!is.function(create) || !is.function(revoke)) {
     throw artifactGraphError(
       "artifact-graph-object-url-platform-unavailable",
       "Artifact materialization requires native Blob URL creation and revocation.",
@@ -1706,11 +1709,11 @@ async function createOrdinaryArtifactObjectUrls(
   const materializedByPath = new Map();
   const created = [];
   async function materialize(descriptor, body) {
-    const blob = body instanceof Blob && body.type === descriptor.mediaType
+    const blob = is.instanceCheck(body, Blob) && body.type === descriptor.mediaType
       ? body
       : new Blob([body], { type: descriptor.mediaType });
     const moduleUrl = create(blob);
-    if (typeof moduleUrl !== "string") {
+    if (!is.string(moduleUrl)) {
       throw artifactGraphError(
         "artifact-graph-object-url-platform-unavailable",
         `Artifact file ${descriptor.path} did not produce an object URL.`,
@@ -1777,7 +1780,7 @@ async function createOrdinaryArtifactObjectUrls(
 function createObjectUrls(files, factory) {
   const create = factory?.create ?? ((blob) => URL.createObjectURL(blob));
   const revoke = factory?.revoke ?? ((url) => URL.revokeObjectURL(url));
-  if (typeof create !== "function" || typeof revoke !== "function") {
+  if (!is.function(create) || !is.function(revoke)) {
     throw new TypeError("Browser speech objectUrlFactory requires create() and revoke().");
   }
   const created = [];
@@ -1830,14 +1833,14 @@ export function createDbopfsSpeechArtifactStore({
   fetchImpl = null,
   objectUrlFactory = null,
 } = {}) {
-  if (!dbopfs || typeof dbopfs.getTableHandle !== "function") {
+  if (!dbopfs || !is.function(dbopfs.getTableHandle)) {
     throw new TypeError("createDbopfsSpeechArtifactStore requires an existing DBOPFS instance.");
   }
-  if (dbopfs.readyPromise !== undefined && typeof dbopfs.readyPromise?.then !== "function") {
+  if (dbopfs.readyPromise !== undefined && !is.function(dbopfs.readyPromise?.then)) {
     throw new TypeError("The DBOPFS readyPromise must be thenable.");
   }
   const locks = dbopfs.lockManager ?? globalThis.navigator?.locks;
-  if (!locks || typeof locks.request !== "function") {
+  if (!locks || !is.function(locks.request)) {
     throw new TypeError(
       "createDbopfsSpeechArtifactStore requires the browser Web Locks API.",
     );
@@ -1873,7 +1876,7 @@ export function createDbopfsSpeechArtifactStore({
     if (dbopfs.readyPromise) await dbopfs.readyPromise;
     tablePromise ||= Promise.resolve(dbopfs.getTableHandle(tableName));
     const result = await tablePromise;
-    if (!result || typeof result.getFileHandle !== "function" || typeof result.removeEntry !== "function") {
+    if (!result || !is.function(result.getFileHandle) || !is.function(result.removeEntry)) {
       throw speechError("ARCANE_AI_STORAGE_UNAVAILABLE", "DBOPFS did not provide a speech artifact table.");
     }
     return result;
@@ -1934,7 +1937,7 @@ export function createDbopfsSpeechArtifactStore({
     const metadata = artifactMetadata(authority);
     const names = storageNames(authority, metadata.files);
     const priorSelection = await readJsonFile(names.selection);
-    const priorCount = Array.isArray(priorSelection?.files)
+    const priorCount = is.array(priorSelection?.files)
       ? priorSelection.files.length
       : 0;
     const fileNames = Array.from(
@@ -2000,7 +2003,7 @@ export function createDbopfsSpeechArtifactStore({
     const metadata = artifactMetadata(authority);
     const names = storageNames(authority, metadata.files);
     const fetchFunction = fetchImpl ?? globalThis.fetch?.bind(globalThis);
-    if (typeof fetchFunction !== "function") {
+    if (!is.function(fetchFunction)) {
       throw speechError("ARCANE_AI_ARTIFACT_SOURCE_UNAVAILABLE", "Browser fetch is unavailable.");
     }
     await removeUnlocked(authority);
@@ -2039,16 +2042,16 @@ export function createDbopfsSpeechArtifactStore({
         let responseOk;
         let responseStatus;
         try {
-          if (!response || typeof response !== "object") {
+          if (!response || !is.object(response)) {
             throw new TypeError("The artifact fetch result is not an object.");
           }
           responseBody = response.body;
           responseOk = response.ok;
           responseStatus = response.status;
           if (
-            typeof responseOk !== "boolean"
-            || !Number.isInteger(responseStatus)
-            || (responseBody !== null && typeof responseBody?.getReader !== "function")
+            !is.boolean(responseOk)
+            || !is.integer(responseStatus)
+            || (responseBody !== null && !is.function(responseBody?.getReader))
           ) {
             throw new TypeError("The artifact fetch result is not a readable Fetch Response.");
           }

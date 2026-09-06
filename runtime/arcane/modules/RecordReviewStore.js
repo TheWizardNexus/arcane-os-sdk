@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 import {resolveApplicationLocalStorageKey} from './AppDataScope.js';
 
@@ -43,17 +46,17 @@ function operationAbortedError(reason){
 }
 
 function isPlainRecord(value){
-    if(!value||typeof value!=='object'||Array.isArray(value)) return false;
+    if(!value||!is.object(value)||is.array(value)) return false;
     const prototype=Object.getPrototypeOf(value);
     return prototype===Object.prototype||prototype===null;
 }
 
 function isAbortSignal(value){
     return Boolean(value)
-        &&typeof value==='object'
-        &&typeof value.aborted==='boolean'
-        &&typeof value.addEventListener==='function'
-        &&typeof value.removeEventListener==='function';
+        &&is.object(value)
+        &&is.boolean(value.aborted)
+        &&is.function(value.addEventListener)
+        &&is.function(value.removeEventListener);
 }
 
 function normalizeOperationOptions(value={}){
@@ -110,15 +113,15 @@ function normalizeRecordId(value=''){
 }
 
 function normalizeReview(value={}){
-    const source=value&&typeof value==='object'?value:{};
+    const source=value&&is.object(value)?value:{};
     const attributes={};
-    if(source.attributes&&typeof source.attributes==='object'&&!Array.isArray(source.attributes)){
+    if(source.attributes&&is.object(source.attributes)&&!is.array(source.attributes)){
         for(const [key,value] of Object.entries(source.attributes)){
             const normalizedKey=String(key);
             setDataProperty(
                 attributes,
                 normalizedKey,
-                Array.isArray(value)
+                is.array(value)
                     ?value.map(function normalizeReviewAttributeItem(item){
                         return String(item);
                     })
@@ -184,7 +187,7 @@ function normalizedStoredRecords(value){
 }
 
 function validateAdapter(adapter){
-    if(!adapter||typeof adapter.get!=='function'||typeof adapter.set!=='function'){
+    if(!adapter||!is.function(adapter.get)||!is.function(adapter.set)){
         throw recordReviewStoreError(
             RECORD_REVIEW_STORE_ERROR_CODES.adapterInvalid,
             'record-review-storage-adapter-invalid',

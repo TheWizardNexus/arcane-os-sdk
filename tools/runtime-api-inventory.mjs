@@ -1,7 +1,10 @@
+import Is from 'strong-type';
 import {readFile,readdir} from 'node:fs/promises';
 import path from 'node:path';
 import vm from 'node:vm';
 import {fileURLToPath,pathToFileURL} from 'node:url';
+
+const is = new Is(false);
 
 const repositoryRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const runtimeRoot=path.join(repositoryRoot,'runtime');
@@ -23,7 +26,7 @@ const runtimePackageImports=new Map([
         path.join(repositoryRoot,'browser-runtime','ai','browser-speech.mjs')
     ]
 ]);
-const runtimeExternalImports=new Set(['event-pubsub']);
+const runtimeExternalImports=new Set(['event-pubsub','strong-type']);
 function portablePath(filePath){
     return path.relative(repositoryRoot,filePath).split(path.sep).join('/');
 }
@@ -55,7 +58,7 @@ function resolvedFile(specifier,identifier){
 }
 
 export async function inspectRuntimeApi(){
-    if(typeof vm.SourceTextModule!=='function'||typeof vm.SyntheticModule!=='function'){
+    if(!is.function(vm.SourceTextModule)||!is.function(vm.SyntheticModule)){
         throw new Error(
             'Runtime API inspection requires Node --experimental-vm-modules.'
         );
@@ -131,7 +134,7 @@ export async function inspectRuntimeApi(){
         const record=await moduleRecord(filePath);
         if(record.module.status==='unlinked')await record.module.link(linker);
         const exports=Reflect.ownKeys(record.module.namespace)
-            .filter(name=>typeof name==='string')
+            .filter(name=>is.string(name))
             .sort();
         return {exports,parseMode:record.parseMode};
     };

@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const REPORT_KEY_PATTERN=/^[a-zA-Z0-9._:-]+$/;
 const REQUEST_ID_PATTERN=/^[a-zA-Z0-9-]+$/;
 const PROVIDER_ID_PATTERN=/^[a-zA-Z0-9._:-]+$/;
@@ -18,16 +21,16 @@ export class MailTransportError extends Error {
         this.code=code;
         this.details=details;
         this.retryable=Boolean(retryable);
-        this.retryAfterMs=Number.isSafeInteger(retryAfterMs)&&retryAfterMs>0
+        this.retryAfterMs=is.safeInteger(retryAfterMs)&&retryAfterMs>0
             ? retryAfterMs
             : 0;
-        this.statusCode=Number.isSafeInteger(statusCode)?statusCode:0;
+        this.statusCode=is.safeInteger(statusCode)?statusCode:0;
         this.uncertain=Boolean(uncertain);
     }
 }
 
 export function normalizeMailEndpoint(endpoint,base=globalThis.location?.href){
-    if(typeof endpoint!=='string'||!endpoint.trim()){
+    if(!is.string(endpoint)||!endpoint.trim()){
         throw new Error('Mail endpoint is required');
     }
     let url;
@@ -47,7 +50,7 @@ export function normalizeMailEndpoint(endpoint,base=globalThis.location?.href){
 }
 
 export function serializeMailReport(report){
-    if(!report||typeof report!=='object'||Array.isArray(report)){
+    if(!report||!is.object(report)||is.array(report)){
         throw new Error('Mail report must be a JSON object');
     }
     try{
@@ -62,7 +65,7 @@ export function serializeMailReport(report){
 }
 
 function validateSerializedReport(serializedReport){
-    if(typeof serializedReport!=='string'||!serializedReport){
+    if(!is.string(serializedReport)||!serializedReport){
         throw new Error('Serialized mail report is required');
     }
     let parsed;
@@ -71,7 +74,7 @@ function validateSerializedReport(serializedReport){
     }catch{
         throw new Error('Serialized mail report must contain valid JSON');
     }
-    if(!parsed||typeof parsed!=='object'||Array.isArray(parsed)){
+    if(!parsed||!is.object(parsed)||is.array(parsed)){
         throw new Error('Serialized mail report must contain a JSON object');
     }
     return serializedReport;
@@ -80,14 +83,14 @@ function validateSerializedReport(serializedReport){
 function parseJsonObject(value){
     try{
         const parsed=JSON.parse(value);
-        return parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed:null;
+        return parsed&&is.object(parsed)&&!is.array(parsed)?parsed:null;
     }catch{
         return null;
     }
 }
 
 function parseRetryAfter(value,now=Date.now()){
-    if(typeof value!=='string'||!value.trim()){
+    if(!is.string(value)||!value.trim()){
         return 0;
     }
     const trimmed=value.trim();
@@ -95,7 +98,7 @@ function parseRetryAfter(value,now=Date.now()){
         return Math.max(0,Math.ceil(Number(trimmed)*1000));
     }
     const timestamp=Date.parse(trimmed);
-    return Number.isFinite(timestamp)
+    return is.finite(timestamp)
         ? Math.max(0,timestamp-now)
         : 0;
 }
@@ -110,19 +113,19 @@ function invalidSuccessResponse(response,responseText){
 function parseDeliveryResponse(response,responseText){
     const body=parseJsonObject(responseText);
     if(!body
-        || typeof body.requestId!=='string'||!REQUEST_ID_PATTERN.test(body.requestId)
+        || !is.string(body.requestId)||!REQUEST_ID_PATTERN.test(body.requestId)
         || !Object.hasOwn(RESPONSE_CONTRACT,body.status)
         || RESPONSE_CONTRACT[body.status]!==response.status) {
         throw invalidSuccessResponse(response,responseText);
     }
     for(const field of ['accepted','rejected']){
         if(body[field]!==undefined
-            && (!Number.isSafeInteger(body[field])||body[field]<0)) {
+            && (!is.safeInteger(body[field])||body[field]<0)) {
             throw invalidSuccessResponse(response,responseText);
         }
     }
     if(body.providerId!==undefined
-        && (typeof body.providerId!=='string'||!PROVIDER_ID_PATTERN.test(body.providerId))){
+        && (!is.string(body.providerId)||!PROVIDER_ID_PATTERN.test(body.providerId))){
         throw invalidSuccessResponse(response,responseText);
     }
 
@@ -135,7 +138,7 @@ function parseDeliveryResponse(response,responseText){
         status:body.status,
         statusCode:response.status,
         ...(body.providerId?{providerId:body.providerId}:{}),
-        retryAfterMs:Number.isSafeInteger(body.retryAfterMs)&&body.retryAfterMs>0
+        retryAfterMs:is.safeInteger(body.retryAfterMs)&&body.retryAfterMs>0
             ? body.retryAfterMs
             : parseRetryAfter(response.headers?.get?.('retry-after')),
     };
@@ -143,14 +146,14 @@ function parseDeliveryResponse(response,responseText){
 
 function parseRejection(response,responseText){
     const body=parseJsonObject(responseText);
-    const source=body?.error&&typeof body.error==='object'&&!Array.isArray(body.error)
+    const source=body?.error&&is.object(body.error)&&!is.array(body.error)
         ? body.error
         : body;
     const rawCode=source?.code;
-    const code=typeof rawCode==='string'&&ERROR_CODE_PATTERN.test(rawCode)
+    const code=is.string(rawCode)&&ERROR_CODE_PATTERN.test(rawCode)
         ? rawCode
         : `MAIL_HTTP_${String(response.status)}`;
-    let retryable=typeof source?.retryable==='boolean'
+    let retryable=is.boolean(source?.retryable)
         ? source.retryable
         : RETRYABLE_STATUS_CODES.has(response.status);
     if(code==='invalid_idempotent_request'||NON_RETRYABLE_RATE_CODES.has(code)){
@@ -158,8 +161,8 @@ function parseRejection(response,responseText){
     }else if(code==='concurrent_idempotent_requests'){
         retryable=true;
     }
-    const uncertain=typeof source?.uncertain==='boolean'?source.uncertain:false;
-    const bodyRetryAfter=Number.isSafeInteger(source?.retryAfterMs)&&source.retryAfterMs>0
+    const uncertain=is.boolean(source?.uncertain)?source.uncertain:false;
+    const bodyRetryAfter=is.safeInteger(source?.retryAfterMs)&&source.retryAfterMs>0
         ? source.retryAfterMs
         : 0;
     return new MailTransportError(`Mail server rejected the request (${response.status})`,{
@@ -173,8 +176,8 @@ function parseRejection(response,responseText){
 }
 
 async function readResponseText(response){
-    if(!response.body||typeof response.body.getReader!=='function'){
-        if(typeof response.text!=='function'){
+    if(!response.body||!is.function(response.body.getReader)){
+        if(!is.function(response.text)){
             throw new MailTransportError('Mail server returned an unreadable response',{
                 code:'MAIL_UNREADABLE_RESPONSE',statusCode:response.status,uncertain:true,
             });
@@ -225,21 +228,21 @@ export async function sendMailReport({
     serializedReport,
     signal,
 }){
-    if(typeof fetchImpl!=='function'){
+    if(!is.function(fetchImpl)){
         throw new MailTransportError('Mail transport is unavailable',{code:'MAIL_UNAVAILABLE'});
     }
     const resolvedEndpoint=normalizeMailEndpoint(endpoint);
-    if(typeof appName!=='string'||!/^[a-z0-9](?:[a-z0-9-]{0,62})$/.test(appName)){
+    if(!is.string(appName)||!/^[a-z0-9](?:[a-z0-9-]{0,62})$/.test(appName)){
         throw new Error('Mail application identity is invalid');
     }
-    if(typeof reportKey!=='string'||!REPORT_KEY_PATTERN.test(reportKey)){
+    if(!is.string(reportKey)||!REPORT_KEY_PATTERN.test(reportKey)){
         throw new Error('Mail report key must contain safe characters');
     }
     if(requestTimeout!==null&&requestTimeout!==undefined
-        &&(!Number.isSafeInteger(requestTimeout)||requestTimeout<1)){
+        &&(!is.safeInteger(requestTimeout)||requestTimeout<1)){
         throw new Error('Mail request timeout must be a positive integer');
     }
-    if(appKey!==undefined&&appKey!==null&&typeof appKey!=='string'){
+    if(appKey!==undefined&&appKey!==null&&!is.string(appKey)){
         throw new Error('Mail application key must be a string');
     }
     if(signal!==undefined&&!(signal instanceof AbortSignal)){
@@ -252,7 +255,7 @@ export async function sendMailReport({
         'Idempotency-Key':reportKey,
         'X-Mail-App':appName,
     };
-    if(typeof appKey==='string'&&appKey){
+    if(is.string(appKey)&&appKey){
         headers['X-Mail-Key']=appKey;
     }
 

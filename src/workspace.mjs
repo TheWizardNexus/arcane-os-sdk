@@ -1,3 +1,4 @@
+import Is from 'strong-type';
 import {readFile,readdir,realpath,stat} from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -8,6 +9,8 @@ import {
 import {loadAppDescriptor} from './app-descriptor.mjs';
 import {SDK_NAME as EXPECTED_SDK_NAME} from './constants.mjs';
 import {inspectImportMapHtml} from './import-map.mjs';
+
+const is = new Is(false);
 
 const APP_ID_PATTERN=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const NPM_PACKAGE_NAME_PATTERN=/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/u;
@@ -22,7 +25,7 @@ function fail(message,code='ARCANE_WORKSPACE_INVALID'){
 }
 
 function isObject(value){
-    return value!==null&&typeof value==='object'&&!Array.isArray(value);
+    return value!==null&&is.object(value)&&!is.array(value);
 }
 
 function ordinal(left,right){
@@ -37,7 +40,7 @@ function throwIfAborted(signal){
 }
 
 async function emit(onEvent,event){
-    if(typeof onEvent==='function')await onEvent(event);
+    if(is.function(onEvent))await onEvent(event);
 }
 
 async function readJson(filePath,label){
@@ -71,7 +74,7 @@ function sameDirectoryPath(left,right){
 }
 
 function sdkPackageSourceForDependency(dependencyName){
-    if(typeof dependencyName!=='string'||dependencyName.length>214
+    if(!is.string(dependencyName)||dependencyName.length>214
         ||!NPM_PACKAGE_NAME_PATTERN.test(dependencyName)){
         fail(`Invalid installed SDK dependency name: ${String(dependencyName)}.`);
     }
@@ -85,7 +88,7 @@ function sdkPackageSourceForDependency(dependencyName){
 }
 
 function dependencyNameForSdkPackageSource(source){
-    if(typeof source!=='string'||!source.startsWith('node_modules/'))return null;
+    if(!is.string(source)||!source.startsWith('node_modules/'))return null;
     const dependencyName=source.slice('node_modules/'.length);
     try{
         return sdkPackageSourceForDependency(dependencyName)===source?dependencyName:null;
@@ -95,7 +98,7 @@ function dependencyNameForSdkPackageSource(source){
 }
 
 function routeIncludeMatches(actual,wanted,optionalSecurity){
-    if(!Array.isArray(actual)||!Array.isArray(wanted))return false;
+    if(!is.array(actual)||!is.array(wanted))return false;
     if(actual.length===wanted.length
         &&actual.every(function sameIncludedPath(value,index){return value===wanted[index];})){
         return true;
@@ -118,11 +121,11 @@ export function resolveSdkPackageDeclaration(rootPackage,{
         if(!isObject(group))fail(`package.json ${groupName} must be a JSON object.`);
         for(const [dependencyName,specifier] of Object.entries(group)){
             const canonicalName=dependencyName===EXPECTED_SDK_NAME;
-            const aliasTarget=typeof specifier==='string'
+            const aliasTarget=is.string(specifier)
                 &&(specifier===`npm:${EXPECTED_SDK_NAME}`
                     ||specifier.startsWith(`npm:${EXPECTED_SDK_NAME}@`));
             if(!canonicalName&&!aliasTarget)continue;
-            if(typeof specifier!=='string'||!specifier.trim()){
+            if(!is.string(specifier)||!specifier.trim()){
                 fail(`package.json ${groupName}.${dependencyName} must declare an SDK package version or source.`);
             }
             candidates.push(completeValue({
@@ -155,7 +158,7 @@ export function resolveSdkPackageDeclaration(rootPackage,{
 function classifyRootConfig(config){
     const validated=validatePackagerRootConfig(config,ROOT_CONFIG_NAME);
     const routes=validated.sharedPayloads['browser-runtime'];
-    if(!Array.isArray(routes))fail(`${ROOT_CONFIG_NAME} must define browser-runtime routes.`);
+    if(!is.array(routes))fail(`${ROOT_CONFIG_NAME} must define browser-runtime routes.`);
     const externalPackageSource=routes.length===2
         &&dependencyNameForSdkPackageSource(routes[1]?.source)!==null
         ?routes[1].source
@@ -194,7 +197,7 @@ function classifyRootConfig(config){
                     optionalArcaneSecurity&&index===0
                         &&wanted.source==='arcane'&&wanted.destination==='arcane'
                 )
-                &&Array.isArray(route.exclude)&&route.exclude.length===0;
+                &&is.array(route.exclude)&&route.exclude.length===0;
         });
     };
     let workspaceMode;
@@ -272,7 +275,7 @@ export async function inspectWorkspaceProfile(workspaceRoot=process.cwd()){
 
 export async function selectApp(workspaceRoot=process.cwd(),appId){
     const apps=await discoverApps(workspaceRoot);
-    if(appId!==undefined&&(typeof appId!=='string'||!APP_ID_PATTERN.test(appId))){
+    if(appId!==undefined&&(!is.string(appId)||!APP_ID_PATTERN.test(appId))){
         fail(`Invalid app id: ${String(appId)}.`,'ARCANE_USAGE');
     }
     if(appId){
@@ -292,7 +295,7 @@ export async function resolveWorkspace({workspaceRoot=process.cwd(),appId}={}){
     const canonicalRoot=profile.workspaceRoot;
     const config=profile.config;
     const apps=await discoverAppsInRoot(canonicalRoot,config);
-    if(appId!==undefined&&(typeof appId!=='string'||!APP_ID_PATTERN.test(appId))){
+    if(appId!==undefined&&(!is.string(appId)||!APP_ID_PATTERN.test(appId))){
         fail(`Invalid app id: ${String(appId)}.`,'ARCANE_USAGE');
     }
     let app;
@@ -330,7 +333,7 @@ export async function resolveInstalledSdkInstallation(workspaceRoot,declaration)
         path.join(canonicalPackageRoot,'package.json'),
         'installed SDK package manifest'
     );
-    if(installedPackage.name!==EXPECTED_SDK_NAME||typeof installedPackage.version!=='string'){
+    if(installedPackage.name!==EXPECTED_SDK_NAME||!is.string(installedPackage.version)){
         fail(`Installed SDK package must identify as ${EXPECTED_SDK_NAME}.`);
     }
     const runtimeRoot=path.join(canonicalPackageRoot,'runtime');
@@ -427,8 +430,8 @@ export async function validateDiscoveredApplication({
     onEvent
 }={}){
     throwIfAborted(signal);
-    if(!app||typeof app.appId!=='string'||!APP_ID_PATTERN.test(app.appId)
-        ||typeof app.appRoot!=='string'
+    if(!app||!is.string(app.appId)||!APP_ID_PATTERN.test(app.appId)
+        ||!is.string(app.appRoot)
         ||!app.manifest||!app.descriptor){
         fail('A discovered Arcane application is required for focused validation.');
     }

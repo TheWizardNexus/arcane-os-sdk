@@ -36,6 +36,20 @@ settles it: an exact matching executed, declined, cancelled, or not-executed
   commit when a release is explicitly selected. That release-only identity is
   not an ordinary application, development, package, or runtime gate.
 - Use plain JavaScript and web standards. Do not introduce TypeScript or TSX.
+- Use the declared `strong-type` dependency for ordinary type predicates across
+  the toolchain, portable runtime, browser providers, and component scripts.
+  Reuse one module- or component-scoped `Is(false)` for branching; preserve
+  existing public errors, accepted inputs, null handling, ranges, and defaults.
+  `object` includes null and `number` includes NaN and infinities; use the
+  precise finite/integer/array predicates where those are the existing contract.
+  Do not replace a broad record check with `plainObject`, coerce payloads, or
+  add stricter schemas merely to standardize type checks. Retain nominal
+  constructor checks, classic-script probes, and isolated generated-code probes
+  when substituting a library check would change their semantics or execution
+  scope. Publication bootstrap tools use the shipped relative dependency path
+  when they must run before npm dependencies are installed.
+  Keep the npm pin, lockfile, and shipped strong-type projections aligned through
+  the published dependency update workflow; never hand-edit upstream source.
 - Remove only demonstrably obsolete SDK code. An alternative API, positional
   signature, or old label does not make an API with live callers dead. Preserve
   needed public interfaces and their shared implementations unless the user

@@ -37,7 +37,7 @@ for the installed-inventory-derived physical-runtime contract in SDK `0.5.17`.
 | `arcane-os/logging` | Shared console diagnostics controlled by the existing `user.developer` preference. |
 | `arcane-os/preference-store` | Portable preference records and injected storage adapters. |
 | `arcane-os/speech-playback` | Portable speech preparation, playback state, and injected media adapters. |
-| `arcane-os/speech-text` | Dependency-free speech-input formatting cleanup for complete text and streamed chunks. |
+| `arcane-os/speech-text` | Speech-input formatting cleanup for complete text and streamed chunks. |
 | `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, complete DBOPFS model storage, streaming, cancellation, and structural tool-call results. |
 | `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS provider mechanisms, ordinary upstream assets, materialized/native routing, Workers, and cancellation. |
 | `arcane-os/mail` | Portable Mail runtime, durable outbox, complete transport responses, and provider-neutral acceptance contracts. |
@@ -1719,7 +1719,7 @@ console.log(splitSpeechText('Hello world.'));
 
 ### Overview
 
-Streams the SDK's dependency-free speech formatting cleanup across input chunk
+Streams the SDK's speech formatting cleanup across input chunk
 boundaries. `append()` removes runs of two or more identical `*`, `#`, `_`,
 backtick, or `~` marks while retaining single marks and every other character.
 It is a narrow speech filter, not a Markdown parser. Normal SDK TTS calls use

@@ -1,3 +1,4 @@
+import Is from 'strong-type';
 import {
     mkdir,
     readFile,
@@ -10,6 +11,8 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {verifyRuntimeReferenceContracts} from './reference-contract-extractor.mjs';
 import {createReferenceModuleContractMap} from './reference-module-contracts.mjs';
+
+const is = new Is(false);
 
 const scriptPath=fileURLToPath(import.meta.url);
 const repositoryRoot=path.resolve(path.dirname(scriptPath),'..');
@@ -2110,7 +2113,7 @@ export async function createReferenceSite(){
     }
     const runtimeModuleInventory=JSON.parse(runtimeModuleInventoryInput.contents);
     const runtimeModuleRecords=runtimeModuleInventory.artifacts;
-    if(!Array.isArray(runtimeModuleRecords)){
+    if(!is.array(runtimeModuleRecords)){
         throw new Error('The runtime module inventory must contain an artifacts array.');
     }
     const runtimeContracts=await verifyRuntimeReferenceContracts({
@@ -2465,7 +2468,7 @@ async function priorManagedOutputs(){
         ));
         return [...(prior.pages??[]),...(prior.inventories??[]),...(prior.assets??[])]
             .map(record=>record.output)
-            .filter(output=>typeof output==='string'&&output.startsWith('site/reference/'));
+            .filter(output=>is.string(output)&&output.startsWith('site/reference/'));
     }catch(error){
         if(error?.code==='ENOENT'||error instanceof SyntaxError)return [];
         throw error;

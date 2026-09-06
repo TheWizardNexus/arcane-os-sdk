@@ -1,6 +1,6 @@
 {
   "name": "strong-type",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "type": "module",
   "description": "Dependency-free native ESM type enforcement for JavaScript values, objects, classes, browsers, and Node.",
   "main": "index.js",
@@ -14,6 +14,7 @@
   "files": [
     "index.js",
     "node.js",
+    "benchmark/core.js",
     "assets/strong-type-header.png",
     "README.md",
     "licence"
@@ -26,11 +27,16 @@
     "node": ">=12.21.0"
   },
   "scripts": {
+    "benchmark": "node benchmark/core.js",
+    "benchmark:baseline": "node benchmark/core.js --baseline",
+    "benchmark:historical": "node benchmark/core.js --historical",
     "test": "node scripts/test.js",
-    "test:core": "node scripts/test.js core",
-    "test:node": "node scripts/test.js node",
-    "test:docs": "node scripts/test.js docs",
-    "coverage": "node --test --experimental-test-coverage --test-coverage-include=index.js --test-coverage-include=node.js --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=95 test/CI.js test/node.js test/docs.js",
+    "test:unit": "node scripts/test.js unit",
+    "test:functional": "node scripts/test.js functional",
+    "test:integration": "node scripts/test.js integration",
+    "test:regression": "node scripts/test.js regression",
+    "test:legacy": "node scripts/test.js legacy",
+    "coverage": "vanilla-test coverage node",
     "start": "node scripts/serve.js",
     "nodeExample": "node ./example/node/typecheck.js",
     "check": "npm test"
@@ -56,5 +62,8 @@
   "bugs": {
     "url": "https://github.com/RIAEvangelist/strong-type/issues"
   },
-  "homepage": "https://riaevangelist.github.io/strong-type/"
+  "homepage": "https://riaevangelist.github.io/strong-type/",
+  "devDependencies": {
+    "vanilla-test": "2.1.0"
+  }
 }

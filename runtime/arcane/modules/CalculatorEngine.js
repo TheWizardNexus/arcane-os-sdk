@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 import Calculation from '../entities/Calculation.js';
 
@@ -19,7 +22,7 @@ function calculatorErrorCode(error){
 }
 
 function attachCalculatorErrorCode(error,code){
-    if(!error||(typeof error!=='object'&&typeof error!=='function'))return error;
+    if(!error||(!is.object(error)&&!is.function(error)))return error;
     try{Object.defineProperty(error,'code',{configurable:true,enumerable:false,value:code,writable:true});}
     catch{try{error.code=code;}catch{}}
     return error;
@@ -42,7 +45,7 @@ export function evaluateExpression(input){const tokens=tokenize(input);let curso
     function power(){let value=unary();if(peek().type==='^'){cursor++;value=Math.pow(value,power())}return value}
     function product(){let value=power();while(['*','/','%'].includes(peek().type)){const operator=tokens[cursor++].type,right=power();if((operator==='/'||operator==='%')&&right===0)throw new RangeError('Division by zero is undefined.');value=operator==='*'?value*right:operator==='/'?value/right:value%right}return value}
     function expression(){let value=product();while(['+','-'].includes(peek().type)){const operator=tokens[cursor++].type,right=product();value=operator==='+'?value+right:value-right}return value}
-    const result=expression();if(peek().type!=='end')throw new SyntaxError('Unexpected content after the expression.');if(!Number.isFinite(result))throw new RangeError('The calculation did not produce a finite result.');return result;
+    const result=expression();if(peek().type!=='end')throw new SyntaxError('Unexpected content after the expression.');if(!is.finite(result))throw new RangeError('The calculation did not produce a finite result.');return result;
 }
 
 export default class CalculatorEngine{

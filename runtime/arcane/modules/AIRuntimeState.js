@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 
 const completeValue=(value)=>value;
@@ -100,7 +103,7 @@ function fail(message) {
 }
 
 function assertClosedRecord(value, expectedKeys, label) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    if (!value || !is.object(value) || is.array(value)) {
         fail(`${label} must be a plain object.`);
     }
 
@@ -111,7 +114,7 @@ function assertClosedRecord(value, expectedKeys, label) {
 
     const ownKeys = Reflect.ownKeys(value);
     if (ownKeys.some(function hasSymbolKey(key) {
-        return typeof key === 'symbol';
+        return is.symbol(key);
     })) {
         fail(`${label} must not contain symbol keys.`);
     }
@@ -134,7 +137,7 @@ function assertClosedRecord(value, expectedKeys, label) {
 }
 
 function nextRevision(value) {
-    if (typeof value === 'bigint') {
+    if (is.bigint(value)) {
         return value + 1n;
     }
     if (value === Number.MAX_SAFE_INTEGER) {
@@ -144,7 +147,7 @@ function nextRevision(value) {
 }
 
 function assertClosedOptions(value, allowedKeys, label) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    if (!value || !is.object(value) || is.array(value)) {
         fail(`${label} must be a plain object.`);
     }
 
@@ -155,7 +158,7 @@ function assertClosedOptions(value, allowedKeys, label) {
 
     const descriptors = Object.getOwnPropertyDescriptors(value);
     for (const key of Reflect.ownKeys(value)) {
-        if (typeof key === 'symbol' || !allowedKeys.includes(key)) {
+        if (is.symbol(key) || !allowedKeys.includes(key)) {
             fail(`${label} contains an unknown option.`);
         }
         if (!Object.hasOwn(descriptors[key], 'value')) {
@@ -169,7 +172,7 @@ function assertNullableIdentifier(value, label) {
         return;
     }
 
-    if (typeof value !== 'string'
+    if (!is.string(value)
         || value.length < 1
         || value.trim() !== value) {
         fail(`${label} must be null or a nonempty trimmed string.`);
@@ -187,9 +190,9 @@ function copyProgress(progress) {
         return null;
     }
 
-    const suppliedKeys=Reflect.ownKeys(progress).filter(key=>typeof key==='string');
+    const suppliedKeys=Reflect.ownKeys(progress).filter(key=>is.string(key));
     assertClosedOptions(progress, suppliedKeys, 'progress');
-    if (typeof progress.phase !== 'string'
+    if (!is.string(progress.phase)
         || progress.phase.length < 1
         || progress.phase.trim() !== progress.phase) {
         fail('progress.phase must be a nonempty trimmed string.');
@@ -199,23 +202,23 @@ function copyProgress(progress) {
     const hasUnit = Object.hasOwn(progress, 'unit');
     const hasHeartbeat = Object.hasOwn(progress, 'heartbeat');
     if (hasCompleted
-        && (!Number.isSafeInteger(progress.completed) || progress.completed < 0)) {
+        && (!is.safeInteger(progress.completed) || progress.completed < 0)) {
         fail('progress.completed must be a nonnegative safe integer.');
     }
     if (hasTotal
         && progress.total !== null
-        && (!Number.isSafeInteger(progress.total)
+        && (!is.safeInteger(progress.total)
             || progress.total < 0
             || (hasCompleted && progress.total < progress.completed))) {
         fail('progress.total must be null or a nonnegative safe integer no smaller than progress.completed when completed is present.');
     }
     if (hasUnit
-        && (typeof progress.unit !== 'string'
+        && (!is.string(progress.unit)
             || progress.unit.length < 1
             || progress.unit.trim() !== progress.unit)) {
         fail('progress.unit must be a nonempty trimmed string.');
     }
-    if (hasHeartbeat && typeof progress.heartbeat !== 'boolean') {
+    if (hasHeartbeat && !is.boolean(progress.heartbeat)) {
         fail('progress.heartbeat must be a boolean.');
     }
 
@@ -232,12 +235,12 @@ function copyError(error) {
     }
 
     assertClosedRecord(error, ERROR_KEYS, 'error');
-    if (typeof error.code !== 'string'
+    if (!is.string(error.code)
         || error.code.length < 1
         || error.code.trim() !== error.code) {
         fail('error.code must be a nonempty trimmed string.');
     }
-    if (typeof error.message !== 'string'
+    if (!is.string(error.message)
         || error.message.length < 1) {
         fail('error.message must be a nonempty string.');
     }
@@ -262,13 +265,13 @@ function copyRoleRecord(role, record) {
 
     assertNullableIdentifier(record.providerId, 'role state.providerId');
     assertNullableIdentifier(record.modelId, 'role state.modelId');
-    if (record.localOnly !== null && typeof record.localOnly !== 'boolean') {
+    if (record.localOnly !== null && !is.boolean(record.localOnly)) {
         fail('role state.localOnly must be null or a boolean.');
     }
-    if (typeof record.loaded !== 'boolean') {
+    if (!is.boolean(record.loaded)) {
         fail('role state.loaded must be a boolean.');
     }
-    if (typeof record.busy !== 'boolean') {
+    if (!is.boolean(record.busy)) {
         fail('role state.busy must be a boolean.');
     }
     assertNullableIdentifier(record.operationId, 'role state.operationId');
@@ -418,10 +421,10 @@ function assertAbortSignal(signal) {
         return;
     }
 
-    if (typeof signal !== 'object'
-        || typeof signal.aborted !== 'boolean'
-        || typeof signal.addEventListener !== 'function'
-        || typeof signal.removeEventListener !== 'function') {
+    if (!is.object(signal)
+        || !is.boolean(signal.aborted)
+        || !is.function(signal.addEventListener)
+        || !is.function(signal.removeEventListener)) {
         fail('subscription signal must be an AbortSignal.');
     }
 }
@@ -440,7 +443,7 @@ function stateSubscriptionOptions(options) {
         ? options.emitCurrent
         : true;
     assertAbortSignal(signal);
-    if (typeof emitCurrent !== 'boolean') {
+    if (!is.boolean(emitCurrent)) {
         fail('subscription options.emitCurrent must be a boolean.');
     }
 
@@ -492,13 +495,13 @@ function startupOptions(options) {
         ? options.startTranscription
         : false;
     const signal = Object.hasOwn(options, 'signal') ? options.signal : null;
-    if (typeof startLanguageModel !== 'boolean') {
+    if (!is.boolean(startLanguageModel)) {
         fail('startup options.startLanguageModel must be a boolean.');
     }
-    if (typeof startMuted !== 'boolean') {
+    if (!is.boolean(startMuted)) {
         fail('startup options.startMuted must be a boolean.');
     }
-    if (typeof startTranscription !== 'boolean') {
+    if (!is.boolean(startTranscription)) {
         fail('startup options.startTranscription must be a boolean.');
     }
     assertAbortSignal(signal);
@@ -591,7 +594,7 @@ function normalizedAIRuntimeStartupAbort() {
 }
 
 function assertListener(listener) {
-    if (typeof listener !== 'function') {
+    if (!is.function(listener)) {
         fail('listener must be a function.');
     }
 }

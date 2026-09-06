@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 export const AI_PREFERENCE_SLOT_KEYS=Object.freeze([
     'llmProvider',
     'sttProvider',
@@ -8,7 +11,7 @@ export const AI_PREFERENCE_SLOT_KEYS=Object.freeze([
 ]);
 
 function preferenceToken(value){
-    return typeof value==='string'
+    return is.string(value)
         ?value.trim()
         :'';
 }
@@ -20,7 +23,7 @@ function allowedTokensForSlot(allowedValues,index){
         return null;
     }
 
-    if(!Array.isArray(supplied)&&!(supplied instanceof Set)){
+    if(!is.array(supplied)&&!(supplied instanceof Set)){
         throw new TypeError(
             `Allowed AI preference values for ${AI_PREFERENCE_SLOT_KEYS[index]} must be an array or Set.`
         );
@@ -47,13 +50,13 @@ export function normalizeAIPreferenceTuple(
         aliases=[]
     }={}
 ){
-    if(!Array.isArray(defaults)||defaults.length!==AI_PREFERENCE_SLOT_KEYS.length){
+    if(!is.array(defaults)||defaults.length!==AI_PREFERENCE_SLOT_KEYS.length){
         throw new TypeError(
             `AI preference defaults must contain exactly ${AI_PREFERENCE_SLOT_KEYS.length} slots.`
         );
     }
 
-    const source=Array.isArray(value)?value:[];
+    const source=is.array(value)?value:[];
 
     return AI_PREFERENCE_SLOT_KEYS.map((slot,index)=>{
         const fallback=preferenceToken(defaults[index]);
@@ -84,8 +87,8 @@ export function normalizeAIPreferenceTuple(
 }
 
 export function aiPreferenceTuplesEqual(left,right){
-    return Array.isArray(left)
-        &&Array.isArray(right)
+    return is.array(left)
+        &&is.array(right)
         &&left.length===AI_PREFERENCE_SLOT_KEYS.length
         &&right.length===AI_PREFERENCE_SLOT_KEYS.length
         &&left.every((value,index)=>value===right[index]);

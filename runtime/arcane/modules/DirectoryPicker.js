@@ -1,7 +1,10 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 function isRecord(value){
     return Boolean(value)
-        &&typeof value==='object'
-        &&!Array.isArray(value);
+        &&is.object(value)
+        &&!is.array(value);
 }
 
 function coded(error,code){
@@ -11,7 +14,7 @@ function coded(error,code){
 
 function optionalText(value,label){
     if(value===undefined||value===null) return value;
-    if(typeof value!=='string') throw new TypeError(`${label} must be a string when provided.`);
+    if(!is.string(value)) throw new TypeError(`${label} must be a string when provided.`);
     return value;
 }
 
@@ -30,7 +33,7 @@ function normalizeDirectoryPickerOptions(input={}){
 function normalizeDirectorySelection(input){
     if(
         !isRecord(input)
-        ||typeof input.cancelled!=='boolean'
+        ||!is.boolean(input.cancelled)
     ){
         throw coded(
             new TypeError('The directory picker provider returned an invalid result.'),
@@ -73,7 +76,7 @@ export default class DirectoryPicker{
     }
 
     get available(){
-        return typeof this.provider?.selectDirectory==='function';
+        return is.function(this.provider?.selectDirectory);
     }
 
     async select(options={}){

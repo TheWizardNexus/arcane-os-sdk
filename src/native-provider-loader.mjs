@@ -1,8 +1,11 @@
+import Is from 'strong-type';
 import {lstat,realpath} from 'node:fs/promises';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
 import {validateNativeBuilder} from './native-plan.mjs';
+
+const is = new Is(false);
 
 const PROVIDER_ROOT=['machine_bundles','arcane-os-machine-bundle','tools'];
 
@@ -55,10 +58,10 @@ async function resolveProviderLocation({
             supportedTargets:Object.keys(FIXED_NATIVE_PROVIDER_PATHS)
         });
     }
-    if(typeof arcaneRoot!=='string'||!arcaneRoot.trim()){
+    if(!is.string(arcaneRoot)||!arcaneRoot.trim()){
         fail(`The ${target} native provider requires an Arcane OS checkout root.`);
     }
-    if(typeof inspect!=='function'||typeof canonicalize!=='function'){
+    if(!is.function(inspect)||!is.function(canonicalize)){
         fail('The Arcane native provider loader dependencies are invalid.');
     }
     const requestedRoot=path.resolve(arcaneRoot);
@@ -107,7 +110,7 @@ async function resolveProviderLocation({
 }
 
 export async function loadArcaneNativeProvider(options={}){
-    if(options===null||typeof options!=='object'||Array.isArray(options)){
+    if(options===null||!is.object(options)||is.array(options)){
         fail('Arcane native provider options must be an object.');
     }
     const {
@@ -120,7 +123,7 @@ export async function loadArcaneNativeProvider(options={}){
         onEvent
     }=options;
     throwIfAborted(signal);
-    if(typeof importModule!=='function')fail('The Arcane native provider importer is invalid.');
+    if(!is.function(importModule))fail('The Arcane native provider importer is invalid.');
     await onEvent?.({
         type:'native.provider.load.started',
         target,

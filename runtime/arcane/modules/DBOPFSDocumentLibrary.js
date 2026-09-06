@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import DocumentLexicalSearch,{
     documentContextExcerpt,
     documentSearchTokens,
@@ -31,8 +34,8 @@ function fail(message,code='DBOPFS_DOCUMENT_INVALID',ErrorType=TypeError){
 
 function isPlainRecord(value){
     return Boolean(value)
-        &&typeof value==='object'
-        &&!Array.isArray(value)
+        &&is.object(value)
+        &&!is.array(value)
         &&Object.getPrototypeOf(value)===Object.prototype;
 }
 
@@ -42,7 +45,7 @@ function assertKnownKeys(value,allowed,label){
 }
 
 function boundedInteger(value,label,{minimum,maximum}){
-    if(!Number.isSafeInteger(value)||value<minimum||(maximum!==undefined&&value>maximum)){
+    if(!is.safeInteger(value)||value<minimum||(maximum!==undefined&&value>maximum)){
         const range=maximum===undefined?`${minimum} or greater`:`${minimum} through ${maximum}`;
         fail(`${label} must be an integer from ${range}.`,'DBOPFS_DOCUMENT_INVALID_LIMIT',RangeError);
     }
@@ -51,7 +54,7 @@ function boundedInteger(value,label,{minimum,maximum}){
 
 function normalizedText(value,label,{optional=false}={}){
     if(optional&&(value===undefined||value===null||value==='')) return '';
-    if(typeof value!=='string') fail(`${label} must be a string.`);
+    if(!is.string(value)) fail(`${label} must be a string.`);
     const text=value;
     if(!text.trim()&&!optional) fail(`${label} cannot be empty.`);
     return text;
@@ -59,10 +62,10 @@ function normalizedText(value,label,{optional=false}={}){
 
 function signalLike(value){
     return value===undefined||value===null||(
-        typeof value==='object'
-        &&typeof value.aborted==='boolean'
-        &&typeof value.addEventListener==='function'
-        &&typeof value.removeEventListener==='function'
+        is.object(value)
+        &&is.boolean(value.aborted)
+        &&is.function(value.addEventListener)
+        &&is.function(value.removeEventListener)
     );
 }
 
@@ -80,7 +83,7 @@ async function yieldEvaluationTask(signal){
     throwIfAborted(signal);
     await new Promise((resolve,reject)=>{
         try{
-            if(typeof globalThis.MessageChannel==='function'){
+            if(is.function(globalThis.MessageChannel)){
                 const channel=new globalThis.MessageChannel();
                 channel.port1.onmessage=()=>{
                     channel.port1.close();
@@ -122,13 +125,13 @@ function normalizeSchema(input){
 
 function stringList(value,label){
     if(value===undefined||value===null) return [];
-    if(!Array.isArray(value)) fail(`${label} must be an array.`);
+    if(!is.array(value)) fail(`${label} must be an array.`);
     return value.map((item,index)=>normalizedText(item,`${label} entry ${index+1}`));
 }
 
 function headings(value){
     if(value===undefined||value===null) return [];
-    if(!Array.isArray(value)) fail('Document headings must be an array.');
+    if(!is.array(value)) fail('Document headings must be an array.');
     return value.map((item,index)=>{
         if(!isPlainRecord(item)) fail(`Document heading ${index+1} must be a plain object.`);
         assertKnownKeys(item,new Set(['id','level','text']),`Document heading ${index+1}`);
@@ -153,7 +156,7 @@ function normalizeDocument(input,schema,index,{stored=false}={}){
     const id=normalizedText(input[fields.id],`Document ${index+1} id`);
     if(!IDENTIFIER.test(id)) fail(`Document ${index+1} id is invalid.`);
     const body=input[fields.body];
-    if(typeof body!=='string') fail(`Document ${id} body must be a string.`);
+    if(!is.string(body)) fail(`Document ${id} body must be a string.`);
     const mediaType=normalizedText(input[fields.mediaType]??'text/markdown',`Document ${id} mediaType`);
     if(!['text/markdown','text/plain'].includes(mediaType)) fail(`Document ${id} mediaType is unsupported.`);
     const kind=normalizedText(input[fields.kind]??'document',`Document ${id} kind`).toLowerCase();
@@ -213,7 +216,7 @@ function manifestKey(schema){
 
 function generationId(){
     const value=globalThis.crypto?.randomUUID?.();
-    if(typeof value==='string'&&value)return value;
+    if(is.string(value)&&value)return value;
     generationSequence+=1;
     return `generation-${Date.now().toString(36)}-${generationSequence.toString(36)}`;
 }
@@ -248,7 +251,7 @@ function readFailureError(message,errors,failures){
 function sourceFailureKey(file,index,schema){
     for(const field of ['id','sourcePath','path']){
         const value=file?.[schema.fields[field]];
-        if(typeof value==='string'&&value.trim()) return normalizedFailureText(value,`source:${index+1}`);
+        if(is.string(value)&&value.trim()) return normalizedFailureText(value,`source:${index+1}`);
     }
     return `source:${index+1}`;
 }
@@ -258,11 +261,11 @@ function normalizeReadCoverage(input,count){
     if(
         !isPlainRecord(input)
         ||Object.keys(input).some(key=>!['errors','failures','readable','total'].includes(key))
-        ||!Array.isArray(input.failures)
+        ||!is.array(input.failures)
         ||Object.keys(input.failures).length!==input.failures.length
-        ||!Number.isSafeInteger(input.errors)
-        ||!Number.isSafeInteger(input.readable)
-        ||!Number.isSafeInteger(input.total)
+        ||!is.safeInteger(input.errors)
+        ||!is.safeInteger(input.readable)
+        ||!is.safeInteger(input.total)
     ) fail('Stored document read coverage is invalid.','DBOPFS_DOCUMENT_INCOMPLETE');
     const failures=input.failures.map((item,index)=>{
         if(!isPlainRecord(item)||item.phase!=='source-read'
@@ -416,7 +419,7 @@ async function readEvaluationSources(sources,options){
                 body=await read(descriptor.source,{
                     ordinal:descriptor.ordinal,signal:signal??null
                 });
-                if(typeof body!=='string') fail('read must resolve to document text.');
+                if(!is.string(body)) fail('read must resolve to document text.');
             }catch(error){return {error};}
             return {body,record:{...descriptor.record,body}};
         }));
@@ -478,7 +481,7 @@ class DBOPFSDocumentLibrary{
             'concurrency','db','maxCorpusCharacters','maxDocumentCharacters','maxSearchCharacters','schema'
         ]),'DBOPFS document library options');
         const db=options.db??globalThis.dbopfs;
-        if(!db||typeof db.get!=='function'||typeof db.set!=='function'||typeof db.getAllKeys!=='function'||typeof db.delete!=='function'){
+        if(!db||!is.function(db.get)||!is.function(db.set)||!is.function(db.getAllKeys)||!is.function(db.delete)){
             fail('A DBOPFS-compatible db with get, set, getAllKeys, and delete is required.','DBOPFS_DOCUMENT_STORAGE_UNAVAILABLE');
         }
         this.#db=db;
@@ -511,9 +514,9 @@ class DBOPFSDocumentLibrary{
             new Set(['files','onProgress','read','readFailurePolicy','signal']),
             'Document bootstrap options',
         );
-        if(!Array.isArray(options.files)) fail('Document bootstrap files must be an array.');
-        if(options.onProgress!==undefined&&typeof options.onProgress!=='function') fail('onProgress must be a function.');
-        if(options.read!==undefined&&typeof options.read!=='function') fail('read must be a function.');
+        if(!is.array(options.files)) fail('Document bootstrap files must be an array.');
+        if(options.onProgress!==undefined&&!is.function(options.onProgress)) fail('onProgress must be a function.');
+        if(options.read!==undefined&&!is.function(options.read)) fail('read must be a function.');
         const readFailurePolicy=options.readFailurePolicy??'preserve-readable';
         if(!READ_FAILURE_POLICIES.has(readFailurePolicy)){
             fail('readFailurePolicy must be "reject" or "preserve-readable".');
@@ -537,9 +540,9 @@ class DBOPFSDocumentLibrary{
                 this.#concurrency,
                 options.signal,
                 async file=>{
-                    if(typeof file?.[this.#schema.fields.body]==='string') return file;
+                    if(is.string(file?.[this.#schema.fields.body])) return file;
                     const body=await options.read({...file},{signal:options.signal??null});
-                    if(typeof body!=='string') fail('read must resolve to document text.');
+                    if(!is.string(body)) fail('read must resolve to document text.');
                     return {...file,[this.#schema.fields.body]:body};
                 },
                 (_result,file)=>reportProgress(options.onProgress,{
@@ -689,9 +692,9 @@ class DBOPFSDocumentLibrary{
             ||manifest.schemaId!==this.#schema.id
             ||manifest.table!==this.#schema.table
             ||manifest.schemaVersion!==this.#schema.version
-            ||typeof manifest.generation!=='string'
+            ||!is.string(manifest.generation)
             ||!manifest.generation
-            ||!Array.isArray(manifest.keys)
+            ||!is.array(manifest.keys)
         ) fail('The DBOPFS document corpus has not completed bootstrap.','DBOPFS_DOCUMENT_NOT_BOOTSTRAPPED');
         const readCoverage=normalizeReadCoverage(manifest.readCoverage,manifest.keys.length);
         if((manifest.completed===PARTIAL_COMPLETION)!==(readCoverage.errors>0)){
@@ -700,7 +703,7 @@ class DBOPFSDocumentLibrary{
         const keys=[...manifest.keys];
         if(
             new Set(keys).size!==keys.length
-            ||keys.some(key=>typeof key!=='string'||!key)
+            ||keys.some(key=>!is.string(key)||!key)
         ) fail('The DBOPFS document corpus differs from its completion manifest.','DBOPFS_DOCUMENT_INCOMPLETE');
         const settled=await boundedMap(
             keys,
@@ -776,7 +779,7 @@ class DBOPFSDocumentLibrary{
             'maxScoringCharacters','onProgress','read','readFailurePolicy','signal','sources','tags'
         ]),'Document evaluation options');
         if(!signalLike(options.signal)) fail('signal must be an AbortSignal.');
-        if(options.onProgress!==undefined&&typeof options.onProgress!=='function') fail('onProgress must be a function.');
+        if(options.onProgress!==undefined&&!is.function(options.onProgress)) fail('onProgress must be a function.');
         throwIfAborted(options.signal);
         new DocumentLexicalSearch([]).rank(query,{
             kinds:options.kinds,
@@ -784,8 +787,8 @@ class DBOPFSDocumentLibrary{
         });
         const filters=normalizedEvaluationFilters(options.kinds,options.tags);
 
-        if(!Array.isArray(options.sources)) fail('Document evaluation sources must be an array.');
-        if(typeof options.read!=='function') fail('Source evaluation requires a read function.');
+        if(!is.array(options.sources)) fail('Document evaluation sources must be an array.');
+        if(!is.function(options.read)) fail('Source evaluation requires a read function.');
         const readFailurePolicy=options.readFailurePolicy??'preserve-readable';
         if(!READ_FAILURE_POLICIES.has(readFailurePolicy)){
             fail('readFailurePolicy must be "reject" or "preserve-readable".');

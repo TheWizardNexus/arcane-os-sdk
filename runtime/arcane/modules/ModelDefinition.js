@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const MODEL_REFERENCE=/^[A-Za-z0-9][A-Za-z0-9._/-]*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$/;
 const PARAMETER_NAME=/^[a-z][a-z0-9_]*$/;
 
@@ -8,13 +11,13 @@ function fail(message){
 }
 
 async function completeResponseText(response){
-    if(typeof response?.text!=='function'){
+    if(!is.function(response?.text)){
         fail('The model definition response is not readable.');
     }
 
     const text=await response.text();
 
-    if(typeof text!=='string'){
+    if(!is.string(text)){
         fail('The model definition response is not readable text.');
     }
 
@@ -27,7 +30,7 @@ async function completeResponseText(response){
  * are rejected so browser prompts cannot silently drift from the definition.
  */
 export function parseModelDefinition(source){
-    if(typeof source!=='string'
+    if(!is.string(source)
         ||!source
         ||source.includes('\0')
     ){
@@ -85,7 +88,7 @@ export function parseModelDefinition(source){
 export async function loadModelDefinitionSystemPrompt(url,{
     fetchImpl=globalThis.fetch
 }={}){
-    if(typeof fetchImpl!=='function'){
+    if(!is.function(fetchImpl)){
         fail('A browser fetch implementation is required.');
     }
 

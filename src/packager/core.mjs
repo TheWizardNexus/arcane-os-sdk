@@ -1,3 +1,4 @@
+import Is from 'strong-type';
 import {
     copyFile,
     lstat,
@@ -13,6 +14,8 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {withWorkspaceOperationLock} from '../workspace-operation-lock.mjs';
 import {inspectImportMapHtml,readWorkspaceAssetVersion,rewriteAssetReferences} from '../import-map.mjs';
+
+const is = new Is(false);
 
 export const ROOT_CONFIG_NAME='arcane-packager.json';
 export const APP_CONFIG_NAME='arcane-package.json';
@@ -42,7 +45,7 @@ function throwIfAborted(signal){
 }
 
 async function emit(onEvent,event){
-    if(typeof onEvent==='function')await onEvent(event);
+    if(is.function(onEvent))await onEvent(event);
 }
 
 function compareText(left,right){
@@ -52,7 +55,7 @@ function compareText(left,right){
 }
 
 function isPlainObject(value){
-    return value!==null&&typeof value==='object'&&!Array.isArray(value);
+    return value!==null&&is.object(value)&&!is.array(value);
 }
 
 function copyJson(value){
@@ -67,14 +70,14 @@ function assertOnlyKeys(value,allowed,label){
 }
 
 function normalizeWorkspaceRoot(workspaceRoot){
-    if(typeof workspaceRoot!=='string'||!workspaceRoot.trim()){
+    if(!is.string(workspaceRoot)||!workspaceRoot.trim()){
         fail('workspaceRoot must be a directory path.');
     }
     return path.resolve(workspaceRoot);
 }
 
 export function normalizeRelativePath(value,label='path'){
-    if(typeof value!=='string'||!value||value.includes('\\')||TEXT_CONTROL_PATTERN.test(value)){
+    if(!is.string(value)||!value||value.includes('\\')||TEXT_CONTROL_PATTERN.test(value)){
         fail(`Unsafe ${label}: ${String(value)}`);
     }
     if(path.posix.isAbsolute(value)||/^[a-z]:/iu.test(value))fail(`Unsafe ${label}: ${value}`);
@@ -119,7 +122,7 @@ function isGlobLike(value){
 }
 
 function validatePathList(value,label,{required=false}={}){
-    if(!Array.isArray(value)||(required&&value.length===0)){
+    if(!is.array(value)||(required&&value.length===0)){
         fail(`${label} must be ${required?'a non-empty':'an'} array of literal relative paths.`);
     }
     const normalized=value.map((entry,index)=>{
@@ -160,14 +163,14 @@ function isExcluded(relative,excludes){
 }
 
 function assertPresentationText(value,label){
-    if(typeof value!=='string'||!value.trim()){
+    if(!is.string(value)||!value.trim()){
         fail(`${label} must be nonempty text.`);
     }
     return value;
 }
 
 export function parseSemver(value){
-    if(typeof value!=='string')fail(`Invalid semantic version: ${String(value)}`);
+    if(!is.string(value))fail(`Invalid semantic version: ${String(value)}`);
     const match=/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/u.exec(value);
     if(!match)fail(`Invalid semantic version: ${value}`);
     const prerelease=match[4]?match[4].split('.'):[];
@@ -177,7 +180,7 @@ export function parseSemver(value){
         }
     }
     const numbers=match.slice(1,4).map(Number);
-    if(numbers.some(number=>!Number.isSafeInteger(number))){
+    if(numbers.some(number=>!is.safeInteger(number))){
         fail(`Semantic version component exceeds JavaScript's safe integer range: ${value}`);
     }
     return {
@@ -204,7 +207,7 @@ export function incrementSemver(value,bump,preid='rc'){
     if(bump==='major')return formatSemver({major:current.major+1,minor:0,patch:0});
     if(bump==='minor')return formatSemver({major:current.major,minor:current.minor+1,patch:0});
     if(bump==='patch')return formatSemver({major:current.major,minor:current.minor,patch:current.patch+1});
-    if(typeof preid!=='string'||!/^[0-9A-Za-z-]+$/u.test(preid)){
+    if(!is.string(preid)||!/^[0-9A-Za-z-]+$/u.test(preid)){
         fail(`Invalid prerelease identifier: ${String(preid)}`);
     }
     const next={major:current.major,minor:current.minor,patch:current.patch,prerelease:[]};
@@ -264,7 +267,7 @@ export function validateRootConfig(value,configPath=ROOT_CONFIG_NAME){
     const sharedPayloads={};
     for(const [id,routes] of Object.entries(value.sharedPayloads).sort(([left],[right])=>compareText(left,right))){
         if(!SAFE_SHARED_ID_PATTERN.test(id))fail(`Unsafe shared payload id: ${id}`);
-        if(!Array.isArray(routes)||routes.length===0){
+        if(!is.array(routes)||routes.length===0){
             fail(`sharedPayloads.${id} must be a non-empty array.`);
         }
         sharedPayloads[id]=routes.map((route,index)=>
@@ -304,11 +307,11 @@ export function validateAppConfig(value,appId,rootConfig,configPath=`apps/${appI
     if(!['static','adapter'].includes(value.strategy)){
         fail(`${appId}/${APP_CONFIG_NAME}.strategy must be "static" or "adapter".`);
     }
-    if(!Array.isArray(value.shared)||new Set(value.shared).size!==value.shared.length){
+    if(!is.array(value.shared)||new Set(value.shared).size!==value.shared.length){
         fail(`${appId}/${APP_CONFIG_NAME}.shared must be an array of unique shared payload ids.`);
     }
     for(const [index,id] of value.shared.entries()){
-        if(typeof id!=='string'||!Object.hasOwn(rootConfig.sharedPayloads,id)){
+        if(!is.string(id)||!Object.hasOwn(rootConfig.sharedPayloads,id)){
             fail(`${appId}/${APP_CONFIG_NAME}.shared[${index}] references an unknown shared payload.`);
         }
     }
@@ -383,7 +386,7 @@ async function loadContext(requestedWorkspaceRoot,appId){
     const workspaceRoot=await realDirectory(normalizeWorkspaceRoot(requestedWorkspaceRoot),'Workspace root');
     const rootConfigPath=path.join(workspaceRoot,ROOT_CONFIG_NAME);
     const rootConfig=validateRootConfig(await readJson(rootConfigPath,ROOT_CONFIG_NAME),rootConfigPath);
-    if(typeof appId!=='string'||!APP_ID_PATTERN.test(appId))fail(`Unsafe app id: ${String(appId)}`);
+    if(!is.string(appId)||!APP_ID_PATTERN.test(appId))fail(`Unsafe app id: ${String(appId)}`);
     const appsRoot=await realDirectory(path.join(workspaceRoot,rootConfig.appsRoot),'Apps root');
     const appRoot=resolveInside(appsRoot,appId,'app id');
     await assertContainedRealPath(appsRoot,appRoot,`apps/${appId}`);
@@ -616,7 +619,7 @@ async function loadAdapter(context){
     const adapterPath=resolveInside(context.appRoot,context.config.adapter,`${context.appId} adapter`);
     await assertContainedRealPath(context.appRoot,adapterPath,`${context.appId} adapter`);
     const module=await import(`${pathToFileURL(adapterPath).href}?source=${Date.now()}`);
-    if(typeof module.buildArcanePackage!=='function'){
+    if(!is.function(module.buildArcanePackage)){
         fail(`${context.appId} adapter must export buildArcanePackage.`);
     }
     return module;
@@ -816,7 +819,7 @@ export async function verifyApp({workspaceRoot,appId,signal,onEvent}={}){
     const manifest=await readJson(path.join(outputRoot,RELEASE_MANIFEST_NAME),RELEASE_MANIFEST_NAME);
     if(!isPlainObject(manifest)||manifest.schemaVersion!==1||manifest.kind!=='arcane-app-release'
         ||manifest.packagerVersion!==PACKAGER_VERSION||manifest.app?.id!==appId
-        ||manifest.app?.version!==context.config.version||!Array.isArray(manifest.files)){
+        ||manifest.app?.version!==context.config.version||!is.array(manifest.files)){
         fail(`${RELEASE_MANIFEST_NAME} is malformed.`);
     }
     const expected=manifest.files.map((file,index)=>normalizeRelativePath(

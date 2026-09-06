@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {recurringChatMessages} from './ChatRecords.js';
 
 const FORBIDDEN_REQUEST_FIELDS=new Set([
@@ -12,7 +15,7 @@ const FORBIDDEN_REQUEST_FIELDS=new Set([
 ]);
 
 function isPlainRecord(value){
-    if(!value||typeof value!=='object'||Array.isArray(value))return false;
+    if(!value||!is.object(value)||is.array(value))return false;
     const prototype=Object.getPrototypeOf(value);
     return prototype===Object.prototype||prototype===null;
 }
@@ -23,7 +26,7 @@ function coded(error,code){
 }
 
 function contentText(value,label,{optional=false}={}){
-    if(typeof value!=='string') throw new TypeError(`${label} must be a string.`);
+    if(!is.string(value)) throw new TypeError(`${label} must be a string.`);
     if(!value.trim()){
         if(optional) return null;
         throw new TypeError(`${label} must contain text.`);
@@ -33,7 +36,7 @@ function contentText(value,label,{optional=false}={}){
 
 function optionalMetadata(value,label){
     if(value===undefined||value===null||value==='') return null;
-    if(typeof value!=='string'){
+    if(!is.string(value)){
         throw coded(new TypeError(`${label} must be a string when provided.`),'AI_CHAT_INVALID_RESPONSE');
     }
     if(!value.trim()) return null;
@@ -41,12 +44,12 @@ function optionalMetadata(value,label){
 }
 
 function usageCount(value){
-    return Number.isSafeInteger(value)&&value>=0?value:null;
+    return is.safeInteger(value)&&value>=0?value:null;
 }
 
 function providerUsageCount(value,label){
     if(value===undefined) return null;
-    if(!Number.isSafeInteger(value)||value<0){
+    if(!is.safeInteger(value)||value<0){
         throw coded(
             new TypeError(`${label} must be a nonnegative integer when provided.`),
             'AI_CHAT_INVALID_RESPONSE',
@@ -57,10 +60,10 @@ function providerUsageCount(value,label){
 
 function signalLike(value){
     return value===undefined||value===null||(
-        typeof value==='object'
-        &&typeof value.aborted==='boolean'
-        &&typeof value.addEventListener==='function'
-        &&typeof value.removeEventListener==='function'
+        is.object(value)
+        &&is.boolean(value.aborted)
+        &&is.function(value.addEventListener)
+        &&is.function(value.removeEventListener)
     );
 }
 
@@ -76,7 +79,7 @@ function assertMessageKeys(value,allowed,label){
 }
 
 function toolCallArgumentMessage(value,label){
-    if(typeof value!=='string'){
+    if(!is.string(value)){
         throw new TypeError(`${label} must be a JSON string.`);
     }
     let argumentsRecord;
@@ -94,7 +97,7 @@ function toolCallArgumentMessage(value,label){
             'AI_CHAT_INVALID_TOOL_CALL',
         );
     }
-    if(typeof argumentsRecord.message!=='string'||!argumentsRecord.message.trim()){
+    if(!is.string(argumentsRecord.message)||!argumentsRecord.message.trim()){
         throw coded(
             new TypeError(`${label}.message must contain user-facing text.`),
             'AI_CHAT_TOOL_MESSAGE_REQUIRED',
@@ -105,7 +108,7 @@ function toolCallArgumentMessage(value,label){
 
 function requireToolMessageSchemas(value,label){
     if(value===undefined) return;
-    if(!Array.isArray(value)) throw new TypeError(`${label} must be an array.`);
+    if(!is.array(value)) throw new TypeError(`${label} must be an array.`);
     for(let index=0;index<value.length;index++){
         const tool=value[index];
         const parameters=tool?.function?.parameters;
@@ -119,9 +122,9 @@ function requireToolMessageSchemas(value,label){
             ||!isPlainRecord(parameters.properties)
             ||!isPlainRecord(messageSchema)
             ||messageSchema.type!=='string'
-            ||!Number.isInteger(messageSchema.minLength)
+            ||!is.integer(messageSchema.minLength)
             ||messageSchema.minLength<1
-            ||!Array.isArray(parameters.required)
+            ||!is.array(parameters.required)
             ||!parameters.required.includes('message')
         ){
             throw coded(
@@ -141,7 +144,7 @@ function normalizeRequestOptions(value,label){
     if(forbidden) throw new TypeError(`${label}.${forbidden} is managed by the chat session.`);
     requireToolMessageSchemas(value.tools,`${label}.tools`);
     for(const key of ['parallelToolCalls','parallel_tool_calls']){
-        if(Object.hasOwn(value,key)&&typeof value[key]!=='boolean'){
+        if(Object.hasOwn(value,key)&&!is.boolean(value[key])){
             throw new TypeError(`${label}.${key} must be a boolean when provided.`);
         }
     }
@@ -151,12 +154,12 @@ function normalizeRequestOptions(value,label){
 export function normalizeStructuralToolCall(call,label='Structural tool call'){
     try{
         if(!isPlainRecord(call)) throw new TypeError(`${label} must be a plain object.`);
-        if(typeof call.id!=='string'||!call.id.trim()){
+        if(!is.string(call.id)||!call.id.trim()){
             throw new TypeError(`${label}.id must contain text.`);
         }
         if(call.type!=='function') throw new TypeError(`${label}.type must be function.`);
         if(!isPlainRecord(call.function)) throw new TypeError(`${label}.function must be a plain object.`);
-        if(typeof call.function.name!=='string'||!call.function.name.trim()){
+        if(!is.string(call.function.name)||!call.function.name.trim()){
             throw new TypeError(`${label}.function.name must contain text.`);
         }
         toolCallArgumentMessage(call.function.arguments,`${label}.function.arguments`);
@@ -177,7 +180,7 @@ export function normalizeStructuralToolCall(call,label='Structural tool call'){
 
 function normalizeToolCalls(value,label){
     if(value===undefined) return null;
-    if(!Array.isArray(value)){
+    if(!is.array(value)){
         throw new TypeError(`${label} must be an array of structural tool calls.`);
     }
     const ids=new Set();
@@ -204,13 +207,13 @@ function normalizeMessage(value,label,allowedRoles){
     if(
         value.role==='assistant'
         &&Object.hasOwn(value,'reasoning_content')
-        &&typeof value.reasoning_content!=='string'
+        &&!is.string(value.reasoning_content)
     ){
         throw new TypeError(`${label}.reasoning_content must be a string when provided.`);
     }
     const hasReasoning=Boolean(
         value.role==='assistant'
-        &&typeof value.reasoning_content==='string'
+        &&is.string(value.reasoning_content)
         &&value.reasoning_content.length
     );
     let content;
@@ -274,7 +277,7 @@ function publicMessage(value){
 
 function normalizeInitialMessages(value){
     if(value===undefined) return [];
-    if(!Array.isArray(value)) throw new TypeError('initialMessages must be an array.');
+    if(!is.array(value)) throw new TypeError('initialMessages must be an array.');
     const messages=value.map((item,index)=>normalizeMessage(
         item,
         `initialMessages[${index}]`,
@@ -285,14 +288,14 @@ function normalizeInitialMessages(value){
 }
 
 function normalizeInputMessages(value){
-    if(typeof value==='string'){
+    if(is.string(value)){
         return [normalizeMessage(
             {role:'user',content:value},
             'The user message',
             new Set(['user']),
         )];
     }
-    if(Array.isArray(value)){
+    if(is.array(value)){
         if(!value.length){
             throw new TypeError('The request tool-result batch must not be empty.');
         }
@@ -375,7 +378,7 @@ function pendingToolCallIds(messages,validate=false){
 
 async function configuredArcaneChat(request){
     const api=globalThis.Arcane?.ai;
-    if(typeof api?.chat!=='function'){
+    if(!is.function(api?.chat)){
         throw coded(
             new Error('The configured Arcane AI chat capability is unavailable.'),
             'AI_CHAT_UNAVAILABLE',
@@ -427,7 +430,7 @@ function normalizeSessionResponse(response){
 }
 
 function normalizeOpenAICompatibleResponse(response){
-    if(!Array.isArray(response.choices)||response.choices.length===0){
+    if(!is.array(response.choices)||response.choices.length===0){
         throw coded(
             new TypeError('The chat provider completion must contain at least one choice.'),
             'AI_CHAT_INVALID_RESPONSE',
@@ -530,8 +533,8 @@ export default class ConfiguredAIChatSession{
         const chat=options.chat===undefined?configuredArcaneChat:options.chat;
         const contextBuilder=options.contextBuilder??null;
         const request=normalizeRequestOptions(options.request,'request');
-        if(typeof chat!=='function') throw new TypeError('chat must be a function.');
-        if(contextBuilder!==null&&typeof contextBuilder!=='function'){
+        if(!is.function(chat)) throw new TypeError('chat must be a function.');
+        if(contextBuilder!==null&&!is.function(contextBuilder)){
             throw new TypeError('contextBuilder must be a function when provided.');
         }
         const rawSystemPrompt=options.systemPrompt??'';

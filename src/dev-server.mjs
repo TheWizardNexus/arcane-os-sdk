@@ -1,3 +1,4 @@
+import Is from 'strong-type';
 import {constants as FS_CONSTANTS} from 'node:fs';
 import {lstat,open,readFile,realpath} from 'node:fs/promises';
 import http from 'node:http';
@@ -8,6 +9,8 @@ import {
     inspectImportMapHtml,MANAGED_IMPORT_MAP_ATTRIBUTE,
     readWorkspaceAssetVersion,rewriteAssetReferences
 } from './import-map.mjs';
+
+const is = new Is(false);
 
 const MIME_TYPES=new Map([
     ['.css','text/css; charset=utf-8'],
@@ -165,12 +168,12 @@ function sdkBrowserSourcePathAllowed(relative){
 }
 
 async function emitRuntimeSourceEvent(onEvent,event){
-    if(typeof onEvent==='function')await onEvent(event);
+    if(is.function(onEvent))await onEvent(event);
 }
 
 async function verifySdkRuntimeSourceRoot(sourceRoot,workspaceRoot,appId,{signal,onEvent}={}){
     throwIfAborted(signal);
-    if(typeof sourceRoot!=='string'||!sourceRoot.trim()){
+    if(!is.string(sourceRoot)||!sourceRoot.trim()){
         fail('sdkRuntimeSourceRoot must name an Arcane SDK directory.',
             'ARCANE_DEV_RUNTIME_SOURCE_INVALID');
     }
@@ -449,7 +452,7 @@ async function sourceRoutes(workspaceRoot,appId,{
 }
 
 async function packagedRoutes(releaseRoot){
-    if(typeof releaseRoot!=='string'||!releaseRoot.trim())fail('releaseRoot is required in packaged mode.','ARCANE_USAGE');
+    if(!is.string(releaseRoot)||!releaseRoot.trim())fail('releaseRoot is required in packaged mode.','ARCANE_USAGE');
     const requested=path.resolve(releaseRoot);
     const canonical=await canonicalRealDirectory(requested,'Packaged release root');
     return {
@@ -504,7 +507,7 @@ async function startOwnedDevServer({
     if(host!=='127.0.0.1'&&host!=='::1'){
         fail('Development server host must be a numeric loopback address (127.0.0.1 or ::1).','ARCANE_POLICY_DENIED');
     }
-    if(!Number.isInteger(port)||port<0||port>65535)fail('port must be an integer from 0 through 65535.','ARCANE_USAGE');
+    if(!is.integer(port)||port<0||port>65535)fail('port must be an integer from 0 through 65535.','ARCANE_USAGE');
     const requestedRuntimeMode=mode==='source'&&sdkRuntimeSourceRoot!==undefined
         ?'sdk-source'
         :null;
@@ -624,7 +627,7 @@ async function startOwnedDevServer({
     });
     await listen(server,{host,port,signal});
     const address=server.address();
-    if(!address||typeof address==='string'){
+    if(!address||is.string(address)){
         server.close();
         fail('Development server did not expose a TCP address.');
     }

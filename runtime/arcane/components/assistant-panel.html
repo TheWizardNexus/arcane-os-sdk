@@ -296,6 +296,9 @@
 </section>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const host=this;
     const root=host.shadowRoot;
     const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
@@ -428,7 +431,7 @@
     }
 
     function toggle(force,options={}){
-        const next=typeof force==='boolean'?force:!opened;
+        const next=is.boolean(force)?force:!opened;
         return setOpened(next,options);
     }
 
@@ -632,7 +635,7 @@
     }
 
     function returnFocus(){
-        if(previousFocus?.isConnected&&typeof previousFocus.focus==='function'){
+        if(previousFocus?.isConnected&&is.function(previousFocus.focus)){
             previousFocus.focus({preventScroll:true});
         }
         previousFocus=null;

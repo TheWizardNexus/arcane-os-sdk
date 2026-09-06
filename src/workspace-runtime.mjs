@@ -1,3 +1,4 @@
+import Is from 'strong-type';
 import {randomUUID} from 'node:crypto';
 import {copyFile,lstat,mkdir,readFile,readdir,realpath,rename,rm,writeFile} from 'node:fs/promises';
 import path from 'node:path';
@@ -5,6 +6,8 @@ import {SDK_VERSION} from './constants.mjs';
 import {rewriteAssetReferences} from './import-map.mjs';
 import {getSdkRoot} from './runtime.mjs';
 import {getSdkBrowserRuntimeRoot} from './sdk-browser-runtime.mjs';
+
+const is = new Is(false);
 
 const STAGING_PREFIX='.arcane-runtime-content-staging-';
 const BACKUP_PREFIX='.arcane-runtime-content-backup-';
@@ -23,7 +26,7 @@ function throwIfAborted(signal){
 }
 
 async function emit(onEvent,event){
-    if(typeof onEvent==='function')await onEvent(event);
+    if(is.function(onEvent))await onEvent(event);
 }
 
 function compareText(left,right){

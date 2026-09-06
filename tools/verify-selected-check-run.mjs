@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import Is from '../runtime/strong-type/index.js';
+
+const is = new Is(false);
 
 const CHECK_WORKFLOW_PATH='.github/workflows/check.yml';
 const VERSION_PATTERN=/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-dev(?:\.(0|[1-9][0-9]*))?)?$/u;
@@ -27,12 +30,12 @@ function parseArguments(arguments_){
 
 function requiredEnvironment(name){
     const value=process.env[name];
-    if(typeof value!=='string'||value==='')fail(`${name} is required.`);
+    if(!is.string(value)||value==='')fail(`${name} is required.`);
     return value;
 }
 
 function workflowPath(value){
-    if(typeof value!=='string')return '';
+    if(!is.string(value))return '';
     return value.split('@',1)[0];
 }
 
@@ -94,7 +97,7 @@ async function main(){
         token,
         `/actions/runs/${options.runId}/artifacts?per_page=100`
     );
-    const artifacts=Array.isArray(artifactDocument?.artifacts)
+    const artifacts=is.array(artifactDocument?.artifacts)
         ?artifactDocument.artifacts
         :[];
     const artifact=artifacts.find(candidate=>String(candidate?.id)===options.artifactId);

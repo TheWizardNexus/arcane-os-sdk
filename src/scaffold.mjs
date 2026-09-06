@@ -1,3 +1,4 @@
+import Is from 'strong-type';
 import {lstat,mkdir,readFile,readdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
@@ -7,6 +8,8 @@ import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
 import {SDK_NAME,SDK_VERSION,workspaceTemplate} from './templates/workspace-template.mjs';
 import {inspectWorkspaceProfile,resolveSdkPackageDeclaration} from './workspace.mjs';
 import {parseSemver} from './packager/core.mjs';
+
+const is = new Is(false);
 
 const APP_ID_PATTERN=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const DISPLAY_CONTROL_PATTERN=/[\x00-\x1f\x7f]/;
@@ -25,14 +28,14 @@ function throwIfAborted(signal){
 }
 
 async function emit(onEvent,event){
-    if(typeof onEvent==='function')await onEvent(event);
+    if(is.function(onEvent))await onEvent(event);
 }
 
 function validateInputs(appId,displayName){
-    if(typeof appId!=='string'||!APP_ID_PATTERN.test(appId)){
+    if(!is.string(appId)||!APP_ID_PATTERN.test(appId)){
         fail(`Invalid app id: ${String(appId)}. Use lowercase words separated by hyphens.`,'ARCANE_USAGE');
     }
-    if(displayName!==undefined&&(typeof displayName!=='string'||displayName!==displayName.trim()
+    if(displayName!==undefined&&(!is.string(displayName)||displayName!==displayName.trim()
         ||!displayName||displayName.length>160||DISPLAY_CONTROL_PATTERN.test(displayName)
         ||/[<>]/.test(displayName))){
         fail('displayName must be plain trimmed text no longer than 160 characters.','ARCANE_USAGE');
@@ -162,7 +165,7 @@ async function readExistingPackage(workspaceRoot){
     let existing;
     try{existing=JSON.parse(source);}
     catch(error){fail(`Existing package.json is not valid JSON: ${error.message}.`);}
-    if(!existing||typeof existing!=='object'||Array.isArray(existing))fail('Existing package.json must be a JSON object.');
+    if(!existing||!is.object(existing)||is.array(existing))fail('Existing package.json must be a JSON object.');
     return {exists:true,packagePath,source,document:existing};
 }
 
@@ -315,8 +318,8 @@ export async function createWorkspace({
 }){
     validateInputs(appId,displayName);
     validateScaffoldTarget(target);
-    if(typeof targetPath!=='string'||!targetPath.trim())fail('targetPath is required.','ARCANE_USAGE');
-    if(typeof initializeGit!=='boolean')fail('initializeGit must be a boolean.','ARCANE_USAGE');
+    if(!is.string(targetPath)||!targetPath.trim())fail('targetPath is required.','ARCANE_USAGE');
+    if(!is.boolean(initializeGit))fail('initializeGit must be a boolean.','ARCANE_USAGE');
     throwIfAborted(signal);
     const workspaceRoot=path.resolve(targetPath);
     await emit(onEvent,{type:'scaffold.started',mode:'create',workspaceRoot,appId,target});

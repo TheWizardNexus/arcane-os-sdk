@@ -1,8 +1,11 @@
+import Is from 'strong-type';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import packageDocument from '../package.json' with {type:'json'};
 
-if(packageDocument.name!=='arcane-os'||typeof packageDocument.version!=='string'
+const is = new Is(false);
+
+if(packageDocument.name!=='arcane-os'||!is.string(packageDocument.version)
     ||!/^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/u.test(packageDocument.version)){
     throw new Error('The Arcane SDK package identity is invalid.');
 }

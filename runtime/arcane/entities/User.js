@@ -1,5 +1,5 @@
 import { arcaneLogging } from 'arcane-os/logging';
-import Is from '../../node_modules/strong-type/index.js';
+import Is from 'strong-type';
 import DBLS from '../modules/DBLS.js';
 import {
     arcaneEvents,
@@ -30,14 +30,14 @@ function createDefaultDashboard(){
 }
 
 function normalizeDashboard(dashboard={}){
-    const source=dashboard&&typeof dashboard==='object'&&!Array.isArray(dashboard)
-        &&dashboard.charts&&typeof dashboard.charts==='object'&&!Array.isArray(dashboard.charts)
+    const source=dashboard&&is.object(dashboard)&&!is.array(dashboard)
+        &&dashboard.charts&&is.object(dashboard.charts)&&!is.array(dashboard.charts)
         ? dashboard.charts
         : {};
     const charts={};
 
     for(const [key,value] of Object.entries(source)){
-        if(typeof value==='boolean'){
+        if(is.boolean(value)){
             charts[key]=value;
         }
     }
@@ -646,9 +646,9 @@ class UserEntity {
     /** @param {number} v */
     set firstBootUp(v){
         if(
-            typeof v!=='number'
-            ||!Number.isFinite(v)
-            ||!Number.isSafeInteger(v)
+            !is.number(v)
+            ||!is.finite(v)
+            ||!is.safeInteger(v)
             ||v<0
         ){
             throw new Error(
@@ -757,7 +757,7 @@ class UserEntity {
 
     /** @param {{charts:Object<string,boolean>}} v */
     set dashboard(v){
-        if(!v||typeof v!=='object'||Array.isArray(v)){
+        if(!v||!is.object(v)||is.array(v)){
             throw new Error('dashboard must be an object');
         }
 
@@ -885,7 +885,7 @@ class UserEntity {
     }
 
     withFreshExplicit(operation){
-        if(typeof operation!=='function'){
+        if(!is.function(operation)){
             throw new TypeError('A fresh UserEntity operation is required.');
         }
         const result=this.#explicitUpdateQueue.then(()=>
@@ -916,13 +916,13 @@ class UserEntity {
     #withExplicitLock(operation){
         const locks=globalThis.navigator?.locks;
 
-        if(typeof locks?.request==='function'){
+        if(is.function(locks?.request)){
             return locks.request(
                 `user-entity:${this.fileName}`,
                 operation
             );
         }
-        if(typeof globalThis.window==='object'){
+        if(is.object(globalThis.window)){
             const error=new Error(
                 'This browser cannot safely coordinate profile changes across tabs.'
             );

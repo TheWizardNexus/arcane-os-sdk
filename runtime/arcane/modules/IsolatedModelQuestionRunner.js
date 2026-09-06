@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const SENTENCE_BOUNDARY=/[.!?]+(?:["'\\u2019\\u201d)\\]}]+)?(?=\\s|$)/gu;
 const WORD_OR_NUMBER=/[\\p{L}\\p{N}]/u;
 
@@ -9,12 +12,12 @@ function codedError(code,message,ErrorType=Error){
 
 function isPlainRecord(value){
     return Boolean(value)
-        &&typeof value==='object'
-        &&!Array.isArray(value);
+        &&is.object(value)
+        &&!is.array(value);
 }
 
 function countSentences(value){
-    if(typeof value!=='string'){
+    if(!is.string(value)){
         throw new TypeError('Sentence counting requires a string.');
     }
     if(!value.trim()){
@@ -36,8 +39,8 @@ function countSentences(value){
 
 function requireLocalAI(localAI){
     if(!localAI
-        ||typeof localAI.inspectIsolatedModel!=='function'
-        ||typeof localAI.runIsolatedQuestion!=='function'){
+        ||!is.function(localAI.inspectIsolatedModel)
+        ||!is.function(localAI.runIsolatedQuestion)){
         throw codedError(
             'ARCANE_ISOLATED_MODEL_API_UNAVAILABLE',
             'The Arcane isolated-model API is unavailable. Open this application through a compatible Arcane OS host.'
@@ -52,14 +55,14 @@ class IsolatedModelQuestionRunner{
     }
 
     async inspectModel(model,expectedModel,contextTokens){
-        if(typeof model!=='string'||!model.trim()){
+        if(!is.string(model)||!model.trim()){
             throw codedError(
                 'INVALID_ISOLATED_MODEL_RUNNER_REQUEST',
                 'The isolated-model inspection requires a model.',
                 TypeError
             );
         }
-        if(contextTokens!==undefined&&(!Number.isSafeInteger(contextTokens)||contextTokens<1)){
+        if(contextTokens!==undefined&&(!is.safeInteger(contextTokens)||contextTokens<1)){
             throw codedError(
                 'INVALID_ISOLATED_MODEL_RUNNER_REQUEST',
                 'The isolated-model inspection context token value must be positive when provided.',
@@ -81,12 +84,12 @@ class IsolatedModelQuestionRunner{
             );
         }
         const {onPhase,...request}=input;
-        if(typeof request.model!=='string'
+        if(!is.string(request.model)
             ||!request.model.trim()
-            ||typeof request.prompt!=='string'
-            ||(Object.hasOwn(request,'systemPrompt')&&typeof request.systemPrompt!=='string')
+            ||!is.string(request.prompt)
+            ||(Object.hasOwn(request,'systemPrompt')&&!is.string(request.systemPrompt))
             ||(Object.hasOwn(request,'options')&&!isPlainRecord(request.options))
-            ||(onPhase!==undefined&&typeof onPhase!=='function')){
+            ||(onPhase!==undefined&&!is.function(onPhase))){
             throw codedError(
                 'INVALID_ISOLATED_MODEL_RUNNER_REQUEST',
                 'The isolated-model question request contains invalid values.',
@@ -95,7 +98,7 @@ class IsolatedModelQuestionRunner{
         }
         const streamOptions=onPhase===undefined?{}:{onPhase};
         const result=await this.localAI.runIsolatedQuestion(request,streamOptions);
-        if(!isPlainRecord(result)||typeof result.answer!=='string'){
+        if(!isPlainRecord(result)||!is.string(result.answer)){
             throw codedError(
                 'ARCANE_ISOLATED_MODEL_RESPONSE_INVALID',
                 'Arcane Core returned an invalid isolated-model response.'

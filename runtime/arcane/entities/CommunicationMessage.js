@@ -1,10 +1,13 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const CHANNELS=new Set(['email','sms','mms','rcs','whatsapp','other']);
 const DIRECTIONS=new Set(['inbound','outbound']);
 const STATUSES=new Set(['draft','queued','sending','sent','delivered','read','failed','received']);
 
 function required(value,label){const text=String(value??'').trim();if(!text) throw new TypeError(`${label} is required.`);return text;}
 function strings(value){return Array.from(value||[],item=>String(item??'').trim()).filter(Boolean);}
-function instant(value){const date=value instanceof Date?value:new Date(value||Date.now());if(Number.isNaN(date.valueOf())) throw new TypeError('Message timestamp is invalid.');return date.toISOString();}
+function instant(value){const date=value instanceof Date?value:new Date(value||Date.now());if(is.NaN(date.valueOf())) throw new TypeError('Message timestamp is invalid.');return date.toISOString();}
 
 export default class CommunicationMessage{
     constructor(input={}){

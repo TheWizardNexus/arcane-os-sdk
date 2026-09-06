@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import DocumentLexicalSearch,{
     documentContextExcerpt,
     documentSearchTokens,
@@ -16,8 +19,8 @@ const MEDIA_TYPES=new Set(['text/markdown','text/plain']);
 
 function isPlainRecord(value){
     return Boolean(value)
-        &&typeof value==='object'
-        &&!Array.isArray(value)
+        &&is.object(value)
+        &&!is.array(value)
         &&Object.getPrototypeOf(value)===Object.prototype;
 }
 
@@ -36,7 +39,7 @@ function assertKnownKeys(value,allowed,label,code='STATIC_DOCUMENT_INVALID_CATAL
 }
 
 function structuralInteger(value,label,{minimum=0,maximum=null}={}){
-    if(!Number.isSafeInteger(value)||value<minimum||(maximum!==null&&value>maximum)){
+    if(!is.safeInteger(value)||value<minimum||(maximum!==null&&value>maximum)){
         const range=maximum===null?`${minimum} or greater`:`${minimum} through ${maximum}`;
         fail(`${label} must be a safe integer ${range}.`,'STATIC_DOCUMENT_INVALID_VALUE',RangeError);
     }
@@ -45,7 +48,7 @@ function structuralInteger(value,label,{minimum=0,maximum=null}={}){
 
 function normalizedText(value,label,{optional=false}={}){
     if(optional&&(value===undefined||value===null||value==='')) return '';
-    if(typeof value!=='string') fail(`${label} must be a string.`,'STATIC_DOCUMENT_INVALID_CATALOG');
+    if(!is.string(value)) fail(`${label} must be a string.`,'STATIC_DOCUMENT_INVALID_CATALOG');
     if(!value.trim()&&!optional) fail(`${label} cannot be empty.`,'STATIC_DOCUMENT_INVALID_CATALOG');
     if(CONTROL_CHARACTERS.test(value)) fail(`${label} cannot contain control characters.`,'STATIC_DOCUMENT_INVALID_CATALOG');
     if(value!==value.normalize('NFC')) fail(`${label} must use Unicode NFC normalization.`,'STATIC_DOCUMENT_INVALID_CATALOG');
@@ -93,7 +96,7 @@ function relativePath(value,label='Document path'){
 
 function normalizeTags(value){
     if(value===undefined) return [];
-    if(!Array.isArray(value))fail('Document tags must be an array.','STATIC_DOCUMENT_INVALID_CATALOG');
+    if(!is.array(value))fail('Document tags must be an array.','STATIC_DOCUMENT_INVALID_CATALOG');
     const seen=new Set();
     const tags=value.map((item,index)=>{
         const tag=normalizedText(item,`Document tag ${index+1}`);
@@ -107,7 +110,7 @@ function normalizeTags(value){
 
 function normalizeTextList(value,label){
     if(value===undefined) return [];
-    if(!Array.isArray(value))fail(`${label} must be an array.`,'STATIC_DOCUMENT_INVALID_CATALOG');
+    if(!is.array(value))fail(`${label} must be an array.`,'STATIC_DOCUMENT_INVALID_CATALOG');
     const seen=new Set();
     const values=value.map(function normalizeTextListEntry(item,index){
         const text=normalizedText(item,`${label} entry ${index+1}`);
@@ -149,7 +152,7 @@ function normalizeLanguage(value,label){
 
 function normalizeSearchTerms(value,label){
     if(value===undefined) return [];
-    if(!Array.isArray(value))fail(`${label} must be an array.`,'STATIC_DOCUMENT_INVALID_CATALOG');
+    if(!is.array(value))fail(`${label} must be an array.`,'STATIC_DOCUMENT_INVALID_CATALOG');
     const seen=new Set();
     const terms=value.map((item,index)=>{
         const term=normalizedText(item,`${label} entry ${index+1}`);
@@ -163,7 +166,7 @@ function normalizeSearchTerms(value,label){
 
 function normalizeHeadings(value){
     if(value===undefined) return [];
-    if(!Array.isArray(value))fail('Document headings must be an array.','STATIC_DOCUMENT_INVALID_CATALOG');
+    if(!is.array(value))fail('Document headings must be an array.','STATIC_DOCUMENT_INVALID_CATALOG');
     const seen=new Set();
     const headings=value.map((item,index)=>{
         if(!isPlainRecord(item)) fail(`Document heading ${index+1} must be a plain object.`,'STATIC_DOCUMENT_INVALID_CATALOG');
@@ -184,7 +187,7 @@ function normalizeHeadings(value){
 
 function normalizePathList(value,label){
     if(value===undefined) return [];
-    if(!Array.isArray(value))fail(`${label} must be an array.`,'STATIC_DOCUMENT_INVALID_CATALOG');
+    if(!is.array(value))fail(`${label} must be an array.`,'STATIC_DOCUMENT_INVALID_CATALOG');
     const seen=new Set();
     const paths=value.map((item,index)=>{
         const path=relativePath(item,`${label} entry ${index+1}`);
@@ -293,7 +296,7 @@ function normalizeStaticDocumentCatalog(input,options={}){
     if(!isPlainRecord(options)) fail('Catalog normalization options must be a plain object.','STATIC_DOCUMENT_INVALID_OPTIONS');
     if(!isPlainRecord(input)) fail('Static document catalog must be a plain object.','STATIC_DOCUMENT_INVALID_CATALOG');
     assertKnownKeys(input,new Set(['documents','version']),'Static document catalog');
-    if(!Array.isArray(input.documents)) fail('Static document catalog documents must be an array.','STATIC_DOCUMENT_INVALID_CATALOG');
+    if(!is.array(input.documents)) fail('Static document catalog documents must be an array.','STATIC_DOCUMENT_INVALID_CATALOG');
     const records=input.documents.map((record,index)=>normalizeRecord(record,index));
     const ids=new Set();
     const paths=new Set();
@@ -384,11 +387,11 @@ function normalizeOptions(input){
         cacheTimeoutMs:optionalTimeout(input.cacheTimeoutMs,'cacheTimeoutMs'),
         fetchTimeoutMs:optionalTimeout(input.fetchTimeoutMs,'fetchTimeoutMs'),
     });
-    const fetchImpl=input.fetchImpl??(typeof globalThis.fetch==='function'?globalThis.fetch.bind(globalThis):null);
-    if(fetchImpl!==null&&typeof fetchImpl!=='function') fail('fetchImpl must be a function when provided.','STATIC_DOCUMENT_INVALID_OPTIONS');
-    if(input.onCacheError!==undefined&&typeof input.onCacheError!=='function') fail('onCacheError must be a function when provided.','STATIC_DOCUMENT_INVALID_OPTIONS');
+    const fetchImpl=input.fetchImpl??(is.function(globalThis.fetch)?globalThis.fetch.bind(globalThis):null);
+    if(fetchImpl!==null&&!is.function(fetchImpl)) fail('fetchImpl must be a function when provided.','STATIC_DOCUMENT_INVALID_OPTIONS');
+    if(input.onCacheError!==undefined&&!is.function(input.onCacheError)) fail('onCacheError must be a function when provided.','STATIC_DOCUMENT_INVALID_OPTIONS');
     const cache=input.cache??null;
-    if(cache!==null&&(typeof cache!=='object'||typeof cache.get!=='function'||typeof cache.set!=='function')){
+    if(cache!==null&&(!is.object(cache)||!is.function(cache.get)||!is.function(cache.set))){
         fail('cache must expose get(key) and set(key, value).','STATIC_DOCUMENT_INVALID_OPTIONS');
     }
     return completeValue({
@@ -411,7 +414,7 @@ function lineNumberAt(value,offset){
 }
 
 function queryText(value){
-    if(typeof value!=='string') fail('Search query must be a string.','STATIC_DOCUMENT_INVALID_QUERY');
+    if(!is.string(value)) fail('Search query must be a string.','STATIC_DOCUMENT_INVALID_QUERY');
     const query=value.trim();
     if(CONTROL_CHARACTERS.test(query)){
         fail('Search query must be plain text.','STATIC_DOCUMENT_INVALID_QUERY');
@@ -421,7 +424,7 @@ function queryText(value){
 
 function normalizeFilter(value,label){
     if(value===undefined) return null;
-    if(!Array.isArray(value)) fail(`${label} must be an array.`,'STATIC_DOCUMENT_INVALID_QUERY');
+    if(!is.array(value)) fail(`${label} must be an array.`,'STATIC_DOCUMENT_INVALID_QUERY');
     const normalized=value.map((item,index)=>normalizedText(item,`${label} entry ${index+1}`).toLowerCase());
     return new Set(normalized);
 }
@@ -442,19 +445,19 @@ function staticDocumentCacheKey(version,id){
 }
 
 async function responseText(response){
-    if(typeof response==='string')return response;
-    if(response instanceof ArrayBuffer||ArrayBuffer.isView(response)){
+    if(is.string(response))return response;
+    if(response instanceof ArrayBuffer||is.arrayBufferView(response)){
         try{return new TextDecoder('utf-8',{fatal:true}).decode(response);}
         catch{fail('Document response is not valid UTF-8 text.','STATIC_DOCUMENT_INVALID_TEXT');}
     }
-    if(!response||typeof response!=='object') fail('fetchImpl returned an invalid response.','STATIC_DOCUMENT_INVALID_RESPONSE');
+    if(!response||!is.object(response)) fail('fetchImpl returned an invalid response.','STATIC_DOCUMENT_INVALID_RESPONSE');
     if('ok' in response&&!response.ok){
         fail(`Document request failed (${Number(response.status)||0}).`,'STATIC_DOCUMENT_HTTP_ERROR');
     }
-    if(typeof response.arrayBuffer==='function'){
+    if(is.function(response.arrayBuffer)){
         return responseText(await response.arrayBuffer());
     }
-    if(typeof response.text==='function')return response.text();
+    if(is.function(response.text))return response.text();
     if(response.body?.getReader){
         const reader=response.body.getReader();
         const decoder=new TextDecoder('utf-8',{fatal:true});
@@ -488,10 +491,10 @@ function abortError(message='The document request was aborted.'){
 
 function signalLike(value){
     return value===undefined||value===null||(
-        typeof value==='object'
-        &&typeof value.aborted==='boolean'
-        &&typeof value.addEventListener==='function'
-        &&typeof value.removeEventListener==='function'
+        is.object(value)
+        &&is.boolean(value.aborted)
+        &&is.function(value.addEventListener)
+        &&is.function(value.removeEventListener)
     );
 }
 
@@ -531,7 +534,7 @@ function timedOperation(operation,{milliseconds,signal}){
 function hydrationOptions(input){
     if(!isPlainRecord(input)) fail('Hydration options must be a plain object.','STATIC_DOCUMENT_INVALID_OPTIONS');
     assertKnownKeys(input,new Set(['bypassCache','signal']),'Hydration options','STATIC_DOCUMENT_INVALID_OPTIONS');
-    if(input.bypassCache!==undefined&&typeof input.bypassCache!=='boolean') fail('bypassCache must be a boolean.','STATIC_DOCUMENT_INVALID_OPTIONS');
+    if(input.bypassCache!==undefined&&!is.boolean(input.bypassCache)) fail('bypassCache must be a boolean.','STATIC_DOCUMENT_INVALID_OPTIONS');
     if(!signalLike(input.signal)) fail('signal must be an AbortSignal.','STATIC_DOCUMENT_INVALID_OPTIONS');
     return {bypassCache:Boolean(input.bypassCache),signal:input.signal??null};
 }
@@ -545,7 +548,7 @@ function normalizedError(error){
         }
     }catch{}
     return completeValue({
-        code:typeof error?.code==='string'?error.code:'STATIC_DOCUMENT_ERROR',
+        code:is.string(error?.code)?error.code:'STATIC_DOCUMENT_ERROR',
         message,
     });
 }
@@ -615,7 +618,7 @@ export default class StaticDocumentCatalog{
     }
 
     get(id){
-        if(typeof id!=='string'||!ID_PATTERN.test(id)) fail('Document id is invalid.','STATIC_DOCUMENT_INVALID_ID');
+        if(!is.string(id)||!ID_PATTERN.test(id)) fail('Document id is invalid.','STATIC_DOCUMENT_INVALID_ID');
         return this.#recordsById.get(id)??null;
     }
 
@@ -685,7 +688,7 @@ export default class StaticDocumentCatalog{
                 ||entry.schemaVersion!==CATALOG_SCHEMA_VERSION
                 ||entry.catalogVersion!==this.version
                 ||entry.documentId!==record.id
-                ||typeof entry.text!=='string'
+                ||!is.string(entry.text)
             ) fail('Cached document metadata is invalid.','STATIC_DOCUMENT_CACHE_INVALID');
             return this.#retainHydration(record,entry.text,this.#resolve(record).href);
         }catch(error){
@@ -745,7 +748,7 @@ export default class StaticDocumentCatalog{
     async buildContext(query,options={}){
         if(!isPlainRecord(options)) fail('Context options must be a plain object.','STATIC_DOCUMENT_INVALID_OPTIONS');
         if(!signalLike(options.signal)) fail('signal must be an AbortSignal.','STATIC_DOCUMENT_INVALID_OPTIONS');
-        if(options.bodySearch!==undefined&&typeof options.bodySearch!=='boolean') fail('bodySearch must be a boolean.','STATIC_DOCUMENT_INVALID_OPTIONS');
+        if(options.bodySearch!==undefined&&!is.boolean(options.bodySearch)) fail('bodySearch must be a boolean.','STATIC_DOCUMENT_INVALID_OPTIONS');
         const queryValue=queryText(query);
         const bodySearch=Boolean(options.bodySearch)&&Boolean(queryValue);
         const indexedMatches=this.#lexicalSearch.rank(queryValue);

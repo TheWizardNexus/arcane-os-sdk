@@ -189,7 +189,7 @@ async function paritySnapshot(root,{expectedArcaneFileCount}){
         map.imports['event-pubsub'],
         './arcane/sdk/dependencies/event-pubsub/index.js'
     );
-    assert.equal(map.imports['strong-type'],undefined);
+    assert.equal(map.imports['strong-type'],'./arcane/dependencies/strong-type/index.js');
     assert.equal(map.imports['arcane-os'],undefined);
     for(const specifier of [
         'arcane/DBOPFS',
@@ -350,9 +350,9 @@ try{
         fetchJson('./arcane/sdk/dependencies/event-pubsub/package.json'),
         fetchJson('./arcane/sdk/dependencies/strong-type/package.json')
     ]);
-    requireCondition(runtimeStrongType.version==='1.1.0','Arcane runtime strong-type identity drifted.');
+    requireCondition(runtimeStrongType.version==='2.0.1','Arcane runtime strong-type identity drifted.');
     requireCondition(eventPubSub.version==='6.1.0','SDK event-pubsub identity drifted.');
-    requireCondition(sdkStrongType.version==='2.0.0','SDK sibling strong-type identity drifted.');
+    requireCondition(sdkStrongType.version==='2.0.1','SDK sibling strong-type identity drifted.');
 
     const documentResponse=await fetch(location.href,{cache:'no-store'});
     requireCondition(documentResponse.ok,'The Arcane browser server did not return its document.');

@@ -1,6 +1,9 @@
-function number(value,label,{minimum=-Infinity,maximum=Infinity}={}){const result=Number(value);if(!Number.isFinite(result)||result<minimum||result>maximum)throw new TypeError(`${label} is invalid.`);return result;}
+import Is from 'strong-type';
+const is=new Is(false);
+
+function number(value,label,{minimum=-Infinity,maximum=Infinity}={}){const result=Number(value);if(!is.finite(result)||result<minimum||result>maximum)throw new TypeError(`${label} is invalid.`);return result;}
 function text(value,label){const result=String(value??'');if(!result.trim())throw new TypeError(`${label} is required.`);return result;}
-function instant(value,label){const date=new Date(value);if(Number.isNaN(date.valueOf()))throw new TypeError(`${label} is invalid.`);return date.toISOString();}
+function instant(value,label){const date=new Date(value);if(is.NaN(date.valueOf()))throw new TypeError(`${label} is invalid.`);return date.toISOString();}
 
 export class WeatherLocation{
     constructor({id='',name,region='',country='',latitude,longitude,timezone='auto'}={}){this.id=String(id||`${latitude},${longitude}`);this.name=text(name,'Weather location name');this.region=String(region||'');this.country=String(country||'');this.latitude=number(latitude,'Latitude',{minimum:-90,maximum:90});this.longitude=number(longitude,'Longitude',{minimum:-180,maximum:180});this.timezone=String(timezone||'auto');}

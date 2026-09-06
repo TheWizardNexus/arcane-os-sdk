@@ -1,5 +1,8 @@
+import Is from "../dependencies/strong-type/index.js";
 import { arcaneLogging } from '../logging.mjs';
 import { createArcaneEventSource } from "arcane-os/event-manager";
+
+const is = new Is(false);
 
 export const ARCANE_AI_ADAPTER_PROTOCOL = "arcane-ai-adapter/1";
 
@@ -65,18 +68,18 @@ export function normalizeArcaneAIError(error, {
       { cause: error ?? signal?.reason, kind, operation },
     );
   }
-  if (error instanceof ArcaneAIError) return error;
-  const code = typeof error?.code === "string" && error.code.startsWith("ARCANE_AI_")
+  if (is.instanceCheck(error, ArcaneAIError)) return error;
+  const code = is.string(error?.code) && error.code.startsWith("ARCANE_AI_")
     ? error.code
     : ERROR_CODES[operation] ?? ERROR_CODES.request;
-  const message = typeof error?.message === "string" && error.message.trim()
+  const message = is.string(error?.message) && error.message.trim()
     ? error.message
     : `The Arcane AI ${operation} operation failed.`;
   return new ArcaneAIError(code, message, { cause: error, kind, operation });
 }
 
 function providerMethod(provider, name) {
-  return typeof provider?.[name] === "function" ? provider[name].bind(provider) : null;
+  return is.function(provider?.[name]) ? provider[name].bind(provider) : null;
 }
 
 function invalidStatus(cause) {
@@ -91,7 +94,7 @@ function copyError(error) {
   if (!error) return null;
   let code;
   let message;
-  if (typeof error === "object" || typeof error === "function") {
+  if (is.object(error) || is.function(error)) {
     try {
       const codeDescriptor = Object.getOwnPropertyDescriptor(error, "code");
       const messageDescriptor = Object.getOwnPropertyDescriptor(error, "message");
@@ -102,7 +105,7 @@ function copyError(error) {
       code = codeDescriptor?.value;
       message = messageDescriptor?.value;
     } catch (copyErrorFailure) {
-      if (copyErrorFailure instanceof ArcaneAIError) throw copyErrorFailure;
+      if (is.instanceCheck(copyErrorFailure, ArcaneAIError)) throw copyErrorFailure;
       throw invalidStatus(copyErrorFailure);
     }
   }
@@ -113,17 +116,17 @@ function copyError(error) {
 }
 
 function isModelControllerListener(value) {
-  return typeof value === "function"
-    || Boolean(value && typeof value === "object" && typeof value.handleEvent === "function");
+  return is.function(value)
+    || Boolean(value && is.object(value) && is.function(value.handleEvent));
 }
 
 function copyProviderStatus(value) {
   if (value === undefined || value === null) return {};
-  if (typeof value !== "object" || Array.isArray(value)) throw invalidStatus();
+  if (!is.object(value) || is.array(value)) throw invalidStatus();
   try {
     const copy = {};
     for (const key of Reflect.ownKeys(value)) {
-      if (typeof key !== "string") throw invalidStatus();
+      if (!is.string(key)) throw invalidStatus();
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
       if (!descriptor || !("value" in descriptor)) throw invalidStatus();
       Object.defineProperty(copy, key, {
@@ -135,7 +138,7 @@ function copyProviderStatus(value) {
     }
     return copy;
   } catch (error) {
-    if (error instanceof ArcaneAIError) throw error;
+    if (is.instanceCheck(error, ArcaneAIError)) throw error;
     throw invalidStatus(error);
   }
 }
@@ -149,20 +152,20 @@ function invalidProgress(cause) {
 }
 
 function copyProgressValue(value, state) {
-  if (value === null || typeof value !== "object") return value;
+  if (value === null || !is.object(value)) return value;
   if (state.seen.has(value)) {
     throw invalidProgress();
   }
   const prototype = Object.getPrototypeOf(value);
-  if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) {
+  if (!is.array(value) && prototype !== Object.prototype && prototype !== null) {
     throw invalidProgress();
   }
   state.seen.add(value);
-  const copy = Array.isArray(value) ? [] : prototype === null ? Object.create(null) : {};
+  const copy = is.array(value) ? [] : prototype === null ? Object.create(null) : {};
   try {
     for (const key of Reflect.ownKeys(value)) {
-      if (Array.isArray(value) && key === "length") continue;
-      if (typeof key !== "string") {
+      if (is.array(value) && key === "length") continue;
+      if (!is.string(key)) {
         throw invalidProgress();
       }
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
@@ -182,23 +185,23 @@ function copyProgressValue(value, state) {
 
 function copyProgress(progress) {
   if (progress === undefined || progress === null) return null;
-  if (typeof progress !== "object" || Array.isArray(progress)) {
+  if (!is.object(progress) || is.array(progress)) {
     throw invalidProgress();
   }
   try {
     return copyProgressValue(progress, { seen: new WeakSet() });
   } catch (error) {
-    if (error instanceof ArcaneAIError) throw error;
+    if (is.instanceCheck(error, ArcaneAIError)) throw error;
     throw invalidProgress(error);
   }
 }
 
 function publicProgress(progress) {
-  return progress && typeof progress === "object" ? copyProgress(progress) : null;
+  return progress && is.object(progress) ? copyProgress(progress) : null;
 }
 
 function localRequirement(options, provider) {
-  if (options?.localOnly !== undefined && typeof options.localOnly !== "boolean") {
+  if (options?.localOnly !== undefined && !is.boolean(options.localOnly)) {
     throw new TypeError("localOnly must be a boolean when provided.");
   }
   if (options?.localOnly === true && provider.capabilities?.().localOnly !== true) {
@@ -222,7 +225,7 @@ function linkedAbortSignal(externalSignal) {
 }
 
 function fireAndForget(callback, ...args) {
-  if (typeof callback !== "function") return;
+  if (!is.function(callback)) return;
   try {
     Promise.resolve(callback(...args)).catch(() => undefined);
   } catch {
@@ -245,20 +248,20 @@ function displayRequestId(value) {
 function completeTextValue(value, seen, location) {
   if (value === null) return null;
   if (value === undefined) return { $type: "undefined" };
-  if (typeof value === "bigint") return { $type: "bigint", value: value.toString() };
-  if (typeof value === "number" && !Number.isFinite(value)) {
+  if (is.bigint(value)) return { $type: "bigint", value: value.toString() };
+  if (is.number(value) && !is.finite(value)) {
     return { $type: "number", value: String(value) };
   }
-  if (typeof value === "symbol") return { $type: "symbol", value: String(value) };
-  if (typeof value === "function") {
+  if (is.symbol(value)) return { $type: "symbol", value: String(value) };
+  if (is.function(value)) {
     return { $type: "function", value: Function.prototype.toString.call(value) };
   }
-  if (typeof value !== "object") return value;
+  if (!is.object(value)) return value;
   if (seen.has(value)) return { $ref: seen.get(value) };
   seen.set(value, location);
-  if (value instanceof Date) return { $type: "date", value: value.toISOString() };
-  if (value instanceof RegExp) return { $type: "regexp", value: String(value) };
-  if (value instanceof Map) {
+  if (is.instanceCheck(value, Date)) return { $type: "date", value: value.toISOString() };
+  if (is.instanceCheck(value, RegExp)) return { $type: "regexp", value: String(value) };
+  if (is.instanceCheck(value, Map)) {
     return {
       $type: "map",
       entries: [...value.entries()].map(([key, entry], index) => [
@@ -267,7 +270,7 @@ function completeTextValue(value, seen, location) {
       ]),
     };
   }
-  if (value instanceof Set) {
+  if (is.instanceCheck(value, Set)) {
     return {
       $type: "set",
       values: [...value].map((entry, index) => completeTextValue(
@@ -277,25 +280,25 @@ function completeTextValue(value, seen, location) {
       )),
     };
   }
-  if (ArrayBuffer.isView(value)) {
+  if (is.arrayBufferView(value)) {
     return {
       $type: value.constructor?.name ?? "ArrayBufferView",
       values: Array.from(
-        value instanceof DataView
+        is.instanceCheck(value, DataView)
           ? new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
           : value,
         (entry, index) => completeTextValue(entry, seen, `${location}.values[${index}]`),
       ),
     };
   }
-  if (value instanceof ArrayBuffer) {
+  if (is.instanceCheck(value, ArrayBuffer)) {
     return { $type: "ArrayBuffer", values: Array.from(new Uint8Array(value)) };
   }
-  const copy = Array.isArray(value) ? [] : {};
+  const copy = is.array(value) ? [] : {};
   for (const key of Reflect.ownKeys(value)) {
-    if (Array.isArray(value) && key === "length") continue;
+    if (is.array(value) && key === "length") continue;
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    const renderedKey = typeof key === "symbol" ? `[${String(key)}]` : key;
+    const renderedKey = is.symbol(key) ? `[${String(key)}]` : key;
     copy[renderedKey] = descriptor && "value" in descriptor
       ? completeTextValue(descriptor.value, seen, `${location}.${renderedKey}`)
       : {
@@ -308,12 +311,12 @@ function completeTextValue(value, seen, location) {
 }
 
 export function completeValueText(value) {
-  if (typeof value === "string") return value;
+  if (is.string(value)) return value;
   return JSON.stringify(completeTextValue(value, new WeakMap(), "$"), null, 2);
 }
 
 function textFromCompletion(completion) {
-  if (!Array.isArray(completion?.choices)) return completeValueText(completion);
+  if (!is.array(completion?.choices)) return completeValueText(completion);
   if(completion.choices.length>1)return completeValueText(completion);
   const choice=completion.choices[0];
   const content=choice?.message?.content;
@@ -323,17 +326,17 @@ function textFromCompletion(completion) {
 function structuralToolCall(call,location){
   if(
     !call
-    ||typeof call!=="object"
-    ||Array.isArray(call)
+    ||!is.object(call)
+    ||is.array(call)
     ||call.type!=="function"
-    ||typeof call.id!=="string"
+    ||!is.string(call.id)
     ||!call.id.trim()
     ||!call.function
-    ||typeof call.function!=="object"
-    ||Array.isArray(call.function)
-    ||typeof call.function.name!=="string"
+    ||!is.object(call.function)
+    ||is.array(call.function)
+    ||!is.string(call.function.name)
     ||!call.function.name.trim()
-    ||typeof call.function.arguments!=="string"
+    ||!is.string(call.function.arguments)
   ){
     throw new ArcaneAIError(
       "ARCANE_AI_TOOL_CALL_INVALID",
@@ -353,8 +356,8 @@ function structuralToolCall(call,location){
   }
   if(
     !argumentsRecord
-    ||typeof argumentsRecord!=="object"
-    ||Array.isArray(argumentsRecord)
+    ||!is.object(argumentsRecord)
+    ||is.array(argumentsRecord)
   ){
     throw new ArcaneAIError(
       "ARCANE_AI_TOOL_CALL_INVALID",
@@ -362,7 +365,7 @@ function structuralToolCall(call,location){
       {operation:"request"},
     );
   }
-  if(typeof argumentsRecord.message!=="string"||!argumentsRecord.message.trim()){
+  if(!is.string(argumentsRecord.message)||!argumentsRecord.message.trim()){
     throw new ArcaneAIError(
       "ARCANE_AI_TOOL_MESSAGE_REQUIRED",
       `${location} arguments must include a nonempty user-facing message.`,
@@ -382,14 +385,14 @@ function structuralToolCall(call,location){
 }
 
 function plainStructuralRecord(value){
-  if(!value||typeof value!=="object"||Array.isArray(value)) return false;
+  if(!value||!is.object(value)||is.array(value)) return false;
   const prototype=Object.getPrototypeOf(value);
   return prototype===Object.prototype||prototype===null;
 }
 
 function requireToolMessageSchemas(value,location){
   if(value===undefined) return;
-  if(!Array.isArray(value)){
+  if(!is.array(value)){
     throw new ArcaneAIError(
       "ARCANE_AI_TOOL_CALL_INVALID",
       `${location} must be an array.`,
@@ -408,9 +411,9 @@ function requireToolMessageSchemas(value,location){
       ||!plainStructuralRecord(parameters.properties)
       ||!plainStructuralRecord(messageSchema)
       ||messageSchema.type!=="string"
-      ||!Number.isInteger(messageSchema.minLength)
+      ||!is.integer(messageSchema.minLength)
       ||messageSchema.minLength<1
-      ||!Array.isArray(parameters.required)
+      ||!is.array(parameters.required)
       ||!parameters.required.includes("message")
     ){
       throw new ArcaneAIError(
@@ -448,7 +451,7 @@ function structuralCallsFromMessage(message,location){
   if(
     !descriptor
     ||!Object.hasOwn(descriptor,"value")
-    ||!Array.isArray(descriptor.value)
+    ||!is.array(descriptor.value)
   ){
     throw new ArcaneAIError(
       "ARCANE_AI_TOOL_CALL_INVALID",
@@ -463,12 +466,12 @@ function structuralRequest(value){
   if(!plainStructuralRecord(value)){
     throw new TypeError("AI request options must be a plain object.");
   }
-  if(value.messages!==undefined&&!Array.isArray(value.messages)){
+  if(value.messages!==undefined&&!is.array(value.messages)){
     throw new TypeError("AI request messages must be an array.");
   }
   requireToolMessageSchemas(value.tools,"AI request tools");
   for(const key of ["parallelToolCalls","parallel_tool_calls"]){
-    if(Object.hasOwn(value,key)&&typeof value[key]!=="boolean"){
+    if(Object.hasOwn(value,key)&&!is.boolean(value[key])){
       throw new TypeError(`AI request ${key} must be a boolean when provided.`);
     }
   }
@@ -481,7 +484,7 @@ function structuralRequest(value){
     );
     let openedToolCall=false;
     if(Object.hasOwn(message,"tool_calls")){
-      if(message?.role!=="assistant"||!Array.isArray(calls)){
+      if(message?.role!=="assistant"||!is.array(calls)){
         throw new ArcaneAIError(
           "ARCANE_AI_TOOL_CALL_INVALID",
           `AI request messages[${String(messageIndex)}].tool_calls is invalid.`,
@@ -515,7 +518,7 @@ function structuralRequest(value){
     }
     if(message?.role==="tool"){
       if(
-        typeof message.content!=="string"
+        !is.string(message.content)
         ||!message.content.trim()
       ){
         throw new ArcaneAIError(
@@ -526,7 +529,7 @@ function structuralRequest(value){
       }
       if(
         !pendingToolCallIds.size
-        ||typeof message.tool_call_id!=="string"
+        ||!is.string(message.tool_call_id)
         ||!pendingToolCallIds.has(message.tool_call_id)
       ){
         throw new ArcaneAIError(
@@ -556,7 +559,7 @@ function structuralRequest(value){
 }
 
 function toolRecordFromCompletion(completion) {
-  if(typeof completion==="string")return null;
+  if(is.string(completion))return null;
   if(!plainStructuralRecord(completion)){
     throw new ArcaneAIError(
       "ARCANE_AI_INVALID_PROVIDER_RESULT",
@@ -595,7 +598,7 @@ function toolRecordFromCompletion(completion) {
     if(
       !descriptor
       ||!Object.hasOwn(descriptor,"value")
-      ||!Array.isArray(descriptor.value)
+      ||!is.array(descriptor.value)
       ||!descriptor.value.length
     ){
       throw new ArcaneAIError(
@@ -611,7 +614,7 @@ function toolRecordFromCompletion(completion) {
         :null;
       if(
         !plainStructuralRecord(choice)
-        ||!Number.isSafeInteger(choice.index)
+        ||!is.safeInteger(choice.index)
         ||choice.index<0
         ||indexes.has(choice.index)
         ||!messageDescriptor
@@ -669,9 +672,9 @@ function sameCompleteStreamValue(left,right,leftToRight=new Map(),rightToLeft=ne
   if(
     !left
     ||!right
-    ||typeof left!=="object"
-    ||typeof right!=="object"
-    ||Array.isArray(left)!==Array.isArray(right)
+    ||!is.object(left)
+    ||!is.object(right)
+    ||is.array(left)!==is.array(right)
   )return false;
   if(leftToRight.has(left)||rightToLeft.has(right)){
     return leftToRight.get(left)===right&&rightToLeft.get(right)===left;
@@ -768,13 +771,13 @@ function createStreamedToolCallAccumulator(){
     }
     if(!Object.hasOwn(delta,"tool_calls"))return;
     const descriptor=Object.getOwnPropertyDescriptor(delta,"tool_calls");
-    if(!descriptor||!Object.hasOwn(descriptor,"value")||!Array.isArray(descriptor.value)){
+    if(!descriptor||!Object.hasOwn(descriptor,"value")||!is.array(descriptor.value)){
       throw mismatch(`${location}.tool_calls must be an array data property.`);
     }
     for(const [fragmentPosition,fragment] of descriptor.value.entries()){
       if(
         !plainStructuralRecord(fragment)
-        ||!Number.isSafeInteger(fragment.index)
+        ||!is.safeInteger(fragment.index)
         ||fragment.index<0
       ){
         throw mismatch(
@@ -790,7 +793,7 @@ function createStreamedToolCallAccumulator(){
       };
       if(Object.hasOwn(fragment,"id")){
         if(
-          typeof fragment.id!=="string"
+          !is.string(fragment.id)
           ||!fragment.id
           ||current.id&&current.id!==fragment.id
         ){
@@ -800,7 +803,7 @@ function createStreamedToolCallAccumulator(){
       }
       if(Object.hasOwn(fragment,"type")){
         if(
-          typeof fragment.type!=="string"
+          !is.string(fragment.type)
           ||!fragment.type
           ||current.type&&current.type!==fragment.type
         ){
@@ -813,13 +816,13 @@ function createStreamedToolCallAccumulator(){
           throw mismatch("A streamed structural tool call has an invalid function fragment.");
         }
         if(Object.hasOwn(fragment.function,"name")){
-          if(typeof fragment.function.name!=="string"){
+          if(!is.string(fragment.function.name)){
             throw mismatch("A streamed structural tool call has an invalid function-name fragment.");
           }
           current.name+=fragment.function.name;
         }
         if(Object.hasOwn(fragment.function,"arguments")){
-          if(typeof fragment.function.arguments!=="string"){
+          if(!is.string(fragment.function.arguments)){
             throw mismatch("A streamed structural tool call has an invalid arguments fragment.");
           }
           current.arguments+=fragment.function.arguments;
@@ -837,13 +840,13 @@ function createStreamedToolCallAccumulator(){
       rememberDelta(state,chunk.delta,"The streamed model delta");
       rememberCompleteMessage(state,chunk.message,"The streamed model message");
     }
-    if(!Array.isArray(chunk.choices)||!chunk.choices.length)return;
+    if(!is.array(chunk.choices)||!chunk.choices.length)return;
     for(const [position,choice] of chunk.choices.entries()){
       if(
         !plainStructuralRecord(choice)
         ||(!structuralRecord(choice.delta)&&!structuralRecord(choice.message))
       )continue;
-      if(!Number.isSafeInteger(choice.index)||choice.index<0){
+      if(!is.safeInteger(choice.index)||choice.index<0){
         throw mismatch(
           `The streamed model choice ${String(position)} has no valid choice index.`,
         );
@@ -889,7 +892,7 @@ function createStreamedToolCallAccumulator(){
 
   function terminalChoices(completion){
     const result=new Map();
-    if(typeof completion==="string")return result;
+    if(is.string(completion))return result;
     if(Object.hasOwn(completion,"message")){
       result.set(
         directChoice,
@@ -949,9 +952,9 @@ function isPublicStreamStructuralKey(key){
 const OMITTED_PUBLIC_STREAM_DATA=Symbol("omitted-public-stream-data");
 
 function projectPublicStreamData(value,seen=new Map()){
-  if(value===null||value===undefined||typeof value!=="object")return value;
+  if(value===null||value===undefined||!is.object(value))return value;
   if(seen.has(value))return seen.get(value);
-  if(Array.isArray(value)){
+  if(is.array(value)){
     const result=[];
     seen.set(value,result);
     for(const item of value){
@@ -998,7 +1001,7 @@ export class ModelController {
   #error = null;
 
   constructor({ provider, loadPolicy = "on-demand", security } = {}) {
-    if (!provider || typeof provider !== "object") {
+    if (!provider || !is.object(provider)) {
       throw new TypeError("ModelController requires an LLM provider.");
     }
     if (
@@ -1074,9 +1077,9 @@ export class ModelController {
     this.#events.dispatch(type, status, {
       operationId,
       publicDetail: {
-        ...(typeof status.state === "string" ? { state: status.state } : {}),
+        ...(is.string(status.state) ? { state: status.state } : {}),
         ...(progress ? { progress } : {}),
-        ...(typeof status.error?.code === "string" ? { code: status.error.code } : {}),
+        ...(is.string(status.error?.code) ? { code: status.error.code } : {}),
       },
     });
   }
@@ -1364,12 +1367,12 @@ export class ModelController {
       );
       if (
         !value
-        ||typeof value[Symbol.asyncIterator]!=="function"
-        ||typeof value.cancel!=="function"
+        ||!is.function(value[Symbol.asyncIterator])
+        ||!is.function(value.cancel)
         ||!value.result
-        ||typeof value.result.then!=="function"
+        ||!is.function(value.result.then)
       ) {
-        if(typeof value?.cancel==="function"){
+        if(is.function(value?.cancel)){
           Promise.resolve().then(()=>value.cancel(
             "The provider returned an invalid stream handle.",
           )).catch(function reportInvalidModelStreamCleanupFailure(error){
@@ -1392,7 +1395,7 @@ export class ModelController {
         );
         throw error;
       }
-      if(!iterator||typeof iterator.next!=="function"){
+      if(!iterator||!is.function(iterator.next)){
         Promise.resolve().then(()=>value.cancel(
           "The provider returned an invalid stream iterator.",
         )).catch(function reportInvalidModelIteratorCleanupFailure(error){
@@ -1520,7 +1523,7 @@ export class ModelController {
       throw normalizeArcaneAIError(null, { operation: "request", signal: options.signal });
     }
     toolRecordFromCompletion(response);
-    if (typeof options.onResponse === "function") {
+    if (is.function(options.onResponse)) {
       await options.onResponse(response, id, false);
     }
     return response;
@@ -1539,21 +1542,21 @@ export class ModelController {
       for await (const chunk of handle) {
         if (options.signal?.aborted) break;
         await options.onDataChunk?.(chunk, id);
-        if(typeof chunk==="string"){
+        if(is.string(chunk)){
           if(chunk)await options.onChunk?.(chunk, displayId, false);
           continue;
         }
-        const streamedChoices=Array.isArray(chunk?.choices)?chunk.choices:[];
+        const streamedChoices=is.array(chunk?.choices)?chunk.choices:[];
         for(const choice of streamedChoices){
           const delta = choice?.delta ?? {};
           if (
-            typeof delta.reasoning_content === "string"
+            is.string(delta.reasoning_content)
             &&delta.reasoning_content
             &&options.seeThinking === true
           ) {
             await options.onChunk?.(delta.reasoning_content, displayId, true);
           }
-          if (typeof delta.content === "string"&&delta.content) {
+          if (is.string(delta.content)&&delta.content) {
             await options.onChunk?.(delta.content, displayId, false);
           }
         }
@@ -1564,17 +1567,17 @@ export class ModelController {
       }
       const tools = toolRecordFromCompletion(completion);
       await options.onDataResult?.(completion, id);
-      if (typeof options.onResponse === "function") {
+      if (is.function(options.onResponse)) {
         await options.onResponse(completion, id, false);
       }
       for (const call of tools ?? []) {
         await options.onToolCall?.(call, displayId);
       }
-      const multipleChoices=Array.isArray(completion?.choices)&&completion.choices.length>1;
+      const multipleChoices=is.array(completion?.choices)&&completion.choices.length>1;
       const output = multipleChoices
         ?textFromCompletion(completion)
         :tools??textFromCompletion(completion);
-      if (typeof options.onComplete === "function") {
+      if (is.function(options.onComplete)) {
         await options.onComplete(output, displayId, false);
       }
       return output;

@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import waitForComponent from './WaitForComponent.js';
 import { arcaneLogging,readArcaneDeveloperMode } from 'arcane-os/logging';
 import {
@@ -22,7 +25,7 @@ const ERROR_REASONS={
     unhandledRejectionCaptured:'unhandled-promise-rejection-captured'
 };
 const RUNTIME_OCCURRENCE_PREFIX=(
-    typeof globalThis.crypto?.randomUUID==='function'
+    is.function(globalThis.crypto?.randomUUID)
         ? globalThis.crypto.randomUUID()
         : `${Date.now().toString(36)}-${Math.random().toString(36).replace(/^0\./,'')}`
 );
@@ -43,7 +46,7 @@ function safeText(value,fallback=''){
     }
 
     try{
-        const text=typeof value==='string' ? value:String(value);
+        const text=is.string(value) ? value:String(value);
         return text||fallback;
     }catch{
         return fallback;
@@ -52,7 +55,7 @@ function safeText(value,fallback=''){
 
 function safeNumber(value){
     const number=Number(value);
-    return Number.isFinite(number) ? number:null;
+    return is.finite(number) ? number:null;
 }
 
 function safeIso(timestamp){
@@ -111,7 +114,7 @@ export function normalizeErrorEvent(event={},target=globalThis.window){
 export function normalizeRejectionEvent(event={},target=globalThis.window){
     const reason=event?.reason;
     const reasonIsObject=reason!==null
-        && (typeof reason==='object'||typeof reason==='function');
+        && (is.object(reason)||is.function(reason));
 
     return {
         type:'unhandledrejection',
@@ -144,11 +147,11 @@ function defaultStorage(target){
 }
 
 async function sendWithWindowMail(target,...args){
-    if(typeof target?.mail?.send!=='function'){
+    if(!is.function(target?.mail?.send)){
         await import('./Mail.js');
     }
 
-    if(typeof target?.mail?.send!=='function'){
+    if(!is.function(target?.mail?.send)){
         throw new Error('Mail notification service is unavailable');
     }
 
@@ -178,8 +181,8 @@ function buildDeveloperIncidentContent(document,incident,occurrenceId){
     const details=document.createElement('dl');
     const source=[
         safeText(incident?.filename),
-        Number.isFinite(incident?.lineno) ? incident.lineno:'',
-        Number.isFinite(incident?.colno) ? incident.colno:'',
+        is.finite(incident?.lineno) ? incident.lineno:'',
+        is.finite(incident?.colno) ? incident.colno:'',
     ].filter(value => value!=='').join(':');
 
     content.className='developer-error-content';
@@ -262,7 +265,7 @@ async function presentDeveloperIncidentModal(target,incident,occurrenceId){
     };
     const onPageHide=() => {
         try{
-            if(typeof modal.close==='function'){
+            if(is.function(modal.close)){
                 modal.close(undefined,true);
             }else{
                 modal.remove();
@@ -308,7 +311,7 @@ class Errors {
 
     constructor(options={}) {
         const target=options.target||globalThis.window;
-        if(!target||typeof target.addEventListener!=='function'){
+        if(!target||!is.function(target.addEventListener)){
             throw new TypeError('Errors requires an event target');
         }
 
@@ -334,15 +337,15 @@ class Errors {
             ? defaultStorage(target)
             : options.storage;
         this.storageHealthy=(
-            typeof this.storage?.getItem==='function'
-            && typeof this.storage?.setItem==='function'
+            is.function(this.storage?.getItem)
+            && is.function(this.storage?.setItem)
         );
         this.sendMail=options.sendMail
             || sendWithWindowMail.bind(null,target);
-        this.isDeveloperMode=typeof options.isDeveloperMode==='function'
+        this.isDeveloperMode=is.function(options.isDeveloperMode)
             ? options.isDeveloperMode
             : readArcaneDeveloperMode.bind(null,target);
-        this.presentDeveloperIncident=typeof options.presentDeveloperIncident==='function'
+        this.presentDeveloperIncident=is.function(options.presentDeveloperIncident)
             ? options.presentDeveloperIncident
             : presentDeveloperIncidentModal.bind(null,target);
 
@@ -397,12 +400,12 @@ class Errors {
 
         try{
             const value=JSON.parse(this.storage.getItem(LEDGER_STORAGE_KEY));
-            if(!value||typeof value!=='object'){
+            if(!value||!is.object(value)){
                 return empty;
             }
 
             return {
-                pending:Array.isArray(value.pending)
+                pending:is.array(value.pending)
                     ? value.pending
                     : []
             };
@@ -470,7 +473,7 @@ class Errors {
     }
 
     restorePending(records){
-        if(!Array.isArray(records)){
+        if(!is.array(records)){
             return;
         }
 
@@ -478,23 +481,23 @@ class Errors {
         for(const storedRecord of records){
             if(
                 !storedRecord
-                || typeof storedRecord!=='object'
+                || !is.object(storedRecord)
                 || !storedRecord.incident
-                || typeof storedRecord.incident!=='object'
+                || !is.object(storedRecord.incident)
             ){
                 this.warn('A persisted error delivery could not be restored.');
                 continue;
             }
 
-            const capturedAt=Number.isFinite(storedRecord.capturedAt)
+            const capturedAt=is.finite(storedRecord.capturedAt)
                 ? storedRecord.capturedAt
-                : Number.isFinite(storedRecord.firstSeen)
+                : is.finite(storedRecord.firstSeen)
                     ? storedRecord.firstSeen
                     : timestamp;
-            const dueAt=Number.isFinite(storedRecord.dueAt)
+            const dueAt=is.finite(storedRecord.dueAt)
                 ? storedRecord.dueAt:capturedAt+this.delayMs;
             let occurrenceId=(
-                typeof storedRecord.occurrenceId==='string'
+                is.string(storedRecord.occurrenceId)
                 && storedRecord.occurrenceId.trim()
             )
                 ? storedRecord.occurrenceId
@@ -777,7 +780,7 @@ class Errors {
             const modal=this.target.document?.querySelector?.(
                 'html-import[data-global-error-modal]'
             );
-            if(typeof modal?.close==='function'){
+            if(is.function(modal?.close)){
                 modal.close(undefined,true);
             }else{
                 modal?.remove?.();
@@ -812,7 +815,7 @@ class Errors {
     }
 }
 
-if(typeof window!=='undefined'&&window.errors?.[HANDLER_MARKER]!==true){
+if(!is.undefined(globalThis.window)&&window.errors?.[HANDLER_MARKER]!==true){
     new Errors();
 }
 

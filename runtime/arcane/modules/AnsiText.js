@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const ANSI_PATTERN=/\x1b\[([0-9;?]*)([ -\/]*)([@-~])/g;
 const COLORS=['black','red','green','yellow','blue','magenta','cyan','white'];
 
@@ -24,7 +27,7 @@ function applyCodes(style,raw=''){
         else if(code>=40&&code<=47) style.background=COLORS[code-40];
         else if(code>=90&&code<=97) style.foreground=`bright-${COLORS[code-90]}`;
         else if(code>=100&&code<=107) style.background=`bright-${COLORS[code-100]}`;
-        else if((code===38||code===48)&&codes[index+1]===5&&Number.isInteger(codes[index+2])){
+        else if((code===38||code===48)&&codes[index+1]===5&&is.integer(codes[index+2])){
             style[code===38?'foreground':'background']=`index-${Math.max(0,Math.min(255,codes[index+2]))}`;
             index+=2;
         }

@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const PROVIDER_ID=/^[a-z0-9][a-z0-9._-]{1,63}$/;
 
 export default class CommunicationProviderRegistry{
@@ -5,7 +8,7 @@ export default class CommunicationProviderRegistry{
     register(provider){
         const id=String(provider?.id||'').trim().toLowerCase();
         if(!PROVIDER_ID.test(id)) throw new TypeError('Communication provider id is invalid.');
-        for(const method of ['listThreads','getMessages','send']) if(typeof provider[method]!=='function') throw new TypeError(`Provider ${id} must implement ${method}().`);
+        for(const method of ['listThreads','getMessages','send']) if(!is.function(provider[method])) throw new TypeError(`Provider ${id} must implement ${method}().`);
         if(this.providers.has(id)) throw new RangeError(`Communication provider already registered: ${id}`);
         this.providers.set(id,{...provider,id,label:String(provider.label||id),channels:Object.freeze(Array.from(provider.channels||['other'])),listThreads:provider.listThreads.bind(provider),getMessages:provider.getMessages.bind(provider),send:provider.send.bind(provider)});
         return this.get(id);

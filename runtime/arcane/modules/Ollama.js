@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 /**
  * First-class browser module for Arcane's capability-gated Ollama service.
  * Apps should import this module instead of connecting to localhost:11434.
@@ -59,7 +62,7 @@ export class Ollama{
         try{
             const response=await this.version()
             const version=String(
-                typeof response==='string' ? response : response?.version||''
+                is.string(response) ? response : response?.version||''
             ).trim()||null
             return {ready:true,version,errorCode:null}
         }catch(error){
@@ -95,8 +98,8 @@ export class Ollama{
                 publicDetail:{ready:true,reason}
             }
         )
-        if(typeof globalThis.CustomEvent==='function'
-            &&typeof globalThis.dispatchEvent==='function'){
+        if(is.function(globalThis.CustomEvent)
+            &&is.function(globalThis.dispatchEvent)){
             projectArcaneDOMEvent(globalThis,occurrence)
         }
     }

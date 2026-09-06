@@ -1,5 +1,8 @@
+import Is from "../dependencies/strong-type/index.js";
 import { arcaneLogging } from '../logging.mjs';
 import { Wllama } from "./wllama/index.mjs";
+
+const is = new Is(false);
 
 const completeValue = (value) => value;
 
@@ -63,15 +66,15 @@ function runtimeCapabilitySnapshot(evidence) {
   const navigatorObject = globalThis.navigator;
   const webgpuOperational = evidence?.state === "ready" && evidence?.webgpu?.observed === true;
   return completeValue({
-    webAssembly: typeof globalThis.WebAssembly === "object",
-    opfs: typeof navigatorObject?.storage?.getDirectory === "function",
+    webAssembly: is.object(globalThis.WebAssembly),
+    opfs: is.function(navigatorObject?.storage?.getDirectory),
     webgpu: webgpuOperational,
     webgpuApiPresent: Boolean(navigatorObject?.gpu),
     webgpuOperational,
     webgpuEvidenceProtocol: RUNTIME_EVIDENCE_PROTOCOL,
     crossOriginIsolated: globalThis.crossOriginIsolated === true,
     secureContext: globalThis.isSecureContext === true,
-    hardwareConcurrency: Number.isSafeInteger(navigatorObject?.hardwareConcurrency)
+    hardwareConcurrency: is.safeInteger(navigatorObject?.hardwareConcurrency)
       ? navigatorObject.hardwareConcurrency
       : null,
   });
@@ -80,7 +83,7 @@ function runtimeCapabilitySnapshot(evidence) {
 function normalizePositiveInteger(value, fallback) {
   if (value === undefined || value === null) return fallback;
   const number = Number(value);
-  if (!Number.isSafeInteger(number) || number < 1) {
+  if (!is.safeInteger(number) || number < 1) {
     throw new RangeError("Expected a positive safe integer.");
   }
   return number;
@@ -142,7 +145,7 @@ function createEvidenceLogger(logger) {
 
   function observe(level, args) {
     for (const value of args) {
-      if (typeof value !== "string") continue;
+      if (!is.string(value)) continue;
       for (const line of value.split(/\r?\n/u)) observeLine(level, line);
     }
   }
@@ -151,7 +154,7 @@ function createEvidenceLogger(logger) {
   for (const level of ["debug", "log", "warn", "error"]) {
     wrapped[level] = (...args) => {
       observe(level, args);
-      if (typeof logger?.[level] === "function") logger[level](...args);
+      if (is.function(logger?.[level])) logger[level](...args);
     };
   }
 
@@ -214,7 +217,7 @@ function createStructuredStreamCapture() {
 
   function observe(value) {
     chunks += 1;
-    if (!value || typeof value !== "object" || !Array.isArray(value.choices)) {
+    if (!value || !is.object(value) || !is.array(value.choices)) {
       invalid = true;
       return;
     }
@@ -227,8 +230,8 @@ function createStructuredStreamCapture() {
     if (
       choice?.index !== 0
       || !delta
-      || typeof delta !== "object"
-      || Array.isArray(delta)
+      || !is.object(delta)
+      || is.array(delta)
       || (delta.role !== undefined && delta.role !== "assistant")
       || (choice.finish_reason !== undefined && choice.finish_reason !== null)
       || delta.tool_calls !== undefined
@@ -239,7 +242,7 @@ function createStructuredStreamCapture() {
       return;
     }
     if (delta.content === undefined || delta.content === null) return;
-    if (typeof delta.content !== "string") {
+    if (!is.string(delta.content)) {
       invalid = true;
       return;
     }
@@ -296,7 +299,7 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
   }
 
   function cancellationError(reason, fallback = "The Wllama operation was cancelled.") {
-    return reason instanceof Error ? reason : new Error(reason ? String(reason) : fallback);
+    return is.error(reason) ? reason : new Error(reason ? String(reason) : fallback);
   }
 
   function trackOperation(rawOperation) {
@@ -380,7 +383,7 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
     });
     next.setCompat(null);
     for (const method of ["arcaneLoadModel", "arcaneTelemetry", "arcaneTerminate"]) {
-      if (typeof next[method] !== "function") {
+      if (!is.function(next[method])) {
         throw new Error(`The packaged Wllama projection is missing public ${method}().`);
       }
     }
@@ -401,10 +404,10 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
   }
 
   async function load(files, options = {}) {
-    if (!Array.isArray(files) || files.length === 0) {
+    if (!is.array(files) || files.length === 0) {
       throw new TypeError("Wllama load() requires at least one File or Blob.");
     }
-    if (typeof globalThis.WebAssembly !== "object") {
+    if (!is.object(globalThis.WebAssembly)) {
       throw new Error("WebAssembly is unavailable in this browser.");
     }
     if (!globalThis.navigator?.gpu) {
@@ -435,25 +438,25 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
       loadOptions.n_ubatch = normalizePositiveInteger(options.microBatchTokens, 128);
     }
     if (options.reasoning !== undefined) {
-      if (typeof options.reasoning !== "boolean") {
+      if (!is.boolean(options.reasoning)) {
         throw new TypeError("reasoning must be a boolean when provided.");
       }
       loadOptions.reasoning = options.reasoning;
     }
     if (options.chatTemplate !== undefined) {
-      if (typeof options.chatTemplate !== "string") {
+      if (!is.string(options.chatTemplate)) {
         throw new TypeError("chatTemplate must be a string when provided.");
       }
       loadOptions.chat_template = options.chatTemplate;
     }
     if (options.jinja !== undefined) {
-      if (typeof options.jinja !== "boolean") {
+      if (!is.boolean(options.jinja)) {
         throw new TypeError("jinja must be a boolean when provided.");
       }
       loadOptions.jinja = options.jinja;
     }
     if (options.templateDefaults !== undefined) {
-      if (!options.templateDefaults || typeof options.templateDefaults !== "object" || Array.isArray(options.templateDefaults)) {
+      if (!options.templateDefaults || !is.object(options.templateDefaults) || is.array(options.templateDefaults)) {
         throw new TypeError("templateDefaults must be a plain object when provided.");
       }
       loadOptions.default_template_kwargs = { ...options.templateDefaults };
@@ -482,7 +485,7 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
     try {
       await loadOperation;
       if (pending?.engine !== next) throw new Error("Wllama load was cancelled.");
-      if (typeof next.isModelLoaded !== "function" || next.isModelLoaded() !== true) {
+      if (!is.function(next.isModelLoaded) || next.isModelLoaded() !== true) {
         throw runtimeFailure(
           "ARCANE_AI_LOAD_FAILED",
           "Wllama did not confirm a successfully loaded model.",
@@ -553,13 +556,13 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
         lastObservedOperational: evidenceState.webgpu?.lastObservedOperational === true,
       },
       failure: completeValue({
-        code: typeof error?.code === "string" ? error.code : "ARCANE_AI_RUNTIME_FAILED",
+        code: is.string(error?.code) ? error.code : "ARCANE_AI_RUNTIME_FAILED",
       }),
     });
   }
 
   async function inference(options, onData = null) {
-    if (!options || typeof options !== "object" || Array.isArray(options)) {
+    if (!options || !is.object(options) || is.array(options)) {
       throw new TypeError("Wllama inference options must be an object.");
     }
     if (Object.hasOwn(options, "signal")) {
@@ -629,7 +632,7 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
   }
 
   function stream(options, onData) {
-    if (typeof onData !== "function") {
+    if (!is.function(onData)) {
       throw new TypeError("Wllama stream() requires an onData callback.");
     }
     return inference({ ...options, stream: true }, onData);
@@ -653,7 +656,7 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
 
   async function probe({ args = ["-o", "ADD"] } = {}) {
     if (engine) throw new Error("The no-model Wllama probe cannot run while a model is loaded.");
-    if (!Array.isArray(args) || args.some((value) => typeof value !== "string")) {
+    if (!is.array(args) || args.some((value) => !is.string(value))) {
       throw new TypeError("Wllama probe args must be an array of strings.");
     }
     const temporary = newEngine();

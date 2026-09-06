@@ -1,3 +1,4 @@
+import Is from "../dependencies/strong-type/index.js";
 import { arcaneLogging } from '../logging.mjs';
 import {
   ARCANE_AI_ADAPTER_PROTOCOL,
@@ -8,6 +9,8 @@ import {
 } from "./model-controller.mjs";
 import { createPackagedWllamaRuntime } from "./browser-wllama-runtime.mjs";
 import { arcaneEvents } from "../event-manager.mjs";
+
+const is = new Is(false);
 
 const completeValue = (value) => value;
 
@@ -76,9 +79,9 @@ function httpContentRange(value) {
   const end = Number(match[2]);
   const total = Number(match[3]);
   if (
-    !Number.isSafeInteger(start)
-    || !Number.isSafeInteger(end)
-    || !Number.isSafeInteger(total)
+    !is.safeInteger(start)
+    || !is.safeInteger(end)
+    || !is.safeInteger(total)
     || start < 0
     || end < start
     || total <= end
@@ -88,11 +91,11 @@ function httpContentRange(value) {
 
 function httpContentLength(value) {
   const length = Number(String(value ?? "").trim());
-  return Number.isSafeInteger(length) && length > 0 ? length : null;
+  return is.safeInteger(length) && length > 0 ? length : null;
 }
 
 function downloadConcurrencyValue(value) {
-  if (!Number.isSafeInteger(value) || value < 1) {
+  if (!is.safeInteger(value) || value < 1) {
     throw new RangeError("Model downloadConcurrency must be a positive safe integer.");
   }
   return value;
@@ -126,7 +129,7 @@ function modelHttpRanges(total) {
 }
 
 function progressClock() {
-  return typeof globalThis.performance?.now === "function"
+  return is.function(globalThis.performance?.now)
     ? globalThis.performance.now()
     : Date.now();
 }
@@ -142,7 +145,7 @@ function modelSourceUrl(value) {
 }
 
 function requiredText(value, field) {
-  if (typeof value !== "string" || !value.trim()) {
+  if (!is.string(value) || !value.trim()) {
     throw new TypeError(`Browser model ${field} must be a nonempty string.`);
   }
   return value.trim();
@@ -196,7 +199,7 @@ function descriptorFileName(value, url) {
 }
 
 function descriptorFile(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (!value || !is.object(value) || is.array(value)) {
     throw new TypeError("Each browser model file descriptor must be an object.");
   }
   if (Object.hasOwn(value, "immutableUrl")) {
@@ -210,14 +213,14 @@ function descriptorFile(value) {
     name: descriptorFileName(value, url),
     url: url.href,
   };
-  if (Number.isSafeInteger(value.bytes) && value.bytes > 0) {
+  if (is.safeInteger(value.bytes) && value.bytes > 0) {
     file.bytes = value.bytes;
   }
   return completeValue(file);
 }
 
 function modelDescriptor(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (!value || !is.object(value) || is.array(value)) {
     throw new TypeError("A browser model descriptor is required.");
   }
   const id = modelIdText(value.id);
@@ -225,7 +228,7 @@ function modelDescriptor(value) {
     .some((field) => Object.hasOwn(value, field))) {
     throw new TypeError("Browser model descriptor files must be declared in files[].");
   }
-  if (!Array.isArray(value.files) || value.files.length === 0) {
+  if (!is.array(value.files) || value.files.length === 0) {
     throw new TypeError("Browser model files must be a nonempty ordered array.");
   }
   let files = value.files.map((file) => descriptorFile(file));
@@ -282,7 +285,7 @@ function highPerformanceGpuBrowser() {
     if (brands.has("Vivaldi") || /\bVivaldi\//u.test(userAgent)) {
         return { name: "Vivaldi", url: "vivaldi://flags/#force-high-performance-gpu" };
     }
-    if (brands.has("Brave") || typeof navigatorObject?.brave?.isBrave === "function") {
+    if (brands.has("Brave") || is.function(navigatorObject?.brave?.isBrave)) {
         return { name: "Brave", url: "brave://flags/#force-high-performance-gpu" };
     }
     if (brands.has("Opera") || /\bOPR\//u.test(userAgent)) {
@@ -368,7 +371,7 @@ export function createBrowserModelSource(descriptor, {
   const rangeRequestUrls = new Array(metadata.files.length).fill(null);
 
   function selectedMember(memberIndex) {
-    if (!Number.isSafeInteger(memberIndex)) {
+    if (!is.safeInteger(memberIndex)) {
       throw new TypeError("A browser model file index must be a safe integer.");
     }
     if (memberIndex < 0 || memberIndex >= metadata.files.length) {
@@ -381,7 +384,7 @@ export function createBrowserModelSource(descriptor, {
     const member = selectedMember(memberIndex);
     throwIfAborted(signal, "install");
     const fetchFunction = fetchImpl ?? globalThis.fetch?.bind(globalThis);
-    if (typeof fetchFunction !== "function") {
+    if (!is.function(fetchFunction)) {
       throw fail("ARCANE_AI_MODEL_SOURCE_UNAVAILABLE", "Browser fetch is unavailable.");
     }
     const requestOptions = {
@@ -418,7 +421,7 @@ export function createBrowserModelSource(descriptor, {
 
   function openedDownload(download) {
     const { member, response, finalUrl } = download;
-    if (!response.body || typeof response.body.getReader !== "function") {
+    if (!response.body || !is.function(response.body.getReader)) {
       throw fail("ARCANE_AI_MODEL_SOURCE_INVALID", "The model response did not provide a byte stream.");
     }
     async function cancel(reason) {
@@ -464,7 +467,7 @@ export function createBrowserModelSource(descriptor, {
             if (
               (!header || observed)
               && (!observed || (observed.start === 0 && observed.end === 0))
-              && Number.isSafeInteger(total)
+              && is.safeInteger(total)
               && total > 0
             ) {
               await cancelReadableBody(download.response.body);
@@ -502,9 +505,9 @@ export function createBrowserModelSource(descriptor, {
 
   async function openRange(memberIndex, { signal, start, end, total } = {}) {
     if (
-      !Number.isSafeInteger(start)
-      || !Number.isSafeInteger(end)
-      || !Number.isSafeInteger(total)
+      !is.safeInteger(start)
+      || !is.safeInteger(end)
+      || !is.safeInteger(total)
       || start < 0
       || end < start
       || end >= total
@@ -550,18 +553,18 @@ export function createBrowserModelSource(descriptor, {
 }
 
 async function* byteChunks(body, signal) {
-  if (body instanceof Uint8Array || body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
+  if (is.instanceCheck(body, Uint8Array) || is.instanceCheck(body, ArrayBuffer) || is.arrayBufferView(body)) {
     throwIfAborted(signal, "install");
-    yield body instanceof Uint8Array
+    yield is.instanceCheck(body, Uint8Array)
       ? body
       : new Uint8Array(body.buffer ?? body, body.byteOffset ?? 0, body.byteLength);
     return;
   }
-  if (body && typeof body.stream === "function") {
+  if (body && is.function(body.stream)) {
     yield* byteChunks(body.stream(), signal);
     return;
   }
-  if (body && typeof body.getReader === "function") {
+  if (body && is.function(body.getReader)) {
     const reader = body.getReader();
     try {
       while (true) {
@@ -588,7 +591,7 @@ async function* byteChunks(body, signal) {
         }
         const { done, value } = step;
         if (done) return;
-        yield value instanceof Uint8Array ? value : new Uint8Array(value);
+        yield is.instanceCheck(value, Uint8Array) ? value : new Uint8Array(value);
       }
     } finally {
       if (signal?.aborted) await reader.cancel(signal.reason).catch(() => undefined);
@@ -633,9 +636,9 @@ function rangePartDetails(modelName, name) {
   const end = Number(match[2]);
   const total = Number(match[3]);
   if (
-    !Number.isSafeInteger(start)
-    || !Number.isSafeInteger(end)
-    || !Number.isSafeInteger(total)
+    !is.safeInteger(start)
+    || !is.safeInteger(end)
+    || !is.safeInteger(total)
     || start < 0
     || end < start
     || total <= end
@@ -659,16 +662,16 @@ export function createDbopfsModelStore({
   estimateStorage = null,
   downloadConcurrency = DEFAULT_MODEL_DOWNLOAD_CONCURRENCY,
 } = {}) {
-  if (!dbopfs || (typeof dbopfs !== "object" && typeof dbopfs !== "function")) {
+  if (!dbopfs || (!is.object(dbopfs) && !is.function(dbopfs))) {
     throw new TypeError("createDbopfsModelStore requires an existing DBOPFS instance.");
   }
-  if (typeof dbopfs.getTableHandle !== "function") {
+  if (!is.function(dbopfs.getTableHandle)) {
     throw new TypeError("The DBOPFS instance is missing getTableHandle().");
   }
-  if (dbopfs.readyPromise !== undefined && typeof dbopfs.readyPromise?.then !== "function") {
+  if (dbopfs.readyPromise !== undefined && !is.function(dbopfs.readyPromise?.then)) {
     throw new TypeError("The DBOPFS readyPromise must be thenable.");
   }
-  if (estimateStorage !== null && typeof estimateStorage !== "function") {
+  if (estimateStorage !== null && !is.function(estimateStorage)) {
     throw new TypeError("estimateStorage must be a function or null.");
   }
   const workerLimit = downloadConcurrencyValue(downloadConcurrency);
@@ -678,7 +681,7 @@ export function createDbopfsModelStore({
     if (dbopfs.readyPromise) await dbopfs.readyPromise;
     tablePromise ||= Promise.resolve(dbopfs.getTableHandle(tableName));
     const handle = await tablePromise;
-    if (!handle || typeof handle.getFileHandle !== "function" || typeof handle.removeEntry !== "function") {
+    if (!handle || !is.function(handle.getFileHandle) || !is.function(handle.removeEntry)) {
       throw fail("ARCANE_AI_STORAGE_UNAVAILABLE", "DBOPFS did not provide an OPFS table handle.");
     }
     return handle;
@@ -717,7 +720,7 @@ export function createDbopfsModelStore({
     function totalBytesValue() {
       if (memberTotals.some((value) => value === null)) return null;
       const totalBytes = memberTotals.reduce((sum, value) => sum + value, 0);
-      return Number.isSafeInteger(totalBytes) ? totalBytes : null;
+      return is.safeInteger(totalBytes) ? totalBytes : null;
     }
 
     function progressRecord(now) {
@@ -782,20 +785,20 @@ export function createDbopfsModelStore({
     }
 
     function setMemberTotal(memberIndex, totalBytes) {
-      if (!Number.isSafeInteger(totalBytes) || totalBytes <= 0) return;
+      if (!is.safeInteger(totalBytes) || totalBytes <= 0) return;
       if (memberTotals[memberIndex] === totalBytes) return;
       memberTotals[memberIndex] = totalBytes;
       publishSafely({ force: true });
     }
 
     function addBytes(value) {
-      if (!Number.isSafeInteger(value) || value <= 0) return;
+      if (!is.safeInteger(value) || value <= 0) return;
       loadedBytes += value;
       publishSafely();
     }
 
     function discardBytes(value) {
-      if (!Number.isSafeInteger(value) || value <= 0) return;
+      if (!is.safeInteger(value) || value <= 0) return;
       loadedBytes = Math.max(0, loadedBytes - value);
       samples = [];
       publishSafely({ force: true });
@@ -808,7 +811,7 @@ export function createDbopfsModelStore({
         publishSafely({ force: true });
       },
       completeMember(memberIndex, totalBytes) {
-        if (Number.isSafeInteger(totalBytes) && totalBytes > 0) {
+        if (is.safeInteger(totalBytes) && totalBytes > 0) {
           memberTotals[memberIndex] = totalBytes;
         }
         completed += 1;
@@ -830,13 +833,13 @@ export function createDbopfsModelStore({
         publishSafely({ force: true });
       },
       restoreBytes(value) {
-        if (!Number.isSafeInteger(value) || value <= 0) return;
+        if (!is.safeInteger(value) || value <= 0) return;
         loadedBytes += value;
         samples = [];
         publishSafely({ force: true });
       },
       restoreMember(memberIndex, totalBytes) {
-        if (!Number.isSafeInteger(totalBytes) || totalBytes <= 0) return;
+        if (!is.safeInteger(totalBytes) || totalBytes <= 0) return;
         memberTotals[memberIndex] = totalBytes;
         loadedBytes += totalBytes;
         completed += 1;
@@ -971,7 +974,7 @@ export function createDbopfsModelStore({
           const expected = range.end - range.start + 1;
           for await (const chunk of byteChunks(opened.body, downloadSignal)) {
             const nextReceived = received + chunk.byteLength;
-            if (!Number.isSafeInteger(nextReceived) || nextReceived > expected) {
+            if (!is.safeInteger(nextReceived) || nextReceived > expected) {
               throw fail(
                 "ARCANE_AI_MODEL_DOWNLOAD_FAILED",
                 "The model server returned more content than the requested HTTP byte range.",
@@ -1113,7 +1116,7 @@ export function createDbopfsModelStore({
 
   async function memberRangePartNames(modelName) {
     const directory = await table();
-    if (typeof directory.entries !== "function") return null;
+    if (!is.function(directory.entries)) return null;
     const prefix = rangePartPrefix(modelName);
     const names = [];
     for await (const [name] of directory.entries()) {
@@ -1133,7 +1136,7 @@ export function createDbopfsModelStore({
   } = {}) {
     const existingNames = await memberRangePartNames(modelName);
     let names = existingNames;
-    if (names === null && Number.isSafeInteger(total) && total > 0) {
+    if (names === null && is.safeInteger(total) && total > 0) {
       names = modelHttpRanges(total).map((range) => rangePartName(modelName, range));
     }
     names ??= [];
@@ -1183,7 +1186,7 @@ export function createDbopfsModelStore({
     if (completeMembers.length === 0) return;
     try {
       const directory = await table();
-      if (typeof directory.entries === "function") {
+      if (is.function(directory.entries)) {
         const prefixes = completeMembers.map(({ modelName }) => rangePartPrefix(modelName));
         const entries = [];
         for await (const [name] of directory.entries()) {
@@ -1206,7 +1209,7 @@ export function createDbopfsModelStore({
   async function removeRangeParts(source, names) {
     const members = sourceMetadata(source).files;
     const directory = await table();
-    if (typeof directory.entries === "function") {
+    if (is.function(directory.entries)) {
       const prefixes = names.models.map((entry) => rangePartPrefix(entry.name));
       const entries = [];
       for await (const [name] of directory.entries()) {
@@ -1219,7 +1222,7 @@ export function createDbopfsModelStore({
     const removed = [];
     for (let memberIndex = 0; memberIndex < members.length; memberIndex += 1) {
       const total = members[memberIndex].bytes;
-      if (!Number.isSafeInteger(total) || total <= 0) continue;
+      if (!is.safeInteger(total) || total <= 0) continue;
       removed.push(await removeMemberRangeParts(
         names.models[memberIndex].name,
         { total },
@@ -1280,7 +1283,7 @@ export function createDbopfsModelStore({
         return null;
       }
       partFiles.push(partFile);
-      if (Number.isFinite(partFile.lastModified)) {
+      if (is.finite(partFile.lastModified)) {
         lastModified = Math.max(lastModified, partFile.lastModified);
       }
     }
@@ -1310,7 +1313,7 @@ export function createDbopfsModelStore({
   async function storedRangeMember(member, modelName, signal) {
     const names = await memberRangePartNames(modelName);
     const availableNames = names === null ? null : new Set(names);
-    const declaredTotal = Number.isSafeInteger(member.bytes) && member.bytes > 0
+    const declaredTotal = is.safeInteger(member.bytes) && member.bytes > 0
       ? member.bytes
       : null;
     if (declaredTotal !== null) {
@@ -1387,7 +1390,7 @@ export function createDbopfsModelStore({
   }
 
   async function install(source, { signal, onProgress = null } = {}) {
-    if (onProgress !== null && typeof onProgress !== "function") {
+    if (onProgress !== null && !is.function(onProgress)) {
       throw new TypeError("Model store onProgress must be a function or null.");
     }
     const names = storageName(source);
@@ -1510,7 +1513,7 @@ export function createDbopfsModelStore({
     onProgress = null,
     offline = false,
   } = {}) {
-    if (onProgress !== null && typeof onProgress !== "function") {
+    if (onProgress !== null && !is.function(onProgress)) {
       throw new TypeError("Model store onProgress must be a function or null.");
     }
     const total = sourceMetadata(source).files.length;
@@ -1675,7 +1678,7 @@ function responseFormat(structuredOutput) {
   if (structuredOutput === true || structuredOutput === "json") {
     return completeValue({ type: "json_object" });
   }
-  if (typeof structuredOutput !== "object" || Array.isArray(structuredOutput)) {
+  if (!is.object(structuredOutput) || is.array(structuredOutput)) {
     throw new TypeError("structuredOutput must be false, true, \"json\", or a JSON Schema object.");
   }
   return completeValue({
@@ -1685,14 +1688,14 @@ function responseFormat(structuredOutput) {
 }
 
 function plainStructuralRecord(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  if (!value || !is.object(value) || is.array(value)) return false;
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
 }
 
 function validateToolMessageSchemas(value) {
   if (value === undefined) return;
-  if (!Array.isArray(value)) throw new TypeError("tools must be an array.");
+  if (!is.array(value)) throw new TypeError("tools must be an array.");
   for (const [index, tool] of value.entries()) {
     const parameters = tool?.function?.parameters;
     const messageSchema = parameters?.properties?.message;
@@ -1705,9 +1708,9 @@ function validateToolMessageSchemas(value) {
       || !plainStructuralRecord(parameters.properties)
       || !plainStructuralRecord(messageSchema)
       || messageSchema.type !== "string"
-      || !Number.isInteger(messageSchema.minLength)
+      || !is.integer(messageSchema.minLength)
       || messageSchema.minLength < 1
-      || !Array.isArray(parameters.required)
+      || !is.array(parameters.required)
       || !parameters.required.includes("message")
     ) {
       throw fail(
@@ -1746,7 +1749,7 @@ function validateRequestMessages(messages) {
       }
     }
     if (message?.role === "tool") {
-      if (typeof message.content !== "string" || !message.content.trim()) {
+      if (!is.string(message.content) || !message.content.trim()) {
         throw fail(
           "ARCANE_AI_INVALID_TOOL_MESSAGE",
           `messages[${String(messageIndex)}] must contain a nonblank user-facing tool result.`,
@@ -1754,7 +1757,7 @@ function validateRequestMessages(messages) {
       }
       if (
         !pendingToolCallIds.size
-        || typeof message.tool_call_id !== "string"
+        || !is.string(message.tool_call_id)
         || !pendingToolCallIds.has(message.tool_call_id)
       ) {
         throw fail(
@@ -1790,12 +1793,12 @@ function validateStructuralRequest(request) {
   if (!plainStructuralRecord(request)) {
     throw new TypeError("The browser-WASM LLM request must be a plain object.");
   }
-  if (!Array.isArray(request.messages)) throw new TypeError("messages must be an array.");
+  if (!is.array(request.messages)) throw new TypeError("messages must be an array.");
   validateRequestMessages(request.messages);
   validateToolMessageSchemas(request.tools);
   const parallelValues = [request.parallelToolCalls, request.parallel_tool_calls];
   if (parallelValues.some(function invalidParallelBrowserWasmPreference(value) {
-    return value !== undefined && typeof value !== "boolean";
+    return value !== undefined && !is.boolean(value);
   })) {
     throw new TypeError("parallelToolCalls must be a boolean when provided.");
   }
@@ -1830,13 +1833,13 @@ function completionOptions(request, abortSignal, stream) {
     if (request[source] !== undefined) options[target] = request[source];
   }
   if (request.templateOptions !== undefined) {
-    if (!request.templateOptions || typeof request.templateOptions !== "object" || Array.isArray(request.templateOptions)) {
+    if (!request.templateOptions || !is.object(request.templateOptions) || is.array(request.templateOptions)) {
       throw new TypeError("templateOptions must be a plain object when provided.");
     }
     options.chat_template_kwargs = { ...request.templateOptions };
   }
   if (request.tools !== undefined) {
-    if (!Array.isArray(request.tools)) throw new TypeError("tools must be an array.");
+    if (!is.array(request.tools)) throw new TypeError("tools must be an array.");
     options.tools = request.tools;
   }
   if (request.toolChoice !== undefined) options.tool_choice = request.toolChoice;
@@ -1863,7 +1866,7 @@ function validateToolCalls(message, location = "The model response") {
   }
   if (!Object.hasOwn(message, "tool_calls")) return [];
   const descriptor = Object.getOwnPropertyDescriptor(message, "tool_calls");
-  if (!descriptor || !Object.hasOwn(descriptor, "value") || !Array.isArray(descriptor.value)) {
+  if (!descriptor || !Object.hasOwn(descriptor, "value") || !is.array(descriptor.value)) {
     throw fail("ARCANE_AI_TOOL_CALL_INVALID", `${location} contains malformed tool calls.`);
   }
   const calls = descriptor.value;
@@ -1871,14 +1874,14 @@ function validateToolCalls(message, location = "The model response") {
   for (const call of calls) {
     if (
       !plainStructuralRecord(call)
-      || typeof call.id !== "string"
+      || !is.string(call.id)
       || !call.id.trim()
       || ids.has(call.id)
       || call.type !== "function"
       || !plainStructuralRecord(call.function)
-      || typeof call.function.name !== "string"
+      || !is.string(call.function.name)
       || !call.function.name.trim()
-      || typeof call.function.arguments !== "string"
+      || !is.string(call.function.arguments)
     ) {
       throw fail("ARCANE_AI_TOOL_CALL_INVALID", `${location} contains malformed tool calls.`);
     }
@@ -1898,7 +1901,7 @@ function validateToolCalls(message, location = "The model response") {
         `${location} contains structural tool arguments that are not a JSON object.`,
       );
     }
-    if (typeof argumentsRecord.message !== "string" || !argumentsRecord.message.trim()) {
+    if (!is.string(argumentsRecord.message) || !argumentsRecord.message.trim()) {
       throw fail(
         "ARCANE_AI_TOOL_MESSAGE_REQUIRED",
         `${location} structural tool arguments must include a nonempty user-facing message.`,
@@ -1940,7 +1943,7 @@ function validateCompletion(value, requestId) {
   if (
     !choicesDescriptor
     || !Object.hasOwn(choicesDescriptor, "value")
-    || !Array.isArray(choicesDescriptor.value)
+    || !is.array(choicesDescriptor.value)
     || choicesDescriptor.value.length === 0
   ) {
     throw fail("ARCANE_AI_INVALID_PROVIDER_RESULT", "The model returned an invalid chat completion.");
@@ -1954,7 +1957,7 @@ function validateCompletion(value, requestId) {
       : null;
     if (
       !plainStructuralRecord(choice)
-      || !Number.isSafeInteger(choice.index)
+      || !is.safeInteger(choice.index)
       || choice.index < 0
       || indexes.has(choice.index)
       || !messageDescriptor
@@ -1977,7 +1980,7 @@ function selectedCompletionToolCalls(completion) {
   const message = Object.hasOwn(completion ?? {}, "message")
     ? completion.message
     : completion?.choices?.[0]?.message;
-  return Array.isArray(message?.tool_calls) ? message.tool_calls : [];
+  return is.array(message?.tool_calls) ? message.tool_calls : [];
 }
 
 function sameCanonicalToolCalls(left, right) {
@@ -1995,9 +1998,9 @@ function sameCompleteStreamValue(left, right, leftToRight = new Map(), rightToLe
   if (
     !left
     || !right
-    || typeof left !== "object"
-    || typeof right !== "object"
-    || Array.isArray(left) !== Array.isArray(right)
+    || !is.object(left)
+    || !is.object(right)
+    || is.array(left) !== is.array(right)
   ) return false;
   if (leftToRight.has(left) || rightToLeft.has(right)) {
     return leftToRight.get(left) === right && rightToLeft.get(right) === left;
@@ -2051,9 +2054,9 @@ function isPublicStreamStructuralKey(key) {
 const OMITTED_PUBLIC_STREAM_DATA = Symbol("omitted-public-stream-data");
 
 function projectPublicStreamData(value, seen = new Map()) {
-  if (value === null || value === undefined || typeof value !== "object") return value;
+  if (value === null || value === undefined || !is.object(value)) return value;
   if (seen.has(value)) return seen.get(value);
-  if (Array.isArray(value)) {
+  if (is.array(value)) {
     const result = [];
     seen.set(value, result);
     for (const item of value) {
@@ -2067,7 +2070,7 @@ function projectPublicStreamData(value, seen = new Map()) {
   let sourceDataFields = 0;
   const descriptors = Object.getOwnPropertyDescriptors(value);
   for (const key of Reflect.ownKeys(descriptors)) {
-    if (typeof key === "symbol") continue;
+    if (is.symbol(key)) continue;
     const descriptor = descriptors[key];
     if (!Object.hasOwn(descriptor, "value")) continue;
     sourceDataFields += 1;
@@ -2090,7 +2093,7 @@ function createCompletionAccumulator(modelId, requestId) {
 
   function choice(index) {
     const key = index ?? 0;
-    if (!Number.isSafeInteger(key) || key < 0) {
+    if (!is.safeInteger(key) || key < 0) {
       throw fail("ARCANE_AI_INVALID_PROVIDER_RESULT", "The model returned an invalid stream choice index.");
     }
     if (!choices.has(key)) {
@@ -2114,9 +2117,9 @@ function createCompletionAccumulator(modelId, requestId) {
   }
 
   function push(value) {
-    if (!value || typeof value !== "object") return;
+    if (!value || !is.object(value)) return;
     base = { ...base, ...value, id: requestId ?? value.id ?? base.id, choices: [] };
-    for (const item of Array.isArray(value.choices) ? value.choices : []) {
+    for (const item of is.array(value.choices) ? value.choices : []) {
       const record = choice(item.index);
       for (const [key, fieldValue] of Object.entries(item)) {
         if (key !== "delta" && key !== "message") record.choiceMetadata[key] = fieldValue;
@@ -2127,14 +2130,14 @@ function createCompletionAccumulator(modelId, requestId) {
         if (!source) continue;
         for (const [key, fieldValue] of Object.entries(source)) {
           if (isPublicStreamStructuralKey(key)) continue;
-          if (key === "role" && typeof fieldValue === "string") {
+          if (key === "role" && is.string(fieldValue)) {
             record.role = fieldValue;
           } else if (key === "content") {
             if (
               !replaceText
               && record.sawContent
-              && typeof record.content === "string"
-              && typeof fieldValue === "string"
+              && is.string(record.content)
+              && is.string(fieldValue)
             ) record.content += fieldValue;
             else record.content = fieldValue;
             record.sawContent = true;
@@ -2142,8 +2145,8 @@ function createCompletionAccumulator(modelId, requestId) {
             if (
               !replaceText
               && record.sawReasoning
-              && typeof record.reasoning === "string"
-              && typeof fieldValue === "string"
+              && is.string(record.reasoning)
+              && is.string(fieldValue)
             ) record.reasoning += fieldValue;
             else record.reasoning = fieldValue;
             record.sawReasoning = true;
@@ -2151,8 +2154,8 @@ function createCompletionAccumulator(modelId, requestId) {
             if (
               !replaceText
               && record.sawReasoningText
-              && typeof record.reasoningText === "string"
-              && typeof fieldValue === "string"
+              && is.string(record.reasoningText)
+              && is.string(fieldValue)
             ) record.reasoningText += fieldValue;
             else record.reasoningText = fieldValue;
             record.sawReasoningText = true;
@@ -2168,11 +2171,11 @@ function createCompletionAccumulator(modelId, requestId) {
         );
       }
       if (item.finish_reason !== undefined) record.finish_reason = item.finish_reason;
-      if (delta.tool_calls !== undefined && !Array.isArray(delta.tool_calls)) {
+      if (delta.tool_calls !== undefined && !is.array(delta.tool_calls)) {
         throw fail("ARCANE_AI_INVALID_PROVIDER_RESULT", "The model returned malformed streamed tool calls.");
       }
       for (const fragment of delta.tool_calls ?? []) {
-        if (!Number.isSafeInteger(fragment?.index) || fragment.index < 0) {
+        if (!is.safeInteger(fragment?.index) || fragment.index < 0) {
           throw fail("ARCANE_AI_INVALID_PROVIDER_RESULT", "A streamed tool call had no valid index.");
         }
         const tool = record.tools.get(fragment.index) ?? {
@@ -2185,25 +2188,25 @@ function createCompletionAccumulator(modelId, requestId) {
           arguments: "",
         };
         if (fragment.id !== undefined) {
-          if (typeof fragment.id !== "string" || !fragment.id || tool.id && tool.id !== fragment.id) {
+          if (!is.string(fragment.id) || !fragment.id || tool.id && tool.id !== fragment.id) {
             tool.invalidIdentity = true;
           } else {
             tool.id = fragment.id;
           }
         }
         if (fragment.type !== undefined) {
-          if (typeof fragment.type !== "string" || !fragment.type || tool.type && tool.type !== fragment.type) {
+          if (!is.string(fragment.type) || !fragment.type || tool.type && tool.type !== fragment.type) {
             tool.invalidIdentity = true;
           } else {
             tool.type = fragment.type;
           }
         }
         if (fragment.function?.name !== undefined) {
-          if (typeof fragment.function.name !== "string") tool.invalidIdentity = true;
+          if (!is.string(fragment.function.name)) tool.invalidIdentity = true;
           else tool.name += fragment.function.name;
         }
         if (fragment.function?.arguments !== undefined) {
-          if (typeof fragment.function.arguments !== "string") tool.invalidArguments = true;
+          if (!is.string(fragment.function.arguments)) tool.invalidArguments = true;
           else tool.arguments += fragment.function.arguments;
         }
         record.tools.set(fragment.index, tool);
@@ -2298,7 +2301,7 @@ function createCompletionAccumulator(modelId, requestId) {
       }
       if (
         fragmentCalls !== null
-        && (!Array.isArray(terminalCalls) || !sameCanonicalToolCalls(fragmentCalls, terminalCalls))
+        && (!is.array(terminalCalls) || !sameCanonicalToolCalls(fragmentCalls, terminalCalls))
       ) {
         throw fail(
           "ARCANE_AI_TOOL_CALL_INVALID",
@@ -2423,13 +2426,13 @@ function callbackStreamHandle({ runtime, request, signal, onSettled }) {
 function validatedV1StreamHandle(opened, request) {
   if (
     !opened
-    || typeof opened !== "object"
-    || typeof opened[Symbol.asyncIterator] !== "function"
-    || typeof opened.cancel !== "function"
+    || !is.object(opened)
+    || !is.function(opened[Symbol.asyncIterator])
+    || !is.function(opened.cancel)
     || !opened.result
-    || typeof opened.result.then !== "function"
+    || !is.function(opened.result.then)
   ) {
-    if (typeof opened?.cancel === "function") {
+    if (is.function(opened?.cancel)) {
       Promise.resolve().then(function cancelInvalidV1StreamHandle() {
         return opened.cancel("The v1 provider returned an invalid stream handle.");
       }).catch(function reportInvalidV1StreamCleanupFailure(error) {
@@ -2452,7 +2455,7 @@ function validatedV1StreamHandle(opened, request) {
     });
     throw error;
   }
-  if (!iterator || typeof iterator.next !== "function") {
+  if (!iterator || !is.function(iterator.next)) {
     Promise.resolve().then(function cancelInvalidV1Iterator() {
       return opened.cancel("The v1 provider returned an invalid stream iterator.");
     }).catch(function reportInvalidV1IteratorCleanupFailure(error) {
@@ -2536,7 +2539,7 @@ function validatedV1StreamHandle(opened, request) {
       });
     },
     async return(value) {
-      if (typeof iterator.return === "function") {
+      if (is.function(iterator.return)) {
         Promise.resolve().then(function returnUnderlyingV1Stream() {
           return iterator.return(value);
         }).catch(function reportUnderlyingV1StreamReturnFailure(error) {
@@ -2563,7 +2566,7 @@ function validatedV1StreamHandle(opened, request) {
 
 function positiveLoadInteger(value, field, fallback) {
   const resolved = value === undefined ? fallback : value;
-  if (!Number.isSafeInteger(resolved) || resolved < 1) {
+  if (!is.safeInteger(resolved) || resolved < 1) {
     throw new RangeError(`${field} must be a positive safe integer.`);
   }
   return resolved;
@@ -2571,19 +2574,19 @@ function positiveLoadInteger(value, field, fallback) {
 
 function optionalLoadBoolean(value, field) {
   if (value === undefined) return undefined;
-  if (typeof value !== "boolean") throw new TypeError(`${field} must be a boolean when provided.`);
+  if (!is.boolean(value)) throw new TypeError(`${field} must be a boolean when provided.`);
   return value;
 }
 
 function optionalLoadText(value, field) {
   if (value === undefined) return undefined;
-  if (typeof value !== "string") throw new TypeError(`${field} must be a string when provided.`);
+  if (!is.string(value)) throw new TypeError(`${field} must be a string when provided.`);
   return value;
 }
 
 function optionalTemplateDefaults(value) {
   if (value === undefined) return undefined;
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (!value || !is.object(value) || is.array(value)) {
     throw new TypeError("templateDefaults must be a plain object when provided.");
   }
   return { ...value };
@@ -2591,7 +2594,7 @@ function optionalTemplateDefaults(value) {
 
 function measuredRuntimeCapabilities(runtimeCapabilities) {
   const measuredDeviceMemory = Number(globalThis.navigator?.deviceMemory);
-  const deviceMemory = Number.isFinite(measuredDeviceMemory) && measuredDeviceMemory > 0
+  const deviceMemory = is.finite(measuredDeviceMemory) && measuredDeviceMemory > 0
     ? measuredDeviceMemory
     : null;
   return completeValue({ ...runtimeCapabilities, deviceMemory });
@@ -2599,7 +2602,7 @@ function measuredRuntimeCapabilities(runtimeCapabilities) {
 
 function capabilityLoadPlan(runtimeCapabilities, defaults, options = {}) {
   const configured = { ...defaults, ...options };
-  const hardwareConcurrency = Number.isSafeInteger(runtimeCapabilities.hardwareConcurrency)
+  const hardwareConcurrency = is.safeInteger(runtimeCapabilities.hardwareConcurrency)
     && runtimeCapabilities.hardwareConcurrency > 0
     ? runtimeCapabilities.hardwareConcurrency
     : 1;
@@ -2666,8 +2669,8 @@ function sameLoadPlan(left, right) {
 }
 
 function stableModelFailure(error) {
-  const code = typeof error?.code === "string" ? error.code : "";
-  const message = typeof error?.message === "string" ? error.message : "";
+  const code = is.string(error?.code) ? error.code : "";
+  const message = is.string(error?.message) ? error.message : "";
   if (code === "ARCANE_AI_MODEL_SHARD_TOO_LARGE") {
     return completeValue({ code });
   }
@@ -2755,7 +2758,7 @@ function capabilityPolicy(
 }
 
 function providerModelSources(sources) {
-  if (!Array.isArray(sources) || sources.length === 0) {
+  if (!is.array(sources) || sources.length === 0) {
     throw new TypeError("createBrowserWasmLlmProvider requires a nonempty sources array.");
   }
   const ids = new Set();
@@ -2921,8 +2924,8 @@ export function createBrowserWasmLlmProvider({
       : "unloaded";
     errorState = state === "error"
       ? completeValue({
-        code: typeof error?.code === "string" ? error.code : "ARCANE_AI_RUNTIME_FAILED",
-        message: typeof error?.message === "string"
+        code: is.string(error?.code) ? error.code : "ARCANE_AI_RUNTIME_FAILED",
+        message: is.string(error?.message)
           ? error.message
           : "The browser-WASM runtime failed.",
       })
@@ -2985,7 +2988,7 @@ export function createBrowserWasmLlmProvider({
     if (
       options.onProgress !== undefined
       && options.onProgress !== null
-      && typeof options.onProgress !== "function"
+      && !is.function(options.onProgress)
     ) {
       throw new TypeError("Browser-WASM load onProgress must be a function or null.");
     }
@@ -2993,7 +2996,7 @@ export function createBrowserWasmLlmProvider({
     const linked = linkAbortSignal(externalSignal);
     const signal = linked.controller.signal;
     const generation = ++lifecycleGeneration;
-    const reportProgress = typeof context.reportProgress === "function"
+    const reportProgress = is.function(context.reportProgress)
       ? context.reportProgress
       : options.onProgress ?? null;
     const progressStartedAt = Date.now();
@@ -3057,7 +3060,7 @@ export function createBrowserWasmLlmProvider({
           heartbeat: false,
         });
         const modelFiles = admitted.files.map((file, index) => (
-          typeof globalThis.File === "function"
+          is.function(globalThis.File)
             ? new File([file], members[index].name, { type: "application/octet-stream" })
             : file
         ));
@@ -3282,8 +3285,8 @@ function assertV1LlmAdapterSelection(selection, providerId, modelIds, role) {
   }
   if (
     !selection
-    || typeof selection !== "object"
-    || Array.isArray(selection)
+    || !is.object(selection)
+    || is.array(selection)
     || selection.providerId !== providerId
     || !modelIds.has(selection.modelId)
     || selection.localOnly !== true
@@ -3301,7 +3304,7 @@ function assertV1LlmAdapterSelection(selection, providerId, modelIds, role) {
  * The adapter is local-only, never falls back, and never executes tool calls.
  */
 export function adaptV1LlmProvider(provider) {
-  if (!provider || typeof provider !== "object" || Array.isArray(provider)) {
+  if (!provider || !is.object(provider) || is.array(provider)) {
     throw new TypeError("adaptV1LlmProvider requires an Arcane browser-WASM LLM provider.");
   }
   const existing = V1_LLM_PROVIDER_ADAPTERS.get(provider);
@@ -3315,7 +3318,7 @@ export function adaptV1LlmProvider(provider) {
   const requiredMethods = ["capabilities", "status", "load", "unload", "chat", "stream", "dispose"];
   const methods = Object.create(null);
   for (const method of requiredMethods) {
-    if (typeof provider[method] !== "function") {
+    if (!is.function(provider[method])) {
       throw new TypeError(`The browser-WASM LLM provider is missing ${method}().`);
     }
     methods[method] = provider[method].bind(provider);
@@ -3325,10 +3328,10 @@ export function adaptV1LlmProvider(provider) {
   }
 
   const fallbackCatalog = completeValue([model]);
-  const initialCatalog = typeof provider.catalog === "function"
+  const initialCatalog = is.function(provider.catalog)
     ? provider.catalog()
     : fallbackCatalog;
-  if (!Array.isArray(initialCatalog) || initialCatalog.length === 0) {
+  if (!is.array(initialCatalog) || initialCatalog.length === 0) {
     throw new TypeError("The browser-WASM provider catalog must be a nonempty array.");
   }
   const catalogModels = new Map();
@@ -3371,10 +3374,10 @@ export function adaptV1LlmProvider(provider) {
     const value = methods.status();
     if (
       !value
-      || typeof value !== "object"
-      || typeof value.state !== "string"
-      || typeof value.loaded !== "boolean"
-      || typeof value.busy !== "boolean"
+      || !is.object(value)
+      || !is.string(value.state)
+      || !is.boolean(value.loaded)
+      || !is.boolean(value.busy)
     ) {
       throw fail("ARCANE_AI_PROVIDER_STATUS_INVALID", "The browser-WASM provider returned an invalid status.");
     }
@@ -3394,7 +3397,7 @@ export function adaptV1LlmProvider(provider) {
     role: "llm",
     id: providerId,
     localOnly: true,
-    catalog: () => typeof provider.catalog === "function"
+    catalog: () => is.function(provider.catalog)
       ? provider.catalog()
       : fallbackCatalog,
     async inspect(selection, { role = "llm", signal = null } = {}) {
@@ -3435,7 +3438,7 @@ export function adaptV1LlmProvider(provider) {
     } = {}) {
       assertSelection(selection, role);
       throwIfAborted(signal, "load");
-      if (progress !== null && typeof progress !== "function") {
+      if (progress !== null && !is.function(progress)) {
         throw new TypeError("The provider/2 progress sink must be a function or null.");
       }
       await methods.load({

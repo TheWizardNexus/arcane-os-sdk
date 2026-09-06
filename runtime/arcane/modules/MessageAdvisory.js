@@ -1,7 +1,10 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 function completeText(value){return String(value??'');}
 
 export function normalizeContentAdvisory(value){
-    if(!value||typeof value!=='object')return null;
+    if(!value||!is.object(value))return null;
     return {
         level:['critical','high','caution','low','unavailable'].includes(value.level)?value.level:'caution',
         title:completeText(value.title??'Content advisory'),
@@ -27,10 +30,10 @@ export function unavailableMessageInspection(messages){
 
 export async function inspectMessageRecords(messages,inspector,{prepare}={}){
     const advisories=new Map();let failures=0;
-    if(typeof inspector!=='function')return {advisories,failures};
+    if(!is.function(inspector))return {advisories,failures};
     const records=Array.from(messages||[]);
     let context;
-    try{context=typeof prepare==='function'?await prepare(records):undefined;}
+    try{context=is.function(prepare)?await prepare(records):undefined;}
     catch{return unavailableMessageInspection(records);}
     for(const message of records){
         try{const advisory=normalizeContentAdvisory(await inspector(message,context));if(advisory){if(advisory.level==='unavailable')failures+=1;advisories.set(message,advisory);}}

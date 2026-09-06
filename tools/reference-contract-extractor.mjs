@@ -1,7 +1,10 @@
+import Is from 'strong-type';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import vm from 'node:vm';
 import {fileURLToPath,pathToFileURL} from 'node:url';
+
+const is = new Is(false);
 
 export const REFERENCE_CONTRACT_SCHEMA_VERSION=1;
 
@@ -1477,7 +1480,7 @@ function resolveReviewedCallables(
 
 function validateWithVM(source,file,kind){
     if(kind!=='esm')return;
-    if(typeof vm.SourceTextModule!=='function')return;
+    if(!is.function(vm.SourceTextModule))return;
     try{
         new vm.SourceTextModule(source,{identifier:file});
     }catch(error){
@@ -1493,7 +1496,7 @@ export function extractModuleContract(source,{
     kind='esm',
     documentedCallables=RUNTIME_DOCUMENTED_CALLABLE_MEMBERS[path.basename(file)]??[]
 }={}){
-    if(typeof source!=='string')throw new TypeError('source must be a string');
+    if(!is.string(source))throw new TypeError('source must be a string');
     if(['license','stylesheet'].includes(kind)){
         return {
             schemaVersion:REFERENCE_CONTRACT_SCHEMA_VERSION,
@@ -1661,8 +1664,8 @@ function equalNames(left,right){
 }
 
 async function runtimeNamespaces(repositoryRoot,files){
-    if(typeof vm.SourceTextModule!=='function'
-        ||typeof vm.SyntheticModule!=='function'){
+    if(!is.function(vm.SourceTextModule)
+        ||!is.function(vm.SyntheticModule)){
         throw new Error(
             'Use Node --experimental-vm-modules for runtime contract verification.'
         );
@@ -1717,7 +1720,7 @@ async function runtimeNamespaces(repositoryRoot,files){
         if(record.module.status==='unlinked')await record.module.link(linker);
         namespaces.set(relativeFile,sortedNames(
             Reflect.ownKeys(record.module.namespace).filter(
-                name=>typeof name==='string'
+                name=>is.string(name)
             )
         ));
     }
@@ -1770,8 +1773,8 @@ export async function verifyRuntimeReferenceContracts(options={}){
         repositoryRoot,'docs','reference','inventory','runtime-modules.json'
     ),'utf8'));
     const esmRecords=inventory.artifacts.filter(record=>record.kind==='esm');
-    const vmAvailable=typeof vm.SourceTextModule==='function'
-        &&typeof vm.SyntheticModule==='function';
+    const vmAvailable=is.function(vm.SourceTextModule)
+        &&is.function(vm.SyntheticModule);
     if(requireVm&&!vmAvailable){
         throw new Error(
             'Use Node --experimental-vm-modules for runtime contract verification.'

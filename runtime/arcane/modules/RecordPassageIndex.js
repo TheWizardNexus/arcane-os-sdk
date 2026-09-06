@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const MONTH_NUMBER={
   january:1,february:2,march:3,april:4,may:5,june:6,
   july:7,august:8,september:9,october:10,november:11,december:12
@@ -7,7 +10,7 @@ const MONTH_TOKEN='January|February|March|April|May|June|July|August|September|O
 
 function normalizedInteger(value,{minimum=0,fallback=0}={}){
   const number=Number(value);
-  return Number.isInteger(number)&&number>=minimum?number:fallback;
+  return is.integer(number)&&number>=minimum?number:fallback;
 }
 
 function textLines(value=''){
@@ -86,9 +89,9 @@ function findRulePassages(text='',rules=[],{
   const findings=[];
   const seen=new Set();
 
-  for(const definition of Array.isArray(rules)?rules:[]){
+  for(const definition of is.array(rules)?rules:[]){
     if(!definition?.id) continue;
-    const patterns=Array.isArray(definition.patterns)?definition.patterns:[definition.pattern];
+    const patterns=is.array(definition.patterns)?definition.patterns:[definition.pattern];
     let ruleCount=0;
     for(const supplied of patterns.filter(Boolean)){
       const pattern=globalPattern(supplied);
@@ -111,9 +114,9 @@ function findRulePassages(text='',rules=[],{
           lineEnd:lineEnd+1,
           page:pageAtLine(markers,line),
           excerpt,
-          metadata:definition.metadata&&typeof definition.metadata==='object'?{...definition.metadata}:{}
+          metadata:definition.metadata&&is.object(definition.metadata)?{...definition.metadata}:{}
         };
-        if(typeof definition.accept==='function'&&!definition.accept(candidate,{match,source,lines,line})) continue;
+        if(is.function(definition.accept)&&!definition.accept(candidate,{match,source,lines,line})) continue;
         const key=passageKey(candidate);
         if(seen.has(key)) continue;
         seen.add(key);
@@ -127,7 +130,7 @@ function findRulePassages(text='',rules=[],{
 
 function validIsoDate(year,month=1,day=1){
   const y=Number(year); const m=Number(month); const d=Number(day);
-  if(!Number.isInteger(y)||y<1900||y>2100||!Number.isInteger(m)||m<1||m>12||!Number.isInteger(d)||d<1||d>31) return null;
+  if(!is.integer(y)||y<1900||y>2100||!is.integer(m)||m<1||m>12||!is.integer(d)||d<1||d>31) return null;
   const date=new Date(Date.UTC(y,m-1,d));
   if(date.getUTCFullYear()!==y||date.getUTCMonth()!==m-1||date.getUTCDate()!==d) return null;
   return `${String(y).padStart(4,'0')}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;

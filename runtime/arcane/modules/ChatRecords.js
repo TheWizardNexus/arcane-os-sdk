@@ -1,5 +1,8 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 function hasUserEntry(chat=[]){
-    const messages=Array.isArray(chat)
+    const messages=is.array(chat)
         ?chat
         :chat?.messages||[];
 
@@ -9,20 +12,20 @@ function hasUserEntry(chat=[]){
 }
 
 function hasConversationEntry(chat=[]){
-    const messages=Array.isArray(chat)
+    const messages=is.array(chat)
         ?chat
         :chat?.messages||[];
 
     return hasUserEntry(messages)||messages.some(
         message=>
             message?.role==='assistant'
-            &&typeof message.content==='string'
+            &&is.string(message.content)
             &&Boolean(message.content.trim())
     );
 }
 
 function plainRecord(value){
-    if(!value||typeof value!=='object'||Array.isArray(value))return false;
+    if(!value||!is.object(value)||is.array(value))return false;
     const prototype=Object.getPrototypeOf(value);
     return prototype===Object.prototype||prototype===null;
 }
@@ -33,9 +36,9 @@ function coded(error,code){
 }
 
 function copyCompleteValue(value,seen=new Map()){
-    if(value===null||typeof value!=='object')return value;
+    if(value===null||!is.object(value))return value;
     if(seen.has(value))return seen.get(value);
-    if(Array.isArray(value)){
+    if(is.array(value)){
         const result=[];
         seen.set(value,result);
         for(const item of value)result.push(copyCompleteValue(item,seen));
@@ -72,7 +75,7 @@ function providerMessageCopy(message){
 
 function structuralToolMessage(call,label){
     const argumentValue=call?.function?.arguments;
-    if(typeof argumentValue!=='string'){
+    if(!is.string(argumentValue)){
         throw coded(
             new TypeError(`${label}.function.arguments must be a JSON string.`),
             'AI_CHAT_INVALID_TOOL_CALL'
@@ -93,7 +96,7 @@ function structuralToolMessage(call,label){
             'AI_CHAT_INVALID_TOOL_CALL'
         );
     }
-    if(typeof argumentsRecord.message!=='string'||!argumentsRecord.message.trim()){
+    if(!is.string(argumentsRecord.message)||!argumentsRecord.message.trim()){
         throw coded(
             new TypeError(`${label}.function.arguments.message must contain user-facing text.`),
             'AI_CHAT_TOOL_MESSAGE_REQUIRED'
@@ -109,14 +112,14 @@ function activeToolProtocolState(messages){
         const message=messages[index];
         if(message?.role==='assistant'){
             if(start>=0&&!pending.size)start=-1;
-            if(Array.isArray(message.tool_calls)){
+            if(is.array(message.tool_calls)){
                 if(!pending.size&&message.tool_calls.length)start=index;
                 for(const call of message.tool_calls){
-                    if(typeof call?.id==='string'&&call.id)pending.add(call.id);
+                    if(is.string(call?.id)&&call.id)pending.add(call.id);
                 }
             }
         }
-        if(message?.role==='tool'&&typeof message.tool_call_id==='string'){
+        if(message?.role==='tool'&&is.string(message.tool_call_id)){
             pending.delete(message.tool_call_id);
         }
     }
@@ -136,7 +139,7 @@ function appendOrdinaryMessages(result,message,index){
             result.push({role:'assistant',content:String(message.content)});
         }
         if(message.tool_calls===undefined)return;
-        if(!Array.isArray(message.tool_calls)){
+        if(!is.array(message.tool_calls)){
             throw coded(
                 new TypeError(`Chat message ${index+1}.tool_calls must be an array.`),
                 'AI_CHAT_INVALID_TOOL_CALL'
@@ -154,10 +157,10 @@ function appendOrdinaryMessages(result,message,index){
         return;
     }
     if(message.role!=='tool')return;
-    const content=typeof message.tool_call_id==='string'
+    const content=is.string(message.tool_call_id)
         ?message.persistence_message??message.message
         :message.content;
-    if(typeof content==='string'&&content.trim()){
+    if(is.string(content)&&content.trim()){
         result.push({role:'assistant',content});
     }
 }
@@ -168,7 +171,7 @@ function appendOrdinaryMessages(result,message,index){
  * Settled exchanges become complete ordinary visible conversation messages.
  */
 function recurringChatMessages(chat=[],{settleCompleteToolTail=false}={}){
-    const messages=Array.isArray(chat)
+    const messages=is.array(chat)
         ?chat
         :chat?.messages||[];
     const active=activeToolProtocolState(messages);

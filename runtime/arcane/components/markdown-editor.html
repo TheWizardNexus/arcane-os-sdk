@@ -74,6 +74,9 @@
 </section>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const {arcaneLogging}=await import('arcane-os/logging');
 
     const host=this;
@@ -300,7 +303,7 @@
         }
 
         const save=options.onSave||(
-            typeof host.save==='function'?host.save.bind(host):null
+            is.function(host.save)?host.save.bind(host):null
         );
         if(!save){
             status.innerText=options.labels.unavailable;

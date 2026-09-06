@@ -1,5 +1,8 @@
+import Is from 'strong-type';
 import {createHash,randomUUID,timingSafeEqual} from 'node:crypto';
 import http from 'node:http';
+
+const is = new Is(false);
 
 export const RESEND_MAIL_SERVER_PROTOCOL='arcane-resend-mail-gateway/1';
 export const RESEND_MAIL_PATH='/v1/mail';
@@ -41,22 +44,22 @@ function configurationError(message){
 }
 
 function completeErrorDetails(error){
-    if(!error||typeof error!=='object'){
+    if(!error||!is.object(error)){
         return {message:String(error??''),name:'Error'};
     }
     return {
         ...error,
-        ...(typeof error.code==='string'?{code:error.code}:{}),
-        message:typeof error.message==='string'?error.message:String(error),
-        name:typeof error.name==='string'?error.name:'Error',
-        ...(typeof error.stack==='string'?{stack:error.stack}:{})
+        ...(is.string(error.code)?{code:error.code}:{}),
+        message:is.string(error.message)?error.message:String(error),
+        name:is.string(error.name)?error.name:'Error',
+        ...(is.string(error.stack)?{stack:error.stack}:{})
     };
 }
 
 function positiveInteger(value,fallback,{label,allowZero=false}={}){
     const resolved=value===undefined?fallback:value;
     const minimum=allowZero?0:1;
-    if(!Number.isSafeInteger(resolved)||resolved<minimum){
+    if(!is.safeInteger(resolved)||resolved<minimum){
         throw configurationError(`${label} must be ${allowZero?'a nonnegative':'a positive'} integer.`);
     }
     return resolved;
@@ -64,7 +67,7 @@ function positiveInteger(value,fallback,{label,allowZero=false}={}){
 
 function optionalTimerDelay(value,label){
     if(value===undefined||value===null) return null;
-    if(!Number.isSafeInteger(value)||value<1||value>MAX_NODE_TIMER_DELAY_MS){
+    if(!is.safeInteger(value)||value<1||value>MAX_NODE_TIMER_DELAY_MS){
         throw configurationError(
             `${label} must be an integer from 1 through ${MAX_NODE_TIMER_DELAY_MS} `
             +'milliseconds, the Node timer range.'
@@ -74,12 +77,12 @@ function optionalTimerDelay(value,label){
 }
 
 function normalizeRetryAfter(value){
-    return Number.isSafeInteger(value)&&value>0?value:0;
+    return is.safeInteger(value)&&value>0?value:0;
 }
 
 function portNumber(value,fallback){
     const resolved=value===undefined?fallback:value;
-    if(!Number.isSafeInteger(resolved)||resolved<0||resolved>65_535){
+    if(!is.safeInteger(resolved)||resolved<0||resolved>65_535){
         throw configurationError('port must be an integer between 0 and 65535.');
     }
     return resolved;
@@ -93,14 +96,14 @@ function validateSignal(signal){
 }
 
 function validateApiKey(value){
-    if(typeof value!=='string'||value.length<1||!/^[\x21-\x7e]+$/u.test(value)){
+    if(!is.string(value)||value.length<1||!/^[\x21-\x7e]+$/u.test(value)){
         throw configurationError('Resend API key must be a nonempty printable ASCII string.');
     }
     return value;
 }
 
 function validateAppId(value){
-    if(typeof value!=='string'||!APP_ID_PATTERN.test(value)){
+    if(!is.string(value)||!APP_ID_PATTERN.test(value)){
         throw configurationError('Mail application identity is invalid.');
     }
     return value;
@@ -112,7 +115,7 @@ function appKeyDigest(value){
 
 function normalizeCallerAuthentication(options){
     const allowUnauthenticatedCaller=options.allowUnauthenticatedCaller??false;
-    if(typeof allowUnauthenticatedCaller!=='boolean'){
+    if(!is.boolean(allowUnauthenticatedCaller)){
         throw configurationError('allowUnauthenticatedCaller must be a boolean.');
     }
     if(allowUnauthenticatedCaller){
@@ -126,7 +129,7 @@ function normalizeCallerAuthentication(options){
             callerAuthentication:'origin-app-id-only'
         };
     }
-    if(typeof options.appKey!=='string'||!/^[\x21-\x7e]+$/u.test(options.appKey)){
+    if(!is.string(options.appKey)||!/^[\x21-\x7e]+$/u.test(options.appKey)){
         throw configurationError(
             'appKey must be a nonempty printable ASCII string unless unauthenticated caller mode is explicitly enabled.'
         );
@@ -138,7 +141,7 @@ function normalizeCallerAuthentication(options){
 }
 
 function normalizedEmail(value,label){
-    if(typeof value!=='string'){
+    if(!is.string(value)){
         throw configurationError(`${label} must be an email address.`);
     }
     const normalized=value.trim().toLowerCase();
@@ -149,7 +152,7 @@ function normalizedEmail(value,label){
 }
 
 function validateFrom(value){
-    if(typeof value!=='string'||value!==value.trim()||value.length<3||value.length>320
+    if(!is.string(value)||value!==value.trim()||value.length<3||value.length>320
         ||/[\u0000-\u001f\u007f]/u.test(value)){
         throw configurationError('Mail sender is invalid.');
     }
@@ -165,7 +168,7 @@ function validateFrom(value){
 }
 
 function normalizeEmailList(value,label,{allowEmpty=false}={}){
-    if(!Array.isArray(value)||(!allowEmpty&&value.length===0)){
+    if(!is.array(value)||(!allowEmpty&&value.length===0)){
         throw configurationError(`${label} must contain ${allowEmpty?'zero or more':'one or more'} addresses.`);
     }
     const result=[];
@@ -177,7 +180,7 @@ function normalizeEmailList(value,label,{allowEmpty=false}={}){
 }
 
 function normalizeOrigin(value){
-    if(typeof value!=='string'||!value.trim()){
+    if(!is.string(value)||!value.trim()){
         throw configurationError('Every allowed mail origin must be a URL origin.');
     }
     let url;
@@ -194,7 +197,7 @@ function normalizeOrigin(value){
 }
 
 function normalizeOrigins(value){
-    if(!Array.isArray(value)||value.length===0){
+    if(!is.array(value)||value.length===0){
         throw configurationError('allowedOrigins must contain one or more exact origins.');
     }
     const origins=[];
@@ -218,7 +221,7 @@ function validateLoopbackHost(value){
 }
 
 function normalizeConfiguration(options={}){
-    if(!options||typeof options!=='object'||Array.isArray(options)){
+    if(!options||!is.object(options)||is.array(options)){
         throw configurationError('Mail server options must be an object.');
     }
     const callerAuthentication=normalizeCallerAuthentication(options);
@@ -239,13 +242,13 @@ function normalizeConfiguration(options={}){
         throw configurationError('Every error recipient must also be in recipientAllowlist.');
     }
     const fetchImpl=options.fetchImpl??globalThis.fetch;
-    if(typeof fetchImpl!=='function'){
+    if(!is.function(fetchImpl)){
         throw configurationError('A fetch implementation is required for Resend delivery.');
     }
-    if(options.onEvent!==undefined&&typeof options.onEvent!=='function'){
+    if(options.onEvent!==undefined&&!is.function(options.onEvent)){
         throw configurationError('onEvent must be a function when supplied.');
     }
-    if(options.requestIdFactory!==undefined&&typeof options.requestIdFactory!=='function'){
+    if(options.requestIdFactory!==undefined&&!is.function(options.requestIdFactory)){
         throw configurationError('requestIdFactory must be a function when supplied.');
     }
     return {
@@ -277,7 +280,7 @@ function normalizeConfiguration(options={}){
 function createRequestId(factory){
     try{
         const candidate=factory();
-        if(typeof candidate==='string'&&REQUEST_ID_PATTERN.test(candidate)){
+        if(is.string(candidate)&&REQUEST_ID_PATTERN.test(candidate)){
             return candidate;
         }
     }catch{
@@ -292,7 +295,7 @@ function isNumericLoopback(value){
 
 function headerValues(request,name){
     const distinct=request.headersDistinct?.[name];
-    if(Array.isArray(distinct)){
+    if(is.array(distinct)){
         return distinct.map(function stringifyDistinctHeader(value){return String(value);});
     }
     const values=[];
@@ -308,7 +311,7 @@ function headerValues(request,name){
     if(fallback===undefined){
         return [];
     }
-    return Array.isArray(fallback)?fallback.map(String):[String(fallback)];
+    return is.array(fallback)?fallback.map(String):[String(fallback)];
 }
 
 function singleHeader(request,name,{required=true}={}){
@@ -340,7 +343,7 @@ function validateLoopbackRequest(request){
     const hostLiteral=hostname.includes(':')?`[${hostname}]`:hostname;
     const expectedAuthority=localPort===80?hostLiteral:`${hostLiteral}:${String(localPort)}`;
     if(parsed.username||parsed.password||parsed.pathname!=='/'||parsed.search||parsed.hash
-        ||!isNumericLoopback(hostname)||!Number.isSafeInteger(localPort)
+        ||!isNumericLoopback(hostname)||!is.safeInteger(localPort)
         ||statedPort!==localPort||rawHost!==expectedAuthority){
         throw new MailGatewayFault('mail_invalid_host',{statusCode:421});
     }
@@ -483,7 +486,7 @@ function createObserver(onEvent){
         }catch{
             return;
         }
-        if(!result||typeof result.then!=='function'){
+        if(!result||!is.function(result.then)){
             return;
         }
         const task=Promise.resolve(result);
@@ -577,7 +580,7 @@ function readRequestBody(request,{timeoutMs,signal}){
 }
 
 function normalizedReportEmail(value){
-    if(typeof value!=='string'){
+    if(!is.string(value)){
         throw new MailGatewayFault('mail_invalid_recipient',{statusCode:422});
     }
     const address=value.trim().toLowerCase();
@@ -588,7 +591,7 @@ function normalizedReportEmail(value){
 }
 
 function normalizeReportRecipients(report,configuration){
-    if(!Array.isArray(report.to)){
+    if(!is.array(report.to)){
         throw new MailGatewayFault('mail_invalid_recipients',{statusCode:422});
     }
     const recipients=[];
@@ -609,23 +612,23 @@ function normalizeReportRecipients(report,configuration){
 }
 
 function normalizeReport(value,configuration){
-    if(!value||typeof value!=='object'||Array.isArray(value)){
+    if(!value||!is.object(value)||is.array(value)){
         throw new MailGatewayFault('mail_invalid_report',{statusCode:422});
     }
     if(!Object.hasOwn(value,'subject')||!Object.hasOwn(value,'to')
         ||!Object.hasOwn(value,'type')){
         throw new MailGatewayFault('mail_invalid_report_shape',{statusCode:422});
     }
-    if(typeof value.type!=='string'||!MAIL_TYPES.has(value.type)){
+    if(!is.string(value.type)||!MAIL_TYPES.has(value.type)){
         throw new MailGatewayFault('mail_invalid_type',{statusCode:422});
     }
-    if(typeof value.subject!=='string'){
+    if(!is.string(value.subject)){
         throw new MailGatewayFault('mail_invalid_subject',{statusCode:422});
     }
     const hasText=Object.hasOwn(value,'text');
     const hasHtml=Object.hasOwn(value,'html');
-    if(!hasText&&!hasHtml||(hasText&&typeof value.text!=='string')
-        ||(hasHtml&&typeof value.html!=='string')){
+    if(!hasText&&!hasHtml||(hasText&&!is.string(value.text))
+        ||(hasHtml&&!is.string(value.html))){
         throw new MailGatewayFault('mail_content_required',{statusCode:422});
     }
     const recipients=normalizeReportRecipients(value,configuration);
@@ -658,7 +661,7 @@ function parseReport(serialized,configuration){
 }
 
 function parseRetryAfter(value,now=Date.now()){
-    if(typeof value!=='string'||!value.trim()){
+    if(!is.string(value)||!value.trim()){
         return 0;
     }
     const trimmed=value.trim();
@@ -666,7 +669,7 @@ function parseRetryAfter(value,now=Date.now()){
         return normalizeRetryAfter(Math.ceil(Number(trimmed)*1000));
     }
     const timestamp=Date.parse(trimmed);
-    return Number.isFinite(timestamp)
+    return is.finite(timestamp)
         ? normalizeRetryAfter(Math.max(0,timestamp-now))
         : 0;
 }
@@ -712,7 +715,7 @@ function awaitAbortable(value,signal){
 function ignoreCancellationFailure(){}
 
 function cancelProviderBody(body){
-    if(!body||typeof body.cancel!=='function'){
+    if(!body||!is.function(body.cancel)){
         return;
     }
     try{
@@ -723,7 +726,7 @@ function cancelProviderBody(body){
 }
 
 function cancelProviderReader(reader){
-    if(!reader||typeof reader.cancel!=='function'){
+    if(!reader||!is.function(reader.cancel)){
         return;
     }
     try{
@@ -737,7 +740,7 @@ async function readProviderBody(response,signal){
     if(response.body===null||response.body===undefined){
         return '';
     }
-    if(typeof response.body.getReader!=='function'){
+    if(!is.function(response.body.getReader)){
         cancelProviderBody(response.body);
         throw new MailGatewayFault('resend_unreadable_response',{
             statusCode:502,
@@ -782,7 +785,7 @@ function parseProviderObject(text){
     }
     try{
         const value=JSON.parse(text);
-        return value&&typeof value==='object'&&!Array.isArray(value)?value:null;
+        return value&&is.object(value)&&!is.array(value)?value:null;
     }catch{
         return null;
     }
@@ -790,7 +793,7 @@ function parseProviderObject(text){
 
 function providerCode(value,statusCode){
     const candidate=value?.name;
-    if(typeof candidate==='string'&&PROVIDER_CODE_PATTERN.test(candidate)){
+    if(is.string(candidate)&&PROVIDER_CODE_PATTERN.test(candidate)){
         return candidate;
     }
     return `resend_http_${String(statusCode)}`;
@@ -883,7 +886,7 @@ async function performResendAttempt(configuration,delivery,idempotencyKey,signal
             ));
         }
         const statusCode=Number(response?.status);
-        if(!Number.isSafeInteger(statusCode)||statusCode<100||statusCode>599){
+        if(!is.safeInteger(statusCode)||statusCode<100||statusCode>599){
             return completeAttempt(ambiguousResult(
                 'resend_invalid_response',
                 configuration.retryableDelayMs,
@@ -912,7 +915,7 @@ async function performResendAttempt(configuration,delivery,idempotencyKey,signal
         }
         const value=parseProviderObject(text);
         if(statusCode>=200&&statusCode<300){
-            if(!value||typeof value.id!=='string'||!PROVIDER_ID_PATTERN.test(value.id)){
+            if(!value||!is.string(value.id)||!PROVIDER_ID_PATTERN.test(value.id)){
                 return completeAttempt(ambiguousResult(
                     'resend_invalid_success_response',
                     configuration.retryableDelayMs,
@@ -945,26 +948,26 @@ async function performResendAttempt(configuration,delivery,idempotencyKey,signal
             report:delivery.report,
             durationMs:Math.max(0,Date.now()-startedAt),
             requestId,
-            providerStatus:Number.isSafeInteger(Number(response?.status))?Number(response.status):0
+            providerStatus:is.safeInteger(Number(response?.status))?Number(response.status):0
         });
     }
 }
 
 function normalizeDirectSendOptions(options){
-    if(!options||typeof options!=='object'||Array.isArray(options)){
+    if(!options||!is.object(options)||is.array(options)){
         throw configurationError('Mail send options must be an object.');
     }
-    if(typeof options.reportKey!=='string'||!IDEMPOTENCY_KEY_PATTERN.test(options.reportKey)){
+    if(!is.string(options.reportKey)||!IDEMPOTENCY_KEY_PATTERN.test(options.reportKey)){
         throw configurationError('reportKey must contain safe identifier characters.');
     }
     const fetchImpl=options.fetchImpl??globalThis.fetch;
-    if(typeof fetchImpl!=='function'){
+    if(!is.function(fetchImpl)){
         throw configurationError('A fetch implementation is required for Resend delivery.');
     }
-    if(options.onEvent!==undefined&&typeof options.onEvent!=='function'){
+    if(options.onEvent!==undefined&&!is.function(options.onEvent)){
         throw configurationError('onEvent must be a function when supplied.');
     }
-    if(options.requestIdFactory!==undefined&&typeof options.requestIdFactory!=='function'){
+    if(options.requestIdFactory!==undefined&&!is.function(options.requestIdFactory)){
         throw configurationError('requestIdFactory must be a function when supplied.');
     }
     return {
@@ -1343,7 +1346,7 @@ export async function startResendMailServer(options={}){
         throw error;
     }
     const address=server.address();
-    if(!address||typeof address==='string'||!isNumericLoopback(address.address)){
+    if(!address||is.string(address)||!isNumericLoopback(address.address)){
         await Promise.allSettled([closeHttpServer(server),requestHandler.close()]);
         throw configurationError('Mail server did not bind to a numeric loopback address.');
     }

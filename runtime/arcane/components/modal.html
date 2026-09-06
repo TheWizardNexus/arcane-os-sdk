@@ -156,6 +156,9 @@
 </dialog>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const {arcaneLogging}=await import('arcane-os/logging');
 
     const host=this;
@@ -339,7 +342,7 @@
         }
 
         const tasks=jobs.filter(function isRunnableTask(job){
-            return job&&typeof job.name==='string'&&typeof job.task==='function';
+            return job&&is.string(job.name)&&is.function(job.task);
         });
         if(!tasks.length){
             return [];

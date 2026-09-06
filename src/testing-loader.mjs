@@ -1,6 +1,9 @@
+import Is from 'strong-type';
 import {lstatSync,realpathSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+
+const is = new Is(false);
 
 const TESTING_SPECIFIER='arcane-os/testing';
 const TESTING_URL=new URL('./testing.mjs',import.meta.url).href;
@@ -25,7 +28,7 @@ function urlLikeSpecifier(specifier){
 }
 
 function safeManagedTarget(target){
-    return typeof target==='string'
+    return is.string(target)
         &&target.startsWith('./')
         &&target.length>2
         &&!/[\\%?#\u0000-\u001f\u007f]/u.test(target)
@@ -115,14 +118,14 @@ export function initialize({managedImportMap}={}){
     const imports=managedImportMap.imports;
     if(managedImportMap.protocol!==MANAGED_IMPORT_MAP_PROTOCOL
         ||!MANAGED_IMPORT_MAP_BOUNDARIES.has(managedImportMap.boundary)
-        ||imports===null||typeof imports!=='object'||Array.isArray(imports)){
+        ||imports===null||!is.object(imports)||is.array(imports)){
         loaderFailure('Managed test import-map loader data is malformed.');
     }
     const boundary=physicalDirectory(managedImportMap.baseURL);
     const exact=new Map();
     const urls=new Map();
     for(const [specifier,target] of Object.entries(imports)){
-        if(typeof specifier!=='string'||specifier===''||!safeManagedTarget(target)){
+        if(!is.string(specifier)||specifier===''||!safeManagedTarget(target)){
             loaderFailure(`Managed test import-map entry is invalid: ${String(specifier)}.`);
         }
         const targetURL=physicalManagedTarget(
@@ -149,7 +152,7 @@ export function initialize({managedImportMap}={}){
 function managedResolution(specifier,context){
     if(managedImports===null)return null;
     if(managedImports.has(specifier))return managedImports.get(specifier);
-    if(urlLikeSpecifier(specifier)&&typeof context.parentURL==='string'){
+    if(urlLikeSpecifier(specifier)&&is.string(context.parentURL)){
         let requested;
         try{requested=new URL(specifier,context.parentURL).href;}
         catch{requested=null;}

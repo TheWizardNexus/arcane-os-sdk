@@ -1,4 +1,4 @@
-import Is from '../../node_modules/strong-type/index.js';
+import Is from 'strong-type';
 import './DBOPFS.js';
 import UserEntity from '../entities/User.js';
 import {

@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const IDENTIFIER_MAXIMUM_CHARACTERS = 128;
 
 const SCHEMA = 'arcane.intent-envelope';
@@ -60,7 +63,7 @@ function fail(code, path, message, options) {
 }
 
 function isReservedKey(key) {
-    return typeof key === 'string' && RESERVED_KEYS.has(key);
+    return is.string(key) && RESERVED_KEYS.has(key);
 }
 
 function validateUnicode(value, path) {
@@ -86,7 +89,7 @@ function normalizedString(value, path, options = {}) {
     if (nullable && value === null) {
         return null;
     }
-    if (typeof value !== 'string') {
+    if (!is.string(value)) {
         fail('INTENT_ENVELOPE_INVALID', path, 'Intent envelope field has an invalid type.');
     }
     validateUnicode(value, path);
@@ -102,7 +105,7 @@ function identifier(value, path, options = {}) {
     if (nullable && value === null) {
         return null;
     }
-    if (typeof value !== 'string') {
+    if (!is.string(value)) {
         fail('INTENT_ENVELOPE_INVALID', path, 'Intent envelope identifier has an invalid type.');
     }
     validateUnicode(value, path);
@@ -113,14 +116,14 @@ function identifier(value, path, options = {}) {
 }
 
 function enumeration(value, path, values) {
-    if (typeof value !== 'string' || !values.has(value)) {
+    if (!is.string(value) || !values.has(value)) {
         fail('INTENT_ENVELOPE_INVALID', path, 'Intent envelope enum value is invalid.');
     }
     return value;
 }
 
 function plainRecord(value, path, allowedKeys, active) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    if (!value || !is.object(value) || is.array(value)) {
         fail('INTENT_ENVELOPE_INVALID', path, 'Intent envelope field must be a plain record.');
     }
     const prototype = Object.getPrototypeOf(value);
@@ -139,7 +142,7 @@ function plainRecord(value, path, allowedKeys, active) {
     const ownKeys = Reflect.ownKeys(value);
 
     for (const key of ownKeys) {
-        if (typeof key !== 'string' || isReservedKey(key) || !allowed.has(key)) {
+        if (!is.string(key) || isReservedKey(key) || !allowed.has(key)) {
             active.delete(value);
             fail('INTENT_ENVELOPE_UNKNOWN_FIELD', path, 'Intent envelope contains an unsupported field.');
         }
@@ -172,7 +175,7 @@ function ownValue(record, key, path, options = {}) {
 }
 
 function denseArray(value, path, active) {
-    if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    if (!is.array(value) || Object.getPrototypeOf(value) !== Array.prototype) {
         fail('INTENT_ENVELOPE_INVALID', path, 'Intent envelope field must be an array.');
     }
     if (active.has(value)) {
@@ -184,7 +187,7 @@ function denseArray(value, path, active) {
         if (key === 'length') {
             continue;
         }
-        if (typeof key !== 'string' || isReservedKey(key) || !/^(0|[1-9]\d*)$/.test(key) || Number(key) >= value.length) {
+        if (!is.string(key) || isReservedKey(key) || !/^(0|[1-9]\d*)$/.test(key) || Number(key) >= value.length) {
             active.delete(value);
             fail('INTENT_ENVELOPE_UNKNOWN_FIELD', path, 'Intent envelope array contains an unsupported field.');
         }
@@ -208,24 +211,24 @@ function finishArray(value, active) {
 }
 
 function normalizeTimestamp(value, path) {
-    if (typeof value !== 'string') {
+    if (!is.string(value)) {
         fail('INTENT_ENVELOPE_INVALID', path, 'Intent envelope timestamp is invalid.');
     }
     const instant = new Date(value);
-    if (Number.isNaN(instant.valueOf()) || instant.toISOString() !== value) {
+    if (is.NaN(instant.valueOf()) || instant.toISOString() !== value) {
         fail('INTENT_ENVELOPE_INVALID', path, 'Intent envelope timestamp is invalid.');
     }
     return value;
 }
 
 function normalizeTrustedTimestamp(value, path) {
-    if (!(typeof value === 'string' || value instanceof Date)) {
+    if (!(is.string(value) || value instanceof Date)) {
         fail('INTENT_ENVELOPE_INVALID', path, 'Intent envelope timestamp is invalid.');
     }
 
     const instant = new Date(value);
 
-    if (Number.isNaN(instant.valueOf())) {
+    if (is.NaN(instant.valueOf())) {
         fail('INTENT_ENVELOPE_INVALID', path, 'Intent envelope timestamp is invalid.');
     }
 
@@ -245,7 +248,7 @@ function normalizeGoal(value, path, active) {
     const version = identifier(versionValue, `${path}.version`);
     const confidenceValue = ownValue(record, 'confidence', path);
     if (confidenceValue !== null && (
-        typeof confidenceValue !== 'number' || !Number.isFinite(confidenceValue) || confidenceValue < 0 || confidenceValue > 1
+        !is.number(confidenceValue) || !is.finite(confidenceValue) || confidenceValue < 0 || confidenceValue > 1
     )) {
         finishRecord(record, active);
         fail('INTENT_ENVELOPE_INVALID', `${path}.confidence`, 'Intent envelope confidence is invalid.');
@@ -256,15 +259,15 @@ function normalizeGoal(value, path, active) {
 }
 
 function normalizeScalar(value, path) {
-    if (value === null || typeof value === 'string' || typeof value === 'boolean') {
-        if (typeof value === 'string') {
+    if (value === null || is.string(value) || is.boolean(value)) {
+        if (is.string(value)) {
             validateUnicode(value, path);
         }
 
         return value;
     }
 
-    if (typeof value === 'number' && Number.isFinite(value)) {
+    if (is.number(value) && is.finite(value)) {
         return value;
     }
 
@@ -704,7 +707,7 @@ export function createIntentEnvelope(payload, trustedContext) {
 }
 
 export function rehydrateIntentEnvelope(canonical) {
-    if (typeof canonical === 'string') {
+    if (is.string(canonical)) {
         try {
             const parsed = JSON.parse(canonical);
             return buildEnvelope(parsed);

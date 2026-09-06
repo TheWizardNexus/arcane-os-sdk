@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 function workspaceRoot(value){
     const root=String(value??'').trim();
     if(!root||/[\u0000-\u001f]/.test(root)){
@@ -44,7 +47,7 @@ export default class DevelopmentWorkspace{
     }
 
     require(method){
-        if(!this.available||typeof this.api?.[method]!=='function'){
+        if(!this.available||!is.function(this.api?.[method])){
             throw new Error('The Arcane development-workspace capability is unavailable. Open this application through an installed Arcane OS developer build.');
         }
         return this.api[method].bind(this.api);

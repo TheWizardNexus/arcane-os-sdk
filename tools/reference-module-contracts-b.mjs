@@ -125,7 +125,7 @@ console.log(normalizeMailEndpoint('/v1/mail', 'https://mail.example.com/'));`
         paramsResults:"new MarkdownSpeech(); append(text='',end=false) requires text to be a string and returns only newly available narration with repeated same *, #, _, backtick, and ~ runs removed. A trailing candidate formatting mark waits for the next chunk; a truthy end value flushes a pending single mark and resets state. reset() clears pending state and returns undefined. Single marks and every other character remain literal.",
         events:[],
         errors:['TypeError when append text is not a string.'],
-        capabilitiesCore:'None. The runtime projection and public arcane-os/speech-text package subpath share the same dependency-free implementation.',
+        capabilitiesCore:'None. The runtime projection and public arcane-os/speech-text package subpath share the same implementation with strong-type input predicates.',
         example:String.raw`import {MarkdownSpeech} from '/arcane/modules/MarkdownSpeech.js';
 
 const speechText = new MarkdownSpeech();

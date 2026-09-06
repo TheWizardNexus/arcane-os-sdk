@@ -1,5 +1,8 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 function parseRecordLinks(value='',{pattern=/\b[A-Z]\d{4}\b/gi}={}){
-    const text=Array.isArray(value)?value.join(' '):String(value||'');
+    const text=is.array(value)?value.join(' '):String(value||'');
     return [...new Set([...text.matchAll(pattern)].map(match=>match[0].toUpperCase()))];
 }
 

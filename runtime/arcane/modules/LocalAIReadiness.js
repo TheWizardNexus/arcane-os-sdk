@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {AI_PREFERENCE_SLOT_KEYS} from './AIPreferenceTuple.js';
 import {
     getCoreLocalModelCatalog,
@@ -18,7 +21,7 @@ const LOCAL_SPEECH_PROVIDERS=new Set([
 ]);
 
 function token(value,{uppercase=false}={}){
-    const normalized=typeof value==='string'
+    const normalized=is.string(value)
         ?value.trim()
         :'';
 
@@ -37,7 +40,7 @@ function completeResult(value){
 }
 
 function positiveSafeInteger(value){
-    return Number.isSafeInteger(value)&&value>0
+    return is.safeInteger(value)&&value>0
         ?value
         :null;
 }
@@ -45,7 +48,7 @@ function positiveSafeInteger(value){
 function preferenceSlot(preferences,index){
     const value=preferences[index];
 
-    if(typeof value!=='string'||!value.trim()){
+    if(!is.string(value)||!value.trim()){
         throw new TypeError(
             'The AI preference for '
             +AI_PREFERENCE_SLOT_KEYS[index]
@@ -62,7 +65,7 @@ function preferenceSlot(preferences,index){
  * tuple or choose a replacement provider.
  */
 export function deriveLocalAIRequirements(preferences){
-    if(!Array.isArray(preferences)||preferences.length!==AI_PREFERENCE_SLOT_KEYS.length){
+    if(!is.array(preferences)||preferences.length!==AI_PREFERENCE_SLOT_KEYS.length){
         throw new TypeError(
             'AI preferences must contain exactly '
             +AI_PREFERENCE_SLOT_KEYS.length
@@ -138,7 +141,7 @@ function healthText(status,names){
  * aggregate ready proof.
  */
 export function evaluateLocalSpeechHealth(status){
-    if(!status||typeof status!=='object'||Array.isArray(status)){
+    if(!status||!is.object(status)||is.array(status)){
         return completeResult({
             reachable:false,
             ready:false,
@@ -232,7 +235,7 @@ function normalizedTimeout(value){
         return DEFAULT_TIMEOUT_MS;
     }
 
-    if(!Number.isSafeInteger(value)||value<1){
+    if(!is.safeInteger(value)||value<1){
         throw new RangeError('Local AI readiness timeout must be a positive integer.');
     }
 
@@ -240,13 +243,13 @@ function normalizedTimeout(value){
 }
 
 async function fetchJSON(fetchImpl,url,timeoutMs){
-    if(typeof fetchImpl!=='function'){
+    if(!is.function(fetchImpl)){
         const error=new Error('Browser fetch is unavailable.');
         error.code='BROWSER_FETCH_UNAVAILABLE';
         throw error;
     }
 
-    const controller=typeof AbortController==='function'
+    const controller=is.function(globalThis.AbortController)
         ?new AbortController()
         :null;
     let timer;
@@ -275,7 +278,7 @@ async function fetchJSON(fetchImpl,url,timeoutMs){
             throw error;
         }
 
-        if(typeof response.text!=='function'){
+        if(!is.function(response.text)){
             const error=new Error('The local readiness endpoint returned an invalid response.');
             error.code='LOCAL_AI_HEALTH_INVALID_RESPONSE';
             throw error;
@@ -283,7 +286,7 @@ async function fetchJSON(fetchImpl,url,timeoutMs){
 
         const text=await response.text();
 
-        if(typeof text!=='string'||!text){
+        if(!is.string(text)||!text){
             const error=new Error('The local readiness endpoint returned an invalid response.');
             error.code='LOCAL_AI_HEALTH_INVALID_RESPONSE';
             throw error;
@@ -299,7 +302,7 @@ async function fetchJSON(fetchImpl,url,timeoutMs){
             throw error;
         }
 
-        if(!parsed||typeof parsed!=='object'||Array.isArray(parsed)){
+        if(!parsed||!is.object(parsed)||is.array(parsed)){
             const error=new Error('The local readiness endpoint returned an invalid record.');
             error.code='LOCAL_AI_HEALTH_INVALID_RESPONSE';
             throw error;
@@ -316,7 +319,7 @@ async function fetchJSON(fetchImpl,url,timeoutMs){
 }
 
 async function probeNativeOllama(arcane,selectedModel){
-    if(typeof arcane?.localAI?.status!=='function'){
+    if(!is.function(arcane?.localAI?.status)){
         return completeResult({
             ready:false,
             model:null,
@@ -377,7 +380,7 @@ async function probeNativeOllama(arcane,selectedModel){
 }
 
 async function probeUserManagedLoopbackOllama(arcane,selectedModel){
-    if(typeof arcane?.localAI?.status!=='function'){
+    if(!is.function(arcane?.localAI?.status)){
         return completeResult({
             ready:false,
             model:null,
@@ -457,7 +460,7 @@ function unavailableBrowserOllama(){
 }
 
 async function probeNativeSpeech(arcane){
-    if(typeof arcane?.speech?.status!=='function'){
+    if(!is.function(arcane?.speech?.status)){
         return completeResult({
             ...evaluateLocalSpeechHealth(null),
             errorCode:'ARCANE_SPEECH_UNAVAILABLE'
@@ -506,7 +509,7 @@ async function resolveMode(runtime,arcane){
         return runtime;
     }
 
-    if(runtime!==undefined&&(!runtime||typeof runtime!=='object')){
+    if(runtime!==undefined&&(!runtime||!is.object(runtime))){
         throw new TypeError(
             'Local AI runtime must be "native", "browser", '
             +'"user-managed-loopback", or a runtime snapshot.'
@@ -515,7 +518,7 @@ async function resolveMode(runtime,arcane){
 
     let snapshot=runtime;
 
-    if(snapshot===undefined&&typeof arcane?.runtime?.current==='function'){
+    if(snapshot===undefined&&is.function(arcane?.runtime?.current)){
         try{
             snapshot=await arcane.runtime.current();
         }catch{
@@ -744,14 +747,14 @@ function guidance(mode,slots){
 
 function nativeRecovery(arcane,recover){
     if(recover!==undefined){
-        if(typeof recover!=='function'){
+        if(!is.function(recover)){
             throw new TypeError('Local AI recovery must be a function.');
         }
 
         return recover;
     }
 
-    return typeof arcane?.localAI?.recover==='function'
+    return is.function(arcane?.localAI?.recover)
         ?arcane.localAI.recover.bind(arcane.localAI)
         :null;
 }

@@ -1,7 +1,10 @@
+import Is from 'strong-type';
 import {lstat,mkdir,readFile as readFileFromDisk,readdir,realpath,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {SDK_VERSION} from './constants.mjs';
+
+const is = new Is(false);
 
 export const IMPORT_MAP_RELATIVE_PATH='modules/arcane.importmap.json';
 export const MANAGED_IMPORT_MAP_ATTRIBUTE='data-arcane-import-map';
@@ -38,7 +41,7 @@ function throwIfAborted(signal){
 }
 
 async function emit(onEvent,event){
-    if(typeof onEvent!=='function')return null;
+    if(!is.function(onEvent))return null;
     try{
         await onEvent(event);
         return null;
@@ -56,7 +59,7 @@ function compareText(left,right){
 }
 
 function safeRelativePath(value,label='path'){
-    if(typeof value!=='string'||!value||value.includes('\\')||value.includes('\0')
+    if(!is.string(value)||!value||value.includes('\\')||value.includes('\0')
         ||path.posix.isAbsolute(value)||path.posix.normalize(value)!==value
         ||value==='.'||value.startsWith('../')||value.includes('/../')){
         fail(`Import-map ${label} is unsafe: ${String(value)}.`);
@@ -66,7 +69,7 @@ function safeRelativePath(value,label='path'){
 
 function normalizedDocumentPaths(entry,documents){
     if(documents===undefined)return [entry];
-    if(!Array.isArray(documents)||documents.length===0){
+    if(!is.array(documents)||documents.length===0){
         fail('Import-map documents must be a non-empty array of application-relative paths.');
     }
     const normalized=[];
@@ -266,7 +269,7 @@ function classHeader(tokens){
 
 function functionHeader(tokens,closingParenthesis,enclosingBraceKind){
     const openIndex=closingParenthesis?.openTokenIndex;
-    if(!Number.isInteger(openIndex))return null;
+    if(!is.integer(openIndex))return null;
     for(let index=openIndex-1;index>=0;index-=1){
         const token=tokens[index];
         if(new Set([';', '{', '}']).has(token.value))break;
@@ -297,7 +300,7 @@ function arrowFunctionContext(tokens){
     if(arrow?.value!=='=>')return null;
     const parameter=tokens.at(-2);
     let async=false;
-    if(parameter?.value===')'&&Number.isInteger(parameter.openTokenIndex)){
+    if(parameter?.value===')'&&is.integer(parameter.openTokenIndex)){
         const beforeOpen=tokens[parameter.openTokenIndex-1];
         async=beforeOpen?.type==='identifier'&&beforeOpen.value==='async';
     }else{
@@ -375,7 +378,7 @@ function contextualForOf(tokens,parentheses){
 
 function functionParameterDeclaration(tokens,parentheses){
     const context=parentheses.at(-1);
-    if(!Number.isInteger(context?.openTokenIndex))return false;
+    if(!is.integer(context?.openTokenIndex))return false;
     for(let index=context.openTokenIndex-1;index>=0;index-=1){
         const token=tokens[index];
         if(new Set([';','{','}']).has(token.value))return false;
@@ -716,7 +719,7 @@ function importRecord(kind,token){
 }
 
 export function scanModuleImports(source,{importer='<module>'}={}){
-    if(typeof source!=='string')throw new TypeError('scanModuleImports source must be a string.');
+    if(!is.string(source))throw new TypeError('scanModuleImports source must be a string.');
     return moduleImportsFromTokens(tokenize(source),importer);
 }
 
@@ -794,12 +797,12 @@ function moduleImportsFromTokens(tokens,importer){
 }
 
 export function versionAssetUrl(value,version=SDK_VERSION){
-    if(typeof value!=='string')return value;
+    if(!is.string(value))return value;
     return applyReferenceEdits(value,assetUrlVersionEdits(value,version));
 }
 
 function assetUrlVersionEdits(value,version){
-    if(typeof value!=='string'||!value||!version||value.startsWith('#')
+    if(!is.string(value)||!value||!version||value.startsWith('#')
         ||value.startsWith('//')||/^[A-Za-z][A-Za-z0-9+.-]*:/u.test(value)
         ||/^\s/u.test(value))return [];
     const fragmentStart=value.indexOf('#');
@@ -949,7 +952,7 @@ function literalResourceFetch(argumentsList){
 }
 
 function reportAssetReference(onReference,url,kind,baseKind){
-    if(typeof onReference==='function')onReference({url,kind,baseHref:null,...(baseKind?{baseKind}:{})});
+    if(is.function(onReference))onReference({url,kind,baseHref:null,...(baseKind?{baseKind}:{})});
 }
 
 function javascriptReferenceEdits(source,version,onReference){
@@ -1158,7 +1161,7 @@ function importMapReferenceEdits(source,version,onReference){
 }
 
 export function rewriteAssetReferences(source,{filePath,version=SDK_VERSION,onReference}={}){
-    if(typeof source!=='string')throw new TypeError('Asset reference source must be a string.');
+    if(!is.string(source))throw new TypeError('Asset reference source must be a string.');
     const extension=path.extname(String(filePath??'')).toLowerCase();
     if(extension==='.js'||extension==='.mjs'){
         return applyReferenceEdits(source,javascriptReferenceEdits(source,version,onReference));
@@ -1193,7 +1196,7 @@ function importMapUrlVersionEdits(value,version){
 }
 
 function validateInventory(files){
-    if(!Array.isArray(files))throw new TypeError('buildImportMap files must be an array.');
+    if(!is.array(files))throw new TypeError('buildImportMap files must be an array.');
     const exact=new Set();
     for(const value of [...files].sort(compareText)){
         const relative=safeRelativePath(value,'runtime inventory path');
@@ -1249,6 +1252,11 @@ export async function buildImportMap({files,signal,version=SDK_VERSION}={}){
         );
     }
     if(inventory.has('dependencies/strong-type/index.js')){
+        registerSpecifier(
+            namedRegistry,
+            'strong-type',
+            './arcane/dependencies/strong-type/index.js'
+        );
         registerSpecifier(
             namedRegistry,
             './node_modules/strong-type/index.js',
@@ -1344,7 +1352,7 @@ export async function readWorkspaceAssetVersion(workspaceRoot){
     }
     const document=JSON.parse(source);
     const version=document?.sdk?.version;
-    return typeof version==='string'&&version?version:SDK_VERSION;
+    return is.string(version)&&version?version:SDK_VERSION;
 }
 
 function asciiLower(value){
@@ -1432,7 +1440,7 @@ function decodeStructuralAttribute(value,label){
                 return {amp:'&',apos:"'",gt:'>',lt:'<',quot:'"'}[asciiLower(named)];
             }
             const point=Number.parseInt(decimal??hex,decimal?10:16);
-            if(!Number.isSafeInteger(point)||point<=0||point>0x10ffff
+            if(!is.safeInteger(point)||point<=0||point>0x10ffff
                 ||(point>=0xd800&&point<=0xdfff)){
                 fail(`Application HTML ${label} contains an invalid character reference.`);
             }
@@ -1716,7 +1724,7 @@ function htmlAttributeView(value){
             const point=entity[1]||entity[2]
                 ?Number.parseInt(entity[1]??entity[2],entity[1]?10:16)
                 :null;
-            if(point!==null&&(!Number.isSafeInteger(point)||point<=0||point>0x10ffff))return null;
+            if(point!==null&&(!is.safeInteger(point)||point<=0||point>0x10ffff))return null;
             const character=point===null
                 ?{amp:'&',apos:"'",gt:'>',lt:'<',quot:'"'}[asciiLower(entity[3])]
                 :String.fromCodePoint(point);
@@ -1788,7 +1796,7 @@ function htmlReferenceEdits(source,version,onReference){
     const baseHref=base?structuralAttribute(parseTagAttributes(base.open),'href','base'):null;
     if(baseHref&&(/^[A-Za-z][A-Za-z0-9+.-]*:/u.test(baseHref)||baseHref.startsWith('//')))version=null;
     function reportHtmlReference(reference){
-        if(typeof onReference==='function')onReference({...reference,baseHref});
+        if(is.function(onReference))onReference({...reference,baseHref});
     }
     function addNestedEdits(offset,nested){
         for(const edit of nested)edits.push({...edit,start:offset+edit.start,end:offset+edit.end});
@@ -2115,7 +2123,7 @@ async function writeGeneratedFiles({root,files,signal,onEvent}){
 }
 
 function resolvedAppRoot(workspaceRoot,appId,appRoot){
-    if(typeof appId!=='string'||appId.trim()===''){
+    if(!is.string(appId)||appId.trim()===''){
         throw new TypeError('Import-map app id must be a nonempty string.');
     }
     const resolved=path.resolve(appRoot??path.join(workspaceRoot,'apps',appId));
@@ -2129,13 +2137,13 @@ export async function createApplicationTestImportMapContext({
     imports={},
     signal
 }={}){
-    if(typeof applicationRoot!=='string'||applicationRoot.trim()===''){
+    if(!is.string(applicationRoot)||applicationRoot.trim()===''){
         throw new TypeError('applicationRoot must be a nonempty string.');
     }
     if(!['source','dist','test'].includes(boundary)){
         throw new TypeError('boundary must be source, dist, or test.');
     }
-    if(imports===null||typeof imports!=='object'||Array.isArray(imports)){
+    if(imports===null||!is.object(imports)||is.array(imports)){
         throw new TypeError('imports must be a plain object.');
     }
     throwIfAborted(signal);
@@ -2159,7 +2167,7 @@ export async function createApplicationTestImportMapContext({
     const selectedImports={};
     for(const [specifier,target] of Object.entries(imports)){
         throwIfAborted(signal);
-        if(typeof specifier!=='string'||specifier===''||typeof target!=='string'
+        if(!is.string(specifier)||specifier===''||!is.string(target)
             ||!target.startsWith('./')){
             fail(`Application test import-map entry is invalid: ${String(specifier)}.`);
         }
@@ -2192,10 +2200,10 @@ export async function readApplicationTestImportMapContext({
     applicationRoot,
     signal
 }={}){
-    if(typeof workspaceRoot!=='string'||workspaceRoot.trim()===''){
+    if(!is.string(workspaceRoot)||workspaceRoot.trim()===''){
         throw new TypeError('workspaceRoot must be a nonempty string.');
     }
-    if(typeof applicationRoot!=='string'||applicationRoot.trim()===''){
+    if(!is.string(applicationRoot)||applicationRoot.trim()===''){
         throw new TypeError('applicationRoot must be a nonempty string.');
     }
     throwIfAborted(signal);
@@ -2223,9 +2231,9 @@ export async function readApplicationTestImportMapContext({
     catch(error){
         fail(`Application test import-map artifact is not valid JSON: ${error.message}`);
     }
-    if(document===null||typeof document!=='object'||Array.isArray(document)
-        ||document.imports===null||typeof document.imports!=='object'
-        ||Array.isArray(document.imports)){
+    if(document===null||!is.object(document)||is.array(document)
+        ||document.imports===null||!is.object(document.imports)
+        ||is.array(document.imports)){
         fail('Application test import-map artifact must contain an imports object.');
     }
     return createApplicationTestImportMapContext({
@@ -2245,7 +2253,7 @@ async function generateImportMapUnlocked({
     signal,
     onEvent
 }={}){
-    if(typeof workspaceRoot!=='string'||workspaceRoot.trim()===''){
+    if(!is.string(workspaceRoot)||workspaceRoot.trim()===''){
         throw new TypeError('generateImportMap workspaceRoot must be a nonempty string.');
     }
     throwIfAborted(signal);
@@ -2348,7 +2356,7 @@ async function generateImportMapUnlocked({
 
 export async function generateImportMap(options={}){
     const {workspaceRoot}=options??{};
-    if(typeof workspaceRoot!=='string'||workspaceRoot.trim()===''){
+    if(!is.string(workspaceRoot)||workspaceRoot.trim()===''){
         throw new TypeError('generateImportMap workspaceRoot must be a nonempty string.');
     }
     return generateImportMapUnlocked(options);

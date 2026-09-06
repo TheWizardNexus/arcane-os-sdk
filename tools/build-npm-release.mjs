@@ -1,7 +1,10 @@
+import Is from 'strong-type';
 import {spawn} from 'node:child_process';
 import {appendFile,mkdir,readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+
+const is = new Is(false);
 
 const toolRoot=path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot=path.resolve(toolRoot,'..');
@@ -76,8 +79,8 @@ async function main(){
     }catch(error){
         fail(error.message);
     }
-    const report=Array.isArray(reports)?reports.find(item=>item?.name===packageDocument.name):null;
-    if(report?.version!==packageDocument.version||typeof report.filename!=='string'
+    const report=is.array(reports)?reports.find(item=>item?.name===packageDocument.name):null;
+    if(report?.version!==packageDocument.version||!is.string(report.filename)
         ||path.basename(report.filename)!==report.filename){
         fail('npm pack did not return the selected package version and tarball filename.');
     }

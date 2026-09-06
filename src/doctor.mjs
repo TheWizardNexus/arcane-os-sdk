@@ -1,3 +1,4 @@
+import Is from 'strong-type';
 import path from 'node:path';
 import {access,lstat,readdir,realpath} from 'node:fs/promises';
 import {loadRuntimeRelease} from './runtime.mjs';
@@ -6,6 +7,8 @@ import {validateWorkspace} from './workspace.mjs';
 import {runProcess} from './process.mjs';
 import {ARCANE_PROTOCOL,SDK_VERSION} from './constants.mjs';
 import {ERROR_CODES,ArcaneError,throwIfAborted} from './errors.mjs';
+
+const is = new Is(false);
 
 const WINDOWS_SERVICE_NAME='ArcaneOllama';
 const WINDOWS_SERVICE_HOST='C:\\Program Files\\Ollama\\ArcaneOllamaService.exe';
@@ -47,8 +50,8 @@ function parseProbe(text){
     }catch{
         return null;
     }
-    if(!value||typeof value!=='object'||Array.isArray(value)
-        ||Object.getPrototypeOf(value)!==Object.prototype||typeof value.ready!=='boolean'){
+    if(!value||!is.object(value)||is.array(value)
+        ||Object.getPrototypeOf(value)!==Object.prototype||!is.boolean(value.ready)){
         return null;
     }
     return {...value};

@@ -158,7 +158,8 @@ test('complete runtime inventory produces a mutable named import map without rea
         'arcane/SpeechPlayback':'./arcane/modules/SpeechPlayback.js',
         'arcane/ThemeBootstrap':'./arcane/modules/ThemeBootstrap.js',
         'arcane/entities/Preference':'./arcane/entities/Preference.js',
-        'event-pubsub':'./arcane/sdk/dependencies/event-pubsub/index.js'
+        'event-pubsub':'./arcane/sdk/dependencies/event-pubsub/index.js',
+        'strong-type':'./arcane/dependencies/strong-type/index.js'
     };
     for(const target of Object.values(expected))expected[target]=target;
     for(const specifier of Object.keys(expected)){

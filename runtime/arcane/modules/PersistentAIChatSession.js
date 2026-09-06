@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import { arcaneLogging } from 'arcane-os/logging';
 import ChatEntity from '../entities/Chat.js';
 import ConfiguredAIChatSession,{
@@ -28,7 +31,7 @@ function coded(error,code){
 }
 
 function isPlainRecord(value){
-    if(!value||typeof value!=='object'||Array.isArray(value))return false;
+    if(!value||!is.object(value)||is.array(value))return false;
     const prototype=Object.getPrototypeOf(value);
     return prototype===Object.prototype||prototype===null;
 }
@@ -40,16 +43,16 @@ function assertKnownKeys(value,allowed,label){
 
 function boolean(value,label,defaultValue){
     if(value===undefined) return defaultValue;
-    if(typeof value!=='boolean') throw new TypeError(`${label} must be a boolean.`);
+    if(!is.boolean(value)) throw new TypeError(`${label} must be a boolean.`);
     return value;
 }
 
 function signalLike(value){
     return value===undefined||value===null||(
-        typeof value==='object'
-        &&typeof value.aborted==='boolean'
-        &&typeof value.addEventListener==='function'
-        &&typeof value.removeEventListener==='function'
+        is.object(value)
+        &&is.boolean(value.aborted)
+        &&is.function(value.addEventListener)
+        &&is.function(value.removeEventListener)
     );
 }
 
@@ -61,7 +64,7 @@ function providerRequestWithoutLifecycleCallbacks(value){
 
 async function configuredArcaneChat(request){
     const api=globalThis.Arcane?.ai;
-    if(typeof api?.chat!=='function'){
+    if(!is.function(api?.chat)){
         throw coded(
             new Error('The configured Arcane AI chat capability is unavailable.'),
             'AI_CHAT_UNAVAILABLE'
@@ -85,7 +88,7 @@ function normalizeStreamHandlers(value){
         'Persistent chat stream handlers',
     );
     for(const key of ['onChunk','onDataChunk','onDataResult','onToolCall']){
-        if(value[key]!==undefined&&typeof value[key]!=='function'){
+        if(value[key]!==undefined&&!is.function(value[key])){
             throw new TypeError(`${key} must be a function when provided.`);
         }
     }
@@ -99,7 +102,7 @@ function normalizeStreamHandlers(value){
 
 function normalizeStreamResponse(terminal,output){
     const value=terminal??output;
-    if(typeof value==='string'){
+    if(is.string(value)){
         return {message:{role:'assistant',content:value}};
     }
     if(isPlainRecord(value)) return value;
@@ -120,14 +123,14 @@ function terminalStructuralToolCalls(response){
     }
     const messages=hasMessage
         ?[response.message]
-        :hasChoices&&Array.isArray(response.choices)
+        :hasChoices&&is.array(response.choices)
             ?response.choices.map(choice=>choice?.message).filter(Boolean)
             :[];
     const calls=[];
     for(let messageIndex=0;messageIndex<messages.length;messageIndex++){
         const value=messages[messageIndex]?.tool_calls;
         if(value===undefined) continue;
-        if(!Array.isArray(value)){
+        if(!is.array(value)){
             throw coded(
                 new TypeError('The AI stream terminal response contains invalid structural tool calls.'),
                 'AI_CHAT_INVALID_TOOL_CALL',
@@ -146,12 +149,12 @@ function terminalStructuralToolCalls(response){
 
 function sameDataValue(left,right,seen=new Map()){
     if(Object.is(left,right)) return true;
-    if(!left||!right||typeof left!=='object'||typeof right!=='object') return false;
-    if(Array.isArray(left)!==Array.isArray(right)) return false;
+    if(!left||!right||!is.object(left)||!is.object(right)) return false;
+    if(is.array(left)!==is.array(right)) return false;
     const matched=seen.get(left);
     if(matched!==undefined) return matched===right;
     seen.set(left,right);
-    if(Array.isArray(left)){
+    if(is.array(left)){
         return left.length===right.length
             &&left.every((value,index)=>sameDataValue(value,right[index],seen));
     }
@@ -168,8 +171,8 @@ function sameStructuralToolCall(left,right){
 }
 
 function sameStructuralToolCalls(left,right){
-    return Array.isArray(left)
-        &&Array.isArray(right)
+    return is.array(left)
+        &&is.array(right)
         &&left.length===right.length
         &&left.every((call,index)=>sameStructuralToolCall(call,right[index]));
 }
@@ -183,13 +186,13 @@ function normalizeSend(input){
         throw new TypeError('Persistent chat input must contain exactly one message or messages field.');
     }
     const sourceMessages=hasMessages?input.messages:[input.message];
-    if(!Array.isArray(sourceMessages)||!sourceMessages.length){
+    if(!is.array(sourceMessages)||!sourceMessages.length){
         throw new TypeError('messages must be a nonempty array of tool-result messages.');
     }
     const normalizedMessages=sourceMessages.map((value,index)=>{
         const label=hasMessages?`messages[${index}]`:'message';
         if(!isPlainRecord(value)) throw new TypeError(`${label} must be a plain object.`);
-        if(typeof value.content!=='string'||!value.content.trim()){
+        if(!is.string(value.content)||!value.content.trim()){
             throw new TypeError(`${label}.content must contain text.`);
         }
         const role=value.role??'user';
@@ -202,24 +205,24 @@ function normalizeSend(input){
         let persistenceName=null;
         let persistenceStatus=null;
         if(role==='tool'){
-            if(typeof value.tool_call_id!=='string'||!value.tool_call_id.trim()){
+            if(!is.string(value.tool_call_id)||!value.tool_call_id.trim()){
                 throw new TypeError(`${label}.tool_call_id is required for tool messages.`);
             }
             toolCallId=value.tool_call_id;
             if(value.message!==undefined){
-                if(typeof value.message!=='string'||!value.message.trim()){
+                if(!is.string(value.message)||!value.message.trim()){
                     throw new TypeError(`${label}.message must contain user-facing text when provided.`);
                 }
                 persistenceMessage=value.message;
             }
             if(value.name!==undefined){
-                if(typeof value.name!=='string'||!value.name.trim()){
+                if(!is.string(value.name)||!value.name.trim()){
                     throw new TypeError(`${label}.name must contain text when provided.`);
                 }
                 persistenceName=value.name;
             }
             if(value.status!==undefined){
-                if(typeof value.status!=='string'||!value.status.trim()){
+                if(!is.string(value.status)||!value.status.trim()){
                     throw new TypeError(`${label}.status must contain text when provided.`);
                 }
                 persistenceStatus=value.status;
@@ -292,7 +295,7 @@ function normalizeOpening(input){
     assertKnownKeys(input,new Set(['message','request','signal']),'Persistent chat opening input');
     if(!isPlainRecord(input.message)) throw new TypeError('message must be a plain object.');
     assertKnownKeys(input.message,new Set(['content','persist','role']),'message');
-    if(typeof input.message.content!=='string'||!input.message.content.trim()){
+    if(!is.string(input.message.content)||!input.message.content.trim()){
         throw new TypeError('message.content must contain text.');
     }
     const role=input.message.role??'user';
@@ -317,7 +320,7 @@ function normalizeOpening(input){
 }
 
 function fileName(value){
-    if(typeof value!=='string'||value.length===0){
+    if(!is.string(value)||value.length===0){
         throw new TypeError('chatFileName must be a nonempty string.');
     }
     return value;
@@ -355,8 +358,8 @@ class PersistentAIChatSession{
         }
         if(options.ai!==undefined&&(
             !options.ai
-            ||typeof options.ai!=='object'
-            ||typeof options.ai.fetchRequest!=='function'
+            ||!is.object(options.ai)
+            ||!is.function(options.ai.fetchRequest)
         )){
             throw new TypeError('ai must expose fetchRequest(request).');
         }
@@ -369,7 +372,7 @@ class PersistentAIChatSession{
         const chat=options.ai===undefined
             ?options.chat??configuredArcaneChat
             :configuredAIChat(options.ai);
-        if(typeof chat!=='function') throw new TypeError('chat must be a function.');
+        if(!is.function(chat)) throw new TypeError('chat must be a function.');
         if(options.request!==undefined&&!isPlainRecord(options.request)){
             throw new TypeError('request must be a plain object.');
         }
@@ -381,12 +384,12 @@ class PersistentAIChatSession{
             throw new TypeError(`request.${managedRequestField} is managed by the chat session.`);
         }
         for(const key of ['parallelToolCalls','parallel_tool_calls']){
-            if(Object.hasOwn(request,key)&&typeof request[key]!=='boolean'){
+            if(Object.hasOwn(request,key)&&!is.boolean(request[key])){
                 throw new TypeError(`request.${key} must be a boolean when provided.`);
             }
         }
         const systemPrompt=options.systemPrompt??'';
-        if(typeof systemPrompt!=='string') throw new TypeError('systemPrompt must be a string.');
+        if(!is.string(systemPrompt)) throw new TypeError('systemPrompt must be a string.');
         this.#entity=options.chatEntity??new ChatEntity(systemPrompt);
         if(options.chatFileName!==undefined){
             this.#entity.fileName=fileName(options.chatFileName);
@@ -418,7 +421,7 @@ class PersistentAIChatSession{
     async #requestConfiguredAI(request){
         const providerRequest=providerRequestWithoutLifecycleCallbacks(request);
         if(!this.#activeStream) return this.#fetchChat(providerRequest);
-        if(typeof this.#options.ai?.streamRequest!=='function'){
+        if(!is.function(this.#options.ai?.streamRequest)){
             const response=await this.#fetchChat(providerRequest);
             await this.#activeStream.onDataResult(response,providerRequest.id??null);
             return response;

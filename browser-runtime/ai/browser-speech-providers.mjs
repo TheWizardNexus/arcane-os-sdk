@@ -1,3 +1,4 @@
+import Is from "../dependencies/strong-type/index.js";
 import {
   createBrowserSpeechAuthority,
   isBrowserSpeechArtifactGraph,
@@ -6,6 +7,8 @@ import {
   isDbopfsSpeechArtifactStore,
 } from "./browser-speech-artifacts.mjs";
 import { stripSpeechFormatting } from "../speech-text.mjs";
+
+const is = new Is(false);
 
 const completeValue = (value) => value;
 import {
@@ -46,7 +49,7 @@ function providerError(code, message, cause, reason) {
     ? "AbortError"
     : "ArcaneBrowserSpeechProviderError";
   error.code = code;
-  error.reason = typeof reason === "string" && reason
+  error.reason = is.string(reason) && reason
     ? reason
     : UNMAPPED_PROVIDER_REASON;
   PROVIDER_ERRORS.add(error);
@@ -54,7 +57,7 @@ function providerError(code, message, cause, reason) {
 }
 
 function isBrowserSpeechProviderError(value) {
-  return typeof value === "object"
+  return is.object(value)
     && value !== null
     && PROVIDER_ERRORS.has(value);
 }
@@ -69,7 +72,7 @@ function trustedLoadFailure(error, role) {
   if (isTrustedSpeechError(error)) return error;
   return providerError(
     "ARCANE_AI_PROVIDER_LOAD_FAILED",
-    typeof error?.message === "string" && error.message
+    is.string(error?.message) && error.message
       ? error.message
       : `The browser ${role} provider load was rejected.`,
     error,
@@ -81,7 +84,7 @@ function trustedRequestFailure(error, role) {
   if (isTrustedSpeechError(error)) return error;
   return providerError(
     "ARCANE_AI_PROVIDER_REQUEST_FAILED",
-    typeof error?.message === "string" && error.message
+    is.string(error?.message) && error.message
       ? error.message
       : `The browser ${role} engine operation was rejected.`,
     error,
@@ -95,7 +98,7 @@ function trustedWorkerFailure(error, role) {
   if (isTrustedSpeechError(error)) return error;
   return providerError(
     "ARCANE_AI_WORKER_MESSAGE_REJECTED",
-    typeof error?.message === "string" && error.message
+    is.string(error?.message) && error.message
       ? error.message
       : `The browser ${role} Worker returned an unreadable error envelope.`,
     error,
@@ -107,7 +110,7 @@ function trustedLifecycleFailure(error, role, operation) {
   if (isTrustedSpeechError(error)) return error;
   return providerError(
     "ARCANE_AI_INVALID_REQUEST",
-    typeof error?.message === "string" && error.message
+    is.string(error?.message) && error.message
       ? error.message
       : `The browser ${role} ${operation} context could not be read.`,
     error,
@@ -116,8 +119,8 @@ function trustedLifecycleFailure(error, role, operation) {
 }
 
 function resolveReason(reason, fallback = UNMAPPED_PROVIDER_REASON) {
-  const resolved = typeof reason === "function" ? reason() : reason;
-  return typeof resolved === "string" && resolved ? resolved : fallback;
+  const resolved = is.function(reason) ? reason() : reason;
+  return is.string(resolved) && resolved ? resolved : fallback;
 }
 
 function abortError(signal, reason = UNMAPPED_PROVIDER_REASON) {
@@ -140,7 +143,7 @@ function workerFailureCode(error) {
 }
 
 function requiredIdentifier(value, label) {
-  if (typeof value !== "string" || !value.trim()) {
+  if (!is.string(value) || !value.trim()) {
     throw new TypeError(`${label} must be a nonempty trimmed string.`);
   }
   return value.trim();
@@ -159,7 +162,7 @@ function normalizeSpeechExecution(role, execution) {
       maxConcurrentRequests: DEFAULT_TTS_MAX_CONCURRENT_REQUESTS,
     });
   }
-  if (!execution || typeof execution !== "object" || Array.isArray(execution)) {
+  if (!execution || !is.object(execution) || is.array(execution)) {
     throw new TypeError("Browser Kokoro execution must be a plain data record.");
   }
   const prototype = Object.getPrototypeOf(execution);
@@ -185,7 +188,7 @@ function normalizeSpeechExecution(role, execution) {
     throw new TypeError('Browser Kokoro execution.device must be "auto", "webgpu", or "wasm".');
   }
   if (
-    !Number.isSafeInteger(maxConcurrentRequests)
+    !is.safeInteger(maxConcurrentRequests)
     || maxConcurrentRequests < 1
     || maxConcurrentRequests > MAX_TTS_CONCURRENT_REQUESTS
   ) {
@@ -320,15 +323,15 @@ function linkedAbortFailure(linked, fallbackReason) {
 function isAbortSignal(value) {
   return value === null
     || value === undefined
-    || (typeof value === "object"
-      && typeof value.aborted === "boolean"
-      && typeof value.addEventListener === "function"
-      && typeof value.removeEventListener === "function");
+    || (is.object(value)
+      && is.boolean(value.aborted)
+      && is.function(value.addEventListener)
+      && is.function(value.removeEventListener));
 }
 
 function providerContext(context, role, operation) {
   if (context === undefined) return completeValue({ signal: null });
-  if (!context || typeof context !== "object" || Array.isArray(context)) {
+  if (!context || !is.object(context) || is.array(context)) {
     throw providerError(
       "ARCANE_AI_INVALID_REQUEST",
       `Browser ${role} ${operation} context must be an object.`,
@@ -471,7 +474,7 @@ function genericPayloadDescriptors(
   }
   const descriptors = Object.getOwnPropertyDescriptors(payload);
   for (const key of Reflect.ownKeys(descriptors)) {
-    if (typeof key === "symbol" || !allowedKeys.includes(key)) {
+    if (is.symbol(key) || !allowedKeys.includes(key)) {
       throw providerError(
         "ARCANE_AI_INVALID_REQUEST",
         `${label} contains an unknown field.`,
@@ -502,7 +505,7 @@ function genericPayloadDescriptors(
 }
 
 function audioMimeEssence(value, label, reasonPrefix) {
-  if (typeof value !== "string") {
+  if (!is.string(value)) {
     throw providerError(
       "ARCANE_AI_INVALID_REQUEST",
       `${label} must be an audio MIME type.`,
@@ -586,7 +589,7 @@ function observeLoadOperation(record, { signal, progress }, role) {
     };
     const observer = completeValue({
       progress(value) {
-        if (settled || typeof progress !== "function") return;
+        if (settled || !is.function(progress)) return;
         try {
           progress(value);
         } catch (error) {
@@ -642,7 +645,7 @@ async function decodeSharedTranscriptionPayload(
     operationSubject: "stt-transcription",
   });
   const audio = descriptors.audio.value;
-  if (typeof Blob !== "function") {
+  if (!is.function(globalThis.Blob)) {
     throw providerError(
       "ARCANE_AI_INVALID_REQUEST",
       "Shared speech transcription requires the browser Blob constructor.",
@@ -650,7 +653,7 @@ async function decodeSharedTranscriptionPayload(
       "stt-transcription-blob-constructor-unavailable",
     );
   }
-  if (!(audio instanceof Blob)) {
+  if (!is.instanceCheck(audio, Blob)) {
     throw providerError(
       "ARCANE_AI_INVALID_REQUEST",
       "Shared speech transcription audio must be a Blob or File.",
@@ -685,7 +688,7 @@ async function decodeSharedTranscriptionPayload(
   }
   const OfflineAudioContext = globalThis.OfflineAudioContext
     ?? globalThis.webkitOfflineAudioContext;
-  if (typeof OfflineAudioContext !== "function") {
+  if (!is.function(OfflineAudioContext)) {
     throw providerError(
       "ARCANE_AI_AUDIO_DECODE_UNAVAILABLE",
       `Shared Blob transcription requires OfflineAudioContext decoding at ${sampleRate} Hz.`,
@@ -704,7 +707,7 @@ async function decodeSharedTranscriptionPayload(
       "stt-browser-offline-audio-context-construction-rejected",
     );
   }
-  if (typeof decoder.decodeAudioData !== "function") {
+  if (!is.function(decoder.decodeAudioData)) {
     throw providerError(
       "ARCANE_AI_AUDIO_DECODE_UNAVAILABLE",
       "Shared Blob transcription requires browser audio decoding.",
@@ -735,7 +738,7 @@ async function decodeSharedTranscriptionPayload(
       "stt-browser-audio-decode-operation-rejected",
     );
   }
-  if (!decoded || typeof decoded !== "object") {
+  if (!decoded || !is.object(decoded)) {
     throw providerError(
       "ARCANE_AI_AUDIO_DECODE_FAILED",
       "Decoded speech audio must be an AudioBuffer-like object.",
@@ -751,7 +754,7 @@ async function decodeSharedTranscriptionPayload(
       "stt-browser-decoded-audio-sample-rate-mismatch",
     );
   }
-  if (!Number.isSafeInteger(decoded.length)) {
+  if (!is.safeInteger(decoded.length)) {
     throw providerError(
       "ARCANE_AI_AUDIO_DECODE_FAILED",
       "Decoded speech audio frame length must be a safe integer.",
@@ -767,7 +770,7 @@ async function decodeSharedTranscriptionPayload(
       "stt-browser-decoded-audio-empty",
     );
   }
-  if (!Number.isSafeInteger(decoded.numberOfChannels)) {
+  if (!is.safeInteger(decoded.numberOfChannels)) {
     throw providerError(
       "ARCANE_AI_AUDIO_DECODE_FAILED",
       "Decoded speech audio channel count must be a safe integer.",
@@ -783,7 +786,7 @@ async function decodeSharedTranscriptionPayload(
       "stt-browser-decoded-audio-channel-count-zero",
     );
   }
-  if (typeof decoded.getChannelData !== "function") {
+  if (!is.function(decoded.getChannelData)) {
     throw providerError(
       "ARCANE_AI_AUDIO_DECODE_FAILED",
       "Decoded speech audio must expose getChannelData().",
@@ -804,7 +807,7 @@ async function decodeSharedTranscriptionPayload(
         "stt-browser-decoded-audio-channel-read-rejected",
       );
     }
-    if (!(channel instanceof Float32Array)) {
+    if (!is.instanceCheck(channel, Float32Array)) {
       throw providerError(
         "ARCANE_AI_AUDIO_DECODE_FAILED",
         "Decoded speech audio channels must be Float32Array values.",
@@ -827,7 +830,7 @@ async function decodeSharedTranscriptionPayload(
     let sample = 0;
     for (const channel of channels) sample += channel[index];
     sample /= channels.length;
-    if (!Number.isFinite(sample)) {
+    if (!is.finite(sample)) {
       throw providerError(
         "ARCANE_AI_AUDIO_DECODE_FAILED",
         "Decoded speech audio contains a non-finite sample.",
@@ -854,7 +857,7 @@ function cloneNativeTranscriptionPayload(payload, authority) {
   );
   assertPayloadModel(payload, authority, { operationSubject: "stt-transcription" });
   const sampleRate = inputSampleRate(authority);
-  if (!(descriptors.audio.value instanceof Float32Array)) {
+  if (!is.instanceCheck(descriptors.audio.value, Float32Array)) {
     throw providerError(
       "ARCANE_AI_INVALID_REQUEST",
       "Whisper requires Float32Array audio.",
@@ -879,7 +882,7 @@ function cloneNativeTranscriptionPayload(payload, authority) {
     );
   }
   for (const sample of descriptors.audio.value) {
-    if (!Number.isFinite(sample)) {
+    if (!is.finite(sample)) {
       throw providerError(
         "ARCANE_AI_INVALID_REQUEST",
         "Whisper audio must contain only finite Float32 PCM samples.",
@@ -933,12 +936,12 @@ function normalizeSynthesisPayload(payload, authority, speechInputPrepared) {
     assertPayloadModel(payload, authority, { operationSubject: "tts-synthesis" });
     textValue = descriptors.text.value;
   }
-  const suppliedText = typeof textValue === "string" ? textValue : "";
+  const suppliedText = is.string(textValue) ? textValue : "";
   const text = speechInputPrepared === true ? suppliedText : stripSpeechFormatting(suppliedText);
   const voiceValue = Object.hasOwn(descriptors, "voice")
     ? descriptors.voice.value
     : authority.defaultVoice;
-  const voice = typeof voiceValue === "string" ? voiceValue : "";
+  const voice = is.string(voiceValue) ? voiceValue : "";
   const speed = Object.hasOwn(descriptors, "speed") ? descriptors.speed.value : 1;
   if (!text.trim()) {
     throw providerError(
@@ -956,7 +959,7 @@ function normalizeSynthesisPayload(payload, authority, speechInputPrepared) {
       "tts-synthesis-voice-empty",
     );
   }
-  if (!Number.isFinite(speed) || speed <= 0) {
+  if (!is.finite(speed) || speed <= 0) {
     throw providerError(
       "ARCANE_AI_INVALID_REQUEST",
       "Kokoro speed must be greater than 0.",
@@ -987,7 +990,7 @@ async function normalizeRequestPayload(
   cancellationReason,
   speechInputPrepared,
 ) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+  if (!payload || !is.object(payload) || is.array(payload)) {
     throw providerError(
       "ARCANE_AI_INVALID_REQUEST",
       "Speech request payload must be an object.",
@@ -1001,8 +1004,8 @@ async function normalizeRequestPayload(
     const audio = Object.getOwnPropertyDescriptor(payload, "audio");
     if (Object.hasOwn(payload, "mimeType")
       || (Object.hasOwn(audio ?? {}, "value")
-        && typeof Blob === "function"
-        && audio.value instanceof Blob)) {
+        && is.function(globalThis.Blob)
+        && is.instanceCheck(audio.value, Blob))) {
       return decodeSharedTranscriptionPayload(
         payload,
         authority,
@@ -1017,7 +1020,7 @@ async function normalizeRequestPayload(
 
 function encodeSharedSynthesisResult(result, authority) {
   const sampleRate = outputSampleRate(authority);
-  if (!result || typeof result !== "object") {
+  if (!result || !is.object(result)) {
     throw providerError(
       "ARCANE_AI_INVALID_PROVIDER_RESULT",
       "Browser Kokoro must return a synthesis result object.",
@@ -1025,7 +1028,7 @@ function encodeSharedSynthesisResult(result, authority) {
       "tts-synthesis-result-not-object",
     );
   }
-  if (!(result.audio instanceof Float32Array)) {
+  if (!is.instanceCheck(result.audio, Float32Array)) {
     throw providerError(
       "ARCANE_AI_INVALID_PROVIDER_RESULT",
       "Browser Kokoro must return Float32 PCM audio.",
@@ -1080,7 +1083,7 @@ function encodeSharedSynthesisResult(result, authority) {
   view.setUint32(40, result.audio.length * 2, true);
   for (let index = 0; index < result.audio.length; index += 1) {
     const sample = result.audio[index];
-    if (!Number.isFinite(sample)) {
+    if (!is.finite(sample)) {
       throw providerError(
         "ARCANE_AI_INVALID_PROVIDER_RESULT",
         "Browser Kokoro returned a non-finite PCM sample.",
@@ -1115,7 +1118,7 @@ function createBrowserSpeechProvider({
   if (localOnly !== true) {
     throw new TypeError("Browser speech providers are localOnly.");
   }
-  if (typeof offline !== "boolean") {
+  if (!is.boolean(offline)) {
     throw new TypeError("Browser speech offline must be a boolean.");
   }
   if (!isDbopfsSpeechArtifactStore(store)) {
@@ -1446,7 +1449,7 @@ function createBrowserSpeechProvider({
       } catch (error) {
         return Promise.reject(trustedLoadFailure(error, role));
       }
-      if (loadProgress !== undefined && typeof loadProgress !== "function") {
+      if (loadProgress !== undefined && !is.function(loadProgress)) {
         return Promise.reject(providerError(
           "ARCANE_AI_INVALID_REQUEST",
           "Browser speech load progress must be a function when supplied.",
@@ -1514,7 +1517,7 @@ function createBrowserSpeechProvider({
             prepared,
             released: false,
           };
-          record.warnings = Array.isArray(prepared.warnings)
+          record.warnings = is.array(prepared.warnings)
             ? completeValue([...prepared.warnings])
             : NO_PROVIDER_WARNINGS;
           lastWarnings = record.warnings;

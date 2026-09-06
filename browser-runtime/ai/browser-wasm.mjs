@@ -1,3 +1,4 @@
+import Is from "../dependencies/strong-type/index.js";
 import {
   completeValueText,
   createModelController,
@@ -10,6 +11,8 @@ import {
   createDbopfsModelStore,
 } from "./browser-wasm-llm-provider.mjs";
 import { BROWSER_WASM_RUNTIME_AUTHORITY } from "./browser-wllama-runtime.mjs";
+
+const is = new Is(false);
 
 /**
  * Creates the public Arcane browser-local AI API module. The SDK owns lifecycle,
@@ -24,12 +27,12 @@ function createArcaneAI({
 } = {}) {
   const selected = llm ?? provider;
   if (!selected) throw new TypeError("createArcaneAI requires an llm provider.");
-  if (selected instanceof ModelController && security !== undefined) {
+  if (is.instanceCheck(selected, ModelController) && security !== undefined) {
     throw new TypeError(
       "createArcaneAI security must be configured when the existing ModelController is created.",
     );
   }
-  const controller = selected instanceof ModelController
+  const controller = is.instanceCheck(selected, ModelController)
     ? selected
     : createModelController({ provider: selected, loadPolicy, security });
   const api = {
@@ -46,7 +49,7 @@ function createArcaneAI({
   };
 
   async function createChatSession(options = {}) {
-    if (!options || typeof options !== "object" || Array.isArray(options)) {
+    if (!options || !is.object(options) || is.array(options)) {
       throw new TypeError("createChatSession options must be a plain object.");
     }
     if (Object.getPrototypeOf(options) !== Object.prototype) {

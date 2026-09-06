@@ -60,6 +60,9 @@
 </section>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const {arcaneLogging}=await import('arcane-os/logging');
 
     const completeValue=(value)=>value;
@@ -302,7 +305,7 @@
             return false;
         }
         if(
-            typeof MediaRecorder==='undefined'
+            is.undefined(globalThis.MediaRecorder)
             ||!navigator.mediaDevices?.getUserMedia
         ){
             setState('error',options.messages.unsupported);
@@ -468,7 +471,7 @@
                 ||destroyed){
                 return false;
             }
-            const segment=typeof result==='string'?result:'';
+            const segment=is.string(result)?result:'';
             if(segment.length===0){
                 setState('idle',options.messages.noSpeech);
                 return false;
@@ -483,7 +486,7 @@
 
             if(options.persist){
                 const save=options.onSave||(
-                    typeof host.save==='function'?host.save.bind(host):null
+                    is.function(host.save)?host.save.bind(host):null
                 );
                 if(!save){
                     setState('error',options.messages.saveError);
@@ -594,10 +597,10 @@
         if(options.transcribe){
             return options.transcribe(file,context);
         }
-        if(typeof globalThis.ai?.fetchSTT!=='function'){
+        if(!is.function(globalThis.ai?.fetchSTT)){
             await import('../modules/AI.js');
         }
-        if(typeof globalThis.ai?.fetchSTT!=='function'){
+        if(!is.function(globalThis.ai?.fetchSTT)){
             const error=new Error('Speech transcription is not configured.');
             error.code='ARCANE_VOICE_TRANSCRIPTION_STT_RUNTIME_METHOD_UNAVAILABLE';
             throw error;
@@ -646,7 +649,7 @@
         const generation=sessionGeneration;
         const completionTranscript=transcript;
         const complete=options.onComplete||(
-            typeof host.complete==='function'?host.complete.bind(host):null
+            is.function(host.complete)?host.complete.bind(host):null
         );
         setState('completing',options.messages.completing,{
             beginOperation:'completion'
@@ -963,10 +966,10 @@
     function visibleErrorMessage(error,fallback){
         try{
             if(error?.userSafe===true){
-                const message=typeof error.userMessage==='string'
+                const message=is.string(error.userMessage)
                     ?error.userMessage
                     :error.message;
-                if(typeof message==='string'&&message.trim()){
+                if(is.string(message)&&message.trim()){
                     return message;
                 }
             }

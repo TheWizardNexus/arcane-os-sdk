@@ -1,3 +1,4 @@
+import Is from 'strong-type';
 import path from 'node:path';
 import {readdir,lstat,realpath} from 'node:fs/promises';
 import {createWorkspace,initWorkspace} from './scaffold.mjs';
@@ -39,6 +40,8 @@ import {
     verifyAppReleaseBundle
 } from './release-bundle.mjs';
 
+const is = new Is(false);
+
 async function emit(onEvent,event){
     await onEvent?.(event);
 }
@@ -63,10 +66,10 @@ function isOuterCommitEvent(label,event){
 
 function hasCommittedOuterResult(label,result){
     if(label==='import-map')return result?.committed===true;
-    if(label==='package')return typeof result?.outputRoot==='string';
-    if(label==='bundle')return typeof result?.bundlePath==='string';
+    if(label==='package')return is.string(result?.outputRoot);
+    if(label==='bundle')return is.string(result?.bundlePath);
     if(label!=='build')return false;
-    return result?.artifact!=null||typeof result?.release?.outputRoot==='string';
+    return result?.artifact!=null||is.string(result?.release?.outputRoot);
 }
 
 async function ownedWork(label,work,{
@@ -245,8 +248,8 @@ async function preparedWorkspace(options){
     });
     const external=workspace.workspaceMode==='external';
     if(external&&(!workspace.sdkInstallation
-        ||typeof workspace.sdkInstallation.runtimeRoot!=='string'
-        ||typeof workspace.sdkInstallation.browserRuntimeRoot!=='string')){
+        ||!is.string(workspace.sdkInstallation.runtimeRoot)
+        ||!is.string(workspace.sdkInstallation.browserRuntimeRoot))){
         throw new ArcaneError(
             ERROR_CODES.workspaceInvalid,
             'Validated external workspace is missing its SDK runtime directories.'
@@ -397,7 +400,7 @@ async function runPreparedApplicationTests(prepared,options={}){
 export async function testApplication(options={}){
     throwIfAborted(options.signal);
     if(operationScope(options)==='shared'){
-        if(typeof options.testFile!=='string'||!options.testFile){
+        if(!is.string(options.testFile)||!options.testFile){
             throw new ArcaneError(
                 ERROR_CODES.usage,
                 'Shared testing requires one exact repo-relative .test.mjs file.'
@@ -521,7 +524,7 @@ export async function verifyApplication(options={}){
 
 export async function bundleApplication(options={}){
     assertApplicationScope(options,'Release bundling');
-    if(options.overwrite!==undefined&&typeof options.overwrite!=='boolean'){
+    if(options.overwrite!==undefined&&!is.boolean(options.overwrite)){
         throw new ArcaneError(ERROR_CODES.usage,'overwrite must be a literal boolean.');
     }
     const prepared=await preparedWorkspace(options);
@@ -658,7 +661,7 @@ function sameOrDescendant(parent,candidate){
 }
 
 export function resolveNativeBuildOutputRoot({target,workspaceMode,workspaceRoot,outputRoot}={}){
-    if(typeof target!=='string'||!target||target==='browser'){
+    if(!is.string(target)||!target||target==='browser'){
         throw new ArcaneError(ERROR_CODES.usage,'A native output root requires one explicit native target.');
     }
     if(workspaceMode==='integrated'&&!outputRoot){
@@ -696,7 +699,7 @@ function sameCanonicalPath(left,right){
 
 export function assertIntegratedNativeToolchain({workspaceMode,workspaceRoot,toolchainRoot,target}={}){
     if(workspaceMode!=='integrated')return;
-    if(typeof toolchainRoot!=='string'||!sameCanonicalPath(workspaceRoot,toolchainRoot)){
+    if(!is.string(toolchainRoot)||!sameCanonicalPath(workspaceRoot,toolchainRoot)){
         throw new ArcaneError(
             ERROR_CODES.policyDenied,
             `An integrated ${target??'native'} build must use the same Arcane OS checkout for --workspace and --arcane-root.`
@@ -972,7 +975,7 @@ function nativeBuildResult(assembly){
 
 function usesWorkspaceNativeAssembly(options){
     return options.nativeBuilder!=null
-        &&typeof options.workspaceRoot==='string'
+        &&is.string(options.workspaceRoot)
         &&options.release==null
         &&options.appReleaseRoot==null
         &&options.appDescriptor==null;

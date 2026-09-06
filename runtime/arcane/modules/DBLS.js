@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {
     APP_LOCAL_STORAGE_PREFIX,
     resolveBrowserApplicationId
@@ -30,8 +33,8 @@ class DBLS {
         }
 
         if(!storage
-            ||typeof storage.getItem!=='function'
-            ||typeof storage.setItem!=='function'){
+            ||!is.function(storage.getItem)
+            ||!is.function(storage.setItem)){
             const error=new Error('Local storage is unavailable in this browser.');
             error.code='APP_DATA_STORAGE_UNAVAILABLE';
             throw error;
@@ -68,7 +71,7 @@ class DBLS {
 
     // Set an item
     set(key='', value) {
-        if(typeof value !== 'string' && typeof value !== 'number'){
+        if(!is.string(value) && !is.number(value)){
             value=JSON.stringify(value);
         }
         this.storage.setItem(this.storageKey(key), value);
@@ -196,7 +199,7 @@ class DBLS {
     }
 }
 
-if(typeof window.dbls?.get !== "function"){
+if(!is.function(window.dbls?.get)){
     window.dbls=new DBLS();
     window.dbls.ready=true;
 

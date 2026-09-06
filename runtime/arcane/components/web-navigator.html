@@ -59,6 +59,9 @@ button{min-width:2.5rem}
     <p id="status" class="status" role="status" aria-live="polite">Enter an address. Some sites block embedded viewing; use Open externally when needed.</p>
 </section>
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
 const host=this;
 const root=host.shadowRoot;
 const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
@@ -128,7 +131,7 @@ async function evaluate(url,intent){
     }
     try{
         const decision=await navigationGuard(url,{intent});
-        if(!decision||typeof decision!=='object'||typeof decision.blocked!=='boolean'){
+        if(!decision||!is.object(decision)||!is.boolean(decision.blocked)){
             throw new TypeError('Navigation policy returned an invalid decision.');
         }
         return decision;
@@ -230,7 +233,7 @@ function move(amount){
 function configure(options){
     if(destroyed)return false;
     if(options?.homeUrl)homeUrl=normalize(options.homeUrl);
-    navigationGuard=typeof options?.navigationGuard==='function'?options.navigationGuard:null;
+    navigationGuard=is.function(options?.navigationGuard)?options.navigationGuard:null;
     if(options?.initialUrl)ownNavigation(navigate(options.initialUrl));
     else updateButtons();
     return host;

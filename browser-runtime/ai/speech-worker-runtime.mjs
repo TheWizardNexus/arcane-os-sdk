@@ -1,3 +1,7 @@
+import Is from "../dependencies/strong-type/index.js";
+
+const is = new Is(false);
+
 export const SPEECH_WORKER_PROTOCOL = "arcane-ai-speech-worker/1";
 
 const completeValue = (value) => value;
@@ -266,14 +270,14 @@ function workerError(code, message, cause, reason) {
     ? "AbortError"
     : "ArcaneSpeechWorkerError";
   error.code = code;
-  if (typeof reason === "string" && reason) error.reason = reason;
+  if (is.string(reason) && reason) error.reason = reason;
   SDK_WORKER_ERRORS.add(error);
   return error;
 }
 
 function isSdkWorkerError(value) {
   try {
-    return value instanceof Error && SDK_WORKER_ERRORS.has(value);
+    return is.error(value) && SDK_WORKER_ERRORS.has(value);
   } catch {
     return false;
   }
@@ -307,20 +311,20 @@ export function collectSpeechTransferables(value) {
   const buffers = new Set();
   const seen = new WeakSet();
   function visit(candidate) {
-    if (candidate instanceof ArrayBuffer) {
+    if (is.instanceCheck(candidate, ArrayBuffer)) {
       if (!buffers.has(candidate)) {
         buffers.add(candidate);
         transfers.push(candidate);
       }
       return;
     }
-    if (ArrayBuffer.isView(candidate)) {
+    if (is.arrayBufferView(candidate)) {
       visit(candidate.buffer);
       return;
     }
-    if (!candidate || typeof candidate !== "object" || seen.has(candidate)) return;
+    if (!candidate || !is.object(candidate) || seen.has(candidate)) return;
     seen.add(candidate);
-    for (const child of Array.isArray(candidate)
+    for (const child of is.array(candidate)
       ? candidate
       : Object.values(candidate)) visit(child);
   }
@@ -352,7 +356,7 @@ function serializedError(error, role, op) {
     && admission?.code === reportedCode;
   const code = admittedCode ? reportedCode : "ARCANE_AI_PROVIDER_REQUEST_FAILED";
   const reason = admittedCode ? reportedReason : operationFailureReason(role, op);
-  const message = typeof reportedMessage === "string" && reportedMessage.length > 0
+  const message = is.string(reportedMessage) && reportedMessage.length > 0
     ? reportedMessage
     : WORKER_ERROR_MESSAGES[code];
   const envelope = completeValue({
@@ -373,7 +377,7 @@ function fallbackSerializedError(error, role, op) {
   return completeValue({
     protocol: SPEECH_WORKER_ERROR_PROTOCOL,
     code: "ARCANE_AI_PROVIDER_REQUEST_FAILED",
-    message: typeof message === "string" && message.length > 0
+    message: is.string(message) && message.length > 0
       ? message
       : WORKER_ERROR_MESSAGES.ARCANE_AI_PROVIDER_REQUEST_FAILED,
     reason: operationFailureReason(role, op),
@@ -424,9 +428,8 @@ function diagnosticType(value) {
 
 function serializedDiagnosticValue(value, seen = new WeakMap()) {
   if (value === null || value === undefined) return value;
-  const type = typeof value;
-  if (type !== "object" && type !== "function") {
-    return type === "symbol"
+  if (is.primitive(value)) {
+    return is.symbol(value)
       ? diagnosticText(value, "[symbol could not be represented]")
       : value;
   }
@@ -473,7 +476,7 @@ function serializedDiagnosticValue(value, seen = new WeakMap()) {
         );
       }
     }
-    if (typeof key === "symbol") {
+    if (is.symbol(key)) {
       const symbolProperty = Object.create(null);
       defineDiagnosticProperty(
         symbolProperty,
@@ -516,7 +519,7 @@ function serializedDiagnosticValue(value, seen = new WeakMap()) {
     defineDiagnosticProperty(metadata, "symbolProperties", symbolProperties);
   }
   try {
-    if (type === "function") {
+    if (is.function(value)) {
       defineDiagnosticProperty(
         metadata,
         "source",
@@ -547,7 +550,7 @@ function serializedDiagnosticValue(value, seen = new WeakMap()) {
     } else {
       let view = false;
       try {
-        view = ArrayBuffer.isView(value);
+        view = is.arrayBufferView(value);
       } catch {}
       if (view) defineDiagnosticProperty(metadata, "value", value);
     }
@@ -572,11 +575,11 @@ function workerErrorReasonAdmission(reason, role, op) {
 }
 
 export function normalizeSpeechWorkerErrorEnvelope(value, role, op) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  if (!value || !is.object(value) || is.array(value)) return null;
   let descriptors;
   try {
     const keys = Reflect.ownKeys(value);
-    if (keys.some((key) => typeof key !== "string")
+    if (keys.some((key) => !is.string(key))
       || ![
         "code,message,protocol,reason",
         "cause,code,message,protocol,reason",
@@ -594,7 +597,7 @@ export function normalizeSpeechWorkerErrorEnvelope(value, role, op) {
   const reason = descriptors.reason.value;
   if (protocol !== SPEECH_WORKER_ERROR_PROTOCOL) return null;
   if (!Object.hasOwn(WORKER_ERROR_MESSAGES, code)) return null;
-  if (typeof message !== "string" || message.length < 1) return null;
+  if (!is.string(message) || message.length < 1) return null;
   const admission = workerErrorReasonAdmission(reason, role, op);
   if (admission?.code !== code) return null;
   if (descriptors.cause && !Object.hasOwn(descriptors.cause, "value")) return null;
@@ -611,7 +614,7 @@ function requiredText(
   label,
   reason,
 ) {
-  if (typeof value !== "string" || !value.trim()) {
+  if (!is.string(value) || !value.trim()) {
     throw workerError(
       "ARCANE_AI_INVALID_REQUEST",
       `${label} is required.`,
@@ -627,7 +630,7 @@ function requiredContent(
   label,
   reason,
 ) {
-  if (typeof value !== "string" || !value.trim()) {
+  if (!is.string(value) || !value.trim()) {
     throw workerError(
       "ARCANE_AI_INVALID_REQUEST",
       `${label} is required.`,
@@ -640,7 +643,7 @@ function requiredContent(
 
 function requiredSampleRate(value, label, fallback) {
   const candidate = value ?? fallback;
-  if (!Number.isSafeInteger(candidate) || candidate < 1) {
+  if (!is.safeInteger(candidate) || candidate < 1) {
     throw workerError(
       "ARCANE_AI_INVALID_REQUEST",
       `${label} must be a positive safe integer.`,
@@ -656,7 +659,7 @@ function graphConfiguration(configuration) {
 }
 
 function validateMaterializedFile(file, label) {
-  if (!file || typeof file !== "object" || Array.isArray(file)) {
+  if (!file || !is.object(file) || is.array(file)) {
     throw workerError(
       "ARCANE_AI_INVALID_REQUEST",
       `${label} must be an object.`,
@@ -668,7 +671,7 @@ function validateMaterializedFile(file, label) {
   requiredText(file.sourceUrl, `${label} sourceUrl`, "artifact-graph-materialized-source-url-empty");
   requiredText(file.moduleUrl, `${label} moduleUrl`, "artifact-graph-materialized-module-url-empty");
   requiredText(file.mediaType, `${label} mediaType`, "artifact-graph-materialized-media-type-empty");
-  if (file.runtimeRequestUrls !== undefined && !Array.isArray(file.runtimeRequestUrls)) {
+  if (file.runtimeRequestUrls !== undefined && !is.array(file.runtimeRequestUrls)) {
     throw workerError(
       "ARCANE_AI_INVALID_REQUEST",
       `${label} runtimeRequestUrls must be an array.`,
@@ -680,7 +683,7 @@ function validateMaterializedFile(file, label) {
 }
 
 function validateConfiguration(configuration, role) {
-  if (!configuration || typeof configuration !== "object" || Array.isArray(configuration)) {
+  if (!configuration || !is.object(configuration) || is.array(configuration)) {
     throw workerError(
       "ARCANE_AI_INVALID_REQUEST",
       "Speech worker configuration is required.",
@@ -707,7 +710,7 @@ function validateConfiguration(configuration, role) {
   requiredText(configuration.runtime?.entry, "Speech runtime entry", "speech-worker-runtime-entry-empty");
   const execution = configuration.execution;
   if (execution !== undefined) {
-    if (!execution || typeof execution !== "object" || Array.isArray(execution)) {
+    if (!execution || !is.object(execution) || is.array(execution)) {
       throw workerError(
         "ARCANE_AI_INVALID_REQUEST",
         "Speech worker execution must be a plain data record.",
@@ -748,7 +751,7 @@ function validateConfiguration(configuration, role) {
       );
     }
   }
-  if (!Array.isArray(configuration.runtime?.files) || !Array.isArray(configuration.model?.files)) {
+  if (!is.array(configuration.runtime?.files) || !is.array(configuration.model?.files)) {
     throw workerError(
       "ARCANE_AI_INVALID_REQUEST",
       "Speech runtime and model files are required.",
@@ -811,7 +814,7 @@ function validateConfiguration(configuration, role) {
     }
     if (
       wasm.numThreads !== undefined
-      && (!Number.isSafeInteger(wasm.numThreads) || wasm.numThreads < 1)
+      && (!is.safeInteger(wasm.numThreads) || wasm.numThreads < 1)
     ) {
       throw workerError(
         "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
@@ -826,7 +829,7 @@ function validateConfiguration(configuration, role) {
     } else {
       requiredSampleRate(configuration.model.outputSampleRate, "Kokoro outputSampleRate");
       requiredText(configuration.model.defaultVoice, "Kokoro defaultVoice", "tts-default-voice-empty");
-      if (!Array.isArray(configuration.model.voices) || configuration.model.voices.length < 1) {
+      if (!is.array(configuration.model.voices) || configuration.model.voices.length < 1) {
         throw workerError(
           "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
           "Kokoro graph configuration requires the caller-owned voice inventory.",
@@ -852,7 +855,7 @@ function nestedWorkerUrl(role) {
 
 function nestedWorkerFailureEvent(scope, error) {
   const ErrorEventConstructor = scope.ErrorEvent ?? globalThis.ErrorEvent;
-  if (typeof ErrorEventConstructor === "function") {
+  if (is.function(ErrorEventConstructor)) {
     return new ErrorEventConstructor("error", {
       error,
       message: error.message,
@@ -869,10 +872,10 @@ function nestedWorkerFailureEvent(scope, error) {
 }
 
 function ordinaryRequestUrl(value, scope, base = scope.location?.href) {
-  const input = typeof value === "string" || value instanceof URL
+  const input = is.string(value) || is.instanceCheck(value, URL)
     ? String(value)
     : value?.url;
-  if (typeof input !== "string" || input.length < 1) return null;
+  if (!is.string(input) || input.length < 1) return null;
   try {
     return new URL(input, base).href;
   } catch {
@@ -881,7 +884,7 @@ function ordinaryRequestUrl(value, scope, base = scope.location?.href) {
 }
 
 function isBareModuleSpecifier(value) {
-  return typeof value === "string"
+  return is.string(value)
     && !value.startsWith("./")
     && !value.startsWith("../")
     && !value.startsWith("/")
@@ -932,7 +935,7 @@ function createOrdinaryRouteReader(
   }
 
   function nativeInput(input, modulePath) {
-    if (typeof input !== "string" && !(input instanceof URL)) return input;
+    if (!is.string(input) && !is.instanceCheck(input, URL)) return input;
     return ordinaryRequestUrl(input, scope, sourceBase(modulePath)) ?? input;
   }
 
@@ -943,15 +946,15 @@ function createOrdinaryRouteReader(
   }
 
   function responseFor(resolution, input, init) {
-    const mappedInput = typeof RequestConstructor === "function"
-      && input instanceof RequestConstructor
+    const mappedInput = is.function(RequestConstructor)
+      && is.instanceCheck(input, RequestConstructor)
       ? new RequestConstructor(resolution.file.moduleUrl, input)
       : resolution.file.moduleUrl;
     return originalFetch(mappedInput, init);
   }
 
   async function nativeCache(name) {
-    if (!originalCaches || typeof originalCaches.open !== "function") return null;
+    if (!originalCaches || !is.function(originalCaches.open)) return null;
     if (!nativeCaches.has(name)) {
       nativeCaches.set(name, Promise.resolve(originalCaches.open.call(originalCaches, name)));
     }
@@ -1031,7 +1034,7 @@ function createOrdinaryArtifactModuleRouter(
     },
 
     createWorker(modulePath, specifier, options = {}) {
-      if (typeof originalWorker !== "function") {
+      if (!is.function(originalWorker)) {
         throw workerError(
           "ARCANE_AI_PROVIDER_UNAVAILABLE",
           "Nested browser Workers are unavailable.",
@@ -1043,7 +1046,7 @@ function createOrdinaryArtifactModuleRouter(
       if (!resolution) {
         return new originalWorker(reader.nativeInput(specifier, modulePath), options);
       }
-      const workerOptions = options && typeof options === "object"
+      const workerOptions = options && is.object(options)
         ? { ...options, type: "module" }
         : { type: "module" };
       const worker = new originalWorker(nestedWorkerUrl(role), workerOptions);
@@ -1105,7 +1108,7 @@ function installOrdinaryArtifactModuleRouter(scope, configuration, role) {
   const originalFetch = scope.fetch?.bind(scope);
   const originalWorker = scope.Worker;
   const originalCaches = scope.caches;
-  if (typeof originalFetch !== "function") {
+  if (!is.function(originalFetch)) {
     throw workerError(
       "ARCANE_AI_PROVIDER_UNAVAILABLE",
       "Browser fetch is unavailable in the speech Worker.",
@@ -1338,20 +1341,20 @@ function configureRuntimeNamespace(namespace, configuration, role, cache) {
 
 async function disposeEngine(engine) {
   if (!engine) return;
-  if (typeof engine.dispose === "function") {
+  if (is.function(engine.dispose)) {
     await engine.dispose();
     return;
   }
   const disposed = new Set();
   for (const part of [engine.model, engine.tokenizer, engine.processor]) {
-    if (!part || disposed.has(part) || typeof part.dispose !== "function") continue;
+    if (!part || disposed.has(part) || !is.function(part.dispose)) continue;
     disposed.add(part);
     await part.dispose();
   }
 }
 
 async function createWhisperEngine(namespace, configuration, signal, report) {
-  if (typeof namespace?.pipeline !== "function") {
+  if (!is.function(namespace?.pipeline)) {
     throw workerError(
       "ARCANE_AI_PROVIDER_UNAVAILABLE",
       "The Whisper runtime does not export pipeline().",
@@ -1392,7 +1395,7 @@ async function createWhisperEngine(namespace, configuration, signal, report) {
 }
 
 async function createKokoroEngine(namespace, configuration, signal, report) {
-  if (typeof namespace?.KokoroTTS?.from_pretrained !== "function") {
+  if (!is.function(namespace?.KokoroTTS?.from_pretrained)) {
     throw workerError(
       "ARCANE_AI_PROVIDER_UNAVAILABLE",
       "The Kokoro runtime does not export KokoroTTS.",
@@ -1429,7 +1432,7 @@ async function createKokoroEngine(namespace, configuration, signal, report) {
         signal: requestSignal,
       });
       throwIfAborted(requestSignal, "tts-synthesis-cancelled");
-      const audio = output?.audio instanceof Float32Array
+      const audio = is.instanceCheck(output?.audio, Float32Array)
         ? output.audio
         : new Float32Array(output?.audio ?? []);
       return completeValue({
@@ -1444,7 +1447,7 @@ async function createKokoroEngine(namespace, configuration, signal, report) {
 
 function callerVoiceIds(configuration) {
   return new Set((configuration.model.voices ?? []).map((voice) =>
-    typeof voice === "string" ? voice : voice?.id));
+    is.string(voice) ? voice : voice?.id));
 }
 
 function validateInput(role, payload, configuration) {
@@ -1454,7 +1457,7 @@ function validateInput(role, payload, configuration) {
       "Whisper inputSampleRate",
       16_000,
     );
-    if (!(payload?.audio instanceof Float32Array)) {
+    if (!is.instanceCheck(payload?.audio, Float32Array)) {
       throw workerError(
         "ARCANE_AI_INVALID_REQUEST",
         "Whisper requires Float32Array audio.",
@@ -1488,7 +1491,7 @@ function validateInput(role, payload, configuration) {
     );
   }
   const speed = payload?.speed ?? 1;
-  if (!Number.isFinite(speed) || speed <= 0) {
+  if (!is.finite(speed) || speed <= 0) {
     throw workerError(
       "ARCANE_AI_INVALID_REQUEST",
       "Kokoro speed must be greater than 0.",
@@ -1501,7 +1504,7 @@ function validateInput(role, payload, configuration) {
 
 function validateResult(role, result, configuration) {
   if (role === "stt") {
-    if (!result || typeof result.text !== "string") {
+    if (!result || !is.string(result.text)) {
       throw workerError(
         "ARCANE_AI_INVALID_PROVIDER_RESULT",
         "Whisper did not return text.",
@@ -1516,7 +1519,7 @@ function validateResult(role, result, configuration) {
     "Kokoro outputSampleRate",
     24_000,
   );
-  if (!(result?.audio instanceof Float32Array)) {
+  if (!is.instanceCheck(result?.audio, Float32Array)) {
     throw workerError(
       "ARCANE_AI_INVALID_PROVIDER_RESULT",
       "Kokoro must return Float32 PCM.",
@@ -1533,7 +1536,7 @@ function validateResult(role, result, configuration) {
     );
   }
   for (const sample of result.audio) {
-    if (!Number.isFinite(sample)) {
+    if (!is.finite(sample)) {
       throw workerError(
         "ARCANE_AI_INVALID_PROVIDER_RESULT",
         "Kokoro returned non-finite PCM.",
@@ -1553,7 +1556,7 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
   if (role !== "stt" && role !== "tts") {
     throw new TypeError('Speech worker role must be "stt" or "tts".');
   }
-  if (typeof send !== "function") {
+  if (!is.function(send)) {
     throw new TypeError("Speech worker send() is required.");
   }
   let configuration = null;
@@ -1659,7 +1662,7 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
     }
     const input = validateInput(role, request.payload, configuration);
     const method = role === "stt" ? engine.transcribe : engine.synthesize;
-    if (typeof method !== "function") {
+    if (!is.function(method)) {
       throw workerError(
         "ARCANE_AI_PROVIDER_UNAVAILABLE",
         "The speech engine operation is unavailable.",
@@ -1769,7 +1772,7 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
 
   function handleMessage(request) {
     if (request?.protocol !== SPEECH_WORKER_PROTOCOL
-      || !Number.isSafeInteger(request.id)
+      || !is.safeInteger(request.id)
       || request.id < 1) {
       return Promise.reject(workerError(
         "ARCANE_AI_INVALID_REQUEST",
@@ -1836,7 +1839,7 @@ export function installBrowserSpeechWorker(role, scope = globalThis) {
 }
 
 function replayWorkerMessage(scope, event) {
-  if (typeof scope.dispatchEvent === "function") {
+  if (is.function(scope.dispatchEvent)) {
     scope.dispatchEvent(event);
     return;
   }

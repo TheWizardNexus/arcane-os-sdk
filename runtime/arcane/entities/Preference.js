@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const KEY_PATTERN=/^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 const TYPES=new Set(['boolean','number','select','text']);
 
@@ -18,9 +21,9 @@ export default class Preference{
         this.description=String(definition.description||'');
         this.defaultValue=this.normalize(definition.defaultValue);
         this.options=type==='select'?this.normalizeOptions(definition.options):[];
-        this.minimum=Number.isFinite(Number(definition.minimum))?Number(definition.minimum):undefined;
-        this.maximum=Number.isFinite(Number(definition.maximum))?Number(definition.maximum):undefined;
-        this.step=Number.isFinite(Number(definition.step))?Number(definition.step):undefined;
+        this.minimum=is.finite(Number(definition.minimum))?Number(definition.minimum):undefined;
+        this.maximum=is.finite(Number(definition.maximum))?Number(definition.maximum):undefined;
+        this.step=is.finite(Number(definition.step))?Number(definition.step):undefined;
 
         if(type==='select'&&!this.options.some(option=>Object.is(option.value,this.defaultValue))){
             throw new TypeError(`Preference ${key} has a default value outside its options.`);
@@ -28,9 +31,9 @@ export default class Preference{
     }
 
     normalizeOptions(options=[]){
-        if(!Array.isArray(options)||!options.length) throw new TypeError('Select preferences require options.');
+        if(!is.array(options)||!options.length) throw new TypeError('Select preferences require options.');
         return options.map(option=>{
-            const normalized=typeof option==='object'&&option!==null
+            const normalized=is.object(option)&&option!==null
                 ?{label:String(option.label??option.value),value:this.normalize(option.value)}
                 :{label:String(option),value:this.normalize(option)};
             return normalized;
@@ -47,7 +50,7 @@ export default class Preference{
             case 'boolean': return value===true||value==='true'||value===1;
             case 'number': {
                 const number=Number(value);
-                if(!Number.isFinite(number)) throw new TypeError('Numeric preferences require finite values.');
+                if(!is.finite(number)) throw new TypeError('Numeric preferences require finite values.');
                 return number;
             }
             default: return String(value);

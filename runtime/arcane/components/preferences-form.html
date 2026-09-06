@@ -29,6 +29,9 @@
 </form>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const host=this;
     const root=host.shadowRoot;
     const form=root.querySelector('form');
@@ -68,7 +71,7 @@
     reset.addEventListener('click',()=>emit('preferences-reset'));
 
     function configure(options={}){
-        schema=Array.from(options.schema||[]).map(item=>typeof item.toJSON==='function'?item.toJSON():{...item});
+        schema=Array.from(options.schema||[]).map(item=>is.function(item.toJSON)?item.toJSON():{...item});
         title.innerText=String(options.title||'Preferences');
         description.innerText=String(options.description||'');
         description.hidden=!description.innerText;

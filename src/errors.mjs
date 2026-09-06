@@ -1,3 +1,7 @@
+import Is from 'strong-type';
+
+const is = new Is(false);
+
 export const ERROR_CODES={
     usage:'ARCANE_USAGE',
     workspaceInvalid:'ARCANE_WORKSPACE_INVALID',
@@ -17,7 +21,7 @@ export class ArcaneError extends Error{
         this.name='ArcaneError';
         this.code=code||ERROR_CODES.operationFailed;
         this.details=details;
-        this.exitCode=Number.isInteger(exitCode)?exitCode:1;
+        this.exitCode=is.integer(exitCode)?exitCode:1;
     }
 }
 
@@ -49,7 +53,7 @@ export function normalizeError(error,fallbackCode=ERROR_CODES.operationFailed){
         );
     }
 
-    const reportedCode=typeof error?.code==='string'&&/^ARCANE_[A-Z0-9_]+$/u.test(error.code)
+    const reportedCode=is.string(error?.code)&&/^ARCANE_[A-Z0-9_]+$/u.test(error.code)
         ?error.code
         :fallbackCode;
 
@@ -59,7 +63,7 @@ export function normalizeError(error,fallbackCode=ERROR_CODES.operationFailed){
         {
             cause:error,
             details:error?.details,
-            exitCode:Number.isInteger(error?.exitCode)?error.exitCode:undefined
+            exitCode:is.integer(error?.exitCode)?error.exitCode:undefined
         }
     );
 }

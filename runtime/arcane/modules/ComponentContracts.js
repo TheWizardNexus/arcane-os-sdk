@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import { arcaneLogging } from 'arcane-os/logging';
 import {
     createArcaneEventSource,
@@ -46,7 +49,7 @@ function projectSTTActivationEvent(
     EventClass,
     options={}
 ){
-    if(typeof globalThis.CustomEvent!=='function'){
+    if(!is.function(globalThis.CustomEvent)){
         throw codedError(
             'The STT activation DOM compatibility projection requires CustomEvent.',
             STT_ACTIVATION_ERROR_CODES.domProjectionUnavailable
@@ -81,14 +84,14 @@ function record(value,label){
     if(value===undefined){
         return {};
     }
-    if(!value||typeof value!=='object'||Array.isArray(value)){
+    if(!value||!is.object(value)||is.array(value)){
         throw new TypeError(`${label} must be an object`);
     }
     return value;
 }
 
 function string(value,fallback='',allowEmpty=false){
-    if(typeof value!=='string'){
+    if(!is.string(value)){
         return fallback;
     }
     const normalized=value.trim();
@@ -96,7 +99,7 @@ function string(value,fallback='',allowEmpty=false){
 }
 
 function text(value,fallback='',allowEmpty=false){
-    if(typeof value!=='string'){
+    if(!is.string(value)){
         return fallback;
     }
     return value||(allowEmpty?'':fallback);
@@ -126,10 +129,10 @@ function optionAlias(input,previous,keys,fallback){
 
 function optionalCallback(input,previous,keys,label=keys[0]){
     const value=optionAlias(input,previous,keys,null);
-    if(value!==null&&value!==undefined&&typeof value!=='function'){
+    if(value!==null&&value!==undefined&&!is.function(value)){
         throw new TypeError(`${label} must be a function or null`);
     }
-    return typeof value==='function'?value:null;
+    return is.function(value)?value:null;
 }
 
 function finiteNumber(value,label){
@@ -137,7 +140,7 @@ function finiteNumber(value,label){
         return null;
     }
     const normalized=Number(value);
-    if(!Number.isFinite(normalized)){
+    if(!is.finite(normalized)){
         throw new TypeError(`${label} must be a finite number or null`);
     }
     return normalized;
@@ -147,7 +150,7 @@ function stringRecord(value,defaults,label){
     value=record(value,label);
     const normalized={...defaults};
     for(const [key,item] of Object.entries(value)){
-        if(typeof item!=='string'){
+        if(!is.string(item)){
             throw new TypeError(`${label}.${key} must be a string`);
         }
         normalized[key]=item;
@@ -189,7 +192,7 @@ function normalizeChartOptions(input={},previous={}){
     };
 
     for(const [source,target] of Object.entries(aliases)){
-        if(typeof input[source]==='string'){
+        if(is.string(input[source])){
             labels[target]=input[source];
         }
     }
@@ -208,8 +211,8 @@ function normalizeChartOptions(input={},previous={}){
     const chartOptions=option(input,previous,'chartOptions',null);
     if(
         chartOptions!==null
-        &&typeof chartOptions!=='function'
-        &&(!chartOptions||typeof chartOptions!=='object'||Array.isArray(chartOptions))
+        &&!is.function(chartOptions)
+        &&(!chartOptions||!is.object(chartOptions)||is.array(chartOptions))
     ){
         throw new TypeError('chartOptions must be an object, function, or null');
     }
@@ -237,7 +240,7 @@ function normalizeChartOptions(input={},previous={}){
         parseY:optionalCallback(input,previous,['parseY']),
         formatTime:optionalCallback(input,previous,['formatTime']),
         formatValue:optionalCallback(input,previous,['formatValue']),
-        chartOptions:typeof chartOptions==='object'&&chartOptions!==null
+        chartOptions:is.object(chartOptions)&&chartOptions!==null
             ?{...chartOptions}
             :chartOptions,
         data
@@ -249,22 +252,22 @@ function numericX(value,time=true){
         return value.getTime();
     }
     const number=Number(value);
-    if(Number.isFinite(number)){
+    if(is.finite(number)){
         return number;
     }
-    if(time&&typeof value==='string'){
+    if(time&&is.string(value)){
         const parsed=Date.parse(value);
-        return Number.isFinite(parsed)?parsed:NaN;
+        return is.finite(parsed)?parsed:NaN;
     }
     return NaN;
 }
 
 function normalizeChartRows(data=[],options={}){
     const config=normalizeChartOptions(options);
-    if(data&&typeof data==='object'&&!Array.isArray(data)){
+    if(data&&is.object(data)&&!is.array(data)){
         data=Object.entries(data);
     }
-    if(!Array.isArray(data)){
+    if(!is.array(data)){
         return [];
     }
     const normalized=[];
@@ -272,12 +275,12 @@ function normalizeChartRows(data=[],options={}){
     for(let index=0;index<data.length;index++){
         const original=data[index];
         const item=config.mapRow?config.mapRow(original,index):original;
-        const x=Array.isArray(item)
+        const x=is.array(item)
             ?item[0]
             :config.xKey
                 ?item?.[config.xKey]
                 :item?.date??item?.timestamp??item?.x;
-        const y=Array.isArray(item)
+        const y=is.array(item)
             ?item[1]
             :config.yKey
                 ?item?.[config.yKey]
@@ -287,7 +290,7 @@ function normalizeChartRows(data=[],options={}){
         const normalizedX=numericX(parsedX,config.time);
         const normalizedY=Number(parsedY);
 
-        if(Number.isFinite(normalizedX)&&Number.isFinite(normalizedY)){
+        if(is.finite(normalizedX)&&is.finite(normalizedY)){
             normalized.push([normalizedX,normalizedY]);
         }
     }
@@ -297,7 +300,7 @@ function normalizeChartRows(data=[],options={}){
 }
 
 function normalizeDashboardDefinitions(values=[]){
-    if(!Array.isArray(values)){
+    if(!is.array(values)){
         throw new TypeError('Dashboard definitions must be an array');
     }
     const keys=new Set();
@@ -349,7 +352,7 @@ function normalizeDashboardVisibility(values={}){
     values=record(values,'Dashboard visibility');
     const visibility={};
     for(const [key,value] of Object.entries(values)){
-        if(typeof value==='boolean'){
+        if(is.boolean(value)){
             visibility[key]=value;
         }
     }
@@ -372,7 +375,7 @@ function normalizeDashboardOptions(input={},previous={}){
         triggerLabel:'trigger'
     };
     for(const [source,target] of Object.entries(aliases)){
-        if(typeof input[source]==='string'){
+        if(is.string(input[source])){
             labels[target]=input[source];
         }
     }
@@ -380,7 +383,7 @@ function normalizeDashboardOptions(input={},previous={}){
         labels,
         definitions:own(input,'definitions')
             ?normalizeDashboardDefinitions(input.definitions)
-            :Array.isArray(previous.definitions)
+            :is.array(previous.definitions)
                 ?normalizeDashboardDefinitions(previous.definitions)
                 :[],
         visibility:own(input,'visibility')
@@ -396,7 +399,7 @@ function effectiveDashboardVisibility(definitions=[],visibility={}){
         definitions.map(
             definition=>[
                 definition.key,
-                typeof visibility[definition.key]==='boolean'
+                is.boolean(visibility[definition.key])
                     ?visibility[definition.key]
                     :definition.defaultVisible
             ]
@@ -405,16 +408,16 @@ function effectiveDashboardVisibility(definitions=[],visibility={}){
 }
 
 function formatAIRuntimeProgress(progress,fallback){
-    const phase=typeof progress?.phase==='string'&&progress.phase
+    const phase=is.string(progress?.phase)&&progress.phase
         ?progress.phase
         :fallback;
     const completed=progress?.completed;
     const total=progress?.total;
-    const unit=typeof progress?.unit==='string'
+    const unit=is.string(progress?.unit)
         ?progress.unit
         :'';
-    if(!Number.isFinite(completed)
-        ||!Number.isFinite(total)
+    if(!is.finite(completed)
+        ||!is.finite(total)
         ||total<=0
         ||!unit){
         return phase;
@@ -429,15 +432,15 @@ function createSTTActivationController({
     EventClass=globalThis.CustomEvent,
     eventSource=null
 }){
-    if(!host||typeof host.dispatchEvent!=='function'
-        ||typeof host.requestSTTActivation!=='function'){
+    if(!host||!is.function(host.dispatchEvent)
+        ||!is.function(host.requestSTTActivation)){
         throw codedError(
             'The STT activation host must provide dispatchEvent() and requestSTTActivation().',
             STT_ACTIVATION_ERROR_CODES.hostInvalid,
             TypeError
         );
     }
-    if(typeof EventClass!=='function'){
+    if(!is.function(EventClass)){
         throw codedError(
             'The STT activation event class must be a constructor.',
             STT_ACTIVATION_ERROR_CODES.eventClassInvalid,
@@ -445,15 +448,15 @@ function createSTTActivationController({
         );
     }
     if(!button
-        ||typeof button.addEventListener!=='function'
-        ||typeof button.removeEventListener!=='function'){
+        ||!is.function(button.addEventListener)
+        ||!is.function(button.removeEventListener)){
         throw codedError(
             'The STT activation button must provide addEventListener() and removeEventListener().',
             STT_ACTIVATION_ERROR_CODES.buttonInvalid,
             TypeError
         );
     }
-    if(typeof onChange!=='function'){
+    if(!is.function(onChange)){
         throw codedError(
             'The STT activation onChange callback must be a function.',
             STT_ACTIVATION_ERROR_CODES.onChangeInvalid,
@@ -462,10 +465,10 @@ function createSTTActivationController({
     }
     if(eventSource!==null
         &&(
-            typeof eventSource!=='object'
-            ||typeof eventSource.dispatch!=='function'
-            ||typeof eventSource.dispose!=='function'
-            ||typeof eventSource.instanceId!=='string'
+            !is.object(eventSource)
+            ||!is.function(eventSource.dispatch)
+            ||!is.function(eventSource.dispose)
+            ||!is.string(eventSource.instanceId)
         )){
         throw codedError(
             'The STT activation event source must be a compatible Arcane event source.',
@@ -489,7 +492,7 @@ function createSTTActivationController({
     let destroyed=false;
 
     function visibleError(error,fallback){
-        const message=typeof error?.message==='string'
+        const message=is.string(error?.message)
             ?error.message
             :'';
         return message||fallback;
@@ -504,9 +507,9 @@ function createSTTActivationController({
     }
 
     function selected(){
-        return typeof role?.providerId==='string'
+        return is.string(role?.providerId)
             &&role.providerId.length>0
-            &&typeof role?.modelId==='string'
+            &&is.string(role?.modelId)
             &&role.modelId.length>0;
     }
 
@@ -622,7 +625,7 @@ function createSTTActivationController({
                         action:nextAction,
                         reason:STT_ACTIVATION_REASONS.explicitRequest,
                         state:role.state,
-                        roleOperationId:typeof role?.operationId==='string'
+                        roleOperationId:is.string(role?.operationId)
                             ?role.operationId
                             :null
                     }
@@ -692,7 +695,7 @@ function createSTTActivationController({
                         action:nextAction,
                         code,
                         reason,
-                        causeCode:typeof error?.code==='string'
+                        causeCode:is.string(error?.code)
                             ?error.code
                             :null
                     }
@@ -851,13 +854,13 @@ function normalizeVoiceOptions(input={},previous={}){
         transcriptionLabel:'transcription'
     };
     for(const [source,target] of Object.entries(aliases)){
-        if(typeof input[source]==='string'){
+        if(is.string(input[source])){
             labels[target]=input[source];
         }
     }
 
     const constraints=option(input,previous,'mediaConstraints',{audio:true});
-    if(!constraints||typeof constraints!=='object'||Array.isArray(constraints)){
+    if(!constraints||!is.object(constraints)||is.array(constraints)){
         throw new TypeError('mediaConstraints must be an object');
     }
     if(!own(constraints,'audio')||constraints.audio===false){
@@ -869,14 +872,14 @@ function normalizeVoiceOptions(input={},previous={}){
         'mimeTypes',
         ['audio/webm;codecs=opus','audio/mp4','audio/webm']
     );
-    if(!Array.isArray(mimeTypes)){
+    if(!is.array(mimeTypes)){
         throw new TypeError('mimeTypes must be an array');
     }
-    if(mimeTypes.some(value=>typeof value!=='string')){
+    if(mimeTypes.some(value=>!is.string(value))){
         throw new TypeError('mimeTypes must contain only strings');
     }
     const separator=option(input,previous,'separator','\n\n');
-    if(typeof separator!=='string'){
+    if(!is.string(separator)){
         throw new TypeError('separator must be a string');
     }
 
@@ -936,7 +939,7 @@ const MARKDOWN_LABELS=completeValue({
 });
 
 function normalizeMarkdownFormats(values=MARKDOWN_FORMATS){
-    if(!Array.isArray(values)){
+    if(!is.array(values)){
         throw new TypeError('Markdown formats must be an array');
     }
     const ids=new Set();
@@ -984,7 +987,7 @@ function normalizeMarkdownOptions(input={},previous={}){
         toolbarLabel:'toolbar'
     };
     for(const [source,target] of Object.entries(aliases)){
-        if(typeof input[source]==='string'){
+        if(is.string(input[source])){
             labels[target]=input[source];
         }
     }
@@ -1012,11 +1015,11 @@ function applyMarkdownFormat(value='',selectionStart=0,selectionEnd=selectionSta
     const rawEnd=Number(selectionEnd);
     const start=Math.max(
         0,
-        Math.min(value.length,Number.isFinite(rawStart)?rawStart:0)
+        Math.min(value.length,is.finite(rawStart)?rawStart:0)
     );
     const end=Math.max(
         start,
-        Math.min(value.length,Number.isFinite(rawEnd)?rawEnd:start)
+        Math.min(value.length,is.finite(rawEnd)?rawEnd:start)
     );
     const selected=value.slice(start,end);
     const content=selected||format.placeholder;

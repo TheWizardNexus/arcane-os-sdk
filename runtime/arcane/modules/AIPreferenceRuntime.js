@@ -1,7 +1,10 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const runtimeOverrides=new WeakMap();
 
 function requireUser(user){
-    if(!user||typeof user!=='object'){
+    if(!user||!is.object(user)){
         throw new TypeError('An AI preference owner is required.');
     }
 }
@@ -17,7 +20,7 @@ export function setAIPreferenceRuntimeOverride(user,preferences){
         runtimeOverrides.delete(user);
         return null;
     }
-    if(!Array.isArray(preferences)||preferences.length!==6){
+    if(!is.array(preferences)||preferences.length!==6){
         throw new TypeError('An AI runtime preference tuple must contain six entries.');
     }
 

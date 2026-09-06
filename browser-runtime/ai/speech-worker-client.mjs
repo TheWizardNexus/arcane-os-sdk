@@ -1,9 +1,12 @@
+import Is from "../dependencies/strong-type/index.js";
 import {
   collectSpeechTransferables,
   normalizeSpeechWorkerErrorEnvelope,
   SPEECH_WORKER_PROTOCOL,
 } from "./speech-worker-runtime.mjs";
 import { arcaneLogging } from "../logging.mjs";
+
+const is = new Is(false);
 
 const completeValue = (value) => value;
 let nextSpeechWorkerClientId = 0;
@@ -25,7 +28,7 @@ function clientError(code, message, cause, reason) {
     ? "AbortError"
     : "ArcaneSpeechWorkerError";
   error.code = code;
-  if (typeof reason === "string" && reason) error.reason = reason;
+  if (is.string(reason) && reason) error.reason = reason;
   WORKER_CLIENT_ERRORS.add(error);
   return error;
 }
@@ -45,7 +48,7 @@ function abortError(signal, role, op) {
 }
 
 function validateWorker(worker) {
-  if (!worker || typeof worker.postMessage !== "function" || typeof worker.terminate !== "function") {
+  if (!worker || !is.function(worker.postMessage) || !is.function(worker.terminate)) {
     throw new TypeError("The packaged speech worker did not create a Worker.");
   }
   return worker;
@@ -74,7 +77,7 @@ class SpeechWorkerClient {
     if (role !== "stt" && role !== "tts") {
       throw new TypeError('SpeechWorkerClient role must be "stt" or "tts".');
     }
-    if (typeof onTermination !== "function") {
+    if (!is.function(onTermination)) {
       throw new TypeError("SpeechWorkerClient onTermination must be a function.");
     }
     const workerUrl = role === "stt"
@@ -163,7 +166,7 @@ class SpeechWorkerClient {
       ), { intentional: false }).catch(() => undefined);
       return;
     }
-    if (!Number.isSafeInteger(message.id) || typeof message.ok !== "boolean") {
+    if (!is.safeInteger(message.id) || !is.boolean(message.ok)) {
       void this.terminate(clientError(
         "ARCANE_AI_WORKER_MESSAGE_ERROR",
         "The speech Worker response envelope shape was rejected.",
@@ -313,16 +316,16 @@ class SpeechWorkerClient {
 
   async terminate(reason = null, { intentional = true } = {}) {
     this.#trace("terminate.call", { reason, intentional });
-    if (typeof intentional !== "boolean") {
+    if (!is.boolean(intentional)) {
       throw new TypeError("Speech Worker termination intent must be a boolean.");
     }
     if (this.#terminated) return;
-    const terminationReason = reason instanceof Error && WORKER_CLIENT_ERRORS.has(reason)
+    const terminationReason = is.error(reason) && WORKER_CLIENT_ERRORS.has(reason)
       ? reason
       : clientError(
         "ARCANE_AI_OPERATION_SUPERSEDED",
         "The speech Worker was terminated.",
-        reason instanceof Error ? reason : undefined,
+        is.error(reason) ? reason : undefined,
         `${this.#role}-worker-terminated`,
       );
     this.#terminated = true;
@@ -341,7 +344,7 @@ class SpeechWorkerClient {
     try {
       this.#transport = null;
       const termination = worker?.terminate();
-      if (termination && typeof termination.then === "function") await termination;
+      if (termination && is.function(termination.then)) await termination;
     } finally {
       for (const pending of pendingOperations) pending.reject(terminationReason);
       this.#trace("terminated", { reason: terminationReason, intentional });
@@ -359,5 +362,5 @@ export function isSpeechWorkerClient(value) {
 }
 
 export function isSpeechWorkerClientError(value) {
-  return value instanceof Error && WORKER_CLIENT_ERRORS.has(value);
+  return is.error(value) && WORKER_CLIENT_ERRORS.has(value);
 }

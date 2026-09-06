@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {normalizeOllamaModelIdentifier} from './OllamaModelIdentifier.js';
 
 const MAX_CORE_LOCAL_SPEECH_MODELS=8;
@@ -48,7 +51,7 @@ function modelDescriptor(model){
 }
 
 function boundedParallelRequests(value,{allowZero=false}={}){
-    return Number.isSafeInteger(value)
+    return is.safeInteger(value)
         &&(allowZero?value>=0:value>=1)
         ?value
         :null;
@@ -57,7 +60,7 @@ function boundedParallelRequests(value,{allowZero=false}={}){
 function admissionCode(compatibility){
     const code=compatibility?.code;
 
-    return typeof code==='string'&&/^[A-Z][A-Z0-9_]{0,95}$/.test(code)
+    return is.string(code)&&/^[A-Z][A-Z0-9_]{0,95}$/.test(code)
         ?code
         :null;
 }
@@ -91,8 +94,8 @@ function admissionAwareModelDescriptor(model,{rejected=false,activeFallback=null
         throw new TypeError('Arcane Core returned an invalid local-model identifier.');
     }
 
-    const compatibility=model?.compatibility&&typeof model.compatibility==='object'
-        &&!Array.isArray(model.compatibility)
+    const compatibility=model?.compatibility&&is.object(model.compatibility)
+        &&!is.array(model.compatibility)
         ?model.compatibility
         :null;
     const activeParallelRequests=boundedParallelRequests(
@@ -103,7 +106,7 @@ function admissionAwareModelDescriptor(model,{rejected=false,activeFallback=null
         {allowZero:true}
     );
     const activeParallelRequestsAllowed=
-        typeof compatibility?.activeParallelRequestsAllowed==='boolean'
+        is.boolean(compatibility?.activeParallelRequestsAllowed)
             ?compatibility.activeParallelRequestsAllowed
             :null;
     const repairRequired=compatibility?.creationRequired===true
@@ -160,7 +163,7 @@ function admissionAwareModelDescriptor(model,{rejected=false,activeFallback=null
 export function getCoreLocalModelCatalog(status){
     const models=status?.models?.ollama;
 
-    if(!Array.isArray(models)){
+    if(!is.array(models)){
         return Object.freeze([]);
     }
     return Object.freeze(models.map(modelDescriptor));
@@ -172,10 +175,10 @@ export function getCoreLocalModelCatalog(status){
  * diagnostic messages in the application UI.
  */
 export function getCoreLocalModelCatalogWithAdmissionFailures(status){
-    const admitted=Array.isArray(status?.models?.ollama)
+    const admitted=is.array(status?.models?.ollama)
         ?status.models.ollama
         :[];
-    const rejected=Array.isArray(status?.admission?.rejected)
+    const rejected=is.array(status?.admission?.rejected)
         ?status.admission.rejected
         :[];
 
@@ -207,7 +210,7 @@ export function getCoreLocalModelCatalogWithAdmissionFailures(status){
 }
 
 function hasAvailableSpeechRole(models,role){
-    if(!Array.isArray(models)){
+    if(!is.array(models)){
         return false;
     }
     if(models.length>MAX_CORE_LOCAL_SPEECH_MODELS){
@@ -218,16 +221,16 @@ function hasAvailableSpeechRole(models,role){
     for(const model of models){
         if(
             !model
-            ||typeof model!=='object'
-            ||Array.isArray(model)
-            ||typeof model.id!=='string'
+            ||!is.object(model)
+            ||is.array(model)
+            ||!is.string(model.id)
             ||!model.id
             ||model.id.length>128
-            ||typeof model.name!=='string'
+            ||!is.string(model.name)
             ||!model.name
             ||model.name.length>128
             ||model.provider!=='speech'
-            ||!Array.isArray(model.roles)
+            ||!is.array(model.roles)
             ||model.roles.length<1
             ||model.roles.length>2
             ||!model.roles.every(candidate=>candidate==='stt'||candidate==='tts')

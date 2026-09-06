@@ -1,7 +1,10 @@
+import Is from 'strong-type';
 import {randomUUID} from 'node:crypto';
 import {constants as FS_CONSTANTS} from 'node:fs';
 import {lstat,mkdir,open,readFile,realpath,rm} from 'node:fs/promises';
 import path from 'node:path';
+
+const is = new Is(false);
 
 const LOCK_DIRECTORY='.arcane';
 const LOCK_NAME='workspace-operation.lock.json';
@@ -44,7 +47,7 @@ function samePath(left,right){
 }
 
 function validOperation(value){
-    return typeof value==='string'&&/^[a-z][a-z0-9._-]*$/u.test(value);
+    return is.string(value)&&/^[a-z][a-z0-9._-]*$/u.test(value);
 }
 
 function trackedLeaseState(fields){
@@ -96,7 +99,7 @@ async function ensureLockDirectory(workspace){
 }
 
 function ownerIsAlive(pid){
-    if(!Number.isSafeInteger(pid)||pid<1)return false;
+    if(!is.safeInteger(pid)||pid<1)return false;
     try{
         process.kill(pid,0);
         return true;
@@ -106,21 +109,21 @@ function ownerIsAlive(pid){
 }
 
 function lockDocument(value,{workspaceRoot,now=Date.now()}={}){
-    if(!value||typeof value!=='object'||Array.isArray(value)
+    if(!value||!is.object(value)||is.array(value)
         ||value.schemaVersion!==1
         ||value.kind!=='arcane-workspace-operation-lock'
         ||!validOperation(value.operation)
-        ||typeof value.nonce!=='string'||!value.nonce
-        ||!value.owner||!Number.isSafeInteger(value.owner.pid)
-        ||typeof value.scope!=='string'||!samePath(value.scope,workspaceRoot)
-        ||typeof value.acquiredAt!=='string'
-        ||typeof value.expiresAt!=='string'
+        ||!is.string(value.nonce)||!value.nonce
+        ||!value.owner||!is.safeInteger(value.owner.pid)
+        ||!is.string(value.scope)||!samePath(value.scope,workspaceRoot)
+        ||!is.string(value.acquiredAt)
+        ||!is.string(value.expiresAt)
         ||value.releaseProcedure!==RELEASE_PROCEDURE
         ||value.staleRecovery!==STALE_RECOVERY){
         return null;
     }
     const expiresAt=Date.parse(value.expiresAt);
-    if(!Number.isFinite(expiresAt))return null;
+    if(!is.finite(expiresAt))return null;
     return {...value,expired:expiresAt<=now};
 }
 
@@ -227,7 +230,7 @@ async function acquire({
     onEvent
 }){
     throwIfAborted(signal);
-    if(typeof workspaceRoot!=='string'||!workspaceRoot.trim()){
+    if(!is.string(workspaceRoot)||!workspaceRoot.trim()){
         throw new TypeError('workspaceRoot is required for an Arcane workspace operation lock.');
     }
     if(!validOperation(operation)){
@@ -404,7 +407,7 @@ function attachReleaseError(workError,releaseError){
 }
 
 export async function withWorkspaceOperationLock(options,work){
-    if(typeof work!=='function')throw new TypeError('Workspace operation lock work must be a function.');
+    if(!is.function(work))throw new TypeError('Workspace operation lock work must be a function.');
     const acquired=await acquire(options);
     let result;
     let workError;

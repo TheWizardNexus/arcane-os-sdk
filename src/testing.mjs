@@ -1,4 +1,7 @@
+import Is from 'strong-type';
 import VanillaTest from 'vanilla-test';
+
+const is = new Is(false);
 
 export const DEFAULT_TEST_TIMEOUT_MS=30_000;
 
@@ -26,14 +29,14 @@ class TestCancellationError extends Error{
 }
 
 function assertName(name){
-    if(typeof name!=='string'||name.trim()===''){
+    if(!is.string(name)||name.trim()===''){
         throw new TypeError('A test name must be a nonempty string.');
     }
 }
 
 function testTimeout(options){
     const timeout=options.timeout??DEFAULT_TEST_TIMEOUT_MS;
-    if(!Number.isSafeInteger(timeout)||timeout<1||timeout>MAX_TEST_TIMEOUT_MS){
+    if(!is.safeInteger(timeout)||timeout<1||timeout>MAX_TEST_TIMEOUT_MS){
         throw new TypeError(
             `Test timeout must be an integer from 1 through ${String(MAX_TEST_TIMEOUT_MS)} milliseconds.`
         );
@@ -43,13 +46,13 @@ function testTimeout(options){
 
 function definition(name,optionsOrCallback,maybeCallback){
     assertName(name);
-    const hasOptions=typeof optionsOrCallback!=='function';
+    const hasOptions=!is.function(optionsOrCallback);
     const options=hasOptions?optionsOrCallback:{};
     const callback=hasOptions?maybeCallback:optionsOrCallback;
-    if(options===null||typeof options!=='object'||Array.isArray(options)){
+    if(options===null||!is.object(options)||is.array(options)){
         throw new TypeError('Test options must be an object.');
     }
-    if(typeof callback!=='function'){
+    if(!is.function(callback)){
         throw new TypeError(`Test "${name}" requires a callback function.`);
     }
     return {name,timeoutMs:testTimeout(options),callback};
@@ -226,7 +229,7 @@ async function executeDefinition(current,path,outcomes,{parentSignal,state,onPha
             if(state.cancelled||state.fatalError||controller.signal.aborted){
                 throw state.fatalError??cancellationError(controller.signal);
             }
-            if(typeof callback!=='function'){
+            if(!is.function(callback)){
                 throw new TypeError('t.after() requires a callback function.');
             }
             cleanups.push(callback);
@@ -365,7 +368,7 @@ export async function runRegisteredTests({signal,requireTests=true,onPhase}={}){
     if(lifecycle!=='collecting'){
         throw new ReferenceError('The registered test suite can run only once.');
     }
-    if(onPhase!==undefined&&typeof onPhase!=='function'){
+    if(onPhase!==undefined&&!is.function(onPhase)){
         throw new TypeError('onPhase must be a function when provided.');
     }
     lifecycle='running';

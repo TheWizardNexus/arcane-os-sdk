@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import { arcaneLogging } from 'arcane-os/logging';
 import {
     checkLocalAIReadiness,
@@ -36,7 +39,7 @@ function availabilityFromReport(report={}){
 }
 
 function selectedPreferences(source){
-    return typeof source==='function'?source():source;
+    return is.function(source)?source():source;
 }
 
 function pendingReport(requirements){
@@ -172,7 +175,7 @@ export function createLocalAIReadinessController({
         if(destroyed){
             return;
         }
-        if(typeof chat.setAIAvailability==='function'){
+        if(is.function(chat.setAIAvailability)){
             if(chatReadyListenerPending){
                 chat.removeEventListener('chat-ready',publishAvailability);
             }
@@ -239,7 +242,7 @@ export function createLocalAIReadinessController({
             }
             status?.present?.(latestReport);
             applyAvailability(latestReport);
-            if(typeof onChange==='function'){
+            if(is.function(onChange)){
                 onChange(latestReport);
             }
             const availability=availabilityFromReport(latestReport);

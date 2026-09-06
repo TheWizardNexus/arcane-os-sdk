@@ -378,7 +378,7 @@ Applications omit that internal metadata. Displayed messages, saved history,
 model input, caller payload objects, language, voice, synthesis capacity, and
 playback timing are not changed by the filter.
 
-The dependency-free helper is public for code that needs the speech-only
+The shared helper is public for code that needs the speech-only
 transformation directly:
 
 ```javascript

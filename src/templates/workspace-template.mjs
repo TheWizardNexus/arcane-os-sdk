@@ -1,3 +1,4 @@
+import Is from 'strong-type';
 import {
     ARCANE_PROTOCOL,
     CLI_EVENT_PROTOCOL,
@@ -5,6 +6,8 @@ import {
     SDK_VERSION,
     TARGET_ADAPTER_PROTOCOL
 } from '../constants.mjs';
+
+const is = new Is(false);
 
 const NPM_PACKAGE_NAME_PATTERN=/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/u;
 const LOCAL_TARBALL_PATTERN=/^file:.+\.tgz$/iu;
@@ -34,9 +37,9 @@ export function createWorkspaceLockDocument({
     packageVersion=SDK_VERSION,
     packageSource=`node_modules/${dependencyName}`
 }={}){
-    if(packageName!==SDK_NAME||typeof packageVersion!=='string'
+    if(packageName!==SDK_NAME||!is.string(packageVersion)
         ||!/^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/u.test(packageVersion)
-        ||typeof dependencyName!=='string'||dependencyName.length>214
+        ||!is.string(dependencyName)||dependencyName.length>214
         ||!NPM_PACKAGE_NAME_PATTERN.test(dependencyName)
         ||packageSource!==`node_modules/${dependencyName}`){
         throw new Error('Invalid workspace SDK lock authority.');
@@ -68,12 +71,12 @@ export function workspaceTemplate({
 }){
     const canonicalSpecifier=sdkDependencyName===SDK_NAME
         &&(sdkDependencySpecifier===SDK_VERSION
-            ||(typeof sdkDependencySpecifier==='string'
+            ||(is.string(sdkDependencySpecifier)
                 &&LOCAL_TARBALL_PATTERN.test(sdkDependencySpecifier)
                 &&!/[\x00-\x1f\x7f]/.test(sdkDependencySpecifier)));
     const aliasSpecifier=sdkDependencyName!==SDK_NAME
         &&sdkDependencySpecifier===`npm:${SDK_NAME}@${SDK_VERSION}`;
-    if(typeof sdkDependencyName!=='string'||sdkDependencyName.length>214
+    if(!is.string(sdkDependencyName)||sdkDependencyName.length>214
         ||!NPM_PACKAGE_NAME_PATTERN.test(sdkDependencyName)
         ||sdkPackageSource!==`node_modules/${sdkDependencyName}`
         ||(!canonicalSpecifier&&!aliasSpecifier)){
@@ -359,12 +362,16 @@ ${bootstrapMarkup}</head>
         ?'arcane/ThemeBootstrap':'../../../arcane/modules/ThemeBootstrap.js';
     const appDataSpecifier=namedImports
         ?'arcane/AppDataScope':'../../../arcane/modules/AppDataScope.js';
-    files.set(`apps/${appId}/modules/App.js`,`import arcaneThemeReady from '${themeSpecifier}';
+    const strongTypeSpecifier=namedImports
+        ?'strong-type':'../../../arcane/dependencies/strong-type/index.js';
+    files.set(`apps/${appId}/modules/App.js`,`import Is from '${strongTypeSpecifier}';
+import arcaneThemeReady from '${themeSpecifier}';
 import {
     resolveApplicationId,
     resolveApplicationLocalStorageKey
 } from '${appDataSpecifier}';
 
+const is = new Is(false);
 const appName=${JSON.stringify(name)};
 const action=document.querySelector('#app-action');
 const status=document.querySelector('#app-status');
@@ -377,7 +384,7 @@ const countKey=resolveApplicationLocalStorageKey('hello-count',{applicationId:ap
 function loadHelloCount(){
     try{
         const value=Number(globalThis.localStorage?.getItem(countKey)??0);
-        return Number.isSafeInteger(value)&&value>=0?value:0;
+        return is.safeInteger(value)&&value>=0?value:0;
     }catch{
         return 0;
     }

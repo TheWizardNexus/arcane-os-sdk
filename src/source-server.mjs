@@ -1,3 +1,4 @@
+import Is from 'strong-type';
 import {createReadStream} from 'node:fs';
 import {stat} from 'node:fs/promises';
 import http from 'node:http';
@@ -5,6 +6,8 @@ import https from 'node:https';
 import path from 'node:path';
 import {pipeline} from 'node:stream/promises';
 import {fileURLToPath} from 'node:url';
+
+const is = new Is(false);
 
 const MIME_TYPES = new Map([
     ['.css', 'text/css; charset=utf-8'],
@@ -61,7 +64,7 @@ function normalizeHost(value) {
 
 function normalizePort(value) {
     const port = Number(value ?? 0);
-    if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    if (!is.integer(port) || port < 0 || port > 65535) {
         fail('Source server port must be an integer from 0 through 65535.');
     }
     return port;
@@ -113,7 +116,7 @@ function normalizeRoot(value, fieldName) {
         }
         return path.resolve(fileURLToPath(value));
     }
-    if (typeof value !== 'string' || !value.trim()) {
+    if (!is.string(value) || !value.trim()) {
         fail(`${fieldName} must be a filesystem path or file URL.`);
     }
     return path.resolve(value);
@@ -123,7 +126,7 @@ function normalizeInclude(value, fieldName) {
     if (value === undefined) {
         return null;
     }
-    if (!Array.isArray(value)) {
+    if (!is.array(value)) {
         fail(`${fieldName} must be an array when supplied.`);
     }
     return value.map(function normalizeEntry(entry, index) {
@@ -132,7 +135,7 @@ function normalizeInclude(value, fieldName) {
 }
 
 function normalizeMount(value, index) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    if (!value || !is.object(value) || is.array(value)) {
         fail(`mounts[${index}] must be an object.`);
     }
     if (value.urlPath === undefined) {
@@ -149,7 +152,7 @@ function normalizeMount(value, index) {
 }
 
 function normalizeMounts(value) {
-    if (!Array.isArray(value) || value.length === 0) {
+    if (!is.array(value) || value.length === 0) {
         fail('Source server mounts must be a nonempty array.');
     }
     const mounts = value.map(normalizeMount);
@@ -280,7 +283,7 @@ function parseRange(value, size) {
     if (value === undefined) {
         return null;
     }
-    if (typeof value !== 'string' || size === 0) {
+    if (!is.string(value) || size === 0) {
         return false;
     }
     const match = /^bytes=(\d*)-(\d*)$/u.exec(value.trim());
@@ -291,7 +294,7 @@ function parseRange(value, size) {
     let end;
     if (!match[1]) {
         const suffixLength = Number(match[2]);
-        if (!Number.isSafeInteger(suffixLength) || suffixLength <= 0) {
+        if (!is.safeInteger(suffixLength) || suffixLength <= 0) {
             return false;
         }
         start = Math.max(0, size - suffixLength);
@@ -300,7 +303,7 @@ function parseRange(value, size) {
     else {
         start = Number(match[1]);
         end = match[2] ? Number(match[2]) : size - 1;
-        if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end)
+        if (!is.safeInteger(start) || !is.safeInteger(end)
             || start < 0 || end < start || start >= size) {
             return false;
         }
@@ -344,7 +347,7 @@ async function streamFile(request, response, filePath, information, settings) {
 }
 
 async function publishEvent(onEvent, type, detail) {
-    if (typeof onEvent !== 'function') {
+    if (!is.function(onEvent)) {
         return;
     }
     try {
@@ -419,7 +422,7 @@ function createServer(settings) {
     if (settings.tls === undefined || settings.tls === null || settings.tls === false) {
         return http.createServer(listener);
     }
-    if (typeof settings.tls !== 'object' || Array.isArray(settings.tls)) {
+    if (!is.object(settings.tls) || is.array(settings.tls)) {
         fail('Source server tls must be a Node HTTPS options object when supplied.');
     }
     return https.createServer(settings.tls, listener);
@@ -480,11 +483,11 @@ function closeFunction(server) {
 }
 
 export async function startSourceExampleServer(options = {}) {
-    if (!options || typeof options !== 'object' || Array.isArray(options)) {
+    if (!options || !is.object(options) || is.array(options)) {
         fail('Source server options must be an object.');
     }
-    if (options.signal && (typeof options.signal.addEventListener !== 'function'
-        || typeof options.signal.removeEventListener !== 'function')) {
+    if (options.signal && (!is.function(options.signal.addEventListener)
+        || !is.function(options.signal.removeEventListener))) {
         fail('Source server signal must be an AbortSignal when supplied.');
     }
     throwIfAborted(options.signal);
@@ -544,7 +547,7 @@ export async function startSourceExampleServer(options = {}) {
     serverErrorListener = await listen(server, settings.host, settings.port,
         reportOperationalError);
     const address = server.address();
-    if (!address || typeof address === 'string') {
+    if (!address || is.string(address)) {
         await new Promise(function closeUnknownAddress(resolve) {
             server.close(resolve);
         });

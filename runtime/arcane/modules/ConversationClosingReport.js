@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {
     CONVERSATION_ACTION_ITEM_BASES,
     normalizeRememberedConversationActions
@@ -18,7 +21,7 @@ function invalid(message){
 }
 
 function isPlainRecord(value){
-    if(!value||typeof value!=='object'||Array.isArray(value)){
+    if(!value||!is.object(value)||is.array(value)){
         return false;
     }
 
@@ -33,7 +36,7 @@ function normalizedText(value,label,{required=false}={}){
         }
         return '';
     }
-    if(typeof value!=='string'){
+    if(!is.string(value)){
         throw invalid(`${label} must be a string.`);
     }
 
@@ -44,7 +47,7 @@ function normalizedText(value,label,{required=false}={}){
 }
 
 function normalizedFinalMessage(value){
-    if(typeof value!=='string'){
+    if(!is.string(value)){
         throw invalid('final_message must be a string.');
     }
 
@@ -55,7 +58,7 @@ function normalizedFinalMessage(value){
 }
 
 function parseArguments(value){
-    if(typeof value==='string'){
+    if(is.string(value)){
         if(!value)throw invalid('The closing-report arguments are required.');
 
         try{
@@ -91,10 +94,10 @@ export function createConversationClosingReportTool({
     name=DEFAULT_TOOL_NAME,
     description='Prepare a complete closing report when the user clearly ends a conversation.'
 }={}){
-    if(typeof name!=='string'||!TOOL_NAME_PATTERN.test(name)){
+    if(!is.string(name)||!TOOL_NAME_PATTERN.test(name)){
         throw invalid('The closing-report tool name is invalid.');
     }
-    if(typeof description!=='string'||!description.trim()){
+    if(!is.string(description)||!description.trim()){
         throw invalid('The closing-report tool description is invalid.');
     }
 
@@ -157,7 +160,7 @@ export function conversationClosingReportInstruction({
     if(enabled!==true){
         return '';
     }
-    if(typeof toolName!=='string'||!TOOL_NAME_PATTERN.test(toolName)){
+    if(!is.string(toolName)||!TOOL_NAME_PATTERN.test(toolName)){
         throw invalid('The closing-report tool name is invalid.');
     }
 
@@ -195,7 +198,7 @@ export function normalizeConversationClosingReport(value){
 export function classifyConversationClosingReportCalls(calls={}, {
     toolName=DEFAULT_TOOL_NAME
 }={}){
-    if(typeof toolName!=='string'||!TOOL_NAME_PATTERN.test(toolName)){
+    if(!is.string(toolName)||!TOOL_NAME_PATTERN.test(toolName)){
         throw invalid('The closing-report tool name is invalid.');
     }
     if(!isPlainRecord(calls)){

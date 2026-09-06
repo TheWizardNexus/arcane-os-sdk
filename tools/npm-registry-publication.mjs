@@ -1,8 +1,11 @@
+import Is from '../runtime/strong-type/index.js';
 import {spawn} from 'node:child_process';
 import {appendFile} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 
 import {verifyNpmReleaseArtifact} from './npm-release-contract.mjs';
+
+const is = new Is(false);
 
 const DEVELOPMENT_VERSION_PATTERN=/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-dev(?:\.(0|[1-9][0-9]*))?$/u;
 const STABLE_VERSION_PATTERN=/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/u;
@@ -14,11 +17,11 @@ function fail(message){
 }
 
 function plainObject(value){
-    return value!==null&&typeof value==='object'&&!Array.isArray(value);
+    return value!==null&&is.object(value)&&!is.array(value);
 }
 
 function parseJson(output,label){
-    if(typeof output!=='string'||output.trim()==='')fail(`${label} must be nonempty JSON text.`);
+    if(!is.string(output)||output.trim()==='')fail(`${label} must be nonempty JSON text.`);
     try{
         return JSON.parse(output);
     }catch(error){
@@ -28,20 +31,20 @@ function parseJson(output,label){
 
 function numericParts(match,version){
     const parts=match.slice(1,4).map(value=>Number(value));
-    if(parts.some(value=>!Number.isSafeInteger(value))){
+    if(parts.some(value=>!is.safeInteger(value))){
         fail(`Version contains an unsupported numeric component: ${version}.`);
     }
     return parts;
 }
 
 export function parsePublicationVersion(version){
-    if(typeof version!=='string')fail('Package version must be text.');
+    if(!is.string(version))fail('Package version must be text.');
     const stable=STABLE_VERSION_PATTERN.exec(version);
     if(stable)return {version,channel:'latest',parts:numericParts(stable,version)};
     const development=DEVELOPMENT_VERSION_PATTERN.exec(version);
     if(development){
         const sequence=development[4]===undefined?-1:Number(development[4]);
-        if(!Number.isSafeInteger(sequence)){
+        if(!is.safeInteger(sequence)){
             fail(`Version contains an unsupported numeric component: ${version}.`);
         }
         return {version,channel:'dev',parts:[...numericParts(development,version),sequence]};
@@ -51,8 +54,8 @@ export function parsePublicationVersion(version){
 
 export function parseRegistryVersions(output){
     const document=parseJson(output,'npm versions output');
-    const versions=typeof document==='string'?[document]:document;
-    if(!Array.isArray(versions)||versions.some(version=>typeof version!=='string')){
+    const versions=is.string(document)?[document]:document;
+    if(!is.array(versions)||versions.some(version=>!is.string(version))){
         fail('npm versions output must be a version or version array.');
     }
     for(const version of versions)parsePublicationVersion(version);
@@ -63,7 +66,7 @@ export function parseRegistryTags(output){
     const document=parseJson(output,'npm dist-tags output');
     if(!plainObject(document))fail('npm dist-tags output must be one JSON object.');
     for(const [tag,version] of Object.entries(document)){
-        if(typeof version!=='string'||version==='')fail(`npm ${tag} dist-tag must identify a version.`);
+        if(!is.string(version)||version==='')fail(`npm ${tag} dist-tag must identify a version.`);
     }
     return document;
 }
@@ -74,7 +77,7 @@ export function evaluateRegistryPublication({version,channel,versions,tags}){
     if(selectedChannel!==candidate.channel){
         fail(`${version} belongs to the npm ${candidate.channel} channel, not ${selectedChannel}.`);
     }
-    if(!Array.isArray(versions)||versions.some(item=>typeof item!=='string')){
+    if(!is.array(versions)||versions.some(item=>!is.string(item))){
         fail('Registry versions must be a parsed version array.');
     }
     if(!plainObject(tags))fail('Registry tags must be a parsed object.');
@@ -129,7 +132,7 @@ function parseArguments(arguments_){
         else fail(`Unknown argument: ${argument}.`);
     }
     if(!['preflight','verify'].includes(command))fail('Command must be preflight or verify.');
-    if(!Number.isSafeInteger(values.maxWaitMs)||values.maxWaitMs<0){
+    if(!is.safeInteger(values.maxWaitMs)||values.maxWaitMs<0){
         fail('--max-wait-ms must be a nonnegative integer.');
     }
     return values;

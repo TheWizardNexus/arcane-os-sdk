@@ -1,8 +1,11 @@
+import Is from 'strong-type';
 import {lstat,readFile,realpath} from 'node:fs/promises';
 import path from 'node:path';
 import {validateAppDescriptor} from './app-descriptor.mjs';
 import {normalizeRelativePath} from './packager/core.mjs';
 import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
+
+const is = new Is(false);
 
 export const NATIVE_BUILD_PLAN_PROTOCOL='arcane-native-build-plan/1';
 export const NATIVE_BUILDER_PROTOCOL='arcane-native-builder/1';
@@ -38,15 +41,15 @@ function fail(message,code=ERROR_CODES.policyDenied,details){
 }
 
 function isObject(value){
-    return value!==null&&typeof value==='object'&&!Array.isArray(value);
+    return value!==null&&is.object(value)&&!is.array(value);
 }
 
 async function emit(onEvent,event){
-    if(typeof onEvent==='function')await onEvent(event);
+    if(is.function(onEvent))await onEvent(event);
 }
 
 async function realDirectory(location,label){
-    if(typeof location!=='string'||!location.trim())fail(`${label} is required.`,ERROR_CODES.usage);
+    if(!is.string(location)||!location.trim())fail(`${label} is required.`,ERROR_CODES.usage);
     const requested=path.resolve(location);
     let info;
     try{info=await lstat(requested);}
@@ -110,7 +113,7 @@ export function validateNativeBuilder(provider){
         fail(`Native builder protocol must be ${NATIVE_BUILDER_PROTOCOL}.`,ERROR_CODES.targetUnavailable);
     }
     for(const method of ['describe','doctor','prepare','build','verify','run']){
-        if(typeof provider[method]!=='function'){
+        if(!is.function(provider[method])){
             fail(`Native builder must implement ${method}().`,ERROR_CODES.targetUnavailable);
         }
     }
@@ -119,7 +122,7 @@ export function validateNativeBuilder(provider){
 
 async function releaseSelection(releaseRoot,release,label){
     const root=await realDirectory(releaseRoot,`${label} root`);
-    if(!isObject(release)||!Array.isArray(release.files)){
+    if(!isObject(release)||!is.array(release.files)){
         fail(`${label} must provide its structural file inventory.`,ERROR_CODES.usage);
     }
     const files=release.files.map((entry,index)=>normalizeRelativePath(
@@ -150,11 +153,11 @@ async function releaseSelection(releaseRoot,release,label){
 
 async function dependencySelections(value,{signal}={}){
     if(value===undefined)return [];
-    if(!Array.isArray(value))fail('dependencyReleases must be an array.',ERROR_CODES.usage);
+    if(!is.array(value))fail('dependencyReleases must be an array.',ERROR_CODES.usage);
     const dependencies=[];
     for(const [index,item] of value.entries()){
         throwIfAborted(signal);
-        if(!isObject(item)||typeof item.appId!=='string'){
+        if(!isObject(item)||!is.string(item.appId)){
             fail(`dependencyReleases[${index}] is malformed.`,ERROR_CODES.usage);
         }
         const selected=await releaseSelection(
@@ -191,10 +194,10 @@ export async function createNativeBuildPlan({
     ));
     const application=await releaseSelection(appReleaseRoot,release,'application release');
     const dependencies=await dependencySelections(dependencyReleases,{signal});
-    if(!Array.isArray(protectedRoots)){
+    if(!is.array(protectedRoots)){
         fail('protectedRoots must be an array.',ERROR_CODES.usage);
     }
-    if(typeof outputRoot!=='string'||!outputRoot.trim()){
+    if(!is.string(outputRoot)||!outputRoot.trim()){
         fail('outputRoot is required.',ERROR_CODES.usage);
     }
     const selectedOutput=path.resolve(outputRoot);

@@ -343,6 +343,9 @@
 <html-import id="deleteModal" class="modal" href="./arcane/components/modal.html?v=13"></html-import>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const {arcaneLogging}=await import('arcane-os/logging');
 
     import('../modules/DBOPFS.js');
@@ -431,12 +434,12 @@
     }
 
     function isVisibleEntry(entry={}){
-        const normalized=typeof entry==='string'
+        const normalized=is.string(entry)
             ?{name:entry,path:entry,kind:'file'}
             :entry;
         const activeFilter=filter||provider?.filter;
 
-        if(typeof activeFilter==='function'){
+        if(is.function(activeFilter)){
             return activeFilter(normalized)!==false;
         }
 
@@ -542,7 +545,7 @@
         if(destroyed){
             return null;
         }
-        if(nextProvider!==null&&typeof nextProvider?.list!=='function'){
+        if(nextProvider!==null&&!is.function(nextProvider?.list)){
             throw new TypeError('File manager providers must expose list(path).');
         }
 
@@ -564,7 +567,7 @@
         if(destroyed){
             return null;
         }
-        if(nextFilter!==null&&typeof nextFilter!=='function'){
+        if(nextFilter!==null&&!is.function(nextFilter)){
             throw new TypeError('File manager filters must be functions or null.');
         }
 
@@ -593,7 +596,7 @@
     }
 
     function normalizeProviderEntry(candidate={},parentPath=''){
-        if(!candidate||typeof candidate!=='object'){
+        if(!candidate||!is.object(candidate)){
             return null;
         }
 
@@ -620,7 +623,7 @@
             name:name,
             path:path,
             kind:kind,
-            size:Number.isFinite(Number(candidate.size))?Number(candidate.size):0,
+            size:is.finite(Number(candidate.size))?Number(candidate.size):0,
             mimeType:String(candidate.mimeType||''),
             lastModified:candidate.lastModified||'',
             status:String(candidate.status||''),
@@ -629,7 +632,7 @@
     }
 
     function normalizeProviderEntries(entries=[],parentPath=''){
-        if(!Array.isArray(entries)){
+        if(!is.array(entries)){
             throw new TypeError('File manager provider list(path) must return an array.');
         }
 
@@ -833,7 +836,7 @@
         name.innerText=entry.name;
         count.className='tree-file-count';
 
-        if(Number.isFinite(Number(entry.fileCount))){
+        if(is.finite(Number(entry.fileCount))){
             setFileCountLabel(count,Number(entry.fileCount),false);
             item.dataset.fileCount=String(Number(entry.fileCount));
         }
@@ -900,7 +903,7 @@
                 const exact=Number(current._fileManagerEntry?.fileCount);
                 const countElement=current.querySelector(':scope>.tree-item-row>.tree-file-count');
 
-                if(Number.isFinite(exact)){
+                if(is.finite(exact)){
                     current.dataset.fileCount=String(exact);
                     setFileCountLabel(countElement,exact,false);
                 }else if(current.dataset.loaded==='true'){
@@ -1188,7 +1191,7 @@
             return true;
         }
 
-        if(typeof activeTreeProvider().open==='function'){
+        if(is.function(activeTreeProvider().open)){
             try{
                 await activeTreeProvider().open(entry);
                 if(destroyed||generation!==treeOpenGeneration){
@@ -1508,7 +1511,7 @@
 
         if(
             ['json','jsonl','ndjson'].includes(fileRef.ext)
-            &&typeof host.previewTransform==='function'
+            &&is.function(host.previewTransform)
         ){
             preview=await host.previewTransform(
                 preview,
@@ -1530,7 +1533,7 @@
                 break;
             case 'jsonl':
             case 'ndjson':{
-                const records=Array.isArray(preview)?preview:[];
+                const records=is.array(preview)?preview:[];
 
                 for(let i=0;i<records.length;i++){
                     rendered.append(
@@ -1729,7 +1732,7 @@
                         return;
                     }
 
-                    if(closeFile&&typeof fileModal.close==='function'){
+                    if(closeFile&&is.function(fileModal.close)){
                         await fileModal.close(undefined,true);
                         if(destroyed||generation!==deleteGeneration){
                             return;

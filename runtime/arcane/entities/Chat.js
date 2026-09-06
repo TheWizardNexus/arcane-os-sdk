@@ -1,5 +1,5 @@
 import { arcaneLogging } from 'arcane-os/logging';
-import Is from '../../node_modules/strong-type/index.js';
+import Is from 'strong-type';
 import '../modules/DBOPFS.js';
 import '../modules/AI.js';
 import {
@@ -12,7 +12,7 @@ import {normalizeMemoryContent} from '../modules/MemoryRecords.js';
 const is = new Is(false);
 
 function plainRecord(value){
-    if(!value||typeof value!=='object'||Array.isArray(value))return false;
+    if(!value||!is.object(value)||is.array(value))return false;
     const prototype=Object.getPrototypeOf(value);
     return prototype===Object.prototype||prototype===null;
 }
@@ -23,9 +23,9 @@ function coded(error,code){
 }
 
 function copyCompleteValue(value,seen=new Map()){
-    if(value===null||typeof value!=='object')return value;
+    if(value===null||!is.object(value))return value;
     if(seen.has(value))return seen.get(value);
-    if(Array.isArray(value)){
+    if(is.array(value)){
         const result=[];
         seen.set(value,result);
         for(const item of value)result.push(copyCompleteValue(item,seen));
@@ -45,7 +45,7 @@ function copyCompleteValue(value,seen=new Map()){
 
 function copyToolCalls(value){
     if(value===undefined) return null;
-    if(!Array.isArray(value)){
+    if(!is.array(value)){
         const error=new TypeError('assistantMessage.tool_calls must be an array.');
         error.code='AI_CHAT_INVALID_TOOL_CALL';
         throw error;
@@ -61,12 +61,12 @@ function copyToolCalls(value){
         const name=call.function.name;
         const argumentValue=call.function.arguments;
         if(
-            typeof id!=='string'
+            !is.string(id)
             ||!id.trim()
             ||ids.has(id)
-            ||typeof name!=='string'
+            ||!is.string(name)
             ||!name.trim()
-            ||typeof argumentValue!=='string'
+            ||!is.string(argumentValue)
         ){
             const error=new TypeError(`assistantMessage.tool_calls[${index}] is invalid.`);
             error.code='AI_CHAT_INVALID_TOOL_CALL';
@@ -90,7 +90,7 @@ function copyToolCalls(value){
             error.code='AI_CHAT_INVALID_TOOL_CALL';
             throw error;
         }
-        if(typeof argumentRecord.message!=='string'||!argumentRecord.message.trim()){
+        if(!is.string(argumentRecord.message)||!argumentRecord.message.trim()){
             const error=new TypeError(
                 `assistantMessage.tool_calls[${index}].function.arguments.message must contain user-facing text.`
             );
@@ -114,7 +114,7 @@ function structuralToolMessage(call){
 
 function storedStructuralToolCalls(value){
     if(value===undefined) return [];
-    if(!Array.isArray(value)){
+    if(!is.array(value)){
         arcaneLogging.error('Arcane stored assistant tool calls were not an array and were not retained.');
         return [];
     }
@@ -133,12 +133,12 @@ function storedStructuralToolCalls(value){
 }
 
 function storedToolRecord({content,name,status,timestamp}){
-    if(typeof content!=='string'||!content.trim()) return [];
+    if(!is.string(content)||!content.trim()) return [];
     return [{
         role:'tool',
         content,
-        ...(typeof name==='string'&&name.trim()?{name}:{}),
-        ...(typeof status==='string'&&status.trim()?{status}:{}),
+        ...(is.string(name)&&name.trim()?{name}:{}),
+        ...(is.string(status)&&status.trim()?{status}:{}),
         ...(timestamp!==undefined?{timestamp}:{}),
     }];
 }
@@ -151,7 +151,7 @@ function storedChatRecords(messages,{memoryOnly=false}={}){
         if(memoryOnly&&message.memory_excluded===true) continue;
         const timestamp=message.timestamp;
         if(message.role==='user'){
-            if(typeof message.content!=='string') continue;
+            if(!is.string(message.content)) continue;
             result.push({
                 role:'user',
                 content:message.content,
@@ -181,7 +181,7 @@ function storedChatRecords(messages,{memoryOnly=false}={}){
             continue;
         }
         if(message.role==='tool'){
-            const protocolResult=typeof message.tool_call_id==='string'&&message.tool_call_id;
+            const protocolResult=is.string(message.tool_call_id)&&message.tool_call_id;
             result.push(...storedToolRecord({
                 content:protocolResult?message.persistence_message:message.content,
                 name:message.persistence_name??message.name,
@@ -198,12 +198,12 @@ function retainedChatMessages(messages){
 }
 
 function turnMessage(value,label){
-    if(!plainRecord(value)||!['tool','user'].includes(value.role)||typeof value.content!=='string'){
+    if(!plainRecord(value)||!['tool','user'].includes(value.role)||!is.string(value.content)){
         throw new TypeError(`${label} must be a user or tool message.`);
     }
     if(value.role==='tool'){
         const toolCallId=value.tool_call_id;
-        if(typeof toolCallId!=='string'||!toolCallId.trim()){
+        if(!is.string(toolCallId)||!toolCallId.trim()){
             throw coded(
                 new TypeError(`${label}.tool_call_id is invalid.`),
                 'AI_CHAT_INVALID_TOOL_MESSAGE'
@@ -277,13 +277,13 @@ function pendingToolCalls(messages){
             if(toolCallId===undefined){
                 continue;
             }
-            if(typeof toolCallId!=='string'||!toolCallId.trim()){
+            if(!is.string(toolCallId)||!toolCallId.trim()){
                 throw coded(
                     new TypeError(`Chat message ${index+1} has an invalid tool_call_id.`),
                     'AI_CHAT_INCOHERENT_PERSISTENCE'
                 );
             }
-            if(typeof message.content!=='string'||!message.content.trim()){
+            if(!is.string(message.content)||!message.content.trim()){
                 throw coded(
                     new TypeError(`Chat message ${index+1} has a blank tool result.`),
                     'AI_CHAT_INCOHERENT_PERSISTENCE'
@@ -308,7 +308,7 @@ function turnMessages(requestMessage,requestMessages){
         throw new TypeError('Provide exactly one of requestMessage or requestMessages.');
     }
     const values=hasMessages?requestMessages:[requestMessage];
-    if(!Array.isArray(values)||values.length===0){
+    if(!is.array(values)||values.length===0){
         throw new TypeError('requestMessages must be a nonempty array.');
     }
     const records=values.map((value,index)=>
@@ -513,7 +513,7 @@ class ChatEntity{
      * @returns {Array<*>}
      */
     set messages(v){
-        if(!Array.isArray(v)){
+        if(!is.array(v)){
             throw new TypeError('messages must be an array.');
         }
         this.#messages=v.map(message=>copyCompleteValue(message));
@@ -538,7 +538,7 @@ class ChatEntity{
      * @returns {boolean}
      */
     set saved(v){
-        if(typeof v!=='boolean'){
+        if(!is.boolean(v)){
             throw new TypeError('saved must be a boolean.');
         }
         this.#saved=v;
@@ -646,9 +646,9 @@ class ChatEntity{
         const toolCallId=id;
         const toolName=name;
         if(
-            typeof toolCallId!=='string'
+            !is.string(toolCallId)
             ||!toolCallId.trim()
-            ||typeof toolName!=='string'
+            ||!is.string(toolName)
             ||!toolName.trim()
         ){
             throw new TypeError('Tool exchanges require an id and name.');
@@ -663,13 +663,13 @@ class ChatEntity{
             );
         }
 
-        const serializedArguments=typeof argumentValue==='string'
+        const serializedArguments=is.string(argumentValue)
             ?argumentValue
             :JSON.stringify(argumentValue);
-        const serializedResult=typeof result==='string'
+        const serializedResult=is.string(result)
             ?result
             :JSON.stringify(result);
-        if(typeof serializedArguments!=='string'||typeof serializedResult!=='string'){
+        if(!is.string(serializedArguments)||!is.string(serializedResult)){
             throw new TypeError('Tool exchange arguments and results must be JSON-compatible.');
         }
         const toolCall=copyToolCalls([{
@@ -723,7 +723,7 @@ class ChatEntity{
         if(!is.boolean(messagePersist)||!is.boolean(responsePersist)||!is.boolean(extractMemory)){
             throw new TypeError('Turn persistence and memory options must be boolean.');
         }
-        if(typeof memoryRequest!=='function'){
+        if(!is.function(memoryRequest)){
             throw new TypeError('memoryRequest must be a function.');
         }
         if(messagePersist!==responsePersist){
@@ -762,7 +762,7 @@ class ChatEntity{
         const toolCalls=copyToolCalls(assistantMessage.tool_calls);
         const assistantContent=assistantMessage.content??'';
         const assistantReasoning=assistantMessage.reasoning_content;
-        if(assistantReasoning!==undefined&&typeof assistantReasoning!=='string'){
+        if(assistantReasoning!==undefined&&!is.string(assistantReasoning)){
             throw new TypeError('assistantMessage.reasoning_content must be a string when provided.');
         }
         if(
@@ -770,7 +770,7 @@ class ChatEntity{
             ||(
                 !String(assistantContent)
                 &&!toolCalls?.length
-                &&!(typeof assistantReasoning==='string'&&assistantReasoning.length)
+                &&!(is.string(assistantReasoning)&&assistantReasoning.length)
             )
         ){
             throw new TypeError(
@@ -823,7 +823,7 @@ class ChatEntity{
             this.fileName
         );
 
-        if(!content||(Array.isArray(content)&&content.length===0)){
+        if(!content||(is.array(content)&&content.length===0)){
             const systemMessage=this.#messages.find(message=>message.role==='system');
             this.#messages=systemMessage?[systemMessage]:[];
             this.#persistedMessageCount=0;
@@ -832,7 +832,7 @@ class ChatEntity{
             return this.transcript;
         }
 
-        const loadedMessages=Array.isArray(content)
+        const loadedMessages=is.array(content)
             ?content.map(message=>copyCompleteValue(message))
             :String(content)
                 .split('\n')
@@ -858,7 +858,7 @@ class ChatEntity{
     }
 
     async getMemoriesAboutUser({request=messages=>ai.fetch(messages)}={}){
-        if(typeof request!=='function'){
+        if(!is.function(request)){
             throw new TypeError('Memory request must be a function.');
         }
         return this.#writeMemory(

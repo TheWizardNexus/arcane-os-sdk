@@ -1,8 +1,10 @@
 #!/usr/bin/env node
-
+import Is from 'strong-type';
 import {lstat, readFile, readdir} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+
+const is = new Is(false);
 
 const SCRIPT_ROOT=path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT=path.resolve(SCRIPT_ROOT,'..');
@@ -85,9 +87,9 @@ function assertPackageMetadata(packageDocument){
     if(packageDocument.type!=='module'){
         fail('package.json type must be "module".');
     }
-    const stableVersion=typeof packageDocument.version==='string'
+    const stableVersion=is.string(packageDocument.version)
         &&/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(packageDocument.version);
-    const developmentVersion=typeof packageDocument.version==='string'
+    const developmentVersion=is.string(packageDocument.version)
         &&/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-dev(?:\.(0|[1-9][0-9]*))?$/.test(packageDocument.version);
     if(!stableVersion&&!developmentVersion){
         fail('Package version must use numeric MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-dev[.NUMBER].');
@@ -116,7 +118,7 @@ function assertPackageMetadata(packageDocument){
         'examples/wasm-ai-demo/profile-tools.js','examples/wasm-ai-demo/rag.js',
         'examples/wasm-ai-demo/profiles/','examples/wasm-ai-demo/rag/'
     ];
-    if(!Array.isArray(packageDocument.files)
+    if(!is.array(packageDocument.files)
         ||requiredPublishedPaths.some(required=>!packageDocument.files.includes(required))){
         fail('package.json files must include the SDK runtime, maintained docs/, and browser AI demo source.');
     }
@@ -149,7 +151,7 @@ function assertPackageMetadata(packageDocument){
         './package.json'
     ];
     if(!packageDocument.exports
-        ||requiredExports.some(required=>typeof packageDocument.exports[required]!=='string')){
+        ||requiredExports.some(required=>!is.string(packageDocument.exports[required]))){
         fail('package.json is missing one or more required SDK exports.');
     }
 
@@ -168,7 +170,7 @@ function assertPackageMetadata(packageDocument){
     }
 
     for(const [scriptName,script] of Object.entries(packageDocument.scripts??{})){
-        if(typeof script==='string'&&/(?:^|[\s;&|])(?:npx\s+)?(?:tsc|ts-node|tsx)(?:[\s;&|]|$)/i.test(script)){
+        if(is.string(script)&&/(?:^|[\s;&|])(?:npx\s+)?(?:tsc|ts-node|tsx)(?:[\s;&|]|$)/i.test(script)){
             fail(`TypeScript toolchain command is not allowed in script ${scriptName}.`);
         }
     }

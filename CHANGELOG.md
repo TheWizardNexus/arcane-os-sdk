@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Use `strong-type` predicates throughout SDK-owned toolchain, runtime,
+  browser-provider, and component code while retaining existing defaults,
+  domain rules, public errors, and nominal constructor behavior. Align the
+  direct dependency and both shipped projections at `strong-type` 2.0.1,
+  replacing the portable runtime's 1.1.0 snapshot and avoiding Error allocation
+  for ordinary false predicates. Keep managed browser imports and Node reference
+  loading on the same declared dependency.
+- Remove `AIResponseLength` exports; applications own response verbosity.
+  Parse URL-audit HTML with the native HTML parser.
+
 ## 0.5.17
 
 - Restore the public `SPEECH_VOICE_OPTIONS` ordered records and

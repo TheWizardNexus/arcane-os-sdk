@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const componentWaitErrorCodes={
     abortSignalInvalid:'ARCANE_COMPONENT_READINESS_ABORT_SIGNAL_INVALID',
     elementRequired:'ARCANE_COMPONENT_READINESS_ELEMENT_REQUIRED',
@@ -34,7 +37,7 @@ export const COMPONENT_WAIT_ERROR_CODES={...componentWaitErrorCodes};
 export const COMPONENT_WAIT_REASONS={...componentWaitReasons};
 
 function defineComponentWaitError(error,code,reason,cause){
-    const priorCode=typeof error?.code==='string'&&error.code
+    const priorCode=is.string(error?.code)&&error.code
         ?error.code
         :null;
     try{
@@ -102,7 +105,7 @@ function componentWaitAbortError(reason){
 }
 
 function waitForComponent(element,options={}){
-    if(!options||typeof options!=='object'||Array.isArray(options)){
+    if(!options||!is.object(options)||is.array(options)){
         return Promise.reject(
             componentWaitError(
                 'Component readiness wait options must be an object.',
@@ -121,13 +124,13 @@ function waitForComponent(element,options={}){
         timeoutMs=0
     }=options;
 
-    if(typeof errorEvent!=='string'
-        ||!Array.isArray(methods)
+    if(!is.string(errorEvent)
+        ||!is.array(methods)
         ||methods.some(function invalidComponentMethod(method){
-            return typeof method!=='string'||method.trim().length<1;
+            return !is.string(method)||method.trim().length<1;
         })
-        ||typeof property!=='string'
-        ||typeof event!=='string'){
+        ||!is.string(property)
+        ||!is.string(event)){
         return Promise.reject(
             componentWaitError(
                 'Component readiness event, errorEvent, property, and methods options are invalid.',
@@ -137,7 +140,7 @@ function waitForComponent(element,options={}){
             )
         );
     }
-    if(!Number.isFinite(timeoutMs)||timeoutMs<0){
+    if(!is.finite(timeoutMs)||timeoutMs<0){
         return Promise.reject(
             componentWaitError(
                 'timeoutMs must be a non-negative finite number.',
@@ -149,10 +152,10 @@ function waitForComponent(element,options={}){
     }
     if(signal!==null
         &&(
-            typeof signal!=='object'
-            ||typeof signal.aborted!=='boolean'
-            ||typeof signal.addEventListener!=='function'
-            ||typeof signal.removeEventListener!=='function'
+            !is.object(signal)
+            ||!is.boolean(signal.aborted)
+            ||!is.function(signal.addEventListener)
+            ||!is.function(signal.removeEventListener)
         )){
         return Promise.reject(
             componentWaitError(
@@ -211,7 +214,7 @@ function waitForComponent(element,options={}){
                 }
 
                 return methods.every(function componentMethodAvailable(method){
-                    return typeof element[method]==='function';
+                    return is.function(element[method]);
                 });
             }
 
@@ -294,7 +297,7 @@ function waitForComponent(element,options={}){
                     const error=new Error(
                         detail?.message||'The component reported a loading error.'
                     );
-                    const componentCode=typeof detail?.code==='string'
+                    const componentCode=is.string(detail?.code)
                         &&detail.code.trim()
                         ?detail.code
                         :null;
@@ -335,8 +338,8 @@ function waitForComponent(element,options={}){
             }
             if((event||errorEvent)
                 &&(
-                    typeof element.addEventListener!=='function'
-                    ||typeof element.removeEventListener!=='function'
+                    !is.function(element.addEventListener)
+                    ||!is.function(element.removeEventListener)
                 )){
                 fail(
                     componentWaitError(

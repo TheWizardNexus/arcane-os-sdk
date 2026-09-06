@@ -1,8 +1,11 @@
+import Is from 'strong-type';
 import {stat} from 'node:fs/promises';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
 import {runProcess} from './process.mjs';
+
+const is = new Is(false);
 
 export const INTEGRATED_TOOLCHAIN_PROTOCOL='arcane-integrated-toolchain/1';
 export const ARCANE_INTEGRATED_PROVIDER_RELATIVE_PATH=[
@@ -19,7 +22,7 @@ async function emit(onEvent,event){
 }
 
 async function selectedProvider(arcaneRoot){
-    if(typeof arcaneRoot!=='string'||!arcaneRoot.trim()){
+    if(!is.string(arcaneRoot)||!arcaneRoot.trim()){
         fail('An explicit Arcane OS root is required for shared development.',ERROR_CODES.usage);
     }
     const toolchainRoot=path.resolve(arcaneRoot);
@@ -53,10 +56,10 @@ async function selectedProvider(arcaneRoot){
 async function importedProvider(providerPath){
     const namespace=await import(pathToFileURL(providerPath).href);
     const provider=namespace?.integratedDevelopmentProvider;
-    if(!provider||typeof provider!=='object'
-        ||typeof provider.describe!=='function'
-        ||typeof provider.prepare!=='function'
-        ||typeof provider.execute!=='function'){
+    if(!provider||!is.object(provider)
+        ||!is.function(provider.describe)
+        ||!is.function(provider.prepare)
+        ||!is.function(provider.execute)){
         fail('The integrated provider must export integratedDevelopmentProvider.');
     }
     return provider;
@@ -69,7 +72,7 @@ export async function loadArcaneIntegratedProvider({
     run=runProcess
 }={}){
     throwIfAborted(signal);
-    if(typeof run!=='function'){
+    if(!is.function(run)){
         fail('The integrated provider process runner must be a function.',ERROR_CODES.usage);
     }
     await emit(onEvent,{

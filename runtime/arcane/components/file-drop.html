@@ -44,6 +44,9 @@
 </section>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const host=this;
     const root=host.shadowRoot;
     const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
@@ -220,7 +223,7 @@
             return progress;
         }
         const numeric=Number(value);
-        progress=value===null||value===undefined||!Number.isFinite(numeric)
+        progress=value===null||value===undefined||!is.finite(numeric)
             ?null
             :Math.min(100,Math.max(0,numeric));
         feedback.hidden=progress===null&&!statusElement.innerText;
@@ -272,7 +275,7 @@
 
     function numberOr(value,fallback){
         const numeric=Number(value);
-        return Number.isFinite(numeric)&&numeric>=0?numeric:fallback;
+        return is.finite(numeric)&&numeric>=0?numeric:fallback;
     }
 
     function destroy(){

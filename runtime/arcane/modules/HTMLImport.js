@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import { arcaneLogging } from 'arcane-os/logging';
 import {
   createArcaneEventSource,
@@ -17,7 +20,7 @@ const htmlImportModuleURL=new URL(import.meta.url);
 const htmlImportAssetVersion=htmlImportModuleURL.searchParams.get('arcaneVersion');
 
 function versionComponentResource(value,baseHref){
-  if(!htmlImportAssetVersion||typeof value!=='string'||!value||value.startsWith('#')){
+  if(!htmlImportAssetVersion||!is.string(value)||!value||value.startsWith('#')){
     return value;
   }
   let resolvedURL;
@@ -64,7 +67,7 @@ function componentRuntimeRoot(resolvedHref){
 }
 
 function resolveComponentResource(value,runtimeRoot){
-  if(!runtimeRoot||typeof value!=='string'||!value.startsWith('./arcane/')){
+  if(!runtimeRoot||!is.string(value)||!value.startsWith('./arcane/')){
     return value;
   }
   return new URL(value.slice('./arcane/'.length),runtimeRoot).href;
@@ -509,7 +512,7 @@ class HTMLImport extends HTMLElement {
         htmlImportHostRegistry.set(hostToken,binding);
         try{
           document.head.appendChild(executable);
-          if(!binding.promise||typeof binding.promise.then!=='function'){
+          if(!binding.promise||!is.function(binding.promise.then)){
             throw new Error('The HTML import script did not start.');
           }
           await binding.promise;
@@ -522,7 +525,7 @@ class HTMLImport extends HTMLElement {
     }finally{
       const installedDescriptor=Object.getOwnPropertyDescriptor(this,'destroy')??null;
       const installedDestroy=this.destroy;
-      if(typeof installedDestroy==='function'
+      if(is.function(installedDestroy)
         &&installedDestroy!==previousDestroy
         &&!samePropertyDescriptor(installedDescriptor,previousDescriptor)){
         this.#importedDestroy={

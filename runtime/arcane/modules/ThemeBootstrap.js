@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import { arcaneLogging } from 'arcane-os/logging';
 import {loadAndApplyTheme} from './ThemeManager.js';
 import {createArcaneEventSource} from 'arcane-os/event-manager';
@@ -16,7 +19,7 @@ const themeBootstrapEvents=createArcaneEventSource(
 
 function installAppearanceListener(ready){
     const hostEvents=globalThis.Arcane?.events;
-    if(typeof hostEvents?.on!=='function'||globalThis[listenerKey]){
+    if(!is.function(hostEvents?.on)||globalThis[listenerKey]){
         return;
     }
 
@@ -26,11 +29,11 @@ function installAppearanceListener(ready){
         function forwardAppearanceChange(detail={}){
             themeBootstrapOperationSequence+=1;
             const forwarded={
-                scheme:typeof detail?.scheme==='string'?detail.scheme:null,
-                effectiveScheme:typeof detail?.effectiveScheme==='string'
+                scheme:is.string(detail?.scheme)?detail.scheme:null,
+                effectiveScheme:is.string(detail?.effectiveScheme)
                     ?detail.effectiveScheme
                     :null,
-                source:typeof detail?.source==='string'?detail.source:null,
+                source:is.string(detail?.source)?detail.source:null,
                 reason:'host-appearance-changed'
             };
             themeBootstrapEvents.dispatch(
@@ -56,7 +59,7 @@ function installAppearanceListener(ready){
             return false;
         }
         active=false;
-        if(typeof hostUnsubscribe==='function'){
+        if(is.function(hostUnsubscribe)){
             hostUnsubscribe();
         }
         if(globalThis[listenerKey]===dispose){
@@ -94,7 +97,7 @@ export function bootstrapArcaneTheme(options={}){
 
 export function disposeArcaneThemeBootstrap(){
     const dispose=globalThis[listenerKey];
-    return typeof dispose==='function'?dispose():false;
+    return is.function(dispose)?dispose():false;
 }
 
 export const arcaneThemeReady=bootstrapArcaneTheme();

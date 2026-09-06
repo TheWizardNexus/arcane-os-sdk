@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 import Preference,{preferenceSchema} from '../entities/Preference.js';
 import {resolveApplicationLocalStorageKey} from './AppDataScope.js';
@@ -47,17 +50,17 @@ function operationAbortedError(reason){
 }
 
 function isPlainRecord(value){
-    if(!value||typeof value!=='object'||Array.isArray(value)) return false;
+    if(!value||!is.object(value)||is.array(value)) return false;
     const prototype=Object.getPrototypeOf(value);
     return prototype===Object.prototype||prototype===null;
 }
 
 function isAbortSignal(value){
     return Boolean(value)
-        &&typeof value==='object'
-        &&typeof value.aborted==='boolean'
-        &&typeof value.addEventListener==='function'
-        &&typeof value.removeEventListener==='function';
+        &&is.object(value)
+        &&is.boolean(value.aborted)
+        &&is.function(value.addEventListener)
+        &&is.function(value.removeEventListener);
 }
 
 function normalizeOperationOptions(value={}){
@@ -108,10 +111,10 @@ function completePreferenceValues(values){
 
 function validateAdapter(adapter){
     if(!adapter
-        ||typeof adapter.get!=='function'
-        ||typeof adapter.set!=='function'
-        ||typeof adapter.delete!=='function'
-        ||(Reflect.has(adapter,'setMany')&&typeof adapter.setMany!=='function')){
+        ||!is.function(adapter.get)
+        ||!is.function(adapter.set)
+        ||!is.function(adapter.delete)
+        ||(Reflect.has(adapter,'setMany')&&!is.function(adapter.setMany))){
         throw preferenceStoreError(
             PREFERENCE_STORE_ERROR_CODES.adapterInvalid,
             'preference-storage-adapter-invalid',
@@ -144,9 +147,9 @@ function localAdapter(prefix){
 
 function nativeAdapter(){
     const preferences=globalThis.Arcane?.preferences;
-    if(typeof preferences?.get!=='function'
-        ||typeof preferences?.set!=='function'
-        ||typeof preferences?.delete!=='function') return null;
+    if(!is.function(preferences?.get)
+        ||!is.function(preferences?.set)
+        ||!is.function(preferences?.delete)) return null;
     return preferences;
 }
 
@@ -156,7 +159,7 @@ function isUnsupportedNativeAdapter(error){
 
 function preferenceAdapter(){
     const local=localAdapter('arcane.preferences');
-    if(typeof globalThis.arcaneAndroid?.postMessage==='function') return local;
+    if(is.function(globalThis.arcaneAndroid?.postMessage)) return local;
     const native=nativeAdapter();
     if(!native) return local;
     let active=native;
@@ -167,7 +170,7 @@ function preferenceAdapter(){
             if(active!==native||!isUnsupportedNativeAdapter(error)) throw error;
             active=local;
             delete adapter.setMany;
-            if(typeof active[method]!=='function') throw error;
+            if(!is.function(active[method])) throw error;
             return active[method](...args);
         }
     }
@@ -182,7 +185,7 @@ function preferenceAdapter(){
             return call('delete',[key]);
         }
     };
-    if(typeof native.setMany==='function'){
+    if(is.function(native.setMany)){
         adapter.setMany=async function setMany(entries,context){
             return call('setMany',[entries,context]);
         };
@@ -327,7 +330,7 @@ export default class PreferenceStore extends EventTarget{
         return this.#enqueueOperation(
             async function setAllPreferences(commitPreferenceOperation){
                 const context={operationId,signal:operation.signal};
-                if(typeof store.adapter.setMany==='function'){
+                if(is.function(store.adapter.setMany)){
                     const batch={};
                     for(const entry of entries){
                         setDataProperty(batch,entry.storageKey,entry.value);
@@ -437,7 +440,7 @@ export default class PreferenceStore extends EventTarget{
         const publicDetail={
             namespace:this.namespace,
             values,
-            ...(typeof detail.key==='string'
+            ...(is.string(detail.key)
                 ?{preferenceId:detail.key,value:detail.value}
                 :{})
         };

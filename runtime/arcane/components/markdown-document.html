@@ -211,6 +211,9 @@
 </section>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const {arcaneLogging}=await import('arcane-os/logging');
 
     const host=this;
@@ -380,19 +383,19 @@
     }
 
     function normalizeOptions(input={},previous=defaultOptions){
-        if(!input||typeof input!=='object'||Array.isArray(input)){
+        if(!input||!is.object(input)||is.array(input)){
             throw new TypeError('Markdown document options must be an object.');
         }
 
         const labelInput=input.labels===undefined?{}:input.labels;
-        if(!labelInput||typeof labelInput!=='object'||Array.isArray(labelInput)){
+        if(!labelInput||!is.object(labelInput)||is.array(labelInput)){
             throw new TypeError('Markdown document labels must be an object.');
         }
 
         const labels={...previous.labels};
         for(const name of ['content','empty','error','loading','tableOfContents']){
             if(labelInput[name]!==undefined){
-                if(typeof labelInput[name]!=='string'||!labelInput[name].trim()){
+                if(!is.string(labelInput[name])||!labelInput[name].trim()){
                     throw new TypeError(`Markdown document labels.${name} must be a nonempty string.`);
                 }
                 labels[name]=labelInput[name].trim();
@@ -412,14 +415,14 @@
         const onNavigate=input.onNavigate===undefined
             ?previous.onNavigate
             :input.onNavigate;
-        if(onNavigate!==null&&typeof onNavigate!=='function'){
+        if(onNavigate!==null&&!is.function(onNavigate)){
             throw new TypeError('Markdown document onNavigate must be a function or null.');
         }
 
         const showTableOfContents=input.showTableOfContents===undefined
             ?previous.showTableOfContents
             :input.showTableOfContents;
-        if(typeof showTableOfContents!=='boolean'){
+        if(!is.boolean(showTableOfContents)){
             throw new TypeError('Markdown document showTableOfContents must be boolean.');
         }
 
@@ -481,7 +484,7 @@
     }
 
     function sourceURLFrom(input={},fallback=options.sourceURL){
-        if(!input||typeof input!=='object'||Array.isArray(input)){
+        if(!input||!is.object(input)||is.array(input)){
             throw new TypeError('Markdown document render options must be an object.');
         }
         const candidate=input.sourceURL??input.sourceUrl??fallback;
@@ -547,7 +550,7 @@
         transition('loading',{},operationId);
 
         try{
-            const pending=typeof source==='function'
+            const pending=is.function(source)
                 ?source({sourceURL,signal:controller.signal,operationId})
                 :source;
             const result=await pending;
@@ -557,8 +560,8 @@
 
             if(
                 result
-                &&typeof result==='object'
-                &&!Array.isArray(result)
+                &&is.object(result)
+                &&!is.array(result)
             ){
                 sourceURL=sourceURLFrom(
                     result,
@@ -598,7 +601,7 @@
     }
 
     function renderMarkdown(markdown='',sourceURL=options.sourceURL,operationId=null){
-        if(typeof markdown!=='string'){
+        if(!is.string(markdown)){
             throw new TypeError('Markdown document content must be a string.');
         }
 
@@ -783,7 +786,7 @@
         };
         const publicDetail={
             characters:Number(detail.characters||currentMarkdown.length||0),
-            headingCount:Array.isArray(detail.headings)?detail.headings.length:tableOfContents.length,
+            headingCount:is.array(detail.headings)?detail.headings.length:tableOfContents.length,
             state
         };
         if(detail.code){

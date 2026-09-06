@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const DEFAULT_TIMEOUT_MS=10000;
 const MAX_TIMEOUT_MS=300000;
 
@@ -11,17 +14,17 @@ function invalid(message,ErrorType=TypeError){
 }
 
 function isPlainRecord(value){
-    if(!value||typeof value!=='object'||Array.isArray(value)) return false;
+    if(!value||!is.object(value)||is.array(value)) return false;
     const prototype=Object.getPrototypeOf(value);
     return prototype===Object.prototype||prototype===null;
 }
 
 function isAbortSignal(value){
     return Boolean(value)
-        &&typeof value==='object'
-        &&typeof value.aborted==='boolean'
-        &&typeof value.addEventListener==='function'
-        &&typeof value.removeEventListener==='function';
+        &&is.object(value)
+        &&is.boolean(value.aborted)
+        &&is.function(value.addEventListener)
+        &&is.function(value.removeEventListener);
 }
 
 function normalizeOptions(value){
@@ -30,7 +33,7 @@ function normalizeOptions(value){
     if(unknown) throw invalid(`Async boundary options contain an unsupported field: ${unknown}.`);
 
     const timeoutMs=value.timeoutMs??DEFAULT_TIMEOUT_MS;
-    if(!Number.isSafeInteger(timeoutMs)||timeoutMs<1||timeoutMs>MAX_TIMEOUT_MS){
+    if(!is.safeInteger(timeoutMs)||timeoutMs<1||timeoutMs>MAX_TIMEOUT_MS){
         throw invalid(`timeoutMs must be an integer from 1 through ${MAX_TIMEOUT_MS}.`,RangeError);
     }
 
@@ -43,13 +46,13 @@ function normalizeOptions(value){
 }
 
 function normalizeOperation(value){
-    if(typeof value==='function'){
+    if(is.function(value)){
         return Object.freeze({kind:'function',value});
     }
-    if(!value||(typeof value!=='object'&&typeof value!=='function')){
+    if(!value||(!is.object(value)&&!is.function(value))){
         throw coded(new TypeError('The asynchronous operation must be a promise or function.'),'ASYNC_BOUNDARY_INVALID_OPERATION');
     }
-    if(typeof value.then!=='function'){
+    if(!is.function(value.then)){
         throw coded(new TypeError('The asynchronous operation must be a promise or function.'),'ASYNC_BOUNDARY_INVALID_OPERATION');
     }
     return Object.freeze({kind:'promise',value});
@@ -101,7 +104,7 @@ export function runAsyncBoundary(operation,options={}){
     try{
         settings=normalizeOptions(options);
         descriptor=normalizeOperation(operation);
-        if(typeof globalThis.AbortController!=='function'){
+        if(!is.function(globalThis.AbortController)){
             throw coded(new Error('AbortController is unavailable in this environment.'),'ASYNC_BOUNDARY_UNAVAILABLE');
         }
     }catch(error){

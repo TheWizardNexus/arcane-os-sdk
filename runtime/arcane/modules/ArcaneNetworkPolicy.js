@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 export const ARCANE_NETWORK_POLICY_SCHEMA_VERSION=1;
 export const ARCANE_NETWORK_POLICY_URL=new URL('../security/arcane-network-policy.json',import.meta.url);
 
@@ -24,11 +27,11 @@ let defaultPolicyPromise=null;
 const DEFAULT_POLICY_LOAD_TIMEOUT_MS=5000;
 
 function fail(message){const error=new TypeError(`ARCANE_NETWORK_POLICY_INVALID: ${message}`);error.code='ARCANE_NETWORK_POLICY_INVALID';throw error;}
-function isRecord(value){return Boolean(value)&&typeof value==='object'&&!Array.isArray(value);}
+function isRecord(value){return Boolean(value)&&is.object(value)&&!is.array(value);}
 function assertOnlyKeys(value,allowed,label){for(const key of Object.keys(value)){if(!allowed.has(key))fail(`${label} contains unsupported field ${key}.`);}}
 function boundedText(value,label,maximum,{nullable=false}={}){
     if(nullable&&value===null)return null;
-    if(typeof value!=='string'||value!==value.trim()||value.length<1||value.length>maximum||/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(value))fail(`${label} must be bounded plain text.`);
+    if(!is.string(value)||value!==value.trim()||value.length<1||value.length>maximum||/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(value))fail(`${label} must be bounded plain text.`);
     return value;
 }
 function identifier(value,label){const text=boundedText(value,label,80);if(!/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/.test(text))fail(`${label} must be a lowercase identifier.`);return text;}
@@ -43,7 +46,7 @@ function normalizeSource(value,label){
 function isIpLiteral(value){return /^\d+(?:\.\d+){3}$/.test(value)||value.includes(':');}
 
 export function canonicalNetworkHostname(value){
-    if(typeof value!=='string')return null;
+    if(!is.string(value))return null;
     const raw=value.trim(),candidate=raw.endsWith('.')?raw.slice(0,-1):raw;
     if(!candidate||candidate.endsWith('.')||candidate.includes('/')||candidate.includes('@')||candidate.includes(':'))return null;
     try{
@@ -66,7 +69,7 @@ function normalizeDomainRule(value,index,ids){
 function parseIpv4(value){
     const parts=value.split('.');if(parts.length!==4)return null;
     const octets=parts.map(part=>/^(?:0|[1-9]\d{0,2})$/.test(part)?Number(part):NaN);
-    if(octets.some(part=>!Number.isInteger(part)||part<0||part>255))return null;
+    if(octets.some(part=>!is.integer(part)||part<0||part>255))return null;
     return {numeric:octets.reduce((total,part)=>((total<<8)>>>0)+part,0)>>>0,text:octets.join('.')};
 }
 function parseIpv6(value){
@@ -92,7 +95,7 @@ function formatIpv6(numeric){
     return new URL(`http://[${groups.join(':')}]/`).hostname.slice(1,-1);
 }
 function normalizeCidr(value,label){
-    if(typeof value!=='string'||value!==value.trim()||value.split('/').length!==2)fail(`${label} must be a canonical IPv4 or IPv6 CIDR.`);
+    if(!is.string(value)||value!==value.trim()||value.split('/').length!==2)fail(`${label} must be a canonical IPv4 or IPv6 CIDR.`);
     const [address,prefixText]=value.split('/');if(!/^(?:0|[1-9]\d{0,2})$/.test(prefixText))fail(`${label} has an invalid prefix.`);
     const prefix=Number(prefixText),ipv4=parseIpv4(address);
     if(ipv4){if(prefix>32)fail(`${label} has an invalid IPv4 prefix.`);const mask=prefix===0?0:(0xffffffff<<(32-prefix))>>>0;const network=(ipv4.numeric&mask)>>>0;const normalized=`${[(network>>>24)&255,(network>>>16)&255,(network>>>8)&255,network&255].join('.')}/${prefix}`;if(normalized!==value)fail(`${label} must use its canonical network address.`);return normalized;}
@@ -102,11 +105,11 @@ function normalizeCidr(value,label){
 }
 function normalizePortRanges(value,label){
     if(value===undefined)return Object.freeze([]);
-    if(!Array.isArray(value)||value.length>64)fail(`${label} must be a bounded array.`);
+    if(!is.array(value)||value.length>64)fail(`${label} must be a bounded array.`);
     let previous=0;
     return Object.freeze(value.map((range,index)=>{
         const itemLabel=`${label}[${index}]`;if(!isRecord(range))fail(`${itemLabel} must be an object.`);assertOnlyKeys(range,PORT_KEYS,itemLabel);
-        const from=range.from,to=range.to;if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to>65535||from>to||from<=previous)fail(`${itemLabel} must be a sorted, non-overlapping port range.`);previous=to;
+        const from=range.from,to=range.to;if(!is.integer(from)||!is.integer(to)||from<1||to>65535||from>to||from<=previous)fail(`${itemLabel} must be a sorted, non-overlapping port range.`);previous=to;
         return Object.freeze({from,to});
     }));
 }
@@ -160,8 +163,8 @@ indexNormalizedPolicy(EMPTY_POLICY);
 export function validateArcaneNetworkPolicy(value){
     if(!isRecord(value))fail('policy must be an object.');assertOnlyKeys(value,POLICY_KEYS,'policy');
     if(value.schemaVersion!==ARCANE_NETWORK_POLICY_SCHEMA_VERSION)fail('schemaVersion is unsupported.');
-    if(!Number.isSafeInteger(value.generation)||value.generation<1)fail('generation must be a positive safe integer.');
-    if(!Array.isArray(value.domainRules)||!Array.isArray(value.networkRules)||value.domainRules.length>50_000||value.networkRules.length>50_000)fail('rule collections must be bounded arrays.');
+    if(!is.safeInteger(value.generation)||value.generation<1)fail('generation must be a positive safe integer.');
+    if(!is.array(value.domainRules)||!is.array(value.networkRules)||value.domainRules.length>50_000||value.networkRules.length>50_000)fail('rule collections must be bounded arrays.');
     const ids=new Set(),domainRules=value.domainRules.map((rule,index)=>normalizeDomainRule(rule,index,ids)),networkRules=value.networkRules.map((rule,index)=>normalizeNetworkRule(rule,index,ids));
     const normalized=Object.freeze({schemaVersion:value.schemaVersion,generation:value.generation,domainRules:Object.freeze(domainRules),networkRules:Object.freeze(networkRules)});
     NORMALIZED_POLICIES.add(normalized);
@@ -170,7 +173,7 @@ export function validateArcaneNetworkPolicy(value){
 }
 
 function hostnameFromInput(value){
-    if(typeof value!=='string')return null;
+    if(!is.string(value))return null;
     try{if(/^[a-z][a-z0-9+.-]*:\/\//i.test(value))return canonicalNetworkHostname(new URL(value).hostname);}
     catch{return null;}
     return canonicalNetworkHostname(value);
@@ -192,12 +195,12 @@ function normalizeNetworkMatchContext(value){
     for(const key of Object.keys(value))if(!NETWORK_MATCH_CONTEXT_KEYS.has(key))networkQueryFail(`context contains unsupported field ${key}.`);
     const protocol=value.protocol;
     if(protocol!==undefined&&!NETWORK_MATCH_PROTOCOLS.has(protocol))networkQueryFail('context.protocol must be tcp, udp, icmp, or icmpv6.');
-    for(const key of ['localPort','remotePort'])if(value[key]!==undefined&&(!Number.isInteger(value[key])||value[key]<1||value[key]>65535))networkQueryFail(`context.${key} must be an integer from 1 through 65535.`);
+    for(const key of ['localPort','remotePort'])if(value[key]!==undefined&&(!is.integer(value[key])||value[key]<1||value[key]>65535))networkQueryFail(`context.${key} must be an integer from 1 through 65535.`);
     if((value.localPort!==undefined||value.remotePort!==undefined)&&protocol!==undefined&&protocol!=='tcp'&&protocol!=='udp')networkQueryFail('port match context requires protocol tcp or udp when protocol is supplied.');
     return {protocol,localPort:value.localPort,remotePort:value.remotePort};
 }
 function parsedIpLiteral(value){
-    if(typeof value!=='string')return null;
+    if(!is.string(value))return null;
     const trimmed=value.trim(),candidate=trimmed.startsWith('[')&&trimmed.endsWith(']')?trimmed.slice(1,-1):trimmed,ipv4=parseIpv4(candidate);if(ipv4)return {family:4,numeric:ipv4.numeric};
     const ipv6=parseIpv6(candidate.toLowerCase());return ipv6?{family:6,numeric:ipv6.numeric}:null;
 }
@@ -238,10 +241,10 @@ export function invalidateArcaneNetworkPolicyCache(){defaultPolicyPromise=null;}
 
 export async function loadArcaneNetworkPolicy({url=ARCANE_NETWORK_POLICY_URL,fetchImpl=globalThis.fetch,refresh=false,timeoutMs=DEFAULT_POLICY_LOAD_TIMEOUT_MS}={}){
     const isDefault=String(url)===String(ARCANE_NETWORK_POLICY_URL)&&fetchImpl===globalThis.fetch;
-    if(typeof refresh!=='boolean')networkQueryFail('refresh must be a boolean.');
-    if(!Number.isSafeInteger(timeoutMs)||timeoutMs<1||timeoutMs>60000)networkQueryFail('timeoutMs must be an integer from 1 through 60000.');
+    if(!is.boolean(refresh))networkQueryFail('refresh must be a boolean.');
+    if(!is.safeInteger(timeoutMs)||timeoutMs<1||timeoutMs>60000)networkQueryFail('timeoutMs must be an integer from 1 through 60000.');
     if(isDefault&&!refresh&&defaultPolicyPromise)return defaultPolicyPromise;
-    if(typeof fetchImpl!=='function')fail('a fetch implementation is required to load policy.');
+    if(!is.function(fetchImpl))fail('a fetch implementation is required to load policy.');
     const load=(async()=>{
         const controller=new AbortController();let timeoutId;
         const operation=(async()=>{const response=await fetchImpl(url,{cache:'no-store',credentials:'same-origin',signal:controller.signal});if(!response?.ok)throw new Error(`ARCANE_NETWORK_POLICY_LOAD_FAILED: ${response?.status||'unavailable'}`);return validateArcaneNetworkPolicy(await response.json());})();

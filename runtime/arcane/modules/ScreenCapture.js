@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import { arcaneLogging } from 'arcane-os/logging';
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 import GifEncoder from './GifEncoder.js';
@@ -163,10 +166,10 @@ function signalLike(value){
     return value===undefined
         ||value===null
         ||(
-            typeof value==='object'
-            &&typeof value.aborted==='boolean'
-            &&typeof value.addEventListener==='function'
-            &&typeof value.removeEventListener==='function'
+            is.object(value)
+            &&is.boolean(value.aborted)
+            &&is.function(value.addEventListener)
+            &&is.function(value.removeEventListener)
         );
 }
 
@@ -190,7 +193,7 @@ function abortError(cause){
 
 function optionsRecord(value,label){
     if(value===undefined)return {};
-    if(!value||typeof value!=='object'||Array.isArray(value)){
+    if(!value||!is.object(value)||is.array(value)){
         throw captureError(
             SCREEN_CAPTURE_ERRORS.optionsRecordRejected,
             label+' must be an object.',
@@ -211,7 +214,7 @@ function optionsRecord(value,label){
 
 function admittedOperationId(value){
     if(value===undefined||value===null)return null;
-    if(typeof value!=='string'
+    if(!is.string(value)
         ||value.trim()!==value
         ||!value){
         throw captureError(
@@ -225,7 +228,7 @@ function admittedOperationId(value){
 }
 
 function imageResultType(blob){
-    const reported=typeof blob?.type==='string'?blob.type.trim().toLowerCase():'';
+    const reported=is.string(blob?.type)?blob.type.trim().toLowerCase():'';
     if(!reported)return SCREEN_CAPTURE_IMAGE_TYPE_FALLBACK;
     const subtype=reported.startsWith('image/')
         ?reported.slice('image/'.length).split(';',1)[0]
@@ -252,7 +255,7 @@ function supportedRecorderType(Recorder){
 }
 
 function reportDetachedError(error){
-    if(typeof globalThis.reportError==='function')globalThis.reportError(error);
+    if(is.function(globalThis.reportError))globalThis.reportError(error);
     else arcaneLogging.error?.(error);
 }
 
@@ -436,7 +439,7 @@ export default class ScreenCapture extends EventTarget{
         if(this.#events.disposed)return null;
         const compatibilityDetail={
             ...detail,
-            mode:typeof detail?.mode==='string'?detail.mode:operation.mode,
+            mode:is.string(detail?.mode)?detail.mode:operation.mode,
             operationId:operation.id,
             reason,
             ...(code?{code}:{})
@@ -527,7 +530,7 @@ export default class ScreenCapture extends EventTarget{
 
     #attachTrackEnd(operation,stream){
         for(const track of stream?.getTracks?.()||[]){
-            if(typeof track?.addEventListener!=='function')continue;
+            if(!is.function(track?.addEventListener))continue;
             const owner=this;
             function stopEndedScreenCaptureTrack(){
                 if(!owner.#isCurrent(operation))return;
@@ -782,7 +785,7 @@ export default class ScreenCapture extends EventTarget{
             );
             this.#assertCurrent(operation);
             stage='image-encoding';
-            const type=typeof options.type==='string'&&options.type.trim()
+            const type=is.string(options.type)&&options.type.trim()
                 ?options.type.trim()
                 :'image/png';
             const blob=await this.#canvasBlob(
@@ -990,7 +993,7 @@ export default class ScreenCapture extends EventTarget{
 
     #startGifFrameSampling(operation,context,frameDelay){
         const requestedDelay=Number(frameDelay);
-        const explicitDelay=Number.isFinite(requestedDelay)&&requestedDelay>0
+        const explicitDelay=is.finite(requestedDelay)&&requestedDelay>0
             ?requestedDelay
             :null;
         let active=true;
@@ -1000,10 +1003,10 @@ export default class ScreenCapture extends EventTarget{
         if(explicitDelay!==null){
             requestFrame=callback=>setTimeout(()=>callback(monotonicNow()),explicitDelay);
             cancelFrame=handle=>clearTimeout(handle);
-        }else if(typeof operation.video?.requestVideoFrameCallback==='function'){
+        }else if(is.function(operation.video?.requestVideoFrameCallback)){
             requestFrame=callback=>operation.video.requestVideoFrameCallback(callback);
             cancelFrame=handle=>operation.video.cancelVideoFrameCallback?.(handle);
-        }else if(typeof globalThis.requestAnimationFrame==='function'){
+        }else if(is.function(globalThis.requestAnimationFrame)){
             requestFrame=callback=>globalThis.requestAnimationFrame(callback);
             cancelFrame=handle=>globalThis.cancelAnimationFrame?.(handle);
         }else{
@@ -1065,7 +1068,7 @@ export default class ScreenCapture extends EventTarget{
             operation.frames=[];
             operation.frameTimes=[];
             const requestedDelay=Number(options.frameDelay);
-            operation.gifDelay=Number.isFinite(requestedDelay)&&requestedDelay>0
+            operation.gifDelay=is.finite(requestedDelay)&&requestedDelay>0
                 ?requestedDelay
                 :0;
             operation.startedAt=Date.now();
@@ -1261,7 +1264,7 @@ export default class ScreenCapture extends EventTarget{
             if(options.signal?.aborted)throw abortError(options.signal.reason);
             const width=Number(video.videoWidth);
             const height=Number(video.videoHeight);
-            if(!Number.isFinite(width)||width<=0||!Number.isFinite(height)||height<=0){
+            if(!is.finite(width)||width<=0||!is.finite(height)||height<=0){
                 throw captureError(
                     SCREEN_CAPTURE_ERRORS.displayMetadataRejected,
                     'The selected display reported invalid frame dimensions.'
@@ -1370,7 +1373,7 @@ export default class ScreenCapture extends EventTarget{
                 TypeError
             );
         }
-        const mode=typeof detail?.mode==='string'
+        const mode=is.string(detail?.mode)
             ?detail.mode
             :(this.#operation?.mode??'capture');
         const operation=this.#operation??{

@@ -30,6 +30,9 @@
 </div>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const {arcaneLogging}=await import('arcane-os/logging');
 
     const host=this;
@@ -98,7 +101,7 @@
         if(destroyed){
             return false;
         }
-        if(!input||typeof input!=='object'||Array.isArray(input)){
+        if(!input||!is.object(input)||is.array(input)){
             throw new TypeError('Directory picker configuration must be an object.');
         }
         const replacesSelection=Object.prototype.hasOwnProperty.call(input,'picker')
@@ -109,7 +112,7 @@
             :disabled;
         const nextPicker=input.picker===undefined?picker:input.picker;
         if(input.picker!==undefined){
-            if(!nextPicker||typeof nextPicker.select!=='function'){
+            if(!nextPicker||!is.function(nextPicker.select)){
                 throw new TypeError('picker must expose a select(options) function.');
             }
         }

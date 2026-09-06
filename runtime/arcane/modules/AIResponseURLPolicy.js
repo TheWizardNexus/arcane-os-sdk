@@ -1,4 +1,7 @@
+import Is from 'strong-type';
 import {marked} from './Marked.min.js';
+
+const is=new Is(false);
 
 const BARE_HTTP_URL_PATTERN=/\bhttps?:\/\/[^\s<>\[\]"'`]+/giu;
 const BARE_WWW_URL_PATTERN=/\bwww\.[^\s<>\[\]"'`]+/giu;
@@ -82,7 +85,7 @@ function decodeNumericCharacterReference(match,hexadecimal,decimal){
     const codePoint=Number.parseInt(raw,radix);
 
     if(
-        !Number.isInteger(codePoint)
+        !is.integer(codePoint)
         ||codePoint<1
         ||codePoint>0x10FFFF
         ||(codePoint>=0xD800&&codePoint<=0xDFFF)

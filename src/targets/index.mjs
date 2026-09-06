@@ -1,3 +1,4 @@
+import Is from 'strong-type';
 import path from 'node:path';
 import {packageApp,verifyApp} from '../packager/core.mjs';
 import {startDevServer} from '../dev-server.mjs';
@@ -8,6 +9,8 @@ import {
     executeNativeBuildPlan,
     validateNativeBuilder
 } from '../native-plan.mjs';
+
+const is = new Is(false);
 
 const DEFINITIONS=[
     {
@@ -188,7 +191,7 @@ function selectedNativeRequest(targetId,targetRequest){
 }
 
 function selectedArtifact(artifact){
-    if(!artifact||typeof artifact!=='object'||Array.isArray(artifact)){
+    if(!artifact||!is.object(artifact)||is.array(artifact)){
         throw new ArcaneError(ERROR_CODES.usage,'A native artifact is required.');
     }
     return artifact;
@@ -202,7 +205,7 @@ export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
     async function requireProviderTarget(){
         providerDescriptionPromise??=Promise.resolve(provider.describe()).then(description=>{
             if(!description||description.protocol!=='arcane-native-builder/1'
-                ||!Array.isArray(description.targets)||!description.targets.includes(targetId)){
+                ||!is.array(description.targets)||!description.targets.includes(targetId)){
                 throw new ArcaneError(
                     ERROR_CODES.targetUnavailable,
                     `The selected native provider does not support target ${targetId}.`

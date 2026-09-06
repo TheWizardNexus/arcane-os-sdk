@@ -1,11 +1,14 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import * as ArcaneNetworkPolicy from './ArcaneNetworkPolicy.js?v=3';
 
 function completeText(value,fallback){
-    return typeof value==='string'&&value.length>0?value:fallback;
+    return is.string(value)&&value.length>0?value:fallback;
 }
 
 function decisionId(){
-    if(typeof globalThis.crypto?.randomUUID==='function')return globalThis.crypto.randomUUID();
+    if(is.function(globalThis.crypto?.randomUUID))return globalThis.crypto.randomUUID();
     return `navigation-${Date.now().toString(36)}-${Math.random().toString(36).replace(/^0\./u,'')}`;
 }
 
@@ -83,7 +86,7 @@ function unavailableDecision(target,error){
 }
 
 function requireNetworkMatcher(networkMatcher){
-    if(typeof networkMatcher==='function')return networkMatcher;
+    if(is.function(networkMatcher))return networkMatcher;
     const error=new Error('Arcane cannot evaluate literal-IP navigation because the canonical network matcher is unavailable.');
     error.code='ARCANE_NETWORK_POLICY_MATCHER_UNAVAILABLE';
     throw error;
@@ -95,7 +98,7 @@ export function createArcaneNavigationGuard({
     onDecision=null,
     networkMatcher=ArcaneNetworkPolicy.findDeniedNetworkRule
 }={}){
-    if(typeof secure!=='boolean')throw new TypeError('secure must be a boolean.');
+    if(!is.boolean(secure))throw new TypeError('secure must be a boolean.');
     return async function guardArcaneNavigation(value,context={}){
         const target=destinationContext(value);
         let decision;
@@ -140,7 +143,7 @@ export function createArcaneNavigationGuard({
         }catch(error){
             decision=unavailableDecision(target,error);
         }
-        if(typeof onDecision==='function'){
+        if(is.function(onDecision)){
             await onDecision(decision,{intent:completeText(context.intent,'embedded')});
         }
         return decision;

@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import FileEntity from './File.js';
 
 /**
@@ -34,11 +37,11 @@ class ImageEntity extends FileEntity {
 	 * @returns {boolean}
 	 */
 	static isImageFile(file) {
-		if (!file || typeof file.name !== 'string') {
+		if (!file || !is.string(file.name)) {
 			return false;
 		}
 
-		const hasImageMime = typeof file.type === 'string' && file.type.startsWith('image/');
+		const hasImageMime = is.string(file.type) && file.type.startsWith('image/');
 		const hasImageExt = /\.(png|jpe?g|svg)$/i.test(file.name);
 
 		return hasImageMime || hasImageExt;
@@ -51,12 +54,12 @@ class ImageEntity extends FileEntity {
 	 * @returns {boolean}
 	 */
 	static isPNGFile(file) {
-		if (!file || typeof file.name !== 'string') {
+		if (!file || !is.string(file.name)) {
 			return false;
 		}
 
 		const lowerName = file.name.toLowerCase();
-		const hasPngMime = typeof file.type === 'string' && file.type.toLowerCase() === 'image/png';
+		const hasPngMime = is.string(file.type) && file.type.toLowerCase() === 'image/png';
 		const hasPngExt = lowerName.endsWith('.png');
 
 		return hasPngMime || hasPngExt;
@@ -125,7 +128,7 @@ class ImageEntity extends FileEntity {
 	 * @returns {void}
 	 */
 	static revokeBlobURL(url = '') {
-		if (typeof url === 'string' && url.startsWith('blob:')) {
+		if (is.string(url) && url.startsWith('blob:')) {
 			URL.revokeObjectURL(url);
 		}
 	}

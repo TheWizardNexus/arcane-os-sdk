@@ -1,6 +1,9 @@
+import Is from 'strong-type';
 import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
 import {parseSemver} from './packager/core.mjs';
 import {SDK_NAME,SDK_VERSION} from './constants.mjs';
+
+const is = new Is(false);
 
 export const SDK_UPDATE_REGISTRY='https://registry.npmjs.org/';
 export const SDK_UPDATE_TIMEOUT_MS=2500;
@@ -13,7 +16,7 @@ function updateFailure(message,{cause,details}={}){
 }
 
 function plainObject(value){
-    return value!==null&&typeof value==='object'&&!Array.isArray(value);
+    return value!==null&&is.object(value)&&!is.array(value);
 }
 
 function canonicalPackageName(value){
@@ -41,7 +44,7 @@ function registryEndpoint(registry,packageName){
 }
 
 function validateTimeout(value){
-    if(!Number.isSafeInteger(value)||value<1){
+    if(!is.safeInteger(value)||value<1){
         throw updateFailure('The SDK update timeout must be a positive integer of milliseconds.');
     }
     return value;
@@ -76,7 +79,7 @@ async function responseText(response){
     if(!/^(?:application\/json|application\/[A-Za-z0-9.+-]+\+json)(?:\s*;|$)/iu.test(contentType)){
         throw updateFailure('The npm registry returned a non-JSON update response.');
     }
-    if(!response.body||typeof response.body.getReader!=='function'){
+    if(!response.body||!is.function(response.body.getReader)){
         throw updateFailure('The npm registry returned no readable update response.');
     }
     const reader=response.body.getReader();
@@ -113,7 +116,7 @@ function canonicalDistTags(value){
     const tags=Object.create(null);
     for(const [tag,version] of entries){
         if(!DIST_TAG_PATTERN.test(tag)||FORBIDDEN_DIST_TAG_KEYS.has(tag)
-            ||typeof version!=='string'){
+            ||!is.string(version)){
             throw updateFailure('The npm registry update response contained an invalid dist-tag.');
         }
         try{
@@ -180,7 +183,7 @@ export async function checkForSdkUpdate({
     const selectedPackage=canonicalPackageName(packageName);
     const selectedRegistry=validateUpdateRegistry(registry);
     const selectedTimeout=validateTimeout(timeoutMs);
-    if(typeof fetchImpl!=='function'){
+    if(!is.function(fetchImpl)){
         throw updateFailure('The SDK update HTTP client is unavailable.');
     }
     const tag=updateTagForVersion(currentVersion);
@@ -198,7 +201,7 @@ export async function checkForSdkUpdate({
             signal:linked.signal
         });
         throwIfAborted(signal);
-        if(!response||typeof response.status!=='number'){
+        if(!response||!is.number(response.status)){
             throw updateFailure('The npm registry update response is unavailable.');
         }
         if(response.status!==200){

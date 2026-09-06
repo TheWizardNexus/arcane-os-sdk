@@ -14,6 +14,9 @@
 <html-import id="dataModal" class="modal" href="./arcane/components/modal.html?v=13"></html-import>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const {arcaneLogging}=await import('arcane-os/logging');
 
     const host=this;
@@ -29,7 +32,7 @@
     let operationGeneration=0;
     let destroyed=false;
 
-    host.beforeOpen=typeof host.beforeOpen==='function'
+    host.beforeOpen=is.function(host.beforeOpen)
         ?host.beforeOpen
         :async function beforeOpen(){};
     host.open=openData;

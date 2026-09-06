@@ -1,7 +1,10 @@
+import Is from 'strong-type';
 import {spawn} from 'node:child_process';
 import path from 'node:path';
 import {TextDecoder} from 'node:util';
 import {ArcaneError,ERROR_CODES} from './errors.mjs';
+
+const is = new Is(false);
 
 export const RESEND_CREDENTIAL_TARGET_PREFIX='ArcaneOSSDK/mail/resend/';
 
@@ -264,7 +267,7 @@ function assertNotAborted(signal){
 }
 
 export function validateMailCredentialProfile(profile){
-    if(typeof profile!=='string'||profile.length>MAX_PROFILE_LENGTH
+    if(!is.string(profile)||profile.length>MAX_PROFILE_LENGTH
         ||!PROFILE_PATTERN.test(profile)){
         throw usageError(
             'A credential profile must be 1-64 lowercase letters, digits, dots, underscores, or hyphens, and must begin and end with a letter or digit.'
@@ -278,7 +281,7 @@ export function mailCredentialTarget(profile){
 }
 
 function validateSecret(secret){
-    if(typeof secret!=='string'||!SECRET_PATTERN.test(secret)
+    if(!is.string(secret)||!SECRET_PATTERN.test(secret)
         ||Buffer.byteLength(secret,'utf8')>MAX_CREDENTIAL_BYTES){
         throw usageError(
             'A Resend API key must be a nonempty printable ASCII string no larger than 2,560 bytes.'
@@ -292,7 +295,7 @@ function validatePlatform(platform){
 }
 
 function validateTimeout(timeoutMs){
-    if(!Number.isSafeInteger(timeoutMs)||timeoutMs<1||timeoutMs>MAX_HELPER_TIMEOUT_MS){
+    if(!is.safeInteger(timeoutMs)||timeoutMs<1||timeoutMs>MAX_HELPER_TIMEOUT_MS){
         throw usageError(
             `Credential helper timeout must be an integer from 1 through ${String(MAX_HELPER_TIMEOUT_MS)} milliseconds.`
         );
@@ -301,7 +304,7 @@ function validateTimeout(timeoutMs){
 }
 
 function powershellExecutable(systemRoot){
-    if(typeof systemRoot!=='string'||systemRoot.length===0
+    if(!is.string(systemRoot)||systemRoot.length===0
         ||systemRoot.includes('\0')||!path.win32.isAbsolute(systemRoot)){
         throw unavailableError();
     }
@@ -327,7 +330,7 @@ function helperArguments(){
 }
 
 function helperEnvironment(systemRoot,temporaryDirectory){
-    if(typeof temporaryDirectory!=='string'||temporaryDirectory.length===0
+    if(!is.string(temporaryDirectory)||temporaryDirectory.length===0
         ||temporaryDirectory.includes('\0')||!path.win32.isAbsolute(temporaryDirectory)){
         throw unavailableError();
     }
@@ -352,7 +355,7 @@ function parseResponse(buffer){
     try{
         responseText=buffer.toString('utf8');
         const response=JSON.parse(responseText);
-        if(response===null||typeof response!=='object'||Array.isArray(response)
+        if(response===null||!is.object(response)||is.array(response)
             ||response.ok!==true){
             throw operationError();
         }
@@ -374,7 +377,7 @@ function runCredentialProcess({
     signal,
     timeoutMs
 }){
-    if(typeof spawnImpl!=='function')throw usageError('spawnImpl must be a function.');
+    if(!is.function(spawnImpl))throw usageError('spawnImpl must be a function.');
     let input=stdin;
     return new Promise(function executeCredentialHelper(resolve,reject){
         let child;
@@ -494,7 +497,7 @@ async function runWindowsCredentialHelper(request,{
 }={}){
     validatePlatform(platform);
     assertNotAborted(signal);
-    if(typeof runner!=='function')throw usageError('runner must be a function.');
+    if(!is.function(runner))throw usageError('runner must be a function.');
     const executable=powershellExecutable(systemRoot);
     const args=helperArguments();
     const boundedTimeout=validateTimeout(timeoutMs);
@@ -527,7 +530,7 @@ async function runWindowsCredentialHelper(request,{
         invocation.stdin='';
         requestText='';
     }
-    if(typeof output==='string')output=Buffer.from(output,'utf8');
+    if(is.string(output))output=Buffer.from(output,'utf8');
     if(!Buffer.isBuffer(output))throw operationError();
     if(output.length>MAX_HELPER_OUTPUT_BYTES){
         output.fill(0);
@@ -557,7 +560,7 @@ function credentialStatus(profile,exists){
 }
 
 function validateOptions(options){
-    if(options===null||typeof options!=='object'||Array.isArray(options)){
+    if(options===null||!is.object(options)||is.array(options)){
         throw usageError('Mail credential options must be an object.');
     }
     return options;
@@ -601,7 +604,7 @@ export async function setMailCredential(options={}){
 }
 
 function decodeSecret(value){
-    if(typeof value!=='string'||value.length===0||value.length%4!==0
+    if(!is.string(value)||value.length===0||value.length%4!==0
         ||!BASE64_PATTERN.test(value)){
         throw operationError();
     }
@@ -648,7 +651,7 @@ export async function getMailCredentialStatus(options={}){
         {operation:'status',target},
         helperOptions(options)
     );
-    if(typeof response.configured!=='boolean')throw operationError();
+    if(!is.boolean(response.configured))throw operationError();
     return credentialStatus(validatedProfile,response.configured);
 }
 
@@ -660,7 +663,7 @@ export async function deleteMailCredential(options={}){
         {operation:'delete',target},
         helperOptions(options)
     );
-    if(typeof response.deleted!=='boolean'||response.configured!==false){
+    if(!is.boolean(response.deleted)||response.configured!==false){
         throw operationError();
     }
     return credentialStatus(validatedProfile,false);

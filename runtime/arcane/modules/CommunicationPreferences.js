@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {resolveApplicationLocalStorageKey} from './AppDataScope.js';
 
 function adapter(){
@@ -8,6 +11,6 @@ function adapter(){
 
 export default class CommunicationPreferences{
     constructor(namespace='communications'){this.key=`arcane.communications.${String(namespace)}`;this.adapter=adapter();}
-    async load(defaults={}){const result=await this.adapter.get(this.key);return result?.found&&result.value&&typeof result.value==='object'?{...defaults,...result.value}:{...defaults};}
+    async load(defaults={}){const result=await this.adapter.get(this.key);return result?.found&&result.value&&is.object(result.value)?{...defaults,...result.value}:{...defaults};}
     async save(values={}){const safe=Object.fromEntries(Object.entries(values).map(([id,value])=>[id,{enabled:Boolean(value?.enabled),endpoint:String(value?.endpoint||''),accountLabel:String(value?.accountLabel||''),status:String(value?.status||'Disconnected')} ]));await this.adapter.set(this.key,safe);return safe;}
 }

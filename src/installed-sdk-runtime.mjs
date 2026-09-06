@@ -1,3 +1,4 @@
+import Is from 'strong-type';
 import {lstat,readFile,realpath,stat,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {materializeWorkspaceRuntimeContent} from './workspace-runtime.mjs';
@@ -7,6 +8,8 @@ import {
     resolveInstalledSdkInstallation,
     resolveSdkPackageDeclaration
 } from './workspace.mjs';
+
+const is = new Is(false);
 
 function fail(message,code='ARCANE_INSTALLED_SDK_RUNTIME_INVALID'){
     const error=new Error(message);
@@ -22,7 +25,7 @@ function throwIfAborted(signal){
 }
 
 async function canonicalWorkspaceRoot(workspaceRoot){
-    if(typeof workspaceRoot!=='string'||!workspaceRoot.trim()){
+    if(!is.string(workspaceRoot)||!workspaceRoot.trim()){
         fail('workspaceRoot is required to materialize an installed SDK runtime.');
     }
     const requested=path.resolve(workspaceRoot);

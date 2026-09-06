@@ -1,10 +1,13 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {
     canonicalApplicationId,
     openApplicationDataDirectory
 } from './AppDataScope.js';
 
 function safeSegment(value,label){
-    if(typeof value!=='string'){
+    if(!is.string(value)){
         throw new TypeError(`${label} must be a string.`);
     }
     const normalized=value.trim();
@@ -49,7 +52,7 @@ export default class ScopedOPFSCache{
             ?null
             :canonicalApplicationId(applicationId);
         this.#namespace=safeSegment(namespace,'namespace');
-        if(!storage||typeof storage.getDirectory!=='function'){
+        if(!storage||!is.function(storage.getDirectory)){
             throw unavailable();
         }
         this.#storage=storage;
@@ -58,7 +61,7 @@ export default class ScopedOPFSCache{
     }
 
     static supported(storage=globalThis.navigator?.storage){
-        return Boolean(storage&&typeof storage.getDirectory==='function');
+        return Boolean(storage&&is.function(storage.getDirectory));
     }
 
     get namespace(){

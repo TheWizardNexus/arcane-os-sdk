@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 import {stripSpeechFormatting} from 'arcane-os/speech-text';
 
@@ -40,15 +43,15 @@ function splitSpeechText(value=''){
 }
 
 function normalizeParts(parts,defaultVoice=null,defaultSpeed=1){
-    if(!Array.isArray(parts)||!parts.length){
+    if(!is.array(parts)||!parts.length){
         throw new TypeError('Narration text cannot be blank. The full visual content remains available.');
     }
     return parts.map(function normalizePart(part){
-        const candidate=typeof part==='string'?{input:part}:part;
+        const candidate=is.string(part)?{input:part}:part;
         const input=String(candidate?.input??'');
         if(!input.trim())throw new TypeError('Speech segments cannot be blank. The full visual content remains available.');
         const pauseAfterMs=Number(candidate?.pauseAfterMs??0);
-        if(!Number.isFinite(pauseAfterMs)||pauseAfterMs<0){
+        if(!is.finite(pauseAfterMs)||pauseAfterMs<0){
             throw new RangeError('Speech segment pauses must be a nonnegative number of milliseconds.');
         }
         const voiceValue=candidate?.voice??defaultVoice;
@@ -57,7 +60,7 @@ function normalizeParts(parts,defaultVoice=null,defaultSpeed=1){
         if(voiceValue!==null&&voiceValue!==undefined&&!voice.trim()){
             throw new TypeError('Speech segment voice cannot be blank.');
         }
-        if(!Number.isFinite(speed)||speed<=0)throw new RangeError('Every speech segment requires a positive speech speed.');
+        if(!is.finite(speed)||speed<=0)throw new RangeError('Every speech segment requires a positive speech speed.');
         return {
             input,
             pauseAfterMs,
@@ -84,7 +87,7 @@ function synthesizedAudioContractError(cause=null){
 
 function normalizeAudioContentType(value,fallback=null){
     const candidate=value===undefined||value===null?fallback:value;
-    if(typeof candidate!=='string'||!candidate.trim()){
+    if(!is.string(candidate)||!candidate.trim()){
         throw synthesizedAudioContractError();
     }
     const contentType=candidate.split(';',1)[0].trim().toLowerCase();
@@ -103,7 +106,7 @@ function speechAudioBytes(value){
     if(value instanceof ArrayBuffer){
         return new Uint8Array(value.slice(0));
     }
-    if(ArrayBuffer.isView(value)){
+    if(is.arrayBufferView(value)){
         return new Uint8Array(
             value.buffer.slice(
                 value.byteOffset,
@@ -203,23 +206,23 @@ async function validatedSpeechBytes(bytes,contentType='audio/wav'){
 async function playableSpeechBlob(response){
     try{
         if(response instanceof Blob)return validatedSpeechBlob(response);
-        if(response instanceof ArrayBuffer||ArrayBuffer.isView(response)){
+        if(response instanceof ArrayBuffer||is.arrayBufferView(response)){
             return validatedSpeechBytes(speechAudioBytes(response));
         }
-        if(response&&typeof response==='object'){
+        if(response&&is.object(response)){
             if(response.audio instanceof Blob){
                 return validatedSpeechBlob(
                     response.audio,
                     response.contentType
                 );
             }
-            if(response.audio instanceof ArrayBuffer||ArrayBuffer.isView(response.audio)){
+            if(response.audio instanceof ArrayBuffer||is.arrayBufferView(response.audio)){
                 return validatedSpeechBytes(
                     speechAudioBytes(response.audio),
                     response.contentType
                 );
             }
-            if(typeof response.audioBase64==='string'&&response.audioBase64){
+            if(is.string(response.audioBase64)&&response.audioBase64){
                 return validatedSpeechBytes(
                     base64Bytes(response.audioBase64),
                     response.contentType
@@ -238,7 +241,7 @@ async function playableSpeechBlob(response){
 
 function speechPlaybackFailureReason(error){
     if(error?.name==='AbortError')return 'speech-synthesis-cancelled';
-    if(typeof error?.code==='string'
+    if(is.string(error?.code)
         &&Object.hasOwn(SPEECH_PLAYBACK_FAILURE_REASONS,error.code)){
         return SPEECH_PLAYBACK_FAILURE_REASONS[error.code];
     }
@@ -295,7 +298,7 @@ class LatestSpeechQueue{
 }
 
 function queueFor(speech){
-    if((typeof speech!=='object'||speech===null)&&typeof speech!=='function'){
+    if((!is.object(speech)||speech===null)&&!is.function(speech)){
         throw new TypeError('A local speech client is required.');
     }
     let queue=queuesBySpeechClient.get(speech);
@@ -307,15 +310,15 @@ function queueFor(speech){
 }
 
 function providerSpeechCapacity(speech){
-    if(typeof speech?.fetchTTS!=='function')return null;
+    if(!is.function(speech?.fetchTTS))return null;
     try{
         const providerRuntime=speech.providerRuntime;
-        if(!providerRuntime||typeof providerRuntime.status!=='function')return null;
+        if(!providerRuntime||!is.function(providerRuntime.status))return null;
         const capacity=providerRuntime.status(
             'tts',
             {execution:true}
         )?.execution?.maxConcurrentRequests;
-        return Number.isSafeInteger(capacity)&&capacity>0?capacity:null;
+        return is.safeInteger(capacity)&&capacity>0?capacity:null;
     }catch{
         // Clients without inspectable provider capacity retain serialized admission.
         return null;
@@ -424,11 +427,11 @@ class SpeechPlayback{
         delay,
         messages={}
     }={}){
-        if(!audio||typeof audio.addEventListener!=='function'){
+        if(!audio||!is.function(audio.addEventListener)){
             throw new TypeError('SpeechPlayback requires an audio element.');
         }
         const normalizedSpeed=Number(speed);
-        if(!Number.isFinite(normalizedSpeed)||normalizedSpeed<=0){
+        if(!is.finite(normalizedSpeed)||normalizedSpeed<=0){
             throw new RangeError('SpeechPlayback speed must be a positive number.');
         }
         this.audio=audio;
@@ -496,7 +499,7 @@ class SpeechPlayback{
 
     message(name,details={}){
         const value=this.messages[name];
-        return String(typeof value==='function'?value(details):value||'');
+        return String(is.function(value)?value(details):value||'');
     }
 
     nextOperationId(){
@@ -537,7 +540,7 @@ class SpeechPlayback{
         try{
             this.onState(detail);
         }catch(error){
-            if(typeof globalThis.reportError==='function')globalThis.reportError(error);
+            if(is.function(globalThis.reportError))globalThis.reportError(error);
             else console.error(error);
         }
         return detail;
@@ -547,8 +550,8 @@ class SpeechPlayback{
         return Boolean(
             this.speech
             &&(
-                typeof this.speech.fetchTTS==='function'
-                ||typeof this.speech.synthesize==='function'
+                is.function(this.speech.fetchTTS)
+                ||is.function(this.speech.synthesize)
             )
         );
     }
@@ -603,12 +606,12 @@ class SpeechPlayback{
             ...(part.voice?{voice:part.voice}:{}),
             ...(this.responseFormat?{responseFormat:this.responseFormat}:{})
         };
-        if(typeof this.speech?.fetchTTS==='function'){
+        if(is.function(this.speech?.fetchTTS)){
             return playableSpeechBlob(
                 await this.speech.fetchTTS(payload,signal,preparation)
             );
         }
-        if(typeof this.speech?.synthesize==='function'){
+        if(is.function(this.speech?.synthesize)){
             return playableSpeechBlob(
                 await this.speech.synthesize(payload,{signal},preparation)
             );
@@ -783,7 +786,7 @@ class SpeechPlayback{
                 throw error;
             }
             const numericSpeed=Number(speed);
-            if(!Number.isFinite(numericSpeed)||numericSpeed<=0)throw new RangeError('Speech speed must be a positive number.');
+            if(!is.finite(numericSpeed)||numericSpeed<=0)throw new RangeError('Speech speed must be a positive number.');
             const selectedModel=model===null||model===undefined
                 ?null
                 :String(model);
@@ -807,7 +810,7 @@ class SpeechPlayback{
             this.voice=selectedVoice;
             this.responseFormat=selectedResponseFormat;
             normalized=normalizeParts(
-                typeof parts==='function'?parts():parts,
+                is.function(parts)?parts():parts,
                 selectedVoice,
                 numericSpeed
             );
@@ -1007,7 +1010,7 @@ class SpeechPlayback{
 
     fail(error){
         const reason=speechPlaybackFailureReason(error);
-        const code=typeof error?.code==='string'&&error.code.trim()
+        const code=is.string(error?.code)&&error.code.trim()
             ?error.code.trim()
             :reason==='speech-playback-request-contract-mismatch'
                 ?'ARCANE_SPEECH_PLAYBACK_REQUEST_CONTRACT_MISMATCH'

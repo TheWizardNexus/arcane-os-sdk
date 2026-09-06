@@ -1,5 +1,8 @@
+import Is from 'strong-type';
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {arcaneEvents} from './event-manager.mjs';
+
+const is = new Is(false);
 
 const deliveryStorage=new AsyncLocalStorage();
 
@@ -17,13 +20,13 @@ function deliveryOccurrence(event){
 }
 
 function mirror(manager,event,eventMetadata,occurrence){
-    if(!manager||!event||typeof event!=='object'||occurrence.managers.has(manager)){
+    if(!manager||!event||!is.object(event)||occurrence.managers.has(manager)){
         return;
     }
     occurrence.managers.add(manager);
     try{
         const result=manager.forward(event,eventMetadata);
-        if(result&&typeof result.then==='function'){
+        if(result&&is.function(result.then)){
             void Promise.resolve(result).catch(()=>{});
         }
     }catch{
@@ -44,9 +47,9 @@ export function createEventQueue(onEvent,{
     eventManager=arcaneEvents,
     eventMetadata={source:'sdk',category:'operation'}
 }={}){
-    const callback=typeof onEvent==='function'?onEvent:null;
+    const callback=is.function(onEvent)?onEvent:null;
     const manager=eventManager===null?null:eventManager;
-    if(manager&&typeof manager.forward!=='function'){
+    if(manager&&!is.function(manager.forward)){
         throw new TypeError('The central event manager must provide forward(event, metadata).');
     }
     let firstError=null;
@@ -65,7 +68,7 @@ export function createEventQueue(onEvent,{
         resolveFailure(firstError);
         try{
             const result=onFailure?.(firstError);
-            if(result&&typeof result.then==='function'){
+            if(result&&is.function(result.then)){
                 void Promise.resolve(result).catch(()=>{});
             }
         }catch{

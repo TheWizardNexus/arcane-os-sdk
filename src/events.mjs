@@ -1,22 +1,25 @@
+import Is from 'strong-type';
 import {randomUUID} from 'node:crypto';
 import {CLI_EVENT_PROTOCOL,OUTPUT_MODES} from './constants.mjs';
 import {ArcaneError,ERROR_CODES,errorRecord} from './errors.mjs';
+
+const is = new Is(false);
 
 function write(stream,value){
     stream.write(`${value}\n`);
 }
 
 function jsonSafe(value,seen=new WeakSet()){
-    if(value===undefined||value===null||typeof value==='string'
-        ||typeof value==='number'||typeof value==='boolean'){
+    if(value===undefined||value===null||is.string(value)
+        ||is.number(value)||is.boolean(value)){
         return value;
     }
 
-    if(typeof value==='bigint'){
+    if(is.bigint(value)){
         return value.toString();
     }
 
-    if(typeof value==='function'||typeof value==='symbol'){
+    if(is.function(value)||is.symbol(value)){
         return undefined;
     }
 
@@ -24,7 +27,7 @@ function jsonSafe(value,seen=new WeakSet()){
         return errorRecord(value);
     }
 
-    if(Array.isArray(value)){
+    if(is.array(value)){
         if(seen.has(value)){
             return undefined;
         }
@@ -35,7 +38,7 @@ function jsonSafe(value,seen=new WeakSet()){
         return result;
     }
 
-    if(typeof value==='object'){
+    if(is.object(value)){
         if(seen.has(value)){
             return undefined;
         }
@@ -152,7 +155,7 @@ export function createReporter({
             }));
         }else{
             if(result!==undefined){
-                if(typeof result==='string'){
+                if(is.string(result)){
                     write(stdout,result);
                 }else{
                     write(stdout,JSON.stringify(jsonSafe(result),null,2));
@@ -195,10 +198,10 @@ export function createReporter({
     }
 
     function forward(value,data){
-        if(typeof value==='string'){
+        if(is.string(value)){
             return emit(value,data);
         }
-        if(value&&typeof value==='object'){
+        if(value&&is.object(value)){
             const {type='operation.progress',message,...rest}=value;
             return emit(type,rest.data??rest,message);
         }

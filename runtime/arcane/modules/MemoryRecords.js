@@ -1,5 +1,8 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 function normalizeMemoryContent(content=''){
-    if(typeof content!=='string'){
+    if(!is.string(content)){
         return '';
     }
 
@@ -9,7 +12,7 @@ function normalizeMemoryContent(content=''){
         try{
             const parsed=JSON.parse(normalized);
 
-            if(typeof parsed!=='string'){
+            if(!is.string(parsed)){
                 break;
             }
 
@@ -23,14 +26,14 @@ function normalizeMemoryContent(content=''){
 }
 
 function hasMemoryContent(memory={}){
-    const records=Array.isArray(memory)
+    const records=is.array(memory)
         ?memory
         :[memory];
 
     return records.some(
         record=>Boolean(
             normalizeMemoryContent(
-                typeof record==='string'
+                is.string(record)
                     ?record
                     :record?.memory
             )

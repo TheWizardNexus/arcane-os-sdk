@@ -1,7 +1,10 @@
+import Is from '../runtime/strong-type/index.js';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {promisify} from 'node:util';
 import {gunzip} from 'node:zlib';
+
+const is = new Is(false);
 
 const gunzipAsync=promisify(gunzip);
 const PACKAGE_NAME='arcane-os';
@@ -44,7 +47,7 @@ function tarInteger(buffer,start,length,label){
     if(source==='')return 0;
     if(!/^[0-7]+$/u.test(source))fail(`${label} is not valid tar framing.`);
     const value=Number.parseInt(source,8);
-    if(!Number.isSafeInteger(value))fail(`${label} cannot be represented by Node.js.`);
+    if(!is.safeInteger(value))fail(`${label} cannot be represented by Node.js.`);
     return value;
 }
 
@@ -55,7 +58,7 @@ function paxFields(data){
         const space=data.indexOf(0x20,offset);
         if(space===-1)fail('Extended tar header is malformed.');
         const recordLength=Number.parseInt(data.subarray(offset,space).toString('ascii'),10);
-        if(!Number.isSafeInteger(recordLength)||recordLength<1||offset+recordLength>data.length){
+        if(!is.safeInteger(recordLength)||recordLength<1||offset+recordLength>data.length){
             fail('Extended tar header has invalid framing.');
         }
         const record=data.subarray(space+1,offset+recordLength-1).toString('utf8');
@@ -67,7 +70,7 @@ function paxFields(data){
 }
 
 function normalizedPackagePath(value){
-    if(typeof value!=='string'||!value.startsWith('package/')||value.includes('\\')
+    if(!is.string(value)||!value.startsWith('package/')||value.includes('\\')
         ||value.includes('\0')){
         fail(`Packed path is outside the npm package root: ${value}.`);
     }
@@ -142,7 +145,7 @@ function parseTarArchive(archive){
 }
 
 export async function verifyNpmReleaseArtifact({tarballPath,expectedVersion=null}){
-    if(typeof tarballPath!=='string'||tarballPath==='')fail('A release tarball path is required.');
+    if(!is.string(tarballPath)||tarballPath==='')fail('A release tarball path is required.');
     const resolvedTarball=path.resolve(tarballPath);
     let archive;
     try{
@@ -151,11 +154,11 @@ export async function verifyNpmReleaseArtifact({tarballPath,expectedVersion=null
         fail(`Release tarball cannot be read: ${error.message}`);
     }
     const {files,packageDocument}=parseTarArchive(archive);
-    if(packageDocument===null||typeof packageDocument!=='object'||Array.isArray(packageDocument)){
+    if(packageDocument===null||!is.object(packageDocument)||is.array(packageDocument)){
         fail('Packed package.json must contain one JSON object.');
     }
     if(packageDocument.name!==PACKAGE_NAME)fail(`Packed package name must be ${PACKAGE_NAME}.`);
-    if(typeof packageDocument.version!=='string'||!VERSION_PATTERN.test(packageDocument.version)){
+    if(!is.string(packageDocument.version)||!VERSION_PATTERN.test(packageDocument.version)){
         fail(`Packed package version is invalid: ${packageDocument.version}.`);
     }
     if(expectedVersion!==null&&packageDocument.version!==expectedVersion){

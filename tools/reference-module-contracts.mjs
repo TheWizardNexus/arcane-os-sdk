@@ -1,5 +1,8 @@
+import Is from 'strong-type';
 import {referenceModuleContractsA} from './reference-module-contracts-a.mjs';
 import {referenceModuleContractsB} from './reference-module-contracts-b.mjs';
+
+const is = new Is(false);
 
 const allowedClassifications=new Set([
     'host-internal',
@@ -23,17 +26,17 @@ function contractError(message){
 }
 
 function validateString(contract,key){
-    if(typeof contract[key]!=='string'||contract[key].trim()===''){
+    if(!is.string(contract[key])||contract[key].trim()===''){
         contractError(`${contract.name} requires nonempty ${key}.`);
     }
 }
 
 export function createReferenceModuleContractMap(records){
-    if(!Array.isArray(records))contractError('inventory records must be an array.');
+    if(!is.array(records))contractError('inventory records must be an array.');
     const contracts=[...referenceModuleContractsA,...referenceModuleContractsB];
     const map=new Map();
     for(const contract of contracts){
-        if(!contract||typeof contract!=='object'||Array.isArray(contract)){
+        if(!contract||!is.object(contract)||is.array(contract)){
             contractError('every overlay must be an object.');
         }
         if(!contractFields.every(key=>Object.hasOwn(contract,key))){
@@ -48,10 +51,10 @@ export function createReferenceModuleContractMap(records){
         if(!allowedClassifications.has(contract.classification)){
             contractError(`${contract.name} has invalid classification ${contract.classification}.`);
         }
-        if(!Array.isArray(contract.events)||!contract.events.every(value=>typeof value==='string')){
+        if(!is.array(contract.events)||!contract.events.every(value=>is.string(value))){
             contractError(`${contract.name} events must be a string array.`);
         }
-        if(!Array.isArray(contract.errors)||!contract.errors.every(value=>typeof value==='string')){
+        if(!is.array(contract.errors)||!contract.errors.every(value=>is.string(value))){
             contractError(`${contract.name} errors must be a string array.`);
         }
         if(map.has(contract.name))contractError(`duplicate overlay ${contract.name}.`);

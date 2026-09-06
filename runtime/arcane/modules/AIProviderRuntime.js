@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import {arcaneLogging} from 'arcane-os/logging';
 import {stripSpeechFormatting} from 'arcane-os/speech-text';
 import {
@@ -88,7 +91,7 @@ async function awaitStreamCleanup(operation) {
 
 function assertStreamCleanupComplete(outcome) {
     const rejected = outcome.completed
-        && Array.isArray(outcome.results)
+        && is.array(outcome.results)
         && outcome.results.some(function hasRejectedAIStreamCleanup(result) {
             return result.status === 'rejected';
         });
@@ -107,7 +110,7 @@ function assertRole(role) {
 }
 
 function assertIdentifier(value, label) {
-    if (typeof value !== 'string'
+    if (!is.string(value)
         || value.length < 1
         || value.trim() !== value) {
         fail(`${label} must be a nonempty trimmed string.`);
@@ -115,7 +118,7 @@ function assertIdentifier(value, label) {
 }
 
 function nextSequence(value) {
-    if (typeof value === 'bigint') {
+    if (is.bigint(value)) {
         return value + 1n;
     }
     if (value === Number.MAX_SAFE_INTEGER) {
@@ -129,16 +132,16 @@ function assertAbortSignal(signal) {
         return;
     }
 
-    if (typeof signal !== 'object'
-        || typeof signal.aborted !== 'boolean'
-        || typeof signal.addEventListener !== 'function'
-        || typeof signal.removeEventListener !== 'function') {
+    if (!is.object(signal)
+        || !is.boolean(signal.aborted)
+        || !is.function(signal.addEventListener)
+        || !is.function(signal.removeEventListener)) {
         fail('AI provider operation signal must be an AbortSignal.');
     }
 }
 
 function assertPlainObject(value, label) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    if (!value || !is.object(value) || is.array(value)) {
         fail(`${label} must be a plain object.`);
     }
 
@@ -149,7 +152,7 @@ function assertPlainObject(value, label) {
 }
 
 function isPlainRecord(value) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    if (!value || !is.object(value) || is.array(value)) {
         return false;
     }
     const prototype = Object.getPrototypeOf(value);
@@ -160,7 +163,7 @@ function validateLLMToolDeclarations(value) {
     if (value === undefined) {
         return;
     }
-    if (!Array.isArray(value)) {
+    if (!is.array(value)) {
         fail(
             'AI LLM tools must be an array.',
             'ARCANE_AI_TOOL_CALL_INVALID'
@@ -178,9 +181,9 @@ function validateLLMToolDeclarations(value) {
             || !isPlainRecord(parameters.properties)
             || !isPlainRecord(messageSchema)
             || messageSchema.type !== 'string'
-            || !Number.isInteger(messageSchema.minLength)
+            || !is.integer(messageSchema.minLength)
             || messageSchema.minLength < 1
-            || !Array.isArray(parameters.required)
+            || !is.array(parameters.required)
             || !parameters.required.includes('message')) {
             fail(
                 `AI LLM tools[${index}] must require a nonempty string parameters.properties.message.`,
@@ -192,13 +195,13 @@ function validateLLMToolDeclarations(value) {
 
 function validateLLMToolCall(call, label) {
     if (!isPlainRecord(call)
-        || typeof call.id !== 'string'
+        || !is.string(call.id)
         || !call.id.trim()
         || call.type !== 'function'
         || !isPlainRecord(call.function)
-        || typeof call.function.name !== 'string'
+        || !is.string(call.function.name)
         || !call.function.name.trim()
-        || typeof call.function.arguments !== 'string') {
+        || !is.string(call.function.arguments)) {
         fail(
             `${label} must be one complete structural function call.`,
             'ARCANE_AI_TOOL_CALL_INVALID'
@@ -220,7 +223,7 @@ function validateLLMToolCall(call, label) {
             'ARCANE_AI_TOOL_CALL_INVALID'
         );
     }
-    if (typeof argumentsRecord.message !== 'string'
+    if (!is.string(argumentsRecord.message)
         || !argumentsRecord.message.trim()) {
         fail(
             `${label} arguments must include a nonempty user-facing message.`,
@@ -252,7 +255,7 @@ function validateLLMMessageToolCalls(message, label) {
     }
     const descriptor = Object.getOwnPropertyDescriptor(message, 'tool_calls');
     if (!descriptor || !Object.hasOwn(descriptor, 'value')
-        || !Array.isArray(descriptor.value)) {
+        || !is.array(descriptor.value)) {
         fail(
             `${label}.tool_calls must be an array data property.`,
             'ARCANE_AI_TOOL_CALL_INVALID'
@@ -277,7 +280,7 @@ function validateLLMMessageToolCalls(message, label) {
 
 function validateLLMRequestPayload(payload) {
     assertPlainObject(payload, 'AI LLM request payload');
-    if (!Array.isArray(payload.messages)) {
+    if (!is.array(payload.messages)) {
         fail('AI LLM request payload.messages must be an array.');
     }
     const pendingToolCallIds = new Set();
@@ -317,7 +320,7 @@ function validateLLMRequestPayload(payload) {
             openedToolCall = true;
         }
         if (message.role === 'tool') {
-            if (typeof message.content !== 'string'
+            if (!is.string(message.content)
                 || !message.content.trim()) {
                 fail(
                     `AI LLM request payload.messages[${index}] must contain a nonblank user-facing tool result.`,
@@ -325,7 +328,7 @@ function validateLLMRequestPayload(payload) {
                 );
             }
             if (!pendingToolCallIds.size
-                || typeof message.tool_call_id !== 'string'
+                || !is.string(message.tool_call_id)
                 || !pendingToolCallIds.has(message.tool_call_id)) {
                 fail(
                     `AI LLM request payload.messages[${index}] does not settle the pending structural tool call.`,
@@ -360,7 +363,7 @@ function validateLLMRequestPayload(payload) {
         payload.parallel_tool_calls
     ];
     if (parallelValues.some(function invalidParallelLLMToolPreference(value) {
-        return value !== undefined && typeof value !== 'boolean';
+        return value !== undefined && !is.boolean(value);
     })) {
         fail('AI LLM parallel tool-call preferences must be boolean when provided.');
     }
@@ -377,7 +380,7 @@ function validateLLMTerminalMessage(message, label) {
 }
 
 function validateLLMTerminalResult(value, label) {
-    if (typeof value === 'string') {
+    if (is.string(value)) {
         return value;
     }
     if (!isPlainRecord(value)) {
@@ -407,7 +410,7 @@ function validateLLMTerminalResult(value, label) {
     }
     const choicesDescriptor = Object.getOwnPropertyDescriptor(value, 'choices');
     if (!choicesDescriptor || !Object.hasOwn(choicesDescriptor, 'value')
-        || !Array.isArray(choicesDescriptor.value)
+        || !is.array(choicesDescriptor.value)
         || choicesDescriptor.value.length === 0) {
         fail(
             `${label}.choices must be a nonempty array data property.`,
@@ -418,7 +421,7 @@ function validateLLMTerminalResult(value, label) {
     for (let position = 0; position < choicesDescriptor.value.length; position += 1) {
         const choice = choicesDescriptor.value[position];
         if (!isPlainRecord(choice)
-            || !Number.isSafeInteger(choice.index)
+            || !is.safeInteger(choice.index)
             || choice.index < 0
             || indexes.has(choice.index)) {
             fail(
@@ -462,22 +465,22 @@ function canonicalLLMToolCall(call) {
 }
 
 function copyLLMDataValue(value, seen = new Map()) {
-    if (!value || typeof value !== 'object') {
+    if (!value || !is.object(value)) {
         return value;
     }
     if (seen.has(value)) {
         return seen.get(value);
     }
-    if (!Array.isArray(value) && !isPlainRecord(value)) {
+    if (!is.array(value) && !isPlainRecord(value)) {
         return value;
     }
-    const result = Array.isArray(value)
+    const result = is.array(value)
         ? new Array(value.length)
         : Object.create(Object.getPrototypeOf(value));
     seen.set(value, result);
     const descriptors = Object.getOwnPropertyDescriptors(value);
     for (const key of Reflect.ownKeys(descriptors)) {
-        if (Array.isArray(value) && key === 'length') {
+        if (is.array(value) && key === 'length') {
             continue;
         }
         const descriptor = descriptors[key];
@@ -494,12 +497,12 @@ function sameLLMDataValue(left, right, seen = new Map()) {
         return true;
     }
     if (!left || !right
-        || typeof left !== 'object'
-        || typeof right !== 'object'
-        || Array.isArray(left) !== Array.isArray(right)) {
+        || !is.object(left)
+        || !is.object(right)
+        || is.array(left) !== is.array(right)) {
         return false;
     }
-    if (!Array.isArray(left)
+    if (!is.array(left)
         && (!isPlainRecord(left) || !isPlainRecord(right))) {
         return false;
     }
@@ -562,11 +565,11 @@ function terminalLLMToolCallRecord(choiceIndex, completeCalls) {
 }
 
 function terminalLLMToolCalls(value) {
-    if (typeof value === 'string') {
+    if (is.string(value)) {
         return {direct: terminalLLMToolCallRecord(null, []), choices: []};
     }
     if (Object.hasOwn(value, 'message')) {
-        const completeCalls = Array.isArray(value.message?.tool_calls)
+        const completeCalls = is.array(value.message?.tool_calls)
             ? value.message.tool_calls
             : [];
         return {
@@ -577,7 +580,7 @@ function terminalLLMToolCalls(value) {
     return {
         direct: null,
         choices: value.choices.map(function retainTerminalLLMChoice(choice) {
-            const completeCalls = Array.isArray(choice.message?.tool_calls)
+            const completeCalls = is.array(choice.message?.tool_calls)
                 ? choice.message.tool_calls
                 : [];
             return terminalLLMToolCallRecord(choice.index, completeCalls);
@@ -637,7 +640,7 @@ function createLLMStreamToolCallCorrelation() {
         }
         const descriptor = Object.getOwnPropertyDescriptor(source, 'tool_calls');
         if (!descriptor || !Object.hasOwn(descriptor, 'value')
-            || !Array.isArray(descriptor.value)) {
+            || !is.array(descriptor.value)) {
             throw llmStreamToolCallMismatch(
                 `${label}.tool_calls must be an array data property.`
             );
@@ -686,7 +689,7 @@ function createLLMStreamToolCallCorrelation() {
                 );
             }
             if (fragment.index !== undefined
-                && (!Number.isSafeInteger(fragment.index) || fragment.index < 0)) {
+                && (!is.safeInteger(fragment.index) || fragment.index < 0)) {
                 throw llmStreamToolCallMismatch(
                     `${label}.tool_calls[${position}] has an invalid structural call index.`
                 );
@@ -701,7 +704,7 @@ function createLLMStreamToolCallCorrelation() {
                 invalid: false
             };
             if (fragment.id !== undefined) {
-                if (typeof fragment.id !== 'string'
+                if (!is.string(fragment.id)
                     || !fragment.id
                     || (retained.id && retained.id !== fragment.id)) {
                     retained.invalid = true;
@@ -710,7 +713,7 @@ function createLLMStreamToolCallCorrelation() {
                 }
             }
             if (fragment.type !== undefined) {
-                if (typeof fragment.type !== 'string'
+                if (!is.string(fragment.type)
                     || !fragment.type
                     || (retained.type && retained.type !== fragment.type)) {
                     retained.invalid = true;
@@ -726,14 +729,14 @@ function createLLMStreamToolCallCorrelation() {
                 ? fragment.function
                 : {};
             if (functionFragment.name !== undefined) {
-                if (typeof functionFragment.name !== 'string') {
+                if (!is.string(functionFragment.name)) {
                     retained.invalid = true;
                 } else {
                     retained.name += functionFragment.name;
                 }
             }
             if (functionFragment.arguments !== undefined) {
-                if (typeof functionFragment.arguments !== 'string') {
+                if (!is.string(functionFragment.arguments)) {
                     retained.invalid = true;
                 } else {
                     retained.arguments += functionFragment.arguments;
@@ -762,7 +765,7 @@ function createLLMStreamToolCallCorrelation() {
             }
         );
         if (choice.index !== undefined
-            && (!Number.isSafeInteger(choice.index) || choice.index < 0)) {
+            && (!is.safeInteger(choice.index) || choice.index < 0)) {
             throw llmStreamToolCallMismatch(
                 `AI provider stream choice ${position} has an invalid index.`
             );
@@ -811,7 +814,7 @@ function createLLMStreamToolCallCorrelation() {
                 'AI provider stream chunk.message'
             );
         }
-        if (Array.isArray(chunk.choices)) {
+        if (is.array(chunk.choices)) {
             for (let position = 0; position < chunk.choices.length; position += 1) {
                 observeChoice(chunk.choices[position], position);
             }
@@ -1009,13 +1012,13 @@ function projectLLMStreamData(value, seen = new Map()) {
     if (value === null || value === undefined) {
         return value;
     }
-    if (typeof value !== 'object') {
+    if (!is.object(value)) {
         return value;
     }
     if (seen.has(value)) {
         return seen.get(value);
     }
-    if (Array.isArray(value)) {
+    if (is.array(value)) {
         const result = [];
         seen.set(value, result);
         for (const item of value) {
@@ -1031,7 +1034,7 @@ function projectLLMStreamData(value, seen = new Map()) {
     let sourceDataFields = 0;
     const descriptors = Object.getOwnPropertyDescriptors(value);
     for (const key of Reflect.ownKeys(descriptors)) {
-        if (typeof key === 'symbol') {
+        if (is.symbol(key)) {
             continue;
         }
         const descriptor = descriptors[key];
@@ -1055,19 +1058,19 @@ function projectLLMStreamChunk(value) {
 }
 
 function assertCallbackFreeProviderValue(value, seen = new WeakSet()) {
-    if (typeof value === 'function') {
+    if (is.function(value)) {
         fail(
             'AI providers receive data-only request payloads.',
             'ARCANE_AI_PROVIDER_CALLBACK_BOUNDARY'
         );
     }
-    if (!value || typeof value !== 'object') {
+    if (!value || !is.object(value)) {
         return;
     }
-    if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
+    if (value instanceof ArrayBuffer || is.arrayBufferView(value)) {
         return;
     }
-    if (typeof Blob === 'function' && value instanceof Blob) {
+    if (is.function(globalThis.Blob) && value instanceof Blob) {
         return;
     }
     if (seen.has(value)) {
@@ -1077,7 +1080,7 @@ function assertCallbackFreeProviderValue(value, seen = new WeakSet()) {
     const descriptors = Object.getOwnPropertyDescriptors(value);
     for (const key of Reflect.ownKeys(descriptors)) {
         const descriptor = descriptors[key];
-        if (typeof key === 'symbol' || !Object.hasOwn(descriptor, 'value')) {
+        if (is.symbol(key) || !Object.hasOwn(descriptor, 'value')) {
             fail('AI provider request payloads must contain data properties only.');
         }
         assertCallbackFreeProviderValue(descriptor.value, seen);
@@ -1090,7 +1093,7 @@ function assertClosedRecord(value, keys, label) {
     const descriptors = Object.getOwnPropertyDescriptors(value);
     const actual = Reflect.ownKeys(value);
     if (actual.some(function hasSymbolKey(key) {
-        return typeof key === 'symbol';
+        return is.symbol(key);
     })) {
         fail(`${label} must not contain symbol keys.`);
     }
@@ -1119,7 +1122,7 @@ function immutableSelection(role, value) {
     );
     assertIdentifier(value.providerId, `${role} provider selection.providerId`);
     assertIdentifier(value.modelId, `${role} provider selection.modelId`);
-    if (value.localOnly !== null && typeof value.localOnly !== 'boolean') {
+    if (value.localOnly !== null && !is.boolean(value.localOnly)) {
         fail(`${role} provider selection.localOnly must be null or a boolean.`);
     }
 
@@ -1189,7 +1192,7 @@ function immutableStartupOptions(options) {
     assertPlainObject(options, 'AI provider startup options');
     const descriptors = Object.getOwnPropertyDescriptors(options);
     for (const key of Reflect.ownKeys(descriptors)) {
-        if (typeof key === 'symbol'
+        if (is.symbol(key)
             || (key !== 'startLanguageModel'
                 && key !== 'startMuted'
                 && key !== 'startTranscription'
@@ -1215,13 +1218,13 @@ function immutableStartupOptions(options) {
     const signal = Object.hasOwn(descriptors, 'signal')
         ? descriptors.signal.value
         : null;
-    if (typeof startLanguageModel !== 'boolean') {
+    if (!is.boolean(startLanguageModel)) {
         fail('AI startup startLanguageModel must be a boolean.');
     }
-    if (typeof startMuted !== 'boolean') {
+    if (!is.boolean(startMuted)) {
         fail('AI startup startMuted must be a boolean.');
     }
-    if (typeof startTranscription !== 'boolean') {
+    if (!is.boolean(startTranscription)) {
         fail('AI startup startTranscription must be a boolean.');
     }
     assertAbortSignal(signal);
@@ -1237,7 +1240,7 @@ function immutableInspectionOptions(options) {
     assertPlainObject(options, 'AI provider inspection options');
     const descriptors = Object.getOwnPropertyDescriptors(options);
     for (const key of Reflect.ownKeys(descriptors)) {
-        if (typeof key === 'symbol'
+        if (is.symbol(key)
             || (key !== 'localOnly' && key !== 'signal')) {
             fail('AI provider inspection options contain an unknown option.');
         }
@@ -1251,7 +1254,7 @@ function immutableInspectionOptions(options) {
     const signal = Object.hasOwn(descriptors, 'signal')
         ? descriptors.signal.value
         : null;
-    if (typeof localOnly !== 'boolean') {
+    if (!is.boolean(localOnly)) {
         fail('AI provider inspection localOnly must be a boolean.');
     }
     assertAbortSignal(signal);
@@ -1259,7 +1262,7 @@ function immutableInspectionOptions(options) {
 }
 
 function nullableTupleIdentifier(value) {
-    return typeof value === 'string' && value.trim()
+    return is.string(value) && value.trim()
         ? value
         : null;
 }
@@ -1272,7 +1275,7 @@ function completeProgress(value) {
     const descriptors = Object.getOwnPropertyDescriptors(value);
     for (const key of Reflect.ownKeys(descriptors)) {
         const descriptor = descriptors[key];
-        if (typeof key === 'symbol' || !Object.hasOwn(descriptor, 'value')) {
+        if (is.symbol(key) || !Object.hasOwn(descriptor, 'value')) {
             fail('AI provider progress must contain string-keyed data properties only.');
         }
         result[key] = descriptor.value;
@@ -1281,7 +1284,7 @@ function completeProgress(value) {
 }
 
 function stateError(error, fallbackCode) {
-    const code = typeof error?.code === 'string'
+    const code = is.string(error?.code)
         && /^[A-Z][A-Z0-9_]*$/.test(error.code)
         ? error.code
         : fallbackCode;
@@ -1293,7 +1296,7 @@ function stateError(error, fallbackCode) {
             : code.includes('UNAVAILABLE') || code.includes('NOT_REGISTERED')
                 ? 'The selected AI provider is unavailable.'
                 : 'The selected AI provider operation failed.';
-    const message = typeof error?.message === 'string' && error.message
+    const message = is.string(error?.message) && error.message
         ? error.message
         : fallbackMessage;
     return completeValue(
@@ -1335,13 +1338,13 @@ function validateProvider(provider) {
     }
     assertRole(provider.role);
     assertIdentifier(provider.id, 'AI provider.id');
-    if (typeof provider.localOnly !== 'boolean') {
+    if (!is.boolean(provider.localOnly)) {
         fail('AI provider.localOnly must be a boolean.');
     }
     const maxConcurrentRequests = provider.maxConcurrentRequests === undefined
         ? 1
         : provider.maxConcurrentRequests;
-    if (!Number.isSafeInteger(maxConcurrentRequests)
+    if (!is.safeInteger(maxConcurrentRequests)
         || maxConcurrentRequests < 1) {
         fail('AI provider.maxConcurrentRequests must be a positive safe integer.');
     }
@@ -1349,7 +1352,7 @@ function validateProvider(provider) {
         fail('Only TTS providers may process more than one concurrent request.');
     }
     for (const method of PROVIDER_METHODS) {
-        if (typeof provider[method] !== 'function') {
+        if (!is.function(provider[method])) {
             fail(`AI provider.${method} must be a function.`);
         }
     }
@@ -1616,9 +1619,9 @@ function immutableSpeechProviderRoleReplacement(role, value) {
 
 function validateProviderStatus(status) {
     assertPlainObject(status, 'AI provider status');
-    if (typeof status.state !== 'string'
-        || typeof status.loaded !== 'boolean'
-        || typeof status.busy !== 'boolean') {
+    if (!is.string(status.state)
+        || !is.boolean(status.loaded)
+        || !is.boolean(status.busy)) {
         fail('AI provider status must include state, loaded, and busy values.');
     }
     return status;
@@ -1626,14 +1629,14 @@ function validateProviderStatus(status) {
 
 function validateInspection(inspection, selection) {
     assertPlainObject(inspection, 'AI provider inspection');
-    if (typeof inspection.available !== 'boolean') {
+    if (!is.boolean(inspection.available)) {
         fail('AI provider inspection.available must be a boolean.');
     }
     if (!inspection.available) {
-        const code = typeof inspection.code === 'string' && inspection.code.length > 0
+        const code = is.string(inspection.code) && inspection.code.length > 0
             ? inspection.code
             : 'ARCANE_AI_PROVIDER_AUTHORITY_BLOCKED';
-        const message = typeof inspection.message === 'string' && inspection.message.length > 0
+        const message = is.string(inspection.message) && inspection.message.length > 0
             ? inspection.message
             : 'The selected AI provider is unavailable.';
         throw operationError(message, code);
@@ -1923,7 +1926,7 @@ export class AIProviderRuntime {
         const localOnly = Object.hasOwn(options, 'localOnly')
             ? options.localOnly
             : false;
-        if (typeof localOnly !== 'boolean') {
+        if (!is.boolean(localOnly)) {
             fail('AI provider route localOnly must be a boolean.');
         }
         const slot = this.#slots[role];
@@ -2438,7 +2441,7 @@ export class AIProviderRuntime {
 
     configureFromTuple(tuple) {
         arcaneLogging.debug('[Arcane speech runtime] configureFromTuple', tuple);
-        if (!Array.isArray(tuple) || tuple.length !== 6) {
+        if (!is.array(tuple) || tuple.length !== 6) {
             fail('AI preference tuple must contain exactly six entries.');
         }
 
@@ -2544,7 +2547,7 @@ export class AIProviderRuntime {
             if (SPEECH_ROLES.includes(role)) {
                 arcaneLogging.debug('[Arcane speech runtime] provider.catalog.result', role, provider.id, providerCatalog);
             }
-            if (!Array.isArray(providerCatalog)) {
+            if (!is.array(providerCatalog)) {
                 fail('AI provider.catalog() must synchronously return an array.');
             }
             entries.push(
@@ -2728,7 +2731,7 @@ export class AIProviderRuntime {
             ? options.localOnly
             : false;
         assertAbortSignal(signal);
-        if (typeof localOnly !== 'boolean') {
+        if (!is.boolean(localOnly)) {
             fail('AI provider load localOnly must be a boolean.');
         }
         const slot = this.#slots[role];
@@ -3384,7 +3387,7 @@ export class AIProviderRuntime {
             const payload = options.payload;
             const field = Object.hasOwn(payload ?? {}, 'input') ? 'input' : 'text';
             const text = Object.getOwnPropertyDescriptor(payload ?? {}, field)?.value;
-            if (typeof text === 'string') {
+            if (is.string(text)) {
                 const input = stripSpeechFormatting(text);
                 if (input !== text) {
                     const payloadProperties = Object.getOwnPropertyDescriptors(payload);
@@ -3659,14 +3662,14 @@ export class AIProviderRuntime {
 
             function beginAIProviderStreamHandleCleanup(opened, activeIterator, reason) {
                 const cleanup = [];
-                if (typeof opened?.cancel === 'function') {
+                if (is.function(opened?.cancel)) {
                     cleanup.push(
                         Promise.resolve().then(function cancelOpenedAIStream() {
                             return opened.cancel(reason);
                         })
                     );
                 }
-                if (activeIterator && typeof activeIterator.return === 'function') {
+                if (activeIterator && is.function(activeIterator.return)) {
                     cleanup.push(
                         Promise.resolve().then(function returnOpenedAIStream() {
                             return activeIterator.return();
@@ -3699,7 +3702,7 @@ export class AIProviderRuntime {
                 }
                 const lateCleanup = providerOpenPromise.then(
                     async function cleanupLateAIProviderStream(lateHandle) {
-                        if (!lateHandle || typeof lateHandle.cancel !== 'function') {
+                        if (!lateHandle || !is.function(lateHandle.cancel)) {
                             throw operationError(
                                 'The late AI provider stream did not expose cancellable ownership.',
                                 'ARCANE_AI_STREAM_CLEANUP_INCOMPLETE'
@@ -3815,10 +3818,10 @@ export class AIProviderRuntime {
                     });
                     opened = await Promise.race([providerOpenPromise, abortedOpen]);
                     if (!opened
-                        || typeof opened[Symbol.asyncIterator] !== 'function'
-                        || typeof opened.cancel !== 'function'
+                        || !is.function(opened[Symbol.asyncIterator])
+                        || !is.function(opened.cancel)
                         || !opened.result
-                        || typeof opened.result.then !== 'function') {
+                        || !is.function(opened.result.then)) {
                         throw operationError(
                             'AI stream providers must return an async iterable with result and cancel().',
                             'ARCANE_AI_PROVIDER_STREAM_INVALID'
@@ -3826,7 +3829,7 @@ export class AIProviderRuntime {
                     }
                     providerHandle = opened;
                     iterator = opened[Symbol.asyncIterator]();
-                    if (!iterator || typeof iterator.next !== 'function') {
+                    if (!iterator || !is.function(iterator.next)) {
                         throw operationError(
                             'The AI provider stream iterator has no next() method.',
                             'ARCANE_AI_PROVIDER_STREAM_INVALID'
@@ -4121,7 +4124,7 @@ export class AIProviderRuntime {
         arcaneLogging.debug('[Arcane speech runtime] setSpeechMuted', muted);
         this.#assertOpen();
         this.#assertNotConfiguring();
-        if (typeof muted !== 'boolean') {
+        if (!is.boolean(muted)) {
             fail('AI speech muted state must be a boolean.');
         }
         this.#speechDesiredMuted = muted;

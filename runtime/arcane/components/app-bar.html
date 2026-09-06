@@ -220,6 +220,9 @@
 </nav>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const {arcaneLogging}=await import('arcane-os/logging');
 
     const host=this;
@@ -303,11 +306,11 @@
     }
 
     function normalizeNavigation(items=[]){
-        if(!Array.isArray(items)){
+        if(!is.array(items)){
             return [];
         }
 
-        return items.filter(item=>item&&typeof item==='object').map(
+        return items.filter(item=>item&&is.object(item)).map(
             item=>({
                 label:String(item.label||item.name||item.route||''),
                 href:String(item.href||'#'),

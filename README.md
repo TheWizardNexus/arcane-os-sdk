@@ -332,7 +332,7 @@ Streaming calls also recognize a run split across chunks. Single marks and
 ordinary repeated punctuation remain literal. No application option is needed;
 an existing `textFormat` extra is ignored and cannot disable cleanup. Original
 messages and caller payloads remain unchanged for display, storage, and model
-input. The dependency-free `arcane-os/speech-text` entrypoint exports the same
+input. The `arcane-os/speech-text` entrypoint exports the same
 `MarkdownSpeech` streaming class and `stripSpeechFormatting()` one-pass helper
 for code that needs the speech-only transformation directly.
 

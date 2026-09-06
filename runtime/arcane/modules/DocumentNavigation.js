@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const documentNavigationBindings=new WeakMap();
 const documentNavigationForms=new WeakSet();
 
@@ -41,7 +44,7 @@ function nearestDocumentNavigationDetails(group){
 }
 
 function documentNavigationDetailsIsOpen(details){
-    return typeof details.open==='boolean'
+    return is.boolean(details.open)
         ?details.open
         :details.hasAttribute('open');
 }
@@ -113,8 +116,8 @@ function revealCurrentDocumentNavigationItem(binding){
     if(
         !currentItem
         ||currentItem.hidden
-        ||typeof currentItem.getBoundingClientRect!=='function'
-        ||typeof binding.navigation.getBoundingClientRect!=='function'
+        ||!is.function(currentItem.getBoundingClientRect)
+        ||!is.function(binding.navigation.getBoundingClientRect)
     )return false;
 
     const navigationBounds=binding.navigation.getBoundingClientRect();
@@ -204,7 +207,7 @@ function autoInitializeDocumentNavigation(){
     initializeDocumentNavigation(globalThis.document);
 }
 
-if(typeof globalThis.document!=='undefined'){
+if(!is.undefined(globalThis.document)){
     if(globalThis.document.readyState==='loading'){
         globalThis.document.addEventListener(
             'DOMContentLoaded',

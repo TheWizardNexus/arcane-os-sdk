@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import './DBOPFS.js';
 import UserEntity from '../entities/User.js';
 import {
@@ -141,7 +144,7 @@ function normalizeAIReasoningEffort(value){
     if(value===undefined||value===null||value===''){
         return '';
     }
-    if(typeof value!=='string'||!AI_REASONING_EFFORTS.has(value)){
+    if(!is.string(value)||!AI_REASONING_EFFORTS.has(value)){
         const error=new TypeError(
             'AI reasoningEffort must be none, low, medium, high, or max.'
         );
@@ -168,7 +171,7 @@ function aiStructuralError(code,message,cause){
 }
 
 function isPlainAIRecord(value){
-    if(!value||typeof value!=='object'||Array.isArray(value)){
+    if(!value||!is.object(value)||is.array(value)){
         return false;
     }
     const prototype=Object.getPrototypeOf(value);
@@ -197,7 +200,7 @@ function normalizeTTSSegmentation(value,current=DEFAULT_TTS_SEGMENTATION){
         :value.wordCadence;
     if(
         wordCadence!==null
-        &&(!Number.isSafeInteger(wordCadence)||wordCadence<1)
+        &&(!is.safeInteger(wordCadence)||wordCadence<1)
     ){
         throw new RangeError(
             'TTS segmentation wordCadence must be null or a positive integer.'
@@ -208,7 +211,7 @@ function normalizeTTSSegmentation(value,current=DEFAULT_TTS_SEGMENTATION){
 }
 
 function requireAIToolMessageSchemas(value,label='AI tools'){
-    if(!Array.isArray(value)){
+    if(!is.array(value)){
         throw aiStructuralError(
             'AI_CHAT_INVALID_TOOL_CALL',
             `${label} must be an array.`
@@ -227,9 +230,9 @@ function requireAIToolMessageSchemas(value,label='AI tools'){
             ||!isPlainAIRecord(parameters.properties)
             ||!isPlainAIRecord(messageSchema)
             ||messageSchema.type!=='string'
-            ||!Number.isInteger(messageSchema.minLength)
+            ||!is.integer(messageSchema.minLength)
             ||messageSchema.minLength<1
-            ||!Array.isArray(parameters.required)
+            ||!is.array(parameters.required)
             ||!parameters.required.includes('message')
         ){
             throw aiStructuralError(
@@ -243,13 +246,13 @@ function requireAIToolMessageSchemas(value,label='AI tools'){
 function normalizeAIStructuralToolCall(call,label='Structural tool call'){
     if(
         !isPlainAIRecord(call)
-        ||typeof call.id!=='string'
+        ||!is.string(call.id)
         ||!call.id.trim()
         ||call.type!=='function'
         ||!isPlainAIRecord(call.function)
-        ||typeof call.function.name!=='string'
+        ||!is.string(call.function.name)
         ||!call.function.name.trim()
-        ||typeof call.function.arguments!=='string'
+        ||!is.string(call.function.arguments)
     ){
         throw aiStructuralError(
             'AI_CHAT_INVALID_TOOL_CALL',
@@ -272,7 +275,7 @@ function normalizeAIStructuralToolCall(call,label='Structural tool call'){
             `${label} arguments must encode a JSON object.`
         );
     }
-    if(typeof argumentsRecord.message!=='string'||!argumentsRecord.message.trim()){
+    if(!is.string(argumentsRecord.message)||!argumentsRecord.message.trim()){
         throw aiStructuralError(
             'AI_CHAT_TOOL_MESSAGE_REQUIRED',
             `${label} arguments must include a nonempty user-facing message.`
@@ -291,7 +294,7 @@ function normalizeAIStructuralToolCall(call,label='Structural tool call'){
 }
 
 function validateAIRequestMessages(messages=[]){
-    if(!Array.isArray(messages)){
+    if(!is.array(messages)){
         throw new TypeError('AI messages must be an array.');
     }
     const pendingToolCallIds=new Set();
@@ -300,7 +303,7 @@ function validateAIRequestMessages(messages=[]){
         const calls=message?.tool_calls;
         let openedToolCall=false;
         if(calls!==undefined){
-            if(message?.role!=='assistant'||!Array.isArray(calls)){
+            if(message?.role!=='assistant'||!is.array(calls)){
                 throw aiStructuralError(
                     'AI_CHAT_INVALID_TOOL_CALL',
                     `AI messages[${messageIndex}].tool_calls is invalid.`
@@ -330,7 +333,7 @@ function validateAIRequestMessages(messages=[]){
             }
         }
         if(message?.role==='tool'){
-            if(typeof message.content!=='string'||!message.content.trim()){
+            if(!is.string(message.content)||!message.content.trim()){
                 throw aiStructuralError(
                     'AI_CHAT_INVALID_TOOL_MESSAGE',
                     `AI messages[${messageIndex}] must contain a nonblank user-facing tool result.`
@@ -338,7 +341,7 @@ function validateAIRequestMessages(messages=[]){
             }
             if(
                 !pendingToolCallIds.size
-                ||typeof message.tool_call_id!=='string'
+                ||!is.string(message.tool_call_id)
                 ||!pendingToolCallIds.has(message.tool_call_id)
             ){
                 throw aiStructuralError(
@@ -365,7 +368,7 @@ function validateAIRequestMessages(messages=[]){
 function validateAIStructuralRequest(messages,tools,parallelToolCalls){
     validateAIRequestMessages(messages);
     requireAIToolMessageSchemas(tools);
-    if(parallelToolCalls!==undefined&&typeof parallelToolCalls!=='boolean'){
+    if(parallelToolCalls!==undefined&&!is.boolean(parallelToolCalls)){
         throw new TypeError('AI parallelToolCalls must be a boolean when provided.');
     }
 }
@@ -374,12 +377,12 @@ function normalizeAICompletionToolCalls(completion){
     const calls=[];
     const hasMessage=Boolean(
         completion
-        &&typeof completion==='object'
+        &&is.object(completion)
         &&Object.hasOwn(completion,'message')
     );
     const hasChoices=Boolean(
         completion
-        &&typeof completion==='object'
+        &&is.object(completion)
         &&Object.hasOwn(completion,'choices')
     );
     if(hasMessage&&hasChoices){
@@ -388,7 +391,7 @@ function normalizeAICompletionToolCalls(completion){
             'The AI completion must not mix message and choices envelopes.'
         );
     }
-    if(hasChoices&&!Array.isArray(completion.choices)){
+    if(hasChoices&&!is.array(completion.choices)){
         throw aiStructuralError(
             'AI_CHAT_INVALID_RESPONSE',
             'The AI completion choices envelope must be an array.'
@@ -401,7 +404,7 @@ function normalizeAICompletionToolCalls(completion){
             :[];
     for(let messageIndex=0;messageIndex<messages.length;messageIndex+=1){
         const toolCalls=messages[messageIndex]?.tool_calls;
-        if(toolCalls!==undefined&&!Array.isArray(toolCalls)){
+        if(toolCalls!==undefined&&!is.array(toolCalls)){
             throw aiStructuralError(
                 'AI_CHAT_INVALID_TOOL_CALL',
                 `AI response message ${messageIndex+1} contains invalid structural tool calls.`
@@ -428,12 +431,12 @@ function normalizeAICompletionToolCalls(completion){
 
 function sameAIDataValue(left,right,seen=new Map()){
     if(Object.is(left,right))return true;
-    if(!left||!right||typeof left!=='object'||typeof right!=='object')return false;
-    if(Array.isArray(left)!==Array.isArray(right))return false;
+    if(!left||!right||!is.object(left)||!is.object(right))return false;
+    if(is.array(left)!==is.array(right))return false;
     const matched=seen.get(left);
     if(matched!==undefined)return matched===right;
     seen.set(left,right);
-    if(Array.isArray(left)){
+    if(is.array(left)){
         return left.length===right.length
             &&left.every((value,index)=>sameAIDataValue(value,right[index],seen));
     }
@@ -507,11 +510,11 @@ function isAIStreamStructuralKey(key){
 const OMITTED_AI_STREAM_DATA=Symbol('omitted-ai-stream-data');
 
 function projectAIStreamData(value,seen=new Map()){
-    if(value===null||value===undefined||typeof value!=='object'){
+    if(value===null||value===undefined||!is.object(value)){
         return value;
     }
     if(seen.has(value)) return seen.get(value);
-    if(Array.isArray(value)){
+    if(is.array(value)){
         const result=[];
         seen.set(value,result);
         for(const item of value){
@@ -688,7 +691,7 @@ function normalizeAIStartupOptions(options){
             signal:null
         });
     }
-    if(!options||typeof options!=='object'||Array.isArray(options)){
+    if(!options||!is.object(options)||is.array(options)){
         throw new TypeError('AI startup options must be a plain object.');
     }
     const prototype=Object.getPrototypeOf(options);
@@ -697,7 +700,7 @@ function normalizeAIStartupOptions(options){
     }
     const descriptors=Object.getOwnPropertyDescriptors(options);
     for(const key of Reflect.ownKeys(descriptors)){
-        if(typeof key==='symbol'||(
+        if(is.symbol(key)||(
             key!=='startLanguageModel'
             &&key!=='startMuted'
             &&key!=='startTranscription'
@@ -721,20 +724,20 @@ function normalizeAIStartupOptions(options){
     const signal=Object.hasOwn(descriptors,'signal')
         ?descriptors.signal.value
         :null;
-    if(typeof startLanguageModel!=='boolean'){
+    if(!is.boolean(startLanguageModel)){
         throw new TypeError('AI startup startLanguageModel must be a boolean.');
     }
-    if(typeof startMuted!=='boolean'){
+    if(!is.boolean(startMuted)){
         throw new TypeError('AI startup startMuted must be a boolean.');
     }
-    if(typeof startTranscription!=='boolean'){
+    if(!is.boolean(startTranscription)){
         throw new TypeError('AI startup startTranscription must be a boolean.');
     }
     if(signal!==null&&signal!==undefined&&(
-        typeof signal!=='object'
-        ||typeof signal.aborted!=='boolean'
-        ||typeof signal.addEventListener!=='function'
-        ||typeof signal.removeEventListener!=='function'
+        !is.object(signal)
+        ||!is.boolean(signal.aborted)
+        ||!is.function(signal.addEventListener)
+        ||!is.function(signal.removeEventListener)
     )){
         throw new TypeError('AI startup signal must be an AbortSignal.');
     }
@@ -759,16 +762,16 @@ function aiBrowserSpeechError(code,reason,message,cause,{committed=false,name='E
 
 function isAbortSignal(value){
     return Boolean(value)
-        &&typeof value==='object'
-        &&typeof value.aborted==='boolean'
-        &&typeof value.addEventListener==='function'
-        &&typeof value.removeEventListener==='function';
+        &&is.object(value)
+        &&is.boolean(value.aborted)
+        &&is.function(value.addEventListener)
+        &&is.function(value.removeEventListener);
 }
 
 function closedRecord(value,keys,required,label){
     if(!value
-        ||typeof value!=='object'
-        ||Array.isArray(value)
+        ||!is.object(value)
+        ||is.array(value)
         ||![Object.prototype,null].includes(Object.getPrototypeOf(value))){
         throw aiBrowserSpeechError(
             AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
@@ -778,7 +781,7 @@ function closedRecord(value,keys,required,label){
     }
     const descriptors=Object.getOwnPropertyDescriptors(value);
     for(const key of Reflect.ownKeys(descriptors)){
-        if(typeof key!=='string'
+        if(!is.string(key)
             ||!keys.includes(key)
             ||!Object.hasOwn(descriptors[key],'value')){
             throw aiBrowserSpeechError(
@@ -801,7 +804,7 @@ function closedRecord(value,keys,required,label){
 }
 
 function browserSpeechIdentifier(value,label){
-    if(typeof value!=='string'
+    if(!is.string(value)
         ||value.trim()!==value
         ||value.length<1){
         throw aiBrowserSpeechError(
@@ -829,14 +832,14 @@ function normalizeBrowserTTSExecution(value){
     const maxConcurrentRequests=descriptors.maxConcurrentRequests
         ?descriptors.maxConcurrentRequests.value
         :DEFAULT_BROWSER_TTS_EXECUTION.maxConcurrentRequests;
-    if(typeof device!=='string'||!BROWSER_TTS_EXECUTION_DEVICES.has(device)){
+    if(!is.string(device)||!BROWSER_TTS_EXECUTION_DEVICES.has(device)){
         throw aiBrowserSpeechError(
             AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
             AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
             'AI browser speech tts.execution.device must be auto, webgpu, or wasm.'
         );
     }
-    if(!Number.isSafeInteger(maxConcurrentRequests)
+    if(!is.safeInteger(maxConcurrentRequests)
         ||maxConcurrentRequests<1
         ||maxConcurrentRequests>MAX_BROWSER_TTS_CONCURRENT_REQUESTS){
         throw aiBrowserSpeechError(
@@ -881,7 +884,7 @@ function normalizeBrowserSpeechRole(value,role){
     }
     if(hasGraph){
         const graph=descriptors.graph.value;
-        if(!graph||typeof graph!=='object'){
+        if(!graph||!is.object(graph)){
             throw aiBrowserSpeechError(
                 AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
                 AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
@@ -891,7 +894,7 @@ function normalizeBrowserSpeechRole(value,role){
     }else{
         for(const key of ['model','runtime']){
             const descriptor=descriptors[key].value;
-            if(!descriptor||typeof descriptor!=='object'||Array.isArray(descriptor)){
+            if(!descriptor||!is.object(descriptor)||is.array(descriptor)){
                 throw aiBrowserSpeechError(
                     AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
                     AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
@@ -906,7 +909,7 @@ function normalizeBrowserSpeechRole(value,role){
         // an implementation may be enabled.
         secure=descriptors.security.value?.secure===true;
     }
-    if(typeof descriptors.offline.value!=='boolean'){
+    if(!is.boolean(descriptors.offline.value)){
         throw aiBrowserSpeechError(
             AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
             AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
@@ -960,7 +963,7 @@ function normalizeBrowserSpeechConfiguration(value){
         'AI browser speech configuration.id'
     );
     const dbopfs=descriptors.dbopfs.value;
-    if(!dbopfs||typeof dbopfs!=='object'){
+    if(!dbopfs||!is.object(dbopfs)){
         throw aiBrowserSpeechError(
             AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
             AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
@@ -997,8 +1000,8 @@ function normalizeBrowserSpeechConfiguration(value){
 function normalizeBrowserSpeechOperationOptions(value,label){
     if(value===undefined)return completeValue({signal:null});
     if(!value
-        ||typeof value!=='object'
-        ||Array.isArray(value)
+        ||!is.object(value)
+        ||is.array(value)
         ||![Object.prototype,null].includes(Object.getPrototypeOf(value))){
         throw aiBrowserSpeechError(
             AI_BROWSER_SPEECH_ERROR_CODES.operationOptionsContractMismatch,
@@ -1294,7 +1297,7 @@ class AI {
     }
 
     set twinKey(value){
-        this.#license=typeof value==='string' ? value.trim():'';
+        this.#license=is.string(value) ? value.trim():'';
         this.#retainBuiltInLLMReadiness(
             this.#reconcileBuiltInLLMReadiness()
         );
@@ -1317,7 +1320,7 @@ class AI {
             return this.llmService==='TWIN'
                 &&Boolean(this.model)
                 &&Boolean(this.license)
-                &&typeof globalThis.fetch==='function';
+                &&is.function(globalThis.fetch);
         }
         if(providerId==='OLLAMA'){
             return this.llmService==='OLLAMA'
@@ -1434,7 +1437,7 @@ class AI {
                         'ARCANE_AI_ROLE_BUSY'
                     );
                 }
-                if(typeof context.progress!=='function'){
+                if(!is.function(context.progress)){
                     throw new TypeError(
                         'Built-in LLM provider load progress must be a function.'
                     );
@@ -1684,7 +1687,7 @@ class AI {
                         'ARCANE_AI_ROLE_BUSY'
                     );
                 }
-                if(typeof context.progress!=='function'){
+                if(!is.function(context.progress)){
                     throw new TypeError(
                         `Built-in ${role.toUpperCase()} provider load progress must be a function.`
                     );
@@ -2052,7 +2055,7 @@ class AI {
             if(value===undefined||value===null||value===''){
                 return current[index];
             }
-            if(typeof value!=='string'||value.trim()!==value||!value){
+            if(!is.string(value)||value.trim()!==value||!value){
                 throw new TypeError('AI preferences must be nonempty trimmed strings.');
             }
             return value;
@@ -2487,7 +2490,7 @@ class AI {
 
     #browserSpeechOperationId(action){
         this.#browserSpeechOperationSequence=
-            typeof this.#browserSpeechOperationSequence==='bigint'
+            is.bigint(this.#browserSpeechOperationSequence)
                 ? this.#browserSpeechOperationSequence+1n
                 : this.#browserSpeechOperationSequence===Number.MAX_SAFE_INTEGER
                     ? BigInt(this.#browserSpeechOperationSequence)+1n
@@ -2709,7 +2712,7 @@ class AI {
                 publicDetail:completeValue({
                     configurationId:normalized.id,
                     ...(descriptor?{descriptor}:{}),
-                    ...(typeof error?.code==='string'?{code:error.code}:{}),
+                    ...(is.string(error?.code)?{code:error.code}:{}),
                     reason
                 })
             }
@@ -2737,7 +2740,7 @@ class AI {
                 continue;
             }
             const catalog=providers[role].catalog();
-            if(catalog.length!==1||typeof catalog[0]?.id!=='string'){
+            if(catalog.length!==1||!is.string(catalog[0]?.id)){
                 throw aiBrowserSpeechError(
                     AI_BROWSER_SPEECH_ERROR_CODES.providerConstructionRejected,
                     AI_BROWSER_SPEECH_REASONS.providerConstructionRejected,
@@ -2951,7 +2954,7 @@ class AI {
         for(const role of ['tts','stt'].filter(role=>roles.includes(role))){
             if(record.registrationState?.[role]===false)continue;
             const unregister=record.unregisters?.[role];
-            if(typeof unregister!=='function'){
+            if(!is.function(unregister)){
                 failures.push(aiBrowserSpeechError(
                     AI_BROWSER_SPEECH_ERROR_CODES.providerUnregistrationRejected,
                     AI_BROWSER_SPEECH_REASONS.providerUnregistrationRejected,
@@ -3745,7 +3748,7 @@ class AI {
 
     async setSpeechMuted(muted){
         const callId=this.#traceSpeech('setSpeechMuted.call',{requestedMuted:muted});
-        if(typeof muted!=='boolean'){
+        if(!is.boolean(muted)){
             throw new TypeError('AI speech muted state must be a boolean.');
         }
         const generation=++this.#speechControlGeneration;
@@ -3792,12 +3795,12 @@ class AI {
                 if(signal?.aborted){
                     throw normalizeAIRequestAbort(signal.reason);
                 }
-                const message=typeof error==='string'
+                const message=is.string(error)
                     ?error
                     :error?.error?.message??error?.message;
                 if(
                     response.status!==429
-                    ||typeof message!=='string'
+                    ||!is.string(message)
                     ||!message.toLowerCase().includes('overload')
                 ){
                     throw error;
@@ -3836,7 +3839,7 @@ class AI {
         const client=globalThis.Arcane?.ollama;
 
         return this.llmService==='OLLAMA'
-            &&typeof client?.chat==='function'
+            &&is.function(client?.chat)
             ?client
             :null;
     }
@@ -3847,10 +3850,10 @@ class AI {
         if(service!=='LOCAL_SPEACH'){
             return null;
         }
-        if(role==='tts'&&typeof client?.synthesize==='function'){
+        if(role==='tts'&&is.function(client?.synthesize)){
             return client;
         }
-        if(role==='stt'&&typeof client?.transcribe==='function'){
+        if(role==='stt'&&is.function(client?.transcribe)){
             return client;
         }
         return null;
@@ -3858,7 +3861,7 @@ class AI {
 
     async #requestBuiltInSpeechTranscription(payload={},signal=null){
         const audio=payload?.audio;
-        if(!audio||typeof audio.arrayBuffer!=='function'){
+        if(!audio||!is.function(audio.arrayBuffer)){
             throw new TypeError('Speech transcription requires an audio Blob or File.');
         }
         if(signal?.aborted){
@@ -3880,7 +3883,7 @@ class AI {
             if(signal?.aborted){
                 throw normalizeAIRequestAbort(signal.reason);
             }
-            if(!response||typeof response.text!=='string'){
+            if(!response||!is.string(response.text)){
                 throw new TypeError('Arcane returned an invalid local speech transcription.');
             }
             return response.text;
@@ -3908,7 +3911,7 @@ class AI {
     }
 
     async #requestBuiltInSpeechSynthesis(payload={},signal=null){
-        const input=typeof payload?.input==='string'?payload.input:'';
+        const input=is.string(payload?.input)?payload.input:'';
         if(!input){
             throw new TypeError('Speech synthesis requires nonempty input.');
         }
@@ -3916,14 +3919,14 @@ class AI {
             throw normalizeAIRequestAbort(signal.reason);
         }
         const model=String(payload.model||this.modelTTS);
-        const voice=typeof payload.voice==='string'&&payload.voice.trim()
+        const voice=is.string(payload.voice)&&payload.voice.trim()
             ?payload.voice.trim()
             :this.#builtInSpeechDefaultVoice('tts',this.ttsService);
         if(!voice){
             throw new TypeError('The selected speech provider requires a voice.');
         }
         const responseFormat=String(payload.responseFormat||this.audioFormat);
-        const speed=Number.isFinite(payload.speed)?payload.speed:this.voiceSpeed;
+        const speed=is.finite(payload.speed)?payload.speed:this.voiceSpeed;
         const nativeSpeech=this.#nativeSpeech(this.ttsService,'tts');
         if(nativeSpeech){
             const response=await nativeSpeech.synthesize({
@@ -3936,7 +3939,7 @@ class AI {
             if(signal?.aborted){
                 throw normalizeAIRequestAbort(signal.reason);
             }
-            if(!response||typeof response.audioBase64!=='string'){
+            if(!response||!is.string(response.audioBase64)){
                 const error=new TypeError(
                     'The Arcane speech bridge returned invalid TTS audio.'
                 );
@@ -3946,7 +3949,7 @@ class AI {
             return new Blob(
                 [this.#base64ToBytes(response.audioBase64)],
                 {
-                    type:typeof response.contentType==='string'
+                    type:is.string(response.contentType)
                         ?response.contentType
                         :this.audioType
                 }
@@ -3995,7 +3998,7 @@ class AI {
     }
 
     async #androidNativeHost(){
-        if(typeof globalThis.arcaneAndroid?.postMessage==='function'){
+        if(is.function(globalThis.arcaneAndroid?.postMessage)){
             return true;
         }
 
@@ -4037,7 +4040,7 @@ class AI {
     }
 
     #base64ToBytes(value){
-        if(typeof value!=='string'||!value){
+        if(!is.string(value)||!value){
             throw new TypeError('Arcane returned invalid local speech audio.');
         }
 
@@ -4052,7 +4055,7 @@ class AI {
     }
 
     #ollamaTools(tools=[],toolChoice='auto'){
-        if(!Array.isArray(tools)){
+        if(!is.array(tools)){
             return [];
         }
 
@@ -4076,12 +4079,12 @@ class AI {
             const role=String(message?.role??'');
             const content=String(message?.content??'');
 
-            if(role==='assistant'&&Array.isArray(message?.tool_calls)){
+            if(role==='assistant'&&is.array(message?.tool_calls)){
                 const toolCalls=message.tool_calls.map(function sanitizeOllamaToolCall(call){
                     const name=String(call?.function?.name??'').trim();
                     const callId=String(call?.id??'').trim();
                     let argumentValue=call?.function?.arguments;
-                    if(typeof argumentValue==='string'){
+                    if(is.string(argumentValue)){
                         try{
                             argumentValue=JSON.parse(argumentValue);
                         }catch(cause){
@@ -4095,8 +4098,8 @@ class AI {
                     }
                     if(
                         !argumentValue
-                        ||typeof argumentValue!=='object'
-                        ||Array.isArray(argumentValue)
+                        ||!is.object(argumentValue)
+                        ||is.array(argumentValue)
                     ){
                         const error=new TypeError(
                             'Ollama tool call arguments must contain a JSON object.'
@@ -4172,8 +4175,8 @@ class AI {
             return 'json';
         }
         if(
-            typeof value==='object'
-            &&!Array.isArray(value)
+            is.object(value)
+            &&!is.array(value)
             &&(
                 Object.getPrototypeOf(value)===Object.prototype
                 ||Object.getPrototypeOf(value)===null
@@ -4207,7 +4210,7 @@ class AI {
     }
 
     async #reportRequest(requestHandler,request,id,metadata){
-        if(typeof requestHandler!=='function'){
+        if(!is.function(requestHandler)){
             throw new TypeError('AI onRequest callback must be a function.');
         }
         await requestHandler(request,id,metadata);
@@ -4215,31 +4218,31 @@ class AI {
 
     #providerStreamEmissions(chunk,seeThinking){
         const chunks=[];
-        if(typeof chunk==='string'){
+        if(is.string(chunk)){
             if(chunk) chunks.push({text:chunk,thinking:false});
             return {chunks};
         }
-        const choices=Array.isArray(chunk?.choices)?chunk.choices:[];
+        const choices=is.array(chunk?.choices)?chunk.choices:[];
         for(const choice of choices){
             const delta=choice?.delta||{};
             if(
                 seeThinking
-                &&typeof delta.reasoning_content==='string'
+                &&is.string(delta.reasoning_content)
                 &&delta.reasoning_content
             ){
                 chunks.push({text:delta.reasoning_content,thinking:true});
             }
-            if(typeof delta.content==='string'&&delta.content){
+            if(is.string(delta.content)&&delta.content){
                 chunks.push({text:delta.content,thinking:false});
             }
         }
         if(!choices.length){
-            if(seeThinking&&typeof chunk?.thinking==='string'){
+            if(seeThinking&&is.string(chunk?.thinking)){
                 chunks.push({text:chunk.thinking,thinking:true});
             }
-            const text=typeof chunk?.text==='string'
+            const text=is.string(chunk?.text)
                 ?chunk.text
-                :typeof chunk?.content==='string'
+                :is.string(chunk?.content)
                     ?chunk.content
                     :'';
             if(text){
@@ -4250,16 +4253,16 @@ class AI {
     }
 
     #providerCompletionOutput(completion){
-        if(typeof completion==='string'){
+        if(is.string(completion)){
             return completion;
         }
-        if(Array.isArray(completion?.choices)&&completion.choices.length>1){
+        if(is.array(completion?.choices)&&completion.choices.length>1){
             return completion;
         }
         const structuralToolCalls=normalizeAICompletionToolCalls(completion);
         if(structuralToolCalls.length)return structuralToolCalls;
         const content=completion?.choices?.[0]?.message?.content;
-        return typeof content==='string'?content:completion;
+        return is.string(content)?content:completion;
     }
 
     #requestBuiltInLLMChat(payload={},signal=null){
@@ -4331,14 +4334,14 @@ class AI {
         if(value===undefined){
             return [];
         }
-        if(!Array.isArray(value)){
+        if(!is.array(value)){
             throw aiStructuralError(
                 'AI_CHAT_INVALID_TOOL_CALL',
                 'The native Ollama response contains invalid structural tool calls.'
             );
         }
         return value.map(function adaptNativeOllamaToolCall(call,index){
-            if(!call||typeof call!=='object'||Array.isArray(call)){
+            if(!call||!is.object(call)||is.array(call)){
                 throw aiStructuralError(
                     'AI_CHAT_INVALID_TOOL_CALL',
                     `The native Ollama structural tool call ${index+1} is invalid.`
@@ -4347,8 +4350,8 @@ class AI {
             const nativeFunction=call.function;
             if(
                 !nativeFunction
-                ||typeof nativeFunction!=='object'
-                ||Array.isArray(nativeFunction)
+                ||!is.object(nativeFunction)
+                ||is.array(nativeFunction)
             ){
                 throw aiStructuralError(
                     'AI_CHAT_INVALID_TOOL_CALL',
@@ -4358,8 +4361,8 @@ class AI {
             let encodedArguments=nativeFunction.arguments;
             if(
                 encodedArguments
-                &&typeof encodedArguments==='object'
-                &&!Array.isArray(encodedArguments)
+                &&is.object(encodedArguments)
+                &&!is.array(encodedArguments)
             ){
                 try{
                     encodedArguments=JSON.stringify(encodedArguments);
@@ -4393,7 +4396,7 @@ class AI {
             :{};
         const responseFields={...responseRecord};
         delete responseFields.message;
-        const responseId=typeof response?.id==='string'&&response.id
+        const responseId=is.string(response?.id)&&response.id
             ?response.id
             :`ollama-${id}`;
         const adaptedToolCalls=this.#openAICompatibleOllamaToolCalls(
@@ -4405,7 +4408,7 @@ class AI {
         });
         const messageRecord={
             ...message,
-            role:typeof message.role==='string'&&message.role
+            role:is.string(message.role)&&message.role
                 ?message.role
                 :'assistant',
             content:Object.hasOwn(message,'content')?message.content:'',
@@ -4732,8 +4735,8 @@ class AI {
             validateAIStructuralRequest(messages,tools,parallel_tool_calls);
             this.#assertServiceConfigured(this.llmService);
             if(signal&&(
-                typeof signal.aborted!=='boolean'
-                ||typeof signal.addEventListener!=='function'
+                !is.boolean(signal.aborted)
+                ||!is.function(signal.addEventListener)
             )){
                 throw new TypeError('AI request signal must be an AbortSignal.');
             }
@@ -4971,7 +4974,7 @@ class AI {
                 const toolFunction=toolCall.function||{};
                 if(
                     toolCall.index!==undefined
-                    &&(!Number.isSafeInteger(toolCall.index)||toolCall.index<0)
+                    &&(!is.safeInteger(toolCall.index)||toolCall.index<0)
                 ){
                     throw aiStructuralError(
                         'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
@@ -4991,7 +4994,7 @@ class AI {
                 };
 
                 if(toolCall.id!==undefined){
-                    if(typeof toolCall.id!=='string'||!toolCall.id){
+                    if(!is.string(toolCall.id)||!toolCall.id){
                         record.invalidIdentity=true;
                     }else if(record.id&&record.id!==toolCall.id){
                         record.invalidIdentity=true;
@@ -5001,7 +5004,7 @@ class AI {
                 }
 
                 if(toolCall.type!==undefined){
-                    if(typeof toolCall.type!=='string'||!toolCall.type){
+                    if(!is.string(toolCall.type)||!toolCall.type){
                         record.invalidIdentity=true;
                     }else if(record.type&&record.type!==toolCall.type){
                         record.invalidIdentity=true;
@@ -5011,14 +5014,14 @@ class AI {
                 }
 
                 if(toolFunction.name!==undefined){
-                    if(typeof toolFunction.name!=='string'){
+                    if(!is.string(toolFunction.name)){
                         record.invalidName=true;
                     }else{
                         record.name+=toolFunction.name;
                     }
                 }
 
-                if(typeof toolFunction.arguments==='string'){
+                if(is.string(toolFunction.arguments)){
                     record.arguments+=toolFunction.arguments;
                 }else if(toolFunction.arguments!==undefined){
                     record.invalidArguments=true;
@@ -5032,7 +5035,7 @@ class AI {
         function receiveStreamedChoice(choice={},choicePosition=0){
             if(
                 choice.index!==undefined
-                &&(!Number.isSafeInteger(choice.index)||choice.index<0)
+                &&(!is.safeInteger(choice.index)||choice.index<0)
             ){
                 throw aiStructuralError(
                     'AI_CHAT_INVALID_RESPONSE',
@@ -5064,8 +5067,8 @@ class AI {
                     if(key==='content'||key==='reasoning'||key==='reasoning_content'){
                         if(
                             !replaceText
-                            &&typeof value==='string'
-                            &&typeof record.message[key]==='string'
+                            &&is.string(value)
+                            &&is.string(record.message[key])
                         ){
                             record.message[key]+=value;
                         }else{
@@ -5076,7 +5079,7 @@ class AI {
                     record.message[key]=value;
                 }
             }
-            if(typeof record.message.role!=='string'||!record.message.role){
+            if(!is.string(record.message.role)||!record.message.role){
                 record.message.role='assistant';
             }
             if(!Object.hasOwn(record.message,'content')) record.message.content='';
@@ -5098,7 +5101,7 @@ class AI {
             for(const [key,value] of Object.entries(streamedResponse)){
                 if(key!=='choices') streamMetadata[key]=value;
             }
-            const choices=Array.isArray(streamedResponse.choices)
+            const choices=is.array(streamedResponse.choices)
                 ?streamedResponse.choices
                 :[];
             for(let choicePosition=0;choicePosition<choices.length;choicePosition+=1){
@@ -5125,7 +5128,7 @@ class AI {
                 const choiceDelta=choice.delta??{};
                 const choiceMessage=choice.message??null;
                 if(Object.hasOwn(choiceDelta,'tool_calls')){
-                    if(!Array.isArray(choiceDelta.tool_calls)){
+                    if(!is.array(choiceDelta.tool_calls)){
                         throw aiStructuralError(
                             'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
                             `AI stream choice ${choicePosition+1} contains invalid structural tool-call data.`
@@ -5134,7 +5137,7 @@ class AI {
                     receiveStreamedToolCalls(choiceDelta.tool_calls,choiceIndex);
                 }
                 if(choiceMessage&&Object.hasOwn(choiceMessage,'tool_calls')){
-                    if(!Array.isArray(choiceMessage.tool_calls)){
+                    if(!is.array(choiceMessage.tool_calls)){
                         throw aiStructuralError(
                             'AI_CHAT_STREAM_TOOL_CALL_MISMATCH',
                             `AI stream choice ${choicePosition+1} contains invalid terminal structural tool-call data.`
@@ -5148,14 +5151,14 @@ class AI {
                         )
                     );
                 }
-                const content=typeof choiceDelta.content==='string'
+                const content=is.string(choiceDelta.content)
                     ?choiceDelta.content
                     :'';
                 let reasoning='';
                 if(seeThinking){
-                    reasoning=typeof choiceDelta.reasoning_content==='string'
+                    reasoning=is.string(choiceDelta.reasoning_content)
                         ?choiceDelta.reasoning_content
-                        :typeof choiceDelta.reasoning==='string'
+                        :is.string(choiceDelta.reasoning)
                             ?choiceDelta.reasoning
                             :'';
                 }
@@ -5343,7 +5346,7 @@ class AI {
                 const hasToolCalls=structuralToolCallsByChoice.has(choicePosition);
                 return {
                     ...retained.choice,
-                    index:Number.isSafeInteger(retained.choice.index)
+                    index:is.safeInteger(retained.choice.index)
                         &&retained.choice.index>=0
                         ?retained.choice.index
                         :choicePosition,
@@ -5561,8 +5564,8 @@ class AI {
         validateAIStructuralRequest(messages,tools,parallel_tool_calls);
         this.#assertServiceConfigured(this.llmService);
         if(signal&&(
-            typeof signal.aborted!=='boolean'
-            ||typeof signal.addEventListener!=='function'
+            !is.boolean(signal.aborted)
+            ||!is.function(signal.addEventListener)
         )){
             throw new TypeError('AI request signal must be an AbortSignal.');
         }
@@ -5741,7 +5744,7 @@ class AI {
 
         const {voice,speed,waitForPlayback=false}=options;
         const pauseAfterMs=Number(options.pauseAfterMs??0);
-        if(!Number.isFinite(pauseAfterMs)||pauseAfterMs<0){
+        if(!is.finite(pauseAfterMs)||pauseAfterMs<0){
             throw new RangeError('Speech pauses must be a nonnegative number of milliseconds.');
         }
 
@@ -6041,7 +6044,7 @@ class AI {
             entry=>entry.providerId===selection.providerId
         );
         const model=provider?.models.find(entry=>entry?.id===selection.modelId);
-        return typeof model?.defaultVoice==='string'&&model.defaultVoice.trim()
+        return is.string(model?.defaultVoice)&&model.defaultVoice.trim()
             ?model.defaultVoice.trim()
             :null;
     }
@@ -6059,7 +6062,7 @@ class AI {
         if(speech===undefined){
             return this.audioFormat;
         }
-        const prototype=speech&&typeof speech==='object'
+        const prototype=speech&&is.object(speech)
             ?Object.getPrototypeOf(speech)
             :null;
         const descriptors=prototype===Object.prototype||prototype===null
@@ -6067,10 +6070,10 @@ class AI {
             :null;
         const formats=descriptors?.responseFormats?.value;
         const defaultFormat=descriptors?.defaultResponseFormat?.value;
-        if(!Array.isArray(formats)
+        if(!is.array(formats)
             ||formats.length<1
-            ||!formats.every(format=>typeof format==='string'&&format.trim()===format&&format)
-            ||typeof defaultFormat!=='string'
+            ||!formats.every(format=>is.string(format)&&format.trim()===format&&format)
+            ||!is.string(defaultFormat)
             ||!formats.includes(defaultFormat)){
             throw aiProviderError(
                 'The selected TTS provider returned an invalid speech format catalog.',
@@ -6097,7 +6100,7 @@ class AI {
             };
         }
 
-        if(response instanceof ArrayBuffer||ArrayBuffer.isView(response)){
+        if(response instanceof ArrayBuffer||is.arrayBufferView(response)){
             const bytes=response instanceof ArrayBuffer
                 ?new Uint8Array(response)
                 :new Uint8Array(
@@ -6111,11 +6114,11 @@ class AI {
             };
         }
 
-        if(response&&typeof response==='object'){
-            if(typeof response.audioBase64==='string'){
+        if(response&&is.object(response)){
+            if(is.string(response.audioBase64)){
                 return {
                     chunks:[this.#base64ToBytes(response.audioBase64)],
-                    type:typeof response.contentType==='string'
+                    type:is.string(response.contentType)
                         ?response.contentType
                         :this.audioType
                 };
@@ -6129,7 +6132,7 @@ class AI {
                 };
             }
             if(response.audio instanceof ArrayBuffer
-                ||ArrayBuffer.isView(response.audio)){
+                ||is.arrayBufferView(response.audio)){
                 const bytes=response.audio instanceof ArrayBuffer
                     ?new Uint8Array(response.audio)
                     :new Uint8Array(
@@ -6139,7 +6142,7 @@ class AI {
                     );
                 return {
                     chunks:[bytes],
-                    type:typeof response.contentType==='string'
+                    type:is.string(response.contentType)
                         ?response.contentType
                         :this.audioType
                 };
@@ -6168,7 +6171,7 @@ class AI {
 
         const AudioContext=window.AudioContext||window.webkitAudioContext;
 
-        if(typeof AudioContext!=='function'){
+        if(!is.function(AudioContext)){
             throw new TypeError('Audio playback is unavailable in this browser.');
         }
 
@@ -6181,8 +6184,8 @@ class AI {
         try{
             this.#assertServiceConfigured(this.ttsService,'tts');
             if(!payload
-                ||typeof payload!=='object'
-                ||Array.isArray(payload)
+                ||!is.object(payload)
+                ||is.array(payload)
                 ||![Object.prototype,null].includes(Object.getPrototypeOf(payload))){
                 const error=new TypeError('AI.fetchTTS requires a speech request object.');
                 error.code='ARCANE_AI_TTS_REQUEST_INVALID';
@@ -6197,7 +6200,7 @@ class AI {
                 'speed'
             ]);
             for(const key of Reflect.ownKeys(descriptors)){
-                if(typeof key==='symbol'
+                if(is.symbol(key)
                     ||!acceptedKeys.has(key)
                     ||!Object.hasOwn(descriptors[key],'value')){
                     const error=new TypeError(
@@ -6208,9 +6211,9 @@ class AI {
                 }
             }
             if(signal&&(
-                typeof signal.aborted!=='boolean'
-                ||typeof signal.addEventListener!=='function'
-                ||typeof signal.removeEventListener!=='function'
+                !is.boolean(signal.aborted)
+                ||!is.function(signal.addEventListener)
+                ||!is.function(signal.removeEventListener)
             )){
                 const error=new TypeError('AI.fetchTTS signal must be an AbortSignal.');
                 error.code='ARCANE_AI_TTS_SIGNAL_INVALID';
@@ -6221,7 +6224,7 @@ class AI {
             }
 
             const suppliedInput=descriptors.input?.value;
-            if(typeof suppliedInput!=='string'||!suppliedInput.trim()){
+            if(!is.string(suppliedInput)||!suppliedInput.trim()){
                 const error=new TypeError('AI.fetchTTS input must be nonempty text.');
                 error.code='ARCANE_AI_TTS_INPUT_INVALID';
                 throw error;
@@ -6232,7 +6235,7 @@ class AI {
             const selection=this.#providerRuntime.selection('tts');
             const requestedModel=descriptors.model?.value;
             if(requestedModel!==undefined
-                &&(typeof requestedModel!=='string'
+                &&(!is.string(requestedModel)
                     ||requestedModel.trim()!==requestedModel
                     ||!requestedModel)){
                 const error=new TypeError(
@@ -6259,7 +6262,7 @@ class AI {
             }
             const requestedVoice=descriptors.voice?.value;
             if(requestedVoice!==undefined
-                &&(typeof requestedVoice!=='string'
+                &&(!is.string(requestedVoice)
                     ||requestedVoice.trim()!==requestedVoice
                     ||!requestedVoice)){
                 const error=new TypeError(
@@ -6282,7 +6285,7 @@ class AI {
             }
             const requestedResponseFormat=descriptors.responseFormat?.value;
             if(requestedResponseFormat!==undefined
-                &&(typeof requestedResponseFormat!=='string'
+                &&(!is.string(requestedResponseFormat)
                     ||requestedResponseFormat.trim()!==requestedResponseFormat
                     ||!requestedResponseFormat)){
                 const error=new TypeError(
@@ -6302,7 +6305,7 @@ class AI {
             const speed=descriptors.speed
                 ?Number(descriptors.speed.value)
                 :this.voiceSpeed;
-            if(!Number.isFinite(speed)||speed<=0){
+            if(!is.finite(speed)||speed<=0){
                 const error=new RangeError('AI.fetchTTS speed must be a positive number.');
                 error.code='ARCANE_AI_TTS_SPEED_INVALID';
                 throw error;
@@ -6350,9 +6353,9 @@ class AI {
         try{
             this.#assertServiceConfigured(this.sttService,'stt');
             if(signal&&(
-                typeof signal.aborted!=='boolean'
-                ||typeof signal.addEventListener!=='function'
-                ||typeof signal.removeEventListener!=='function'
+                !is.boolean(signal.aborted)
+                ||!is.function(signal.addEventListener)
+                ||!is.function(signal.removeEventListener)
             )){
                 const error=new TypeError('AI.fetchSTT signal must be an AbortSignal.');
                 error.code='ARCANE_AI_STT_SIGNAL_INVALID';
@@ -6369,7 +6372,7 @@ class AI {
                         operation:'transcribe',
                         payload:{
                             audio:audioFile,
-                            mimeType:typeof Blob==='function'
+                            mimeType:is.function(globalThis.Blob)
                                 &&audioFile instanceof Blob
                                 ?String(audioFile.type||'audio/webm')
                                 :'audio/webm',
@@ -6380,10 +6383,10 @@ class AI {
                     }
                 );
                 this.#traceSpeech('fetchSTT.providerResult',{callId,response});
-                const text=typeof response==='string'
+                const text=is.string(response)
                     ?response
                     :response?.text;
-                if(typeof text!=='string'){
+                if(!is.string(text)){
                     const error=new TypeError(
                         'Arcane returned an invalid provider speech transcription.'
                     );
@@ -6490,7 +6493,7 @@ class AI {
                 return true;
             }
 
-            if(typeof context.resume!=='function'){
+            if(!is.function(context.resume)){
                 this.#waitForSpeechGesture(null,context);
                 this.#traceSpeech('resumeAudio.result',{
                     callId,result:false,reason:'resume-unavailable'
@@ -6712,7 +6715,7 @@ class AI {
 
                 try{
                     const duration=Number(job.audioBuffer?.duration);
-                    const hasKnownDuration=Number.isFinite(duration)&&duration>0;
+                    const hasKnownDuration=is.finite(duration)&&duration>0;
                     const currentTime=Number(audioContext.currentTime)||0;
                     const previousContext=this.speechScheduleContext;
                     const remainingDelay=previousContext
@@ -6877,7 +6880,7 @@ class AI {
                     operationId,
                     publicDetail:completeValue({
                         boundary:normalizedBoundary,
-                        ...(typeof error?.code==='string'?{code:error.code}:{}),
+                        ...(is.string(error?.code)?{code:error.code}:{}),
                         generation,
                         reason
                     })
@@ -7019,7 +7022,7 @@ function installAIUserReadyRegistration(){
             ?existingDescriptor.value
             :null;
         if(existing?.protocol!==AI_USER_READY_REGISTRATION_PROTOCOL
-            ||typeof existing.dispose!=='function'){
+            ||!is.function(existing.dispose)){
             throw aiInitializationError(
                 AI_INITIALIZATION_ERROR_CODES.userReadyRegistrationCollision,
                 AI_INITIALIZATION_REASONS.userReadyRegistrationCollision,

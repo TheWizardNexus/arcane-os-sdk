@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const ACTION_ITEM_STATUSES=['open','completed'];
 const ACTION_ITEM_BASES=['user_commitment','optional_homework'];
 const DEFAULT_PRESENTATION_COOLDOWN_MS=7*24*60*60*1000;
@@ -12,7 +15,7 @@ function invalid(message){
 }
 
 function isPlainRecord(value){
-    if(!value||typeof value!=='object'||Array.isArray(value)){
+    if(!value||!is.object(value)||is.array(value)){
         return false;
     }
 
@@ -21,7 +24,7 @@ function isPlainRecord(value){
 }
 
 function normalizedText(value,label='Action item'){
-    if(typeof value!=='string'){
+    if(!is.string(value)){
         throw invalid(`${label} must be a string.`);
     }
     if(UNSAFE_TEXT_CONTROL_PATTERN.test(value)){
@@ -35,7 +38,7 @@ function normalizedText(value,label='Action item'){
 }
 
 function normalizedId(value,label='Action item id'){
-    if(typeof value!=='string'||!ACTION_ITEM_ID_PATTERN.test(value)){
+    if(!is.string(value)||!ACTION_ITEM_ID_PATTERN.test(value)){
         throw invalid(`${label} is invalid.`);
     }
 
@@ -47,7 +50,7 @@ function normalizedOptionalId(value,label){
         return null;
     }
 
-    if(typeof value!=='string'||!CONVERSATION_ID_PATTERN.test(value)){
+    if(!is.string(value)||!CONVERSATION_ID_PATTERN.test(value)){
         throw invalid(`${label} is invalid.`);
     }
 
@@ -58,7 +61,7 @@ function normalizedTimestamp(value,label,{nullable=false}={}){
     if(nullable&&(value===undefined||value===null)){
         return null;
     }
-    if(!Number.isSafeInteger(value)||value<0){
+    if(!is.safeInteger(value)||value<0){
         throw invalid(`${label} must be a non-negative integer timestamp.`);
     }
 
@@ -70,7 +73,7 @@ function normalizedNow(value){
 }
 
 function normalizedRevision(value){
-    if(!Number.isSafeInteger(value)||value<1){
+    if(!is.safeInteger(value)||value<1){
         throw invalid('revision must be a positive integer.');
     }
 
@@ -98,7 +101,7 @@ function nextRevision(item){
 }
 
 function defaultActionItemId(){
-    if(typeof globalThis.crypto?.randomUUID==='function'){
+    if(is.function(globalThis.crypto?.randomUUID)){
         return globalThis.crypto.randomUUID();
     }
 
@@ -110,7 +113,7 @@ function completeItems(items){
 }
 
 export function normalizeRememberedConversationActions(value=[]){
-    if(!Array.isArray(value))throw invalid('Remembered actions must be an array.');
+    if(!is.array(value))throw invalid('Remembered actions must be an array.');
 
     return completeItems(value.map(function normalizeRememberedAction(action){
         if(!isPlainRecord(action)){
@@ -186,7 +189,7 @@ export function normalizeConversationActionItem(value){
 }
 
 export function normalizeConversationActionItems(value=[]){
-    if(!Array.isArray(value))throw invalid('Action items must be an array.');
+    if(!is.array(value))throw invalid('Action items must be an array.');
 
     const ids=new Set();
     const items=value.map(function normalizeActionItemRecord(item){
@@ -231,7 +234,7 @@ export function rememberConversationActionItems(current=[],actions=[],{
 }={}){
     const items=[...normalizeConversationActionItems(current)];
     const remembered=normalizeRememberedConversationActions(actions);
-    if(typeof idFactory!=='function'){
+    if(!is.function(idFactory)){
         throw invalid('idFactory must be a function.');
     }
 
@@ -353,7 +356,7 @@ export function selectConversationActionItemsForPresentation(current=[],{
         throw invalid('conversationId is required.');
     }
     const timestamp=normalizedNow(now);
-    if(!Number.isSafeInteger(cooldownMs)||cooldownMs<0){
+    if(!is.safeInteger(cooldownMs)||cooldownMs<0){
         throw invalid('cooldownMs must be a non-negative integer.');
     }
     const selected=outstandingConversationActionItems(current)
@@ -390,7 +393,7 @@ export function markConversationActionItemsPresented(current=[],ids=[],{
         throw invalid('conversationId is required.');
     }
     const timestamp=normalizedNow(now);
-    if(!Array.isArray(ids))throw invalid('Presented ids must be an array.');
+    if(!is.array(ids))throw invalid('Presented ids must be an array.');
     const requested=new Set(ids.map(id=>normalizedId(id)));
 
     let matched=0;

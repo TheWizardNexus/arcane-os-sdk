@@ -1,7 +1,10 @@
+import Is from 'strong-type';
 import {lstat,readFile,readdir,realpath} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {SDK_VERSION} from './constants.mjs';
+
+const is = new Is(false);
 
 const sdkRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 
@@ -25,7 +28,7 @@ function compareText(left,right){
 }
 
 function safeRelativePath(value){
-    if(typeof value!=='string'||!value||value.includes('\\')||value.includes('\0')
+    if(!is.string(value)||!value||value.includes('\\')||value.includes('\0')
         ||path.posix.isAbsolute(value)||path.posix.normalize(value)!==value
         ||value==='.'||value.startsWith('../')||value.includes('/../')){
         fail(`SDK runtime contains an unsafe relative path: ${String(value)}.`);

@@ -54,6 +54,9 @@
 </section>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const host=this;
     const root=host.shadowRoot;
     const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
@@ -152,8 +155,8 @@
     }
 
     function renderMetadata(input=[]){
-        const entries=Array.isArray(input)
-            ?input.map(entry=>Array.isArray(entry)?entry:[entry.label,entry.value])
+        const entries=is.array(input)
+            ?input.map(entry=>is.array(entry)?entry:[entry.label,entry.value])
             :Object.entries(input||{});
         const fragment=document.createDocumentFragment();
         for(const [label,value] of entries){
@@ -177,7 +180,7 @@
             return false;
         }
         preview.replaceChildren();
-        if(typeof Node!=='undefined'&&value instanceof Node){
+        if(!is.undefined(globalThis.Node)&&value instanceof Node){
             preview.append(value);
         }else if(`${value??''}`){
             const text=document.createElement('pre');
@@ -230,7 +233,7 @@
         if(destroyed){
             return false;
         }
-        const next=typeof value==='object'?value:{label:value,status:value};
+        const next=is.object(value)?value:{label:value,status:value};
         status.innerText=`${next.label||''}`;
         status.dataset.status=`${next.status||''}`;
         status.hidden=!status.innerText;
@@ -278,7 +281,7 @@
 
     function formatSize(value){
         const bytes=Number(value);
-        if(!Number.isFinite(bytes)||bytes<0){
+        if(!is.finite(bytes)||bytes<0){
             return '';
         }
         if(bytes<1024){
@@ -299,7 +302,7 @@
             return '';
         }
         const date=new Date(value);
-        return Number.isNaN(date.getTime())?'':date.toLocaleString();
+        return is.NaN(date.getTime())?'':date.toLocaleString();
     }
 
     function clear(){

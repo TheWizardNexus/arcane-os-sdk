@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 /**
  * Default delay of exactly seven 24-hour periods in milliseconds.
  *
@@ -23,7 +26,7 @@ export class Questionnaire{
      * @throws {RangeError} When the delay is not a positive finite number.
      */
     setNotificationTime(notificationTime){
-        if(!Number.isFinite(notificationTime)||notificationTime<=0){
+        if(!is.finite(notificationTime)||notificationTime<=0){
             throw new RangeError('notificationTime must be a positive finite number');
         }
 
@@ -48,11 +51,11 @@ export class Questionnaire{
             return false;
         }
 
-        if(!Number.isSafeInteger(firstBootUp)||firstBootUp<=0){
+        if(!is.safeInteger(firstBootUp)||firstBootUp<=0){
             return false;
         }
 
-        if(!Number.isFinite(now)||now<firstBootUp){
+        if(!is.finite(now)||now<firstBootUp){
             return false;
         }
 

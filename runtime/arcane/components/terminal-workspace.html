@@ -26,6 +26,9 @@
     <form class="prompt" id="prompt"><label class="prompt-label" id="promptLabel" for="input">arcane ❯</label><textarea class="input" id="input" rows="1" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Enter a command"></textarea></form>
 </section>
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const {parseAnsi,stripAnsi}=await import('../modules/AnsiText.js');
     const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
     const host=this,root=host.shadowRoot;
@@ -62,7 +65,7 @@
     function renderText(row,text,term){const clean=stripAnsi(text);if(!term){for(const token of parseAnsi(text)){const span=document.createElement('span');span.textContent=token.text;const classes=[];if(token.style.bold)classes.push('ansi-bold');if(token.style.dim)classes.push('ansi-dim');if(token.style.italic)classes.push('ansi-italic');if(token.style.underline)classes.push('ansi-underline');if(token.style.foreground&&!token.style.foreground.startsWith('index-'))classes.push(`ansi-${token.style.foreground}`);span.className=classes.join(' ');row.append(span);}return;}let cursor=0,index=clean.toLowerCase().indexOf(term);while(index>=0){row.append(document.createTextNode(clean.slice(cursor,index)));const mark=document.createElement('mark');mark.textContent=clean.slice(index,index+term.length);row.append(mark);cursor=index+term.length;index=clean.toLowerCase().indexOf(term,cursor);}row.append(document.createTextNode(clean.slice(cursor)));}
     function toggleSearch(force){search.hidden=force===undefined?!search.hidden:!force;if(!search.hidden)search.focus();else{search.value='';render();input.focus();}}
     function resizeInput(){input.style.height='auto';input.style.height=`${Math.min(input.scrollHeight,160)}px`;}
-    function emit(type,detail={}){if(destroyed)return false;const operationId=`${events.instanceId}:${type}:${(++eventOperationSequence).toString(36)}`;const publication=events.dispatch(type,detail,{operationId,publicDetail:{hasSession:Boolean(detail.sessionId),lineLength:typeof detail.line==='string'?detail.line.length:0,historyCount:Array.isArray(detail.history)?detail.history.length:0,reason:type}});return projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});}
+    function emit(type,detail={}){if(destroyed)return false;const operationId=`${events.instanceId}:${type}:${(++eventOperationSequence).toString(36)}`;const publication=events.dispatch(type,detail,{operationId,publicDetail:{hasSession:Boolean(detail.sessionId),lineLength:is.string(detail.line)?detail.line.length:0,historyCount:is.array(detail.history)?detail.history.length:0,reason:type}});return projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});}
     function destroy(){if(destroyed)return false;destroyed=true;host.ready=false;for(const id of ['find','clear','interrupt','settings','copy'])root.querySelector(`#${id}`).onclick=null;events.dispose();return true;}
     emit('terminal-workspace-ready');
 </script>

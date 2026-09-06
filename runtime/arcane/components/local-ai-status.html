@@ -95,6 +95,9 @@
 </section>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const host=this;
     const root=host.shadowRoot;
     const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
@@ -286,13 +289,13 @@
     }
 
     function positiveSafeInteger(value){
-        return Number.isSafeInteger(value)&&value>0
+        return is.safeInteger(value)&&value>0
             ?value
             :null;
     }
 
     function normalizeResult(value={}){
-        if(typeof value==='boolean'){
+        if(is.boolean(value)){
             return {
                 required:true,
                 ready:value,

@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const DOCUMENT_SEARCH_FIELD_ORDER=[
     'title','searchTerms','tags','headings','summary','category','navigationGroup',
     'navigationParent','audiences','platforms','sourcePath','path','language','id'
@@ -17,8 +20,8 @@ function fail(message,code='DOCUMENT_SEARCH_INVALID'){
 
 function isPlainRecord(value){
     return Boolean(value)
-        &&typeof value==='object'
-        &&!Array.isArray(value)
+        &&is.object(value)
+        &&!is.array(value)
         &&Object.getPrototypeOf(value)===Object.prototype;
 }
 
@@ -32,7 +35,7 @@ function documentSearchTokens(value){
 }
 
 function list(value,mapper=normalizedDocumentSearchText){
-    return Array.isArray(value)?value.map(mapper):[];
+    return is.array(value)?value.map(mapper):[];
 }
 
 function createDocumentLexicalIndex(record){
@@ -125,7 +128,7 @@ function compareText(left,right){
 }
 
 function normalizeQuery(value){
-    if(typeof value!=='string') fail('Search query must be a string.','DOCUMENT_SEARCH_INVALID_QUERY');
+    if(!is.string(value)) fail('Search query must be a string.','DOCUMENT_SEARCH_INVALID_QUERY');
     const query=value.trim();
     if(CONTROL_CHARACTERS.test(query)){
         fail('Search query must be plain text.','DOCUMENT_SEARCH_INVALID_QUERY');
@@ -135,9 +138,9 @@ function normalizeQuery(value){
 
 function normalizeFilter(value,label){
     if(value===undefined) return null;
-    if(!Array.isArray(value)) fail(`${label} must be an array.`,'DOCUMENT_SEARCH_INVALID_QUERY');
+    if(!is.array(value)) fail(`${label} must be an array.`,'DOCUMENT_SEARCH_INVALID_QUERY');
     return new Set(value.map((item,index)=>{
-        if(typeof item!=='string'||!item.trim()){
+        if(!is.string(item)||!item.trim()){
             fail(`${label} entry ${index+1} must contain text.`,'DOCUMENT_SEARCH_INVALID_QUERY');
         }
         return canonicalKey(item.trim());
@@ -152,7 +155,7 @@ function lineNumberAt(value,offset){
 }
 
 function documentContextExcerpt(value){
-    if(typeof value!=='string') fail('Document context must be text.');
+    if(!is.string(value)) fail('Document context must be text.');
     return {
         lineEnd:lineNumberAt(value,Math.max(0,value.length-1)),
         lineStart:1,
@@ -165,7 +168,7 @@ class DocumentLexicalSearch{
     #records;
 
     constructor(records){
-        if(!Array.isArray(records)) fail('Document search records must be an array.');
+        if(!is.array(records)) fail('Document search records must be an array.');
         this.#records=[...records];
         this.#indexes=new Map(this.#records.map(record=>[record.id,createDocumentLexicalIndex(record)]));
     }

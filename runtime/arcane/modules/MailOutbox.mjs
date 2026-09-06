@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import { arcaneLogging } from 'arcane-os/logging';
 export const MAIL_OUTBOX_PROTOCOL='arcane-mail-outbox/1';
 export const MAIL_OUTBOX_TABLE='mail_outbox';
@@ -30,7 +33,7 @@ function coded(error,code){
 
 function reportMailOutboxObserverError(error){
     try{
-        if(typeof globalThis.reportError==='function'){
+        if(is.function(globalThis.reportError)){
             globalThis.reportError(error);
             return;
         }
@@ -45,14 +48,14 @@ function fail(message,code='MAIL_OUTBOX_INVALID',ErrorType=Error,cause){
 
 function isPlainRecord(value){
     return Boolean(value)
-        &&typeof value==='object'
-        &&!Array.isArray(value)
+        &&is.object(value)
+        &&!is.array(value)
         &&Object.getPrototypeOf(value)===Object.prototype;
 }
 
 function timestamp(value,label,{nullable=false}={}){
     if(nullable&&value===null) return null;
-    if(!Number.isSafeInteger(value)||value<0){
+    if(!is.safeInteger(value)||value<0){
         fail(`${label} must be a nonnegative epoch-millisecond integer.`,'MAIL_OUTBOX_RECORD_INVALID');
     }
     return value;
@@ -61,31 +64,31 @@ function timestamp(value,label,{nullable=false}={}){
 function clockMilliseconds(clock){
     const value=clock();
     const milliseconds=value instanceof Date?value.getTime():Number(value);
-    if(!Number.isSafeInteger(milliseconds)||milliseconds<0){
+    if(!is.safeInteger(milliseconds)||milliseconds<0){
         fail('Mail outbox clock returned an invalid time.','MAIL_OUTBOX_CLOCK_INVALID');
     }
     return milliseconds;
 }
 
 function safeString(value,pattern){
-    return typeof value==='string'&&pattern.test(value)?value:null;
+    return is.string(value)&&pattern.test(value)?value:null;
 }
 
 function safeStatusCode(value){
-    return Number.isSafeInteger(value)&&value>=100&&value<=599?value:null;
+    return is.safeInteger(value)&&value>=100&&value<=599?value:null;
 }
 
 function retryAfterSeconds(value){
     if(value===undefined||value===null) return null;
     const seconds=Number(value);
-    if(!Number.isSafeInteger(seconds)||seconds<0){
+    if(!is.safeInteger(seconds)||seconds<0){
         return null;
     }
     return seconds;
 }
 
 function parseSerializedReport(value){
-    if(typeof value!=='string'||!value){
+    if(!is.string(value)||!value){
         fail('Mail outbox record contains no serialized report.','MAIL_OUTBOX_RECORD_INVALID');
     }
     let parsed;
@@ -115,7 +118,7 @@ function serializeReport(report){
     }catch(error){
         fail('Mail outbox report must be JSON serializable.','MAIL_OUTBOX_REPORT_INVALID',TypeError,error);
     }
-    if(typeof serialized!=='string'||!serialized){
+    if(!is.string(serialized)||!serialized){
         fail('Mail outbox report must be JSON serializable.','MAIL_OUTBOX_REPORT_INVALID',TypeError);
     }
     return serialized;
@@ -124,13 +127,13 @@ function serializeReport(report){
 function quarantineSnapshot(value){
     try{
         const serialized=JSON.stringify(value);
-        if(typeof serialized==='string')return serialized;
+        if(is.string(serialized))return serialized;
     }catch{}
     return null;
 }
 
 function reportKey(value){
-    if(typeof value!=='string'||!REPORT_KEY_PATTERN.test(value)){
+    if(!is.string(value)||!REPORT_KEY_PATTERN.test(value)){
         fail(
             'Mail outbox reportKey must contain safe characters.',
             'MAIL_OUTBOX_REPORT_KEY_INVALID',
@@ -145,7 +148,7 @@ function recordFileName(value){
 }
 
 function reportKeyFromFileName(value){
-    if(typeof value!=='string'||!value.endsWith(FILE_SUFFIX)){
+    if(!is.string(value)||!value.endsWith(FILE_SUFFIX)){
         fail('Mail outbox contains an invalid record filename.','MAIL_OUTBOX_RECORD_INVALID');
     }
     return reportKey(value.slice(0,-FILE_SUFFIX.length));
@@ -158,7 +161,7 @@ function invalidRecordMetadata(fileName,error){
         repairable=true;
     }catch{}
     return {
-        fileName:typeof fileName==='string'?fileName:'',
+        fileName:is.string(fileName)?fileName:'',
         code:safeString(error?.code,SAFE_CODE_PATTERN)||'MAIL_OUTBOX_RECORD_UNREADABLE',
         repairable
     };
@@ -174,7 +177,7 @@ function normalizedFailure(value){
         fail('Mail outbox failure record is invalid.','MAIL_OUTBOX_RECORD_INVALID');
     }
     const code=safeString(value.code,SAFE_CODE_PATTERN);
-    if(!code||typeof value.retryable!=='boolean'||typeof value.uncertain!=='boolean'){
+    if(!code||!is.boolean(value.retryable)||!is.boolean(value.uncertain)){
         fail('Mail outbox failure record is invalid.','MAIL_OUTBOX_RECORD_INVALID');
     }
     return {
@@ -209,8 +212,8 @@ function normalizedResult(value,{invalidCode='MAIL_OUTBOX_RECORD_INVALID'}={}){
         acceptanceAuthority,
         requestId:safeString(value.requestId,SAFE_ID_PATTERN),
         providerId:safeString(value.providerId,SAFE_ID_PATTERN),
-        providerStatus:typeof value.providerStatus==='string'
-            ||Number.isSafeInteger(value.providerStatus)
+        providerStatus:is.string(value.providerStatus)
+            ||is.safeInteger(value.providerStatus)
             ?value.providerStatus
             :null,
         providerCode:safeString(value.providerCode,SAFE_CODE_PATTERN),
@@ -303,7 +306,7 @@ function normalizedRecord(value,expectedReportKey=null){
     if(!STATE_SET.has(value.state)){
         fail('Mail outbox record contains an invalid state.','MAIL_OUTBOX_RECORD_INVALID');
     }
-    if(!Number.isSafeInteger(value.attempts)||value.attempts<0){
+    if(!is.safeInteger(value.attempts)||value.attempts<0){
         fail('Mail outbox record contains an invalid attempt count.','MAIL_OUTBOX_RECORD_INVALID');
     }
     const record={
@@ -432,12 +435,12 @@ function deliveryFailure(error){
     const milliseconds=Number(error?.retryAfterMs);
     const seconds=retryAfterSeconds(
         error?.retryAfterSeconds??(
-            Number.isFinite(milliseconds)&&milliseconds>=0
+            is.finite(milliseconds)&&milliseconds>=0
                 ?Math.ceil(milliseconds/1000)
                 :null
         )
     );
-    const errorRecord=error&&typeof error==='object'&&!Array.isArray(error)
+    const errorRecord=error&&is.object(error)&&!is.array(error)
         ?{...error}
         :{};
     return {
@@ -445,9 +448,9 @@ function deliveryFailure(error){
         result:null,
         failure:{
             ...errorRecord,
-            name:typeof error?.name==='string'?error.name:'Error',
-            message:typeof error?.message==='string'?error.message:String(error??''),
-            ...(typeof error?.stack==='string'?{stack:error.stack}:{}),
+            name:is.string(error?.name)?error.name:'Error',
+            message:is.string(error?.message)?error.message:String(error??''),
+            ...(is.string(error?.stack)?{stack:error.stack}:{}),
             code:safeString(error?.code,SAFE_CODE_PATTERN)||'MAIL_DELIVERY_FAILED',
             statusCode:safeStatusCode(error?.statusCode),
             retryable,
@@ -484,10 +487,10 @@ function abortedDeliveryError(error,signal){
 
 function validateSignal(signal){
     if(signal===null||signal===undefined) return null;
-    if(typeof signal!=='object'
-        ||typeof signal.aborted!=='boolean'
-        ||typeof signal.addEventListener!=='function'
-        ||typeof signal.removeEventListener!=='function'){
+    if(!is.object(signal)
+        ||!is.boolean(signal.aborted)
+        ||!is.function(signal.addEventListener)
+        ||!is.function(signal.removeEventListener)){
         fail('Mail outbox signal must be an AbortSignal.','MAIL_OUTBOX_INVALID',TypeError);
     }
     return signal;
@@ -522,7 +525,7 @@ function waitForOutboxOperation(operation,signal){
 }
 
 function drainReason(value){
-    if(typeof value!=='string'||!/^[a-z][a-z0-9_-]*$/.test(value)){
+    if(!is.string(value)||!/^[a-z][a-z0-9_-]*$/.test(value)){
         fail('Mail outbox drain reason is invalid.','MAIL_OUTBOX_INVALID',TypeError);
     }
     return value;
@@ -583,16 +586,16 @@ class MailOutbox{
             return globalThis.navigator?.onLine!==false;
         },
         lockManager=undefined,
-        onlineTarget=typeof globalThis.addEventListener==='function'?globalThis:null,
+        onlineTarget=is.function(globalThis.addEventListener)?globalThis:null,
         onRecordCommitted=null,
         quarantineTable=QUARANTINE_TABLE,
         table=MAIL_OUTBOX_TABLE
     }={}){
-        if(!storage||typeof storage!=='object'){
+        if(!storage||!is.object(storage)){
             fail('Mail outbox storage is required.','MAIL_OUTBOX_STORAGE_UNAVAILABLE',TypeError);
         }
         for(const method of ['get','set','getAllKeys']){
-            if(typeof storage[method]!=='function'){
+            if(!is.function(storage[method])){
                 fail(
                     `Mail outbox storage must provide ${method}().`,
                     'MAIL_OUTBOX_STORAGE_UNAVAILABLE',
@@ -603,36 +606,36 @@ class MailOutbox{
         const resolvedLockManager=lockManager
             ??storage.lockManager
             ??globalThis.navigator?.locks;
-        if(!resolvedLockManager||typeof resolvedLockManager.request!=='function'){
+        if(!resolvedLockManager||!is.function(resolvedLockManager.request)){
             fail(
                 'Mail outbox requires a Web Locks compatible lock manager.',
                 'MAIL_OUTBOX_LOCK_UNAVAILABLE',
                 TypeError
             );
         }
-        if(typeof deliver!=='function'){
+        if(!is.function(deliver)){
             fail('Mail outbox deliver must be a function.','MAIL_OUTBOX_INVALID',TypeError);
         }
-        if(typeof clock!=='function'||typeof isOnline!=='function'){
+        if(!is.function(clock)||!is.function(isOnline)){
             fail('Mail outbox clock and isOnline hooks must be functions.','MAIL_OUTBOX_INVALID',TypeError);
         }
         if(onlineTarget!==null&&(
-            typeof onlineTarget?.addEventListener!=='function'
-            ||typeof onlineTarget?.removeEventListener!=='function'
+            !is.function(onlineTarget?.addEventListener)
+            ||!is.function(onlineTarget?.removeEventListener)
         )){
             fail('Mail outbox onlineTarget must be an EventTarget.','MAIL_OUTBOX_INVALID',TypeError);
         }
-        if(onRecordCommitted!==null&&typeof onRecordCommitted!=='function'){
+        if(onRecordCommitted!==null&&!is.function(onRecordCommitted)){
             fail(
                 'Mail outbox onRecordCommitted must be a function.',
                 'MAIL_OUTBOX_INVALID',
                 TypeError
             );
         }
-        if(typeof table!=='string'||!TABLE_PATTERN.test(table)){
+        if(!is.string(table)||!TABLE_PATTERN.test(table)){
             fail('Mail outbox table name is invalid.','MAIL_OUTBOX_INVALID',TypeError);
         }
-        if(typeof quarantineTable!=='string'||!TABLE_PATTERN.test(quarantineTable)
+        if(!is.string(quarantineTable)||!TABLE_PATTERN.test(quarantineTable)
             ||quarantineTable===table){
             fail('Mail outbox quarantine table name is invalid.','MAIL_OUTBOX_INVALID',TypeError);
         }
@@ -656,7 +659,7 @@ class MailOutbox{
 
     async #ready(){
         try{
-            if(this.#storage.readyPromise&&typeof this.#storage.readyPromise.then==='function'){
+            if(this.#storage.readyPromise&&is.function(this.#storage.readyPromise.then)){
                 await this.#storage.readyPromise;
             }
         }catch(error){
@@ -684,7 +687,7 @@ class MailOutbox{
         if(!this.#onRecordCommitted) return;
         try{
             const result=this.#onRecordCommitted(record);
-            if(result&&typeof result.then==='function'){
+            if(result&&is.function(result.then)){
                 result.catch(reportMailOutboxObserverError);
             }
         }catch(error){
@@ -773,7 +776,7 @@ class MailOutbox{
         }catch(error){
             fail('Mail outbox could not list durable storage.','MAIL_OUTBOX_STORAGE_FAILED',Error,error);
         }
-        if(!Array.isArray(keys)){
+        if(!is.array(keys)){
             fail('Mail outbox storage returned an invalid key list.','MAIL_OUTBOX_STORAGE_FAILED');
         }
         return [...keys];
@@ -807,7 +810,7 @@ class MailOutbox{
     }
 
     #assertInvalidTarget(fileName,inventory){
-        if(typeof fileName!=='string'||!fileName){
+        if(!is.string(fileName)||!fileName){
             fail('Mail outbox invalid-record filename is required.','MAIL_OUTBOX_INVALID',TypeError);
         }
         const target=inventory.invalidRecords.find(
@@ -848,7 +851,7 @@ class MailOutbox{
     }
 
     #assertDeleteAvailable(){
-        if(typeof this.#storage.delete!=='function'){
+        if(!is.function(this.#storage.delete)){
             fail(
                 'Mail outbox storage does not support invalid-record deletion.',
                 'MAIL_OUTBOX_DELETE_UNAVAILABLE'
@@ -1026,7 +1029,7 @@ class MailOutbox{
     }
 
     async enqueue({report,reportKey:key}={}, {attempt=true,signal=null}={}){
-        if(typeof attempt!=='boolean'){
+        if(!is.boolean(attempt)){
             fail('Mail outbox attempt must be boolean.','MAIL_OUTBOX_INVALID',TypeError);
         }
         const resolvedSignal=validateSignal(signal);

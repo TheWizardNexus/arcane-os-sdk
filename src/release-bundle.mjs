@@ -1,3 +1,4 @@
+import Is from 'strong-type';
 import {
     lstat,
     mkdir,
@@ -14,6 +15,8 @@ import {validateAppDescriptor} from './app-descriptor.mjs';
 import {SDK_NAME,SDK_VERSION} from './constants.mjs';
 import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
 import {RELEASE_MANIFEST_NAME,PACKAGER_VERSION,parseSemver} from './packager/core.mjs';
+
+const is = new Is(false);
 
 export const APP_BUNDLE_MANIFEST_NAME='ARCANE_APP_BUNDLE.json';
 export const APP_BUNDLE_DESCRIPTOR_NAME='arcane-app.json';
@@ -41,7 +44,7 @@ function fail(message,code='ARCANE_BUNDLE_INVALID',details){
 }
 
 async function emit(onEvent,event){
-    if(typeof onEvent==='function')await onEvent(event);
+    if(is.function(onEvent))await onEvent(event);
 }
 
 function compareText(left,right){
@@ -51,7 +54,7 @@ function compareText(left,right){
 }
 
 function isPlainObject(value){
-    return value!==null&&typeof value==='object'&&!Array.isArray(value);
+    return value!==null&&is.object(value)&&!is.array(value);
 }
 
 function copyJson(value){
@@ -63,7 +66,7 @@ function pathKey(value){
 }
 
 export function validateAppBundlePath(value,label='bundle path'){
-    if(typeof value!=='string'||!value||value!==value.normalize('NFC')
+    if(!is.string(value)||!value||value!==value.normalize('NFC')
         ||value.includes('\\')||value.startsWith('/')||/^[a-z]:/iu.test(value)
         ||/[\u0000-\u001f\u007f]/u.test(value)){
         fail(`Unsafe ${label}: ${String(value)}.`);
@@ -100,7 +103,7 @@ function writeTextField(header,offset,length,value,label){
 }
 
 function writeOctalField(header,offset,length,value,label,{trailingSpace=false}={}){
-    if(!Number.isSafeInteger(value)||value<0)fail(`${label} must be a nonnegative integer.`);
+    if(!is.safeInteger(value)||value<0)fail(`${label} must be a nonnegative integer.`);
     const terminal=trailingSpace?'\0 ':'\0';
     const digits=value.toString(8);
     const available=length-terminal.length;
@@ -184,8 +187,8 @@ function readJsonContent(content,label){
 function validateReleaseManifest(value){
     if(!isPlainObject(value)||value.schemaVersion!==1||value.kind!=='arcane-app-release'
         ||value.packagerVersion!==PACKAGER_VERSION||!isPlainObject(value.app)
-        ||typeof value.app.id!=='string'||typeof value.app.version!=='string'
-        ||!Array.isArray(value.files)){
+        ||!is.string(value.app.id)||!is.string(value.app.version)
+        ||!is.array(value.files)){
         fail(`${RELEASE_MANIFEST_NAME} is malformed.`);
     }
     parseSemver(value.app.version);
@@ -213,8 +216,8 @@ function bundleManifest(descriptor,release,files){
 }
 
 async function outputBoundary(outputPath,overwrite){
-    if(typeof outputPath!=='string'||!outputPath.trim())fail('outputPath is required.');
-    if(typeof overwrite!=='boolean')fail('overwrite must be a boolean.',ERROR_CODES.usage);
+    if(!is.string(outputPath)||!outputPath.trim())fail('outputPath is required.');
+    if(!is.boolean(overwrite))fail('overwrite must be a boolean.',ERROR_CODES.usage);
     const resolved=path.resolve(outputPath);
     await mkdir(path.dirname(resolved),{recursive:true});
     const parent=await realDirectory(path.dirname(resolved),'Bundle output directory');
@@ -301,7 +304,7 @@ function readOctalField(header,offset,length,label){
     const text=header.subarray(offset,offset+length).toString('ascii').replace(/[\0 ]+$/u,'');
     if(!/^[0-7]+$/u.test(text))fail(`${label} is not a valid ustar octal field.`);
     const value=Number.parseInt(text,8);
-    if(!Number.isSafeInteger(value))fail(`${label} exceeds the supported integer range.`);
+    if(!is.safeInteger(value))fail(`${label} exceeds the supported integer range.`);
     return value;
 }
 
@@ -344,7 +347,7 @@ function requiredEntry(entries,entryPath){
 
 export async function verifyAppReleaseBundle({bundlePath,signal,onEvent}={}){
     throwIfAborted(signal);
-    if(typeof bundlePath!=='string'||!bundlePath.trim())fail('bundlePath is required.');
+    if(!is.string(bundlePath)||!bundlePath.trim())fail('bundlePath is required.');
     const selected=path.resolve(bundlePath);
     const info=await lstat(selected);
     if(info.isSymbolicLink()||!info.isFile())fail('Bundle path must be a real file.');
@@ -360,7 +363,7 @@ export async function verifyAppReleaseBundle({bundlePath,signal,onEvent}={}){
         ||manifest.kind!==APP_BUNDLE_KIND||manifest.format!==APP_BUNDLE_FORMAT
         ||manifest.sdk?.name!==SDK_NAME||manifest.sdk?.version!==SDK_VERSION
         ||manifest.descriptor!==APP_BUNDLE_DESCRIPTOR_NAME
-        ||manifest.release!==APP_BUNDLE_RELEASE_PATH||!Array.isArray(manifest.files)){
+        ||manifest.release!==APP_BUNDLE_RELEASE_PATH||!is.array(manifest.files)){
         fail(`${APP_BUNDLE_MANIFEST_NAME} is malformed.`);
     }
     const descriptor=copyJson(validateAppDescriptor(readJsonContent(

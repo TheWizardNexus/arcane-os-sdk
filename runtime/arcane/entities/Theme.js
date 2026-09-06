@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const HEX_COLOR=/^#([0-9a-f]{6})$/i;
 const RGB_COLOR=/^(rgb|rgba)\(\s*(\d{1,3})(?:\s*,\s*|\s+)(\d{1,3})(?:\s*,\s*|\s+)(\d{1,3})(?:\s*(?:,|\/)\s*(0|1|0?\.\d+))?\s*\)$/i;
 
@@ -74,7 +77,7 @@ export default class Theme{
     constructor(input={}){
         this.name=normalizeName(input.name||'My Arcane skin');
         this.scheme=input.scheme==='dark'?'dark':'light';
-        const source=input.tokens&&typeof input.tokens==='object'?input.tokens:{};
+        const source=input.tokens&&is.object(input.tokens)?input.tokens:{};
         const defaults=this.scheme==='dark'?arcaneDarkThemeTokens:arcaneLightThemeTokens;
         this.tokens=Object.freeze(Object.fromEntries(themeTokens.map(token=>[
             token.key,
@@ -101,7 +104,7 @@ export default class Theme{
 
     static fromJSON(value){
         if(value instanceof Theme) return value;
-        const parsed=typeof value==='string'?JSON.parse(value):value;
+        const parsed=is.string(value)?JSON.parse(value):value;
         return new Theme(parsed);
     }
 }

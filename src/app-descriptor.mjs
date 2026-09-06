@@ -1,3 +1,4 @@
+import Is from 'strong-type';
 import {isDeepStrictEqual} from 'node:util';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
@@ -11,6 +12,8 @@ import {
     parseSemver,
     validateAppConfig as validateAppPackageConfig
 } from './packager/core.mjs';
+
+const is = new Is(false);
 
 export const APP_DESCRIPTOR_NAME='arcane-app.json';
 export const APP_DESCRIPTOR_SCHEMA_VERSION=2;
@@ -35,7 +38,7 @@ function fail(message){
 }
 
 function isObject(value){
-    return value!==null&&typeof value==='object'&&!Array.isArray(value);
+    return value!==null&&is.object(value)&&!is.array(value);
 }
 
 function assertOnlyKeys(value,allowed,label){
@@ -46,7 +49,7 @@ function assertOnlyKeys(value,allowed,label){
 }
 
 function safeText(value,label){
-    if(typeof value!=='string'||value!==value.trim()||!value
+    if(!is.string(value)||value!==value.trim()||!value
         ||/[<>\u0000-\u001f\u007f]/u.test(value)){
         fail(`${label} must be nonempty, trimmed presentation text.`);
     }
@@ -54,11 +57,11 @@ function safeText(value,label){
 }
 
 function uniqueSortedStrings(value,label,{pattern,required=false}={}){
-    if(!Array.isArray(value)||(required&&value.length===0)){
+    if(!is.array(value)||(required&&value.length===0)){
         fail(`${label} must be ${required?'a nonempty':'an'} array.`);
     }
     const normalized=value.map((entry,index)=>{
-        if(typeof entry!=='string'||entry!==entry.trim()||!entry
+        if(!is.string(entry)||entry!==entry.trim()||!entry
             ||(pattern&&!pattern.test(entry))){
             fail(`${label}[${index}] is invalid.`);
         }
@@ -68,7 +71,7 @@ function uniqueSortedStrings(value,label,{pattern,required=false}={}){
 }
 
 function relativePaths(value,label,{required=false}={}){
-    if(!Array.isArray(value)||(required&&value.length===0)){
+    if(!is.array(value)||(required&&value.length===0)){
         fail(`${label} must be ${required?'a nonempty':'an'} array.`);
     }
     const normalized=value.map((entry,index)=>normalizeRelativePath(entry,`${label}[${index}]`));
@@ -76,9 +79,9 @@ function relativePaths(value,label,{required=false}={}){
 }
 
 function validateOrigins(value,label){
-    if(!Array.isArray(value))fail(`${label} must be an array of origins.`);
+    if(!is.array(value))fail(`${label} must be an array of origins.`);
     const origins=value.map((origin,index)=>{
-        if(typeof origin!=='string'||!origin.trim())fail(`${label}[${index}] is invalid.`);
+        if(!is.string(origin)||!origin.trim())fail(`${label}[${index}] is invalid.`);
         return origin;
     });
     return completeValue(origins);
@@ -87,14 +90,14 @@ function validateOrigins(value,label){
 function validateLocalAIModelPolicy(value,label){
     if(value===undefined)return undefined;
     assertOnlyKeys(value,new Set(['verified_only','models']),label);
-    if(typeof value.verified_only!=='boolean'||!Array.isArray(value.models)){
+    if(!is.boolean(value.verified_only)||!is.array(value.models)){
         fail(`${label} is invalid.`);
     }
     const models=value.models.map((model,index)=>{
         const itemLabel=`${label}.models[${index}]`;
         assertOnlyKeys(model,new Set(['name','definition']),itemLabel);
-        if(typeof model.name!=='string'||!model.name
-            ||typeof model.definition!=='string'||!model.definition.endsWith('Modelfile')){
+        if(!is.string(model.name)||!model.name
+            ||!is.string(model.definition)||!model.definition.endsWith('Modelfile')){
             fail(`${itemLabel} is invalid.`);
         }
         return completeValue({name:model.name,definition:normalizeRelativePath(model.definition,`${itemLabel}.definition`)});
@@ -144,7 +147,7 @@ function validatePackage(value,appId){
 
 function validatePublisher(value){
     assertOnlyKeys(value,new Set(['id','name']),'descriptor.publisher');
-    if(typeof value.id!=='string'||!PUBLISHER_PATTERN.test(value.id)){
+    if(!is.string(value.id)||!PUBLISHER_PATTERN.test(value.id)){
         fail('descriptor.publisher.id must be a lowercase publisher identifier.');
     }
     return completeValue({id:value.id,name:safeText(value.name,'descriptor.publisher.name')});
@@ -191,7 +194,7 @@ function validateDocumentCatalog(value){
     assertOnlyKeys(value,new Set([
         'policy','release','destination','originals','manifest','expectedCount'
     ]),label);
-    if(value.policy!=='public-only'||!Number.isInteger(value.expectedCount)
+    if(value.policy!=='public-only'||!is.integer(value.expectedCount)
         ||value.expectedCount<1){
         fail(`${label} has unsupported policy or expectedCount.`);
     }
@@ -219,7 +222,7 @@ function validateNative(value,appId){
     assertOnlyKeys(value,new Set(['type','icon','order','bundledApps','documentCatalog']),'descriptor.native');
     if(!NATIVE_TYPES.has(value.type))fail('descriptor.native.type is unsupported.');
     const icon=value.icon===null?null:normalizeRelativePath(value.icon,'descriptor.native.icon');
-    if(!Number.isInteger(value.order)||value.order<0){
+    if(!is.integer(value.order)||value.order<0){
         fail('descriptor.native.order must be a nonnegative integer.');
     }
     const bundledApps=uniqueSortedStrings(value.bundledApps,'descriptor.native.bundledApps',{
@@ -392,7 +395,7 @@ function synthesizedDescriptor(packageManifest,nativeDescriptor){
         native:{
             type:native.type??'app',
             icon:native.icon??null,
-            order:Number.isInteger(native.order)?native.order:100,
+            order:is.integer(native.order)?native.order:100,
             bundledApps:[...(native.bundledApps??[])],
             ...(native.documentCatalog?{documentCatalog:native.documentCatalog}:{})
         },

@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 import { arcaneLogging } from 'arcane-os/logging';
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 
@@ -64,7 +67,7 @@ const conversationTimeboxTool={
 };
 
 function isPlainRecord(value){
-    if(!value||typeof value!=='object'||Array.isArray(value))return false;
+    if(!value||!is.object(value)||is.array(value))return false;
     const prototype=Object.getPrototypeOf(value);
     return prototype===Object.prototype||prototype===null;
 }
@@ -73,7 +76,7 @@ function parseToolArguments(value){
     if(isPlainRecord(value)){
         return value;
     }
-    if(typeof value!=='string'){
+    if(!is.string(value)){
         throw new TypeError('The conversation timebox tool requires JSON object arguments.');
     }
     try{
@@ -95,13 +98,13 @@ function normalizeConversationTimeboxCommand(value){
     if(!['set','adjust','clear'].includes(input.action)){
         throw new TypeError('Conversation timebox action must be "set", "adjust", or "clear".');
     }
-    if(typeof input.message!=='string'||!input.message.trim()){
+    if(!is.string(input.message)||!input.message.trim()){
         throw new TypeError('Conversation timebox message must contain user-facing text.');
     }
     if(input.action==='clear'){
         return {...input,action:'clear',message:input.message};
     }
-    if(!Number.isSafeInteger(input.duration_milliseconds)||input.duration_milliseconds<=0){
+    if(!is.safeInteger(input.duration_milliseconds)||input.duration_milliseconds<=0){
         throw new TypeError('duration_milliseconds must be an explicit positive whole number.');
     }
     return {
@@ -113,7 +116,7 @@ function normalizeConversationTimeboxCommand(value){
 }
 
 function appendConversationTimeboxOpeningInstruction(message=''){
-    if(typeof message!=='string'){
+    if(!is.string(message)){
         throw new TypeError('The opening message must be a string.');
     }
     const base=message.trim();
@@ -123,7 +126,7 @@ function appendConversationTimeboxOpeningInstruction(message=''){
 }
 
 function formatConversationElapsed(milliseconds=0){
-    if(!Number.isFinite(milliseconds)||milliseconds<0){
+    if(!is.finite(milliseconds)||milliseconds<0){
         throw new TypeError('Elapsed time must be a non-negative finite number.');
     }
     const totalSeconds=Math.floor(milliseconds/1000);
@@ -141,7 +144,7 @@ function createConversationTimeboxControlMessage(action,milliseconds){
     }
     if(
         !['set','adjust'].includes(action)
-        ||!Number.isSafeInteger(milliseconds)
+        ||!is.safeInteger(milliseconds)
         ||milliseconds<=0
     ){
         throw new TypeError('A timebox control message requires an explicit positive whole-millisecond duration.');
@@ -160,7 +163,7 @@ function conversationTimeboxSubmissionKey(context={}){
     const revision=context.timeboxRevision;
     if(
         !source.startsWith('conversation-timebox')
-        ||!Number.isSafeInteger(revision)
+        ||!is.safeInteger(revision)
         ||revision<1
     ){
         return '';
@@ -181,10 +184,10 @@ function conversationTimeboxError(message,code,reason,ErrorType=Error){
 
 function isAbortSignal(value){
     return Boolean(value)
-        &&typeof value==='object'
-        &&typeof value.aborted==='boolean'
-        &&typeof value.addEventListener==='function'
-        &&typeof value.removeEventListener==='function';
+        &&is.object(value)
+        &&is.boolean(value.aborted)
+        &&is.function(value.addEventListener)
+        &&is.function(value.removeEventListener);
 }
 
 function normalizeSubscriptionOptions(value={}){
@@ -197,7 +200,7 @@ function normalizeSubscriptionOptions(value={}){
         );
     }
     if((value.once!==undefined
-        &&typeof value.once!=='boolean'
+        &&!is.boolean(value.once)
     )||(
         value.signal!==undefined
         &&value.signal!==null
@@ -289,11 +292,11 @@ class ConversationTimebox{
             ['cancel',this.#cancel],
             ['onListenerError',onListenerError]
         ]){
-            if(typeof value!=='function'){
+            if(!is.function(value)){
                 throw new TypeError(`${name} must be a function.`);
             }
         }
-        if(!Number.isFinite(this.#tickMs)||this.#tickMs<=0){
+        if(!is.finite(this.#tickMs)||this.#tickMs<=0){
             throw new RangeError('tickMs must be a positive finite number.');
         }
         this.#events=createArcaneEventSource(this,{
@@ -323,16 +326,16 @@ class ConversationTimebox{
 
     setLimitMilliseconds(milliseconds,{source='user'}={}){
         this.#assertActive();
-        if(!Number.isSafeInteger(milliseconds)||milliseconds<=0){
+        if(!is.safeInteger(milliseconds)||milliseconds<=0){
             throw new TypeError('Conversation time must be an explicit positive whole number of milliseconds.');
         }
-        if(typeof source!=='string'||!source.trim()){
+        if(!is.string(source)||!source.trim()){
             throw new TypeError('Conversation timebox source must contain text.');
         }
         const commandSource=source.trim();
         const now=this.#readClock();
         const dueAtMs=now+milliseconds;
-        if(!Number.isSafeInteger(dueAtMs)||dueAtMs>MAX_DATE_MILLISECONDS){
+        if(!is.safeInteger(dueAtMs)||dueAtMs>MAX_DATE_MILLISECONDS){
             throw new RangeError('The requested conversation duration exceeds the supported date range.');
         }
         if(this.#startedAtMs===null){
@@ -351,10 +354,10 @@ class ConversationTimebox{
 
     adjustLimitMilliseconds(milliseconds,{source='user'}={}){
         this.#assertActive();
-        if(!Number.isSafeInteger(milliseconds)||milliseconds<=0){
+        if(!is.safeInteger(milliseconds)||milliseconds<=0){
             throw new TypeError('Conversation adjustment must be an explicit positive whole number of milliseconds.');
         }
-        if(typeof source!=='string'||!source.trim()){
+        if(!is.string(source)||!source.trim()){
             throw new TypeError('Conversation timebox source must contain text.');
         }
         const commandSource=source.trim();
@@ -364,7 +367,7 @@ class ConversationTimebox{
 
         const now=this.#readClock();
         const dueAtMs=Math.max(now,this.#dueAtMs)+milliseconds;
-        if(!Number.isSafeInteger(dueAtMs)||dueAtMs>MAX_DATE_MILLISECONDS){
+        if(!is.safeInteger(dueAtMs)||dueAtMs>MAX_DATE_MILLISECONDS){
             throw new RangeError('The requested conversation adjustment exceeds the supported date range.');
         }
 
@@ -380,7 +383,7 @@ class ConversationTimebox{
 
     clearLimit({source='user'}={}){
         this.#assertActive();
-        if(typeof source!=='string'||!source.trim()){
+        if(!is.string(source)||!source.trim()){
             throw new TypeError('Conversation timebox source must contain text.');
         }
         const commandSource=source.trim();
@@ -417,7 +420,7 @@ class ConversationTimebox{
     }
 
     subscribe(listener,options={}){
-        if(typeof listener!=='function'){
+        if(!is.function(listener)){
             throw conversationTimeboxError(
                 'Conversation timebox listener must be a function.',
                 conversationTimeboxErrorCodes.subscriptionHandlerInvalid,
@@ -511,7 +514,7 @@ class ConversationTimebox{
 
     #readClock(){
         const now=this.#clock();
-        if(!Number.isSafeInteger(now)||now<0||now>MAX_DATE_MILLISECONDS){
+        if(!is.safeInteger(now)||now<0||now>MAX_DATE_MILLISECONDS){
             throw new TypeError('Conversation timebox clock must return a supported non-negative integer timestamp.');
         }
         return this.#nowMs===null?now:Math.max(now,this.#nowMs);
@@ -581,7 +584,7 @@ function consumeConversationTimeboxCall(calls,controller){
     if(!isPlainRecord(calls)){
         throw new TypeError('Streamed conversation tool calls must be a plain object.');
     }
-    if(!controller||typeof controller.applyCommand!=='function'){
+    if(!controller||!is.function(controller.applyCommand)){
         throw new TypeError('A conversation timebox controller is required.');
     }
     const remainingCalls={...calls};

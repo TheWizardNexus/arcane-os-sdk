@@ -42,6 +42,9 @@
 </section>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
   const host=this; const root=host.shadowRoot;
   const title=root.querySelector('[data-title]'); const assessment=root.querySelector('[data-assessment]'); const badges=root.querySelector('[data-badges]');
   const elements=root.querySelector('[data-elements]'); const application=root.querySelector('[data-application]'); const limitations=root.querySelector('[data-limitations]'); const nextSteps=root.querySelector('[data-next-steps]');
@@ -73,7 +76,7 @@
   }
   function list(target,values=[],emptyLabel){
     target.replaceChildren();
-    for(const value of Array.isArray(values)?values:[]){const item=document.createElement('li'); item.textContent=String(value); target.append(item);}
+    for(const value of is.array(values)?values:[]){const item=document.createElement('li'); item.textContent=String(value); target.append(item);}
     if(!target.children.length){const item=document.createElement('li'); item.textContent=emptyLabel; target.append(item);}
   }
   function sameOrigin(value=''){
@@ -81,8 +84,8 @@
   }
 
   function showFinding(value={},config={}){
-    finding=value&&typeof value==='object'?value:null; if(!finding) throw new TypeError('A finding is required.');
-    sources=Array.isArray(finding.sources)?finding.sources:[];
+    finding=value&&is.object(value)?value:null; if(!finding) throw new TypeError('A finding is required.');
+    sources=is.array(finding.sources)?finding.sources:[];
     title.textContent=String(finding.label||'Investigative lead'); assessment.textContent=String(finding.assessment||finding.conclusion||'Human review is required before reliance.');
     badges.replaceChildren();
     for(const value of [finding.allegedActorLabel?`Alleged actor: ${finding.allegedActorLabel}`:'Actor not assigned',finding.kind||'Investigative lead',finding.confidence?`${finding.confidence} confidence`:'Confidence not assigned']){const badge=document.createElement('span'); badge.className='badge'; badge.textContent=value; badges.append(badge);}
@@ -99,7 +102,7 @@
     originalPicker.replaceChildren(...sources.flatMap((source,index)=>{if(!source?.pdfUrl)return[];const item=document.createElement('option');item.value=String(index);item.textContent=`${source.recordId||'Source'}${source.page?` — PDF page ${source.page}`:''}`;return[item];})); originalPicker.disabled=!originalPicker.options.length;
     original.hidden=true; original.removeAttribute('src'); originalLabel.textContent='Select a cited excerpt to inspect the original source page.';
     options(actor,config.actorOptions||[]); options(disposition,config.dispositionOptions||[]); options(confidence,config.confidenceOptions||[]);
-    const review=finding.review&&typeof finding.review==='object'?finding.review:{};
+    const review=finding.review&&is.object(finding.review)?finding.review:{};
     actor.value=String(review.classification||finding.allegedActor||'unassigned'); disposition.value=String(review.status||'unassessed'); confidence.value=String(review.attributes?.confidence||finding.confidence||'unassigned'); notes.value=String(review.notes||''); saveState.textContent='';
     if(!actor.value&&actor.options.length) actor.selectedIndex=0; if(!disposition.value&&disposition.options.length) disposition.selectedIndex=0; if(!confidence.value&&confidence.options.length) confidence.selectedIndex=0;
     const requestedSourceId=String(config.initialSourceId||'');
@@ -111,7 +114,7 @@
   }
 
   function selectSource(value=0){
-    const index=Number.isInteger(value)?value:sources.findIndex(source=>String(source?.id||'')===String(value||''));
+    const index=is.integer(value)?value:sources.findIndex(source=>String(source?.id||'')===String(value||''));
     if(index<0||!sources[index]?.pdfUrl) return false;
     showSource(index); return true;
   }

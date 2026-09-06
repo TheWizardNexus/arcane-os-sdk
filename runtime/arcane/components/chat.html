@@ -809,6 +809,9 @@
 </section>
 
 <script type="module">
+    const {default:Is}=await import('strong-type');
+    const is=new Is(false);
+
     const {arcaneLogging}=await import('arcane-os/logging');
  
     const {
@@ -885,7 +888,7 @@
     host.language=host.language||'English';
     host.name = host.name||'User';
     host.aiName='AI';
-    let requestedInitialSpeechMuted=typeof speech.initialMuted==='boolean'
+    let requestedInitialSpeechMuted=is.boolean(speech.initialMuted)
         ?speech.initialMuted
         :true;
     let initialSpeechMuteListenerInstalled=false;
@@ -993,8 +996,8 @@
         let causeCode='';
         let message='';
         try{
-            causeCode=typeof error?.code==='string'?error.code:'';
-            message=typeof error?.message==='string'?error.message:'';
+            causeCode=is.string(error?.code)?error.code:'';
+            message=is.string(error?.message)?error.message:'';
         }catch{}
         return {
             error,
@@ -1011,7 +1014,7 @@
     }
 
     function isPlainRecord(value){
-        if(!value||typeof value!=='object'||Array.isArray(value))return false;
+        if(!value||!is.object(value)||is.array(value))return false;
         const prototype=Object.getPrototypeOf(value);
         return prototype===Object.prototype||prototype===null;
     }
@@ -1021,10 +1024,10 @@
             // Only errors deliberately classified by their owner may provide UI copy.
             // Provider and protocol diagnostics remain complete in console/events.
             if(error?.userSafe===true){
-                const message=typeof error.userMessage==='string'
+                const message=is.string(error.userMessage)
                     ?error.userMessage
                     :error.message;
-                if(typeof message==='string'&&message.trim()){
+                if(is.string(message)&&message.trim()){
                     return message;
                 }
             }
@@ -1033,10 +1036,10 @@
     }
 
     function visibleProgressText(value,fallback,field){
-        if(typeof value==='string'){
+        if(is.string(value)){
             return value||fallback;
         }
-        if(value&&typeof value==='object'){
+        if(value&&is.object(value)){
             arcaneLogging.error(`Arcane chat progress ${field} is not text.`,value);
             return visibleErrorMessage(value,fallback);
         }
@@ -1061,10 +1064,10 @@
 
     function compatibleChatSession(session){
         return Boolean(session)
-            &&typeof session==='object'
-            &&typeof session.ready==='function'
-            &&typeof session.history==='function'
-            &&typeof session.send==='function';
+            &&is.object(session)
+            &&is.function(session.ready)
+            &&is.function(session.history)
+            &&is.function(session.send);
     }
 
     function scrollTranscriptToBottom(){
@@ -1078,7 +1081,7 @@
         const value=timestamp instanceof Date
             ?timestamp
             :new Date(timestamp);
-        if(timestamp!==undefined&&timestamp!==null&&Number.isFinite(value.getTime())){
+        if(timestamp!==undefined&&timestamp!==null&&is.finite(value.getTime())){
             time.dateTime=value.toISOString();
             time.textContent=value.toLocaleTimeString([],{
                 hour:'2-digit',
@@ -1095,7 +1098,7 @@
 
     function normalizeVisibleToolCalls(value){
         if(value===undefined) return [];
-        if(!Array.isArray(value)){
+        if(!is.array(value)){
             const failure=new TypeError('Chat session tool calls must be an array.');
             failure.code='AI_CHAT_INVALID_TOOL_CALL';
             throw failure;
@@ -1104,18 +1107,18 @@
         return value.map((call,index)=>{
             if(
                 !call
-                ||typeof call!=='object'
-                ||Array.isArray(call)
+                ||!is.object(call)
+                ||is.array(call)
                 ||call.type!=='function'
                 ||!call.function
-                ||typeof call.function!=='object'
-                ||Array.isArray(call.function)
-                ||typeof call.id!=='string'
+                ||!is.object(call.function)
+                ||is.array(call.function)
+                ||!is.string(call.id)
                 ||!call.id.trim()
                 ||ids.has(call.id)
-                ||typeof call.function.name!=='string'
+                ||!is.string(call.function.name)
                 ||!call.function.name.trim()
-                ||typeof call.function.arguments!=='string'
+                ||!is.string(call.function.arguments)
             ){
                 const failure=new TypeError(`Chat session tool call ${index+1} is invalid.`);
                 failure.code='AI_CHAT_INVALID_TOOL_CALL';
@@ -1133,9 +1136,9 @@
     }
 
     function copyCompleteChatData(value,seen=new Map()){
-        if(value===null||typeof value!=='object') return value;
+        if(value===null||!is.object(value)) return value;
         if(seen.has(value)) return seen.get(value);
-        if(Array.isArray(value)){
+        if(is.array(value)){
             const result=[];
             seen.set(value,result);
             for(const item of value) result.push(copyCompleteChatData(item,seen));
@@ -1153,12 +1156,12 @@
 
     function sameCompleteChatData(left,right,seen=new Map()){
         if(Object.is(left,right)) return true;
-        if(!left||!right||typeof left!=='object'||typeof right!=='object') return false;
-        if(Array.isArray(left)!==Array.isArray(right)) return false;
+        if(!left||!right||!is.object(left)||!is.object(right)) return false;
+        if(is.array(left)!==is.array(right)) return false;
         const matched=seen.get(left);
         if(matched!==undefined) return matched===right;
         seen.set(left,right);
-        if(Array.isArray(left)){
+        if(is.array(left)){
             return left.length===right.length
                 &&left.every((value,index)=>sameCompleteChatData(value,right[index],seen));
         }
@@ -1192,7 +1195,7 @@
             failure.code='AI_CHAT_INVALID_TOOL_CALL';
             throw failure;
         }
-        if(typeof argumentsRecord.message!=='string'||!argumentsRecord.message.trim()){
+        if(!is.string(argumentsRecord.message)||!argumentsRecord.message.trim()){
             const failure=new TypeError(
                 'Structural tool call arguments must include a nonempty user-facing message.'
             );
@@ -1203,7 +1206,7 @@
     }
 
     function setPendingStructuralToolCalls(calls=[]){
-        if(!Array.isArray(calls)||calls.length===0){
+        if(!is.array(calls)||calls.length===0){
             pendingStructuralToolCalls=[];
             pendingStructuralToolMessage='';
             return [];
@@ -1220,8 +1223,8 @@
     }
 
     function sameStructuralToolCalls(left,right){
-        return Array.isArray(left)
-            &&Array.isArray(right)
+        return is.array(left)
+            &&is.array(right)
             &&left.length===right.length
             &&left.every((call,index)=>sameStructuralToolCall(call,right[index]));
     }
@@ -1284,7 +1287,7 @@
     }
 
     function setTranscriptMessageContent(item,content,timestamp){
-        if(typeof content!=='string'){
+        if(!is.string(content)){
             throw new TypeError('Chat session message content must be a string.');
         }
         item.querySelector('.thinking')?.remove();
@@ -1321,8 +1324,8 @@
     }
 
     function latestCommittedTranscriptTurn(transcript,requestMessages){
-        if(!Array.isArray(transcript)) return null;
-        const expected=Array.isArray(requestMessages)
+        if(!is.array(transcript)) return null;
+        const expected=is.array(requestMessages)
             ?requestMessages
             :[requestMessages];
         if(!expected.length) return null;
@@ -1338,7 +1341,7 @@
     }
 
     function createTranscriptMessage(role,content,name,{timestamp,toolCalls}={}){
-        if(typeof content!=='string'){
+        if(!is.string(content)){
             throw new TypeError('Chat session message content must be a string.');
         }
         const item=chatOutput.ownerDocument.createElement('li');
@@ -1378,7 +1381,7 @@
     }
 
     function createSavedRecordFallback(message,index){
-        const content=isPlainRecord(message)&&typeof message.content==='string'
+        const content=isPlainRecord(message)&&is.string(message.content)
             ?message.content
             :'Saved record content is available in details.';
         const item=createTranscriptMessage(
@@ -1401,7 +1404,7 @@
     }
 
     function renderSessionHistory(history){
-        if(!Array.isArray(history)){
+        if(!is.array(history)){
             throw new TypeError('Chat session history must be an array.');
         }
         const fragment=chatOutput.ownerDocument.createDocumentFragment();
@@ -1418,7 +1421,7 @@
                         'AI_CHAT_INCOHERENT_PERSISTENCE'
                     );
                 }
-                if(typeof message.content!=='string'){
+                if(!is.string(message.content)){
                     throw chatError(
                         'Saved chat contains a record without text content.',
                         'AI_CHAT_INCOHERENT_PERSISTENCE'
@@ -1441,7 +1444,7 @@
                     if(message.role==='tool'){
                         if(message.tool_call_id!==undefined){
                             if(
-                                typeof message.tool_call_id!=='string'
+                                !is.string(message.tool_call_id)
                                 ||!message.tool_call_id.trim()
                                 ||!message.content.trim()
                                 ||!restoredPendingToolCalls.has(message.tool_call_id)
@@ -1470,7 +1473,7 @@
                 const name=message.role==='user'
                     ?host.name
                     :message.role==='tool'
-                    ?typeof message.name==='string'&&message.name.trim()
+                    ?is.string(message.name)&&message.name.trim()
                         ?`Tool · ${message.name}`
                         :'Tool'
                     :message.role==='system'
@@ -1549,7 +1552,7 @@
                 ai
             });
             await session.ready();
-            const history=typeof session.transcript==='function'
+            const history=is.function(session.transcript)
                 ?await session.transcript()
                 :await session.history();
             if(destroyed||generation!==sessionBindingGeneration){
@@ -1629,10 +1632,10 @@
 
     function isAbortSignal(value){
         return value!==null
-            &&typeof value==='object'
-            &&typeof value.aborted==='boolean'
-            &&typeof value.addEventListener==='function'
-            &&typeof value.removeEventListener==='function';
+            &&is.object(value)
+            &&is.boolean(value.aborted)
+            &&is.function(value.addEventListener)
+            &&is.function(value.removeEventListener);
     }
 
     function createChatSubmissionAbort(reason,message){
@@ -1769,7 +1772,7 @@
     host.destroy=destroy;
     host.session=null;
     host.sessionStatus={state:'idle',message:'Chat session is not connected.'};
-    host.modelName=typeof host.modelName==='string'?host.modelName:'';
+    host.modelName=is.string(host.modelName)?host.modelName:'';
     host.aiAvailability={llm:false,stt:false,tts:false};
     host.conversationComplete=false;
     applyAIAvailability(host.aiAvailability);
@@ -1802,7 +1805,7 @@
     );
 
     function setConversationComplete(complete=true){
-        if(typeof complete!=='boolean'){
+        if(!is.boolean(complete)){
             throw new TypeError('Conversation completion state must be boolean.');
         }
 
@@ -1823,7 +1826,7 @@
     }
 
     function setInitialSpeechMuted(initialMuted){
-        if(typeof initialMuted!=='boolean'){
+        if(!is.boolean(initialMuted)){
             throw new TypeError('initialMuted must be boolean');
         }
 
@@ -1859,13 +1862,13 @@
         }={}
     ){
         const messageId=String(id);
-        const normalizedTotal=Number.isFinite(Number(total))
+        const normalizedTotal=is.finite(Number(total))
             ?Number(total)
             :0;
-        const normalizedCurrent=Number.isFinite(Number(current))
+        const normalizedCurrent=is.finite(Number(current))
             ?Number(current)
             :0;
-        const normalizedFailed=Number.isFinite(Number(failed))
+        const normalizedFailed=is.finite(Number(failed))
             ?Number(failed)
             :0;
         const message=messageId
@@ -1974,9 +1977,9 @@
 
     function hasSelectedAIRuntimeRole(role){
         const record=latestAIRuntimeRoles?.[role];
-        return typeof record?.providerId==='string'
+        return is.string(record?.providerId)
             &&record.providerId.length>0
-            &&typeof record?.modelId==='string'
+            &&is.string(record?.modelId)
             &&record.modelId.length>0;
     }
 
@@ -2022,14 +2025,14 @@
         }
 
         function selected(){
-            return typeof role?.providerId==='string'
+            return is.string(role?.providerId)
                 &&role.providerId.length>0
-                &&typeof role?.modelId==='string'
+                &&is.string(role?.modelId)
                 &&role.modelId.length>0;
         }
 
         function modelDisplayName(){
-            const configured=typeof host.modelName==='string'
+            const configured=is.string(host.modelName)
                 ?host.modelName.trim()
                 :'';
             return configured||role?.modelId||'the selected language model';
@@ -2039,9 +2042,9 @@
             const totalBytes=role?.progress?.totalBytes;
             const loadedBytes=role?.progress?.loadedBytes;
             if(
-                Number.isFinite(totalBytes)
+                is.finite(totalBytes)
                 &&totalBytes>0
-                &&Number.isFinite(loadedBytes)
+                &&is.finite(loadedBytes)
                 &&loadedBytes>=0
             ){
                 return {
@@ -2053,13 +2056,13 @@
             }
             const total=Number(role?.progress?.total);
             const completed=Number(role?.progress?.completed);
-            const unit=typeof role?.progress?.unit==='string'&&role.progress.unit
+            const unit=is.string(role?.progress?.unit)&&role.progress.unit
                 ?role.progress.unit
                 :'items';
             if(
-                !Number.isFinite(total)
+                !is.finite(total)
                 ||total<=0
-                ||!Number.isFinite(completed)
+                ||!is.finite(completed)
             ){
                 return null;
             }
@@ -2072,7 +2075,7 @@
         }
 
         function formatBytes(value){
-            if(!Number.isFinite(value)||value<0){
+            if(!is.finite(value)||value<0){
                 return '';
             }
             const bytes=value;
@@ -2103,7 +2106,7 @@
         }
 
         function approximateDuration(value){
-            if(!Number.isFinite(value)||value<0){
+            if(!is.finite(value)||value<0){
                 return '';
             }
             const suppliedSeconds=value;
@@ -2127,13 +2130,13 @@
         function activeTransferText(){
             const active=role?.progress?.activeTransfers;
             const limit=role?.progress?.transferLimit;
-            const mode=typeof role?.progress?.transferMode==='string'
+            const mode=is.string(role?.progress?.transferMode)
                 ?role.progress.transferMode.trim().toLowerCase()
                 :'';
             if(
-                !Number.isSafeInteger(active)
+                !is.safeInteger(active)
                 ||active<0
-                ||!Number.isSafeInteger(limit)
+                ||!is.safeInteger(limit)
                 ||limit<1
                 ||!mode
             ){
@@ -2159,7 +2162,7 @@
 
         function progressElapsedText(){
             const elapsedMilliseconds=Number(role?.progress?.elapsedMs);
-            if(!Number.isFinite(elapsedMilliseconds)||elapsedMilliseconds<0){
+            if(!is.finite(elapsedMilliseconds)||elapsedMilliseconds<0){
                 return '';
             }
             const elapsedSeconds=Math.floor(elapsedMilliseconds/1000);
@@ -2177,7 +2180,7 @@
 
         function progressMessage(){
             const measured=determinateProgress();
-            const phaseValue=typeof role?.progress?.phase==='string'&&role.progress.phase
+            const phaseValue=is.string(role?.progress?.phase)&&role.progress.phase
                 ?role.progress.phase
                 :'loading';
             const phase=phaseValue.replaceAll('-',' ');
@@ -2193,7 +2196,7 @@
                 );
                 parts.push(`${formatBytes(remainingBytes)} remaining`);
                 const bytesPerSecond=role?.progress?.bytesPerSecond;
-                if(Number.isFinite(bytesPerSecond)&&bytesPerSecond>=0){
+                if(is.finite(bytesPerSecond)&&bytesPerSecond>=0){
                     parts.push(`${formatBytes(bytesPerSecond)}/s`);
                 }else{
                     parts.push('Calculating speed');
@@ -2318,7 +2321,7 @@
             requestError='';
             const intent={role:'llm',action,reason:'user'};
             const request={intent,state:role};
-            const operationId=typeof role?.operationId==='string'&&role.operationId
+            const operationId=is.string(role?.operationId)&&role.operationId
                 ?role.operationId
                 :createOperationId('llm-activation');
             const generation=++requestGeneration;
@@ -2456,9 +2459,9 @@
         if(
             !controller
             ||requiredMethods.some(function missingConversationTimeboxMethod(name){
-                return typeof controller[name]!=='function';
+                return !is.function(controller[name]);
             })
-            ||typeof controller.limitReachedMessage!=='string'
+            ||!is.string(controller.limitReachedMessage)
         ){
             throw new TypeError('A compatible conversation timebox controller is required.');
         }
@@ -2559,7 +2562,7 @@
     }
 
     function queueConversationTimeboxMessage(message,context,guard){
-        const operationId=typeof context?.operationId==='string'&&context.operationId
+        const operationId=is.string(context?.operationId)&&context.operationId
             ?context.operationId
             :nextChatOperationId('conversation-timebox');
         const deliveryContext={...context,operationId};
@@ -2573,7 +2576,7 @@
                 if(destroyed||aiRuntimeStateAbortController.signal.aborted){
                     return false;
                 }
-                if(typeof guard==='function'&&!guard()){
+                if(is.function(guard)&&!guard()){
                     return false;
                 }
                 let lastError;
@@ -2591,7 +2594,7 @@
                     if(destroyed||aiRuntimeStateAbortController.signal.aborted){
                         return false;
                     }
-                    if(typeof guard==='function'&&!guard()){
+                    if(is.function(guard)&&!guard()){
                         return false;
                     }
                     if(
@@ -2614,7 +2617,7 @@
                         if(destroyed||aiRuntimeStateAbortController.signal.aborted){
                             return false;
                         }
-                        if(typeof guard==='function'&&!guard()){
+                        if(is.function(guard)&&!guard()){
                             return false;
                         }
                         return requireConversationTimeboxDelivery(delivered);
@@ -2633,7 +2636,7 @@
                 if(destroyed||aiRuntimeStateAbortController.signal.aborted){
                     return false;
                 }
-                if(typeof guard==='function'&&!guard()){
+                if(is.function(guard)&&!guard()){
                     return false;
                 }
                 if(result!==false){
@@ -2649,7 +2652,7 @@
                 if(destroyed||aiRuntimeStateAbortController.signal.aborted){
                     return false;
                 }
-                if(typeof guard==='function'&&!guard()){
+                if(is.function(guard)&&!guard()){
                     return false;
                 }
                 setConversationTimeboxError(
@@ -2722,7 +2725,7 @@
     );
 
     async function streamMessage(text='', id='', isThinking){
-        if(typeof text!=='string'){
+        if(!is.string(text)){
             if(text instanceof Error){
                 arcaneLogging.error('Arcane chat stream delivered an Error as content.',text);
                 throw text;
@@ -2792,7 +2795,7 @@
             &&speech.muted===false
         ){
             const aiRuntime=boundChatAI??globalThis.ai;
-            if(typeof aiRuntime?.streamTTS==='function'){
+            if(is.function(aiRuntime?.streamTTS)){
                 void Promise.resolve(aiRuntime.streamTTS(text)).catch(
                     reportTTSError
                 );
@@ -3046,7 +3049,7 @@
             );
         }
 
-        const sessionRequestMessages=Array.isArray(sessionRequest)
+        const sessionRequestMessages=is.array(sessionRequest)
             ?sessionRequest
             :[sessionRequest];
         if(!sessionRequestMessages.length){
@@ -3079,7 +3082,7 @@
                     status:'Working'
                 }
             );
-            const result=typeof session.stream==='function'
+            const result=is.function(session.stream)
                 ?await session.stream(
                     request,
                     {
@@ -3130,13 +3133,13 @@
             ){
                 return false;
             }
-            if(!result||typeof result!=='object'||Array.isArray(result)){
+            if(!result||!is.object(result)||is.array(result)){
                 throw new TypeError('The chat session returned an invalid result.');
             }
-            if(!result.message||typeof result.message.content!=='string'){
+            if(!result.message||!is.string(result.message.content)){
                 throw new TypeError('The chat session result must contain assistant message content.');
             }
-            const committedTurn=typeof session.transcript==='function'
+            const committedTurn=is.function(session.transcript)
                 ?latestCommittedTranscriptTurn(
                     await session.transcript(),
                     sessionRequestMessages
@@ -3327,7 +3330,7 @@
             error.code='AI_CHAT_TOOL_RESULT_NOT_PENDING';
             throw error;
         }
-        if(!Array.isArray(options.results)||options.results.length===0){
+        if(!is.array(options.results)||options.results.length===0){
             throw new TypeError('Tool results must be a nonempty array.');
         }
         const statuses=new Map([
@@ -3369,7 +3372,7 @@
             }
             const toolCallId=result.toolCallId;
             if(
-                typeof toolCallId!=='string'
+                !is.string(toolCallId)
                 ||!pendingById.has(toolCallId)
                 ||resultsById.has(toolCallId)
             ){
@@ -3392,11 +3395,11 @@
                     'Tool-result status must be executed, declined, cancelled, or not-executed.'
                 );
             }
-            if(typeof result.message!=='string'||!result.message.trim()){
+            if(!is.string(result.message)||!result.message.trim()){
                 throw new TypeError('Tool-result message must contain user-facing text.');
             }
             const persist=result.persist??true;
-            if(typeof persist!=='boolean'){
+            if(!is.boolean(persist)){
                 throw new TypeError('Tool-result persist must be boolean.');
             }
             resultsById.set(toolCallId,{
@@ -3426,7 +3429,7 @@
             error.code='AI_CHAT_INCOHERENT_PERSISTENCE';
             throw error;
         }
-        const operationId=typeof context.operationId==='string'&&context.operationId
+        const operationId=is.string(context.operationId)&&context.operationId
             ?context.operationId
             :nextChatOperationId('tool-results');
         const ownership=createChatSubmissionOwnership(context.signal??null);
@@ -3556,10 +3559,10 @@
         if(destroyed){
             return false;
         }
-        if(typeof textOverride!=='string'){
+        if(!is.string(textOverride)){
             throw new TypeError('Programmatic chat messages must be strings.');
         }
-        if(!context||typeof context!=='object'||Array.isArray(context)){
+        if(!context||!is.object(context)||is.array(context)){
             throw new TypeError('Chat submission context must be an object.');
         }
         if(host.conversationComplete){
@@ -3586,7 +3589,7 @@
         if(!text.trim()){
             return false;
         }
-        const operationId=typeof submissionContext.operationId==='string'
+        const operationId=is.string(submissionContext.operationId)
             &&submissionContext.operationId
             ?submissionContext.operationId
             :nextChatOperationId('message');
@@ -3656,7 +3659,7 @@
             if(host.aiAvailability.tts&&speech.muted===false){
                 const aiRuntime=boundChatAI??globalThis.ai;
                 aiRuntime?.stopAudio?.();
-                if(typeof aiRuntime?.resumeAudio==='function'){
+                if(is.function(aiRuntime?.resumeAudio)){
                     void Promise.resolve(aiRuntime.resumeAudio()).catch(
                         function reportPlaybackResumeFailure(error){
                             reportTTSError(error,'playback-resume');
@@ -3693,7 +3696,7 @@
         if(destroyed){
             return false;
         }
-        if(typeof speech.reportTTSError==='function'){
+        if(is.function(speech.reportTTSError)){
             try{
                 speech.reportTTSError(error,boundary);
                 return true;

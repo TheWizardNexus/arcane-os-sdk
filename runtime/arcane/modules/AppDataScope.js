@@ -1,3 +1,6 @@
+import Is from 'strong-type';
+const is=new Is(false);
+
 const APPLICATION_ID_PATTERN=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const APPLICATION_ID_MAX_LENGTH=64;
 const APP_DATA_DIRECTORY='apps';
@@ -18,7 +21,7 @@ function scopeError(code,message){
  * @returns {string}
  */
 export function canonicalApplicationId(value,label='applicationId'){
-    if(typeof value!=='string'
+    if(!is.string(value)
         ||value.length<1
         ||value.length>APPLICATION_ID_MAX_LENGTH
         ||!APPLICATION_ID_PATTERN.test(value)){
@@ -112,13 +115,13 @@ export function resolveApplicationLocalStorageKey(logicalKey='',options={}){
 }
 
 async function nativeApplicationId(arcane=globalThis.Arcane){
-    if(typeof arcane?.app?.current!=='function'){
+    if(!is.function(arcane?.app?.current)){
         return null;
     }
 
     const descriptor=await arcane.app.current();
 
-    if(!descriptor||typeof descriptor!=='object'){
+    if(!descriptor||!is.object(descriptor)){
         throw scopeError(
             'APP_DATA_SCOPE_INVALID',
             'Arcane returned an invalid bound application descriptor.'
@@ -200,7 +203,7 @@ export async function openApplicationDataDirectory({
     arcane=globalThis.Arcane,
     create=true
 }={}){
-    if(!storage||typeof storage.getDirectory!=='function'){
+    if(!storage||!is.function(storage.getDirectory)){
         throw scopeError(
             'APP_DATA_STORAGE_UNAVAILABLE',
             'Origin Private File System storage is unavailable in this browser.'
@@ -214,7 +217,7 @@ export async function openApplicationDataDirectory({
     });
     const root=await storage.getDirectory();
 
-    if(!root||typeof root.getDirectoryHandle!=='function'){
+    if(!root||!is.function(root.getDirectoryHandle)){
         throw scopeError(
             'APP_DATA_STORAGE_UNAVAILABLE',
             'Arcane could not open the Origin Private File System root.'
