@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.0
+
+- Add `removeBrowserSpeechModelCache()` to remove an explicitly retired Hugging
+  Face speech model from the current browser origin's upstream cache. Preserve
+  other models, voices, runtimes, DBOPFS artifacts, and preferences; report each
+  completed removal and surface cancellation or partial failure.
+- Keep model retirement policy in consuming applications. The operation starts
+  no model download or inference and leaves NPU, GPU, and CPU selection unchanged.
+
 ## 0.7.3
 
 - Correct public development serving for OPFS/DBOPFS and other browser APIs

@@ -4,6 +4,7 @@ export {
   createBrowserSpeechArtifactGraph,
   createBrowserSpeechAuthority,
   createDbopfsSpeechArtifactStore,
+  removeBrowserSpeechModelCache,
 } from "./browser-speech-artifacts.mjs";
 export {
   createBrowserKokoroProvider,

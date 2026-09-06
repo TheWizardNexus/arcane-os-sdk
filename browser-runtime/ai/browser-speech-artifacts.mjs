@@ -2331,6 +2331,53 @@ export function createDbopfsSpeechArtifactStore({
   return store;
 }
 
+export async function removeBrowserSpeechModelCache(
+    {repository, cacheStorage = globalThis.caches, signal} = {}
+) {
+    const selectedRepository = requiredText(repository, 'repository');
+    const removed = [];
+    const result = {repository: selectedRepository, removed};
+    const modelPath = `/${selectedRepository.split('/').map(encodeURIComponent).join('/')}/resolve/`;
+
+    try {
+        throwIfAborted(signal);
+        if (!is.function(cacheStorage?.has) || !is.function(cacheStorage?.open)) {
+            throw speechError(
+                'ARCANE_AI_STORAGE_UNAVAILABLE',
+                'Browser model cache storage is unavailable.',
+                undefined,
+                'browser-speech-model-cache-unavailable'
+            );
+        }
+        const cached = await cacheStorage.has('transformers-cache');
+        throwIfAborted(signal);
+        if (!cached) return result;
+        const cache = await cacheStorage.open('transformers-cache');
+        const requests = await cache.keys();
+        for (const request of requests) {
+            throwIfAborted(signal);
+            const url = new URL(request.url);
+            if (url.origin !== 'https://huggingface.co' || !url.pathname.startsWith(modelPath)) {
+                continue;
+            }
+            if (await cache.delete(request)) removed.push(request.url);
+        }
+        throwIfAborted(signal);
+        return result;
+    } catch (cause) {
+        const error = cause?.name === 'AbortError' || isBrowserSpeechArtifactError(cause)
+            ? cause
+            : speechError(
+                'ARCANE_AI_STORAGE_DELETE_FAILED',
+                'Unable to remove the selected browser speech model download.',
+                cause,
+                'browser-speech-model-cache-delete-rejected'
+            );
+        error.removed = removed;
+        throw error;
+    }
+}
+
 export function isBrowserSpeechAuthority(value) {
   return AUTHORITIES.has(value);
 }

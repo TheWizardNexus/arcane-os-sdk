@@ -125,6 +125,7 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `createCanonicalUstarHeader()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `createDbopfsModelStore()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser with a ready DBOPFS instance and OPFS |
 | `createDbopfsSpeechArtifactStore()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with ready DBOPFS, Web Locks, Fetch, File/Blob, and object URLs |
+| `removeBrowserSpeechModelCache()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser CacheStorage; explicit removal of one selected upstream model |
 | `createNativeBuildPlan()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `createNativeTargetAdapter()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `createReporter()` | function | `arcane-os` | Events, processes, and testing | Node |
@@ -6395,6 +6396,24 @@ const authority = createBrowserSpeechAuthority({
     }
 });
 ```
+
+## removeBrowserSpeechModelCache()
+
+```text
+removeBrowserSpeechModelCache({ repository, cacheStorage=globalThis.caches, signal }={})
+```
+
+Removes cached Hugging Face resources for the exact selected repository, across
+all revisions, from the current origin's existing `transformers-cache`.
+Returns `{repository,removed}`, including each complete URL actually deleted.
+An absent model or cache returns an empty list. The caller must stop using the
+retired model first; this operation does not unload providers or start inference.
+Other models, runtime resources, voice caches, declared DBOPFS artifacts, and
+preferences are preserved. Use `store.remove(authority)` separately for declared
+DBOPFS artifacts. Missing storage and cache failures surface
+`ARCANE_AI_STORAGE_UNAVAILABLE` and `ARCANE_AI_STORAGE_DELETE_FAILED`.
+Cancellation stops subsequent deletions with `AbortError`; `error.removed`
+retains the complete list of deletions already completed.
 
 ## createDbopfsSpeechArtifactStore()
 

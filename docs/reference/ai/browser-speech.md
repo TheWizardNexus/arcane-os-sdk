@@ -1027,6 +1027,33 @@ forward a security payload to the Worker and performs no security work. Passing
 `{secure:true}` does not activate hardening. Any future hardening stage requires
 a separate user review and an explicit implementation change before it may execute.
 
+## `removeBrowserSpeechModelCache()`
+
+```javascript
+const removal = await removeBrowserSpeechModelCache(
+    {repository: 'Xenova/whisper-small', signal}
+);
+```
+
+Exported by `arcane-os/ai/browser-speech`. This explicit operation removes all
+cached revisions of the exact selected Hugging Face model from the current
+origin's existing `transformers-cache`. It returns `{repository,removed}`,
+where `removed` contains the complete URLs actually deleted. An absent cache or
+model returns an empty list. Other models, runtime files, the Kokoro voice
+cache, DBOPFS files, and preferences remain untouched. No model is loaded or
+downloaded and no inference is started.
+
+The caller owns model retirement policy and must stop using the retired model
+before removal so a live provider cannot download it again. This operation is
+separate from `store.remove(authority)`, which removes declared DBOPFS files.
+`cacheStorage` may explicitly supply a CacheStorage implementation; it defaults
+to `globalThis.caches`. Missing storage rejects with
+`ARCANE_AI_STORAGE_UNAVAILABLE`; cache failures reject with
+`ARCANE_AI_STORAGE_DELETE_FAILED`. An aborted `signal` stops further removals
+with `AbortError`. Deletions already completed are retained in `error.removed`;
+removal is repeatable and does not claim transactional rollback. The operation
+enumerates one cache once and awaits each matching deletion in order.
+
 ## Ordinary module routing
 
 Artifact-graph preparation reads each stored JavaScript module, discovers
