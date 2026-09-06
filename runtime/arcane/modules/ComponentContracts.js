@@ -407,49 +407,51 @@ function effectiveDashboardVisibility(definitions=[],visibility={}){
     );
 }
 
-function formatAIRuntimeProgress(progress,fallback){
-    const phase=is.string(progress?.phase)&&progress.phase
-        ?progress.phase
-        :fallback;
-    const parts=[phase];
-    const message=is.string(progress?.message)&&progress.message
-        ?progress.message
-        :is.string(progress?.stage)&&progress.stage
-            ?progress.stage
-            :'';
-    if(message&&message!==phase){
+function formatAIRuntimeProgress(progress, fallback) {
+    const phase = is.string(progress?.phase) && progress.phase
+        ? progress.phase
+        : fallback;
+    const parts = [phase];
+    const message = is.string(progress?.message) && progress.message
+        ? progress.message
+        : is.string(progress?.stage) && progress.stage
+            ? progress.stage
+            : '';
+    if (message && message !== phase) {
         parts.push(message);
     }
-    const item=is.string(progress?.item)&&progress.item
-        ?progress.item
-        :is.string(progress?.file)&&progress.file
-            ?progress.file
-            :'';
-    if(item&&item!==message){
+    const item = is.string(progress?.item) && progress.item
+        ? progress.item
+        : is.string(progress?.file) && progress.file
+            ? progress.file
+            : '';
+    if (item && item !== message) {
         parts.push(item);
     }
-    const completed=progress?.completed;
-    const total=progress?.total;
-    const unit=is.string(progress?.unit)
-        ?progress.unit
-        :'';
-    if(is.finite(completed)&&is.finite(total)&&total>0&&unit){
+    const completed = progress?.completed;
+    const total = progress?.total;
+    const unit = is.string(progress?.unit)
+        ? progress.unit
+        : '';
+    if (is.finite(completed) && is.finite(total) && total > 0 && unit) {
         parts.push(`${completed} of ${total} ${unit}`);
-    }else if(is.finite(completed)&&completed>=0&&unit==='files'){
+    } else if (is.finite(completed) && completed >= 0 && unit === 'files') {
         parts.push(`${completed} files complete`);
     }
-    if(is.finite(progress?.elapsedMs)&&progress.elapsedMs>=0){
-        const elapsedSeconds=Math.floor(progress.elapsedMs/1000);
-        const hours=Math.floor(elapsedSeconds/3600);
-        const minutes=Math.floor(elapsedSeconds%3600/60);
-        const seconds=elapsedSeconds%60;
-        parts.push(hours>0
-            ?`${hours}h ${minutes}m elapsed`
-            :minutes>0
-                ?`${minutes}m ${String(seconds).padStart(2,'0')}s elapsed`
-                :`${seconds}s elapsed`);
+    if (is.finite(progress?.elapsedMs) && progress.elapsedMs >= 0) {
+        const elapsedSeconds = Math.floor(progress.elapsedMs / 1000);
+        const hours = Math.floor(elapsedSeconds / 3600);
+        const minutes = Math.floor(elapsedSeconds % 3600 / 60);
+        const seconds = elapsedSeconds % 60;
+        parts.push(
+            hours > 0
+                ? `${hours}h ${minutes}m elapsed`
+                : minutes > 0
+                    ? `${minutes}m ${String(seconds).padStart(2, '0')}s elapsed`
+                    : `${seconds}s elapsed`
+        );
     }
-    if(progress?.heartbeat===true){
+    if (progress?.heartbeat === true) {
         parts.push('Still working');
     }
     return parts.join(' · ');
@@ -458,7 +460,7 @@ function formatAIRuntimeProgress(progress,fallback){
 function createSTTActivationController({
     host,
     button,
-    progress=null,
+    progress = null,
     onChange,
     EventClass=globalThis.CustomEvent,
     eventSource=null
@@ -626,35 +628,38 @@ function createSTTActivationController({
             &&['unloaded','loading','unloading','error'].includes(role.state);
     }
 
-    function renderProgress(){
-        if(!progress){
+    function renderProgress() {
+        if (!progress) {
             return;
         }
-        const active=!destroyed
-            &&(requestPending||['loading','unloading'].includes(role?.state));
-        progress.hidden=!active;
-        if(!active){
+        const active = !destroyed
+            && (requestPending || ['loading', 'unloading'].includes(role?.state));
+        progress.hidden = !active;
+        if (!active) {
             progress.removeAttribute('value');
             progress.removeAttribute('max');
             progress.removeAttribute('aria-valuetext');
             return;
         }
-        const completed=role?.progress?.completed;
-        const total=role?.progress?.total;
-        const unit=role?.progress?.unit;
-        if(!is.finite(completed)
-            ||completed<0
-            ||!is.finite(total)
-            ||total<=0
-            ||!is.string(unit)
-            ||!unit){
+        const completed = role?.progress?.completed;
+        const total = role?.progress?.total;
+        const unit = role?.progress?.unit;
+        if (!is.finite(completed)
+            || completed < 0
+            || !is.finite(total)
+            || total <= 0
+            || !is.string(unit)
+            || !unit) {
             progress.removeAttribute('value');
             progress.removeAttribute('max');
-        }else{
-            progress.max=total;
-            progress.value=completed;
+        } else {
+            progress.max = total;
+            progress.value = completed;
         }
-        progress.setAttribute('aria-valuetext',status());
+        progress.setAttribute(
+            'aria-valuetext',
+            status()
+        );
     }
 
     async function request(nextAction){

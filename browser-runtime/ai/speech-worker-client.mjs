@@ -288,7 +288,10 @@ class SpeechWorkerClient {
         });
       }
       signal?.addEventListener?.("abort", onAbort, { once: true });
-      client.#pending.set(id, { resolve, reject, cleanup, op, onProgress });
+      client.#pending.set(
+          id,
+          { resolve, reject, cleanup, op, onProgress }
+      );
       const message = {
         protocol: SPEECH_WORKER_PROTOCOL,
         id,

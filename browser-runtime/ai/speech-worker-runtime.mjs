@@ -1597,12 +1597,14 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
     const loadingFiles = new Set();
     function publishProgress(progress) {
         if (!reporting || signal?.aborted) return;
-        send({
-            protocol: SPEECH_WORKER_PROTOCOL,
-            id: request.id,
-            type: 'progress',
-            progress,
-        });
+        send(
+            {
+                protocol: SPEECH_WORKER_PROTOCOL,
+                id: request.id,
+                type: 'progress',
+                progress,
+            }
+        );
     }
     function reportModelProgress(detail) {
         if (!reporting || signal?.aborted) return;
@@ -1623,16 +1625,18 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
             : detail?.status === 'done'
                 ? 'Loaded model file'
                 : 'Loading model file';
-        publishProgress({
-            phase: initializing ? 'initialize' : 'download',
-            stage: 'model',
-            message,
-            file,
-            completed: completedFiles.size,
-            total: null,
-            unit: 'files',
-            detail,
-        });
+        publishProgress(
+            {
+                phase: initializing ? 'initialize' : 'download',
+                stage: 'model',
+                message,
+                file,
+                completed: completedFiles.size,
+                total: null,
+                unit: 'files',
+                detail,
+            }
+        );
     }
     try {
       configuration = validateConfiguration(request.payload?.configuration, role);
@@ -1647,13 +1651,15 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
         });
       }
       loadFailureReason = `${role}-worker-runtime-import-rejected`;
-      publishProgress({
-          phase: 'initialize',
-          stage: 'runtime',
-          message: 'Opening the speech runtime',
-          file: entry.path,
-          total: null,
-      });
+      publishProgress(
+          {
+              phase: 'initialize',
+              stage: 'runtime',
+              message: 'Opening the speech runtime',
+              file: entry.path,
+              total: null,
+          }
+      );
       const namespace = await import(entry.moduleUrl);
       throwIfAborted(signal, `${role}-load-cancelled`);
       restoreNamespace = configureRuntimeNamespace(
@@ -1663,12 +1669,14 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
         environment.cache,
       );
       loadFailureReason = `${role}-worker-model-load-rejected`;
-      publishProgress({
-          phase: 'initialize',
-          stage: 'model',
-          message: `Initializing the speech model on ${configuration.execution?.device ?? 'wasm'}`,
-          total: null,
-      });
+      publishProgress(
+          {
+              phase: 'initialize',
+              stage: 'model',
+              message: `Initializing the speech model on ${configuration.execution?.device ?? 'wasm'}`,
+              total: null,
+          }
+      );
       engine = role === "stt"
         ? await createWhisperEngine(namespace, configuration, signal, reportModelProgress)
         : await createKokoroEngine(namespace, configuration, signal, reportModelProgress);

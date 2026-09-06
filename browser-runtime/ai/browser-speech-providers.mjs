@@ -1337,7 +1337,11 @@ function createBrowserSpeechProvider({
     let failure = pool.failure;
     if (!failure) {
       try {
-        await pool.slots[0].client.request("load", { configuration }, { signal, onProgress });
+        await pool.slots[0].client.request(
+            'load',
+            { configuration },
+            { signal, onProgress }
+        );
       } catch (error) {
         failure = error;
       }
@@ -1346,21 +1350,27 @@ function createBrowserSpeechProvider({
       const remainingLoads = [];
       let completedWorkers = 1;
       function reportPoolProgress(detail) {
-          onProgress({
-              phase: 'initialize',
-              stage: 'workers',
-              message: `Opening speech model sessions on ${device}`,
-              completed: completedWorkers,
-              total: pool.slots.length,
-              unit: 'sessions',
-              detail,
-          });
+          onProgress(
+              {
+                  phase: 'initialize',
+                  stage: 'workers',
+                  message: `Opening speech model sessions on ${device}`,
+                  completed: completedWorkers,
+                  total: pool.slots.length,
+                  unit: 'sessions',
+                  detail,
+              }
+          );
       }
       async function loadRemainingWorker(slot) {
-          await slot.client.request('load', { configuration }, {
-              signal,
-              onProgress: reportPoolProgress,
-          });
+          await slot.client.request(
+              'load',
+              { configuration },
+              {
+                  signal,
+                  onProgress: reportPoolProgress,
+              }
+          );
           completedWorkers += 1;
           reportPoolProgress(null);
       }
@@ -1531,7 +1541,10 @@ function createBrowserSpeechProvider({
           ) return;
           const value = {
               ...progress,
-              elapsedMs: Math.max(0, Date.now() - loadStartedAt),
+              elapsedMs: Math.max(
+                  0,
+                  Date.now() - loadStartedAt
+              ),
           };
           record.lastProgress = value;
           for (const observer of [...record.observers]) observer.progress(value);
@@ -1543,17 +1556,22 @@ function createBrowserSpeechProvider({
         let preparation = null;
         let pool = null;
         try {
-          reportLoadProgress({
-              phase: 'prepare',
-              stage: 'cache',
-              message: 'Opening stored speech runtime files',
-              total: null,
-          });
-          prepared = await store.prepare(authority.graph ?? authority, {
-            signal: linked.controller.signal,
-            offline,
-            onProgress: reportLoadProgress,
-          });
+          reportLoadProgress(
+              {
+                  phase: 'prepare',
+                  stage: 'cache',
+                  message: 'Opening stored speech runtime files',
+                  total: null,
+              }
+          );
+          prepared = await store.prepare(
+              authority.graph ?? authority,
+              {
+                  signal: linked.controller.signal,
+                  offline,
+                  onProgress: reportLoadProgress,
+              }
+          );
           preparation = {
             prepared,
             released: false,

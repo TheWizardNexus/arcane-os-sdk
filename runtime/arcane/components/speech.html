@@ -145,7 +145,12 @@
 <button id="stopButton" type="button" class="hidden" disabled>Send</button>
 <div class="speech_feedback">
     <p id="speechStatus" class="speech_status" role="status" aria-live="polite"></p>
-    <progress id="sttActivationProgress" class="stt_activation_progress" aria-label="Transcription model activation progress" hidden></progress>
+    <progress
+        id="sttActivationProgress"
+        class="stt_activation_progress"
+        aria-label="Transcription model activation progress"
+        hidden
+    ></progress>
 </div>
 <button id="muteButton" type="button" class="mute" aria-pressed="true" aria-label="Voice unavailable" disabled>Voice unavailable</button>
 
@@ -690,7 +695,9 @@
             tone = localStatus.tone;
             if (sttActivationController.pending
                 || ['loading', 'unloading'].includes(sttRole.state)) {
-                messages.push(describeSTTRole());
+                messages.push(
+                    describeSTTRole()
+                );
             }
         } else {
             messages.push(describeSTTRole());
