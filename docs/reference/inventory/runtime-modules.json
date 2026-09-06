@@ -8,9 +8,9 @@
     "sdkVersion": "0.5.17",
     "protocol": "arcane/1"
   },
-  "artifactCount": 85,
-  "javascriptArtifactCount": 83,
-  "esmExportCount": 356,
+  "artifactCount": 84,
+  "javascriptArtifactCount": 82,
+  "esmExportCount": 351,
   "artifacts": [
     {
       "file": "runtime/arcane/modules/AI.js",
@@ -78,23 +78,6 @@
       "protocol": "arcane-ai-runtime/2, arcane-ai-provider/2, arcane-ai-model-authority/1",
       "normalization": "Normalizes mutable complete per-role routes, lifecycle/status, cancellation, streaming cleanup, capacity-1 FIFO LLM/STT lanes, bounded provider-declared parallel TTS requests with FIFO overflow, automatic repeated-formatting-mark removal from cloned direct TTS payloads, local-only selection, direct LLM history/declaration/terminal structural contracts, complete all-choice content/reasoning FIFO iteration, private automatic provider draining with result-first buffering, terminal-only structural calls, exact per-choice observed/terminal correlation, and a separate complete validated terminal result without creating a fallback.",
       "surface": "Protocol constants; singleton-only `AIProviderRuntime`; `aiProviderRuntime`; `getAIProviderRuntime()`; provider registration/identity/selection, closed three-role and STT/TTS-only validation/configuration/replacement, status/catalog/inspection, startup, per-role load/unload/dispose/cancel, dispose-all, request/stream/speech aliases, SDK-internal speech-input preparation metadata, and mute controls."
-    },
-    {
-      "file": "runtime/arcane/modules/AIResponseLength.js",
-      "name": "AIResponseLength.js",
-      "kind": "esm",
-      "exports": [
-        "AI_RESPONSE_LENGTH_DEFAULT",
-        "AI_RESPONSE_LENGTH_OPTIONS",
-        "aiResponseLengthInstruction",
-        "applyAIResponseLength",
-        "normalizeAIResponseLength"
-      ],
-      "summary": "Normalizes low/medium/high response-preference selectors while leaving complete prompts unchanged.",
-      "availability": "Cross-host",
-      "protocol": "In-process only",
-      "normalization": "Selectors normalize to low, medium, or high; every label is Complete, the instruction is empty, and prompt content remains unchanged.",
-      "surface": "Response-preference constants plus `normalizeAIResponseLength()`, `aiResponseLengthInstruction()`, and `applyAIResponseLength()`."
     },
     {
       "file": "runtime/arcane/modules/AIResponseURLPolicy.js",

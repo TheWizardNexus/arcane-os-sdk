@@ -4,6 +4,13 @@ Every file shipped under `runtime/arcane/modules/` appears here. Start with the 
 
 Apps import renderer ESM from `/arcane/modules/<file>`. Classic scripts, the OPFS worker, uPlot stylesheet, and vendor license are called out explicitly. Importing a module does not grant a native capability.
 
+Applications own response-detail preferences, their saved values, and any
+verbosity instruction appended to the system prompt. The former
+`AIResponseLength.js` module and its exports have been removed. Before adopting
+this source change, consumers must normalize preferences in their application
+and pass their complete system prompt directly instead of calling the former
+no-op `applyAIResponseLength()` helper. Existing saved preferences are unchanged.
+
 ## Availability shorthand
 
 - **Cross-host** means in-process logic built from standard JavaScript/Web APIs.
@@ -44,7 +51,6 @@ own asynchronous work, cancellation, and backpressure.
 | [`AIPreferenceRuntime.js`](#aipreferenceruntimejs) | esm | Applies and reads non-persistent per-user AI preference overrides. | Cross-host | Normalized six-slot preference state. |
 | [`AIPreferenceTuple.js`](#aipreferencetuplejs) | esm | Normalizes and compares the six provider/model preference slots. | Cross-host | Fully normalized frozen tuple. |
 | [`AIProviderRuntime.js`](#aiproviderruntimejs) | esm | Owns provider-neutral selection, lifecycle, routing, startup, requests, streaming, cancellation, and independent LLM/STT/TTS state. | Cross-host runtime; provider-specific availability | Normalized required provider members plus route/status contracts, with explicit local-only selection and no implicit fallback. |
-| [`AIResponseLength.js`](#airesponselengthjs) | esm | Normalizes current low/medium/high response-preference selectors while preserving complete prompts. | Cross-host | Current selector normalization; prompt content remains unchanged. |
 | [`AIResponseURLPolicy.js`](#airesponseurlpolicyjs) | esm | Extracts and audits links from AI Markdown, rendered HTML, CSS, srcset, bare URLs, and email text. | Cross-host | Normalized frozen allowlist audit. |
 | [`AIRuntimeState.js`](#airuntimestatejs) | esm | Publishes sticky mutable role snapshots, lifecycle intents, and startup-settlement barriers. | Cross-host state contract | Closed monotonic state records; events report state but grant no authority. |
 | [`AnsiText.js`](#ansitextjs) | esm | Parses terminal ANSI sequences into display spans or strips them to plain text. | Cross-host | Normalized text/span output. |
@@ -807,35 +813,6 @@ import {getAIProviderRuntime} from '/arcane/modules/AIProviderRuntime.js';
 
 const runtime = getAIProviderRuntime();
 console.log(runtime.protocol, runtime.status());
-```
-
-## AIResponseLength.js
-
-### Overview
-
-Normalizes current low/medium/high response-preference selectors while
-preserving complete prompts unchanged.
-
-### Public surface
-
-Response-preference constants plus `normalizeAIResponseLength()`,
-`aiResponseLengthInstruction()`, and `applyAIResponseLength()`. Every option is
-labeled `Complete`, the instruction helper returns an empty string, and the
-application helper returns its complete `systemPrompt` unchanged.
-
-Exact exports: `AI_RESPONSE_LENGTH_DEFAULT`, `AI_RESPONSE_LENGTH_OPTIONS`, `aiResponseLengthInstruction`, `applyAIResponseLength`, `normalizeAIResponseLength`.
-
-### Availability and normalization
-
-**Cross-host.** Current selector normalization with no prompt transformation.
-Transport: In-process only. [Deep protocol details](protocols.md).
-
-### Example
-
-```javascript
-import * as module from '/arcane/modules/AIResponseLength.js';
-
-console.log(Object.keys(module));
 ```
 
 ## AIResponseURLPolicy.js

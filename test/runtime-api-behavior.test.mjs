@@ -4,13 +4,6 @@ import {readFile} from 'node:fs/promises';
 import test from '../src/testing.mjs';
 import {arcaneEvents} from '../src/event-manager.mjs';
 import {
-    applyAIResponseLength,
-    AI_RESPONSE_LENGTH_DEFAULT,
-    AI_RESPONSE_LENGTH_OPTIONS,
-    aiResponseLengthInstruction,
-    normalizeAIResponseLength
-} from '../runtime/arcane/modules/AIResponseLength.js';
-import {
     getCoreLocalModelCatalog,
     getCoreLocalModelCatalogWithAdmissionFailures,
     getCoreLocalSpeechAvailability,
@@ -991,21 +984,6 @@ test('Core speech projection requires both role health and bounded catalog evide
         }),
         /too many local speech models/u
     );
-});
-
-test('AI response-length compatibility preserves complete provider-independent prompts',()=>{
-    assert.equal(AI_RESPONSE_LENGTH_DEFAULT,'medium');
-    assert.deepEqual(
-        AI_RESPONSE_LENGTH_OPTIONS.map(option=>option.label),
-        ['Complete','Complete','Complete']
-    );
-    assert.equal(normalizeAIResponseLength(' HIGH '),'high');
-    assert.equal(normalizeAIResponseLength('unknown'),'medium');
-    assert.equal(aiResponseLengthInstruction('low'),'');
-    const prompt='  System context with every surrounding character.  ';
-    assert.equal(applyAIResponseLength(prompt,'low'),prompt);
-    assert.equal(applyAIResponseLength(prompt,'high'),prompt);
-    assert.throws(()=>applyAIResponseLength(null,'medium'),/must be a string/u);
 });
 
 test(

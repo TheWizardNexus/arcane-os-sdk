@@ -28,10 +28,6 @@ export const RUNTIME_DOCUMENTED_CALLABLE_MEMBERS={
         'load','unload','dispose','disposeAll','request','chat','stream',
         'transcribe','synthesize','cancel','setSpeechMuted'
     ],
-    'AIResponseLength.js':[
-        'normalizeAIResponseLength','aiResponseLengthInstruction',
-        'applyAIResponseLength'
-    ],
     'AIResponseURLPolicy.js':[
         'auditAIResponseLinks','extractAIResponseLinks',
         'normalizeAIResponseLink','decodeHTMLCharacterReferences'
@@ -1700,7 +1696,9 @@ async function runtimeNamespaces(repositoryRoot,files){
         return record;
     };
     const linker=async(specifier,referencingModule)=>{
-        if(specifier.startsWith('node:'))return builtinModule(specifier);
+        if(specifier.startsWith('node:')||specifier==='strong-type'){
+            return builtinModule(specifier);
+        }
         if(!specifier.startsWith('.')&&!specifier.startsWith('/')){
             throw new Error(`Unsupported runtime import ${specifier}.`);
         }
