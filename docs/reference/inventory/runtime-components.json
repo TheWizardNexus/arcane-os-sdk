@@ -5,9 +5,9 @@
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
     "branch": "main",
     "path": "runtime/arcane/components",
-    "sdkVersion": "0.5.18"
+    "sdkVersion": "0.6.1"
   },
-  "componentCount": 39,
+  "componentCount": 40,
   "loader": "/arcane/modules/HTMLImport.js",
   "artifacts": [
     {
@@ -75,6 +75,29 @@
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
       "normalization": "DOM-normalized; caller/provider results remain external"
+    },
+    {
+      "file": "runtime/arcane/components/browser-ai-setup.html",
+      "name": "browser-ai-setup.html",
+      "purpose": "Displays browser API availability and browser-specific WebNN setup guidance for NPU use.",
+      "methods": [
+        "refresh()",
+        "open()",
+        "destroy()",
+        "ready"
+      ],
+      "events": [
+        "browser-ai-setup-ready"
+      ],
+      "slots": [],
+      "dependencies": [
+        "browser-device-settings.mjs",
+        "arcane-os/logging",
+        "arcane-os/event-manager"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; browser flags navigation attempt, alert, and Clipboard API",
+      "normalization": "API presence and setup instructions normalized; browser flags navigation, clipboard support, and hardware execution remain browser-owned. API presence does not establish a working adapter, loaded model, or physical NPU/GPU execution."
     },
     {
       "file": "runtime/arcane/components/calculator.html",

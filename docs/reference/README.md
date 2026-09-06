@@ -143,7 +143,7 @@ The synchronized browser payload exposes:
   ESM modules, classic vendor globals, one worker protocol, and one Node-oriented
   mail transport;
 - 14 shared entity modules under `runtime/arcane/entities/`;
-- 39 reusable HTML-import components under `runtime/arcane/components/`;
+- 40 reusable HTML-import components under `runtime/arcane/components/`;
 - seven shared CSS artifacts, images, optional physical-workspace security
   files where present, and the vendored `strong-type` dependency.
 

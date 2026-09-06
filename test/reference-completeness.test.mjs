@@ -618,9 +618,9 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
     });
 
     await t.test('all HTML components and their executable public surfaces are cataloged',async()=>{
-        assert.equal(componentInventory.componentCount,39);
-        assert.equal(live.components.length,39);
-        assert.equal(live.parsedComponentScriptCount,39);
+        assert.equal(componentInventory.componentCount,40);
+        assert.equal(live.components.length,40);
+        assert.equal(live.parsedComponentScriptCount,40);
         const componentContractSource=await readFile(
             path.join(
                 repositoryRoot,

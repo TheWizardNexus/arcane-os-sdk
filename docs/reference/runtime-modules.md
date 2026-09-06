@@ -3566,5 +3566,5 @@ console.log(Object.keys(module));
 ## Entity and component continuations
 
 - [Runtime entity modules](runtime-entities.md) explains all 14 modules, and [shared entity contracts](core/arcane-entities.md) owns all 29 exports.
-- [Runtime components](runtime-components.md) owns all 39 HTML-import fragments, methods, slots, and events.
+- [Runtime components](runtime-components.md) owns all 40 HTML-import fragments, methods, slots, and events.
 - [Arcane Ollama](arcane-ollama.md) expands the raw-versus-normalized behavior of `Ollama.js`.
