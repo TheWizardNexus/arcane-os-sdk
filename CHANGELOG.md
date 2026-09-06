@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.2
+
+- Replace browser NPU setup buttons with direct browser-specific flags links
+  and retain copy-address controls and the public `open()` method.
+- Add the missing GPU performance flags link, setup instructions, and GPU
+  detection control. Chrome uses its own `chrome://` flags address.
+- Show adapter availability and its reported name after one shared detection
+  request. Keep fallback and failed detection visible without claiming that
+  the browser performance flag is enabled or a model is running on that GPU.
+  Detection creates no device, loads no model, and changes no browser settings.
+
 ## 0.6.1
 
 - Add a reusable profile component for browser NPU setup and WebNN/WebGPU API

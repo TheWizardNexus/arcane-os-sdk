@@ -5,7 +5,7 @@
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
     "branch": "main",
     "path": "runtime/arcane/components",
-    "sdkVersion": "0.6.1"
+    "sdkVersion": "0.6.2"
   },
   "componentCount": 40,
   "loader": "/arcane/modules/HTMLImport.js",
@@ -79,9 +79,10 @@
     {
       "file": "runtime/arcane/components/browser-ai-setup.html",
       "name": "browser-ai-setup.html",
-      "purpose": "Displays browser API availability and browser-specific WebNN setup guidance for NPU use.",
+      "purpose": "Displays browser API and WebGPU adapter availability with browser-specific NPU and GPU flags links.",
       "methods": [
         "refresh()",
+        "checkGpu()",
         "open()",
         "destroy()",
         "ready"
@@ -96,8 +97,8 @@
         "arcane-os/event-manager"
       ],
       "availability": "Browser and supported native WebViews",
-      "transport": "HTMLImport + DOM; browser flags navigation attempt, alert, and Clipboard API",
-      "normalization": "API presence and setup instructions normalized; browser flags navigation, clipboard support, and hardware execution remain browser-owned. API presence does not establish a working adapter, loaded model, or physical NPU/GPU execution."
+      "transport": "HTMLImport + DOM; browser flags links, Clipboard API, WebGPU adapter request, and preserved open() navigation attempt with alert",
+      "normalization": "API presence, adapter availability, and setup instructions normalized. Mounting starts one adapter request; checkGpu() coalesces concurrent calls, while refresh() remains synchronous. No GPU device, model, or WebNN context is created. Adapter availability does not establish browser flag state, high-performance selection, or model execution."
     },
     {
       "file": "runtime/arcane/components/calculator.html",

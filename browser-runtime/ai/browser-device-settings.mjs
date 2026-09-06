@@ -63,6 +63,7 @@ export function getBrowserDeviceSettings(navigatorObject = globalThis.navigator)
     ) {
       browserId = "chrome";
       name = "Google Chrome";
+      highPerformanceGpu = { name, url: "chrome://flags/#force-high-performance-gpu" };
     } else {
       browserId = "chromium";
       name = "your Chromium browser";
@@ -79,5 +80,25 @@ export function getBrowserDeviceSettings(navigatorObject = globalThis.navigator)
     highPerformanceGpu: desktopWindows ? highPerformanceGpu : null,
     webnnAvailable: is.function(navigatorObject?.ml?.createContext),
     webgpuAvailable: Boolean(navigatorObject?.gpu),
+  };
+}
+
+// Adapter selection is availability evidence, not the browser flag's state or
+// proof that a model is executing on this GPU. The power preference is a hint.
+export async function detectBrowserGpu(navigatorObject = globalThis.navigator) {
+  if (!is.function(navigatorObject?.gpu?.requestAdapter)) {
+    return { available: false, reason: "api-unavailable" };
+  }
+  const adapter = await navigatorObject.gpu.requestAdapter({ powerPreference: "high-performance" });
+  if (!adapter) return { available: false, reason: "adapter-unavailable" };
+  const info = adapter.info;
+  return {
+    available: true,
+    name: info?.description
+      || [info?.vendor, info?.architecture, info?.device].filter(Boolean).join(" ")
+      || "WebGPU adapter",
+    isFallbackAdapter: is.boolean(info?.isFallbackAdapter)
+      ? info.isFallbackAdapter
+      : is.boolean(adapter.isFallbackAdapter) ? adapter.isFallbackAdapter : null,
   };
 }

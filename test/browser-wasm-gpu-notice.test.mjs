@@ -96,9 +96,9 @@ test('Windows Chromium notice names only the current browser and its single perf
         {navigator: {userAgent: `${windowsChrome} Vivaldi/7.0.0.0`}, name: 'Vivaldi', scheme: 'vivaldi'},
         {navigator: {userAgentData: {platform: 'Windows', brands: [{brand: 'Vivaldi'}]}}, name: 'Vivaldi', scheme: 'vivaldi'},
         {navigator: {userAgent: `${windowsChrome} Edg/140.0.0.0`, userAgentData: {platform: 'Windows', brands: [{brand: 'Microsoft Edge'}, {brand: 'Vivaldi'}]}}, name: 'Vivaldi', scheme: 'vivaldi'},
-        {navigator: {userAgent: windowsChrome}, name: 'your browser', scheme: 'about'},
+        {navigator: {userAgent: windowsChrome}, name: 'Google Chrome', scheme: 'chrome'},
         {navigator: {platform: 'Win32', userAgent: 'Chromium/140.0.0.0'}, name: 'your browser', scheme: 'about'},
-        {navigator: {userAgentData: {platform: 'Windows', brands: [{brand: 'Google Chrome'}, {brand: 'Chromium'}]}}, name: 'your browser', scheme: 'about'}
+        {navigator: {userAgentData: {platform: 'Windows', brands: [{brand: 'Google Chrome'}, {brand: 'Chromium'}]}}, name: 'Google Chrome', scheme: 'chrome'}
     ];
     for (const scenario of cases) {
         const fixture = browserFixture(scenario.navigator);
