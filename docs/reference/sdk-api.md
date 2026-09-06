@@ -6437,8 +6437,10 @@ createBrowserWhisperProvider(options={})
 
 The recognized options are
 `{id='arcane-browser-whisper',localOnly=true,graph,model,runtime,appSecurity,
-security,store,offline=false}`. `graph` is mutually exclusive with `model` and
-`runtime`. The mutable result is
+security,store,offline=false,execution={device:'auto',maxConcurrentRequests:1}}`.
+`execution.device` is `auto`, `webnn-npu`, `webgpu`, or `wasm`; its capacity is
+exactly 1. `graph` is mutually exclusive with `model` and `runtime`. The mutable
+result is
 `{protocol:'arcane-ai-provider/2',role:'stt',id,localOnly:true,
 maxConcurrentRequests:1,catalog,inspect,status,load,request,unload,dispose}`.
 The only request operation is
@@ -6448,8 +6450,22 @@ re-freeze the cloned record.
 
 `status()` returns
 `{role,providerId,modelId,state,lifecycleStatus,lifecycleReason,activeOperation,
-loaded,busy,generation,errorCode,cache,warnings}` and includes `security` only
-for an explicit secure intent.
+loaded,busy,generation,errorCode,cache,warnings,execution}` and includes
+`security` only for an explicit secure intent.
+`execution` reports `requestedDevice`, `selectedDevice`,
+`maxConcurrentRequests`, and `activeRequestCount`; `selectedDevice` is `null`
+before load and after unload. The high-level projection is
+`ai.providerRuntime.status('stt', {execution:true}).execution`.
+
+Automatic loading tries `webnn-npu` when `navigator.ml.createContext` is
+exposed, then `webgpu` when `navigator.gpu` is exposed, then CPU through `wasm`.
+A failed candidate is cleaned up before a fresh Worker tries the next backend
+with the same prepared model and dtype. Explicit selections do not fall back.
+`selectedDevice` names the backend requested by the successful upstream session
+load; it does not prove that every operation ran on a physical accelerator.
+WebNN may execute unsupported operations through WASM, and exact model,
+browser, driver, and hardware compatibility remains upstream.
+
 States are `unloaded`, `loading`, `ready`, `unloading`, `error`, and
 `disposed`. Compatible concurrent loads coalesce; concurrent requests fail as
 `ARCANE_AI_PROVIDER_BUSY`. Cancellation after the Worker request begins
@@ -6523,8 +6539,8 @@ createBrowserKokoroProvider(options={})
 The recognized options are
 `{id='arcane-browser-kokoro',localOnly=true,graph,model,runtime,appSecurity,
 security,store,offline=false,execution={device:'auto',maxConcurrentRequests:4}}`.
-`execution.device` is `auto`, `webgpu`, or `wasm`; its capacity is an integer
-from 1 through 4. `graph` is mutually exclusive with `model` and `runtime`. The
+`execution.device` is `auto`, `webnn-npu`, `webgpu`, or `wasm`; its capacity is
+an integer from 1 through 4. `graph` is mutually exclusive with `model` and `runtime`. The
 mutable result is
 `{protocol:'arcane-ai-provider/2',role:'tts',id,localOnly:true,
 maxConcurrentRequests,catalog,inspect,status,load,request,unload,dispose}`. The
@@ -6543,10 +6559,11 @@ mono 16-bit PCM. Unsupported formats fail
 `ARCANE_AI_UNSUPPORTED_RESPONSE_FORMAT`; malformed adapter audio fails
 `ARCANE_AI_INVALID_PROVIDER_RESULT`. Unknown fields and accessors reject as malformed.
 
-Automatic execution attempts a complete WebGPU pool when the browser exposes
-WebGPU and falls back by replacing the complete candidate pool with WASM when
-WebGPU model loading rejects. Explicit `webgpu` does not fall back. Every slot
-loads the same caller-selected model and dtype in a distinct Worker so the
+Automatic execution tries a complete WebNN NPU pool when
+`navigator.ml.createContext` is exposed, then WebGPU when `navigator.gpu` is
+exposed, then CPU through WASM. A failed candidate is cleaned up before a fresh
+pool tries the next backend. Explicit device selections do not fall back. Every
+slot loads the same caller-selected model and dtype in a distinct Worker so the
 selected adapter's per-isolate inference serialization does not serialize the
 pool. Direct provider `status().execution` reports `requestedDevice`,
 `selectedDevice`, `maxConcurrentRequests`, and `activeRequestCount`.
@@ -6555,7 +6572,11 @@ by `AI.configureBrowserSpeech()`, use
 `ai.providerRuntime.status('tts', {execution:true}).execution`. Requested
 `auto` with selected `wasm` means automatic fallback occurred. Inspection
 errors propagate; the default runtime `status()` remains a sticky lifecycle
-read. These fields do not prove physical GPU kernel overlap.
+read. `selectedDevice` names the backend requested by the successful upstream
+session load. These fields do not prove that every operation ran on a physical
+NPU or GPU, or that accelerator kernels overlap. WebNN may execute unsupported
+operations through WASM; exact model, browser, driver, and hardware
+compatibility remains upstream.
 
 Capacity 4 means up to four segments synthesize at once. Segment 5 and later
 wait in the SDK's provider-neutral FIFO queue; they are not dropped. Synthesis

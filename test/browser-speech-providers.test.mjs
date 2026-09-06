@@ -232,6 +232,7 @@ function whisperRuntimeSource(operationSource) {
     };
     export async function pipeline(_task, _repository, options) {
       globalThis.__arcaneSelectedSpeechDtype = options.dtype;
+      globalThis.__arcaneSelectedSpeechDevice = options.device;
       ${operationSource}
     }
   `;
@@ -365,7 +366,7 @@ test("browser speech authority preserves complete caller metadata and q8", () =>
   );
 });
 
-test("speech Worker preserves q8 and complete mutable transcription content", async () => {
+test("speech Worker preserves q8 and complete mutable transcription content", async function completeWhisperTranscription() {
   const transcript = "  complete transcript\nwith every trailing detail  ";
   const runtime = createSpeechWorkerRuntime({ role: "stt", send() {} });
   await runtime.handleMessage({
@@ -390,6 +391,7 @@ test("speech Worker preserves q8 and complete mutable transcription content", as
     payload: { audio: new Float32Array([0, 0.25]), sampleRate: 16_000 },
   });
   assert.equal(globalThis.__arcaneSelectedSpeechDtype, "q8");
+  assert.equal(globalThis.__arcaneSelectedSpeechDevice, "wasm");
   assert.deepEqual(result, { text: transcript });
   result.annotation = "mutable caller result";
   assert.equal(result.annotation, "mutable caller result");
@@ -401,6 +403,7 @@ test("speech Worker preserves q8 and complete mutable transcription content", as
     payload: null,
   });
   delete globalThis.__arcaneSelectedSpeechDtype;
+  delete globalThis.__arcaneSelectedSpeechDevice;
 });
 
 test("speech Worker preserves complete synthesis text", async () => {
@@ -584,26 +587,42 @@ test("automatic Kokoro execution replaces a rejected WebGPU pool with WASM", asy
   }));
 });
 
-test("speech execution options retain one STT slot and bounded TTS capacity", () => {
+test("speech execution options retain one STT slot and bounded TTS capacity", function speechExecutionContracts() {
   const { store } = createMemoryStore(["stt", "tts"]);
   const whisperOptions = providerOptions("stt", store);
   const kokoroOptions = providerOptions("tts", store);
 
   const whisper = createBrowserWhisperProvider(whisperOptions);
   assert.equal(whisper.maxConcurrentRequests, 1);
-  assert.throws(
-    () => createBrowserWhisperProvider({
+  assert.deepEqual(whisper.status().execution, {
+    requestedDevice: "auto",
+    selectedDevice: null,
+    maxConcurrentRequests: 1,
+    activeRequestCount: 0,
+  });
+  for (const device of ["webnn-npu", "webgpu", "wasm"]) {
+    const configuredWhisper = createBrowserWhisperProvider({
       ...whisperOptions,
-      execution: { device: "wasm", maxConcurrentRequests: 1 },
-    }),
-    /does not accept an execution option/u,
+      execution: { device, maxConcurrentRequests: 1 },
+    });
+    assert.equal(configuredWhisper.status().execution.requestedDevice, device);
+    assert.equal(configuredWhisper.maxConcurrentRequests, 1);
+  }
+  assert.throws(
+    function rejectConcurrentWhisper() {
+      return createBrowserWhisperProvider({
+        ...whisperOptions,
+        execution: { device: "webnn-npu", maxConcurrentRequests: 2 },
+      });
+    },
+    /safe integer from 1 through 1/u,
   );
   assert.throws(
     () => createBrowserKokoroProvider({
       ...kokoroOptions,
       execution: { device: "cpu", maxConcurrentRequests: 2 },
     }),
-    /must be "auto", "webgpu", or "wasm"/u,
+    /must be "auto", "webnn-npu", "webgpu", or "wasm"/u,
   );
   assert.throws(
     () => createBrowserKokoroProvider({
@@ -630,6 +649,190 @@ test("speech execution options retain one STT slot and bounded TTS capacity", ()
     });
     assert.equal(configuredKokoro.maxConcurrentRequests, maxConcurrentRequests);
     assert.equal(configuredKokoro.status().execution.maxConcurrentRequests, maxConcurrentRequests);
+  }
+});
+
+test("speech automatically tries NPU then GPU then CPU with one prepared model", async function automaticSpeechDevicePriority(t) {
+  for (const role of ["stt", "tts"]) {
+    for (const scenario of [
+      { name: "NPU available", ml: true, gpu: true, rejected: [], devices: ["webnn-npu"] },
+      { name: "NPU unavailable", ml: true, gpu: true, rejected: ["webnn-npu"], devices: ["webnn-npu", "webgpu"] },
+      { name: "both accelerators unavailable", ml: true, gpu: true, rejected: ["webnn-npu", "webgpu"], devices: ["webnn-npu", "webgpu", "wasm"] },
+      { name: "GPU API only", ml: false, gpu: true, rejected: [], devices: ["webgpu"] },
+      { name: "CPU API only", ml: false, gpu: false, rejected: [], devices: ["wasm"] },
+    ]) {
+      await t.test(`${role}: ${scenario.name}`, async function selectSpeechDevice(caseContext) {
+        const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+        Object.defineProperty(globalThis, "navigator", {
+          configurable: true,
+          value: {
+            ...(scenario.ml ? { ml: { createContext() { throw new Error("Provider must let the upstream model own its NPU context."); } } } : {}),
+            ...(scenario.gpu ? { gpu: {} } : {}),
+          },
+        });
+        caseContext.after(function restoreSpeechPriorityNavigator() {
+          if (navigatorDescriptor) Object.defineProperty(globalThis, "navigator", navigatorDescriptor);
+          else delete globalThis.navigator;
+        });
+        const { store, materialized } = createMemoryStore([role]);
+        const workers = [];
+        const attempts = [];
+        const diagnostics = [];
+        const originalWarn = console.warn;
+        console.warn = function recordSpeechFallbackDiagnostic(...args) { diagnostics.push(args); };
+        caseContext.after(function restoreSpeechPriorityDiagnostics() { console.warn = originalWarn; });
+        installContractWorker(caseContext, function createPrioritizedSpeechWorker() {
+          const contract = createSpeechWorkerContract({
+            role,
+            responseError: function rejectUnavailableSpeechBackend(message) {
+              if (message.op !== "load") return null;
+              const configuration = message.payload.configuration;
+              attempts.push(configuration);
+              if (!scenario.rejected.includes(configuration.execution.device)) return null;
+              return {
+                protocol: "arcane-ai-speech-worker-error/1",
+                code: "ARCANE_AI_PROVIDER_REQUEST_FAILED",
+                message: `Complete ${configuration.execution.device} load failure.`,
+                reason: `${role}-worker-model-load-rejected`,
+              };
+            },
+          });
+          workers.push(contract);
+          return contract;
+        });
+        const factory = role === "stt" ? createBrowserWhisperProvider : createBrowserKokoroProvider;
+        const provider = factory({
+          ...providerOptions(role, store),
+          execution: { device: "auto", maxConcurrentRequests: 1 },
+        });
+        caseContext.after(function disposePrioritizedSpeechProvider() { return provider.dispose(); });
+        const ready = await provider.load({ role, selection: selection(provider) });
+        assert.deepEqual(attempts.map(function attemptedDevice(configuration) {
+          return configuration.execution.device;
+        }), scenario.devices);
+        assert.equal(materialized.length, 2, "Backend attempts reuse one prepared runtime/model set.");
+        for (const configuration of attempts) {
+          assert.equal(configuration.model, attempts[0].model);
+          assert.equal(configuration.runtime, attempts[0].runtime);
+          assert.equal(configuration.model.dtype, "q8");
+        }
+        assert.equal(ready.execution.selectedDevice, scenario.devices.at(-1));
+        assert.equal(ready.execution.maxConcurrentRequests, 1);
+        assert.equal(diagnostics.length, scenario.rejected.length);
+        assert.equal(ready.warnings.length, scenario.rejected.length);
+        for (const [index, diagnostic] of diagnostics.entries()) {
+          assert.equal(diagnostic[1].message, `Complete ${scenario.rejected[index]} load failure.`);
+        }
+        for (const worker of workers) {
+          assert.equal(worker.terminated, worker !== workers.at(-1));
+        }
+      });
+    }
+  }
+});
+
+test("explicit speech devices and cancelled accelerator loading never fall back", async function explicitSpeechDeviceAndCancellation(t) {
+  for (const role of ["stt", "tts"]) {
+    for (const device of ["webnn-npu", "webgpu"]) {
+      await t.test(`${role}: explicit ${device}`, async function explicitSpeechBackend(caseContext) {
+        const { store } = createMemoryStore([role]);
+        const workers = [];
+        installContractWorker(caseContext, function createRejectedExplicitSpeechWorker() {
+          const contract = createSpeechWorkerContract({
+            role,
+            responseError: {
+              protocol: "arcane-ai-speech-worker-error/1",
+              code: "ARCANE_AI_PROVIDER_REQUEST_FAILED",
+              message: `Selected ${device} is unavailable.`,
+              reason: `${role}-worker-model-load-rejected`,
+            },
+          });
+          workers.push(contract);
+          return contract;
+        });
+        const factory = role === "stt" ? createBrowserWhisperProvider : createBrowserKokoroProvider;
+        const provider = factory({
+          ...providerOptions(role, store),
+          execution: { device, maxConcurrentRequests: 1 },
+        });
+        caseContext.after(function disposeExplicitSpeechProvider() { return provider.dispose(); });
+        await assert.rejects(provider.load({ role, selection: selection(provider) }), {
+          message: `Selected ${device} is unavailable.`,
+        });
+        assert.equal(workers.length, 1);
+        assert.equal(workers[0].terminated, true);
+        assert.equal(provider.status().execution.selectedDevice, null);
+      });
+    }
+    await t.test(`${role}: cancellation during NPU loading`, async function cancelAcceleratedSpeechLoad(caseContext) {
+      const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+      Object.defineProperty(globalThis, "navigator", {
+        configurable: true,
+        value: { ml: { createContext() {} }, gpu: {} },
+      });
+      caseContext.after(function restoreCancelledSpeechNavigator() {
+        if (navigatorDescriptor) Object.defineProperty(globalThis, "navigator", navigatorDescriptor);
+        else delete globalThis.navigator;
+      });
+      const { store } = createMemoryStore([role]);
+      const controller = new AbortController();
+      const workers = [];
+      installContractWorker(caseContext, function createCancelledNpuWorker() {
+        const contract = createSpeechWorkerContract({
+          role,
+          responseError: function cancelSelectedNpuLoad(message) {
+            if (message.op === "load") controller.abort("cancel selected NPU load");
+            return null;
+          },
+        });
+        workers.push(contract);
+        return contract;
+      });
+      const factory = role === "stt" ? createBrowserWhisperProvider : createBrowserKokoroProvider;
+      const provider = factory({
+        ...providerOptions(role, store),
+        execution: { device: "auto", maxConcurrentRequests: 1 },
+      });
+      caseContext.after(function disposeCancelledSpeechProvider() { return provider.dispose(); });
+      await assert.rejects(provider.load({ role, selection: selection(provider), signal: controller.signal }), {
+        code: "ARCANE_AI_REQUEST_ABORTED",
+      });
+      await provider.unload();
+      assert.equal(workers.length, 1);
+      assert.equal(workers[0].terminated, true);
+      assert.equal(provider.status().execution.selectedDevice, null);
+    });
+  }
+});
+
+test("speech Workers forward each concrete backend to the selected upstream engine", async function concreteSpeechWorkerDevices(t) {
+  for (const role of ["stt", "tts"]) {
+    for (const device of ["webnn-npu", "webgpu", "wasm"]) {
+      await t.test(`${role}: ${device}`, async function forwardConcreteSpeechBackend(caseContext) {
+        const runtime = createSpeechWorkerRuntime({ role, send() {} });
+        const source = role === "stt"
+          ? whisperRuntimeSource("return Object.assign(async function transcribe() { return {text:'complete transcript'}; }, {async dispose() {}});")
+          : kokoroRuntimeSource("return {async generate() { return {audio:new Float32Array([0]),sampling_rate:24000}; },async dispose() {}};");
+        caseContext.after(async function releaseConcreteSpeechRuntime() {
+          await runtime.handleMessage({ protocol: SPEECH_WORKER_PROTOCOL, id: 2, op: "unload", payload: null });
+          delete globalThis.__arcaneSelectedSpeechDevice;
+          delete globalThis.__arcaneSelectedSpeechDtype;
+        });
+        await runtime.handleMessage({
+          protocol: SPEECH_WORKER_PROTOCOL,
+          id: 1,
+          op: "load",
+          payload: {
+            configuration: {
+              ...selfContainedWorkerConfiguration(source, role),
+              execution: { device },
+            },
+          },
+        });
+        assert.equal(globalThis.__arcaneSelectedSpeechDevice, device);
+        assert.equal(globalThis.__arcaneSelectedSpeechDtype, "q8");
+      });
+    }
   }
 });
 

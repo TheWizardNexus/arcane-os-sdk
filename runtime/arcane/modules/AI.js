@@ -27,11 +27,8 @@ const DEFAULT_TTS_SEGMENTATION={
     punctuation:'sentence',
     wordCadence:null
 };
-const DEFAULT_BROWSER_TTS_EXECUTION={
-    device:'auto',
-    maxConcurrentRequests:4
-};
-const BROWSER_TTS_EXECUTION_DEVICES=new Set(['auto','webgpu','wasm']);
+const DEFAULT_BROWSER_SPEECH_EXECUTION_DEVICE='auto';
+const BROWSER_SPEECH_EXECUTION_DEVICES=new Set(['auto','webnn-npu','webgpu','wasm']);
 const MAX_BROWSER_TTS_CONCURRENT_REQUESTS=4;
 const TTS_PUNCTUATION_MODES=new Set(['sentence','any','none']);
 // A complete punctuation run is a boundary unless the whole run consists of
@@ -817,36 +814,45 @@ function browserSpeechIdentifier(value,label){
     return value;
 }
 
-function normalizeBrowserTTSExecution(value){
+function normalizeBrowserSpeechExecution(role,value){
+    const label=`AI browser speech ${role}.execution`;
+    const maximumConcurrentRequests=role==='stt'
+        ?1
+        :MAX_BROWSER_TTS_CONCURRENT_REQUESTS;
     if(value===undefined){
-        return completeValue({...DEFAULT_BROWSER_TTS_EXECUTION});
+        return completeValue({
+            device:DEFAULT_BROWSER_SPEECH_EXECUTION_DEVICE,
+            maxConcurrentRequests:maximumConcurrentRequests
+        });
     }
     const descriptors=closedRecord(
         value,
         ['device','maxConcurrentRequests'],
         [],
-        'AI browser speech tts.execution'
+        label
     );
     const device=descriptors.device
         ?descriptors.device.value
-        :DEFAULT_BROWSER_TTS_EXECUTION.device;
+        :DEFAULT_BROWSER_SPEECH_EXECUTION_DEVICE;
     const maxConcurrentRequests=descriptors.maxConcurrentRequests
         ?descriptors.maxConcurrentRequests.value
-        :DEFAULT_BROWSER_TTS_EXECUTION.maxConcurrentRequests;
-    if(!is.string(device)||!BROWSER_TTS_EXECUTION_DEVICES.has(device)){
+        :maximumConcurrentRequests;
+    if(!is.string(device)||!BROWSER_SPEECH_EXECUTION_DEVICES.has(device)){
         throw aiBrowserSpeechError(
             AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
             AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
-            'AI browser speech tts.execution.device must be auto, webgpu, or wasm.'
+            `${label}.device must be auto, webnn-npu, webgpu, or wasm.`
         );
     }
     if(!is.safeInteger(maxConcurrentRequests)
         ||maxConcurrentRequests<1
-        ||maxConcurrentRequests>MAX_BROWSER_TTS_CONCURRENT_REQUESTS){
+        ||maxConcurrentRequests>maximumConcurrentRequests){
         throw aiBrowserSpeechError(
             AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
             AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
-            `AI browser speech tts.execution.maxConcurrentRequests must be an integer from 1 through ${MAX_BROWSER_TTS_CONCURRENT_REQUESTS}.`
+            role==='stt'
+                ?`${label}.maxConcurrentRequests must be 1.`
+                :`${label}.maxConcurrentRequests must be an integer from 1 through ${maximumConcurrentRequests}.`
         );
     }
     return completeValue({device,maxConcurrentRequests});
@@ -917,13 +923,6 @@ function normalizeBrowserSpeechRole(value,role){
             `${label}.offline must be a boolean.`
         );
     }
-    if(role==='stt'&&descriptors.execution){
-        throw aiBrowserSpeechError(
-            AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
-            AI_BROWSER_SPEECH_REASONS.configurationContractMismatch,
-            'AI browser speech execution policy is available only for TTS.'
-        );
-    }
     return completeValue({
         providerId,
         ...(hasGraph
@@ -937,11 +936,10 @@ function normalizeBrowserSpeechRole(value,role){
                 ...(secure?{security:{secure:true}}:{})
             }),
         offline:descriptors.offline.value,
-        ...(role==='tts'
-            ?{execution:normalizeBrowserTTSExecution(
-                descriptors.execution?.value
-            )}
-            :{})
+        execution:normalizeBrowserSpeechExecution(
+            role,
+            descriptors.execution?.value
+        )
     });
 }
 
@@ -2770,10 +2768,10 @@ class AI {
                     ?{artifactGraphId:catalog.artifactGraphId}
                     :{}),
                 offline:configured.offline,
+                execution:configured.execution,
                 ...(role==='tts'
                     ?{
-                        defaultVoice:catalog.defaultVoice,
-                        execution:configured.execution
+                        defaultVoice:catalog.defaultVoice
                     }
                     :{})
             });
@@ -3145,7 +3143,7 @@ class AI {
                         }),
                     store,
                     offline:configured.offline,
-                    ...(role==='tts'?{execution:configured.execution}:{})
+                    execution:configured.execution
                 });
             }
             providers=completeValue({...candidateProviders});

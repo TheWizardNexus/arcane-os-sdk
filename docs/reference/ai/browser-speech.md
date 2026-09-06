@@ -55,11 +55,11 @@ export const speechSelection = {
 };
 ```
 
-The omitted execution record below uses the SDK's WebGPU-first automatic
-selection, so this basic configuration uses `fp32` because
+The omitted execution record below uses the SDK's NPU, GPU, then CPU automatic
+selection. This basic configuration uses `fp32` because
 [Kokoro.js recommends `fp32` when using WebGPU](https://github.com/hexgrad/kokoro/tree/main/kokoro.js#usage).
-Automatic fallback carries this same selected model and dtype to WASM; the SDK
-does not rewrite the application selection. If you intentionally choose
+Automatic fallback carries this same selected model and dtype between devices;
+the SDK does not rewrite the application selection. If you intentionally choose
 another dtype, evaluate that exact model, browser, and execution route.
 `selectedDevice` reports routing after load, not pronunciation, text fidelity,
 or audio quality.
@@ -229,9 +229,10 @@ playback. `replay()` keeps completed and pending provider segments and retries
 only failed missing segments.
 
 The default `{device:'auto',maxConcurrentRequests:4}` attempts the full ONNX
-Worker/session pool on WebGPU, then recreates that pool on WASM only if WebGPU
-loading fails. The basic configuration above keeps `fp32` for this WebGPU-first
-path and any automatic WASM fallback. Use the status example below to read
+Worker/session pool on WebNN NPU, then WebGPU, then CPU through WASM. It skips
+an accelerator when its browser API is absent and replaces a failed candidate
+with a fresh pool before trying the next device. The basic configuration above
+keeps `fp32` throughout that sequence. Use the status example below to read
 `selectedDevice`; console node-assignment warnings alone do not identify the
 selected execution device or assess the generated audio.
 
@@ -588,8 +589,20 @@ console.log(speechText.append('ing', true)); // ing
 
 ## Choose a device or reduce memory use
 
-Omitting `tts.execution` selects `{device:'auto',maxConcurrentRequests:4}`.
-These are three alternative configurations, not a sequence of required loads:
+Both speech roles accept `execution:{device,maxConcurrentRequests}`. Omitting
+`stt.execution` selects `{device:'auto',maxConcurrentRequests:1}`; omitting
+`tts.execution` selects `{device:'auto',maxConcurrentRequests:4}`. Whisper keeps
+one transcription slot. Kokoro accepts capacities 1 through 4.
+
+Automatic selection tries `webnn-npu` when `navigator.ml.createContext` is
+exposed, then `webgpu` when `navigator.gpu` is exposed, then CPU through `wasm`.
+API exposure only determines which upstream backend to attempt; it
+does not establish compatible hardware, operators, or model shapes. A failed
+candidate is fully cleaned up before the next candidate uses fresh Workers
+with the same prepared model and dtype. An explicit `webnn-npu`, `webgpu`, or
+`wasm` selection attempts only that backend and reports its failure.
+
+These are four alternative TTS configurations:
 
 ```javascript
 async function selectSpeechExecution(execution) {
@@ -609,15 +622,22 @@ async function selectSpeechExecution(execution) {
 
 // Choose and call one from your application settings action:
 // await selectSpeechExecution({ device: 'auto' });
+// await selectSpeechExecution({ device: 'webnn-npu' });
 // await selectSpeechExecution({ device: 'webgpu' });
 // await selectSpeechExecution({ device: 'wasm', maxConcurrentRequests: 1 });
 ```
 
-The override accepts integers 1, 2, 3, or 4. `auto` tries a complete WebGPU pool
-when available, then recreates a complete WASM pool if that load cannot finish.
-Explicit `webgpu` reports a load error when unavailable; explicit `wasm` never
-attempts WebGPU. The same application-selected model and dtype apply on both
-devices. A configuration change leaves TTS muted; explicitly load/unmute again.
+The TTS capacity override accepts integers 1, 2, 3, or 4; an STT capacity
+override accepts only 1. Apply the same device choices to the configured
+`stt.execution` record. A configuration change leaves TTS muted; explicitly
+load/unmute again.
+
+The selected upstream versions expose WebNN NPU through
+[Transformers.js device selection](https://github.com/huggingface/transformers.js/blob/4.2.0/packages/transformers/src/backends/onnx.js)
+and [Kokoro.js device forwarding](https://github.com/hexgrad/kokoro/blob/664c76a704021239ba59c84dcbaa4d3dece01fe9/kokoro.js/src/kokoro.js).
+WebNN compatibility depends on the model's shapes and operations, browser,
+drivers, and hardware. Unsupported operations may run through WASM even after
+an NPU session loads; see the [ONNX Runtime WebNN contract](https://onnxruntime.ai/docs/tutorials/web/ep-webnn.html).
 
 ## Inspect the requested and selected device
 
@@ -627,15 +647,15 @@ loading. This explicitly reads the selected provider's current report; ordinary
 separate execution-state event subscription.
 
 ```javascript
-function printSpeechStatus() {
-  const status = ai.providerRuntime.status('tts', { execution: true });
+function printSpeechStatus(role = 'tts') {
+  const status = ai.providerRuntime.status(role, { execution: true });
   const execution = status.execution;
-  console.log('TTS state:', status.state);
+  console.log('Speech role and state:', role, status.state);
   if (execution) {
     console.log('Requested device:', execution.requestedDevice);
     console.log('Selected device:', execution.selectedDevice);
     console.log('Capacity:', execution.maxConcurrentRequests);
-    console.log('Active synthesis requests:', execution.activeRequestCount);
+    console.log('Active requests:', execution.activeRequestCount);
     console.log('Automatic WASM fallback:',
       execution.requestedDevice === 'auto' && execution.selectedDevice === 'wasm');
   }
@@ -645,13 +665,18 @@ function printSpeechStatus() {
 Call `printSpeechStatus()` after the load in `sayHello()` or from your status
 button. The same projection is at
 `ai.providerRuntime.status(null, {execution:true}).roles.tts.execution`.
+For configured Whisper, call `printSpeechStatus('stt')` or read the corresponding
+`roles.stt.execution` projection.
 `selectedDevice` is `null`
 until a pool is selected and returns to `null` on unload. Providers without an
 execution report omit `execution`; do not infer a device from `navigator.gpu`
 or a configured preference alone. An explicit inspection can throw a provider
 status error; handle it with the same `error.code` / `error.message` pattern.
-Treat `selectedDevice` as route status only; evaluate actual speech output for
-the model, dtype, browser, and device combinations your application supports.
+`selectedDevice` names the backend requested by the successful upstream session
+load. It does not prove that every operation ran on a physical NPU or GPU, or
+establish transcription correctness, pronunciation, or audio quality. Evaluate
+actual speech output for the model, dtype, browser, and device combinations your
+application supports.
 
 ## Stop, mute, cancel, and release
 
@@ -991,11 +1016,12 @@ they do not silently convert into a rejection policy.
 The Worker applies only the selected runtime settings needed to run the chosen
 provider:
 
-- Kokoro forwards the pool's selected `webgpu` or `wasm` device to
+- Kokoro forwards the pool's selected `webnn-npu`, `webgpu`, or `wasm` device to
   `KokoroTTS.from_pretrained()`. Its configured dtype remains exactly the
-  caller-selected dtype on both paths. The WASM path also uses
+  caller-selected dtype on every path. The WASM path also uses
   `namespace.env.wasmPaths = {mjs,wasm}`.
-- Transformers uses
+- Transformers forwards the selected device to its speech-recognition pipeline,
+  preserves the caller-selected dtype, and uses
   `namespace.env.backends.onnx.wasm.wasmPaths = {mjs,wasm}`, keeps remote model
   loading enabled, and applies caller-selected `numThreads` when present.
 
@@ -1029,15 +1055,15 @@ The constructors also accept ordinary `model` and `runtime` descriptors instead
 of `graph`; the two forms are mutually exclusive. Both forms require an
 SDK-created DBOPFS speech artifact store. `localOnly` remains `true`.
 
-Kokoro additionally accepts the exact `execution` record
-`{device,maxConcurrentRequests}`. `device` is `auto`, `webgpu`, or `wasm`;
-`maxConcurrentRequests` is an integer from 1 through 4. Omission defaults to
-`{device:'auto',maxConcurrentRequests:4}`. `auto` attempts a complete WebGPU
-Worker pool only when the browser exposes WebGPU. If that pool cannot load, the
-SDK tears it down and creates a complete WASM pool with the same caller-selected
-model and dtype. Explicit `webgpu` rejects when WebGPU cannot load; explicit
-`wasm` never attempts GPU. Whisper remains one WASM Worker and does not accept
-this option.
+Both constructors accept the exact `execution` record
+`{device,maxConcurrentRequests}`. `device` is `auto`, `webnn-npu`, `webgpu`, or
+`wasm`. Whisper permits capacity 1 and defaults to
+`{device:'auto',maxConcurrentRequests:1}`. Kokoro permits integer capacities 1
+through 4 and defaults to `{device:'auto',maxConcurrentRequests:4}`. `auto`
+tries WebNN NPU when `navigator.ml.createContext` is exposed, then WebGPU when
+`navigator.gpu` is exposed, then WASM. Before advancing after a failed load,
+the SDK tears down the candidate and creates fresh Workers using the same
+prepared model and dtype. Explicit device selections never fall back.
 
 Each constructor returns an `arcane-ai-provider/2` object with:
 
@@ -1123,12 +1149,13 @@ mutable values.
 Provider states are `unloaded`, `loading`, `ready`, `unloading`, `error`, and
 `disposed`. `status()` includes role, provider/model ids, state, lifecycle
 status and reason, active operation, loaded/busy flags, generation, error code,
-cache state, and warnings. Kokoro status also includes an `execution` record
+cache state, and warnings. Both speech roles include an `execution` record
 with requested and selected device, request limit, and active request count. A
-successful `selectedDevice:'webgpu'` reports the execution provider selected by
-the upstream model load; it does not claim that browser, driver, or GPU kernels
-overlap physically or that generated audio has been quality-validated. A
-security field is absent in ordinary mode.
+successful `selectedDevice` reports the backend requested by the upstream model
+load. It does not prove that every operation ran on a physical NPU or GPU,
+that accelerator kernels overlap, or that generated speech is correct. WebNN
+may execute unsupported operations through WASM. A security field is absent
+in ordinary mode.
 
 The provider/2 load context accepts an optional progress callback for interface
 compatibility, but the current browser-speech artifact and Worker transport
@@ -1203,7 +1230,7 @@ operation.
 ## Ownership
 
 - Applications own model, runtime, dtype, sample-rate, voice, profile, prompt,
-  catalog, activation, optional TTS execution override, and presentation
+  catalog, activation, optional STT/TTS execution override, and presentation
   policy.
 - Upstream publishers own their runtime, model, voice, and license delivery.
 - The SDK owns storage, materialization, routing, Worker lifecycle, normalized

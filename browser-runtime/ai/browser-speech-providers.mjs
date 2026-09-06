@@ -23,8 +23,8 @@ const ROLE_OPERATION = completeValue({ stt: "transcribe", tts: "synthesize" });
 const STT_SAMPLE_RATE = 16_000;
 const TTS_SAMPLE_RATE = 24_000;
 const TTS_RESPONSE_FORMAT = "wav";
-const TTS_EXECUTION_DEVICES = new Set(["auto", "webgpu", "wasm"]);
-const DEFAULT_TTS_EXECUTION_DEVICE = "auto";
+const SPEECH_EXECUTION_DEVICES = new Set(["auto", "webnn-npu", "webgpu", "wasm"]);
+const DEFAULT_SPEECH_EXECUTION_DEVICE = "auto";
 const DEFAULT_TTS_MAX_CONCURRENT_REQUESTS = 4;
 const MAX_TTS_CONCURRENT_REQUESTS = 4;
 const ROLE_REQUEST_REASON = completeValue({
@@ -150,24 +150,21 @@ function requiredIdentifier(value, label) {
 }
 
 function normalizeSpeechExecution(role, execution) {
-  if (role === "stt") {
-    if (execution !== undefined) {
-      throw new TypeError("Browser Whisper does not accept an execution option.");
-    }
-    return completeValue({ device: "wasm", maxConcurrentRequests: 1 });
-  }
+  const label = role === "stt" ? "Browser Whisper" : "Browser Kokoro";
+  const defaultConcurrency = role === "stt" ? 1 : DEFAULT_TTS_MAX_CONCURRENT_REQUESTS;
+  const maximumConcurrency = role === "stt" ? 1 : MAX_TTS_CONCURRENT_REQUESTS;
   if (execution === undefined) {
     return completeValue({
-      device: DEFAULT_TTS_EXECUTION_DEVICE,
-      maxConcurrentRequests: DEFAULT_TTS_MAX_CONCURRENT_REQUESTS,
+      device: DEFAULT_SPEECH_EXECUTION_DEVICE,
+      maxConcurrentRequests: defaultConcurrency,
     });
   }
   if (!execution || !is.object(execution) || is.array(execution)) {
-    throw new TypeError("Browser Kokoro execution must be a plain data record.");
+    throw new TypeError(`${label} execution must be a plain data record.`);
   }
   const prototype = Object.getPrototypeOf(execution);
   if (prototype !== Object.prototype && prototype !== null) {
-    throw new TypeError("Browser Kokoro execution must be a plain data record.");
+    throw new TypeError(`${label} execution must be a plain data record.`);
   }
   const descriptors = Object.getOwnPropertyDescriptors(execution);
   for (const key of Reflect.ownKeys(descriptors)) {
@@ -175,34 +172,35 @@ function normalizeSpeechExecution(role, execution) {
       (key !== "device" && key !== "maxConcurrentRequests")
       || !Object.hasOwn(descriptors[key], "value")
     ) {
-      throw new TypeError("Browser Kokoro execution contains an unsupported or accessor field.");
+      throw new TypeError(`${label} execution contains an unsupported or accessor field.`);
     }
   }
   const device = Object.hasOwn(descriptors, "device")
     ? descriptors.device.value
-    : DEFAULT_TTS_EXECUTION_DEVICE;
+    : DEFAULT_SPEECH_EXECUTION_DEVICE;
   const maxConcurrentRequests = Object.hasOwn(descriptors, "maxConcurrentRequests")
     ? descriptors.maxConcurrentRequests.value
-    : DEFAULT_TTS_MAX_CONCURRENT_REQUESTS;
-  if (!TTS_EXECUTION_DEVICES.has(device)) {
-    throw new TypeError('Browser Kokoro execution.device must be "auto", "webgpu", or "wasm".');
+    : defaultConcurrency;
+  if (!SPEECH_EXECUTION_DEVICES.has(device)) {
+    throw new TypeError(`${label} execution.device must be "auto", "webnn-npu", "webgpu", or "wasm".`);
   }
   if (
     !is.safeInteger(maxConcurrentRequests)
     || maxConcurrentRequests < 1
-    || maxConcurrentRequests > MAX_TTS_CONCURRENT_REQUESTS
+    || maxConcurrentRequests > maximumConcurrency
   ) {
-    throw new TypeError("Browser Kokoro execution.maxConcurrentRequests must be a safe integer from 1 through 4.");
+    throw new TypeError(`${label} execution.maxConcurrentRequests must be a safe integer from 1 through ${maximumConcurrency}.`);
   }
   return completeValue({ device, maxConcurrentRequests });
 }
 
-function navigatorHasWebGpu() {
-  try {
-    return Boolean(globalThis.navigator?.gpu);
-  } catch {
-    return false;
-  }
+function speechExecutionDevices(requestedDevice) {
+  if (requestedDevice !== "auto") return [requestedDevice];
+  const devices = [];
+  if (is.function(globalThis.navigator?.ml?.createContext)) devices.push("webnn-npu");
+  if (globalThis.navigator?.gpu) devices.push("webgpu");
+  devices.push("wasm");
+  return devices;
 }
 
 function createProviderAuthority({
@@ -1187,14 +1185,12 @@ function createBrowserSpeechProvider({
       cache,
       lifecycleReason,
       activeOperation,
-      execution: role === "tts"
-        ? completeValue({
-          requestedDevice: speechExecution.device,
-          selectedDevice,
-          maxConcurrentRequests: speechExecution.maxConcurrentRequests,
-          activeRequestCount: requestOperations.size,
-        })
-        : null,
+      execution: completeValue({
+        requestedDevice: speechExecution.device,
+        selectedDevice,
+        maxConcurrentRequests: speechExecution.maxConcurrentRequests,
+        activeRequestCount: requestOperations.size,
+      }),
       secureIntent,
       warnings: providerWarnings(runtimeWarnings),
     });
@@ -1535,34 +1531,42 @@ function createBrowserSpeechProvider({
               `${role}-load-superseded-by-unload`,
             );
           }
-          const primaryDevice = role === "stt"
-            ? "wasm"
-            : speechExecution.device === "auto"
-              ? navigatorHasWebGpu() ? "webgpu" : "wasm"
-              : speechExecution.device;
-          try {
-            pool = await loadWorkerPool(
-              preparation,
-              primaryDevice,
-              record.warnings,
-              linked.controller.signal,
-            );
-          } catch (error) {
-            if (
-              role !== "tts"
-              || speechExecution.device !== "auto"
-              || primaryDevice !== "webgpu"
-              || linked.controller.signal.aborted
-              || operationGeneration !== generation
-            ) {
-              throw error;
+          const devices = speechExecutionDevices(speechExecution.device);
+          for (const [index, device] of devices.entries()) {
+            throwIfAborted(linked.controller.signal, `${role}-load-cancelled`);
+            if (operationGeneration !== generation) {
+              throw providerError(
+                "ARCANE_AI_OPERATION_SUPERSEDED",
+                "Browser speech loading was superseded.",
+                undefined,
+                `${role}-load-superseded-by-unload`,
+              );
             }
-            pool = await loadWorkerPool(
-              preparation,
-              "wasm",
-              record.warnings,
-              linked.controller.signal,
-            );
+            try {
+              pool = await loadWorkerPool(
+                preparation,
+                device,
+                record.warnings,
+                linked.controller.signal,
+              );
+              break;
+            } catch (error) {
+              if (
+                index === devices.length - 1
+                || linked.controller.signal.aborted
+                || operationGeneration !== generation
+                || error?.code === "ARCANE_AI_REQUEST_ABORTED"
+                || error?.code === "ARCANE_AI_OPERATION_SUPERSEDED"
+              ) {
+                throw error;
+              }
+              // A fresh Worker releases a failed upstream initialization before
+              // the next backend reuses the same prepared model and precision.
+              const warning = `Browser ${role} ${device} loading failed; trying ${devices[index + 1]}.`;
+              record.warnings = [...record.warnings, warning];
+              lastWarnings = record.warnings;
+              console.warn(warning, error);
+            }
           }
           throwIfAborted(
             linked.controller.signal,

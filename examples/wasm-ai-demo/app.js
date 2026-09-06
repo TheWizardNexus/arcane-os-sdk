@@ -434,7 +434,7 @@ function speechConfiguration(dbopfs) {
       offline: false,
     },
     tts: {
-      // Omit execution to use the SDK's auto device and four synthesis slots.
+      // Omit execution for NPU, GPU, then CPU selection and four synthesis slots.
       // Kokoro.js recommends fp32 for the WebGPU route attempted by auto.
       providerId: "wasm-ai-demo-browser-kokoro",
       model: {

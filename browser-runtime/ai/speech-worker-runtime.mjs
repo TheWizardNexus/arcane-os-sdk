@@ -738,10 +738,9 @@ function validateConfiguration(configuration, role) {
     if (
       descriptorMismatch
       || !Object.hasOwn(descriptors, "device")
-      || (role === "stt" && descriptors.device.value !== "wasm")
-      || (role === "tts"
-        && descriptors.device.value !== "wasm"
-        && descriptors.device.value !== "webgpu")
+      || (descriptors.device.value !== "wasm"
+        && descriptors.device.value !== "webgpu"
+        && descriptors.device.value !== "webnn-npu")
     ) {
       throw workerError(
         "ARCANE_AI_INVALID_REQUEST",
@@ -1367,7 +1366,7 @@ async function createWhisperEngine(namespace, configuration, signal, report) {
     "automatic-speech-recognition",
     configuration.model.repository,
     {
-      device: "wasm",
+      device: configuration.execution?.device ?? "wasm",
       dtype: configuration.model.dtype ?? "fp32",
       revision: configuration.model.revision,
       progress_callback: report,

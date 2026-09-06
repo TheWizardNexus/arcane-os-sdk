@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.0
+
+- Prefer WebNN NPU, then WebGPU, then CPU through WASM for browser Whisper
+  transcription and Kokoro synthesis. Skip absent accelerator APIs and replace
+  failed model-load Workers before trying the next backend with the same
+  application-selected model and precision.
+- Add Whisper execution configuration and NPU selection for both speech roles.
+  Explicit `webnn-npu`, `webgpu`, and `wasm` choices report failure without
+  falling back. Whisper retains one slot; Kokoro retains four by default and
+  accepts capacities from one through four.
+- Report requested and successfully selected backends for both roles through
+  provider execution status. Selection reports upstream session loading;
+  actual accelerator use and speech quality depend on the selected runtime,
+  model, browser, drivers, and hardware. Wllama remains on its WebGPU backend.
+
 ## 0.5.19
 
 - Report observed Wllama initialization stages and runtime activity through

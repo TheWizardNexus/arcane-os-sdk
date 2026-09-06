@@ -253,10 +253,15 @@ user activation intent exposed by the shared speech component.
 `setSpeechMuted(false)` records the public unmuted state only after the selected
 TTS route reaches ready; a failed load leaves the public state muted. In contrast,
 `setSpeechMuted(true)` cancels active TTS work and unloads that role.
-The optional browser-speech `tts.execution` record selects
-`device:'auto'|'webgpu'|'wasm'` and a `maxConcurrentRequests` integer from 1
-through 4. Omission uses GPU-first automatic selection with four bounded Kokoro
-Worker/session slots; STT remains one WASM Worker.
+The optional browser-speech `stt.execution` and `tts.execution` records select
+`device:'auto'|'webnn-npu'|'webgpu'|'wasm'` and `maxConcurrentRequests`.
+Omission uses NPU, GPU, then CPU automatic selection with one Whisper slot and
+four bounded Kokoro Worker/session slots. Whisper accepts only capacity 1;
+Kokoro accepts integers 1 through 4. Automatic loading attempts WebNN NPU when
+`navigator.ml.createContext` is exposed, then WebGPU when `navigator.gpu` is
+exposed, then WASM. A failed candidate is cleaned up before fresh Workers try
+the next device with the same prepared model and dtype. Explicit device
+selections report failure without falling back.
 Capacity 4 means up to four segments synthesize at once. Segment 5 and later
 wait in the SDK's FIFO queue; they are not dropped. Synthesis may finish out
 of order, but playback waits for earlier segments and plays exact input order.
@@ -265,11 +270,15 @@ latency. This capacity does not establish physical GPU kernel overlap.
 
 After configuration, explicitly inspect execution through
 `ai.providerRuntime.status('tts', {execution:true}).execution`. When supplied
-by the selected provider, this read returns its execution snapshot. Kokoro
-reports `requestedDevice`, `selectedDevice`, `maxConcurrentRequests`, and
+by the selected provider, this read returns its execution snapshot. Whisper and
+Kokoro report `requestedDevice`, `selectedDevice`, `maxConcurrentRequests`, and
 `activeRequestCount`. `selectedDevice` is `null` before load and after unload.
 `requestedDevice === 'auto' && selectedDevice === 'wasm'` identifies automatic
-WASM fallback after a successful load. Calling `status()` without options keeps
+WASM fallback after a successful load. Read the same fields for Whisper with
+`status('stt', {execution:true})`. The selected device is the backend requested
+by a successful upstream session load, not proof that every operation ran on a
+physical accelerator; WebNN may execute unsupported operations through WASM.
+Calling `status()` without options keeps
 the existing sticky lifecycle snapshot and does not inspect provider execution.
 Provider inspection failures are surfaced to the caller.
 `fetchTTS({model,voice,input,responseFormat,speed},signal,preparation={})` accepts the public
@@ -501,9 +510,11 @@ await ai.disposeBrowserSpeech({signal});
 
 The record is a mutable plain data record with exactly
 `{protocol,id,dbopfs,tableName?,stt?,tts?}` and at least one role. Each supplied
-mutable STT role is exactly `{providerId,graph,security?,offline}` or
-`{providerId,model,runtime,security?,offline}`. TTS accepts the corresponding
-shape plus optional `execution:{device,maxConcurrentRequests}`. The graph and
+mutable STT or TTS role is exactly
+`{providerId,graph,security?,offline,execution?}` or
+`{providerId,model,runtime,security?,offline,execution?}`. The optional
+`execution` record contains `{device,maxConcurrentRequests}` with the
+role-specific defaults and capacities described above. The graph and
 direct authority forms are mutually exclusive; `providerId` and `id` are nonblank exact strings,
 `graph` is the role-matching graph returned by the SDK browser
 speech artifact API, and `offline` is boolean. The direct form forwards its
@@ -526,8 +537,9 @@ or reproduce DBOPFS cache logic.
 
 The returned descriptor is exactly `{protocol,configurationId,stt,tts}`; an
 external, unmanaged role is `null`. A managed STT descriptor is
-`{role:'stt',providerId,modelId,artifactGraphId?,offline}`; TTS adds
-`defaultVoice` and the normalized `execution` record. `artifactGraphId` is present only for the graph form.
+`{role:'stt',providerId,modelId,artifactGraphId?,offline,execution}`; TTS adds
+`defaultVoice`. Both include the normalized `execution` record.
+`artifactGraphId` is present only for the graph form.
 `browserSpeechConfiguration` returns the exact caller-owned record when no
 managed role is carried. After a partial replacement that carries another
 managed role, it returns a mutable merged record with the replacement call's
@@ -764,16 +776,19 @@ never loads or downloads a model. `load()` forwards provider progress into the
 sticky role record; `unload()` and `dispose()` abort owned work, await exposed
 settlement, and verify provider status before publishing terminal state.
 
-`status('tts', {execution:true})` explicitly reads the selected provider and
-adds its optional `execution` snapshot to a copy of the role record.
+`status('stt', {execution:true})` or `status('tts', {execution:true})` explicitly
+reads the selected provider and adds its optional `execution` snapshot to a
+copy of the role record.
 `status(null, {execution:true})` provides the equivalent projection under
 `roles.llm`, `roles.stt`, and `roles.tts`. Providers that do not supply execution
 omit that field. No provider load or sticky-state event is triggered; default
 `status()` keeps its existing identity and behavior. A provider inspection
-error propagates. Kokoro's execution contains `requestedDevice`,
+error propagates. Each Whisper or Kokoro execution report contains `requestedDevice`,
 `selectedDevice` (`null` while unloaded), `maxConcurrentRequests`, and
-`activeRequestCount`; these describe provider execution, not physical GPU
-kernel overlap.
+`activeRequestCount`. The selected device names the backend requested by a
+successful upstream session load. It does not prove that every operation ran
+on a physical NPU or GPU, or that accelerator kernels overlap; WebNN may use
+WASM for unsupported operations.
 
 `validateSpeechConfiguration(value)` returns one mutable two-role selection
 record without committing it, where `value` is the closed `{stt,tts}` record.

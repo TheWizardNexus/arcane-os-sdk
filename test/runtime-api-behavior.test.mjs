@@ -3099,10 +3099,21 @@ test(
         try{
             const {
                 default:AI,
-                AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL
+                AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+                AI_BROWSER_SPEECH_ERROR_CODES
             }=await import('../runtime/arcane/modules/AI.js?browser-speech-role-contract');
+            const runtime=getAIProviderRuntime();
+            for(const role of AI_RUNTIME_ROLES){
+                await runtime.unload(role);
+            }
+            runtime.configureSpeech({
+                stt:{default:null,localOnly:null},
+                tts:{default:null,localOnly:null}
+            });
+            for(const role of ['stt','tts']){
+                runtime.unregister(role,'LOCAL_SPEACH');
+            }
             ai=new AI('TWIN','OPENAI','OPENAI','TWIN','OPENAI','OPENAI');
-            const runtime=ai.providerRuntime;
             const initialLocalTTSSelection=runtime.selection('tts');
             const pendingSTTSelection={
                 providerId:'saved-stt-route',
@@ -3128,7 +3139,8 @@ test(
             const unsubscribeHydration=subscribeAIRuntimeState(
                 function observePendingSpeechHydration(snapshot){
                     hydrationProviderIds.push(snapshot.roles.stt.providerId);
-                }
+                },
+                {emitCurrent:false}
             );
             const initialSTTOnly={
                 protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
@@ -3150,15 +3162,18 @@ test(
                 hydrationProviderIds.includes('browser-stt-direct'),
                 true
             );
-            assert.equal(
-                hydrationProviderIds.every(providerId=>
-                    providerId==='browser-stt-direct'
-                ),
-                true
-            );
+            assert.deepEqual(hydrationProviderIds,[
+                'saved-stt-route',
+                'browser-stt-direct'
+            ]);
             assert.equal(ai.browserSpeechConfiguration,initialSTTOnly);
             assert.equal(initialSTTDescriptor.stt.providerId,'browser-stt-direct');
             assert.equal(initialSTTDescriptor.stt.modelId,'stt-model-direct');
+            assert.deepEqual(initialSTTDescriptor.stt.execution,{
+                device:'auto',
+                maxConcurrentRequests:1
+            });
+            assert.equal(Object.hasOwn(initialSTTDescriptor.stt,'defaultVoice'),false);
             assert.equal(initialSTTDescriptor.tts,null);
             assert.equal(runtime.status('stt').state,'unloaded');
             assert.deepEqual(dbopfsReads,[]);
@@ -3167,11 +3182,11 @@ test(
                 localTTSIdentity
             );
             assert.equal(runtime.selection('tts'),localTTSSelection);
-            assert.equal(runtime.status('tts'),localTTSStatus);
+            assert.deepEqual(runtime.status('tts'),localTTSStatus);
             assert.equal(await ai.disposeBrowserSpeech(),true);
             assert.equal(runtime.selection('stt'),null);
             assert.equal(runtime.selection('tts'),localTTSSelection);
-            assert.equal(runtime.status('tts'),localTTSStatus);
+            assert.deepEqual(runtime.status('tts'),localTTSStatus);
 
             const initial={
                 protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
@@ -3184,6 +3199,10 @@ test(
             assert.equal(ai.browserSpeechConfiguration,initial);
             assert.equal(initialDescriptor.stt.providerId,'browser-stt-a');
             assert.equal(initialDescriptor.tts.providerId,'browser-tts-a');
+            assert.deepEqual(initialDescriptor.stt.execution,{
+                device:'auto',
+                maxConcurrentRequests:1
+            });
             assert.deepEqual(initialDescriptor.tts.execution,{
                 device:'auto',
                 maxConcurrentRequests:4
@@ -3194,12 +3213,48 @@ test(
                 maxConcurrentRequests:4,
                 activeRequestCount:0
             });
+            assert.deepEqual(ai.providerRuntime.status('stt',{execution:true}).execution,{
+                requestedDevice:'auto',
+                selectedDevice:null,
+                maxConcurrentRequests:1,
+                activeRequestCount:0
+            });
+            assert.equal(Object.hasOwn(initial.stt,'execution'),false);
+            assert.equal(Object.hasOwn(initial.tts,'execution'),false);
             assert.equal(runtime.selection('stt').providerId,'browser-stt-a');
             assert.equal(runtime.selection('tts').providerId,'browser-tts-a');
             assert.equal(runtime.status('stt').state,'unloaded');
             assert.equal(runtime.status('tts').state,'unloaded');
             assert.equal(ai.muted,true);
             assert.deepEqual(dbopfsReads,[]);
+
+            for(const role of ['stt','tts']){
+                const invalidCapacities=role==='stt'
+                    ?[0,2,1.5]
+                    :[0,5,1.5];
+                for(const maxConcurrentRequests of invalidCapacities){
+                    const invalid={
+                        protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+                        id:`browser-speech-invalid-${role}-${maxConcurrentRequests}`,
+                        dbopfs,
+                        [role]:{
+                            ...browserSpeechRole(role,`invalid-${role}`,'invalid'),
+                            execution:{device:'auto',maxConcurrentRequests}
+                        }
+                    };
+                    assert.throws(function rejectInvalidSpeechCapacity(){
+                        ai.configureBrowserSpeech(invalid);
+                    },{
+                        code:AI_BROWSER_SPEECH_ERROR_CODES.configurationContractMismatch,
+                        message:role==='stt'
+                            ?'AI browser speech stt.execution.maxConcurrentRequests must be 1.'
+                            :'AI browser speech tts.execution.maxConcurrentRequests must be an integer from 1 through 4.'
+                    });
+                }
+            }
+            assert.equal(ai.browserSpeechConfiguration,initial);
+            assert.equal(runtime.selection('stt').providerId,'browser-stt-a');
+            assert.equal(runtime.selection('tts').providerId,'browser-tts-a');
 
             const retainedTTSIdentity=runtime.providerIdentity('tts','browser-tts-a');
             const retainedTTSSelection=runtime.selection('tts');
@@ -3211,15 +3266,27 @@ test(
                 dbopfs,
                 stt:browserSpeechRole('stt','browser-stt-b','b')
             };
+            sttOnly.stt.execution={device:'webnn-npu'};
             const sttDescriptor=await ai.configureBrowserSpeech(sttOnly);
             assert.equal(sttDescriptor.stt.providerId,'browser-stt-b');
+            assert.deepEqual(sttDescriptor.stt.execution,{
+                device:'webnn-npu',
+                maxConcurrentRequests:1
+            });
+            assert.deepEqual(runtime.status('stt',{execution:true}).execution,{
+                requestedDevice:'webnn-npu',
+                selectedDevice:null,
+                maxConcurrentRequests:1,
+                activeRequestCount:0
+            });
+            assert.deepEqual(sttOnly.stt.execution,{device:'webnn-npu'});
             assert.equal(sttDescriptor.tts,retainedTTSDescriptor);
             assert.deepEqual(
                 runtime.providerIdentity('tts','browser-tts-a'),
                 retainedTTSIdentity
             );
             assert.deepEqual(runtime.selection('tts'),retainedTTSSelection);
-            assert.equal(runtime.status('tts'),retainedTTSStatus);
+            assert.deepEqual(runtime.status('tts'),retainedTTSStatus);
             assert.equal(ai.muted,true);
             assert.equal(runtime.providerIdentity('stt','browser-stt-a'),null);
             assert.equal(ai.browserSpeechConfiguration.stt,sttOnly.stt);
@@ -3243,18 +3310,18 @@ test(
                 tts:browserSpeechRole('tts','browser-tts-b','b')
             };
             ttsOnly.tts.execution={
-                device:'wasm',
+                device:'webgpu',
                 maxConcurrentRequests:3
             };
             const ttsDescriptor=await ai.configureBrowserSpeech(ttsOnly);
             assert.equal(ttsDescriptor.stt,retainedSTTDescriptor);
             assert.equal(ttsDescriptor.tts.providerId,'browser-tts-b');
             assert.deepEqual(ttsDescriptor.tts.execution,{
-                device:'wasm',
+                device:'webgpu',
                 maxConcurrentRequests:3
             });
             assert.deepEqual(ai.providerRuntime.status(null,{execution:true}).roles.tts.execution,{
-                requestedDevice:'wasm',
+                requestedDevice:'webgpu',
                 selectedDevice:null,
                 maxConcurrentRequests:3,
                 activeRequestCount:0
@@ -3264,7 +3331,7 @@ test(
                 retainedSTTIdentity
             );
             assert.deepEqual(runtime.selection('stt'),retainedSTTSelection);
-            assert.equal(runtime.status('stt'),retainedSTTStatus);
+            assert.deepEqual(runtime.status('stt'),retainedSTTStatus);
             assert.equal(runtime.providerIdentity('tts','browser-tts-a'),null);
             assert.equal(ai.browserSpeechConfiguration.stt,sttOnly.stt);
             assert.equal(ai.browserSpeechConfiguration.tts,ttsOnly.tts);
@@ -3278,6 +3345,42 @@ test(
             assert.equal(runtime.providerIdentity('stt','browser-stt-b'),null);
             assert.equal(runtime.providerIdentity('tts','browser-tts-b'),null);
             assert.equal(Object.hasOwn(runtime.status('tts',{execution:true}),'execution'),false);
+            assert.deepEqual(dbopfsReads,[]);
+
+            for(const executionDevices of [
+                {stt:'webgpu',tts:'webnn-npu'},
+                {stt:'wasm',tts:'wasm'}
+            ]){
+                const configured={
+                    protocol:AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+                    id:`browser-speech-${executionDevices.stt}-${executionDevices.tts}`,
+                    dbopfs
+                };
+                for(const role of ['stt','tts']){
+                    configured[role]={
+                        ...browserSpeechRole(role,`explicit-${role}`,'explicit'),
+                        execution:{device:executionDevices[role]}
+                    };
+                }
+                const descriptor=await ai.configureBrowserSpeech(configured);
+                for(const role of ['stt','tts']){
+                    const maxConcurrentRequests=role==='stt'?1:4;
+                    assert.deepEqual(descriptor[role].execution,{
+                        device:executionDevices[role],
+                        maxConcurrentRequests
+                    });
+                    assert.deepEqual(runtime.status(role,{execution:true}).execution,{
+                        requestedDevice:executionDevices[role],
+                        selectedDevice:null,
+                        maxConcurrentRequests,
+                        activeRequestCount:0
+                    });
+                    assert.deepEqual(configured[role].execution,{
+                        device:executionDevices[role]
+                    });
+                }
+                assert.equal(await ai.disposeBrowserSpeech(),true);
+            }
             assert.deepEqual(dbopfsReads,[]);
             ai.configureProviders({
                 llm:{default:null,localOnly:null},
