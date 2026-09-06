@@ -2,8 +2,8 @@
 
 The npm package exposes a Node.js ESM control plane, the portable
 `arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`,
-`arcane-os/preference-store`, `arcane-os/speech-playback`, and
-`arcane-os/speech-text` entrypoints, and the browser-only
+`arcane-os/preference-store`, `arcane-os/speech-playback`,
+`arcane-os/speech-text`, and `arcane-os/browser-device` entrypoints, and the browser-only
 `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints.
 Those package subpaths are distinct from application-facing projection modules
 in the managed browser map, such as `arcane/AIProviderRuntime`,
@@ -38,6 +38,7 @@ for the installed-inventory-derived physical-runtime contract in SDK `0.5.18`.
 | `arcane-os/preference-store` | Portable preference records and injected storage adapters. |
 | `arcane-os/speech-playback` | Portable speech preparation, playback state, and injected media adapters. |
 | `arcane-os/speech-text` | Speech-input formatting cleanup for complete text and streamed chunks. |
+| `arcane-os/browser-device` | Synchronous mobile or desktop identity hints for application-owned settings. |
 | `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, complete DBOPFS model storage, streaming, cancellation, and structural tool-call results. |
 | `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS provider mechanisms, ordinary upstream assets, materialized/native routing, Workers, and cancellation. |
 | `arcane-os/mail` | Portable Mail runtime, durable outbox, complete transport responses, and provider-neutral acceptance contracts. |
@@ -124,6 +125,7 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `createBrowserWhisperProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with Workers, object URLs, caller-selected Whisper runtime/model artifacts, and an SDK DBOPFS speech store |
 | `createCanonicalUstarHeader()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `createDbopfsModelStore()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser with a ready DBOPFS instance and OPFS |
+| `getBrowserDeviceClass()` | function | `arcane-os/browser-device` | Browser device settings | Node and Browser; synchronous identity hint with no model, storage, or GPU operation |
 | `createDbopfsSpeechArtifactStore()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with ready DBOPFS, Web Locks, Fetch, File/Blob, and object URLs |
 | `removeBrowserSpeechModelCache()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser CacheStorage; explicit removal of one selected upstream model |
 | `createNativeBuildPlan()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
@@ -6005,6 +6007,43 @@ const source = createBrowserModelSource({
         url:'https://models.example/releases/4f7c/model-q4-00002-of-00002.gguf'
     }]
 });
+```
+
+## getBrowserDeviceClass()
+
+### Overview
+
+Returns `mobile` or `desktop` to select application-owned settings. Phones and
+tablets use `mobile` when browser client hints, platform, user-agent information,
+or the iPadOS Mac-platform/touch combination identifies them. Missing or
+unrecognized identity uses `desktop`.
+
+### Signature and result
+
+```text
+getBrowserDeviceClass(navigatorObject = globalThis.navigator)
+```
+
+The optional navigator-like object supplies `userAgentData`, `userAgent`,
+`platform`, and `maxTouchPoints`. The synchronous string result reports a
+settings class, not hardware capability or readiness.
+
+### Availability and normalization
+
+Import from `arcane-os/browser-device` in Node or a browser. The dependency-free
+entrypoint reads only the supplied or global browser identity and does not load
+an AI runtime. No model, GPU, storage, network, or listener operation runs.
+Missing or unrecognized identity returns `desktop`; browser identity masking
+can affect classification. Existing provider defaults remain unchanged unless
+the caller selects and supplies its own profile.
+
+### Example
+
+```javascript
+import {getBrowserDeviceClass} from 'arcane-os/browser-device';
+
+const deviceClass = getBrowserDeviceClass();
+console.log(deviceClass); // mobile or desktop
 ```
 
 ## createBrowserWasmLlmProvider()

@@ -61,6 +61,25 @@ model source. Each file needs only a name and HTTPS URL. A positive optional
 `bytes` value supplies observational progress and transport-planning metadata;
 it never validates, admits, identifies, or decides cache reuse for content.
 
+## Mobile and desktop settings
+
+`getBrowserDeviceClass(navigatorObject = globalThis.navigator)`, exported from
+`arcane-os/browser-device`, returns `mobile` or `desktop` for choosing
+application-owned settings. Mobile includes a positive mobile client hint,
+Android or iOS platform information, mobile user-agent identifiers, and iPadOS
+reporting a Mac platform with multiple touch points. Missing or unrecognized
+identity defaults to `desktop`; a browser hiding all mobile hints may therefore
+receive that profile. This classification is a settings hint, not evidence of
+GPU capability, available memory, or model readiness.
+
+Keep complete mobile and desktop load profiles at the application owner and
+pass the selected profile as `createBrowserWasmLlmProvider({loadDefaults})`.
+Choose it once before provider creation so catalog inspection and model loading
+use the same settings. The helper reads identity synchronously and starts no
+GPU request, model operation, listener, or viewport-dependent reload. Its
+dependency-free entrypoint does not import the inference runtime. Profile
+selection does not alter prompts, documents, history, or output limits.
+
 ## Lifecycle at a glance
 
 `createArcaneAI()` owns one LLM controller. Its default `loadPolicy` is

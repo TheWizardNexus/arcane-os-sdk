@@ -6,7 +6,7 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 202,
+  "memberCount": 203,
   "members": [
     {
       "id": "root:APP_BUNDLE_DESCRIPTOR_NAME",
@@ -2951,6 +2951,22 @@
       "availability": "Browser with a ready DBOPFS instance and OPFS support",
       "protocol": "Resumable ordered model members and deterministic per-member Range parts over existing DBOPFS method semantics",
       "normalization": "Uses one bounded transfer axis, preserves ordered completed shards and deterministic current Range parts within any member across interruption, emits coalesced additive loaded/total/remaining/rate/ETA/active-worker telemetry, rolls discarded partial writes back out of progress, cleans superseded current Range parts after a complete replacement exists, and settles failed or cancelled peers while retaining completed work for retry"
+    },
+    {
+      "id": "browser-device:getBrowserDeviceClass",
+      "name": "getBrowserDeviceClass",
+      "displayName": "getBrowserDeviceClass()",
+      "kind": "function",
+      "signature": "getBrowserDeviceClass(navigatorObject = globalThis.navigator)",
+      "entrypoints": [
+        "arcane-os/browser-device"
+      ],
+      "primaryImport": "arcane-os/browser-device",
+      "group": "Browser device settings",
+      "summary": "Returns a mobile or desktop browser identity hint for application-owned settings.",
+      "availability": "Node and Browser; no model, storage, or GPU capability required",
+      "protocol": "Synchronous optional navigator-like identity input and mobile or desktop string result",
+      "normalization": "Positive mobile hints, Android or iOS identity, and iPadOS Mac-platform touch identity select mobile; missing or unrecognized identity selects desktop. Importing the dependency-free entrypoint loads no AI runtime, and classification performs no model, GPU, storage, network, or listener operation."
     },
     {
       "id": "browser-speech:BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL",

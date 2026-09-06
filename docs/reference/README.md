@@ -124,11 +124,12 @@ Public reference entries follow the established Arcane documentation model:
 
 ## Public runtime inventory
 
-The package exposes 202 semantic JavaScript records across 18 JavaScript
+The package exposes 203 semantic JavaScript records across 19 JavaScript
 entrypoints, plus eight JSON Schemas and package metadata. Ten entrypoints are
 Node.js control-plane surfaces,
 `arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`, `arcane-os/preference-store`, and
-`arcane-os/speech-playback` plus `arcane-os/speech-text` run in Node and browsers, and
+`arcane-os/speech-playback`, `arcane-os/speech-text`, and `arcane-os/browser-device`
+run in Node and browsers, and
 `arcane-os/ai/browser-wasm` plus `arcane-os/ai/browser-speech` are browser-only.
 The [machine-readable package
 inventory](inventory/package-api.json) and [SDK member reference](sdk-api.md)

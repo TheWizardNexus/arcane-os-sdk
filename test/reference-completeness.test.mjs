@@ -163,13 +163,13 @@ test('the public package API inventory matches every JavaScript export and MDN e
 
     await t.test('the inventory has stable unique records',()=>{
         assert.equal(inventory.sdkVersion,packageDocument.version);
-        assert.equal(inventory.memberCount,202);
+        assert.equal(inventory.memberCount,203);
         assert.equal(inventory.memberCount,exportGraph.length);
         assert.equal(
             Object.values(packageDocument.exports).filter(target=>
                 typeof target==='string'&&/[.](?:mjs|js)$/u.test(target)
             ).length,
-            18
+            19
         );
         assert.equal(inventory.members.length,inventory.memberCount);
         assert.equal(new Set(inventory.members.map(member=>member.id)).size,inventory.memberCount);
@@ -283,6 +283,12 @@ test('the public package API inventory matches every JavaScript export and MDN e
                 names:[
                     'MarkdownSpeech',
                     'stripSpeechFormatting'
+                ]
+            }],
+            ['arcane-os/browser-device',{
+                target:'./browser-runtime/browser-device.mjs',
+                names:[
+                    'getBrowserDeviceClass'
                 ]
             }]
         ]);
