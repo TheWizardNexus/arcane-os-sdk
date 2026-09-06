@@ -2052,6 +2052,11 @@ Defines the same-origin `<html-import>` loader with open shadow root, inline scr
 
 default `HTMLImport`; registers `html-import`; `connectedCallback()` and `ready`.
 
+Registration occurs once per custom-element registry. Imports through different
+module URLs reuse and export the registered constructor, including overlapping
+application startup and developer error-dialog imports. Existing component
+instances, loading, readiness events, and teardown keep that same constructor.
+
 Exact exports: `default`.
 
 ### Availability and normalization

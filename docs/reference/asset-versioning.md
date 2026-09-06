@@ -57,6 +57,12 @@ take effect on ordinary navigation or refresh; they do not replace live module
 instances, force a reload, restart a model, or erase a conversation. The SDK does
 not retain earlier installed runtime trees after materialization.
 
+`HTMLImport` registers its element once per browser custom-element registry.
+Application revision URLs and the developer error dialog's module URL can be
+different; each import exports the constructor already registered in that
+document. Repeated imports do not replace existing component instances or
+register a second `html-import` definition.
+
 ## Scope and work
 
 One invocation acts on the selected workspace/application. Runtime

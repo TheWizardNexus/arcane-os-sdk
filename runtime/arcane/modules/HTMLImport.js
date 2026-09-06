@@ -538,6 +538,12 @@ class HTMLImport extends HTMLElement {
   }
 }
   
-customElements.define('html-import', HTMLImport);
+// Application startup and error dialogs can import different URL variants.
+// Each variant must use the constructor already owned by this registry.
+const RegisteredHTMLImport = customElements.get('html-import') || HTMLImport;
 
-export default HTMLImport;
+if(RegisteredHTMLImport === HTMLImport){
+  customElements.define('html-import', HTMLImport);
+}
+
+export default RegisteredHTMLImport;

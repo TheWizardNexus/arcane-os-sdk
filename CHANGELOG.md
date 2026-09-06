@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.1
+
+- Reuse the registered `html-import` constructor across module URL variants,
+  including overlapping application startup and developer error-dialog imports.
+  Prevent duplicate custom-element registration from raising `NotSupportedError`
+  while preserving component loading, readiness, teardown, and existing instances.
+
 ## 0.8.0
 
 - Add `removeBrowserSpeechModelCache()` to remove an explicitly retired Hugging
