@@ -13,7 +13,7 @@ import map resolves `arcane/AI` and `arcane/DBOPFS`. These browser modules are
 not Node inference APIs. To create an application:
 
 ```bash
-npx arcane-os@0.5.17 new hello-speech --path ./hello-speech --target browser
+npx arcane-os@0.5.18 new hello-speech --path ./hello-speech --target browser
 cd hello-speech
 npm install
 npm run dev
@@ -280,8 +280,9 @@ passage synchronously before `Promise.all` waits, so synthesis can use the
 provider's available capacity. The returned array has one boolean per passage
 in input order: `true` after all its extracted audio buffers naturally end,
 or `false` after terminal cancellation or failure. `ai.stopAudio()` cancels
-all speech owned by that AI instance and settles pending playback results
-`false`.
+streamed speech and prepared playback owned by that AI instance and settles
+pending playback results `false`. Detached preparation described below keeps
+its independent lifetime.
 
 The selected voice and speed are captured for segments extracted by that call.
 That includes any text left in the same AI instance's partial-stream buffer;
@@ -300,6 +301,198 @@ their playback results `false`. A trailing
 pause delays the next queued audio on the existing `AudioContext` clock; it
 does not delay the preceding promise after that passage's last buffer ends.
 The promise is a playback result, not a listener acknowledgement.
+
+## Prepare narration once and replay stored audio
+
+Use `ai.prepareTTS()` when preparation must continue independently of playback,
+or when a later visit should reuse generated audio. It returns a handle
+synchronously and starts preparing the supplied complete parts without speaking
+them. Attach `ai.playPreparedTTS()` immediately to play those parts as their
+audio becomes available, or omit playback to prepare them silently.
+
+Use the configured `ai` and ready, application-owned `dbopfs` from the quick
+start. Configuration itself does not load Kokoro. This path reads stored audio
+first: a complete match can replay while the AI starts muted, with no model
+load. Only missing audio requests the selected provider's shared load/unmute
+path. Do not eagerly call `setSpeechMuted(false)` before this path if fully
+cached playback should avoid loading the model.
+
+```javascript
+ai.configureTTSSegmentation(
+    {
+        punctuation: 'any',
+        wordCadence: null
+    }
+);
+
+function prepareNarration(text, key) {
+    return ai.prepareTTS(
+        {
+            parts: [
+                {
+                    input: text,
+                    voice: speechSelection.model.defaultVoice,
+                    speed: 1,
+                    pauseAfterMs: 0
+                }
+            ],
+            storage: {
+                db: dbopfs,
+                table: 'saved_narration',
+                key
+            },
+            identity: {
+                model: speechSelection.model,
+                runtime: speechSelection.runtime
+            },
+            onState: reportNarrationPreparation
+        }
+    );
+}
+
+function reportNarrationPreparation(state) {
+    console.log('Narration preparation:', state);
+}
+
+function reportNarrationPlayback(state) {
+    console.log('Narration playback:', state);
+}
+
+async function readNarration(text, key) {
+    const prepared = prepareNarration(text, key);
+    const playback = ai.playPreparedTTS(
+        prepared,
+        {onState: reportNarrationPlayback}
+    );
+    const [record, ended] = await Promise.all(
+        [prepared.ready, playback.finished]
+    );
+    return {record, ended};
+}
+```
+
+Call `readNarration('**Hello**. Welcome back.', 'welcome')` from an owned user
+action and handle its rejection. Calling only `prepareNarration(...)` prepares
+silently; observe that handle's `ready` promise to receive its complete record
+or error. A storage key groups application content. The application owns its
+keys, preparation priority, semantic identity, and retention policy; the SDK
+does not select another page or speak background work.
+
+### Preparation inputs and reuse
+
+`ai.prepareTTS({parts,storage,identity,signal,onState})` accepts an ordered array
+of strings or `{input,voice?,speed?,pauseAfterMs?}` records. An omitted voice
+uses the selected model default; omitted speed uses `ai.voiceSpeed`; omitted
+pause is zero. The SDK snapshots the selected speech configuration and current
+punctuation/word-cadence options for that preparation. A part's pause applies
+after its final extracted segment. Complete original input remains available
+for semantic comparison; automatic Markdown cleanup affects only the speech
+copy and occurs once before segmentation.
+
+`storage` is optional. When supplied, `{db,table,key}` names the caller's ready
+DBOPFS instance and its application-owned table/key. The SDK stores complete
+generated audio as raw files and retains MIME metadata separately so subsequent
+`Blob` playback preserves its content type. Reuse compares complete semantic
+inputs, including parts, selection, segmentation, and separate application
+`identity`. A changed voice, speed, source text, or other semantic selection
+prepares the changed request. An SDK patch version alone does not invalidate
+stored speech.
+
+The storage key is encoded as `encodeURIComponent(key) + '.json'` for its
+manifest. That version-1 manifest keeps an `entries` array of semantic variants
+under the key. Each entry records
+`{id,parts,originalParts,selection,segmentation,identity,segments}`; the ordered
+stored segment entries name `{audioFile,contentType}`. `originalParts` retains
+the complete source text, including whitespace. These persistent semantic
+inputs and `identity` must be JSON-compatible. Raw audio filenames contain the
+generated record ID and segment index. Storage writes preserve existing
+variants; the application chooses when its records should be removed.
+
+Matching pending requests on the same AI instance and the same storage
+`db`/`table`/`key` share synthesis. Each caller receives its own handle and
+cancellation signal. Cancelling one handle detaches that caller; the shared
+preparation is aborted only when its last pending caller cancels. Different AI
+instances do not share an in-flight synthesis operation. Complete stored
+results remain reusable through the same application storage.
+After a durable preparation completes, a later preparation call rereads its
+manifest and saved-file presence, regenerating only missing segments. A
+completed preparation without storage reuses its retained Blobs.
+
+Preparation requests retain call order for synthesis admission. Within each
+request, punctuation segments use the existing bounded provider queue: the
+default Kokoro capacity admits up to four at once, with later segments waiting
+in FIFO order. Completion may be out of order; segment metadata and playback
+remain in input order. Preparing another request does not attach it to playback.
+
+### Preparation handle and progress
+
+| Member | Contract |
+| --- | --- |
+| `state` | Current string: `queued`, `preparing`, `ready`, `error`, or `cancelled`. |
+| `segments` | Ordered segment metadata with `input`, `voice`, `speed`, `pauseAfterMs`, `index`, `state`, `audioFile`, `contentType`, and `error`. |
+| `ready` | Promise resolving the complete ordered record when every segment is generated or reused and, when storage is supplied, durably saved. Rejects with the complete error or `AbortError` if cancelled while pending. |
+| `getAudio(index)` | Promise waiting for that ordered segment and returning its complete `Blob` with the recorded MIME type. |
+| `cancel()` | Cancels this preparation handle without erasing successful stored segments. |
+
+The optional synchronous `onState` callback receives
+`{state,completed,total,segments,error}`. It observes preparation only; it is
+not a playback-state callback. `completed` counts settled segments, including
+failed segments; inspect `state`, segment errors, and `ready` for the outcome.
+`total` is the number of ordered segments.
+Without `storage`, the handle retains generated Blobs for its lifetime; the
+same result shape has `audioFile:null` and the actual `contentType`.
+The supplied signal observes preparation until `ready` settles. Manual
+`cancel()` remains available afterward to stop further reads through that
+handle. If a raw audio write has already begun when cancellation arrives,
+its metadata transaction finishes so that successful audio can be reused;
+no later queued write starts for that cancelled preparation.
+Cancelling preparation prevents later synthesis, but the existing shared
+provider load/unmute operation has no per-preparation signal and may finish.
+Cancellation does not claim to stop an already-started shared model load.
+
+### Playback controls and independent lifetimes
+
+`ai.playPreparedTTS(prepared,{signal,onState})` returns
+`{state,error,finished,pause(),resume(),stop()}` immediately. It uses the
+existing AI audio-clock scheduler and waits for each earlier segment before scheduling
+later audio. Ready adjacent buffers retain contiguous scheduling. Requested
+pauses separate adjacent parts; a final trailing pause does not delay
+`finished`, which resolves after the final audio buffer ends.
+
+`state` and `error` are current-state getters. The optional synchronous
+`onState` callback receives `{state,error}` and is observational. Playback
+states are `waiting`, `waiting-for-gesture`, `scheduled`, `paused`, `complete`,
+`stopped`, and `error`. Use `waiting-for-gesture` to present an audio-unlock
+control. A `false` result from `resume()` is not a first-segment-ready signal;
+inspect `state` and `error` to distinguish a stopped or unavailable context
+from browser gesture waiting. The ordinary playback path creates its audio
+context immediately, before the first audio segment is ready.
+
+`finished` resolves `true` after natural playback completion and `false` after
+stop, playback cancellation, or failure. Real failures also reach the existing
+`ai-tts-failure` event and complete SDK diagnostics. `pause()`
+and `resume()` control only this handle's audio context, and `stop()` stops
+that playback handle. The controls return booleans; pause and resume are
+asynchronous. Each AI has one playback lane: a new `playPreparedTTS()` call
+stops its preceding streamed or prepared playback, and `streamTTS()` interrupts
+active prepared playback. This replacement preserves detached preparation.
+None of these playback controls cancels preparation or deletes saved audio.
+Use the preparation handle's `cancel()` or its separate `signal` when the
+application also wants to stop preparation. Successful saved segments survive
+cancellation or failure for later reuse.
+
+`ai.stopAudio()` stops streamed speech and all prepared playback on that AI,
+while detached preparation continues. `ai.setSpeechMuted(true)` additionally
+cancels provider TTS work and unloads the provider. Replacing the speech
+configuration cancels missing generation tied to the earlier selection.
+Neither action deletes completed stored audio. Apply those broader lifecycle
+controls deliberately when the application intends to stop provider work.
+
+Preparation `ready` and playback `finished` are separate promises. Natural
+playback completion must not be used as a signal to cancel other background
+preparations. A page that starts several preparations owns and observes every
+`ready` promise, even when it plays only one handle. Browser autoplay permission
+still applies; neither promise proves that a person heard the audio.
 
 ## Stream chunks as they arrive
 
@@ -466,7 +659,7 @@ These are actions for your own controls, using the same `ai` instance:
 
 ```javascript
 function stopSpeech() {
-  ai.stopAudio(); // Cancels queued speech and stops scheduled/playing audio.
+  ai.stopAudio(); // Stops streamed speech and all prepared playback.
 }
 
 async function muteSpeech() {

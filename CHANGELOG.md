@@ -12,6 +12,20 @@
 - Remove `AIResponseLength` exports; applications own response verbosity.
   Parse URL-audit HTML with the native HTML parser.
 
+## 0.5.18
+
+- Add `AI.prepareTTS()` for detached punctuation-segmented synthesis, optional
+  DBOPFS audio storage, complete semantic-input reuse, shared pending work and
+  independent preparation cancellation. Persist MIME metadata with each audio
+  segment and retain successful segments after interruption or partial failure.
+- Add `AI.playPreparedTTS()` to replay prepared or pending audio through the
+  existing audio-clock scheduler. Playback has its own completion, pause,
+  resume, stop, state and error surface; stopping playback keeps detached
+  preparation alive. Cached audio plays without loading a speech model.
+- Keep Markdown cleanup at its shared owner, preserve the existing TTS APIs,
+  and share provider capacity across preparation requests. Applications own
+  content grouping, storage keys, preparation order and retention policy.
+
 ## 0.5.17
 
 - Restore the public `SPEECH_VOICE_OPTIONS` ordered records and

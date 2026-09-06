@@ -15,7 +15,7 @@ export const RUNTIME_DOCUMENTED_CALLABLE_MEMBERS={
     'AI.js':[
         'setAI','configureProviders','transitionAI','transitionProviders',
         'startProviders','setSpeechMuted','streamRequest','streamMessage','fetchRequest','fetch',
-        'configureTTSSegmentation','streamTTS','finishTTS','fetchSTT',
+        'configureTTSSegmentation','streamTTS','prepareTTS','playPreparedTTS','finishTTS','fetchSTT',
         'stopAudio','resumeAudio','playAudio'
     ],
     'AIPreferenceRuntime.js':[

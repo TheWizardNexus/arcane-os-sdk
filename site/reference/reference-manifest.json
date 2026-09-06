@@ -3,7 +3,7 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.5.17",
+    "sdk": "0.5.18",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
@@ -254,21 +254,6 @@
       }
     },
     {
-      "source": "runtime/arcane/modules/AIResponseLength.js",
-      "output": "site/reference/runtime-modules/ai-response-length/index.html",
-      "route": "reference/runtime-modules/ai-response-length/",
-      "kind": "runtime-module",
-      "moduleClassification": "public-first-party",
-      "contractCounts": {
-        "exports": 5,
-        "reviewedCallables": 3,
-        "publicMembers": 0,
-        "literalCustomEvents": 0,
-        "directCodedFailures": 0,
-        "exportedErrorSubclasses": 0
-      }
-    },
-    {
       "source": "runtime/arcane/modules/AIResponseURLPolicy.js",
       "output": "site/reference/runtime-modules/ai-response-url-policy/index.html",
       "route": "reference/runtime-modules/ai-response-url-policy/",
@@ -306,8 +291,8 @@
       "moduleClassification": "public-first-party",
       "contractCounts": {
         "exports": 8,
-        "reviewedCallables": 17,
-        "publicMembers": 36,
+        "reviewedCallables": 19,
+        "publicMembers": 38,
         "literalCustomEvents": 0,
         "directCodedFailures": 32,
         "exportedErrorSubclasses": 0
@@ -1105,6 +1090,21 @@
         "publicMembers": 14,
         "literalCustomEvents": 0,
         "directCodedFailures": 0,
+        "exportedErrorSubclasses": 0
+      }
+    },
+    {
+      "source": "runtime/arcane/modules/PreparedSpeech.js",
+      "output": "site/reference/runtime-modules/prepared-speech/index.html",
+      "route": "reference/runtime-modules/prepared-speech/",
+      "kind": "runtime-module",
+      "moduleClassification": "public-first-party",
+      "contractCounts": {
+        "exports": 1,
+        "reviewedCallables": 0,
+        "publicMembers": 0,
+        "literalCustomEvents": 0,
+        "directCodedFailures": 1,
         "exportedErrorSubclasses": 0
       }
     },

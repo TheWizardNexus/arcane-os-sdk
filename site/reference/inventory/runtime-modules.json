@@ -5,12 +5,12 @@
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
     "branch": "main",
     "path": "runtime/arcane",
-    "sdkVersion": "0.5.17",
+    "sdkVersion": "0.5.18",
     "protocol": "arcane/1"
   },
   "artifactCount": 85,
   "javascriptArtifactCount": 83,
-  "esmExportCount": 356,
+  "esmExportCount": 352,
   "artifacts": [
     {
       "file": "runtime/arcane/modules/AI.js",
@@ -29,8 +29,8 @@
       "summary": "Owns provider-selectable chat and the one-time caller-authority browser STT/TTS configuration, lifecycle, synthesis, transcription, and playback boundary.",
       "availability": "Browser + native bridge + TWiN Cloud",
       "protocol": "arcane-ai-browser-speech-configuration/1, AIProviderRuntime arcane-ai-provider/2 routes, globalThis.arcaneEvents, TWiN Cloud HTTPS, Arcane.ollama, Arcane.speech, Android WebView bridge",
-      "normalization": "Complete mutable caller-owned browser speech authority, SDK-owned provider registration/replacement/disposal, explicit STT/TTS activation, normalized Kokoro TTS execution with default capacity 4, explicit provider-neutral execution snapshots through status(role,{execution:true}), sticky readiness, canonical window.user readiness without compatibility-event object-identity admission or polling, exact ordered structural calls with required arguments.message, atomic nonblank all-ID tool-result sequencing, complete all-choice streaming/data validation, native Ollama structural adaptation, complete-response then all validated tool callbacks then completion ordering, observed async callbacks, Blob/File transcription, automatic repeated-formatting-mark removal from cloned outbound TTS input while caller and visible content stays exact, immediate exact-segment synthesis, per-call voice/speed capture, optional final-segment pause on the existing audio clock, optional per-call terminal playback completion, ordered audio-clock scheduling, playable audio, active-generation TTS operation-failure routing, mute, and cancellation are normalized; provider/model/runtime/voice policy remains caller-owned.",
-      "surface": "Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; explicit `providerRuntime.status(role,{execution:true})` snapshots; `streamTTS(text,end,options={})` with optional voice, speed, pauseAfterMs, and waitForPlayback; automatic speech-input cleanup with SDK-internal preparation metadata; configure/dispose speech, route lifecycle, declaration-validated chat/stream requests with exact ordered calls, synthesis/transcription, and playback controls; initializes from current canonical user readiness, installs `window.ai`, and projects `ai-ready` plus active-generation `ai-tts-failure`."
+      "normalization": "Complete mutable caller-owned browser speech authority, SDK-owned provider registration/replacement/disposal, explicit STT/TTS activation, normalized Kokoro TTS execution with default capacity 4, explicit provider-neutral execution snapshots through status(role,{execution:true}), sticky readiness, canonical window.user readiness without compatibility-event object-identity admission or polling, exact ordered structural calls with required arguments.message, atomic nonblank all-ID tool-result sequencing, complete all-choice streaming/data validation, native Ollama structural adaptation, complete-response then all validated tool callbacks then completion ordering, observed async callbacks, Blob/File transcription, automatic repeated-formatting-mark removal from cloned outbound TTS input while caller and visible content stays exact, immediate exact-segment synthesis, per-call voice/speed capture, optional final-segment pause on the existing audio clock, optional per-call terminal playback completion, detached preparation with complete semantic DBOPFS audio reuse and same-owner pending request sharing, independent prepared playback without a model load for cached audio, ordered audio-clock scheduling, playable audio, active-generation TTS operation-failure routing, mute, and cancellation are normalized; provider/model/runtime/voice policy remains caller-owned.",
+      "surface": "Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; explicit `providerRuntime.status(role,{execution:true})` snapshots; `streamTTS(text,end,options={})` with optional voice, speed, pauseAfterMs, and waitForPlayback; automatic speech-input cleanup with SDK-internal preparation metadata; `prepareTTS({parts,storage,identity,signal,onState})` returning ordered segments, state, ready, getAudio(index), and cancel(); `playPreparedTTS(prepared,{signal,onState})` returning state, error, finished, pause(), resume(), and stop() with one playback lane per AI and observational state/error callbacks; configure/dispose speech, route lifecycle, declaration-validated chat/stream requests with exact ordered calls, synthesis/transcription, and playback controls; initializes from current canonical user readiness, installs `window.ai`, and projects `ai-ready` plus active-generation `ai-tts-failure`."
     },
     {
       "file": "runtime/arcane/modules/AIPreferenceRuntime.js",
@@ -80,23 +80,6 @@
       "surface": "Protocol constants; singleton-only `AIProviderRuntime`; `aiProviderRuntime`; `getAIProviderRuntime()`; provider registration/identity/selection, closed three-role and STT/TTS-only validation/configuration/replacement, status/catalog/inspection, startup, per-role load/unload/dispose/cancel, dispose-all, request/stream/speech aliases, SDK-internal speech-input preparation metadata, and mute controls."
     },
     {
-      "file": "runtime/arcane/modules/AIResponseLength.js",
-      "name": "AIResponseLength.js",
-      "kind": "esm",
-      "exports": [
-        "AI_RESPONSE_LENGTH_DEFAULT",
-        "AI_RESPONSE_LENGTH_OPTIONS",
-        "aiResponseLengthInstruction",
-        "applyAIResponseLength",
-        "normalizeAIResponseLength"
-      ],
-      "summary": "Normalizes low/medium/high response-preference selectors while leaving complete prompts unchanged.",
-      "availability": "Cross-host",
-      "protocol": "In-process only",
-      "normalization": "Selectors normalize to low, medium, or high; every label is Complete, the instruction is empty, and prompt content remains unchanged.",
-      "surface": "Response-preference constants plus `normalizeAIResponseLength()`, `aiResponseLengthInstruction()`, and `applyAIResponseLength()`."
-    },
-    {
       "file": "runtime/arcane/modules/AIResponseURLPolicy.js",
       "name": "AIResponseURLPolicy.js",
       "kind": "esm",
@@ -108,8 +91,8 @@
       ],
       "summary": "Extracts and audits links from AI Markdown, rendered HTML, CSS, srcset, bare URLs, and email text.",
       "availability": "Cross-host",
-      "protocol": "In-process; bundled Marked parser",
-      "normalization": "Normalized frozen allowlist audit.",
+      "protocol": "In-process; bundled Marked parser and native HTML parsing when a document is available",
+      "normalization": "Mutable audit with exact link comparison after entity and Markdown escape decoding, without URI canonicalization or response mutation. Browsers use native HTML parsing; hosts without a document retain lexical extraction and the existing limited entity decoder. Already decoded rendered values are not decoded again. Authored links retain source offsets; DOM-only attribute links use document order after authored links.",
       "surface": "`auditAIResponseLinks()`, `extractAIResponseLinks()`, `normalizeAIResponseLink()`, `decodeHTMLCharacterReferences()`."
     },
     {
@@ -834,7 +817,7 @@
       "summary": "Re-exports the shared MarkdownSpeech class that removes repeated same formatting marks from streamed narration before speech segmentation.",
       "availability": "Cross-host",
       "protocol": "Shared arcane-os/speech-text package entrypoint",
-      "normalization": "The runtime projection and public package subpath share dependency-free speech-only filtering of repeated *, #, _, backtick, and ~ runs across chunks; single marks and all other characters remain literal; terminal flush and reset clear pending formatting state.",
+      "normalization": "The runtime projection and public package subpath share speech-only filtering of repeated *, #, _, backtick, and ~ runs across chunks; single marks and all other characters remain literal; terminal flush and reset clear pending formatting state.",
       "surface": "`MarkdownSpeech`; `append(text='',end=false)`, `reset()`."
     },
     {
@@ -1017,6 +1000,19 @@
       "protocol": "Arcane.preferences or app-scoped localStorage + per-realm globalThis.arcaneEvents authority",
       "normalization": "Complete ordinary values remain mutable; setAll uses one optional atomic adapter batch for every selected value when advertised, otherwise retains complete serial per-key compatibility, never retries a rejected dispatched batch serially, and only exact unsupported native capability changes future operations to the browser fallback.",
       "surface": "Event/error constants, default `PreferenceStore`, re-exported `Preference`/schema; load/set/setAll/reset APIs, required adapter get/set/delete plus optional setMany, state-free EventTarget/on compatibility, and `dispose()`."
+    },
+    {
+      "file": "runtime/arcane/modules/PreparedSpeech.js",
+      "name": "PreparedSpeech.js",
+      "kind": "esm",
+      "exports": [
+        "prepareSpeech"
+      ],
+      "summary": "Owns detached ordered speech preparation, complete semantic audio reuse, and per-caller cancellation behind AI.prepareTTS.",
+      "availability": "Browser or native WebView with Blob, AbortController, an injected synthesis callback, and optional ready DBOPFS",
+      "protocol": "In-process preparation handle plus caller-owned DBOPFS raw audio and version-1 semantic manifest",
+      "normalization": "Preserves complete original parts and JSON-compatible semantic context, shares pending matching work on the same owner/storage group, admits segments in order, stores complete Blobs and MIME metadata, retains successful audio after failure or cancellation, and separates generation readiness from playback.",
+      "surface": "Named prepareSpeech({owner,parts,originalParts,selection,segmentation,storage,identity,signal,onState,synthesize}) returns {segments,state,ready,getAudio(index),cancel()}; applications use AI.prepareTTS and AI.playPreparedTTS so the shared AI owner retains segmentation, provider readiness, capacity, and playback."
     },
     {
       "file": "runtime/arcane/modules/QRCode.min.js",

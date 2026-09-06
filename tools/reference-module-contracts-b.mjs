@@ -315,6 +315,19 @@ await store.set('enabled', true);
 console.log(await store.load());`
     },
     {
+        name:'PreparedSpeech.js',
+        classification:'public-first-party',
+        lifecycleSideEffects:'Import creates no provider, model, storage operation, audio context, or playback. prepareSpeech starts owned asynchronous generation/reuse; the injected AI callback owns synthesis. Optional DBOPFS writes serialize by database, table, and key within the realm; successful stored audio survives cancellation or failure.',
+        paramsResults:'prepareSpeech({owner,parts,originalParts=parts,selection=null,segmentation=null,storage=null,identity=null,signal=null,onState,synthesize}) returns {segments,state,ready,getAudio(index),cancel()}. The owning AI supplies segmented speech plus complete original parts and semantic context. Matching pending requests share synthesis on the same owner and storage group, while each handle can cancel independently. ready resolves the complete ordered record after generation/reuse and optional durable saving; getAudio(index) returns a complete Blob with preserved MIME metadata. Applications use AI.prepareTTS and AI.playPreparedTTS to retain the shared segmentation, provider readiness, capacity, and playback owners.',
+        events:['Optional synchronous onState({state,completed,total,segments,error}) observes preparation; observer failures reach shared diagnostics. No playback event is emitted here.'],
+        errors:['TypeError for malformed storage, part, callback, or JSON-compatible semantic metadata inputs.','RangeError for an invalid segment index.','AbortError with ARCANE_AI_REQUEST_ABORTED for cancelled handles.','Complete synthesis/storage errors propagate through ready/getAudio; successful segments are retained.'],
+        capabilitiesCore:'No Core capability. Blob, AbortController, an injected synthesis callback, and optional ready DBOPFS supply the functional boundaries; application identity, priority, and retention policy remain with the caller.',
+        example:String.raw`import {prepareSpeech} from '/arcane/modules/PreparedSpeech.js';
+
+// Applications use AI.prepareTTS; importing this mechanism starts no work.
+console.log(typeof prepareSpeech);`
+    },
+    {
         name:'QRCode.min.js',
         classification:'vendor',
         lifecycleSideEffects:'Classic-script load defines global QRCode. Construction and makeCode() render canvas/SVG/table/image DOM under the target; clear() removes rendered output.',

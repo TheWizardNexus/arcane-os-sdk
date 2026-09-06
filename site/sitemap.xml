@@ -48,7 +48,6 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai-preference-runtime/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai-preference-tuple/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai-provider-runtime/</loc></url>
-  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai-response-length/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai-response-url-policy/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai-runtime-state/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ai/</loc></url>
@@ -105,6 +104,7 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/open-meteo-weather-provider/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/persistent-ai-chat-session/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/preference-store/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/prepared-speech/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/qr-code-min/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/questionnaire/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/record-link-index/</loc></url>

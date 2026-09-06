@@ -19,7 +19,7 @@ This table is the Node `package.json#exports` map: it defines package
 entrypoints for SDK/tooling code. It is distinct from the generated browser
 import map that resolves application-facing `arcane/*` modules and the focused
 EventManager entry. See [browser runtime delivery](protocols.md#browser-runtime-delivery)
-for the installed-inventory-derived physical-runtime contract in SDK `0.5.17`.
+for the installed-inventory-derived physical-runtime contract in SDK `0.5.18`.
 
 | Specifier | Purpose |
 | --- | --- |
@@ -43,6 +43,22 @@ for the installed-inventory-derived physical-runtime contract in SDK `0.5.17`.
 | `arcane-os/mail` | Portable Mail runtime, durable outbox, complete transport responses, and provider-neutral acceptance contracts. |
 
 Eight JSON schemas and `package.json` are data-only export subpaths. In Node ESM, import JSON with `with {type: 'json'}`, or resolve and read it explicitly.
+
+### Managed AI narration
+
+Applications import `AI` through `arcane/AI` in the managed browser map.
+`ai.prepareTTS({parts,storage,identity,signal,onState})` prepares complete
+punctuation segments without playing them and optionally saves/reuses their
+audio through application-owned DBOPFS. Its immediate handle exposes ordered
+segments, preparation state, `ready`, `getAudio(index)`, and `cancel()`.
+`ai.playPreparedTTS(prepared,{signal,onState})` attaches ordered playback and
+returns `state`, `error`, `finished`, `pause()`, `resume()`, and `stop()`.
+Each AI has one playback lane; replacing playback preserves independent
+preparation. Fully cached replay does not load the speech
+model. See [prepared narration](ai/browser-speech.md#prepare-narration-once-and-replay-stored-audio)
+for complete inputs, storage ownership, progress, errors, and cancellation,
+and [AI.js](runtime-modules.md#aijs) for the managed runtime contract.
+These are AI instance methods, not new npm export names.
 
 ## Shared operation contract
 
@@ -757,7 +773,7 @@ deterministic map. The package root also contains the public
 {
   schemaVersion: 1,
   kind: 'arcane-app-runtime-projection',
-  sdkVersion: '0.5.17',
+  sdkVersion: '0.5.18',
   pathPrefix: 'arcane/',
   files: [{path}]
 }
@@ -3633,7 +3649,7 @@ workspace it additionally returns the exact installed package authority:
     packageSource,
     canonicalPackageRoot,
     packageName: 'arcane-os',
-    packageVersion: '0.5.17',
+    packageVersion: '0.5.18',
     runtimeRoot,
     browserRuntimeRoot
   }
@@ -3641,9 +3657,9 @@ workspace it additionally returns the exact installed package authority:
 ```
 
 The dependency can be named `arcane-os` or be one exact npm alias for
-`npm:arcane-os@0.5.17`. The selected installation must still be one direct,
+`npm:arcane-os@0.5.18`. The selected installation must still be one direct,
 physical, non-link package directory whose manifest identifies exactly as
-`arcane-os@0.5.17`; duplicate canonical/alias declarations reject.
+`arcane-os@0.5.18`; duplicate canonical/alias declarations reject.
 `allowMissingManagedImportMap` is an internal packaging/development seam. An
 ordinary caller should leave it `false`.
 

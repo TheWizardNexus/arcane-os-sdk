@@ -17,6 +17,7 @@ import {
 import {normalizeOllamaModelIdentifier} from './OllamaModelIdentifier.js';
 import {arcaneLogging} from 'arcane-os/logging';
 import {MarkdownSpeech,stripSpeechFormatting} from 'arcane-os/speech-text';
+import {prepareSpeech} from './PreparedSpeech.js';
 
 const completeValue=(value)=>value;
 
@@ -1188,6 +1189,9 @@ class AI {
     #speechJobSequence=0;
     #stopOllamaReady=null;
     #ttsSegmentation={...DEFAULT_TTS_SEGMENTATION};
+    #preparedSpeechReadiness = null;
+    #preparedSpeechPlaybacks = new Set();
+    #speechUnlockContext = null;
 
     #traceSpeech(phase,detail={}){
         if(!arcaneLogging.enabled)return null;
@@ -5727,12 +5731,288 @@ class AI {
         return result;
     }
 
+    prepareTTS({parts, storage = null, identity = null, signal = null, onState = null} = {}) {
+        if(!is.array(parts)) {
+            throw new TypeError('AI.prepareTTS parts must be an array.');
+        }
+        const runtime = this;
+        const selected = this.#providerRuntime.selection('tts');
+        const configuredSpeech = this.browserSpeechConfiguration?.tts;
+        const configuration = configuredSpeech
+            ? {
+                model: configuredSpeech.model ?? null,
+                runtime: configuredSpeech.runtime ?? null,
+                graph: configuredSpeech.graph ?? null,
+                device: configuredSpeech.execution?.device ?? 'auto'
+            }
+            : null;
+        const selection = {
+            providerId: selected?.providerId ?? this.ttsService,
+            modelId: selected?.modelId ?? this.modelTTS,
+            responseFormat: selected ? this.#providerSpeechResponseFormat() : this.audioFormat,
+            configuration
+        };
+        const browserGeneration = this.#browserSpeechGeneration;
+        const controlGeneration = this.#speechControlGeneration;
+        const defaultVoice = selected
+            ? this.#providerSpeechVoice()
+            : this.#builtInSpeechDefaultVoice('tts', this.ttsService);
+        const responseFormat = selection.responseFormat;
+        const segmentation = this.ttsSegmentation;
+        const segments = [];
+        for(const part of parts) {
+            const source = is.string(part) ? {input: part} : part;
+            if(!is.string(source?.input)) {
+                throw new TypeError('Each prepared speech part requires input text.');
+            }
+            const voice = source.voice ?? defaultVoice;
+            const speed = Number(source.speed ?? this.voiceSpeed);
+            const pauseAfterMs = Number(source.pauseAfterMs ?? 0);
+            if(!is.finite(speed) || speed <= 0) {
+                throw new RangeError('Prepared speech speed must be positive.');
+            }
+            if(!is.finite(pauseAfterMs) || pauseAfterMs < 0) {
+                throw new RangeError('Prepared speech pauses must be nonnegative milliseconds.');
+            }
+            const cleaned = stripSpeechFormatting(source.input);
+            const {segments: outputs} = this.#segmentSpeechText(cleaned, true, segmentation);
+            for(const [index, input] of outputs.entries()) {
+                if(!input.trim()) continue;
+                segments.push(
+                    {input, voice, speed, pauseAfterMs: index === outputs.length - 1 ? pauseAfterMs : 0}
+                );
+            }
+        }
+        this.#traceSpeech('prepareTTS.call', {parts, segments, selection, segmentation, identity, storage});
+        async function synthesizePreparedSpeech(part, requestSignal) {
+            function assertPreparedSpeechSelection() {
+                const current = runtime.#providerRuntime.selection('tts');
+                if(requestSignal?.aborted) throw normalizeAIRequestAbort(requestSignal.reason);
+                if(browserGeneration !== runtime.#browserSpeechGeneration
+                    || controlGeneration !== runtime.#speechControlGeneration
+                    || selection.providerId !== (current?.providerId ?? runtime.ttsService)
+                    || selection.modelId !== (current?.modelId ?? runtime.modelTTS)) {
+                    throw normalizeAIRequestAbort('The prepared speech selection changed.');
+                }
+            }
+            assertPreparedSpeechSelection();
+            if(selected) {
+                const status = runtime.#providerRuntime.status('tts');
+                if(status.state !== 'ready' || status.loaded !== true) {
+                    if(!runtime.#preparedSpeechReadiness) {
+                        const readiness = runtime.#providerRuntime.setSpeechMuted(false);
+                        runtime.#preparedSpeechReadiness = readiness;
+                        readiness.finally(
+                            function releasePreparedSpeechReadiness() {
+                                if(runtime.#preparedSpeechReadiness === readiness) {
+                                    runtime.#preparedSpeechReadiness = null;
+                                }
+                            }
+                        ).catch(
+                            function reportPreparedSpeechReadinessFailure(error) {
+                                runtime.#traceSpeech('prepareTTS.readiness.error', {error});
+                            }
+                        );
+                    }
+                    await runtime.#preparedSpeechReadiness;
+                    assertPreparedSpeechSelection();
+                }
+            }
+            return runtime.fetchTTS(
+                {model: selection.modelId, input: part.input, voice: part.voice, speed: part.speed, responseFormat},
+                requestSignal,
+                {speechInputPrepared: true}
+            );
+        }
+        return prepareSpeech(
+            {
+                owner: this,
+                parts: segments,
+                originalParts: parts,
+                selection,
+                segmentation,
+                storage,
+                identity,
+                signal,
+                onState,
+                synthesize: synthesizePreparedSpeech
+            }
+        );
+    }
+
+    playPreparedTTS(prepared, {signal = null, onState = null} = {}) {
+        if(!is.array(prepared?.segments) || !is.function(prepared?.getAudio)) {
+            throw new TypeError('AI.playPreparedTTS requires a speech preparation handle.');
+        }
+        const runtime = this;
+        if(onState !== null && !is.function(onState)) {
+            throw new TypeError('Prepared playback onState must be a function when provided.');
+        }
+        // One playback lane per AI; detached preparation has its own lifetime.
+        this.stopAudio();
+        const group = {jobs: [], context: null, paused: false, stopped: false, state: 'waiting', error: null};
+        const completions = [];
+        const generation = this.speechGeneration;
+        this.#traceSpeech('playPreparedTTS.call', {segments: prepared.segments});
+        function publishPreparedPlaybackState(state, error = group.error) {
+            group.state = state;
+            group.error = error;
+            try {
+                onState?.({state, error});
+            } catch(observerError) {
+                arcaneLogging.error('Prepared playback state observer failed.', observerError);
+            }
+        }
+        group.publish = publishPreparedPlaybackState;
+        group.fail = function reportPreparedPlaybackFailure(error) {
+            publishPreparedPlaybackState('error', error);
+        };
+        function stopPreparedPlayback() {
+            if(group.stopped) return false;
+            group.stopped = true;
+            runtime.speechResumeAttempt += 1;
+            runtime.speechResumePending = false;
+            publishPreparedPlaybackState('stopped');
+            for(const job of group.jobs) {
+                if(job.state === 'complete') continue;
+                if(job.sourceNode) {
+                    job.sourceNode.onended = null;
+                    if(job.sourceNode.__arcaneStarted) {
+                        try {
+                            job.sourceNode.stop();
+                        } catch(error) {
+                            arcaneLogging.warn('Prepared speech could not be stopped.', error);
+                        }
+                    }
+                }
+                runtime.#cancelSpeechJob(job);
+            }
+            if(runtime.speechScheduleContext === group.context) {
+                runtime.speechScheduleContext = null;
+                runtime.speechScheduleTime = 0;
+            }
+            runtime.#requestSpeechPlayback();
+            return true;
+        }
+        const control = {
+            finished: null,
+            get state() { return group.state; },
+            get error() { return group.error; },
+            async pause() {
+                if(group.stopped || !group.context || group.context.state === 'closed') return false;
+                group.paused = true;
+                if(runtime.#speechUnlockContext === group.context) runtime.#clearSpeechUnlock();
+                await group.context.suspend();
+                if(!group.stopped) publishPreparedPlaybackState('paused');
+                return true;
+            },
+            async resume() {
+                if(group.stopped || !group.context || group.context.state === 'closed') return false;
+                group.paused = false;
+                const resumed = await runtime.resumeAudio(group.context, true);
+                if(!group.stopped && !group.paused && !group.error) {
+                    publishPreparedPlaybackState(resumed
+                        ? group.jobs.some(function hasScheduledPreparedAudio(job) { return job.state === 'scheduled'; })
+                            ? 'scheduled' : 'waiting'
+                        : 'waiting-for-gesture');
+                }
+                return resumed;
+            },
+            stop: stopPreparedPlayback
+        };
+        this.#preparedSpeechPlaybacks.add(control);
+        for(const [index, segment] of prepared.segments.entries()) {
+            const job = {
+                diagnosticId: ++this.#speechJobSequence,
+                abortController: null,
+                audioBuffer: null,
+                audioContext: null,
+                generation,
+                scheduledEnd: null,
+                scheduledStart: null,
+                sourceNode: null,
+                state: 'preparing',
+                text: segment.input,
+                pauseAfterMs: segment.pauseAfterMs ?? 0,
+                preparedPlayback: group,
+                resolvePlayback: null
+            };
+            completions.push(
+                new Promise(
+                    function capturePreparedPlaybackCompletion(resolve) {
+                        job.resolvePlayback = resolve;
+                    }
+                )
+            );
+            group.jobs.push(job);
+            this.speechJobs.push(job);
+            Promise.resolve().then(
+                async function decodePreparedSpeechSegment() {
+                    if(group.stopped) return false;
+                    const audio = await prepared.getAudio(index);
+                    if(group.stopped || generation !== runtime.speechGeneration) return false;
+                    return runtime.playAudio([audio], group.context, null, audio.type, job);
+                }
+            ).catch(
+                function failPreparedSpeechSegment(error) {
+                    if(group.stopped) return false;
+                    return runtime.#failSpeechJob(job, error, 'prepared-audio');
+                }
+            );
+        }
+        control.finished = Promise.all(completions).then(
+            async function finishPreparedPlayback(results) {
+                const completed = !group.stopped && results.every(Boolean);
+                group.stopped = true;
+                publishPreparedPlaybackState(completed ? 'complete' : group.error ? 'error' : 'stopped');
+                signal?.removeEventListener('abort', stopPreparedPlayback);
+                runtime.#preparedSpeechPlaybacks.delete(control);
+                if(runtime.#speechUnlockContext === group.context) runtime.#clearSpeechUnlock();
+                if(runtime.speechScheduleContext === group.context) {
+                    runtime.speechScheduleContext = null;
+                    runtime.speechScheduleTime = 0;
+                }
+                if(group.context && group.context.state !== 'closed') {
+                    try {
+                        await group.context.close();
+                    } catch(error) {
+                        arcaneLogging.warn('Prepared speech audio context could not be closed.', error);
+                    }
+                }
+                runtime.#traceSpeech('playPreparedTTS.result', {completed});
+                return completed;
+            }
+        );
+        signal?.addEventListener('abort', stopPreparedPlayback, {once: true});
+        publishPreparedPlaybackState('waiting');
+        if(signal?.aborted) {
+            stopPreparedPlayback();
+        } else if(group.jobs.length) {
+            // Playing saved audio does not require activating a synthesis provider.
+            this.muted = false;
+            try {
+                const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
+                if(!is.function(AudioContext)) throw new TypeError('Audio playback is unavailable in this browser.');
+                group.context = new AudioContext();
+                this.resumeAudio(group.context, true).catch(
+                    function failPreparedSpeechUnlock(error) {
+                        for(const job of group.jobs) runtime.#failSpeechJob(job, error, 'playback-resume');
+                    }
+                );
+            } catch(error) {
+                for(const job of group.jobs) this.#failSpeechJob(job, error, 'playback-start');
+            }
+        }
+        return control;
+    }
+
     streamTTS(
         text='',
         end=false,
         options={}
     ){
         const callId=this.#traceSpeech('streamTTS.call',{text,end,options});
+        for(const playback of this.#preparedSpeechPlaybacks) playback.stop();
         if(this.muted){
             if(end){
                 this.audioMessageChunks='';
@@ -5803,15 +6083,22 @@ class AI {
     }
 
     #extractSpeechSegments(end=false){
+        const {segments, remainder} = this.#segmentSpeechText(this.audioMessageChunks, end, this.#ttsSegmentation);
+        this.audioMessageChunks = remainder;
+        return segments;
+    }
+
+    #segmentSpeechText(text, end, segmentation) {
         const segments=[];
-        let remainder=this.audioMessageChunks;
+        let remainder=text;
 
         while(remainder.length>0){
             const punctuationBoundary=this.#findSpeechPunctuationBoundary(
                 remainder,
-                end
+                end,
+                segmentation
             );
-            const cadenceBoundary=this.#findSpeechCadenceBoundary(remainder,end);
+            const cadenceBoundary=this.#findSpeechCadenceBoundary(remainder,end,segmentation);
             let boundary=punctuationBoundary;
 
             if(boundary<0||(cadenceBoundary>0&&cadenceBoundary<boundary)){
@@ -5834,15 +6121,14 @@ class AI {
             }
         }
 
-        this.audioMessageChunks=remainder;
-        return segments;
+        return {segments, remainder};
     }
 
-    #findSpeechPunctuationBoundary(text,end=false){
-        if(this.#ttsSegmentation.punctuation==='none'){
+    #findSpeechPunctuationBoundary(text,end=false,segmentation=this.#ttsSegmentation){
+        if(segmentation.punctuation==='none'){
             return -1;
         }
-        if(this.#ttsSegmentation.punctuation==='any'){
+        if(segmentation.punctuation==='any'){
             return this.#findAnySpeechPunctuationBoundary(text,end);
         }
 
@@ -5887,8 +6173,8 @@ class AI {
         return -1;
     }
 
-    #findSpeechCadenceBoundary(text,end=false){
-        const wordCadence=this.#ttsSegmentation.wordCadence;
+    #findSpeechCadenceBoundary(text,end=false,segmentation=this.#ttsSegmentation){
+        const wordCadence=segmentation.wordCadence;
         if(wordCadence===null){
             return -1;
         }
@@ -6419,6 +6705,7 @@ class AI {
         const callId=this.#traceSpeech('stopAudio.call',{
             remainder:this.audioMessageChunks,queuedJobs:this.speechJobs.length
         });
+        for(const playback of this.#preparedSpeechPlaybacks) playback.stop();
         this.speechGeneration+=1;
         this.speechResumeAttempt+=1;
         this.speechResumePending=false;
@@ -6478,9 +6765,14 @@ class AI {
 
         let attempt=0;
         let context;
+        let preparedGroup = null;
 
         try{
             context=audioContext||this.#getSpeechAudioContext();
+            preparedGroup = this.speechJobs.find(function findPreparedResumeOwner(job) {
+                return job.preparedPlayback?.context === context;
+            })?.preparedPlayback ?? null;
+            if(preparedGroup?.paused || preparedGroup?.stopped) return false;
             this.#traceSpeech('resumeAudio.context',{
                 callId,state:context.state,audioTime:context.currentTime,
                 sampleRate:context.sampleRate
@@ -6504,6 +6796,12 @@ class AI {
             attempt=++this.speechResumeAttempt;
             this.speechResumePending=true;
             await context.resume();
+            if(preparedGroup?.stopped) return false;
+            if(preparedGroup?.paused) {
+                await context.suspend();
+                this.speechResumePending = false;
+                return false;
+            }
             this.#traceSpeech('resumeAudio.resumed',{
                 callId,state:context.state,audioTime:context.currentTime
             });
@@ -6525,12 +6823,17 @@ class AI {
             }
         }catch(error){
             this.#traceSpeech('resumeAudio.error',{callId,error,state:context?.state});
+            if(preparedGroup?.stopped || preparedGroup?.paused) return false;
             if(attempt&&attempt!==this.speechResumeAttempt){
                 return context?.state==='running';
             }
 
             if(attempt===this.speechResumeAttempt){
                 this.speechResumePending=false;
+            }
+            if(preparedGroup && error?.name !== 'NotAllowedError') {
+                for(const job of preparedGroup.jobs) this.#failSpeechJob(job, error, 'playback-resume');
+                return false;
             }
             if(context?.state==='closed'){
                 this.#clearSpeechUnlock();
@@ -6592,7 +6895,8 @@ class AI {
             this.speechJobs.push(job);
         }
 
-        if(this.muted||job.generation!==this.speechGeneration){
+        if(this.muted||job.generation!==this.speechGeneration
+            ||job.preparedPlayback?.stopped||['cancelled','failed'].includes(job.state)){
             return this.#cancelSpeechJob(job);
         }
 
@@ -6609,7 +6913,8 @@ class AI {
                 channels:audioBuffer.numberOfChannels,audioBuffer
             });
 
-            if(this.muted||job.generation!==this.speechGeneration){
+            if(this.muted||job.generation!==this.speechGeneration
+                ||job.preparedPlayback?.stopped||['cancelled','failed'].includes(job.state)){
                 return this.#cancelSpeechJob(job);
             }
 
@@ -6687,6 +6992,8 @@ class AI {
 
                 const audioContext=job.sourceNode.context||job.audioContext;
 
+                if(job.preparedPlayback?.paused) break;
+
                 if(audioContext.state!=='running'){
                     this.#waitForSpeechGesture(null,audioContext);
 
@@ -6742,6 +7049,9 @@ class AI {
                     }
                     this.isSpeaking=true;
                     job.sourceNode.start(scheduledStart);
+                    if(job.preparedPlayback && !job.preparedPlayback.error) {
+                        job.preparedPlayback.publish('scheduled');
+                    }
                     this.#traceSpeechJob('playback.scheduled',job,{
                         audioEnd:hasKnownDuration?scheduledStart+duration:null,
                         previousScheduledEnd:this.speechScheduleTime,
@@ -6776,6 +7086,9 @@ class AI {
                 !this.muted
                 &&!this.speechAwaitingGesture
                 &&!this.speechResumePending
+                &&!this.speechJobs.some(function hasPausedPreparedPlayback(job) {
+                    return job.preparedPlayback?.paused;
+                })
                 &&!this.speechJobs.some(
                     function hasScheduledSpeechWithoutDuration(job){
                         return job.state==='scheduled'
@@ -6903,6 +7216,7 @@ class AI {
         }
 
         job.state='failed';
+        job.preparedPlayback?.fail(error);
         this.#traceSpeechJob('queue.failed',job,{boundary,error});
 
         this.#publishTTSFailure(error,{
@@ -6963,7 +7277,15 @@ class AI {
         const target=window;
 
         this.speechAwaitingGesture=true;
+        this.#speechUnlockContext=audioContext;
+        const preparedJob = this.speechJobs.find(function preparedPlaybackForGesture(job) {
+            return job.preparedPlayback?.context === audioContext;
+        });
+        if(preparedJob && !preparedJob.preparedPlayback.paused && !preparedJob.preparedPlayback.error) {
+            preparedJob.preparedPlayback.publish('waiting-for-gesture');
+        }
         this.speechUnlockHandler=function unlockSpeechFromUserGesture(){
+            if(preparedJob?.preparedPlayback.paused || preparedJob?.preparedPlayback.stopped) return false;
             runtime.#clearSpeechUnlock();
             return runtime.resumeAudio(audioContext);
         };
@@ -7001,6 +7323,7 @@ class AI {
         }
 
         this.speechUnlockHandler=null;
+        this.#speechUnlockContext=null;
         this.speechAwaitingGesture=false;
     }
 }

@@ -106,6 +106,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`OpenMeteoWeatherProvider.js`](#openmeteoweatherproviderjs) | esm | Searches and loads Open-Meteo data into complete mutable Arcane weather entities. | Browser / native WebView / server with fetch + cloud | Provider data normalized to mutable entities; transport errors mixed. |
 | [`PersistentAIChatSession.js`](#persistentaichatsessionjs) | esm | Adds explicit retained-history/memory policy to complete configured chat without changing DBOPFS or ChatEntity semantics. | Browser / native WebView with DBOPFS and configured chat | Retained context commits atomically; `persist:false` turns are one-operation-only. |
 | [`PreferenceStore.js`](#preferencestorejs) | esm | Loads and updates schema-defined app preferences through native storage with a narrow browser fallback. | Browser/native hybrid | Complete ordinary values remain mutable; setAll uses one optional atomic adapter batch for every selected value when advertised, otherwise performs complete ordered serial writes, and only exact unsupported native capability changes future operations to the browser fallback. |
+| [`PreparedSpeech.js`](#preparedspeechjs) | esm | Owns detached ordered preparation, semantic audio reuse, and per-caller cancellation behind AI.prepareTTS. | Browser / native WebView with injected synthesis and optional DBOPFS | Complete original inputs, ordered audio metadata, durable reuse, and observable preparation results. |
 | [`QRCode.min.js`](#qrcodeminjs) | classic-script | Vendored QRCode generator for DOM, canvas, SVG, and image output. | Browser vendor script | Vendor-native. |
 | [`Questionnaire.js`](#questionnairejs) | esm | Evaluates whether a one-time questionnaire prompt is due without performing the prompt. | Cross-host | Normalized conservative boolean. |
 | [`RecordLinkIndex.js`](#recordlinkindexjs) | esm | Parses record links and builds their normalized index. | Cross-host | Fully normalized. |
@@ -150,6 +151,8 @@ default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and
 `streamRequest()`, `streamMessage()`, `fetchRequest()`, `fetch()`,
 read-only `ttsSegmentation`, `configureTTSSegmentation()`,
 `streamTTS(text='',end=false,options={})`,
+`prepareTTS({parts,storage,identity,signal,onState})`,
+`playPreparedTTS(prepared,{signal,onState})`,
 `finishTTS()`, `fetchTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`,
 `playAudio()`; consumes `user-entity-loaded` and `arcane-ollama-ready`,
 installs `window.ai`, and emits `ai-ready` and `ai-tts-failure`.
@@ -318,12 +321,62 @@ flush, not a queue-wide playback barrier. A muted call resolves `false`.
 Playback completion stays pending while the browser waits for an audio-unlock
 gesture or a recoverable resume attempt. If resuming a closed `AudioContext`
 fails, the affected jobs terminate and their playback results settle `false`.
-`stopAudio()` cancels all speech owned
-by this AI instance and settles pending playback promises `false`. A trailing
+`stopAudio()` cancels streamed speech and prepared playback owned
+by this AI instance and settles pending playback promises `false`; detached
+preparation retains its own cancellation lifetime. A trailing
 pause delays the next queued audio; the preceding promise resolves when its
 last audio buffer ends, without waiting out that pause. Completion describes
 the playback lifecycle, not proof that a listener heard the sound. See the
 [complete-passage example](ai/browser-speech.md#queue-complete-passages-and-wait-for-playback).
+
+`prepareTTS({parts,storage,identity,signal,onState})` returns an immediate
+`{segments,state,ready,getAudio(index),cancel()}` handle for detached complete
+speech preparation. Parts are strings or `{input,voice?,speed?,pauseAfterMs?}`
+records. It retains the full source for semantic matching, snapshots the
+selected speech configuration and segmentation, and applies automatic
+formatting cleanup once to the speech copy. Generation uses the existing
+bounded provider queue without adding playback. Optional
+`storage:{db,table,key}` saves complete audio files and their MIME metadata in
+the caller's ready DBOPFS instance; the separate JSON-compatible `identity`
+adds application-owned semantic context. Reuse compares complete inputs rather
+than an SDK version alone.
+
+`state` is `queued`, `preparing`, `ready`, `error`, or `cancelled`.
+`onState({state,completed,total,segments,error})` synchronously observes
+preparation progress. `ready` resolves the complete record after every segment
+is ready and, when storage is selected, durably saved. `getAudio(index)` waits
+for the corresponding ordered segment and returns its complete `Blob` with
+the retained MIME type. Preparation failure rejects; cancellation rejects as
+`AbortError` and preserves successfully stored segments. Matching pending
+requests share synthesis only on the same AI instance and storage group;
+cancelling one handle does not cancel another active matching caller.
+Preparation cancellation prevents later synthesis, but an already-started
+shared provider load/unmute has no per-preparation signal and may finish.
+
+`playPreparedTTS(prepared,{signal,onState})` can attach immediately. Its returned
+`{state,error,finished,pause(),resume(),stop()}` handle schedules segments in
+their original order using the existing AI audio clock. `finished` resolves `true` after
+natural completion and `false` after stop, cancellation, or failure; genuine
+failures also use the existing complete diagnostics and `ai-tts-failure` event.
+Part pauses separate adjacent audio; the final trailing pause does not delay
+`finished` after the final audio buffer ends. State/error getters and the
+optional synchronous `onState({state,error})` callback expose `waiting`,
+`waiting-for-gesture`, `scheduled`, `paused`, `complete`, `stopped`, or `error`.
+Use `waiting-for-gesture` for audio-unlock UI; a `false` result from `resume()`
+alone is not a first-segment-ready signal.
+Pause and resume are asynchronous boolean controls scoped to that handle's
+audio context; stop is synchronous. Playback completion and these controls do
+not cancel independent preparation. One AI has one playback lane: attaching
+prepared playback replaces its preceding streamed or prepared audio, and
+`streamTTS()` interrupts active prepared playback. `stopAudio()` stops all
+this AI's playback but keeps detached preparation running; `setSpeechMuted(true)` also cancels
+provider TTS work and unloads it. Replacing the selected speech configuration
+cancels missing generation for that earlier selection. Completed stored audio
+remains in application storage.
+Fully stored replay enables playback without loading the selected speech
+model even when the AI starts muted. Missing audio alone requests the shared
+TTS readiness path. See [prepared narration](ai/browser-speech.md#prepare-narration-once-and-replay-stored-audio)
+for full record shapes, storage ownership, and a complete example.
 
 Streaming speech retains sentence
 segmentation by default. `configureTTSSegmentation({punctuation,wordCadence})`
@@ -2677,6 +2730,54 @@ Arcane.preferences or app-scoped localStorage. [Deep protocol details](protocols
 import * as module from '/arcane/modules/PreferenceStore.js';
 
 console.log(Object.keys(module));
+```
+
+## PreparedSpeech.js
+
+### Overview
+
+Shared preparation mechanism used by `AI.prepareTTS()`. It owns ordered
+generation admission, same-owner request sharing, complete audio storage and
+semantic reuse, and each caller's preparation lifetime. It does not construct
+an audio context, play speech, or select application content.
+
+### Public surface
+
+Named `prepareSpeech({owner,parts,originalParts=parts,selection=null,
+segmentation=null,storage=null,identity=null,signal=null,onState,synthesize})`.
+The owning AI supplies already segmented speech parts, complete original parts,
+its selection snapshot, and its synthesis callback. The returned handle is
+`{segments,state,ready,getAudio(index),cancel()}`. Applications use
+`AI.prepareTTS()` and `AI.playPreparedTTS()` so the existing AI owner retains
+automatic formatting cleanup, segmentation, provider readiness/capacity, and
+ordered playback. See the [complete preparation contract](ai/browser-speech.md#prepare-narration-once-and-replay-stored-audio).
+
+`storage:{db,table,key}` is optional; the ready DBOPFS instance supplies
+`get`, `set`, `readFile`, and `writeFile`. JSON-compatible semantic inputs stay
+complete in the version-1 manifest. Raw audio is persisted separately and its
+MIME type is retained in metadata. Storage mutation serializes by database,
+table, and key within the realm. Synthesis sharing is scoped to the same owner
+and matching semantic inputs/storage; playback remains outside this module.
+
+Exact exports: `prepareSpeech`.
+
+### Availability and normalization
+
+**Browser or native WebView with Blob, AbortController, an injected synthesis
+callback, and optional ready DBOPFS.** Import creates no provider or
+playback. Calling the preparation function starts owned asynchronous work.
+`ready` rejects complete synthesis/storage failures or `AbortError` after
+cancellation; successful audio remains available for reuse. Malformed part,
+storage, or semantic metadata inputs throw `TypeError`; an invalid segment
+index rejects with `RangeError`. No Core capability is selected here.
+
+### Example
+
+```javascript
+import {prepareSpeech} from '/arcane/modules/PreparedSpeech.js';
+
+// Applications use AI.prepareTTS; this import only exposes the SDK mechanism.
+console.log(typeof prepareSpeech); // function
 ```
 
 ## QRCode.min.js
