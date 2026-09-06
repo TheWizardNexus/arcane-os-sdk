@@ -130,6 +130,36 @@ window.addEventListener('ai-tts-failure', function reportSpeechFailure(event) {
 
 Call `speechEvents.abort()` when disposing that interface to remove the listener.
 
+## Browser NPU setup
+
+Applications can place the shared `browser-ai-setup.html` component in their
+profile or settings page. It reports whether this page exposes WebNN and
+WebGPU, without loading a model or creating an accelerator context:
+
+```html
+<html-import
+  id="browserAISetup"
+  href="/arcane/components/browser-ai-setup.html">
+</html-import>
+```
+
+**Set up NPU** uses the same browser-settings approach as the existing
+high-performance GPU notice: attempt to open the browser's flags page, then
+show instructions including the full address to paste if navigation was
+blocked. Chrome uses `chrome://flags/#web-machine-learning-neural-network`;
+Edge uses `edge://flags/#web-machine-learning-neural-network`. Unrecognized
+browsers receive explicit Chrome and Edge choices instead of an assumed target.
+The [ONNX Runtime WebNN guide](https://onnxruntime.ai/docs/tutorials/web/ep-webnn.html)
+documents the **Enables WebNN API** flag and model/operator requirements.
+
+This control does not save an execution preference, change browser settings,
+restart the browser, or report that the NPU is active. A WebNN API presence
+result is not proof of NPU hardware, a compatible model, or physical execution.
+The profile also cannot report a different chat page's loaded runtime. The
+existing automatic speech route remains NPU, then GPU, then CPU; upstream
+sessions can still place unsupported operators on CPU. Use the owning model
+runtime's evidence to determine actual accelerator execution.
+
 ## Developer diagnostics
 
 The shared logging API and speech traces are available in SDK `0.5.14`.

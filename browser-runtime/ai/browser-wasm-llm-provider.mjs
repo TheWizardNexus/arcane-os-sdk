@@ -8,6 +8,7 @@ import {
   resolveModelSecurity,
 } from "./model-controller.mjs";
 import { createPackagedWllamaRuntime } from "./browser-wllama-runtime.mjs";
+import { getBrowserDeviceSettings, openBrowserDeviceSettings } from "./browser-device-settings.mjs";
 import { arcaneEvents } from "../event-manager.mjs";
 
 const is = new Is(false);
@@ -264,65 +265,20 @@ function publicDescriptor(source) {
   return modelDescriptor(source);
 }
 
-function highPerformanceGpuBrowser() {
-    const navigatorObject = globalThis.navigator;
-    const userAgent = String(navigatorObject?.userAgent ?? "");
-    const clientHints = navigatorObject?.userAgentData;
-    const platform = String(clientHints?.platform || navigatorObject?.platform || userAgent);
-    if (
-        !/\b(?:Windows|Win32|Win64)\b/iu.test(platform)
-        || clientHints?.mobile === true
-        || /\b(?:Android|iPhone|iPad|iPod|Mobile)\b/iu.test(userAgent)
-    ) {
-        return null;
-    }
-
-    const brands = new Set();
-    for (const entry of clientHints?.brands ?? []) {
-        brands.add(entry.brand);
-    }
-    // Vivaldi can append its identity while also identifying as Edge or Chrome.
-    if (brands.has("Vivaldi") || /\bVivaldi\//u.test(userAgent)) {
-        return { name: "Vivaldi", url: "vivaldi://flags/#force-high-performance-gpu" };
-    }
-    if (brands.has("Brave") || is.function(navigatorObject?.brave?.isBrave)) {
-        return { name: "Brave", url: "brave://flags/#force-high-performance-gpu" };
-    }
-    if (brands.has("Opera") || /\bOPR\//u.test(userAgent)) {
-        return { name: "Opera", url: "opera://flags/#force-high-performance-gpu" };
-    }
-    if (brands.has("Microsoft Edge") || /\bEdg\//u.test(userAgent)) {
-        return { name: "Microsoft Edge", url: "edge://flags/#force-high-performance-gpu" };
-    }
-    if (
-        brands.has("Chromium")
-        || brands.has("Google Chrome")
-        || /\b(?:Chrome|Chromium)\//u.test(userAgent)
-    ) {
-        // Some Chromium browsers mask their brand. about:// uses their own flags page.
-        return { name: "your browser", url: "about://flags/#force-high-performance-gpu" };
-    }
-    return null;
-}
-
 function notifyHighPerformanceGpu(adapter) {
     if (highPerformanceGpuNoticeShown) {
         return;
     }
-    const browser = highPerformanceGpuBrowser();
+    const browser = getBrowserDeviceSettings().highPerformanceGpu;
     if (!browser) {
         return;
     }
     highPerformanceGpuNoticeShown = true;
-    try {
-        globalThis.open?.(browser.url, "_blank", "noopener,noreferrer");
-    } catch {
-        // Browsers may reject internal-page navigation from web content.
-    }
     const adapterName = adapter.description || adapter.name
         || [adapter.vendor, adapter.architecture].filter(Boolean).join(" ")
         || "the available WebGPU adapter";
-    globalThis.alert?.(
+    openBrowserDeviceSettings(
+        browser,
         `Selected WebGPU adapter: ${adapterName}.\n\n`
         + `If this computer has multiple GPUs, enable “Force High Performance GPU” in ${browser.name} `
         + "to request the high-performance GPU when available. "

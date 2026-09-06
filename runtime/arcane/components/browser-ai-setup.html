@@ -1,0 +1,212 @@
+<link rel="stylesheet" href="./arcane/css/primitives.css?v=1">
+<style>
+    :host{display:block;min-width:0}
+    .availability{display:grid;gap:var(--arcane-space-2);margin:0}
+    .availability div{display:grid;gap:var(--arcane-space-1)}
+    .availability dt{font-weight:700}
+    .availability dd{margin:0}
+    .flag-choice{margin-block:var(--arcane-space-4)}
+    .flag-choice h3{margin-block:var(--arcane-space-2)}
+    .actions{display:flex;flex-wrap:wrap;gap:var(--arcane-space-2)}
+    p,dt,dd,li,button{overflow-wrap:anywhere}
+    button{white-space:normal}
+    code{display:block;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;margin-block:var(--arcane-space-2)}
+    li{margin-block:var(--arcane-space-2)}
+</style>
+
+<section class="arcane-card" aria-labelledby="setupTitle">
+    <header class="arcane-card__header">
+        <h2 id="setupTitle" class="arcane-section-heading">Browser AI acceleration</h2>
+    </header>
+    <div class="arcane-card__body">
+        <p id="browserName"></p>
+        <dl class="availability" aria-live="polite">
+            <div><dt>WebNN API</dt><dd id="webnnAvailability"></dd></div>
+            <div><dt>WebGPU API</dt><dd id="webgpuAvailability"></dd></div>
+        </dl>
+        <p class="arcane-help">These checks show browser APIs only. They do not report whether a model is running on an NPU or GPU.</p>
+        <h3>NPU setup</h3>
+        <p id="browserInstructions"></p>
+        <div id="flagAddresses"></div>
+        <ol id="setupSteps"></ol>
+        <p>Browser API availability does not confirm that an NPU or a particular model is supported. You choose whether to change the browser setting.</p>
+        <p><a href="https://onnxruntime.ai/docs/tutorials/web/ep-webnn.html">ONNX Runtime WebNN setup documentation</a></p>
+        <p id="copyStatus" class="arcane-help" role="status" aria-live="polite"></p>
+    </div>
+    <footer class="arcane-card__footer">
+        <button id="refreshAvailability" class="arcane-button arcane-button--secondary" type="button">Refresh browser availability</button>
+        <p id="setupStatus" class="arcane-help" role="status" aria-live="polite"></p>
+    </footer>
+</section>
+
+<script type="module">
+    const host=this;
+    const root=host.shadowRoot;
+    host.ready=false;
+
+    const {
+        getBrowserDeviceSettings,
+        openBrowserDeviceSettings,
+        WEBNN_BROWSER_SETTINGS
+    }=await import('../sdk/ai/browser-device-settings.mjs');
+    const {arcaneLogging}=await import('arcane-os/logging');
+    const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
+    const events=createArcaneEventSource(host,{
+        source:'arcane.component.browser-ai-setup',
+        eventTypes:['browser-ai-setup-ready']
+    });
+    const lifecycleController=new AbortController();
+    const status=root.querySelector('#setupStatus');
+    const copyStatus=root.querySelector('#copyStatus');
+    const choices=[];
+    const setupSteps=[
+        'If the flags page does not open, copy the matching address into your browser\'s address bar and open it.',
+        'Find “Enables WebNN API” and choose Enabled.',
+        'Save your work, then use the browser\'s Relaunch control.',
+        'Return to this page and select Refresh browser availability.'
+    ];
+    let copyTask=null;
+    let destroyed=false;
+
+    host.refresh=refresh;
+    host.open=open;
+    host.destroy=destroy;
+
+    function refresh(){
+        if(destroyed)return false;
+        const settings=getBrowserDeviceSettings();
+        root.querySelector('#browserName').textContent=settings.browserId==='unknown'
+            ?'Browser not identified.'
+            :`Browser: ${settings.name}.`;
+        root.querySelector('#webnnAvailability').textContent=settings.webnnAvailable
+            ?'Exposed to this page.'
+            :'Unavailable to this page.';
+        root.querySelector('#webgpuAvailability').textContent=settings.webgpuAvailable
+            ?'Exposed to this page.'
+            :'Unavailable to this page.';
+        root.querySelector('#browserInstructions').textContent=settings.webnnFlagsURL
+            ?`Set up NPU attempts to open the WebNN flags page in ${settings.name} and shows the full instructions.`
+            :'A matching WebNN flags address is not known for this browser. Choose Google Chrome or Microsoft Edge below if that is the browser you are using.';
+        for(const choice of choices){
+            choice.row.hidden=Boolean(settings.webnnFlagsURL)
+                &&choice.target.url!==settings.webnnFlagsURL;
+            choice.setupButton.textContent=settings.webnnFlagsURL
+                ?'Set up NPU'
+                :`Set up NPU in ${choice.target.name}`;
+        }
+        return settings;
+    }
+
+    function open(browserId){
+        if(destroyed)return false;
+        const current=refresh();
+        const selectedId=browserId??current.browserId;
+        const target=WEBNN_BROWSER_SETTINGS.find(function matchSetupBrowser(browser){
+            return browser.browserId===selectedId;
+        });
+        if(!target){
+            status.textContent='Choose the Google Chrome or Microsoft Edge setup button that matches your browser.';
+            return false;
+        }
+        const instructions=setupSteps.map(function numberSetupStep(step,index){
+            return `${index+1}. ${step}`;
+        }).join('\n');
+        openBrowserDeviceSettings(
+            target,
+            `NPU setup for ${target.name}\n\n${instructions}\n\n${target.url}`
+        );
+        status.textContent='If the flags page did not open, copy its address above and paste it into your browser\'s address bar.';
+    }
+
+    function copyAddress(address){
+        if(destroyed)return Promise.resolve(false);
+        if(copyTask)return copyTask;
+        copyStatus.textContent='Copying address...';
+        for(const choice of choices)choice.copyButton.disabled=true;
+        copyTask=writeAddress().finally(function finishAddressCopy(){
+            copyTask=null;
+            if(!destroyed){
+                for(const choice of choices)choice.copyButton.disabled=false;
+            }
+        });
+        return copyTask;
+
+        async function writeAddress(){
+            try{
+                await globalThis.navigator.clipboard.writeText(address);
+                if(destroyed)return false;
+                copyStatus.textContent='Address copied. Paste it into your browser\'s address bar.';
+                return true;
+            }catch(error){
+                if(!destroyed){
+                    copyStatus.textContent='The address could not be copied automatically. Select the complete address above, copy it manually, and paste it into your browser\'s address bar.';
+                    arcaneLogging.error('Unable to copy the browser WebNN flags address.',error);
+                }
+                return false;
+            }
+        }
+    }
+
+    const addressList=root.querySelector('#flagAddresses');
+    for(const target of WEBNN_BROWSER_SETTINGS){
+        const row=document.createElement('section');
+        const heading=document.createElement('h3');
+        const address=document.createElement('code');
+        const actions=document.createElement('div');
+        const setupButton=document.createElement('button');
+        const copyButton=document.createElement('button');
+        row.className='flag-choice';
+        heading.textContent=target.name;
+        address.textContent=target.url;
+        address.tabIndex=0;
+        address.setAttribute('aria-label',`${target.name} flags address`);
+        actions.className='actions';
+        setupButton.type='button';
+        setupButton.className='arcane-button';
+        setupButton.addEventListener('click',function openSelectedBrowserSettings(){
+            return open(target.browserId);
+        },{signal:lifecycleController.signal});
+        copyButton.type='button';
+        copyButton.className='arcane-button arcane-button--secondary';
+        copyButton.textContent=`Copy ${target.name} address`;
+        copyButton.addEventListener('click',function copySelectedBrowserAddress(){
+            return copyAddress(target.url);
+        },{signal:lifecycleController.signal});
+        actions.append(setupButton,copyButton);
+        row.append(heading,address,actions);
+        addressList.append(row);
+        choices.push({row,target,setupButton,copyButton});
+    }
+    const stepList=root.querySelector('#setupSteps');
+    for(const step of setupSteps){
+        const item=document.createElement('li');
+        item.textContent=step;
+        stepList.append(item);
+    }
+
+    root.querySelector('#refreshAvailability').addEventListener('click',function refreshBrowserAvailability(){
+        refresh();
+        status.textContent='Browser API availability refreshed.';
+    },{signal:lifecycleController.signal});
+    host.ownerDocument.defaultView.addEventListener('pagehide',function disposeBeforePageUnload(event){
+        if(!event.persisted)destroy();
+    },{
+        signal:lifecycleController.signal
+    });
+
+    function destroy(){
+        if(destroyed)return false;
+        destroyed=true;
+        host.ready=false;
+        lifecycleController.abort('browser-ai-setup-destroyed');
+        events.dispose();
+        return true;
+    }
+
+    refresh();
+    host.ready=true;
+    const publication=events.dispatch('browser-ai-setup-ready',{}, {
+        publicDetail:{ready:true}
+    });
+    projectArcaneDOMEvent(host,publication.occurrence);
+</script>

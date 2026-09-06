@@ -60,6 +60,7 @@ appropriate.
 | --- | --- | --- | --- | --- |
 | [`app-bar.html`](#app-barhtml) | Responsive application navigation, route state, status, and trailing actions. | `setNavigation()`<br>`setActiveRoute()`<br>`setStatus()`<br>`refresh()`<br>`destroy()` | `app-bar-ready` | DOM-normalized |
 | [`assistant-panel.html`](#assistant-panelhtml) | Reusable assistant drawer, message area, composer, pending/streaming/empty/error state, and actions. | `open()`<br>`close()`<br>`toggle()`<br>`send()`<br>`clear()`<br>`setState()`<br>`focusComposer()`<br>`scrollToEnd()`<br>`destroy()` | `assistant-ready`<br>`assistant-opened`<br>`assistant-closed`<br>`assistant-send`<br>`assistant-clear` | DOM-normalized; caller/provider results remain external |
+| [`browser-ai-setup.html`](#browser-ai-setuphtml) | Browser API availability and NPU setup instructions with browser-specific flags actions. | `refresh()`<br>`open()`<br>`destroy()`<br>`ready` | `browser-ai-setup-ready` | API presence only; settings navigation and hardware execution remain browser-owned |
 | [`calculator.html`](#calculatorhtml) | Calculator keypad and result/error event surface backed by CalculatorEngine. | `calculate()`<br>`destroy()` | `calculator-ready`<br>`calculation-complete`<br>`calculation-error` | Normalized Calculation/error events |
 | [`chart.html`](#charthtml) | Accessible uPlot line, area, or point chart with normalized options and rows. | `configure()`<br>`populate()`<br>`setData()`<br>`addData()`<br>`update()`<br>`destroy()` | `chart-ready`<br>`chart-remove` | Options/rows normalized; uPlot rendering is vendor-native |
 | [`chat.html`](#chathtml) | Shared chat, visible selected-model activation request, file upload, streaming, structural tool settlement, speech, language, availability, and conversation-timebox surface. | `streamMessage()`<br>`setMessageProgress()`<br>`setAIAvailability()`<br>`setInitialSpeechMuted()`<br>`setConversationComplete()`<br>`bindConversationTimebox()`<br>`bindSession()`<br>`submitMessage()`<br>`submitToolResult()`<br>`submitToolResults()`<br>`sendMessage()`<br>`languageChanged()`<br>`requestAIActivation()`<br>`destroy()` | `chat-ready`<br>`chat-session-bound`<br>`chat-session-message`<br>`chat-session-error`<br>`chat-send-message`<br>`chat-send-error`<br>`chat-file-uploaded`<br>`chat-file-upload-error`<br>`chat-language-changed`<br>`chat-language-change-error`<br>`chat-ai-activation-request`<br>`chat-ai-activation-error`<br>`chat-speech-synthesis-error`<br>`conversation-timebox-error` | UI/runtime state, explicit user activation intent, and honest structural-call settlement normalized; AI/storage/media behavior mixed |
@@ -150,6 +151,58 @@ Slots: `title`, `subtitle`, `identity`, `messages/message`, `composer`, `actions
 <html-import
   id="assistant-panel.html"
   href="/arcane/components/assistant-panel.html">
+</html-import>
+```
+
+## browser-ai-setup.html
+
+### Overview
+
+Displays WebNN and WebGPU API availability for the current page and explains how
+to enable WebNN for NPU use. Its setup action uses the same browser-flags opening
+attempt and alert fallback as the existing high-performance GPU notice. Chrome
+and Edge receive their own flags addresses; other or unidentified browsers show
+both explicit choices.
+
+### Public surface
+
+Methods/properties: `refresh()`, `open(browserId?)`, `destroy()`, `ready`.
+
+Events: `browser-ai-setup-ready`.
+
+`refresh()` synchronously updates API presence and browser guidance and returns
+the current settings record: `browserId`, `name`, `webnnFlagsURL`,
+`highPerformanceGpu`, `webnnAvailable`, and `webgpuAvailable`. It returns `false`
+after destruction. Availability means that the browser exposes the API to this
+page; it does not confirm a working adapter, loaded model, or hardware execution.
+
+`open()` refreshes the display, attempts to open the detected Chrome or Edge flags
+page, and presents an alert containing the full address and enable/relaunch
+instructions. Pass `"chrome"` or `"edge"` to choose explicitly. Invoke it from a
+user action. It returns `false` when destroyed or when no supported target is
+selected, and otherwise returns `undefined`; it never reports that navigation
+succeeded. Browsers may block internal-page navigation, so the full addresses
+also remain visible and copyable in the component.
+
+`destroy()` aborts owned listeners, disposes the event source, marks `ready`
+false, and suppresses UI updates from a pending clipboard operation. It returns
+`true` the first time and `false` thereafter. A BFCache-persisted `pagehide`
+preserves the component; nonpersisted `pagehide` destroys it.
+
+### Availability and normalization
+
+**Browser and supported native WebViews.** API presence and setup instructions
+are normalized; browser flags, clipboard support, and device execution remain
+platform-owned. Mounting or refreshing creates no model, GPU adapter, or WebNN
+context. The component saves no preferences, changes no browser settings, and
+does not restart the browser. It cannot report model state owned by another page.
+
+### Example
+
+```html
+<html-import
+  id="browser-ai-setup"
+  href="/arcane/components/browser-ai-setup.html">
 </html-import>
 ```
 

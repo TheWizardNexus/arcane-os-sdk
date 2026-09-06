@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.1
+
+- Add a reusable profile component for browser NPU setup and WebNN/WebGPU API
+  availability. Its setup button uses the existing GPU guidance approach:
+  attempt the appropriate Chrome or Edge flags page, then show an alert with
+  instructions and the address to paste if the browser blocks navigation.
+- Share browser identification and the flags-opening helper with the existing
+  high-performance GPU notice. Preserve that notice's targets and wording.
+  Setup does not change saved preferences, browser flags, selected models, or
+  inference; API availability is not reported as physical NPU execution.
+
 ## 0.6.0
 
 - Prefer WebNN NPU, then WebGPU, then CPU through WASM for browser Whisper

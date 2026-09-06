@@ -2,17 +2,24 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {Script, createContext} from 'node:vm';
 
+import Is from '../browser-runtime/dependencies/strong-type/index.js';
 import test from '../src/testing.mjs';
 
+const settingsUrl = new URL('../browser-runtime/ai/browser-device-settings.mjs', import.meta.url);
+const settingsSource = await readFile(settingsUrl, 'utf8');
+const authoredSettings = settingsSource.match(/const is = new Is\(false\);[\s\S]*/u);
+assert.ok(authoredSettings, 'The shared browser settings helper owns browser detection and flag guidance.');
 const providerUrl = new URL('../browser-runtime/ai/browser-wasm-llm-provider.mjs', import.meta.url);
 const providerSource = await readFile(providerUrl, 'utf8');
 const authoredNotice = providerSource.match(
-    /function highPerformanceGpuBrowser\(\)[\s\S]*?(?=function sourceMetadata\()/u
+    /function notifyHighPerformanceGpu\(adapter\)[\s\S]*?(?=function sourceMetadata\()/u
 );
 assert.ok(authoredNotice, 'The provider owns the browser notice and adapter event together.');
-// Execute the authored private boundary without introducing a production test API
-// or importing a model runtime. Browser calls and evidence remain synthetic.
-const noticeScript = new Script(authoredNotice[0]);
+// Execute the authored helper and private notice without importing a model runtime.
+// Only ESM export declarations are removed; browser calls and evidence remain synthetic.
+const noticeScript = new Script(
+    `${authoredSettings[0].replace(/^export /gmu, '')}\n${authoredNotice[0]}`
+);
 const windowsChrome = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36';
 
 function browserFixture(navigatorObject, {popupThrows = false, instrumentThrows = false} = {}) {
@@ -21,6 +28,7 @@ function browserFixture(navigatorObject, {popupThrows = false, instrumentThrows 
     const events = [];
     let gpuRequests = 0;
     const context = createContext({
+        Is,
         navigator: navigatorObject === undefined ? undefined : {
             ...navigatorObject,
             gpu: {
