@@ -198,3 +198,98 @@ test("component authority records the projection without changing Wllama WASM", 
   assert.equal(module.projection.wasmModified, false);
   assert.equal(wasm.sha256, "95c6ff9ef2a03ff2c63bc91db132f0126a0bd0456b272cd8ae2e0f592fb059f6");
 });
+
+test("initialization progress observes real runtime stages without claiming completed weight loads", async function observeInitializationProgress() {
+  const { runInNewContext } = await import("node:vm");
+  const { default: Is } = await import("../browser-runtime/dependencies/strong-type/index.js");
+  const runtime = await readFile(
+    repoPath("browser-runtime", "ai", "browser-wllama-runtime.mjs"),
+    "utf8",
+  );
+  const constantsStart = runtime.indexOf("const WEBGPU_ADAPTER_PATTERN = ");
+  const constantsEnd = runtime.indexOf("\nexport const BROWSER_WASM_RUNTIME_AUTHORITY", constantsStart);
+  const loggerStart = runtime.indexOf("function createEvidenceLogger(logger) {");
+  const loggerEnd = runtime.indexOf("\nfunction createStructuredStreamCapture()", loggerStart);
+  assert.ok(constantsStart >= 0 && constantsEnd > constantsStart);
+  assert.ok(loggerStart >= 0 && loggerEnd > loggerStart);
+  const createLogger = runInNewContext(
+    `${runtime.slice(constantsStart, constantsEnd)}\n${runtime.slice(loggerStart, loggerEnd)}\ncreateEvidenceLogger`,
+    {
+      is: new Is(false),
+      completeValue: function preserveCompleteValue(value) { return value; },
+    },
+  );
+  const forwarded = [];
+  const logger = {};
+  for (const level of ["debug", "log", "warn", "error"]) {
+    logger[level] = function recordCompleteLog(...args) {
+      forwarded.push({ level, args });
+    };
+  }
+  const observer = createLogger(logger);
+  const progress = [];
+  const release = observer.beginLoadProgress(function recordLoadProgress(value) {
+    progress.push(value);
+  });
+  const stages = [
+    ['Loading "wllama.wasm" from "https://example.test/wllama.wasm"', "runtime", "Loading the WebAssembly runtime"],
+    ["Calling wllamaStart...", "backend", "Starting the inference engine"],
+    ["Loading model...", "metadata", "Reading model metadata"],
+    ["ggml_webgpu: adapter_info: vendor_id: 1 | vendor: Example | architecture: test | device_id: 2 | name: Example GPU | device_desc: Test adapter", "gpu", "Graphics device initialized; preparing the model"],
+    ["llama_model_loader: loaded meta data with 42 key-value pairs and 459 tensors from models/example.gguf (version GGUF V3)", "metadata", "Model metadata read: 459 tensors"],
+    ["load_tensors: loading model tensors, this can take a while... (load_mode = async)", "weights", "Loading model weights for 459 tensors"],
+    ["load_tensors: offloaded 25/25 layers to GPU", "weights", "Loading model weights; 25 of 25 layers assigned to the GPU"],
+    ["llama_context: constructing llama_context", "context", "Preparing the inference context"],
+    ["sched_reserve: graph nodes  = 1200", "graph", "Preparing the inference graph"],
+    ["sched_reserve: graph splits = 2 (with bs=512), 1 (with bs=1)", "graph", "Preparing the inference graph"],
+    ["cmn  common_init_: warming up the model with an empty run - please wait ... (--no-warmup to disable)", "warmup", "Warming up the model with an empty run"],
+  ];
+  for (const [line, stage, message] of stages) {
+    const previousCount = progress.length;
+    observer.logger.debug(line);
+    assert.equal(progress.length, previousCount + 2);
+    assert.equal(progress[previousCount], null);
+    const record = progress.at(-1);
+    assert.equal(record.phase, "initialize");
+    assert.equal(record.stage, stage);
+    assert.equal(record.message, message);
+    assert.equal(record.total, null);
+    assert.equal(Object.hasOwn(record, "completed"), false);
+    assert.equal(Object.hasOwn(record, "unit"), false);
+    assert.deepEqual(forwarded.at(-1), { level: "debug", args: [line] });
+  }
+
+  const nativeDetails = { loadedCtxInfo: { n_layer: 24, n_ctx: 4096 } };
+  for (const level of ["debug", "log", "warn", "error"]) {
+    const original = "  Runtime detail with original whitespace\r\nand a second line.  ";
+    const previousCount = progress.length;
+    observer.logger[level](original, nativeDetails);
+    assert.equal(progress.length, previousCount + 1);
+    assert.equal(progress.at(-1), null);
+    assert.deepEqual(forwarded.at(-1), { level, args: [original, nativeDetails] });
+    assert.equal(forwarded.at(-1).args[1], nativeDetails);
+  }
+  const previousCount = progress.length;
+  observer.logger.debug(nativeDetails);
+  assert.equal(progress.length, previousCount + 1);
+  assert.equal(progress.at(-1), null);
+  assert.equal(forwarded.at(-1).args[0], nativeDetails);
+
+  release();
+  const releasedCount = progress.length;
+  observer.logger.debug("Loading model...");
+  observer.logger.log("Complete inference output", nativeDetails);
+  assert.equal(progress.length, releasedCount);
+  assert.deepEqual(forwarded.at(-1), {
+    level: "log",
+    args: ["Complete inference output", nativeDetails],
+  });
+
+  const restarted = [];
+  const releaseRestarted = observer.beginLoadProgress(function recordRestartedLoad(value) {
+    restarted.push(value);
+  });
+  observer.logger.debug("load_tensors: loading model tensors, this can take a while... (load_mode = async)");
+  assert.equal(restarted.at(-1).message, "Loading model weights");
+  releaseRestarted();
+});

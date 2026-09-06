@@ -2039,6 +2039,20 @@
         }
 
         function determinateProgress(){
+            if(role?.progress?.phase==='initialize'){
+                const {completed,total,unit}=role.progress;
+                if(
+                    !is.finite(total)
+                    ||total<=0
+                    ||!is.finite(completed)
+                    ||completed<0
+                    ||!is.string(unit)
+                    ||!unit
+                ){
+                    return null;
+                }
+                return {completed,total,unit,byteTelemetry:false};
+            }
             const totalBytes=role?.progress?.totalBytes;
             const loadedBytes=role?.progress?.loadedBytes;
             if(
@@ -2160,8 +2174,10 @@
             return `${active} of ${limit} ${noun}${limit===1?'':'s'} active`;
         }
 
-        function progressElapsedText(){
-            const elapsedMilliseconds=Number(role?.progress?.elapsedMs);
+        function progressElapsedText(
+            elapsedMilliseconds,
+            suffix='elapsed'
+        ){
             if(!is.finite(elapsedMilliseconds)||elapsedMilliseconds<0){
                 return '';
             }
@@ -2170,12 +2186,12 @@
             const minutes=Math.floor(elapsedSeconds%3600/60);
             const seconds=elapsedSeconds%60;
             if(hours>0){
-                return `${hours}h ${minutes}m elapsed`;
+                return `${hours}h ${minutes}m ${suffix}`;
             }
             if(minutes>0){
-                return `${minutes}m ${String(seconds).padStart(2,'0')}s elapsed`;
+                return `${minutes}m ${String(seconds).padStart(2,'0')}s ${suffix}`;
             }
-            return `${seconds}s elapsed`;
+            return `${seconds}s ${suffix}`;
         }
 
         function progressMessage(){
@@ -2183,7 +2199,14 @@
             const phaseValue=is.string(role?.progress?.phase)&&role.progress.phase
                 ?role.progress.phase
                 :'loading';
-            const phase=phaseValue.replaceAll('-',' ');
+            const initializing=phaseValue==='initialize';
+            const phase=initializing
+                ?is.string(role?.progress?.message)&&role.progress.message
+                    ?role.progress.message
+                    :is.string(role?.progress?.stage)&&role.progress.stage
+                        ?role.progress.stage.replaceAll('-',' ')
+                        :'Initializing the selected model'
+                :phaseValue.replaceAll('-',' ');
             const parts=[
                 `Loading ${modelDisplayName()} through the Arcane SDK`,
                 phase
@@ -2211,18 +2234,38 @@
                     :measured.unit;
                 parts.push(`${measured.completed} of ${measured.total} ${suffix}`);
             }
-            const transfers=activeTransferText();
+            const transfers=initializing?'':activeTransferText();
             if(transfers){
                 parts.push(transfers);
             }
-            const elapsed=progressElapsedText();
+            const elapsed=progressElapsedText(Number(role?.progress?.elapsedMs));
             if(elapsed){
                 parts.push(elapsed);
-                if(role?.progress?.heartbeat===true){
+                if(!initializing&&role?.progress?.heartbeat===true){
                     parts.push('Still working');
                 }
             }
-            if(!measured?.byteTelemetry){
+            if(initializing){
+                const phaseElapsed=progressElapsedText(
+                    role.progress.phaseElapsedMs,
+                    'in this stage'
+                );
+                if(phaseElapsed){
+                    parts.push(phaseElapsed);
+                }
+                if(role.progress.heartbeat===true){
+                    const activityElapsed=progressElapsedText(
+                        role.progress.activityElapsedMs,
+                        'ago'
+                    );
+                    if(activityElapsed){
+                        parts.push(`Last runtime activity ${activityElapsed}`);
+                    }
+                }
+                parts.push(measured
+                    ?'Keep this tab open'
+                    :'Completion percentage unavailable; keep this tab open');
+            }else if(!measured?.byteTelemetry){
                 parts.push('The first activation can take several minutes; keep this tab open');
             }
             return parts.join(' · ');

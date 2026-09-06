@@ -101,10 +101,31 @@ active-worker count changes, and the download completes. At known completion, re
 and active transfers are zero. Applications format the raw measures into B,
 KB, MB, GB, transfer-rate, and duration labels.
 
-While a load remains active, the provider also repeats its current record every
-five seconds with `heartbeat:true` and an updated `elapsedMs`. A heartbeat
-confirms that the owned operation is still active; it does not invent
-additional transferred content.
+Initialization keeps `phase:'initialize'` and reports a `stage` and a readable
+`message` from the packaged runtime's existing log signals: runtime startup,
+engine startup, model metadata, graphics-device initialization, model weights,
+inference context, and inference graph. Warmup is shown only if the runtime
+actually reports it; the default upstream log level may omit that signal.
+These messages do not change the runtime's log level or replace its complete
+diagnostic output.
+
+Initialization has `total:null` and omits `completed` and `unit`, so its progress
+bar is indeterminate. Downloaded-file completion is not activation completion.
+The metadata tensor count and GPU layer assignment are descriptive only:
+upstream reports assigned layers before model-weight loading has finished.
+The pinned runtime does not expose a measured overall initialization fraction
+or a shader-compilation completion count. Readiness still requires the load
+operation to resolve and the runtime to confirm the model is loaded.
+
+While a load remains active, the provider repeats its current record every five
+seconds with `heartbeat:true` and an updated `elapsedMs`. During initialization,
+`phaseElapsedMs` measures time in the current stage and `activityElapsedMs`
+measures time since the most recent runtime log signal. A signal without a
+recognized stage updates activity time without triggering another UI render.
+The shared chat loading panel shows the observed stage and those timings. A
+heartbeat only shows that the provider's timer ran; it does not establish
+runtime advancement, estimate a completion time, or advance the progress bar.
+Late runtime progress is ignored after cancellation or supersession.
 
 The DBOPFS store uses one bounded transfer axis. Ordered multi-file GGUF sets
 download several members concurrently and preserve completed shards across a

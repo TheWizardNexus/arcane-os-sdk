@@ -94,6 +94,59 @@ function createEvidenceLogger(logger) {
   let offload = null;
   let invalid = false;
   let completionCapture = null;
+  let loadProgress = null;
+  let tensorCount = null;
+
+  function observeLoadLine(line) {
+    if (!loadProgress) return;
+    let stage;
+    let message;
+    const metadata = line.match(/^llama_model_loader: loaded meta data with \d+ key-value pairs and (\d+) tensors from /u);
+    const layers = line.match(GPU_OFFLOAD_PATTERN);
+    if (line.startsWith('Loading "wllama.wasm" from ')) {
+      stage = "runtime";
+      message = "Loading the WebAssembly runtime";
+    } else if (line === "Calling wllamaStart...") {
+      stage = "backend";
+      message = "Starting the inference engine";
+    } else if (line === "Loading model...") {
+      stage = "metadata";
+      message = "Reading model metadata";
+    } else if (WEBGPU_ADAPTER_PATTERN.test(line)) {
+      stage = "gpu";
+      message = "Graphics device initialized; preparing the model";
+    } else if (metadata) {
+      tensorCount = Number(metadata[1]);
+      stage = "metadata";
+      message = `Model metadata read: ${tensorCount} tensors`;
+    } else if (line.startsWith("load_tensors: loading model tensors,")) {
+      stage = "weights";
+      message = tensorCount === null
+        ? "Loading model weights"
+        : `Loading model weights for ${tensorCount} tensors`;
+    } else if (layers) {
+      // Upstream reports layer assignment before the weight reads finish.
+      stage = "weights";
+      message = `Loading model weights; ${layers[1]} of ${layers[2]} layers assigned to the GPU`;
+    } else if (line === "llama_context: constructing llama_context") {
+      stage = "context";
+      message = "Preparing the inference context";
+    } else if (/^[^:]+:\s+graph (?:nodes|splits)\s+=\s+\d+/u.test(line)) {
+      stage = "graph";
+      message = "Preparing the inference graph";
+    } else if (/^cmn\s+common_init_:\s+warming up the model with an empty run\b/u.test(line)) {
+      stage = "warmup";
+      message = "Warming up the model with an empty run";
+    }
+    if (stage) {
+      loadProgress({
+        phase: "initialize",
+        stage,
+        message,
+        total: null,
+      });
+    }
+  }
 
   function same(left, right) {
     return JSON.stringify(left) === JSON.stringify(right);
@@ -119,6 +172,7 @@ function createEvidenceLogger(logger) {
     observeCompletionLine(level, value);
     const line = String(value).trim();
     if (!line) return;
+    observeLoadLine(line);
     const adapterMatch = line.match(WEBGPU_ADAPTER_PATTERN);
     if (adapterMatch) {
       const next = completeValue({
@@ -144,6 +198,8 @@ function createEvidenceLogger(logger) {
   }
 
   function observe(level, args) {
+    // Activity without a new stage updates its age without repainting the UI.
+    loadProgress?.(null);
     for (const value of args) {
       if (!is.string(value)) continue;
       for (const line of value.split(/\r?\n/u)) observeLine(level, line);
@@ -160,6 +216,13 @@ function createEvidenceLogger(logger) {
 
   return completeValue({
     logger: completeValue(wrapped),
+    beginLoadProgress(report) {
+      loadProgress = report;
+      tensorCount = null;
+      return function releaseLoadProgress() {
+        loadProgress = null;
+      };
+    },
     beginCompletionCapture() {
       if (completionCapture) {
         throw runtimeFailure(
@@ -469,6 +532,18 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
       cleanup: null,
     });
     const loadController = new AbortController();
+    let progressFailure = null;
+    const releaseLoadProgress = sessionObservers.get(next).beginLoadProgress(
+      function reportRuntimeLoadProgress(progress) {
+        if (loadController.signal.aborted || !is.function(options.onProgress)) return;
+        try {
+          options.onProgress(progress);
+        } catch (error) {
+          progressFailure = error;
+          loadController.abort(error);
+        }
+      },
+    );
     const loadOperation = Promise.resolve().then(() => (
       next.arcaneLoadModel(files, loadOptions, loadController.signal)
     ));
@@ -484,6 +559,7 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
     else signal?.addEventListener?.("abort", onAbort, { once: true });
     try {
       await loadOperation;
+      if (progressFailure) throw progressFailure;
       if (pending?.engine !== next) throw new Error("Wllama load was cancelled.");
       if (!is.function(next.isModelLoaded) || next.isModelLoaded() !== true) {
         throw runtimeFailure(
@@ -496,6 +572,7 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
       engine = next;
       publishEvidence({ state: "ready", webgpu, cancellation: null, cleanup: null });
     } catch (error) {
+      releaseLoadProgress();
       let cleanupFailure = null;
       try {
         await exitSession(next);
@@ -513,6 +590,7 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
       if (cleanupFailure) throw cleanupFailure;
       throw error;
     } finally {
+      releaseLoadProgress();
       signal?.removeEventListener?.("abort", onAbort);
     }
 

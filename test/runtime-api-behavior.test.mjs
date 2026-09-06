@@ -3504,6 +3504,78 @@ test(
         assert.equal(progress.max,10);
         assert.equal(progress.value,4);
         assert.equal(button.textContent,'Cancel activation');
+
+        const initializing={
+            ...loading,
+            progress:{
+                phase:'initialize',
+                stage:'model-load',
+                message:'Loading model tensors',
+                completed:3,
+                total:12,
+                unit:'tensors',
+                elapsedMs:345000,
+                phaseElapsedMs:60000,
+                activityElapsedMs:25000,
+                heartbeat:true
+            }
+        };
+        controller.synchronize(initializing);
+        assert.equal(
+            status.textContent,
+            'Loading selected-model through the Arcane SDK · Loading model tensors · 3 of 12 tensors · 5m 45s elapsed · 1m 00s in this stage · Last runtime activity 25s ago · Keep this tab open'
+        );
+        assert.equal(progress.max,12);
+        assert.equal(progress.value,3);
+        assert.equal(progress.attributes.get('aria-valuetext'),status.textContent);
+        assert.doesNotMatch(status.textContent,/Still working|1 of 1 files/u);
+
+        controller.synchronize({
+            ...initializing,
+            progress:{
+                phase:'initialize',
+                stage:'context-create',
+                message:'Creating the model context',
+                total:null,
+                elapsedMs:350000,
+                phaseElapsedMs:0,
+                activityElapsedMs:0,
+                heartbeat:false
+            }
+        });
+        assert.equal(
+            status.textContent,
+            'Loading selected-model through the Arcane SDK · Creating the model context · 5m 50s elapsed · 0s in this stage · Completion percentage unavailable; keep this tab open'
+        );
+        assert.equal(progress.value,undefined);
+        assert.equal(progress.max,undefined);
+        assert.equal(progress.attributes.get('aria-valuetext'),status.textContent);
+
+        controller.synchronize({
+            ...initializing,
+            progress:{
+                phase:'initialize',
+                stage:'context-create',
+                total:12,
+                unit:'tensors',
+                heartbeat:true
+            }
+        });
+        assert.equal(
+            status.textContent,
+            'Loading selected-model through the Arcane SDK · context create · Completion percentage unavailable; keep this tab open'
+        );
+        assert.equal(progress.value,undefined,'An unknown completed count must not become zero.');
+        assert.equal(progress.max,undefined);
+        assert.equal(progress.attributes.get('aria-valuetext'),status.textContent);
+
+        controller.synchronize(loading);
+        assert.equal(
+            status.textContent,
+            'Loading selected-model through the Arcane SDK · download · 4 of 10 octets · The first activation can take several minutes; keep this tab open'
+        );
+        assert.equal(progress.max,10);
+        assert.equal(progress.value,4);
         assert.equal(await controller.request('unload'),true);
         assert.deepEqual(intents.at(-1),{role:'llm',action:'unload',reason:'user'});
 

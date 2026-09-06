@@ -3000,24 +3000,47 @@ export function createBrowserWasmLlmProvider({
       ? context.reportProgress
       : options.onProgress ?? null;
     const progressStartedAt = Date.now();
+    let progressStageStartedAt = progressStartedAt;
+    let progressUpdatedAt = progressStartedAt;
     let currentProgress = null;
     let progressHeartbeat = null;
 
     function publishModelLoadProgress(progress) {
-      if (!reportProgress) return;
+      if (!reportProgress || signal.aborted || generation !== lifecycleGeneration || state !== "loading") return;
+      const now = Date.now();
+      if (currentProgress?.phase !== progress.phase || currentProgress?.stage !== progress.stage) {
+        progressStageStartedAt = now;
+      }
+      progressUpdatedAt = now;
       currentProgress = { ...progress, heartbeat: false };
       reportProgress(completeValue({
         ...currentProgress,
-        elapsedMs: Math.max(0, Date.now() - progressStartedAt),
+        elapsedMs: Math.max(0, now - progressStartedAt),
+        ...(progress.phase === "initialize" ? {
+          phaseElapsedMs: Math.max(0, now - progressStageStartedAt),
+          activityElapsedMs: 0,
+        } : {}),
       }));
     }
 
+    function publishModelInitializationProgress(progress) {
+      if (!reportProgress || signal.aborted || generation !== lifecycleGeneration || state !== "loading") return;
+      progressUpdatedAt = Date.now();
+      if (!progress || (currentProgress?.stage === progress.stage && currentProgress?.message === progress.message)) return;
+      publishModelLoadProgress(progress);
+    }
+
     function publishModelLoadHeartbeat() {
-      if (!reportProgress || !currentProgress) return;
+      if (!reportProgress || !currentProgress || signal.aborted || generation !== lifecycleGeneration || state !== "loading") return;
+      const now = Date.now();
       reportProgress(completeValue({
         ...currentProgress,
         heartbeat: true,
-        elapsedMs: Math.max(0, Date.now() - progressStartedAt),
+        elapsedMs: Math.max(0, now - progressStartedAt),
+        ...(currentProgress.phase === "initialize" ? {
+          phaseElapsedMs: Math.max(0, now - progressStageStartedAt),
+          activityElapsedMs: Math.max(0, now - progressUpdatedAt),
+        } : {}),
       }));
     }
 
@@ -3054,9 +3077,9 @@ export function createBrowserWasmLlmProvider({
         const members = sourceMetadata(activeSource).files;
         publishModelLoadProgress({
           phase: "initialize",
-          completed: members.length,
-          total: members.length,
-          unit: "files",
+          stage: "runtime",
+          message: "Starting the WebAssembly runtime and opening model files",
+          total: null,
           heartbeat: false,
         });
         const modelFiles = admitted.files.map((file, index) => (
@@ -3074,6 +3097,7 @@ export function createBrowserWasmLlmProvider({
           ...runtimeOptions,
           ...activeLoadPlan,
           signal,
+          onProgress: publishModelInitializationProgress,
         });
         if (!runtime.isLoaded()) {
           throw fail(
