@@ -538,59 +538,35 @@
            }
     }
 
-    table {
-        width:calc(100% - .5em);
-        margin: auto; /* Center the table horizontally */
+    /* Native table layout shares columns across rows and grows with complete cell content. */
+    .chat_output table {
+        width: 100%;
+        margin: .75em 0;
         border-collapse: collapse;
-        overflow-x: auto; /* Enables horizontal scrolling */
-        display:table;
-        background: var(--modal-background);
-        box-shadow: 0 0 0.7em var(--border-color);
-        border-radius: 0.5em 0.5em 0.5em 0.5em;
-        border-spacing: unset;
+        border-spacing: 0;
+        background: var(--arcane-surface, var(--background));
+        color: var(--text-color);
     }
 
-    thead, tbody {
-        display: table; /* These elements behave like table rows */
-        width: 100%; /* Table rows take full available space */
-        table-layout: fixed; /* Ensures the table layout respects the width settings */
+    .chat_output th,
+    .chat_output td {
+        padding: .6em .75em;
+        border: 1px solid var(--arcane-border, var(--border-color));
+        vertical-align: top;
+        overflow-wrap: anywhere;
     }
 
-    tbody tr{
-        height: 130px;
+    .chat_output th:not([align]),
+    .chat_output td:not([align]) {
+        text-align: start;
     }
 
-    thead tr{
-        background: var(--background);
-        color: var(--platinum);
-        border-radius: .5em .5em 0 0;
+    .chat_output thead {
+        background: var(--arcane-surface-muted, var(--secondary-color));
     }
 
-    tr{
-        display: grid;
-        grid-template-columns: 
-                6em 1fr 1fr 1fr;
-    }
-
-    tr:hover{
-        background:var(--secondary-color);
-    }
-
-    th, td {
-        text-align: left;
-        word-wrap: break-word;
-    }
-
-    th{
-        border:none;
-        padding:.4em;
-    }
-
-    td{
-        background: var(--border-color);
-        padding:.4em;
-        border: 1px solid var(--accent-color);
-        overflow: visible;
+    .chat_output tbody tr:hover {
+        background: var(--arcane-surface-muted, var(--secondary-color));
     }
 </style>
 
