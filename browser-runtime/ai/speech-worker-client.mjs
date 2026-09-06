@@ -166,6 +166,11 @@ class SpeechWorkerClient {
       ), { intentional: false }).catch(() => undefined);
       return;
     }
+    if (is.safeInteger(message.id) && message.type === 'progress') {
+        const pending = this.#pending.get(message.id);
+        if (pending?.op === 'load') pending.onProgress?.(message.progress);
+        return;
+    }
     if (!is.safeInteger(message.id) || !is.boolean(message.ok)) {
       void this.terminate(clientError(
         "ARCANE_AI_WORKER_MESSAGE_ERROR",
@@ -207,7 +212,7 @@ class SpeechWorkerClient {
     ));
   }
 
-  request(op, payload, { signal = null } = {}) {
+  request(op, payload, { signal = null, onProgress = null } = {}) {
     this.#trace("request.call", { op, payload, aborted: signal?.aborted });
     if (!PUBLIC_WORKER_OPERATIONS.has(op)) {
       this.#trace("request.rejected", { op, reason: "unknown-operation" });
@@ -283,7 +288,7 @@ class SpeechWorkerClient {
         });
       }
       signal?.addEventListener?.("abort", onAbort, { once: true });
-      client.#pending.set(id, { resolve, reject, cleanup, op });
+      client.#pending.set(id, { resolve, reject, cleanup, op, onProgress });
       const message = {
         protocol: SPEECH_WORKER_PROTOCOL,
         id,

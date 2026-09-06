@@ -1204,10 +1204,22 @@ that accelerator kernels overlap, or that generated speech is correct. WebNN
 may execute unsupported operations through WASM. A security field is absent
 in ordinary mode.
 
-The provider/2 load context accepts an optional progress callback for interface
-compatibility, but the current browser-speech artifact and Worker transport
-publishes no progress records. Consumers present the explicit lifecycle states
-instead of inventing a numeric total.
+The provider/2 load context accepts an optional `progress` callback. Speech
+artifact preparation and upstream model loading publish records through that
+callback and the shared sticky AI runtime state. Records include `phase`,
+`stage`, `message`, the current `file` when available, and `elapsedMs`.
+Known artifact inventories report `completed`, `total`, and `unit:'files'`.
+Upstream model files are discovered during loading, so their total remains
+`null` while completed files are counted. Remaining TTS pool initialization
+reports completed model sessions. Consumers use an indeterminate progress bar
+when no final total is known; transfer quantities do not determine this display.
+
+The Worker sends intermediate `{protocol,id,type:'progress',progress}` messages
+for its active load request. They do not settle the request; the ordinary final
+response still owns completion or failure. Complete upstream callback content
+remains in the adjacent `detail` field for diagnostics. Compatible observers
+receive the latest progress when joining an active load, and cancelled,
+superseded, or settled loads stop publishing progress.
 
 Compatible concurrent loads share one underlying preparation and pool load
 while each caller retains its own cancellation signal. One observer cannot

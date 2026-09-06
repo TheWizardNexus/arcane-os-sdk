@@ -6395,9 +6395,11 @@ and materializes object URLs, then returns
 `{cache,runtime,model,release}`. Call `release()` when the Worker no longer
 needs those URLs. `offline:true` never fetches and rejects a miss with
 `ARCANE_AI_ARTIFACT_OFFLINE_MISS`. `remove(authority)` deletes that exact
-authority's files and selection metadata. `onProgress` remains an optional
-provider-interface callback, but the current store publishes no progress
-records.
+authority's files and selection metadata. Optional `onProgress` receives
+preparation and download records with `phase`, `stage`, `message`, and the
+current `file` when available. File operations report actual `completed` and
+`total` inventory counts with `unit:'files'`; module preparation uses
+`total:null`. Cancellation stops progress along with the owning operation.
 
 ### Availability and normalization
 

@@ -80,9 +80,12 @@
         display: none;
     }
 
-    .speech_status {
+    .speech_feedback {
         grid-column: 2;
         min-width: 0;
+    }
+
+    .speech_status {
         margin: 0;
         color: var(--arcane-muted, var(--text-color));
         font-size: .86rem;
@@ -92,6 +95,18 @@
 
     .speech_status[data-tone="error"] {
         color: var(--arcane-danger, var(--danger-color));
+    }
+
+    .stt_activation_progress {
+        display: block;
+        width: 100%;
+        height: .6rem;
+        margin-block-start: .7rem;
+        accent-color: var(--arcane-action, var(--primary-color));
+    }
+
+    .stt_activation_progress[hidden] {
+        display: none;
     }
 
     #muteButton {
@@ -112,7 +127,7 @@
             grid-row: 1 / span 2;
         }
 
-        .speech_status {
+        .speech_feedback {
             grid-row: 2;
             grid-column: 2 / span 2;
         }
@@ -128,7 +143,10 @@
 <button id="recordButton" type="button" aria-label="Transcription unavailable" disabled>Hold to talk</button>
 <button id="sttActivationButton" type="button" hidden disabled>Start transcription</button>
 <button id="stopButton" type="button" class="hidden" disabled>Send</button>
-<p id="speechStatus" class="speech_status" role="status" aria-live="polite"></p>
+<div class="speech_feedback">
+    <p id="speechStatus" class="speech_status" role="status" aria-live="polite"></p>
+    <progress id="sttActivationProgress" class="stt_activation_progress" aria-label="Transcription model activation progress" hidden></progress>
+</div>
 <button id="muteButton" type="button" class="mute" aria-pressed="true" aria-label="Voice unavailable" disabled>Voice unavailable</button>
 
 <script type="module">
@@ -179,6 +197,7 @@
     const shadowRoot = host.shadowRoot;
     const recordButton = shadowRoot.querySelector('#recordButton');
     const sttActivationButton = shadowRoot.querySelector('#sttActivationButton');
+    const sttActivationProgress = shadowRoot.querySelector('#sttActivationProgress');
     const stopButton = shadowRoot.querySelector('#stopButton');
     const muteButton = shadowRoot.querySelector('#muteButton');
     const speechStatus = shadowRoot.querySelector('#speechStatus');
@@ -319,6 +338,7 @@
         {
             host,
             button: sttActivationButton,
+            progress: sttActivationProgress,
             onChange: renderSTTActivationState,
             eventSource: events
         }
@@ -668,6 +688,10 @@
         if (localStatus?.message) {
             messages.push(localStatus.message);
             tone = localStatus.tone;
+            if (sttActivationController.pending
+                || ['loading', 'unloading'].includes(sttRole.state)) {
+                messages.push(describeSTTRole());
+            }
         } else {
             messages.push(describeSTTRole());
         }

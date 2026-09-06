@@ -380,8 +380,13 @@ the module declares a shadowing binding with the same name. Explicit
 `globalThis` or `self` calls continue through the materialized-file router.
 
 The speech Worker uses its ordinary global Worker message boundary directly for
-requests, results, errors, and cancellation. It creates no private
-`MessageChannel` and publishes no Worker progress transport.
+requests, progress, results, errors, and cancellation. It creates no private
+`MessageChannel`. During loading, `{protocol,id,type:'progress',progress}`
+messages retain the active request id without settling its pending result.
+Progress records describe the current phase, stage, message, file, and completed
+file count with `total:null` for dynamically discovered model files. Complete
+upstream callback content remains in the adjacent `detail` field. The ordinary
+final success or failure envelope ends the request and its progress stream.
 
 Worker operations use `arcane-ai-speech-worker/1`. The public Worker client
 supports `load`, `use`, `status`, `unload`, and `dispose`; the transport host
@@ -459,9 +464,11 @@ while the loaded provider remains ready.
 Speech failure neither disables text chat nor retries through another local,
 native, or cloud provider. The provider/Worker layer is event-neutral: it
 exposes promises, `AbortSignal`, and precise lifecycle/status records, but owns
-no event bus or listener registry. The provider/2 load context accepts an
-optional progress callback for interface compatibility; the current
-browser-speech artifact and Worker transport publishes no progress records.
+no event bus. The provider/2 load context accepts an optional `progress`
+callback that receives artifact preparation, upstream model loading, and session
+initialization records. Compatible concurrent observers share one load and
+receive its current progress; cancelling one observer leaves the others active.
+The shared AI runtime projects those records into sticky role state.
 
 ### Persistent chat and document context
 

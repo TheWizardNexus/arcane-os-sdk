@@ -1417,7 +1417,7 @@ behavior for chart, dashboard, Markdown, and voice components.
 ### Public surface
 
 Constant sets plus normalization, formatting, and explicit STT activation
-helpers. `createSTTActivationController({host,button,onChange,EventClass=CustomEvent})`
+helpers. `createSTTActivationController({host,button,progress=null,onChange,EventClass=CustomEvent})`
 consumes only normalized
 [`AIRuntimeState`](#airuntimestatejs) `stt` role records. Its mutable controller
 exposes `action`, `error`, `label`, `pending`, `selected`, `status`, `title`, and
@@ -1427,6 +1427,12 @@ exposes `action`, `error`, `label`, `pending`, `selected`, `status`, `title`, an
 `onChange()` is called whenever presentation should be rendered again. Browser
 callers use the default `CustomEvent`; non-DOM callers must inject a compatible
 `EventClass` constructor.
+
+An optional native `progress` element presents the active loading phase. Known
+file or session totals produce determinate progress; an unknown total remains
+indeterminate. The shared status includes the complete loading message, current
+file, completion count, and reported elapsed time. Terminal state and destruction
+clear the loading display without starting any provider work.
 
 `request('load'|'unload')` emits the cancelable
 `speech-stt-activation-request` event with mutable `{intent,state}` before it

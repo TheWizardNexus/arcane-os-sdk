@@ -621,6 +621,7 @@ function observeLoadOperation(record, { signal, progress }, role) {
       );
       return;
     }
+    if (record.lastProgress !== null) observer.progress(record.lastProgress);
   });
 }
 
@@ -1322,7 +1323,7 @@ function createBrowserSpeechProvider({
     return pool;
   }
 
-  async function loadWorkerPool(preparation, device, warnings, signal) {
+  async function loadWorkerPool(preparation, device, warnings, signal, onProgress) {
     const pool = createWorkerPool(preparation, device, warnings);
     const configuration = completeValue({
       role,
@@ -1336,15 +1337,36 @@ function createBrowserSpeechProvider({
     let failure = pool.failure;
     if (!failure) {
       try {
-        await pool.slots[0].client.request("load", { configuration }, { signal });
+        await pool.slots[0].client.request("load", { configuration }, { signal, onProgress });
       } catch (error) {
         failure = error;
       }
     }
     if (!failure) {
       const remainingLoads = [];
+      let completedWorkers = 1;
+      function reportPoolProgress(detail) {
+          onProgress({
+              phase: 'initialize',
+              stage: 'workers',
+              message: `Opening speech model sessions on ${device}`,
+              completed: completedWorkers,
+              total: pool.slots.length,
+              unit: 'sessions',
+              detail,
+          });
+      }
+      async function loadRemainingWorker(slot) {
+          await slot.client.request('load', { configuration }, {
+              signal,
+              onProgress: reportPoolProgress,
+          });
+          completedWorkers += 1;
+          reportPoolProgress(null);
+      }
+      if (pool.slots.length > 1) reportPoolProgress(null);
       for (const slot of pool.slots.slice(1)) {
-        remainingLoads.push(slot.client.request("load", { configuration }, { signal }));
+        remainingLoads.push(loadRemainingWorker(slot));
       }
       const settlements = await Promise.allSettled(remainingLoads);
       failure = pool.failure;
@@ -1488,6 +1510,7 @@ function createBrowserSpeechProvider({
       errorCode = null;
       const record = {
         promise: null,
+        lastProgress: null,
         warnings: NO_PROVIDER_WARNINGS,
         observers: new Set(),
         settled: false,
@@ -1498,6 +1521,21 @@ function createBrowserSpeechProvider({
           linked.abort(reason, code);
         },
       };
+      const loadStartedAt = Date.now();
+      function reportLoadProgress(progress) {
+          if (
+              record.settled
+              || linked.controller.signal.aborted
+              || operationGeneration !== generation
+              || state !== 'loading'
+          ) return;
+          const value = {
+              ...progress,
+              elapsedMs: Math.max(0, Date.now() - loadStartedAt),
+          };
+          record.lastProgress = value;
+          for (const observer of [...record.observers]) observer.progress(value);
+      }
       lastWarnings = NO_PROVIDER_WARNINGS;
       selectedDevice = null;
       const promise = Promise.resolve().then(async function loadBrowserSpeechProviderPool() {
@@ -1505,9 +1543,16 @@ function createBrowserSpeechProvider({
         let preparation = null;
         let pool = null;
         try {
+          reportLoadProgress({
+              phase: 'prepare',
+              stage: 'cache',
+              message: 'Opening stored speech runtime files',
+              total: null,
+          });
           prepared = await store.prepare(authority.graph ?? authority, {
             signal: linked.controller.signal,
             offline,
+            onProgress: reportLoadProgress,
           });
           preparation = {
             prepared,
@@ -1548,6 +1593,7 @@ function createBrowserSpeechProvider({
                 device,
                 record.warnings,
                 linked.controller.signal,
+                reportLoadProgress,
               );
               break;
             } catch (error) {

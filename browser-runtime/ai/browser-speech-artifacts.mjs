@@ -1962,6 +1962,10 @@ export function createDbopfsSpeechArtifactStore({
     return artifactGraphError(graphFileReason(descriptor, boundary), message);
   }
 
+  function reportArtifactProgress(onProgress, signal, progress) {
+      if (!signal?.aborted && is.function(onProgress)) onProgress(progress);
+  }
+
   async function openCached(authority, { signal, onProgress } = {}) {
     const graph = ARTIFACT_GRAPHS.has(authority);
     const metadata = artifactMetadata(authority);
@@ -1975,14 +1979,38 @@ export function createDbopfsSpeechArtifactStore({
     for (let index = 0; index < metadata.files.length; index += 1) {
       throwIfAborted(signal);
       const descriptor = metadata.files[index];
+      reportArtifactProgress(onProgress, signal, {
+          phase: 'prepare',
+          stage: 'cache',
+          message: 'Opening cached speech file',
+          file: descriptor.path,
+          completed: index,
+          total: metadata.files.length,
+          unit: 'files',
+      });
       const file = await readFile(names.files[index]);
       if (!file) {
         await removeUnlocked(authority);
         return null;
       }
       files.push({ descriptor, file });
+      reportArtifactProgress(onProgress, signal, {
+          phase: 'prepare',
+          stage: 'cache',
+          message: 'Opened cached speech file',
+          file: descriptor.path,
+          completed: files.length,
+          total: metadata.files.length,
+          unit: 'files',
+      });
     }
     try {
+      reportArtifactProgress(onProgress, signal, {
+          phase: 'prepare',
+          stage: 'runtime',
+          message: 'Preparing speech runtime modules',
+          total: null,
+      });
       const routing = graph
         ? await planOrdinaryMaterializedRuntime({ files }, metadata, signal)
         : null;
@@ -2020,6 +2048,15 @@ export function createDbopfsSpeechArtifactStore({
         throwIfAborted(signal);
         const descriptor = metadata.files[index];
         const sourceUrl = graph ? descriptor.sourceUrl : descriptor.url;
+        reportArtifactProgress(onProgress, signal, {
+            phase: 'download',
+            stage: 'artifacts',
+            message: 'Downloading speech file',
+            file: descriptor.path,
+            completed: index,
+            total: metadata.files.length,
+            unit: 'files',
+        });
         let response;
         try {
           response = await fetchFunction(sourceUrl, {
@@ -2095,7 +2132,22 @@ export function createDbopfsSpeechArtifactStore({
           throw speechError("ARCANE_AI_ARTIFACT_CACHE_REJECTED", "DBOPFS did not preserve a speech artifact.");
         }
         installed.push({ descriptor, file });
+        reportArtifactProgress(onProgress, signal, {
+            phase: 'download',
+            stage: 'artifacts',
+            message: 'Stored speech file',
+            file: descriptor.path,
+            completed: installed.length,
+            total: metadata.files.length,
+            unit: 'files',
+        });
       }
+      reportArtifactProgress(onProgress, signal, {
+          phase: 'prepare',
+          stage: 'runtime',
+          message: 'Preparing speech runtime modules',
+          total: null,
+      });
       const routing = graph
         ? await planOrdinaryMaterializedRuntime({ files: installed }, metadata, signal)
         : null;
@@ -2145,6 +2197,12 @@ export function createDbopfsSpeechArtifactStore({
       }
       throw speechError("ARCANE_AI_ARTIFACT_OFFLINE_MISS", "No cached offline speech artifacts are available.");
     }
+    reportArtifactProgress(onProgress, signal, {
+        phase: 'prepare',
+        stage: 'runtime',
+        message: 'Opening prepared speech files',
+        total: null,
+    });
     if (graph) {
       const materialized = await createOrdinaryArtifactObjectUrls(
         admitted,

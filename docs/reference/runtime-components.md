@@ -1497,7 +1497,11 @@ For a selected `unloaded`, `loading`, `unloading`, or `error` role, the componen
 keeps recording Start disabled and presents the same keyboard-operable Start
 transcription/Try again or Cancel loading control as `speech.html`. Both use the
 shared `createSTTActivationController()` contract. User operation emits the
-cancelable `speech-stt-activation-request` event with mutable complete `{intent,state}`;
+cancelable `speech-stt-activation-request` event with mutable complete `{intent,state}`.
+During loading, both controls show a native progress bar and the current
+preparation, download, or initialization message with the current file and
+reported elapsed time. Unknown totals remain indeterminate. In `speech.html`,
+prior local status stays visible alongside the loading status. The activation event's
 `preventDefault()` suppresses the callback. The default
 `requestSTTActivation(intent)` publishes the mutable
 `{role:'stt',action:'load'|'unload',reason:'user'}` intent. Callback failure emits
