@@ -814,6 +814,8 @@ function assetUrlVersionEdits(value,version){
     if(queryStart<0)return [{start:address.length,end:address.length,value:`?arcaneVersion=${versionValue}`}];
     const query=address.slice(queryStart+1);
     const edits=[];
+    const parameters=[];
+    let versionFound=false;
     let offset=queryStart+1;
     for(const parameter of query.split('&')){
         const equals=parameter.indexOf('=');
@@ -821,7 +823,10 @@ function assetUrlVersionEdits(value,version){
         let decodedKey=key;
         try{decodedKey=decodeURIComponent(key.replaceAll('+',' '));}
         catch{decodedKey=key;}
-        if(decodedKey==='arcaneVersion'){
+        const remove=decodedKey==='v'||(decodedKey==='arcaneVersion'&&versionFound);
+        parameters.push({start:offset,end:offset+parameter.length,remove});
+        if(decodedKey==='arcaneVersion'&&!versionFound){
+            versionFound=true;
             edits.push({
                 start:offset+(equals<0?parameter.length:equals+1),
                 end:offset+parameter.length,
@@ -830,10 +835,25 @@ function assetUrlVersionEdits(value,version){
         }
         offset+=parameter.length+1;
     }
-    if(edits.length===0)edits.push({
+    // Remove adjacent obsolete fields together, including only their separator.
+    // Other field spelling and source-level escapes remain untouched.
+    for(let index=0;index<parameters.length;index+=1){
+        if(!parameters[index].remove)continue;
+        const first=index;
+        while(parameters[index+1]?.remove)index+=1;
+        edits.push({
+            start:parameters[first].start-(first>0?1:0),
+            end:parameters[index].end+(first===0&&index<parameters.length-1?1:0),
+            value:''
+        });
+    }
+    const lastRetained=parameters.findLast(function retainedParameter(parameter){
+        return !parameter.remove;
+    });
+    if(!versionFound)edits.push({
         start:address.length,
         end:address.length,
-        value:`${query&&!query.endsWith('&')?'&':''}arcaneVersion=${versionValue}`
+        value:`${lastRetained&&lastRetained.end>lastRetained.start?'&':''}arcaneVersion=${versionValue}`
     });
     return edits;
 }
@@ -841,7 +861,7 @@ function assetUrlVersionEdits(value,version){
 function applyReferenceEdits(source,edits){
     let result=source;
     for(const edit of edits.sort(function descendingReferenceOffset(left,right){
-        return right.start-left.start;
+        return right.start-left.start||right.end-left.end;
     })){
         result=result.slice(0,edit.start)+edit.value+result.slice(edit.end);
     }

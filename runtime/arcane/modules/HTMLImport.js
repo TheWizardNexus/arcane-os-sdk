@@ -43,14 +43,21 @@ function versionComponentResource(value,baseHref){
   const versionField=`arcaneVersion=${encodeURIComponent(htmlImportAssetVersion)}`;
   let replaced=false;
   const fields=query?query.split('&').map(function versionQueryField(field){
-    if(!new URLSearchParams(field).has('arcaneVersion'))return field;
+    const parameter=new URLSearchParams(field);
+    if(parameter.has('v'))return null;
+    if(!parameter.has('arcaneVersion'))return field;
     if(replaced)return null;
     replaced=true;
-    return versionField;
+    const equals=field.indexOf('=');
+    const key=equals<0?field:field.slice(0,equals);
+    return `${key}=${encodeURIComponent(htmlImportAssetVersion)}`;
   }).filter(function retainQueryField(field){
     return field!==null;
   }):[];
-  if(!replaced)fields.push(versionField);
+  if(!replaced){
+    if(fields.at(-1)==='')fields[fields.length-1]=versionField;
+    else fields.push(versionField);
+  }
   return `${pathname}?${fields.join('&')}${fragment}`;
 }
 

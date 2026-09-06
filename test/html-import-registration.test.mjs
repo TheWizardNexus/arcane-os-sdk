@@ -95,7 +95,7 @@ test(
         replaceGlobal('customElements', registry);
         replaceGlobal(hostRegistryKey, new Map());
         replaceGlobal('document', {
-            baseURI: 'https://example.test/app/',
+            baseURI: new URL('./components/', import.meta.url).href,
             createElement(name) {
                 if (name === 'html-import') return new (registry.get(name))();
                 assert.equal(name, 'template');
@@ -151,7 +151,8 @@ test(
         assert.ok(imported instanceof first.default);
         assert.equal(imported.shadowRoot.mode, 'open');
         assert.equal(imported.ready, false);
-        imported.setAttribute('href', './component.html');
+        const componentHref = './component.html?v=6&mode=a%20b&arcaneVersion=&arcaneVersion=old#part';
+        imported.setAttribute('href', componentHref);
         imported.addEventListener('html-import-ready', function recordReady(event) {
             readyEvents.push(event);
         });
@@ -164,12 +165,15 @@ test(
         assert.equal(imported.ready, true);
         assert.equal(imported.shadowRoot.content.html, html);
         assert.equal(requests.length, 1);
-        assert.equal(requests[0].url, 'https://example.test/app/component.html');
+        assert.equal(requests[0].url, new URL(
+            './component.html?mode=a%20b&arcaneVersion=0.7.3#part',
+            document.baseURI
+        ).href);
         assert.equal(requests[0].options.method, 'GET');
         assert.equal(requests[0].options.cache, 'default');
         assert.equal(requests[0].options.signal.aborted, false);
         assert.equal(readyEvents.length, 1);
-        assert.equal(readyEvents[0].detail.href, './component.html');
+        assert.equal(readyEvents[0].detail.href, componentHref);
         assert.equal(readyEvents[0].bubbles, true);
         assert.equal(readyEvents[0].composed, true);
         assert.deepEqual(errorEvents, []);

@@ -2,6 +2,10 @@
 
 ## 0.8.1
 
+- Use `arcaneVersion` as the sole local resource version field across import maps,
+  runtime materialization, source serving, packaged applications, and dynamic
+  components. Remove `v` and duplicate version fields while preserving unrelated
+  query parameters, fragments, and ordinary caching.
 - Reuse the registered `html-import` constructor across module URL variants,
   including overlapping application startup and developer error-dialog imports.
   Prevent duplicate custom-element registration from raising `NotSupportedError`

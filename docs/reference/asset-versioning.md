@@ -7,10 +7,11 @@ SDK package metadata, not a timestamp, content measurement, or application
 constant.
 
 For example, an existing `./arcane/modules/HTMLImport.js?v=6#module` reference
-retains its application revision and fragment and gains
-`&arcaneVersion=${version}` before the fragment. Regenerating for another SDK
-release replaces only the `arcaneVersion` value. Existing query spelling and
-application parameters remain intact.
+becomes `./arcane/modules/HTMLImport.js?arcaneVersion=${version}#module`.
+`arcaneVersion` is the sole resource version field: transformation removes `v`,
+updates the first existing `arcaneVersion`, and removes duplicate version fields.
+Regenerating for another SDK release replaces that version value. Unrelated
+query fields, their spelling, and fragments remain intact.
 
 ## Public tooling
 
@@ -58,8 +59,8 @@ instances, force a reload, restart a model, or erase a conversation. The SDK doe
 not retain earlier installed runtime trees after materialization.
 
 `HTMLImport` registers its element once per browser custom-element registry.
-Application revision URLs and the developer error dialog's module URL can be
-different; each import exports the constructor already registered in that
+Previously authored revision URLs and the developer error dialog's module URL
+can be different; each import exports the constructor already registered in that
 document. Repeated imports do not replace existing component instances or
 register a second `html-import` definition.
 

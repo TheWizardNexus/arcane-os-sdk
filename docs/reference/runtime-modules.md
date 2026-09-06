@@ -2057,6 +2057,10 @@ module URLs reuse and export the registered constructor, including overlapping
 application startup and developer error-dialog imports. Existing component
 instances, loading, readiness events, and teardown keep that same constructor.
 
+Local component resources use the loader's `arcaneVersion` as their sole version
+field. Existing `v` fields are removed; unrelated query fields and fragments
+remain intact.
+
 Exact exports: `default`.
 
 ### Availability and normalization
