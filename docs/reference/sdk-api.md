@@ -3461,17 +3461,30 @@ async startDevServer(options={})
 
 Import it from `arcane-os`. Source mode accepts
 `{workspaceRoot=process.cwd(), appId, mode='source', host='127.0.0.1', port=0,
-signal, onEvent}` and serves one validated workspace application plus its
-complete SDK or integrated runtime. Packaged mode uses
+https=false, certPath, keyPath, tls, signal, onEvent}` and serves one validated
+workspace application plus its complete SDK or integrated runtime. Packaged mode uses
 `{mode:'packaged', releaseRoot, host, port, signal, onEvent}` and serves the
 complete selected release files. `host` defaults to `127.0.0.1` and accepts an
 explicit network address or hostname. Use `0.0.0.0` for all IPv4 interfaces or
 `::` for the platform's IPv6 wildcard listener; port `0` asks the operating
 system for an available port.
 
+`https:true` reads `.arcane/dev/server-cert.pem` and
+`.arcane/dev/server-key.pem` relative to `workspaceRoot` unless explicit
+`certPath` and `keyPath` are supplied together. The path pair also selects
+HTTPS without `https:true`; relative paths resolve from the workspace. A
+direct `tls` object instead supplies Node HTTPS server options, including
+`cert` and `key`, without reading certificate files. Keep private material
+server-side. Missing PEM files and Node certificate/key parse errors reject
+startup without falling back to HTTP. Node owns TLS option handling and the
+handshake; browser trust and address matching are evaluated when a client
+connects. The CLI's `--public` selects HTTPS and the wildcard bind;
+the API's `host` option alone changes only the bind address.
+
 The promise settles after the listener is ready and resolves to
-`{server, mode, workspaceRoot, appId, host, port, origin, cleanUrl, url,
-networkUrls, close, closed, lifecycle}`. `server` is the raw Node HTTP server.
+`{server, protocol, mode, workspaceRoot, appId, host, port, origin, cleanUrl, url,
+networkUrls, close, closed, lifecycle}`. `server` is the raw Node HTTP or HTTPS
+server; `protocol` is `'http:'` or `'https:'`.
 `url` and `cleanUrl` are the same application URL. Wildcard listeners use
 `localhost` in that local URL; `host` retains the actual bound address.
 `networkUrls` lists application URLs for applicable non-loopback interface
@@ -3479,6 +3492,12 @@ addresses discovered once at startup. These URLs are connection candidates,
 not evidence of reachability from another device. The server adds no session
 capability or authentication. In packaged mode, `workspaceRoot` and `appId`
 are `null`.
+
+All returned application URLs use the selected transport's scheme. The server
+reads one PEM pair per startup and does not create certificates or modify trust
+stores. Each client must trust the issuing CA and open an address covered by the
+server certificate. Lifecycle events and CLI summaries exclude TLS options and
+private key contents. See [development HTTPS setup](cli.md#development-https-setup).
 
 Starting the server opens the selected listener and emits awaited,
 backpressured `server.starting` and `server.started` events. Request failures
@@ -3880,6 +3899,11 @@ async function usedescribeTargets(...arguments_) {
 ### Overview
 
 Starts one owned browser development server for the selected application.
+
+`https`, `certPath`, `keyPath`, and `tls` follow the
+[`startDevServer()` TLS contract](#startdevserver), alongside `host` and `port`.
+The operation refreshes the selected app's managed import maps once, then owns
+one source listener and returns its protocol, URLs, and shutdown lifecycle.
 
 ### Signature and result
 

@@ -2,6 +2,7 @@ import Is from 'strong-type';
 import {constants as FS_CONSTANTS} from 'node:fs';
 import {lstat,open,readFile,realpath} from 'node:fs/promises';
 import http from 'node:http';
+import https from 'node:https';
 import os from 'node:os';
 import path from 'node:path';
 import {resolveWorkspace} from './workspace.mjs';
@@ -494,7 +495,7 @@ function browserHostname(host){
     return host.includes(':')?`[${host}]`:host;
 }
 
-function networkUrlsForAddress(address,startPath){
+function networkUrlsForAddress(address,startPath,protocol){
     if(address.address==='127.0.0.1'||address.address==='::1')return [];
     const allIPv4=address.address==='0.0.0.0';
     const allInterfaces=address.address==='::';
@@ -507,10 +508,47 @@ function networkUrlsForAddress(address,startPath){
             if(entry.family==='IPv6'&&entry.scopeid)continue;
             if(allIPv4&&entry.family!=='IPv4')continue;
             if(!allIPv4&&!allInterfaces&&entry.address!==address.address)continue;
-            urls.add(`http://${browserHostname(entry.address)}:${address.port}${startPath}`);
+            urls.add(`${protocol}//${browserHostname(entry.address)}:${address.port}${startPath}`);
         }
     }
     return [...urls];
+}
+
+async function resolveDevelopmentTls({workspaceRoot,https:useHttps,tls,certPath,keyPath,signal}){
+    if(tls!==undefined&&tls!==null&&tls!==false){
+        if(!is.object(tls)||is.array(tls)){
+            fail('Development server tls must be a Node HTTPS options object.','ARCANE_USAGE');
+        }
+        return {options:tls};
+    }
+    if(certPath===undefined&&keyPath===undefined&&!useHttps)return undefined;
+    if((certPath===undefined)!==(keyPath===undefined)){
+        fail('HTTPS development requires both certPath and keyPath when either is supplied.','ARCANE_USAGE');
+    }
+    const certificatePath=path.resolve(workspaceRoot,certPath??'.arcane/dev/server-cert.pem');
+    const privateKeyPath=path.resolve(workspaceRoot,keyPath??'.arcane/dev/server-key.pem');
+    try{
+        const reads=await Promise.allSettled([
+            readFile(certificatePath,{signal}),
+            readFile(privateKeyPath,{signal})
+        ]);
+        for(const read of reads){
+            if(read.status==='rejected')throw read.reason;
+        }
+        return {
+            options:{cert:reads[0].value,key:reads[1].value},
+            privateKeyPath:await realpath(privateKeyPath)
+        };
+    }catch(error){
+        if(error.code==='ENOENT'){
+            fail(
+                `HTTPS development requires a certificate at ${certificatePath} and a key at ${privateKeyPath}. `
+                +'Provide that pair or select existing files with --cert and --key.',
+                'ARCANE_DEV_TLS_MISSING'
+            );
+        }
+        throw error;
+    }
 }
 
 async function startOwnedDevServer({
@@ -520,6 +558,10 @@ async function startOwnedDevServer({
     releaseRoot,
     host='127.0.0.1',
     port=0,
+    https:useHttps=false,
+    tls,
+    certPath,
+    keyPath,
     signal,
     sdkRuntimeSourceRoot
 }={},events,releaseSignal){
@@ -543,6 +585,11 @@ async function startOwnedDevServer({
         appId,
         ...(requestedRuntimeMode?{runtimeMode:requestedRuntimeMode}:{})
     });
+    const selectedTls=await resolveDevelopmentTls({
+        workspaceRoot,https:useHttps,tls,certPath,keyPath,signal
+    });
+    const protocol=selectedTls?'https:':'http:';
+    throwIfAborted(signal);
     const routeSet=mode==='source'
         ?await sourceRoutes(workspaceRoot,appId,{
             sdkRuntimeSourceRoot,
@@ -570,7 +617,7 @@ async function startOwnedDevServer({
     const resourcePaths=new Set([routeSet.startPath]);
     const requestTasks=new Set();
     const runFileWork=createFileWorkLimiter();
-    const server=http.createServer((request,response)=>{
+    function serveDevelopmentRequest(request,response){
         let task;
         task=(async()=>{
             if(request.method!=='GET'&&request.method!=='HEAD'){
@@ -595,6 +642,11 @@ async function startOwnedDevServer({
             await runFileWork(async()=>{
                 const opened=await openSafeFile(mapping.root,relative);
                 if(!opened){deny(response,404,'Not found.');return;}
+                if(selectedTls?.privateKeyPath
+                    &&canonicalLocationKey(opened.candidate)===canonicalLocationKey(selectedTls.privateKeyPath)){
+                    deny(response,404,'Not found.');
+                    return;
+                }
                 const extension=path.extname(opened.candidate).toLowerCase();
                 const html=extension==='.html'||extension==='.htm';
                 let managedDocument=false;
@@ -648,7 +700,10 @@ async function startOwnedDevServer({
             requestTasks.delete(task);
         });
         requestTasks.add(task);
-    });
+    }
+    const server=selectedTls
+        ?https.createServer(selectedTls.options,serveDevelopmentRequest)
+        :http.createServer(serveDevelopmentRequest);
     await listen(server,{host,port,signal});
     const address=server.address();
     if(!address||is.string(address)){
@@ -658,7 +713,7 @@ async function startOwnedDevServer({
     const visibleHost=address.address==='0.0.0.0'||address.address==='::'
         ?'localhost'
         :browserHostname(address.address);
-    const endpoint=new URL(`http://${visibleHost}:${address.port}`);
+    const endpoint=new URL(`${protocol}//${visibleHost}:${address.port}`);
     const origin=endpoint.origin;
     const cleanUrl=`${origin}${routeSet.startPath}`;
     const url=cleanUrl;
@@ -742,6 +797,7 @@ async function startOwnedDevServer({
     server.once('close',()=>{void finishLifecycle();});
     const result={
         server,
+        protocol,
         mode,
         workspaceRoot:routeSet.workspaceRoot,
         appId:routeSet.appId,
@@ -760,9 +816,10 @@ async function startOwnedDevServer({
         lifecycle
     };
     try{
-        result.networkUrls=networkUrlsForAddress(address,routeSet.startPath);
+        result.networkUrls=networkUrlsForAddress(address,routeSet.startPath,protocol);
         await events.send({
             type:'server.started',
+            protocol,
             mode,
             host:result.host,
             port:result.port,

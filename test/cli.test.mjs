@@ -119,17 +119,19 @@ test('CLI maps the SDK runtime source only for explicit development',async()=>{
 
 test('CLI public development preserves app selection and explicit host precedence',async function publicDevelopmentOptions(){
     for(const selection of [
-        {appId:'example-app',args:[],host:'127.0.0.1'},
-        {appId:'another-app',args:['--public'],host:'0.0.0.0'},
-        {appId:'example-app',args:['--host','192.0.2.10'],host:'192.0.2.10'},
-        {appId:'another-app',args:['--public','--host','127.0.0.1'],host:'127.0.0.1'},
-        {appId:'example-app',args:['--host','192.0.2.10','--public'],host:'192.0.2.10'}
+        {appId:'example-app',args:[],host:'127.0.0.1',https:false},
+        {appId:'another-app',args:['--public'],host:'0.0.0.0',https:true},
+        {appId:'example-app',args:['--host','192.0.2.10'],host:'192.0.2.10',https:false},
+        {appId:'another-app',args:['--public','--host','127.0.0.1'],host:'127.0.0.1',https:true},
+        {appId:'example-app',args:['--host','192.0.2.10','--public'],host:'192.0.2.10',https:true},
+        {appId:'example-app',args:['--https'],host:'127.0.0.1',https:true}
     ]){
         const stdout=memoryStream();
         const stderr=memoryStream();
         const invocations=[];
+        const protocol=selection.https?'https:':'http:';
         const networkUrls=selection.host==='127.0.0.1'?[]:[
-            `http://192.0.2.10:8123/apps/${selection.appId}/index.html`
+            `${protocol}//192.0.2.10:8123/apps/${selection.appId}/index.html`
         ];
         const exitCode=await runCliInProcess([
             'dev','--app',selection.appId,'--port','8123',...selection.args,'--output','ndjson'
@@ -143,7 +145,8 @@ test('CLI public development preserves app selection and explicit host precedenc
                     appId:options.appId,
                     host:options.host,
                     port:options.port,
-                    url:`http://localhost:8123/apps/${options.appId}/index.html`,
+                    protocol,
+                    url:`${protocol}//localhost:8123/apps/${options.appId}/index.html`,
                     networkUrls,
                     lifecycle:Promise.resolve(),
                     close:async function closeDevelopmentFixture(){}
@@ -156,8 +159,10 @@ test('CLI public development preserves app selection and explicit host precedenc
         assert.equal(invocations[0].options.appId,selection.appId);
         assert.equal(invocations[0].options.host,selection.host);
         assert.equal(invocations[0].options.port,8123);
+        assert.equal(invocations[0].options.https,selection.https);
         const events=parseNdjson(stdout.read());
         const ready=events.find(function serverReady(event){return event.type==='server.ready';});
+        assert.equal(ready.data.protocol,protocol);
         assert.deepEqual(ready.data.networkUrls,networkUrls);
         assert.deepEqual(events.at(-1).data.result.networkUrls,networkUrls);
     }
@@ -167,8 +172,8 @@ test('CLI prints every public development network URL in human output',async fun
     const stdout=memoryStream();
     const stderr=memoryStream();
     const networkUrls=[
-        'http://192.0.2.10:8123/apps/example-app/index.html',
-        'http://198.51.100.20:8123/apps/example-app/index.html'
+        'https://192.0.2.10:8123/apps/example-app/index.html',
+        'https://198.51.100.20:8123/apps/example-app/index.html'
     ];
     const exitCode=await runCliInProcess(['dev','--public'],{
         stdout:stdout.stream,
@@ -176,7 +181,7 @@ test('CLI prints every public development network URL in human output',async fun
         execute:async function publicServerFixture(){
             return {
                 mode:'source',appId:'example-app',host:'0.0.0.0',port:8123,
-                url:'http://localhost:8123/apps/example-app/index.html',
+                protocol:'https:',url:'https://localhost:8123/apps/example-app/index.html',
                 networkUrls,lifecycle:Promise.resolve(),
                 close:async function closePublicServerFixture(){}
             };
@@ -184,6 +189,48 @@ test('CLI prints every public development network URL in human output',async fun
     });
     assert.equal(exitCode,0,stderr.read());
     for(const url of networkUrls)assert.ok(stderr.read().includes(`Network: ${url}`));
+});
+
+test('CLI certificate paths select HTTPS relative to the chosen workspace',async function developmentCertificateOptions(){
+    const cwd=path.resolve('cli-certificate-fixture');
+    const workspaceRoot=path.join(cwd,'selected-workspace');
+    const stdout=memoryStream();
+    let selectedOptions;
+    const exitCode=await runCliInProcess([
+        'dev','--workspace','selected-workspace','--cert','tls/cert.pem','--key','tls/key.pem'
+    ],{
+        cwd,
+        stdout:stdout.stream,
+        stderr:memoryStream().stream,
+        execute:async function selectCertificatePair(_command,options){
+            selectedOptions=options;
+            return {
+                mode:'source',host:options.host,port:8000,protocol:'https:',
+                url:'https://127.0.0.1:8000/apps/example-app/index.html',
+                lifecycle:Promise.resolve(),close:async function closeCertificateFixture(){}
+            };
+        }
+    });
+    assert.equal(exitCode,0);
+    assert.equal(selectedOptions.workspaceRoot,workspaceRoot);
+    assert.equal(selectedOptions.host,'127.0.0.1');
+    assert.equal(selectedOptions.https,true);
+    assert.equal(selectedOptions.certPath,path.join(workspaceRoot,'tls','cert.pem'));
+    assert.equal(selectedOptions.keyPath,path.join(workspaceRoot,'tls','key.pem'));
+    assert.equal(stdout.read().includes('key.pem'),false);
+
+    for(const args of [['dev','--cert','cert.pem'],['dev','--key','key.pem'],['run','--https']]){
+        let executed=false;
+        const output=memoryStream();
+        const rejectedCode=await runCliInProcess([...args,'--output','ndjson'],{
+            stdout:output.stream,
+            stderr:memoryStream().stream,
+            execute:async function unexpectedIncompleteCertificateOperation(){executed=true;}
+        });
+        assert.equal(rejectedCode,1);
+        assert.equal(executed,false);
+        assert.equal(parseNdjson(output.read()).at(-1).data.error.code,'ARCANE_USAGE');
+    }
 });
 
 test('CLI public flag applies only to development',async function publicFlagScope(){

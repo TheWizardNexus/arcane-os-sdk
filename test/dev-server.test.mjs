@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {cp,mkdir,readFile,realpath,symlink,writeFile} from 'node:fs/promises';
+import https from 'node:https';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -556,6 +557,7 @@ test('development server keeps local defaults and supports explicit public bindi
                 });
                 context.after(function closeSelectedServer(){return instance.close();});
                 const publicBinding=host==='0.0.0.0';
+                assert.equal(instance.protocol,'http:');
                 if(publicBinding){
                     assert.equal(instance.server.address().address,'0.0.0.0');
                     assert.equal(instance.origin,`http://localhost:${instance.port}`);
@@ -581,6 +583,49 @@ test('development server keeps local defaults and supports explicit public bindi
     }finally{
         os.networkInterfaces=originalNetworkInterfaces;
     }
+});
+
+test('development server selects the HTTPS listener without exposing TLS settings',async function httpsDevelopmentTransport(t){
+    const parent=await temporaryDirectory(t,{prefix:'arcane-https-server-'});
+    const workspaceRoot=path.join(parent,'workspace');
+    const appId='https-app';
+    await createWorkspace({targetPath:workspaceRoot,appId});
+    const sdkRuntimeSourceRoot=await createSdkRuntimeSource(parent);
+    const events=[];
+    const instance=await startDevServer({
+        workspaceRoot,appId,sdkRuntimeSourceRoot,host:'0.0.0.0',
+        tls:{sessionIdContext:'fixture-private-tls-setting'},
+        onEvent:function collectHttpsEvent(event){events.push(event);}
+    });
+    t.after(function closeHttpsServer(){return instance.close();});
+    // This tests listener selection and reporting; it does not claim a certificate handshake.
+    assert.ok(instance.server instanceof https.Server);
+    assert.equal(instance.protocol,'https:');
+    assert.equal(instance.origin,`https://localhost:${instance.port}`);
+    assert.equal(instance.url,`${instance.origin}/apps/${appId}/index.html`);
+    for(const url of instance.networkUrls)assert.equal(new URL(url).protocol,'https:');
+    assert.equal(events.at(-1).protocol,'https:');
+    assert.equal(Object.hasOwn(instance,'tls'),false);
+    assert.equal(JSON.stringify(events).includes('fixture-private-tls-setting'),false);
+});
+
+test('HTTPS development reports missing certificate files without starting HTTP',async function missingDevelopmentCertificates(t){
+    const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-missing-certificates-'});
+    const events=[];
+    await assert.rejects(startDevServer({
+        workspaceRoot,https:true,
+        onEvent:function collectCertificateFailureEvent(event){events.push(event);}
+    }),function isMissingCertificatePair(error){
+        assert.equal(error.code,'ARCANE_DEV_TLS_MISSING');
+        assert.ok(error.message.includes(path.join(workspaceRoot,'.arcane','dev','server-cert.pem')));
+        assert.ok(error.message.includes(path.join(workspaceRoot,'.arcane','dev','server-key.pem')));
+        return true;
+    });
+    assert.deepEqual(events.map(function certificateEventType(event){return event.type;}),['server.starting']);
+    await assert.rejects(
+        startDevServer({workspaceRoot,certPath:'cert.pem'}),
+        function isIncompleteCertificatePair(error){return error.code==='ARCANE_USAGE';}
+    );
 });
 
 test('development server reports malformed host options before binding',async function invalidServerHost(){

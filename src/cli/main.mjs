@@ -18,6 +18,8 @@ const VALUE_OPTIONS=new Set([
     'arcane-root',
     'host',
     'port',
+    'cert',
+    'key',
     'target',
     'format',
     'signing',
@@ -36,6 +38,7 @@ const VALUE_OPTIONS=new Set([
 const FLAG_OPTIONS=new Set([
     'git',
     'public',
+    'https',
     'skip-tests',
     'dry-run',
     'require-local-ai',
@@ -61,7 +64,7 @@ Usage:
   ${CLI_NAME} upgrade [--workspace <directory>] [--app <id>]
   ${CLI_NAME} doctor [--workspace <directory>] [--arcane-root <directory>]
   ${CLI_NAME} import-map [--workspace <directory>] [--app <id>]
-  ${CLI_NAME} dev [--app <id>] [--public] [--host <address>] [--port 8000] [--sdk-runtime-source <sdk-root>]
+  ${CLI_NAME} dev [--app <id>] [--public] [--https] [--cert <pem>] [--key <pem>] [--host <address>] [--port 8000] [--sdk-runtime-source <sdk-root>]
   ${CLI_NAME} test [--app <id>] [--scope app]
   ${CLI_NAME} test --scope shared --test-file <repo-relative.test.mjs>
   ${CLI_NAME} check [--app <id>] [--scope app] [--skip-tests]
@@ -84,7 +87,9 @@ Usage:
   ${CLI_NAME} mail serve --profile <profile> --from <address> --app <id> --origin <origin> [--allow-to <addresses>] [--app-key-stdin] [--host 127.0.0.1] [--port 8025] [--request-timeout <ms>]
 
 Development:
-  --public                      Bind all IPv4 interfaces (0.0.0.0) and print network URLs.
+  --public                      Serve HTTPS on all IPv4 interfaces (0.0.0.0) and print network URLs.
+  --https                       Use HTTPS with .arcane/dev/server-cert.pem and server-key.pem.
+  --cert <pem> --key <pem>        Use an existing certificate pair; paths are relative to the workspace.
   --host <address>               Override the bind address; takes precedence over --public.
   --sdk-runtime-source <sdk-root>  Dev-only live SDK checkout; omitted preserves the workspace runtime mode.
 
@@ -451,6 +456,9 @@ function operationOptions(command,parsed,cwd){
     if(flags.has('public')&&command!=='dev'){
         usage('--public is supported only by dev.');
     }
+    if((flags.has('https')||values.cert!==undefined||values.key!==undefined)&&command!=='dev'){
+        usage('--https, --cert, and --key are supported only by dev.');
+    }
     if(flags.has('overwrite')&&command!=='bundle'){
         usage('--overwrite is supported only by bundle.');
     }
@@ -510,10 +518,18 @@ function operationOptions(command,parsed,cwd){
     }
     if(command==='dev'){
         noExtraPositionals(command,positionals);
+        if((values.cert===undefined)!==(values.key===undefined)){
+            usage('HTTPS development requires --cert and --key together.');
+        }
         return {
             ...common,
             host:values.host??(flags.has('public')?'0.0.0.0':'127.0.0.1'),
             port:readPort(values.port,8000),
+            https:flags.has('public')||flags.has('https')||values.cert!==undefined,
+            ...(values.cert===undefined?{}:{
+                certPath:path.resolve(workspaceRoot,values.cert),
+                keyPath:path.resolve(workspaceRoot,values.key)
+            }),
             ...(values['sdk-runtime-source']===undefined?{}:{
                 sdkRuntimeSourceRoot:path.resolve(cwd,values['sdk-runtime-source'])
             })
@@ -837,6 +853,7 @@ function serverSummary(result){
         host:result.host,
         port:result.port,
         url:result.url,
+        ...(result.protocol===undefined?{}:{protocol:result.protocol}),
         ...(result.networkUrls===undefined?{}:{networkUrls:result.networkUrls}),
         ...(result.callerAuthentication
             ?{callerAuthentication:result.callerAuthentication}

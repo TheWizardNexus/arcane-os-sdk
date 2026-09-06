@@ -116,6 +116,16 @@ files into `dist`, or restarting the server. Restarting is not a content
 synchronization step; when a refresh is stale, first verify the command, URL,
 workspace, selected app, and resolved source route.
 
+The shared dev server owns HTTP and HTTPS transport for the same selected
+routes. `arcane dev --public` selects HTTPS on the IPv4 wildcard address;
+explicit `--host` controls the bind address, while `--https` selects HTTPS
+without changing it. Public/HTTPS CLI startup reads one workspace-local PEM
+pair before binding. The certificate covers the device-facing address, and
+each client trusts its issuing CA through that platform's certificate setup.
+This supplies the secure origin required by OPFS/DBOPFS on LAN devices. The
+server does not install trust, generate certificates, or expose private TLS
+material through CLI events. Ordinary localhost development remains HTTP.
+
 Development is an intentionally fast feedback loop. Keep each increment small
 and independently understandable so its effect has one clear cause and a
 mistake can be isolated without untangling unrelated work. A development
@@ -279,7 +289,7 @@ paths are withheld from the native provider. The provider copies the complete
 selected release rather than accepting an unrelated source path. Verification
 is a separate explicit operation for a selected release artifact.
 
-The SDK `0.7.2` runtime requires Arcane `0.8.12` or newer. Compatibility
+The SDK `0.7.3` runtime requires Arcane `0.8.12` or newer. Compatibility
 is contractual rather than exact-version pinning: the prepared Core must meet
 the highest minimum declared by the runtime, selected app, and bundled app
 dependencies; keep each app's Arcane protocol generation; and provide every

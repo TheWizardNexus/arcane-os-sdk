@@ -49,7 +49,9 @@ meaning and cardinality rules:
 | `--app` | app id | Workspace/app operations except shared scope and `verify-bundle`; also the exact `mail serve` caller id. |
 | `--arcane-root` | directory | `doctor`, native `build`/`run`, `native-doctor`, `native-prepare` |
 | `--host` / `--port` | host / integer 0–65535 | Browser `dev`/`run` default to `127.0.0.1:8000`; `mail serve` defaults to `127.0.0.1:8025` and admits numeric loopback only. |
-| `--public` | flag | `dev`; binds to `0.0.0.0` unless `--host` explicitly selects another address. |
+| `--public` | flag | `dev`; serves HTTPS and binds to `0.0.0.0` unless `--host` explicitly selects another address. |
+| `--https` | flag | `dev`; serves HTTPS with the configured or default workspace PEM pair. |
+| `--cert` / `--key` | PEM file paths | `dev`; supply both to select HTTPS with an explicit certificate chain and private key. Relative paths resolve from the workspace. |
 | `--target` | target id | `new`, `init`, native diagnostics, `build`, `run` |
 | `--format` / `--signing` | target-supported values | Native diagnostics, `build`, `run` |
 | `--output-root` | directory | Native `build` and `run` |
@@ -310,7 +312,7 @@ npm exec -- arcane upgrade --workspace . --app hello-world
 
 Starts one development server for one selected app and maps the exact
 workspace/runtime routes. It defaults to localhost; `--public` enables access
-from other devices on the network.
+from other devices on the network over HTTPS.
 
 For an external workspace, the server exposes the selected projected
 `arcane/` root, including `arcane/sdk` and `arcane/dependencies`, alongside the
@@ -319,7 +321,7 @@ The explicit live-source SDK mapping remains unchanged and does not replace the
 installed projection.
 
 ```text
-arcane dev [--app <id>] [--public] [--host <address>] [--port 8000]
+arcane dev [--app <id>] [--public] [--https] [--cert <file> --key <file>] [--host <address>] [--port 8000]
 ```
 
 ### Lifecycle
@@ -333,10 +335,43 @@ device, since `localhost` refers to that device and `0.0.0.0` is a bind address.
 Network URLs come from one interface snapshot at startup and do not establish
 remote reachability through the machine's firewall or network.
 
-This option changes the listener address. It does not configure a firewall,
-router forwarding, an internet tunnel, authentication, or HTTPS. Browser
-features that require a [secure context](https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Secure_Contexts)
-still require HTTPS when accessed through a LAN address.
+Public mode also selects HTTPS. Plain localhost development stays HTTP.
+`--https` selects HTTPS without changing the bind address; supplying both
+`--cert` and `--key` also selects HTTPS. The command does not configure a
+firewall, router forwarding, or an internet tunnel.
+
+### Development HTTPS setup
+
+Before starting public mode, place the development server's PEM certificate
+chain at `.arcane/dev/server-cert.pem` and its PEM private key at
+`.arcane/dev/server-key.pem`, relative to the workspace. Alternatively, pass
+`--cert <file> --key <file>` together. The certificate must cover the LAN IP
+address or hostname opened by each device. Certificate creation and renewal
+belong to the developer's certificate tooling; the server does not generate a
+CA or alter device trust stores. Keep `.arcane/dev/` ignored by Git and keep the
+private key on the development computer.
+
+The server reads the selected pair once asynchronously per startup, before
+binding. Missing files or certificate/key parse errors produce a startup error; public
+mode never silently falls back to HTTP. Certificate/key contents are not
+included in operation events or JSON/NDJSON output. Restart the server after
+replacing its certificate pair; ordinary app source edits still appear on
+refresh without restarting.
+
+DBOPFS uses [OPFS, which requires a secure context](https://developer.mozilla.org/en-US/docs/Web/API/StorageManager/getDirectory).
+HTTP localhost is a special case on the device running the server; a LAN HTTP
+address does not receive that exception. For HTTPS issued by a development CA,
+each accessing device must trust that CA and use an address covered by the
+server certificate.
+
+On Android Chrome, transfer only the public CA certificate to the phone. In
+Android Settings, open the security settings, then **Encryption & credentials
+> Install a certificate > CA certificate**, and select that public certificate.
+Samsung devices may label the entry **Install from device storage**. Menu names
+vary by device; Google's [Android CA installation instructions](https://support.google.com/device-usage-study-help/answer/15713321?co=GENIE.Platform%3DAndroid&hl=en)
+show these paths. Then open the printed HTTPS network URL in Chrome. The CA
+installation is a device action; server readiness does not prove Android trust
+or remote reachability.
 
 ### Example
 

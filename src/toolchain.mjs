@@ -466,6 +466,10 @@ export async function developApplication(options={}){
         }),
         host:options.host,
         port:options.port,
+        https:options.https,
+        tls:options.tls,
+        certPath:options.certPath,
+        keyPath:options.keyPath,
         signal:options.signal,
         onEvent:options.onEvent
     });

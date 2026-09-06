@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.3
+
+- Correct public development serving for OPFS/DBOPFS and other browser APIs
+  requiring a secure context. `npm run dev -- --app <id> --public` now serves
+  HTTPS using a workspace-local development certificate pair, with explicit
+  `--cert`/`--key` paths and `--https` available for any selected app.
+- Add HTTPS transport to the shared development server and report the actual
+  protocol in local and network URLs. Preserve ordinary HTTP localhost,
+  selected source/runtime routes, refresh behavior, and owned cancellation.
+- Document certificate setup and Android CA installation. Keep TLS material
+  out of operation events and report missing certificates before binding.
+- Clarify the browser accelerator setup instruction to close and reopen the
+  browser after changing a flag, with that final step underlined and emphasized.
+
 ## 0.7.2
 
 - Keep both supported browser NPU and GPU flag address copy controls available
