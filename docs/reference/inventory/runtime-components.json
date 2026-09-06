@@ -5,7 +5,7 @@
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
     "branch": "main",
     "path": "runtime/arcane/components",
-    "sdkVersion": "0.7.1"
+    "sdkVersion": "0.7.2"
   },
   "componentCount": 40,
   "loader": "/arcane/modules/HTMLImport.js",
@@ -98,7 +98,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; Clipboard API and WebGPU adapter request. Settings addresses use Copy controls and appear as text if copying fails; open() copies the NPU address without navigation or an alert.",
-      "normalization": "API presence, adapter availability, explicit browser GPU class, and copy instructions normalized. A reported discrete GPU shows Already using the performance GPU. Only explicitly reported integrated/software adapters show flag instructions. Absent type metadata shows GPU available and leaves performance selection unconfirmed. Mounting starts one adapter request; checkGpu() coalesces concurrent calls, while refresh() remains synchronous. No GPU device, model, or WebNN context is created. Adapter metadata does not establish browser flag state, the fastest physical GPU, or another page's model execution."
+      "normalization": "API presence, adapter availability, explicit browser GPU class, and copy instructions normalized. Supported browser NPU and GPU flag copy controls remain available regardless of API availability, adapter class, or detection failure. A reported discrete GPU shows Already using the performance GPU. Absent type metadata shows GPU available and leaves performance selection unconfirmed. Mounting starts one adapter request; checkGpu() coalesces concurrent calls, while refresh() remains synchronous. No GPU device, model, or WebNN context is created. Adapter metadata does not establish browser flag state, the fastest physical GPU, or another page's model execution."
     },
     {
       "file": "runtime/arcane/components/calculator.html",

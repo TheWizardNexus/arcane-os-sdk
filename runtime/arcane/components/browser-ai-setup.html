@@ -58,9 +58,10 @@
         <p><span id="gpuAvailability" class="arcane-badge gpu-status" role="status" aria-live="polite"></span></p>
         <p id="gpuAdapterName" class="arcane-help"></p>
         <div id="gpuSetup" hidden>
-            <p>If you have a discrete GPU, enable “Force High Performance GPU”, save your work, and restart the browser.</p>
+            <p>“Force High Performance GPU” prefers your faster GPU.</p>
             <button id="copyGpuAddress" class="arcane-button arcane-button--secondary" type="button">Copy GPU flag address</button>
         </div>
+        <p>Paste a copied address into your browser's address bar. Enable the flag, save your work, and relaunch.</p>
         <details>
             <summary>Setup help</summary>
             <p><a href="https://onnxruntime.ai/docs/tutorials/web/ep-webnn.html">WebNN setup documentation</a></p>
@@ -101,7 +102,6 @@
     let copyTask=null;
     let copyingAddress = null;
     let gpuTask=null;
-    let gpuResult = null;
     let destroyed=false;
 
     host.refresh=refresh;
@@ -115,10 +115,9 @@
         root.querySelector('#webnnAvailability').textContent = settings.webnnAvailable
             ? 'WebNN available.'
             : 'WebNN unavailable.';
-        root.querySelector('#npuSetup').hidden = settings.webnnAvailable;
         const unknownBrowser = settings.browserId === 'unknown';
         root.querySelector('#browserInstructions').textContent = settings.webnnFlagsURL || unknownBrowser
-            ? 'Enable “Enables WebNN API”, save your work, and relaunch the browser.'
+            ? '“Enables WebNN API” allows NPU use when supported.'
             : 'See Setup help for this browser.';
         for (const choice of choices) {
             choice.row.hidden = !unknownBrowser && choice.target.url !== settings.webnnFlagsURL;
@@ -129,12 +128,7 @@
     }
 
     function renderGpuGuidance(settings = getBrowserDeviceSettings()) {
-        const gpuTarget = settings.highPerformanceGpu;
-        const nonperformance = gpuResult?.available && (
-            gpuResult.performanceStatus === 'integrated'
-            || gpuResult.performanceStatus === 'fallback'
-        );
-        root.querySelector('#gpuSetup').hidden = !nonperformance || !gpuTarget;
+        root.querySelector('#gpuSetup').hidden = !settings.highPerformanceGpu;
     }
 
     function checkGpu() {
@@ -156,7 +150,6 @@
             try {
                 const result = await detectBrowserGpu();
                 if (destroyed) return false;
-                gpuResult = result;
                 if (!result.available) {
                     gpuAvailability.textContent = 'GPU unavailable.';
                     gpuAvailability.dataset.status = 'warning';
@@ -174,14 +167,11 @@
                     gpuAvailability.dataset.status = 'unknown';
                 }
                 gpuAdapterName.textContent = result.available ? result.name : '';
-                renderGpuGuidance();
                 return result;
             } catch (error) {
                 if (!destroyed) {
-                    gpuResult = null;
                     gpuAvailability.textContent = 'GPU detection failed. Select Refresh to retry.';
                     gpuAvailability.dataset.status = 'error';
-                    renderGpuGuidance();
                     arcaneLogging.error('Unable to detect the browser GPU adapter.', error);
                 }
                 return false;

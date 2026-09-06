@@ -159,11 +159,13 @@ Slots: `title`, `subtitle`, `identity`, `messages/message`, `composer`, `actions
 ### Overview
 
 Displays a short WebNN availability status and the detected WebGPU adapter.
-When WebNN is unavailable, Chrome and Edge receive a **Copy NPU flag address**
-button for their own browser; unidentified browsers show both choices. Desktop Windows
-Chromium browsers receive the matching Force High Performance GPU address only
-when an integrated or software adapter is explicitly reported,
+Chrome and Edge receive a **Copy NPU flag address** button for their own browser;
+unidentified browsers show both choices. Desktop Windows Chromium browsers
+receive a **Copy GPU flag address** button for the matching browser,
 including `chrome://flags/#force-high-performance-gpu` for identified Chrome.
+Both controls remain available regardless of API availability, adapter class,
+or detection failure. Each flag has one short explanation, followed by a shared
+paste, enable, save, and relaunch instruction.
 Settings addresses use Copy controls and appear as selectable text if copying
 fails. The component does not attempt navigation to internal browser pages.
 
@@ -189,9 +191,8 @@ or `null`, `adapterType` as the browser's string or `null`, and
 `performanceStatus`: `"discrete"`, `"integrated"`, `"fallback"`, or `"unknown"`.
 Only the explicit browser type or fallback field establishes that status;
 vendor names and the requested power preference do not. A discrete result
-shows **Already using the performance GPU.** and hides flag instructions.
-An unknown class shows **GPU available.** without recommending flag changes;
-performance selection remains unconfirmed in the result. Adapter selection does not
+shows **Already using the performance GPU.** An unknown class shows **GPU available.**
+and leaves performance selection unconfirmed. Adapter selection does not
 prove that a browser flag is enabled, that the fastest GPU was selected, or that
 a model is using it. Failure is displayed and logged, and the promise
 resolves to `false`; destruction also yields `false` and suppresses late UI

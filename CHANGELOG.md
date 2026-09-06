@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.2
+
+- Keep both supported browser NPU and GPU flag address copy controls available
+  regardless of API availability, GPU classification, or detection failure.
+  Use one short explanation per flag and one shared paste/enable/relaunch
+  instruction. Preserve browser-reported statuses and the GPU-only chat notice.
+
 ## 0.7.1
 
 - Make Profile NPU and GPU setup concise and copy-only, with **Copy NPU flag
