@@ -16,7 +16,13 @@ dependency and invoke its local CLI with `npm exec -- arcane`. A separate
 global installer, standalone SDK executable, NuGet package, Homebrew formula,
 or OS package is not part of this release surface.
 
-Publication checks run only after the user explicitly selects an npm release.
+The user's standing instruction selects publication when a coherent SDK change
+is complete. Publish every ready change that preserves required functionality
+and remains relevant, while excluding unfinished concurrent or explicitly
+deferred work. Default to a patch release and assess whether a new capability
+warrants a minor revision. Honor an explicit no-publish instruction.
+
+Publication checks run only for that selected npm release output.
 That selected-release workflow validates package metadata, the executable and
 `.gitattributes` boundary, the complete package inventory, version/channel
 agreement, and required license notices. One unprivileged producer packs one
@@ -94,9 +100,9 @@ locked installation, runs one selected `arcane package`, creates one selected
 identities, receipts, provenance records, or attestation sidecars and does not
 run a second admission job.
 
-Stable versioning, the npm `latest` tag, and an official GitHub release remain a
-separate explicit release decision. Current `main` development does not
-silently convert a `-dev` package into an official release. A stable release
+Stable versioning, the npm `latest` tag, and an official GitHub release follow
+the selected release decision, including the standing completed-work authority
+above. Unfinished `main` development does not select a release. A stable release
 must publish the exact selected Check artifact under `latest`; GitHub may then
 attach that same package. Its Git
 tag and GitHub release title must both be the same bare numeric

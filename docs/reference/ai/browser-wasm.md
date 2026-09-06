@@ -491,8 +491,10 @@ identity, default model metadata,
 `streamChat`, `use`, `probe`, and `dispose`. Direct provider `load()` selects a
 catalog model and returns `{model,status}`;
 the public AI API module's `ai.load()` returns the flat controller status.
-Direct `load({onProgress})` forwards the same additive file and byte progress
-records used by the controller and provider/2 adapter.
+Direct `load({onProgress})` forwards the same download progress and observed
+initialization-stage/activity records used by the controller and provider/2
+adapter. Initialization has no completion percentage unless the runtime reports
+a meaningful completion total.
 Provider `security` carries the provider/model-binding `secure` intent. Direct
 `provider.load({security})` and `ai.load({security})` supply the operation
 intent. They do not activate checking in the ordinary development contract.

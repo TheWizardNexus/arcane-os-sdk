@@ -1,6 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.5.19
+
+- Report observed Wllama initialization stages and runtime activity through
+  direct provider loading and the shared AI lifecycle. Keep initialization
+  indeterminate when the runtime supplies no meaningful completion total.
+- Show the current initialization stage, stage duration, and time since runtime
+  activity in shared chat instead of a completed file count during activation.
+  Preserve download progress, cancellation, and complete runtime logging.
+- Remove an adjacent duplicate cancellation check while retaining cancellation
+  handling before initialization and after loading.
+
+## 0.5.18
 
 - Use `strong-type` predicates throughout SDK-owned toolchain, runtime,
   browser-provider, and component code while retaining existing defaults,
@@ -11,8 +22,6 @@
   loading on the same declared dependency.
 - Remove `AIResponseLength` exports; applications own response verbosity.
   Parse URL-audit HTML with the native HTML parser.
-
-## 0.5.18
 
 - Add `AI.prepareTTS()` for detached punctuation-segmented synthesis, optional
   DBOPFS audio storage, complete semantic-input reuse, shared pending work and

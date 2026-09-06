@@ -30,6 +30,11 @@ settles it: an exact matching executed, declined, cancelled, or not-executed
 
 - Work directly on the single canonical `main` branch before and after every
   release; do not create or use a development or feature branch.
+- Publish each completed coherent change through the selected-artifact release
+  workflow. Default to a patch and assess whether new capability warrants a
+  minor revision. Include all ready changes that preserve required functionality
+  and remain relevant; exclude unfinished concurrent work and any scope the user
+  defers. This standing publication authority requires no repeated confirmation.
 - `dev` and `latest` are npm dist-tags selected from the strict package
   version. They are never Git branches and do not change the canonical checkout.
 - Continuous integration and npm publication may identify the selected `main`

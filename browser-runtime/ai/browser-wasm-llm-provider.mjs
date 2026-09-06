@@ -3070,10 +3070,6 @@ export function createBrowserWasmLlmProvider({
         if (generation !== lifecycleGeneration || state !== "loading") {
           throw fail("ARCANE_AI_OPERATION_SUPERSEDED", "The model load was superseded by unload.");
         }
-        throwIfAborted(signal, "load");
-        if (generation !== lifecycleGeneration || state !== "loading") {
-          throw fail("ARCANE_AI_OPERATION_SUPERSEDED", "The model load was superseded by unload.");
-        }
         const members = sourceMetadata(activeSource).files;
         publishModelLoadProgress({
           phase: "initialize",
