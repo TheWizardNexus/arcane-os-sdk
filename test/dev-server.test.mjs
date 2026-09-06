@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {cp,mkdir,readFile,realpath,symlink,writeFile} from 'node:fs/promises';
 import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {createWorkspace} from '../src/scaffold.mjs';
@@ -521,18 +522,74 @@ test('packaged development server serves its selected real directory without adm
     assert.equal(await changedRelease.text(),'changed package content\n');
 });
 
-test('development server refuses non-loopback binding',async t=>{
-    const parent=await temporaryDirectory(t,{prefix:'arcane-server-policy-'});
+test('development server keeps local defaults and supports explicit public binding',async function serverBindAddresses(t){
+    const parent=await temporaryDirectory(t,{prefix:'arcane-server-addresses-'});
     const workspaceRoot=path.join(parent,'workspace');
-    await createWorkspace({targetPath:workspaceRoot,appId:'loopback-only'});
-    await assert.rejects(
-        startDevServer({workspaceRoot,host:'0.0.0.0'}),
-        error=>error?.code==='ARCANE_POLICY_DENIED'
-    );
-    await assert.rejects(
-        startDevServer({workspaceRoot,host:'localhost'}),
-        error=>error?.code==='ARCANE_POLICY_DENIED'
-    );
+    const appId='network-app';
+    await createWorkspace({targetPath:workspaceRoot,appId});
+    const sdkRuntimeSourceRoot=await createSdkRuntimeSource(parent);
+    const originalNetworkInterfaces=os.networkInterfaces;
+    let interfaceReads=0;
+    os.networkInterfaces=function fixtureNetworkInterfaces(){
+        interfaceReads+=1;
+        return {
+            loopback:[{address:'127.0.0.1',family:'IPv4',internal:true}],
+            ethernet:[
+                {address:'192.0.2.10',family:'IPv4',internal:false},
+                {address:'2001:db8::10',family:'IPv6',scopeid:0,internal:false}
+            ],
+            wireless:[{address:'198.51.100.20',family:'IPv4',internal:false}],
+            duplicate:[{address:'192.0.2.10',family:'IPv4',internal:false}]
+        };
+    };
+    try{
+        for(const host of [undefined,'localhost','0.0.0.0']){
+            await t.test(host??'default loopback',async function bindSelectedHost(context){
+                const events=[];
+                const instance=await startDevServer({
+                    workspaceRoot,
+                    appId,
+                    sdkRuntimeSourceRoot,
+                    host,
+                    port:0,
+                    onEvent:function collectServerEvent(event){events.push(event);}
+                });
+                context.after(function closeSelectedServer(){return instance.close();});
+                const publicBinding=host==='0.0.0.0';
+                if(publicBinding){
+                    assert.equal(instance.server.address().address,'0.0.0.0');
+                    assert.equal(instance.origin,`http://localhost:${instance.port}`);
+                    assert.deepEqual(instance.networkUrls,[
+                        `http://192.0.2.10:${instance.port}/apps/${appId}/index.html`,
+                        `http://198.51.100.20:${instance.port}/apps/${appId}/index.html`
+                    ]);
+                }else{
+                    assert.ok(['127.0.0.1','::1'].includes(instance.host));
+                    if(host===undefined)assert.equal(instance.host,'127.0.0.1');
+                    assert.deepEqual(instance.networkUrls,[]);
+                }
+                assert.equal(instance.url,`${instance.origin}/apps/${appId}/index.html`);
+                assert.equal(instance.cleanUrl,instance.url);
+                assert.deepEqual(events.at(-1).networkUrls,instance.networkUrls);
+                const requestOrigin=publicBinding?`http://127.0.0.1:${instance.port}`:instance.origin;
+                const response=await request(requestOrigin,`/apps/${appId}/index.html`);
+                assert.equal(response.status,200);
+                assert.ok((await response.text()).includes(`content="${appId}"`));
+            });
+        }
+        assert.equal(interfaceReads,1);
+    }finally{
+        os.networkInterfaces=originalNetworkInterfaces;
+    }
+});
+
+test('development server reports malformed host options before binding',async function invalidServerHost(){
+    for(const host of ['',null,17]){
+        await assert.rejects(
+            startDevServer({host}),
+            function isHostUsageError(error){return error?.code==='ARCANE_USAGE';}
+        );
+    }
 });
 
 test('source server uses the application materialization without authenticating installed content',async t=>{

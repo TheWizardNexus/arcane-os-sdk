@@ -31,6 +31,7 @@ test('CLI help and version succeed through the shipped executable',async()=>{
     assert.match(help.stdout,/upgrade \[--workspace <directory>\] \[--app <id>\]/u);
     assert.match(help.stdout,/import-map \[--workspace <directory>\] \[--app <id>\]/u);
     assert.match(help.stdout,/dev .*--sdk-runtime-source <sdk-root>/u);
+    assert.match(help.stdout,/dev .*\[--public\]/u);
     assert.match(help.stdout,/verify-bundle <file[.]arcane-app[.]tar[.]gz>/);
 
     const version=await runCli(['--version']);
@@ -113,6 +114,92 @@ test('CLI maps the SDK runtime source only for explicit development',async()=>{
         const rejectedEvents=parseNdjson(rejectedOutput.read());
         assert.equal(rejectedEvents.at(-1).data.error.code,'ARCANE_USAGE');
         assert.match(rejectedEvents.at(-1).data.error.message,/supported only by dev/u);
+    }
+});
+
+test('CLI public development preserves app selection and explicit host precedence',async function publicDevelopmentOptions(){
+    for(const selection of [
+        {appId:'example-app',args:[],host:'127.0.0.1'},
+        {appId:'another-app',args:['--public'],host:'0.0.0.0'},
+        {appId:'example-app',args:['--host','192.0.2.10'],host:'192.0.2.10'},
+        {appId:'another-app',args:['--public','--host','127.0.0.1'],host:'127.0.0.1'},
+        {appId:'example-app',args:['--host','192.0.2.10','--public'],host:'192.0.2.10'}
+    ]){
+        const stdout=memoryStream();
+        const stderr=memoryStream();
+        const invocations=[];
+        const networkUrls=selection.host==='127.0.0.1'?[]:[
+            `http://192.0.2.10:8123/apps/${selection.appId}/index.html`
+        ];
+        const exitCode=await runCliInProcess([
+            'dev','--app',selection.appId,'--port','8123',...selection.args,'--output','ndjson'
+        ],{
+            stdout:stdout.stream,
+            stderr:stderr.stream,
+            execute:async function executeSelectedDevelopment(command,options){
+                invocations.push({command,options});
+                return {
+                    mode:'source',
+                    appId:options.appId,
+                    host:options.host,
+                    port:options.port,
+                    url:`http://localhost:8123/apps/${options.appId}/index.html`,
+                    networkUrls,
+                    lifecycle:Promise.resolve(),
+                    close:async function closeDevelopmentFixture(){}
+                };
+            }
+        });
+        assert.equal(exitCode,0,stderr.read());
+        assert.equal(invocations.length,1);
+        assert.equal(invocations[0].command,'dev');
+        assert.equal(invocations[0].options.appId,selection.appId);
+        assert.equal(invocations[0].options.host,selection.host);
+        assert.equal(invocations[0].options.port,8123);
+        const events=parseNdjson(stdout.read());
+        const ready=events.find(function serverReady(event){return event.type==='server.ready';});
+        assert.deepEqual(ready.data.networkUrls,networkUrls);
+        assert.deepEqual(events.at(-1).data.result.networkUrls,networkUrls);
+    }
+});
+
+test('CLI prints every public development network URL in human output',async function publicDevelopmentOutput(){
+    const stdout=memoryStream();
+    const stderr=memoryStream();
+    const networkUrls=[
+        'http://192.0.2.10:8123/apps/example-app/index.html',
+        'http://198.51.100.20:8123/apps/example-app/index.html'
+    ];
+    const exitCode=await runCliInProcess(['dev','--public'],{
+        stdout:stdout.stream,
+        stderr:stderr.stream,
+        execute:async function publicServerFixture(){
+            return {
+                mode:'source',appId:'example-app',host:'0.0.0.0',port:8123,
+                url:'http://localhost:8123/apps/example-app/index.html',
+                networkUrls,lifecycle:Promise.resolve(),
+                close:async function closePublicServerFixture(){}
+            };
+        }
+    });
+    assert.equal(exitCode,0,stderr.read());
+    for(const url of networkUrls)assert.ok(stderr.read().includes(`Network: ${url}`));
+});
+
+test('CLI public flag applies only to development',async function publicFlagScope(){
+    for(const args of [['run'],['package'],['mail','serve']]){
+        const stdout=memoryStream();
+        let executed=false;
+        const exitCode=await runCliInProcess([...args,'--public','--output','ndjson'],{
+            stdout:stdout.stream,
+            stderr:memoryStream().stream,
+            execute:async function unexpectedPublicOperation(){executed=true;}
+        });
+        assert.equal(exitCode,1);
+        assert.equal(executed,false);
+        const failure=parseNdjson(stdout.read()).at(-1);
+        assert.equal(failure.data.error.code,'ARCANE_USAGE');
+        assert.equal(failure.data.error.message,'--public is supported only by dev.');
     }
 });
 

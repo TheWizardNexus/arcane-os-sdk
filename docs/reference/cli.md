@@ -49,6 +49,7 @@ meaning and cardinality rules:
 | `--app` | app id | Workspace/app operations except shared scope and `verify-bundle`; also the exact `mail serve` caller id. |
 | `--arcane-root` | directory | `doctor`, native `build`/`run`, `native-doctor`, `native-prepare` |
 | `--host` / `--port` | host / integer 0–65535 | Browser `dev`/`run` default to `127.0.0.1:8000`; `mail serve` defaults to `127.0.0.1:8025` and admits numeric loopback only. |
+| `--public` | flag | `dev`; binds to `0.0.0.0` unless `--host` explicitly selects another address. |
 | `--target` | target id | `new`, `init`, native diagnostics, `build`, `run` |
 | `--format` / `--signing` | target-supported values | Native diagnostics, `build`, `run` |
 | `--output-root` | directory | Native `build` and `run` |
@@ -307,9 +308,9 @@ npm exec -- arcane upgrade --workspace . --app hello-world
 
 ### Overview
 
-Starts one loopback development server for one selected app and maps the exact
-workspace/runtime routes. It is a development convenience, not a production
-security boundary.
+Starts one development server for one selected app and maps the exact
+workspace/runtime routes. It defaults to localhost; `--public` enables access
+from other devices on the network.
 
 For an external workspace, the server exposes the selected projected
 `arcane/` root, including `arcane/sdk` and `arcane/dependencies`, alongside the
@@ -318,20 +319,35 @@ The explicit live-source SDK mapping remains unchanged and does not replace the
 installed projection.
 
 ```text
-arcane dev [--app <id>] [--host 127.0.0.1] [--port 8000]
+arcane dev [--app <id>] [--public] [--host <address>] [--port 8000]
 ```
 
 ### Lifecycle
 
 The command reports acceptance before bind/start work, emits the final URL,
 owns the server until cancellation, and restores failure to the process exit.
-The default host is loopback. Exposing another interface is an explicit
-development choice and does not add authentication.
+The default host is `127.0.0.1`. `--public` selects `0.0.0.0` (all IPv4
+interfaces); an explicit `--host` takes precedence. The command prints the
+local URL and available network URLs. Use a printed network URL on the other
+device, since `localhost` refers to that device and `0.0.0.0` is a bind address.
+Network URLs come from one interface snapshot at startup and do not establish
+remote reachability through the machine's firewall or network.
+
+This option changes the listener address. It does not configure a firewall,
+router forwarding, an internet tunnel, authentication, or HTTPS. Browser
+features that require a [secure context](https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Secure_Contexts)
+still require HTTPS when accessed through a LAN address.
 
 ### Example
 
 ```bash
 npm exec -- arcane dev --app hello-world --port 8000
+
+# Forward the public option through an existing dev script, for any app id.
+npm run dev -- --app hello-world --public
+
+# Equivalent direct CLI invocation, with an optional port.
+npm exec -- arcane dev --app hello-world --public --port 8000
 ```
 
 ## `arcane test`

@@ -236,7 +236,7 @@ Packaging writes the complete schema-1 release inventory to
 `ARCANE_APP_RELEASE.json`. Ordinary development, packaging, serving, and run
 paths do not count, limit, hash, truncate, tail, clip, or identify content by
 bytes, and they do not require provenance or verification receipts. The
-loopback server reads and returns each complete selected source, runtime, or
+development server reads and returns each complete selected source, runtime, or
 packaged file. Required credential protection, malformed-input rejection,
 applicable law, unavoidable protocol rules, and operating-system or browser
 safety remain in effect.
@@ -279,7 +279,7 @@ paths are withheld from the native provider. The provider copies the complete
 selected release rather than accepting an unrelated source path. Verification
 is a separate explicit operation for a selected release artifact.
 
-The SDK `0.6.2` runtime requires Arcane `0.8.12` or newer. Compatibility
+The SDK `0.7.0` runtime requires Arcane `0.8.12` or newer. Compatibility
 is contractual rather than exact-version pinning: the prepared Core must meet
 the highest minimum declared by the runtime, selected app, and bundled app
 dependencies; keep each app's Arcane protocol generation; and provide every

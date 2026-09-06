@@ -35,6 +35,7 @@ const VALUE_OPTIONS=new Set([
 ]);
 const FLAG_OPTIONS=new Set([
     'git',
+    'public',
     'skip-tests',
     'dry-run',
     'require-local-ai',
@@ -60,7 +61,7 @@ Usage:
   ${CLI_NAME} upgrade [--workspace <directory>] [--app <id>]
   ${CLI_NAME} doctor [--workspace <directory>] [--arcane-root <directory>]
   ${CLI_NAME} import-map [--workspace <directory>] [--app <id>]
-  ${CLI_NAME} dev [--app <id>] [--host 127.0.0.1] [--port 8000] [--sdk-runtime-source <sdk-root>]
+  ${CLI_NAME} dev [--app <id>] [--public] [--host <address>] [--port 8000] [--sdk-runtime-source <sdk-root>]
   ${CLI_NAME} test [--app <id>] [--scope app]
   ${CLI_NAME} test --scope shared --test-file <repo-relative.test.mjs>
   ${CLI_NAME} check [--app <id>] [--scope app] [--skip-tests]
@@ -83,6 +84,8 @@ Usage:
   ${CLI_NAME} mail serve --profile <profile> --from <address> --app <id> --origin <origin> [--allow-to <addresses>] [--app-key-stdin] [--host 127.0.0.1] [--port 8025] [--request-timeout <ms>]
 
 Development:
+  --public                      Bind all IPv4 interfaces (0.0.0.0) and print network URLs.
+  --host <address>               Override the bind address; takes precedence over --public.
   --sdk-runtime-source <sdk-root>  Dev-only live SDK checkout; omitted preserves the workspace runtime mode.
 
 Global:
@@ -445,6 +448,9 @@ function operationOptions(command,parsed,cwd){
     if(values['sdk-runtime-source']!==undefined&&command!=='dev'){
         usage('--sdk-runtime-source is supported only by dev.');
     }
+    if(flags.has('public')&&command!=='dev'){
+        usage('--public is supported only by dev.');
+    }
     if(flags.has('overwrite')&&command!=='bundle'){
         usage('--overwrite is supported only by bundle.');
     }
@@ -506,7 +512,7 @@ function operationOptions(command,parsed,cwd){
         noExtraPositionals(command,positionals);
         return {
             ...common,
-            host:values.host??'127.0.0.1',
+            host:values.host??(flags.has('public')?'0.0.0.0':'127.0.0.1'),
             port:readPort(values.port,8000),
             ...(values['sdk-runtime-source']===undefined?{}:{
                 sdkRuntimeSourceRoot:path.resolve(cwd,values['sdk-runtime-source'])
@@ -831,6 +837,7 @@ function serverSummary(result){
         host:result.host,
         port:result.port,
         url:result.url,
+        ...(result.networkUrls===undefined?{}:{networkUrls:result.networkUrls}),
         ...(result.callerAuthentication
             ?{callerAuthentication:result.callerAuthentication}
             :{}),
@@ -841,7 +848,11 @@ function serverSummary(result){
 }
 
 async function waitForServer(result,signal,reporter){
-    reporter.emit('server.ready',serverSummary(result),`Development server ready at ${result.url}`);
+    const readyMessage=[
+        `Development server ready at ${result.url}`,
+        ...(result.networkUrls??[]).map(function networkAddress(url){return `Network: ${url}`;})
+    ].join('\n');
+    reporter.emit('server.ready',serverSummary(result),readyMessage);
     if(result.lifecycle&&is.function(result.lifecycle.then)){
         const abort=()=>{
             void Promise.resolve().then(()=>result.close?.()).catch(()=>{});

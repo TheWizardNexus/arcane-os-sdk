@@ -2,6 +2,7 @@ import Is from 'strong-type';
 import {constants as FS_CONSTANTS} from 'node:fs';
 import {lstat,open,readFile,realpath} from 'node:fs/promises';
 import http from 'node:http';
+import os from 'node:os';
 import path from 'node:path';
 import {resolveWorkspace} from './workspace.mjs';
 import {createEventQueue} from './event-queue.mjs';
@@ -489,6 +490,29 @@ function listen(server,{host,port,signal}){
     });
 }
 
+function browserHostname(host){
+    return host.includes(':')?`[${host}]`:host;
+}
+
+function networkUrlsForAddress(address,startPath){
+    if(address.address==='127.0.0.1'||address.address==='::1')return [];
+    const allIPv4=address.address==='0.0.0.0';
+    const allInterfaces=address.address==='::';
+    const urls=new Set();
+    for(const entries of Object.values(os.networkInterfaces())){
+        for(const entry of entries??[]){
+            if(entry.internal)continue;
+            // Scoped IPv6 addresses need the receiving device's interface,
+            // so they cannot provide a portable browser link for another device.
+            if(entry.family==='IPv6'&&entry.scopeid)continue;
+            if(allIPv4&&entry.family!=='IPv4')continue;
+            if(!allIPv4&&!allInterfaces&&entry.address!==address.address)continue;
+            urls.add(`http://${browserHostname(entry.address)}:${address.port}${startPath}`);
+        }
+    }
+    return [...urls];
+}
+
 async function startOwnedDevServer({
     workspaceRoot=process.cwd(),
     appId,
@@ -504,8 +528,8 @@ async function startOwnedDevServer({
     if(sdkRuntimeSourceRoot!==undefined&&mode!=='source'){
         fail('sdkRuntimeSourceRoot is supported only in source development mode.','ARCANE_USAGE');
     }
-    if(host!=='127.0.0.1'&&host!=='::1'){
-        fail('Development server host must be a numeric loopback address (127.0.0.1 or ::1).','ARCANE_POLICY_DENIED');
+    if(!is.string(host)||!host.trim()){
+        fail('Development server host must be a nonempty string.','ARCANE_USAGE');
     }
     if(!is.integer(port)||port<0||port>65535)fail('port must be an integer from 0 through 65535.','ARCANE_USAGE');
     const requestedRuntimeMode=mode==='source'&&sdkRuntimeSourceRoot!==undefined
@@ -631,7 +655,9 @@ async function startOwnedDevServer({
         server.close();
         fail('Development server did not expose a TCP address.');
     }
-    const visibleHost=address.family==='IPv6'?`[${address.address}]`:address.address;
+    const visibleHost=address.address==='0.0.0.0'||address.address==='::'
+        ?'localhost'
+        :browserHostname(address.address);
     const endpoint=new URL(`http://${visibleHost}:${address.port}`);
     const origin=endpoint.origin;
     const cleanUrl=`${origin}${routeSet.startPath}`;
@@ -728,17 +754,20 @@ async function startOwnedDevServer({
         origin,
         cleanUrl,
         url,
+        networkUrls:[],
         close,
         closed:lifecycle,
         lifecycle
     };
     try{
+        result.networkUrls=networkUrlsForAddress(address,routeSet.startPath);
         await events.send({
             type:'server.started',
             mode,
             host:result.host,
             port:result.port,
             url,
+            networkUrls:result.networkUrls,
             appId:result.appId,
             ...(routeSet.runtime?{
                 runtimeMode:routeSet.runtime.mode,

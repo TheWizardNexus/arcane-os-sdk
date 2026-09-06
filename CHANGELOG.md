@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0
+
+- Add `arcane dev --public`, including forwarding through
+  `npm run dev -- --app <id> --public`, to bind the selected app's existing
+  source server to all IPv4 interfaces. Keep the ordinary localhost default
+  and let an explicit `--host` select the bind address.
+- Allow explicit network hosts in the shared development server. Report usable
+  local and network application URLs, including `networkUrls` in server results
+  and lifecycle events, while preserving selected routes and cancellation.
+- Document LAN use and the browser HTTPS requirement for features that need a
+  secure context. No app-specific server, firewall rule, or tunnel is added.
+
 ## 0.6.2
 
 - Replace browser NPU setup buttons with direct browser-specific flags links

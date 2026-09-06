@@ -3451,7 +3451,7 @@ async function useselectApp(...arguments_) {
 
 ### Overview
 
-Starts one owned browser development server with exact runtime/app route mappings and an unguessable session capability.
+Starts one owned browser development server with exact runtime/app route mappings and a caller-selected bind address.
 
 ### Signature, modes, and result
 
@@ -3464,19 +3464,23 @@ Import it from `arcane-os`. Source mode accepts
 signal, onEvent}` and serves one validated workspace application plus its
 complete SDK or integrated runtime. Packaged mode uses
 `{mode:'packaged', releaseRoot, host, port, signal, onEvent}` and serves the
-complete selected release files. `host` must be
-numeric loopback `127.0.0.1` or `::1`; port `0` asks the operating system for an
-available port.
+complete selected release files. `host` defaults to `127.0.0.1` and accepts an
+explicit network address or hostname. Use `0.0.0.0` for all IPv4 interfaces or
+`::` for the platform's IPv6 wildcard listener; port `0` asks the operating
+system for an available port.
 
 The promise settles after the listener is ready and resolves to
-`{server, mode, workspaceRoot, appId, host, port, origin, cleanUrl, url, close,
-closed, lifecycle}`. `server` is the raw Node HTTP server. `url` contains the
-unguessable bootstrap capability that establishes an HttpOnly session
-cookie; do not log, persist, or disclose it. `cleanUrl` contains no capability
-but does not bootstrap a new browser session by itself. In packaged mode,
-`workspaceRoot` and `appId` are `null`.
+`{server, mode, workspaceRoot, appId, host, port, origin, cleanUrl, url,
+networkUrls, close, closed, lifecycle}`. `server` is the raw Node HTTP server.
+`url` and `cleanUrl` are the same application URL. Wildcard listeners use
+`localhost` in that local URL; `host` retains the actual bound address.
+`networkUrls` lists application URLs for applicable non-loopback interface
+addresses discovered once at startup. These URLs are connection candidates,
+not evidence of reachability from another device. The server adds no session
+capability or authentication. In packaged mode, `workspaceRoot` and `appId`
+are `null`.
 
-Starting the server opens a loopback listener and emits awaited,
+Starting the server opens the selected listener and emits awaited,
 backpressured `server.starting` and `server.started` events. Request failures
 emit `server.request.failed`; shutdown emits `server.stopped` after owned
 requests and event delivery drain. Call `await result.close()` in a `finally`
