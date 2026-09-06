@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.0
+
+- Add `getBrowserDeviceClass()` through the dependency-free
+  `arcane-os/browser-device` entrypoint and managed browser import map. Return
+  `mobile` or `desktop` from browser identity hints, including Android tablets
+  and iPadOS Mac-platform touch identity, for application-owned settings.
+- Keep classification independent of model imports, GPU requests, network,
+  storage, listeners, and viewport changes. Missing or unrecognized identity
+  defaults to `desktop`; the result does not claim hardware capability or
+  model readiness, and existing provider defaults remain unchanged.
+
 ## 0.8.1
 
 - Use `arcaneVersion` as the sole local resource version field across import maps,
