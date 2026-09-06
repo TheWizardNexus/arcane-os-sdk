@@ -91,8 +91,8 @@
       ],
       "summary": "Extracts and audits links from AI Markdown, rendered HTML, CSS, srcset, bare URLs, and email text.",
       "availability": "Cross-host",
-      "protocol": "In-process; bundled Marked parser",
-      "normalization": "Normalized frozen allowlist audit.",
+      "protocol": "In-process; bundled Marked parser and native HTML parsing when a document is available",
+      "normalization": "Mutable audit with exact link comparison after entity and Markdown escape decoding, without URI canonicalization or response mutation. Browsers use native HTML parsing; hosts without a document retain lexical extraction and the existing limited entity decoder. Already decoded rendered values are not decoded again. Authored links retain source offsets; DOM-only attribute links use document order after authored links.",
       "surface": "`auditAIResponseLinks()`, `extractAIResponseLinks()`, `normalizeAIResponseLink()`, `decodeHTMLCharacterReferences()`."
     },
     {
@@ -817,7 +817,7 @@
       "summary": "Re-exports the shared MarkdownSpeech class that removes repeated same formatting marks from streamed narration before speech segmentation.",
       "availability": "Cross-host",
       "protocol": "Shared arcane-os/speech-text package entrypoint",
-      "normalization": "The runtime projection and public package subpath share dependency-free speech-only filtering of repeated *, #, _, backtick, and ~ runs across chunks; single marks and all other characters remain literal; terminal flush and reset clear pending formatting state.",
+      "normalization": "The runtime projection and public package subpath share speech-only filtering of repeated *, #, _, backtick, and ~ runs across chunks; single marks and all other characters remain literal; terminal flush and reset clear pending formatting state.",
       "surface": "`MarkdownSpeech`; `append(text='',end=false)`, `reset()`."
     },
     {

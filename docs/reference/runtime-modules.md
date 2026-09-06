@@ -51,7 +51,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`AIPreferenceRuntime.js`](#aipreferenceruntimejs) | esm | Applies and reads non-persistent per-user AI preference overrides. | Cross-host | Normalized six-slot preference state. |
 | [`AIPreferenceTuple.js`](#aipreferencetuplejs) | esm | Normalizes and compares the six provider/model preference slots. | Cross-host | Fully normalized frozen tuple. |
 | [`AIProviderRuntime.js`](#aiproviderruntimejs) | esm | Owns provider-neutral selection, lifecycle, routing, startup, requests, streaming, cancellation, and independent LLM/STT/TTS state. | Cross-host runtime; provider-specific availability | Normalized required provider members plus route/status contracts, with explicit local-only selection and no implicit fallback. |
-| [`AIResponseURLPolicy.js`](#airesponseurlpolicyjs) | esm | Extracts and audits links from AI Markdown, rendered HTML, CSS, srcset, bare URLs, and email text. | Cross-host | Normalized frozen allowlist audit. |
+| [`AIResponseURLPolicy.js`](#airesponseurlpolicyjs) | esm | Extracts and audits links from AI Markdown, rendered HTML, CSS, srcset, bare URLs, and email text. | Cross-host | Mutable audit with exact link comparison after renderer-level decoding. |
 | [`AIRuntimeState.js`](#airuntimestatejs) | esm | Publishes sticky mutable role snapshots, lifecycle intents, and startup-settlement barriers. | Cross-host state contract | Closed monotonic state records; events report state but grant no authority. |
 | [`AnsiText.js`](#ansitextjs) | esm | Parses terminal ANSI sequences into display spans or strips them to plain text. | Cross-host | Normalized text/span output. |
 | [`ApiModelDatabase.js`](#apimodeldatabasejs) | esm | Fetches an injectable HTTP JSON model with parser, cache, redacted public endpoint records, and request lifecycle events. | Browser / native WebView / server with fetch | Request records are normalized; fetch/provider failures remain mixed. |
@@ -829,7 +829,19 @@ Exact exports: `auditAIResponseLinks`, `decodeHTMLCharacterReferences`, `extract
 
 ### Availability and normalization
 
-**Cross-host.** Normalized frozen allowlist audit. Transport: In-process; bundled Marked parser. [Deep protocol details](protocols.md).
+**Cross-host.** Returns a mutable `{ok, links, unsupportedLinks, allowedLinks}`
+audit. Browsers use detached native HTML elements to parse rendered markup and
+decode character references. Hosts without a document retain lexical extraction
+and the existing limited entity decoder. Rendered values are decoded only once.
+Markdown destinations, CSS URLs, srcset candidates, and authored source positions
+remain part of the audit; DOM-only attribute links use document order after
+authored links because the DOM does not expose source offsets.
+
+Comparison uses exact values after entity and Markdown escape decoding. URI
+encoding, decoding, or URL canonicalization would change those values and is
+not applied. The audit neither changes the response content nor fetches or
+navigates to links. Transport: In-process; bundled Marked parser.
+[Deep protocol details](protocols.md).
 
 ### Example
 
@@ -2269,7 +2281,7 @@ Exact exports: `MarkdownSpeech`.
 ### Availability and normalization
 
 **Cross-host.** The runtime projection and public package entrypoint share the
-same dependency-free implementation. `append()` returns only
+same implementation. `append()` returns only
 the newly available narration. Only a trailing candidate marker and whether
 it repeats are retained; ordinary text is emitted immediately. Terminal
 `append(text,true)` flushes a single pending mark and resets state. `reset()`

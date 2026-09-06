@@ -108,11 +108,11 @@ console.log(runtime.protocol,runtime.status());`
     {
         name:'AIResponseURLPolicy.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Pure parsing and auditing; it loads the bundled Markdown parser but performs no fetch or navigation.',
-        paramsResults:'extractAIResponseLinks(text) finds normalized links across Markdown, HTML, CSS, srcset, bare URLs, and email text. auditAIResponseLinks(text, allowedLinks) returns a frozen {ok, links, unsupportedLinks, allowedLinks} audit.',
+        lifecycleSideEffects:'Parsing and auditing with the bundled Markdown parser and detached native HTML elements when a document is available; performs no fetch or navigation and never changes response content.',
+        paramsResults:'extractAIResponseLinks(text) finds links across Markdown, HTML, CSS, srcset, bare URLs, and email text. auditAIResponseLinks(text, allowedLinks) returns a mutable {ok, links, unsupportedLinks, allowedLinks} audit using exact values after entity and Markdown escape decoding, without URI canonicalization. Authored links retain source offsets; DOM-only attribute links use document order after authored links.',
         events:[],
         errors:[],
-        capabilitiesCore:'Cross-host output-safety policy independent of Core and provider transport.',
+        capabilitiesCore:'Cross-host link auditing independent of Core and provider transport. Browsers use native HTML parsing and entity decoding; hosts without a document retain lexical extraction and the existing limited entity decoder. Already decoded rendered values are not decoded again.',
         example:`const audit=auditAIResponseLinks(
     '[Docs](https://example.com/docs)',
     ['https://example.com/docs']

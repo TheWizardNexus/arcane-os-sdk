@@ -9,8 +9,19 @@ const CSS_URL_PATTERN=/\burl\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*))\s*\)/giu;
 const MARKDOWN_AUTOLINK_PATTERN=/<((?:[a-z][a-z0-9+.-]{1,31}):[^<>\s]+|[^<>\s@]+@[^<>\s@]+\.[^<>\s@]+)>/giu;
 const MARKDOWN_ESCAPED_PUNCTUATION_PATTERN=
     /\\([!"#$%&'()*+,\-./:;<=>?@\[\]\\^_`{|}~])/gu;
-const RENDERED_BLOCK_BOUNDARY_PATTERN=
-    /<\/?(?:address|article|aside|blockquote|br|caption|dd|details|dialog|div|dl|dt|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|li|main|nav|ol|p|pre|section|summary|table|tbody|td|tfoot|th|thead|tr|ul)\b[^>]*>/giu;
+const HTML_LINK_ATTRIBUTES=new Set([
+    'href','src','action','formaction','poster','data'
+]);
+const RENDERED_BLOCK_ELEMENTS=new Set([
+    'address','article','aside','blockquote','br','caption','dd','details',
+    'dialog','div','dl','dt','fieldset','figcaption','figure','footer','form',
+    'h1','h2','h3','h4','h5','h6','header','hr','li','main','nav','ol','p','pre',
+    'section','summary','table','tbody','td','tfoot','th','thead','tr','ul'
+]);
+const RENDERED_BLOCK_BOUNDARY_PATTERN=new RegExp(
+    `<\\/?(?:${Array.from(RENDERED_BLOCK_ELEMENTS).join('|')})\\b[^>]*>`,
+    'giu'
+);
 const RENDERED_TAG_PATTERN=/<[^>]*>/gu;
 const INVISIBLE_FORMATTING_PATTERN=/\p{Default_Ignorable_Code_Point}+/gu;
 const INVISIBLE_TEXT_CONTROL_PATTERN=
@@ -83,9 +94,19 @@ function decodeNumericCharacterReference(match,hexadecimal,decimal){
 }
 
 function decodeHTMLCharacterReferences(value=''){
+    let decoder;
+
     return String(value).replace(
-        /&(?:(af|amp|applyfunction|apos|ast|bsol|colon|comma|commat|dollar|equals|excl|gt|ic|invisiblecomma|invisibletimes|it|lpar|lrm|lt|lowbar|negativemediumspace|negativethickspace|negativethinspace|negativeverythinspace|nobreak|num|percnt|period|plus|quest|quot|rlm|rpar|semi|shy|sol|vert|zerowidthspace|zwj|zwnj);|#x([0-9a-f]+);?|#([0-9]+);?)/gi,
+        /&(?:([a-z][a-z0-9]*);|#x([0-9a-f]+);?|#([0-9]+);?)/gi,
         function decodeOneCharacterReference(match,name,hexadecimal,decimal){
+            if(globalThis.document){
+                decoder??=globalThis.document.createElement('textarea');
+                // Parse only the reference so literal markup and line endings
+                // elsewhere in the original value remain untouched.
+                decoder.innerHTML=match;
+                return decoder.value;
+            }
+
             return name
                 ?decodeNamedCharacterReference(match,name)
                 :decodeNumericCharacterReference(
@@ -130,7 +151,7 @@ function trimUnbalancedClosingCharacters(value=''){
 }
 
 function trimBareLinkCandidate(value=''){
-    let result=decodeHTMLCharacterReferences(value).trim();
+    let result=String(value).trim();
 
     result=trimUnbalancedClosingCharacters(result);
     while(/[.,;:!?]$/u.test(result)){
@@ -141,10 +162,10 @@ function trimBareLinkCandidate(value=''){
     return result;
 }
 
-function normalizeAIResponseLink(value='',{bare=false}={}){
+function normalizeDecodedAIResponseLink(value='',bare=false){
     let result=bare
         ?trimBareLinkCandidate(value)
-        :decodeHTMLCharacterReferences(value).trim();
+        :String(value).trim();
 
     if(result.startsWith('<')&&result.endsWith('>')){
         result=result.slice(1,-1).trim();
@@ -158,6 +179,13 @@ function normalizeAIResponseLink(value='',{bare=false}={}){
     }
 
     return result;
+}
+
+function normalizeAIResponseLink(value='',{bare=false}={}){
+    return normalizeDecodedAIResponseLink(
+        decodeHTMLCharacterReferences(value),
+        bare
+    );
 }
 
 function normalizeMarkdownDestination(value=''){
@@ -239,6 +267,28 @@ function extractSrcsetCandidates(value=''){
     }
 
     return candidates;
+}
+
+function* extractHTMLLinkAttributes(text=''){
+    for(const [pattern,kind] of [
+        [HTML_LINK_ATTRIBUTE_PATTERN,'html-attribute'],
+        [HTML_SRCSET_ATTRIBUTE_PATTERN,'html-srcset']
+    ]){
+        for(const match of String(text).matchAll(pattern)){
+            const value=match[1]??match[2]??match[3]??'';
+            const start=(match.index||0)+Math.max(0,match[0].indexOf(value));
+
+            yield {
+                values:kind==='html-srcset'
+                    ?extractSrcsetCandidates(value)
+                    :[value],
+                start,
+                end:start+value.length,
+                attributeStart:match.index||0,
+                kind
+            };
+        }
+    }
 }
 
 function extractMarkdownReferenceDestinations(text=''){
@@ -339,32 +389,76 @@ function extractRenderedMarkdownLinks(text=''){
         pedantic:false
     });
     const links=[];
+    const template=globalThis.document?.createElement('template');
+    let renderedText;
 
-    for(const match of rendered.matchAll(HTML_LINK_ATTRIBUTE_PATTERN)){
-        links.push({
-            value:match[1]??match[2]??match[3]??'',
-            start:match.index||0,
-            kind:'rendered-html-attribute'
-        });
-    }
+    if(template?.content){
+        template.innerHTML=rendered;
+        const textParts=[];
 
-    for(const match of rendered.matchAll(HTML_SRCSET_ATTRIBUTE_PATTERN)){
-        const value=match[1]??match[2]??match[3]??'';
+        function inspectRenderedNode(node){
+            if(node.nodeType===3){
+                textParts.push(node.data);
+                return;
+            }
 
-        for(const candidate of extractSrcsetCandidates(value)){
-            links.push({
-                value:candidate,
-                start:match.index||0,
-                kind:'rendered-html-srcset'
-            });
+            const block=RENDERED_BLOCK_ELEMENTS.has(node.localName);
+            if(block){
+                textParts.push(' ');
+            }
+            for(const attribute of node.attributes||[]){
+                const srcset=attribute.name==='srcset';
+                if(!srcset&&!HTML_LINK_ATTRIBUTES.has(attribute.name)){
+                    continue;
+                }
+                const values=srcset
+                    ?extractSrcsetCandidates(attribute.value)
+                    :[attribute.value];
+
+                for(const value of values){
+                    links.push({
+                        value,
+                        // DOM has no source offsets. Rendered-only candidates
+                        // follow document order after authored source links.
+                        start:links.length,
+                        kind:srcset
+                            ?'rendered-html-srcset'
+                            :'rendered-html-attribute',
+                        decoded:true
+                    });
+                }
+            }
+            const content=node.localName==='template'&&node.content
+                ?node.content
+                :node;
+            for(const child of content.childNodes){
+                inspectRenderedNode(child);
+            }
+            if(block){
+                textParts.push(' ');
+            }
         }
+
+        inspectRenderedNode(template.content);
+        renderedText=textParts.join('');
+    }else{
+        for(const attribute of extractHTMLLinkAttributes(rendered)){
+            for(const value of attribute.values){
+                links.push({
+                    value,
+                    start:attribute.attributeStart,
+                    kind:`rendered-${attribute.kind}`
+                });
+            }
+        }
+        renderedText=decodeHTMLCharacterReferences(
+            rendered
+                .replace(RENDERED_BLOCK_BOUNDARY_PATTERN,' ')
+                .replace(RENDERED_TAG_PATTERN,'')
+        );
     }
 
-    const visibleText=decodeHTMLCharacterReferences(
-        rendered
-            .replace(RENDERED_BLOCK_BOUNDARY_PATTERN,' ')
-            .replace(RENDERED_TAG_PATTERN,'')
-    )
+    const visibleText=renderedText
         .replace(INVISIBLE_FORMATTING_PATTERN,'')
         .replace(INVISIBLE_TEXT_CONTROL_PATTERN,'');
     const visibleWebRanges=[];
@@ -383,7 +477,8 @@ function extractRenderedMarkdownLinks(text=''){
             value:match[0],
             start,
             kind:'rendered-visible-http',
-            bare:true
+            bare:true,
+            decoded:true
         });
     }
 
@@ -398,7 +493,8 @@ function extractRenderedMarkdownLinks(text=''){
             value:`http://${match[0]}`,
             start,
             kind:'rendered-visible-www',
-            bare:true
+            bare:true,
+            decoded:true
         });
     }
 
@@ -412,7 +508,8 @@ function extractRenderedMarkdownLinks(text=''){
             value:`mailto:${match[0]}`,
             start,
             kind:'rendered-visible-email',
-            bare:false
+            bare:false,
+            decoded:true
         });
     }
 
@@ -422,7 +519,7 @@ function extractRenderedMarkdownLinks(text=''){
 /**
  * Returns both authored URL-like text and destinations produced by the same
  * Markdown parser used by Arcane chat. Values stay exact after renderer-level
- * entity and escape decoding; URL canonicalization would weaken provenance.
+ * entity and escape decoding; URL canonicalization would change comparison.
  */
 function extractAIResponseLinks(text=''){
     const source=String(text);
@@ -436,16 +533,19 @@ function extractAIResponseLinks(text=''){
         start=0,
         kind='unknown',
         bare=false,
-        allowEmpty=false
+        allowEmpty=false,
+        decoded=false
     ){
-        const normalized=normalizeAIResponseLink(value,{bare});
+        const normalized=decoded
+            ?normalizeDecodedAIResponseLink(value,bare)
+            :normalizeAIResponseLink(value,{bare});
 
         if((!normalized&&!allowEmpty)||seen.has(normalized)){
             return false;
         }
 
         seen.add(normalized);
-        links.push(Object.freeze({value:normalized,start,kind}));
+        links.push({value:normalized,start,kind});
         return true;
     }
 
@@ -508,28 +608,10 @@ function extractAIResponseLinks(text=''){
         );
     }
 
-    for(const match of source.matchAll(HTML_LINK_ATTRIBUTE_PATTERN)){
-        const value=match[1]??match[2]??match[3]??'';
-        const offset=match[0].indexOf(value);
-
-        const start=(match.index||0)+Math.max(0,offset);
-
-        addStructuredCandidate(
-            value,
-            start,
-            start+value.length,
-            'html-attribute',
-        );
-    }
-
-    for(const match of source.matchAll(HTML_SRCSET_ATTRIBUTE_PATTERN)){
-        const value=match[1]??match[2]??match[3]??'';
-        const offset=(match.index||0)+Math.max(0,match[0].indexOf(value));
-
-        structuredRanges.push({start:offset,end:offset+value.length});
-
-        for(const candidate of extractSrcsetCandidates(value)){
-            addCandidate(candidate,offset,'html-srcset',false);
+    for(const attribute of extractHTMLLinkAttributes(source)){
+        structuredRanges.push({start:attribute.start,end:attribute.end});
+        for(const value of attribute.values){
+            addCandidate(value,attribute.start,attribute.kind,false);
         }
     }
 
@@ -578,7 +660,8 @@ function extractAIResponseLinks(text=''){
             source.length+renderedLink.start,
             renderedLink.kind,
             renderedLink.bare===true,
-            true
+            true,
+            renderedLink.decoded===true
         );
     }
 
@@ -586,7 +669,7 @@ function extractAIResponseLinks(text=''){
         return left.start-right.start||left.value.localeCompare(right.value);
     });
 
-    return Object.freeze(links);
+    return links;
 }
 
 function normalizeAllowedLinks(allowedLinks=[]){
@@ -610,12 +693,12 @@ function auditAIResponseLinks(text='',allowedLinks=[]){
         return !allowed.has(link.value);
     });
 
-    return Object.freeze({
+    return {
         ok:unsupportedLinks.length===0,
         links,
-        unsupportedLinks:Object.freeze(unsupportedLinks),
-        allowedLinks:Object.freeze(Array.from(allowed))
-    });
+        unsupportedLinks,
+        allowedLinks:Array.from(allowed)
+    };
 }
 
 export {
