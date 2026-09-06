@@ -165,7 +165,8 @@ receive a **Copy GPU flag address** button for the matching browser,
 including `chrome://flags/#force-high-performance-gpu` for identified Chrome.
 Both controls remain available regardless of API availability, adapter class,
 or detection failure. Each flag has one short explanation, followed by a shared
-paste, enable, save, and relaunch instruction.
+instruction: paste the address, enable the flag, save work, then close the
+browser and reopen it. The closing and reopening instruction is underlined and emphasized.
 Settings addresses use Copy controls and appear as selectable text if copying
 fails. The component does not attempt navigation to internal browser pages.
 
@@ -210,7 +211,7 @@ explicitly and invoke it from a user action. It returns a promise resolving to
 `true` only after clipboard success, or `false` for destruction, an unsupported
 target, or copy failure. The complete address remains selectable if clipboard
 access fails. On-screen instructions explain pasting it into the address bar,
-enabling WebNN, and relaunching.
+enabling WebNN, saving work, then closing the browser and reopening it.
 
 `destroy()` aborts owned listeners, disposes the event source, marks `ready`
 false, and suppresses UI updates from pending clipboard and adapter operations.

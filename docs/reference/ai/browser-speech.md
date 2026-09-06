@@ -156,7 +156,8 @@ documents the **Enables WebNN API** flag and model/operator requirements.
 The **GPU performance** section shows a short adapter status and a **Copy GPU
 flag address** button on desktop Windows Chromium browsers. The button remains
 available for every adapter class, unavailable API, or detection failure. One
-shared instruction explains pasting, enabling, saving work, and relaunching. Identified
+shared instruction explains pasting, enabling, saving work, then closing the
+browser and reopening it, with the final step underlined and emphasized. Identified
 Chrome uses `chrome://flags/#force-high-performance-gpu`; other recognized
 Chromium browsers use their corresponding internal scheme. **Refresh**
 requests a new availability result; concurrent
