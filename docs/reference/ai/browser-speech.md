@@ -144,28 +144,33 @@ name. It does not load a model or create a GPU device or WebNN context:
 </html-import>
 ```
 
-The **NPU setup** section provides real browser-specific flags links. Chrome uses
+When WebNN is unavailable, **NPU setup** provides a **Copy NPU flag address**
+button and a short enable/relaunch instruction. Chrome uses
 `chrome://flags/#web-machine-learning-neural-network`; Edge uses
 `edge://flags/#web-machine-learning-neural-network`. Unrecognized browsers
-receive explicit Chrome and Edge choices. Full addresses and copy controls
-remain available if the browser blocks internal-page links.
+receive explicit Chrome and Edge choices. A failed copy shows the complete
+address as selectable text; the component does not open internal browser pages.
 The [ONNX Runtime WebNN guide](https://onnxruntime.ai/docs/tutorials/web/ep-webnn.html)
 documents the **Enables WebNN API** flag and model/operator requirements.
 
-The **GPU performance** section shows adapter detection and, on desktop Windows
-Chromium browsers, the matching Force High Performance GPU flags link. Identified
+The **GPU performance** section shows a short adapter status. Only an explicitly
+reported integrated or software adapter receives setup guidance on desktop
+Windows Chromium browsers. Identified
 Chrome uses `chrome://flags/#force-high-performance-gpu`; other recognized
-Chromium browsers use their corresponding internal scheme. **Detect GPU** or
-**Refresh browser availability** requests a new availability result; concurrent
+Chromium browsers use their corresponding internal scheme. **Refresh**
+requests a new availability result; concurrent
 requests share the pending operation. The public `checkGpu()` method provides
 the same promise, while `refresh()` remains a synchronous API-presence and
 settings update. Component readiness does not wait for adapter detection.
 
 Adapter selection uses `powerPreference: "high-performance"` as a hint, not proof
-of the selected GPU's performance or the flag's current state. A returned
-adapter establishes availability only; its fallback classification is reported
-when exposed. The component cannot read the browser flag or prove that a model
-is executing on the adapter. See the
+of the selected GPU's performance or the flag's current state. When the browser
+explicitly reports a discrete GPU, Profile says **Already using the performance
+GPU.** and hides setup instructions. Explicit integrated or software/fallback
+metadata is reported as such. Missing type metadata shows **GPU available.**
+without flag advice and leaves performance selection unconfirmed; a vendor name is not a GPU
+classification. The component cannot read the browser flag or prove that a
+model is executing on the adapter. See the
 [component contract](../runtime-components.md#browser-ai-setuphtml) for result
 fields, failure handling, and disposal behavior.
 

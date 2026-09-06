@@ -8,7 +8,7 @@ import {
   resolveModelSecurity,
 } from "./model-controller.mjs";
 import { createPackagedWllamaRuntime } from "./browser-wllama-runtime.mjs";
-import { getBrowserDeviceSettings, openBrowserDeviceSettings } from "./browser-device-settings.mjs";
+import { getBrowserDeviceSettings, describeBrowserGpu } from "./browser-device-settings.mjs";
 import { arcaneEvents } from "../event-manager.mjs";
 
 const is = new Is(false);
@@ -269,21 +269,22 @@ function notifyHighPerformanceGpu(adapter) {
     if (highPerformanceGpuNoticeShown) {
         return;
     }
+    const selection = describeBrowserGpu(adapter);
+    if (selection.performanceStatus !== "integrated" && selection.performanceStatus !== "fallback") {
+        return;
+    }
     const browser = getBrowserDeviceSettings().highPerformanceGpu;
     if (!browser) {
         return;
     }
     highPerformanceGpuNoticeShown = true;
-    const adapterName = adapter.description || adapter.name
-        || [adapter.vendor, adapter.architecture].filter(Boolean).join(" ")
-        || "the available WebGPU adapter";
-    openBrowserDeviceSettings(
-        browser,
-        `Selected WebGPU adapter: ${adapterName}.\n\n`
-        + `If this computer has multiple GPUs, enable “Force High Performance GPU” in ${browser.name} `
-        + "to request the high-performance GPU when available. "
-        + `Then completely close and reopen ${browser.name} before loading the model again.\n\n`
-        + `If the flags page did not open, paste ${browser.url} into the address bar.`,
+    const selectedKind = selection.performanceStatus === "fallback" ? "Software/fallback" : "Integrated";
+    globalThis.alert?.(
+        `${selectedKind} WebGPU adapter selected: ${selection.name}.\n\n`
+        + "If this computer also has a discrete GPU, the browser may be able to use it. "
+        + `Copy ${browser.url} into the address bar in ${browser.name} `
+        + "and enable “Force High Performance GPU” to request it when available. "
+        + `Save your work, then completely close and reopen ${browser.name} before loading the model again.`,
     );
 }
 
@@ -3057,7 +3058,9 @@ export function createBrowserWasmLlmProvider({
             "Wllama did not confirm that the model loaded successfully.",
           );
         }
-        emitWebgpuAdapterSelection(activeSource, runtime);
+        if (!signal?.aborted && generation === lifecycleGeneration && state === 'loading') {
+            emitWebgpuAdapterSelection(activeSource, runtime);
+        }
         throwIfAborted(signal, "load");
         if (generation !== lifecycleGeneration || state !== "loading") {
           await runtime.exit();

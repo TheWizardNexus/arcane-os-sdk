@@ -187,34 +187,42 @@ Applications remain responsible for model selection and license compliance.
 cannot download. Source downloads use CORS, omit credentials and referrer,
 disable HTTP caching, and honor `AbortSignal`.
 
-On Windows desktop Chromium browsers, observing a WebGPU adapter may open one
-flags page and show one advisory per page session. The notice names only
-**Force High Performance GPU** (`#force-high-performance-gpu`), conditional on
-the computer having multiple GPUs, and asks the user to completely close and
-reopen their browser after enabling it. It applies to any observed GPU vendor;
-an Intel identity alone does not establish that an adapter is integrated or
-slower, and the browser does not expose a reliable machine-wide GPU count.
+After a model loads, its existing Worker reports the adapter it selected.
+The runtime retains that adapter in `evidence().webgpu.adapter`, including
+optional browser-reported `type` and `isFallbackAdapter` fields. This reads
+the loaded Worker's metadata once; it does not request another adapter.
+Missing fields remain unknown. Cancellation also cancels the metadata wait;
+an unavailable observation is logged without rejecting an otherwise loaded model.
 
-An identified Microsoft Edge, Brave, Opera, or Vivaldi receives its own
-`edge://`, `brave://`, `opera://`, or `vivaldi://` flags address. Chrome,
-Chromium, and browsers that conceal their brand receive
-`about://flags/#force-high-performance-gpu`, which the browser rewrites to its
-own flags page, with neutral browser wording. Only the current browser's one
-address appears. Firefox, Safari, non-Windows platforms, and mobile browsers
-receive no flag notice. The notice does not suggest unrelated WebGPU, ANGLE,
-Vulkan, rasterization, or blocklist flags.
+On Windows desktop Chromium browsers, an explicitly reported integrated GPU,
+CPU, or fallback adapter triggers one GPU-only browser alert per page session.
+The alert names the selected adapter and **Force High Performance GPU**
+(`#force-high-performance-gpu`), conditional on the computer also having a
+discrete GPU. It contains the address to paste manually and asks the user to
+save their work and completely close and reopen the browser after changing
+the flag. It does not open a window or navigate to an internal browser page.
+Discrete adapters and unknown adapter classes do not trigger the alert.
 
-The Windows selection workaround is documented by
-[Chrome](https://developer.chrome.com/docs/web-platform/webgpu/troubleshooting-tips#Windows-specific_limitations).
-Other Chromium browsers inherit that flag; the per-vendor addresses and generic
-`about://` rewrite follow the
-[Chromium browser-flags guide](https://developer.chrome.com/blog/browser-flags/).
-[Vivaldi masks its browser identity by default](https://help.vivaldi.com/developers/web/vivaldi-user-agent-and-client-hints-user-agent/),
-so a Chrome user-agent token is not proof that the current browser is Chrome.
-This source-based guidance is not a live GPU-selection test of every browser
-release. The advisory does not change settings, prove another or faster adapter
-exists, inspect the flag's current value, or make a failed load succeed. If the
-browser blocks opening an internal page, the alert retains the copyable address.
+An identified Chrome, Microsoft Edge, Brave, Opera, or Vivaldi receives its own
+`chrome://`, `edge://`, `brave://`, `opera://`, or `vivaldi://` flags address.
+Other detected Chromium browsers receive
+`about://flags/#force-high-performance-gpu` with neutral browser wording.
+Only the current browser's address appears. Firefox, Safari, non-Windows
+platforms, and mobile browsers receive no flag notice. The alert contains no
+NPU guidance or unrelated flags. The Profile `browser-ai-setup` component
+provides Copy controls for its browser addresses.
+
+An adapter vendor or name does not establish its GPU class, and
+`powerPreference: "high-performance"` is a request hint rather than proof of
+the selected hardware. Chromium's optional adapter `type` is a
+[developer feature](https://developer.chrome.com/docs/web-platform/webgpu/developer-features);
+the standard API does not always expose integrated or discrete classification.
+The Profile says **Already using the performance GPU.** for an explicitly
+reported discrete GPU and hides performance flag advice. Missing classification
+shows **GPU available.** without flag advice and remains unconfirmed.
+The browser does not expose the flag's current value or a reliable machine-wide
+GPU count, and a discrete adapter does not prove it is the fastest available.
+See [Chrome's GPU selection guidance](https://developer.chrome.com/docs/web-platform/webgpu/troubleshooting-tips#webgpu_is_slower_than_webgl).
 
 ## Streaming, cancellation, and tools
 

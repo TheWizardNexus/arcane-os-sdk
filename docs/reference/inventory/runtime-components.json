@@ -5,7 +5,7 @@
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
     "branch": "main",
     "path": "runtime/arcane/components",
-    "sdkVersion": "0.6.2"
+    "sdkVersion": "0.7.1"
   },
   "componentCount": 40,
   "loader": "/arcane/modules/HTMLImport.js",
@@ -79,7 +79,7 @@
     {
       "file": "runtime/arcane/components/browser-ai-setup.html",
       "name": "browser-ai-setup.html",
-      "purpose": "Displays browser API and WebGPU adapter availability with browser-specific NPU and GPU flags links.",
+      "purpose": "Displays browser API availability, browser-reported GPU class, and copyable NPU/GPU flags addresses.",
       "methods": [
         "refresh()",
         "checkGpu()",
@@ -97,8 +97,8 @@
         "arcane-os/event-manager"
       ],
       "availability": "Browser and supported native WebViews",
-      "transport": "HTMLImport + DOM; browser flags links, Clipboard API, WebGPU adapter request, and preserved open() navigation attempt with alert",
-      "normalization": "API presence, adapter availability, and setup instructions normalized. Mounting starts one adapter request; checkGpu() coalesces concurrent calls, while refresh() remains synchronous. No GPU device, model, or WebNN context is created. Adapter availability does not establish browser flag state, high-performance selection, or model execution."
+      "transport": "HTMLImport + DOM; Clipboard API and WebGPU adapter request. Settings addresses use Copy controls and appear as text if copying fails; open() copies the NPU address without navigation or an alert.",
+      "normalization": "API presence, adapter availability, explicit browser GPU class, and copy instructions normalized. A reported discrete GPU shows Already using the performance GPU. Only explicitly reported integrated/software adapters show flag instructions. Absent type metadata shows GPU available and leaves performance selection unconfirmed. Mounting starts one adapter request; checkGpu() coalesces concurrent calls, while refresh() remains synchronous. No GPU device, model, or WebNN context is created. Adapter metadata does not establish browser flag state, the fastest physical GPU, or another page's model execution."
     },
     {
       "file": "runtime/arcane/components/calculator.html",

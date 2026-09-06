@@ -1,6 +1,6 @@
 import Is from "../dependencies/strong-type/index.js";
 import { arcaneLogging } from '../logging.mjs';
-import { Wllama } from "./wllama/index.mjs";
+import {Wllama, WllamaRuntimeError} from './wllama/index.mjs';
 
 const is = new Is(false);
 
@@ -567,7 +567,46 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
           "Wllama did not confirm a successfully loaded model.",
         );
       }
-      const webgpu = { observed: true, apiPresent: true };
+      let adapter = null;
+      const telemetryOperation = trackOperation(
+          Promise.resolve().then(
+              function observeLoadedGpu() {
+                  return next.arcaneTelemetry();
+              }
+          )
+      );
+      function cancelGpuObservation() {
+          telemetryOperation.cancel(loadController.signal.reason);
+      }
+      loadController.signal.addEventListener(
+          'abort',
+          cancelGpuObservation,
+          {once: true}
+      );
+      if (loadController.signal.aborted) cancelGpuObservation();
+      try {
+          // Observe the adapter this loaded Worker already selected; do not probe
+          // a second adapter in the page and attribute it to the model.
+          const telemetry = await telemetryOperation.result;
+          if (telemetry?.worker?.invalid === true) {
+              arcaneLogging.warn("The loaded model's GPU adapter observation is inconsistent.", telemetry.worker);
+          } else {
+              adapter = telemetry?.worker?.adapter ?? null;
+          }
+      } catch (error) {
+          if (loadController.signal.aborted || error instanceof WllamaRuntimeError) throw error;
+          arcaneLogging.warn("The loaded model's GPU adapter details are unavailable.", error);
+      } finally {
+          loadController.signal.removeEventListener('abort', cancelGpuObservation);
+      }
+      if (progressFailure) throw progressFailure;
+      if (loadController.signal.aborted) throw cancellationError(loadController.signal.reason);
+      if (pending?.engine !== next) throw new Error('Wllama load was cancelled.');
+      const webgpu = {
+          observed: true,
+          apiPresent: true,
+          adapter
+      };
       pending = null;
       engine = next;
       publishEvidence({ state: "ready", webgpu, cancellation: null, cleanup: null });

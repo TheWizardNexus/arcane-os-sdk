@@ -3490,7 +3490,9 @@ var Wllama = class {
   }
 
   const adapterAnchor = "if(adapter){WebGPU.Internals.jsObjectInsert(adapterPtr,adapter)";
-  const adapterProjection = `if(adapter){(function arcaneRecordSelectedWebgpuAdapter(){const key="__arcaneWllamaWebgpuTelemetry";const previous=globalThis[key]??${emptyWorkerTelemetry};const info=adapter.info??{};const text=value=>typeof value==="string"?value.slice(0,256):"";const next={selected:true,vendorId:null,vendor:text(info.vendor),architecture:text(info.architecture),deviceId:null,name:text(info.device),description:text(info.description)};const conflicts=previous.adapter!==null&&JSON.stringify(previous.adapter)!==JSON.stringify(next);globalThis[key]={protocol:"${protocol}",adapter:previous.adapter??next,bufferCount:previous.bufferCount,bufferBytes:previous.bufferBytes,queueSubmissions:previous.queueSubmissions,commandBuffers:previous.commandBuffers,queueFenceRequests:previous.queueFenceRequests,queueFenceCompletions:previous.queueFenceCompletions,invalid:previous.invalid||conflicts}})();WebGPU.Internals.jsObjectInsert(adapterPtr,adapter)`;
+  const adapterProjection = `if(adapter){(function arcaneRecordSelectedWebgpuAdapter(){const key="__arcaneWllamaWebgpuTelemetry";const previous=globalThis[key]??${emptyWorkerTelemetry};const info=adapter.info??{};const text = function preserveAdapterText(value) {
+    return typeof value === 'string' ? value : '';
+};const next={selected:true,vendorId:null,vendor:text(info.vendor),architecture:text(info.architecture),deviceId:null,name:text(info.device),description:text(info.description),type:typeof info.type==="string"&&info.type?info.type:null,isFallbackAdapter:typeof info.isFallbackAdapter==="boolean"?info.isFallbackAdapter:typeof adapter.isFallbackAdapter==="boolean"?adapter.isFallbackAdapter:null};const conflicts=previous.adapter!==null&&JSON.stringify(previous.adapter)!==JSON.stringify(next);globalThis[key]={protocol:"${protocol}",adapter:previous.adapter??next,bufferCount:previous.bufferCount,bufferBytes:previous.bufferBytes,queueSubmissions:previous.queueSubmissions,commandBuffers:previous.commandBuffers,queueFenceRequests:previous.queueFenceRequests,queueFenceCompletions:previous.queueFenceCompletions,invalid:previous.invalid||conflicts}})();WebGPU.Internals.jsObjectInsert(adapterPtr,adapter)`;
   WLLAMA_EMSCRIPTEN_CODE = replaceSingle(
     WLLAMA_EMSCRIPTEN_CODE,
     adapterAnchor,
@@ -3526,7 +3528,7 @@ var Wllama = class {
   );
 
   const workerAnchor = "  if (verb === 'module.init') {";
-  const workerProjection = `  if (verb === 'arcane.telemetry') {\n    const observed = globalThis.__arcaneWllamaWebgpuTelemetry;\n    const adapter = observed?.adapter?.selected === true ? {\n      selected: true,\n      vendorId: null,\n      vendor: typeof observed.adapter.vendor === 'string' ? observed.adapter.vendor.slice(0, 256) : '',\n      architecture: typeof observed.adapter.architecture === 'string' ? observed.adapter.architecture.slice(0, 256) : '',\n      deviceId: null,\n      name: typeof observed.adapter.name === 'string' ? observed.adapter.name.slice(0, 256) : '',\n      description: typeof observed.adapter.description === 'string' ? observed.adapter.description.slice(0, 256) : '',\n    } : null;\n    msg({\n      callbackId,\n      result: {\n        protocol: '${protocol}',\n        adapter,\n        bufferCount: Number.isSafeInteger(observed?.bufferCount) ? observed.bufferCount : 0,\n        bufferBytes: Number.isSafeInteger(observed?.bufferBytes) ? observed.bufferBytes : 0,\n        queueSubmissions: Number.isSafeInteger(observed?.queueSubmissions) ? observed.queueSubmissions : 0,\n        commandBuffers: Number.isSafeInteger(observed?.commandBuffers) ? observed.commandBuffers : 0,\n        queueFenceRequests: Number.isSafeInteger(observed?.queueFenceRequests) ? observed.queueFenceRequests : 0,\n        queueFenceCompletions: Number.isSafeInteger(observed?.queueFenceCompletions) ? observed.queueFenceCompletions : 0,\n        invalid: observed?.invalid === true,\n      },\n    });\n    return;\n  }\n\n${workerAnchor}`;
+  const workerProjection = `  if (verb === 'arcane.telemetry') {\n    const observed = globalThis.__arcaneWllamaWebgpuTelemetry;\n    const adapter = observed?.adapter?.selected === true ? {\n      selected: true,\n      vendorId: null,\n      vendor: typeof observed.adapter.vendor === 'string' ? observed.adapter.vendor : '',\n      architecture: typeof observed.adapter.architecture === 'string' ? observed.adapter.architecture : '',\n      deviceId: null,\n      name: typeof observed.adapter.name === 'string' ? observed.adapter.name : '',\n      description: typeof observed.adapter.description === 'string' ? observed.adapter.description : '',\n      type: typeof observed.adapter.type === 'string' ? observed.adapter.type : null,\n      isFallbackAdapter: typeof observed.adapter.isFallbackAdapter === 'boolean' ? observed.adapter.isFallbackAdapter : null,\n    } : null;\n    msg({\n      callbackId,\n      result: {\n        protocol: '${protocol}',\n        adapter,\n        bufferCount: Number.isSafeInteger(observed?.bufferCount) ? observed.bufferCount : 0,\n        bufferBytes: Number.isSafeInteger(observed?.bufferBytes) ? observed.bufferBytes : 0,\n        queueSubmissions: Number.isSafeInteger(observed?.queueSubmissions) ? observed.queueSubmissions : 0,\n        commandBuffers: Number.isSafeInteger(observed?.commandBuffers) ? observed.commandBuffers : 0,\n        queueFenceRequests: Number.isSafeInteger(observed?.queueFenceRequests) ? observed.queueFenceRequests : 0,\n        queueFenceCompletions: Number.isSafeInteger(observed?.queueFenceCompletions) ? observed.queueFenceCompletions : 0,\n        invalid: observed?.invalid === true,\n      },\n    });\n    return;\n  }\n\n${workerAnchor}`;
   LLAMA_CPP_WORKER_CODE = replaceSingle(
     LLAMA_CPP_WORKER_CODE,
     workerAnchor,
@@ -3539,7 +3541,7 @@ var Wllama = class {
       return Number.isSafeInteger(candidate) && candidate >= 0 ? candidate : 0;
     }
     function adapterText(candidate) {
-      return typeof candidate === "string" && candidate.length <= 256 ? candidate : "";
+      return typeof candidate === "string" ? candidate : "";
     }
     const rawAdapter = value?.adapter;
     const adapterInvalid = rawAdapter !== undefined && rawAdapter !== null && (
@@ -3547,16 +3549,12 @@ var Wllama = class {
       || rawAdapter.selected !== true
       || rawAdapter.vendorId !== null
       || typeof rawAdapter.vendor !== "string"
-      || rawAdapter.vendor.length > 256
       || typeof rawAdapter.architecture !== "string"
-      || rawAdapter.architecture.length > 256
       || rawAdapter.deviceId !== null
       || typeof rawAdapter.name !== "string"
-      || rawAdapter.name.length > 256
       || typeof rawAdapter.description !== "string"
-      || rawAdapter.description.length > 256
     );
-    const adapter = rawAdapter?.selected === true ? Object.freeze({
+    const adapter = rawAdapter?.selected === true ? {
       selected: true,
       vendorId: null,
       vendor: adapterText(rawAdapter.vendor),
@@ -3564,7 +3562,9 @@ var Wllama = class {
       deviceId: null,
       name: adapterText(rawAdapter.name),
       description: adapterText(rawAdapter.description),
-    }) : null;
+      type: typeof rawAdapter.type === "string" ? rawAdapter.type : null,
+      isFallbackAdapter: typeof rawAdapter.isFallbackAdapter === "boolean" ? rawAdapter.isFallbackAdapter : null,
+    } : null;
     return Object.freeze({
       protocol,
       adapter,

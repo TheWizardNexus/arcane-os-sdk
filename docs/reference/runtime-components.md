@@ -60,7 +60,7 @@ appropriate.
 | --- | --- | --- | --- | --- |
 | [`app-bar.html`](#app-barhtml) | Responsive application navigation, route state, status, and trailing actions. | `setNavigation()`<br>`setActiveRoute()`<br>`setStatus()`<br>`refresh()`<br>`destroy()` | `app-bar-ready` | DOM-normalized |
 | [`assistant-panel.html`](#assistant-panelhtml) | Reusable assistant drawer, message area, composer, pending/streaming/empty/error state, and actions. | `open()`<br>`close()`<br>`toggle()`<br>`send()`<br>`clear()`<br>`setState()`<br>`focusComposer()`<br>`scrollToEnd()`<br>`destroy()` | `assistant-ready`<br>`assistant-opened`<br>`assistant-closed`<br>`assistant-send`<br>`assistant-clear` | DOM-normalized; caller/provider results remain external |
-| [`browser-ai-setup.html`](#browser-ai-setuphtml) | Browser API and WebGPU adapter availability, with browser-specific NPU and GPU flags links. | `refresh()`<br>`checkGpu()`<br>`open()`<br>`destroy()`<br>`ready` | `browser-ai-setup-ready` | API and adapter availability; browser flag state and model execution remain browser-owned |
+| [`browser-ai-setup.html`](#browser-ai-setuphtml) | Browser API availability, reported GPU class, and copyable NPU/GPU settings addresses. | `refresh()`<br>`checkGpu()`<br>`open()`<br>`destroy()`<br>`ready` | `browser-ai-setup-ready` | Browser-reported adapter class; browser flag state and model execution remain browser-owned |
 | [`calculator.html`](#calculatorhtml) | Calculator keypad and result/error event surface backed by CalculatorEngine. | `calculate()`<br>`destroy()` | `calculator-ready`<br>`calculation-complete`<br>`calculation-error` | Normalized Calculation/error events |
 | [`chart.html`](#charthtml) | Accessible uPlot line, area, or point chart with normalized options and rows. | `configure()`<br>`populate()`<br>`setData()`<br>`addData()`<br>`update()`<br>`destroy()` | `chart-ready`<br>`chart-remove` | Options/rows normalized; uPlot rendering is vendor-native |
 | [`chat.html`](#chathtml) | Shared chat, visible selected-model activation request, file upload, streaming, structural tool settlement, speech, language, availability, and conversation-timebox surface. | `streamMessage()`<br>`setMessageProgress()`<br>`setAIAvailability()`<br>`setInitialSpeechMuted()`<br>`setConversationComplete()`<br>`bindConversationTimebox()`<br>`bindSession()`<br>`submitMessage()`<br>`submitToolResult()`<br>`submitToolResults()`<br>`sendMessage()`<br>`languageChanged()`<br>`requestAIActivation()`<br>`destroy()` | `chat-ready`<br>`chat-session-bound`<br>`chat-session-message`<br>`chat-session-error`<br>`chat-send-message`<br>`chat-send-error`<br>`chat-file-uploaded`<br>`chat-file-upload-error`<br>`chat-language-changed`<br>`chat-language-change-error`<br>`chat-ai-activation-request`<br>`chat-ai-activation-error`<br>`chat-speech-synthesis-error`<br>`conversation-timebox-error` | UI/runtime state, explicit user activation intent, and honest structural-call settlement normalized; AI/storage/media behavior mixed |
@@ -158,14 +158,14 @@ Slots: `title`, `subtitle`, `identity`, `messages/message`, `composer`, `actions
 
 ### Overview
 
-Displays WebNN and WebGPU API availability for the current page, detects an
-available WebGPU adapter, and provides browser-specific NPU and GPU flags links.
-The WebNN addresses are real links: Chrome and Edge receive their own addresses;
-other or unidentified browsers show both explicit choices. Desktop Windows
-Chromium browsers also receive the matching Force High Performance GPU link,
+Displays a short WebNN availability status and the detected WebGPU adapter.
+When WebNN is unavailable, Chrome and Edge receive a **Copy NPU flag address**
+button for their own browser; unidentified browsers show both choices. Desktop Windows
+Chromium browsers receive the matching Force High Performance GPU address only
+when an integrated or software adapter is explicitly reported,
 including `chrome://flags/#force-high-performance-gpu` for identified Chrome.
-Copy controls and complete addresses remain available when the browser blocks
-navigation to an internal page.
+Settings addresses use Copy controls and appear as selectable text if copying
+fails. The component does not attempt navigation to internal browser pages.
 
 ### Public surface
 
@@ -184,26 +184,32 @@ calls share the pending promise. The component requests an adapter with the
 `"high-performance"` power-preference hint; it does not create a GPU device or
 load a model. An unavailable result contains `available: false` and a `reason`
 of `"api-unavailable"` or `"adapter-unavailable"`. An available result contains
-`available: true`, the reported adapter `name`, and `isFallbackAdapter` as a
-boolean or `null` when the browser exposes no classification. Adapter selection
-does not prove that a browser flag is enabled, that the fastest GPU was selected,
-or that a model is using it. Failure is displayed and logged, and the promise
+`available: true`, the reported adapter `name`, `isFallbackAdapter` as a boolean
+or `null`, `adapterType` as the browser's string or `null`, and
+`performanceStatus`: `"discrete"`, `"integrated"`, `"fallback"`, or `"unknown"`.
+Only the explicit browser type or fallback field establishes that status;
+vendor names and the requested power preference do not. A discrete result
+shows **Already using the performance GPU.** and hides flag instructions.
+An unknown class shows **GPU available.** without recommending flag changes;
+performance selection remains unconfirmed in the result. Adapter selection does not
+prove that a browser flag is enabled, that the fastest GPU was selected, or that
+a model is using it. Failure is displayed and logged, and the promise
 resolves to `false`; destruction also yields `false` and suppresses late UI
 updates.
 
-Mounting starts one `checkGpu()` operation. **Detect GPU** repeats it explicitly;
-**Refresh browser availability** calls both `refresh()` and `checkGpu()`. Calling
+Mounting starts one `checkGpu()` operation. **Refresh** calls both `refresh()`
+and `checkGpu()`. Calling
 `refresh()` directly remains synchronous and does not request an adapter.
 `ready` and `browser-ai-setup-ready` describe component setup, which can complete
 while adapter detection is still pending.
 
-`open()` refreshes the display, attempts to open the detected Chrome or Edge flags
-page, and presents an alert containing the full address and enable/relaunch
-instructions. Pass `"chrome"` or `"edge"` to choose explicitly. Invoke it from a
-user action. It returns `false` when destroyed or when no supported target is
-selected, and otherwise returns `undefined`; it never reports that navigation
-succeeded. Browsers may block internal-page navigation, so the full addresses
-also remain visible and copyable in the component.
+The retained `open(browserId?)` method now copies the matching NPU flags address
+instead of navigating or showing an alert. Pass `"chrome"` or `"edge"` to choose
+explicitly and invoke it from a user action. It returns a promise resolving to
+`true` only after clipboard success, or `false` for destruction, an unsupported
+target, or copy failure. The complete address remains selectable if clipboard
+access fails. On-screen instructions explain pasting it into the address bar,
+enabling WebNN, and relaunching.
 
 `destroy()` aborts owned listeners, disposes the event source, marks `ready`
 false, and suppresses UI updates from pending clipboard and adapter operations.

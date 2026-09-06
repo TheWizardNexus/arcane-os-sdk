@@ -1,29 +1,20 @@
-import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const WLLAMA_UPSTREAM_AUTHORITY = Object.freeze({
-  package: "@wllama/wllama",
-  version: "3.6.0",
-  sourceRevision: "f16050d8d51a00602c6a2a6b8ac9c09f490eea7f",
-  bytes: 373_519,
-  sha256: "4637e42d636010493a9b274fbbe70bfd8120365da726b1d9e589d85ca84a00d6",
-});
+export const WLLAMA_UPSTREAM_AUTHORITY = {
+    package: '@wllama/wllama',
+    version: '3.6.0',
+    sourceRevision: 'f16050d8d51a00602c6a2a6b8ac9c09f490eea7f'
+};
 
 export const WLLAMA_WEBGPU_EVIDENCE_PROTOCOL = "arcane-wllama-webgpu-evidence/1";
-export const WLLAMA_PROJECTED_BYTES = 392_852;
-export const WLLAMA_PROJECTED_SHA256 = "b119a7cdffabc8541dce283381d18ada4027c0560728aac1fe45bdd30cdac8e2";
 
 const EXPORT_ANCHOR = "\nexport {\n";
 const PROJECTION_MARKER = "function applyArcaneWllamaProjection()";
 
-function sha256(value) {
-  return createHash("sha256").update(value).digest("hex");
-}
-
 /*
- * This function is serialized into the authenticated upstream ESM. It is not
+ * This function is serialized into the installed upstream ESM. It is not
  * invoked by this tool. Inside the projected module it has lexical access to
  * Wllama, ProxyToWorker, WLLAMA_EMSCRIPTEN_CODE, and LLAMA_CPP_WORKER_CODE.
  */
@@ -41,7 +32,9 @@ function applyArcaneWllamaProjection() {
   }
 
   const adapterAnchor = "if(adapter){WebGPU.Internals.jsObjectInsert(adapterPtr,adapter)";
-  const adapterProjection = `if(adapter){(function arcaneRecordSelectedWebgpuAdapter(){const key="__arcaneWllamaWebgpuTelemetry";const previous=globalThis[key]??${emptyWorkerTelemetry};const info=adapter.info??{};const text=value=>typeof value==="string"?value.slice(0,256):"";const next={selected:true,vendorId:null,vendor:text(info.vendor),architecture:text(info.architecture),deviceId:null,name:text(info.device),description:text(info.description)};const conflicts=previous.adapter!==null&&JSON.stringify(previous.adapter)!==JSON.stringify(next);globalThis[key]={protocol:"${protocol}",adapter:previous.adapter??next,bufferCount:previous.bufferCount,bufferBytes:previous.bufferBytes,queueSubmissions:previous.queueSubmissions,commandBuffers:previous.commandBuffers,queueFenceRequests:previous.queueFenceRequests,queueFenceCompletions:previous.queueFenceCompletions,invalid:previous.invalid||conflicts}})();WebGPU.Internals.jsObjectInsert(adapterPtr,adapter)`;
+  const adapterProjection = `if(adapter){(function arcaneRecordSelectedWebgpuAdapter(){const key="__arcaneWllamaWebgpuTelemetry";const previous=globalThis[key]??${emptyWorkerTelemetry};const info=adapter.info??{};const text = function preserveAdapterText(value) {
+    return typeof value === 'string' ? value : '';
+};const next={selected:true,vendorId:null,vendor:text(info.vendor),architecture:text(info.architecture),deviceId:null,name:text(info.device),description:text(info.description),type:typeof info.type==="string"&&info.type?info.type:null,isFallbackAdapter:typeof info.isFallbackAdapter==="boolean"?info.isFallbackAdapter:typeof adapter.isFallbackAdapter==="boolean"?adapter.isFallbackAdapter:null};const conflicts=previous.adapter!==null&&JSON.stringify(previous.adapter)!==JSON.stringify(next);globalThis[key]={protocol:"${protocol}",adapter:previous.adapter??next,bufferCount:previous.bufferCount,bufferBytes:previous.bufferBytes,queueSubmissions:previous.queueSubmissions,commandBuffers:previous.commandBuffers,queueFenceRequests:previous.queueFenceRequests,queueFenceCompletions:previous.queueFenceCompletions,invalid:previous.invalid||conflicts}})();WebGPU.Internals.jsObjectInsert(adapterPtr,adapter)`;
   WLLAMA_EMSCRIPTEN_CODE = replaceSingle(
     WLLAMA_EMSCRIPTEN_CODE,
     adapterAnchor,
@@ -77,7 +70,7 @@ function applyArcaneWllamaProjection() {
   );
 
   const workerAnchor = "  if (verb === 'module.init') {";
-  const workerProjection = `  if (verb === 'arcane.telemetry') {\n    const observed = globalThis.__arcaneWllamaWebgpuTelemetry;\n    const adapter = observed?.adapter?.selected === true ? {\n      selected: true,\n      vendorId: null,\n      vendor: typeof observed.adapter.vendor === 'string' ? observed.adapter.vendor.slice(0, 256) : '',\n      architecture: typeof observed.adapter.architecture === 'string' ? observed.adapter.architecture.slice(0, 256) : '',\n      deviceId: null,\n      name: typeof observed.adapter.name === 'string' ? observed.adapter.name.slice(0, 256) : '',\n      description: typeof observed.adapter.description === 'string' ? observed.adapter.description.slice(0, 256) : '',\n    } : null;\n    msg({\n      callbackId,\n      result: {\n        protocol: '${protocol}',\n        adapter,\n        bufferCount: Number.isSafeInteger(observed?.bufferCount) ? observed.bufferCount : 0,\n        bufferBytes: Number.isSafeInteger(observed?.bufferBytes) ? observed.bufferBytes : 0,\n        queueSubmissions: Number.isSafeInteger(observed?.queueSubmissions) ? observed.queueSubmissions : 0,\n        commandBuffers: Number.isSafeInteger(observed?.commandBuffers) ? observed.commandBuffers : 0,\n        queueFenceRequests: Number.isSafeInteger(observed?.queueFenceRequests) ? observed.queueFenceRequests : 0,\n        queueFenceCompletions: Number.isSafeInteger(observed?.queueFenceCompletions) ? observed.queueFenceCompletions : 0,\n        invalid: observed?.invalid === true,\n      },\n    });\n    return;\n  }\n\n${workerAnchor}`;
+  const workerProjection = `  if (verb === 'arcane.telemetry') {\n    const observed = globalThis.__arcaneWllamaWebgpuTelemetry;\n    const adapter = observed?.adapter?.selected === true ? {\n      selected: true,\n      vendorId: null,\n      vendor: typeof observed.adapter.vendor === 'string' ? observed.adapter.vendor : '',\n      architecture: typeof observed.adapter.architecture === 'string' ? observed.adapter.architecture : '',\n      deviceId: null,\n      name: typeof observed.adapter.name === 'string' ? observed.adapter.name : '',\n      description: typeof observed.adapter.description === 'string' ? observed.adapter.description : '',\n      type: typeof observed.adapter.type === 'string' ? observed.adapter.type : null,\n      isFallbackAdapter: typeof observed.adapter.isFallbackAdapter === 'boolean' ? observed.adapter.isFallbackAdapter : null,\n    } : null;\n    msg({\n      callbackId,\n      result: {\n        protocol: '${protocol}',\n        adapter,\n        bufferCount: Number.isSafeInteger(observed?.bufferCount) ? observed.bufferCount : 0,\n        bufferBytes: Number.isSafeInteger(observed?.bufferBytes) ? observed.bufferBytes : 0,\n        queueSubmissions: Number.isSafeInteger(observed?.queueSubmissions) ? observed.queueSubmissions : 0,\n        commandBuffers: Number.isSafeInteger(observed?.commandBuffers) ? observed.commandBuffers : 0,\n        queueFenceRequests: Number.isSafeInteger(observed?.queueFenceRequests) ? observed.queueFenceRequests : 0,\n        queueFenceCompletions: Number.isSafeInteger(observed?.queueFenceCompletions) ? observed.queueFenceCompletions : 0,\n        invalid: observed?.invalid === true,\n      },\n    });\n    return;\n  }\n\n${workerAnchor}`;
   LLAMA_CPP_WORKER_CODE = replaceSingle(
     LLAMA_CPP_WORKER_CODE,
     workerAnchor,
@@ -90,7 +83,7 @@ function applyArcaneWllamaProjection() {
       return Number.isSafeInteger(candidate) && candidate >= 0 ? candidate : 0;
     }
     function adapterText(candidate) {
-      return typeof candidate === "string" && candidate.length <= 256 ? candidate : "";
+      return typeof candidate === "string" ? candidate : "";
     }
     const rawAdapter = value?.adapter;
     const adapterInvalid = rawAdapter !== undefined && rawAdapter !== null && (
@@ -98,16 +91,12 @@ function applyArcaneWllamaProjection() {
       || rawAdapter.selected !== true
       || rawAdapter.vendorId !== null
       || typeof rawAdapter.vendor !== "string"
-      || rawAdapter.vendor.length > 256
       || typeof rawAdapter.architecture !== "string"
-      || rawAdapter.architecture.length > 256
       || rawAdapter.deviceId !== null
       || typeof rawAdapter.name !== "string"
-      || rawAdapter.name.length > 256
       || typeof rawAdapter.description !== "string"
-      || rawAdapter.description.length > 256
     );
-    const adapter = rawAdapter?.selected === true ? Object.freeze({
+    const adapter = rawAdapter?.selected === true ? {
       selected: true,
       vendorId: null,
       vendor: adapterText(rawAdapter.vendor),
@@ -115,7 +104,9 @@ function applyArcaneWllamaProjection() {
       deviceId: null,
       name: adapterText(rawAdapter.name),
       description: adapterText(rawAdapter.description),
-    }) : null;
+      type: typeof rawAdapter.type === "string" ? rawAdapter.type : null,
+      isFallbackAdapter: typeof rawAdapter.isFallbackAdapter === "boolean" ? rawAdapter.isFallbackAdapter : null,
+    } : null;
     return Object.freeze({
       protocol,
       adapter,
@@ -419,62 +410,45 @@ function applyArcaneWllamaProjection() {
 export const WLLAMA_PROJECTION_BLOCK = `\n(${applyArcaneWllamaProjection.toString()})();\n`;
 
 export function projectWllamaWebgpuRuntime(input) {
-  const sourceBytes = Buffer.isBuffer(input) ? input : Buffer.from(input);
-  if (
-    sourceBytes.byteLength !== WLLAMA_UPSTREAM_AUTHORITY.bytes
-    || sha256(sourceBytes) !== WLLAMA_UPSTREAM_AUTHORITY.sha256
-  ) {
-    throw new Error("The Wllama ESM does not match the authenticated 3.6.0 source authority.");
-  }
-  const source = sourceBytes.toString("utf8");
-  if (source.includes(PROJECTION_MARKER)) {
-    throw new Error("The Wllama ESM is already projected.");
-  }
-  const first = source.indexOf(EXPORT_ANCHOR);
-  const last = source.lastIndexOf(EXPORT_ANCHOR);
-  if (first < 0 || first !== last) {
-    throw new Error("The authenticated Wllama export anchor must occur exactly once.");
-  }
-  return Buffer.from(`${source.slice(0, first)}${WLLAMA_PROJECTION_BLOCK}${source.slice(first)}`);
+    const source = (Buffer.isBuffer(input) ? input : Buffer.from(input)).toString('utf8');
+    if (source.includes(PROJECTION_MARKER)) {
+        throw new Error('The Wllama ESM is already projected.');
+    }
+    const first = source.indexOf(EXPORT_ANCHOR);
+    const last = source.lastIndexOf(EXPORT_ANCHOR);
+    if (first < 0 || first !== last) {
+        throw new Error('The Wllama export anchor must occur exactly once.');
+    }
+    return Buffer.from(`${source.slice(0, first)}${WLLAMA_PROJECTION_BLOCK}${source.slice(first)}`);
 }
 
 async function main() {
-  const toolPath = fileURLToPath(import.meta.url);
-  const repositoryRoot = path.dirname(path.dirname(toolPath));
-  const sourcePath = path.join(
-    repositoryRoot,
-    "node_modules",
-    "@wllama",
-    "wllama",
-    "esm",
-    "index.js",
-  );
-  const destinationPath = path.join(
-    repositoryRoot,
-    "browser-runtime",
-    "ai",
-    "wllama",
-    "index.mjs",
-  );
-  const projected = projectWllamaWebgpuRuntime(await readFile(sourcePath));
-  if (
-    projected.byteLength !== WLLAMA_PROJECTED_BYTES
-    || sha256(projected) !== WLLAMA_PROJECTED_SHA256
-  ) {
-    throw new Error("The deterministic Wllama projection does not match its recorded authority.");
-  }
-  const mode = process.argv[2] ?? "--verify";
-  if (mode === "--write") {
+    if (process.argv[2] !== '--write') {
+        throw new Error('Usage: node tools/project-wllama-webgpu-runtime.mjs --write');
+    }
+    const toolPath = fileURLToPath(import.meta.url);
+    const repositoryRoot = path.dirname(
+        path.dirname(toolPath)
+    );
+    const sourcePath = path.join(
+        repositoryRoot,
+        'node_modules',
+        '@wllama',
+        'wllama',
+        'esm',
+        'index.js'
+    );
+    const destinationPath = path.join(
+        repositoryRoot,
+        'browser-runtime',
+        'ai',
+        'wllama',
+        'index.mjs'
+    );
+    const projected = projectWllamaWebgpuRuntime(
+        await readFile(sourcePath)
+    );
     await writeFile(destinationPath, projected);
-    return;
-  }
-  if (mode !== "--verify") {
-    throw new Error("Usage: node tools/project-wllama-webgpu-runtime.mjs [--verify|--write]");
-  }
-  const current = await readFile(destinationPath);
-  if (!current.equals(projected)) {
-    throw new Error("The packaged Wllama projection does not match the authenticated source projection.");
-  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

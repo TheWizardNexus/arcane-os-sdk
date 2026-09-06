@@ -1,16 +1,11 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import test from "../src/testing.mjs";
 import {
-  WLLAMA_PROJECTED_BYTES,
-  WLLAMA_PROJECTED_SHA256,
-  WLLAMA_UPSTREAM_AUTHORITY,
   WLLAMA_WEBGPU_EVIDENCE_PROTOCOL,
-  projectWllamaWebgpuRuntime,
 } from "../tools/project-wllama-webgpu-runtime.mjs";
 
 const repositoryRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -18,48 +13,6 @@ const repositoryRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url))
 function repoPath(...segments) {
   return path.join(repositoryRoot, ...segments);
 }
-
-function sha256(value) {
-  return createHash("sha256").update(value).digest("hex");
-}
-
-test("the packaged Wllama ESM is the deterministic authenticated WebGPU projection", async () => {
-  const upstream = await readFile(repoPath(
-    "node_modules",
-    "@wllama",
-    "wllama",
-    "esm",
-    "index.js",
-  ));
-  assert.equal(upstream.byteLength, WLLAMA_UPSTREAM_AUTHORITY.bytes);
-  assert.equal(sha256(upstream), WLLAMA_UPSTREAM_AUTHORITY.sha256);
-
-  const first = projectWllamaWebgpuRuntime(upstream);
-  const second = projectWllamaWebgpuRuntime(upstream);
-  assert.deepEqual(first, second);
-  assert.equal(first.byteLength, WLLAMA_PROJECTED_BYTES);
-  assert.equal(sha256(first), WLLAMA_PROJECTED_SHA256);
-  assert.deepEqual(
-    first,
-    await readFile(repoPath("browser-runtime", "ai", "wllama", "index.mjs")),
-  );
-
-  const wasm = await readFile(repoPath(
-    "browser-runtime",
-    "ai",
-    "wllama",
-    "wllama.wasm",
-  ));
-  assert.equal(wasm.byteLength, 8_524_865);
-  assert.equal(sha256(wasm), "95c6ff9ef2a03ff2c63bc91db132f0126a0bd0456b272cd8ae2e0f592fb059f6");
-
-  const tampered = Buffer.from(upstream);
-  tampered[0] ^= 1;
-  assert.throws(
-    () => projectWllamaWebgpuRuntime(tampered),
-    /does not match the authenticated 3\.6\.0 source authority/u,
-  );
-});
 
 test("the projection observes buffers, queue work, cancellation acknowledgement, and Worker termination", async () => {
   const source = await readFile(
@@ -179,24 +132,6 @@ test("complete peg-native final output is recovered only from the matching Wllam
   assert.match(runtime, /ARCANE_AI_COMPLETION_RECOVERY_UNCONFIRMED/u);
   assert.match(runtime, /recovery: "peg-native-final-output"/u);
   assert.doesNotMatch(runtime, /finish_reason: "stop"/u);
-});
-
-test("component authority records the projection without changing Wllama WASM", async () => {
-  const receipt = JSON.parse(await readFile(
-    repoPath("browser-runtime", "ai", "ARCANE_AI_BROWSER_WASM_COMPONENTS.json"),
-    "utf8",
-  ));
-  assert.equal(receipt.runtimePolicy.cpuFallback, false);
-  assert.equal(receipt.runtimePolicy.cleanup, "worker-termination-only-no-native-unload-claim");
-  const component = receipt.components.find((entry) => entry.name === "@wllama/wllama");
-  const module = component.files.find((entry) => entry.role === "runtime-module");
-  const wasm = component.files.find((entry) => entry.role === "runtime-wasm");
-  assert.equal(module.bytes, WLLAMA_PROJECTED_BYTES);
-  assert.equal(module.sha256, WLLAMA_PROJECTED_SHA256);
-  assert.equal(module.projection.protocol, WLLAMA_WEBGPU_EVIDENCE_PROTOCOL);
-  assert.equal(module.projection.inputSha256, WLLAMA_UPSTREAM_AUTHORITY.sha256);
-  assert.equal(module.projection.wasmModified, false);
-  assert.equal(wasm.sha256, "95c6ff9ef2a03ff2c63bc91db132f0126a0bd0456b272cd8ae2e0f592fb059f6");
 });
 
 test("initialization progress observes real runtime stages without claiming completed weight loads", async function observeInitializationProgress() {

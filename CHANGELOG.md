@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.7.1
+
+- Make Profile NPU and GPU setup concise and copy-only, with **Copy NPU flag
+  address** as the NPU action. Confirm a reported discrete GPU with **Already
+  using the performance GPU.** and show GPU setup only for explicitly reported
+  integrated or software adapters. Unknown GPU classes receive no flag advice.
+- Retain the loaded Wllama Worker's adapter details for the GPU-only chat alert.
+  Show that alert only for an explicitly reported integrated or software adapter,
+  with manual browser-address instructions and no attempted navigation.
+- Preserve complete adapter descriptions and optional class/fallback metadata
+  through the Wllama projection. Remove obsolete projection identity gates.
+- Forward speech artifact and upstream model loading progress through sticky AI
+  state. Show the current file, completed files, elapsed time, and initialization
+  in both transcription controls, with indeterminate progress for unknown totals.
+  Preserve cancellation, complete diagnostics, models, and inference precision.
+
 ## 0.7.0
 
 - Add `arcane dev --public`, including forwarding through

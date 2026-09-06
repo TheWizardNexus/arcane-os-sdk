@@ -7,17 +7,6 @@ export const WEBNN_BROWSER_SETTINGS = [
   { browserId: "edge", name: "Microsoft Edge", url: "edge://flags/#web-machine-learning-neural-network" },
 ];
 
-// Internal-page navigation may be blocked. The instructions remain available
-// regardless; returning from this function is not evidence that settings opened.
-export function openBrowserDeviceSettings(target, message) {
-  try {
-    globalThis.open?.(target.url, "_blank", "noopener,noreferrer");
-  } catch {
-    // Continue to the address-bar instructions when the browser rejects the URL.
-  }
-  globalThis.alert?.(message);
-}
-
 // Browser identity selects setup instructions, never hardware or model readiness.
 export function getBrowserDeviceSettings(navigatorObject = globalThis.navigator) {
   const userAgent = String(navigatorObject?.userAgent ?? "");
@@ -83,22 +72,37 @@ export function getBrowserDeviceSettings(navigatorObject = globalThis.navigator)
   };
 }
 
-// Adapter selection is availability evidence, not the browser flag's state or
-// proof that a model is executing on this GPU. The power preference is a hint.
+// Only an explicit browser adapter type or fallback flag establishes its class.
+// Vendor names and powerPreference (including Chromium's echoed request) do not.
+export function describeBrowserGpu(info, legacyFallbackAdapter) {
+    const adapterType = is.string(info?.type) ? info.type : null;
+    const isFallbackAdapter = is.boolean(info?.isFallbackAdapter)
+        ? info.isFallbackAdapter
+        : is.boolean(legacyFallbackAdapter) ? legacyFallbackAdapter : null;
+    let performanceStatus = 'unknown';
+    if (isFallbackAdapter === true || adapterType === 'CPU') performanceStatus = 'fallback';
+    else if (adapterType === 'discrete GPU') performanceStatus = 'discrete';
+    else if (adapterType === 'integrated GPU') performanceStatus = 'integrated';
+    return {
+        name: info?.description || info?.name
+            || [info?.vendor, info?.architecture, info?.device].filter(Boolean).join(' ')
+            || 'WebGPU adapter',
+        adapterType,
+        isFallbackAdapter,
+        performanceStatus
+    };
+}
+
+// This is the adapter returned to this page, not another page's model adapter.
+// Requesting high performance is a hint, not evidence that it was honored.
 export async function detectBrowserGpu(navigatorObject = globalThis.navigator) {
   if (!is.function(navigatorObject?.gpu?.requestAdapter)) {
     return { available: false, reason: "api-unavailable" };
   }
   const adapter = await navigatorObject.gpu.requestAdapter({ powerPreference: "high-performance" });
   if (!adapter) return { available: false, reason: "adapter-unavailable" };
-  const info = adapter.info;
   return {
     available: true,
-    name: info?.description
-      || [info?.vendor, info?.architecture, info?.device].filter(Boolean).join(" ")
-      || "WebGPU adapter",
-    isFallbackAdapter: is.boolean(info?.isFallbackAdapter)
-      ? info.isFallbackAdapter
-      : is.boolean(adapter.isFallbackAdapter) ? adapter.isFallbackAdapter : null,
+    ...describeBrowserGpu(adapter.info, adapter.isFallbackAdapter),
   };
 }
