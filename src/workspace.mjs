@@ -216,12 +216,17 @@ function classifyRootConfig(config){
     });
 }
 
-async function discoverAppsInRoot(root,config){
+async function discoverAppsInRoot(root,config,appId){
+    if(appId!==undefined&&(!is.string(appId)||!APP_ID_PATTERN.test(appId))){
+        fail(`Invalid app id: ${String(appId)}.`,'ARCANE_USAGE');
+    }
     const appsRoot=path.join(root,'apps');
     await assertRealDirectory(appsRoot,'Workspace apps root');
     const entries=await readdir(appsRoot,{withFileTypes:true});
     const apps=[];
     for(const entry of entries.sort((left,right)=>ordinal(left.name,right.name))){
+        // A named operation validates that app, not unrelated application descriptors.
+        if(appId!==undefined&&entry.name!==appId)continue;
         if(!APP_ID_PATTERN.test(entry.name))continue;
         if(entry.isSymbolicLink())fail(`apps/${entry.name} must not be a symbolic link or junction.`);
         if(!entry.isDirectory())continue;
@@ -274,13 +279,11 @@ export async function inspectWorkspaceProfile(workspaceRoot=process.cwd()){
 }
 
 export async function selectApp(workspaceRoot=process.cwd(),appId){
-    const apps=await discoverApps(workspaceRoot);
-    if(appId!==undefined&&(!is.string(appId)||!APP_ID_PATTERN.test(appId))){
-        fail(`Invalid app id: ${String(appId)}.`,'ARCANE_USAGE');
-    }
+    const profile=await inspectWorkspaceProfile(workspaceRoot);
+    const apps=await discoverAppsInRoot(profile.workspaceRoot,profile.config,appId);
     if(appId){
         const selected=apps.find(app=>app.appId===appId);
-        if(!selected)fail(`Unknown app "${appId}". Available apps: ${apps.map(app=>app.appId).join(', ')||'[none]'}.`);
+        if(!selected)fail(`Unknown app "${appId}".`);
         return selected;
     }
     if(apps.length===0)fail('No Arcane applications were found under apps/.');
@@ -294,14 +297,11 @@ export async function resolveWorkspace({workspaceRoot=process.cwd(),appId}={}){
     const profile=await inspectWorkspaceProfile(workspaceRoot);
     const canonicalRoot=profile.workspaceRoot;
     const config=profile.config;
-    const apps=await discoverAppsInRoot(canonicalRoot,config);
-    if(appId!==undefined&&(!is.string(appId)||!APP_ID_PATTERN.test(appId))){
-        fail(`Invalid app id: ${String(appId)}.`,'ARCANE_USAGE');
-    }
+    const apps=await discoverAppsInRoot(canonicalRoot,config,appId);
     let app;
     if(appId){
         app=apps.find(item=>item.appId===appId);
-        if(!app)fail(`Unknown app "${appId}". Available apps: ${apps.map(item=>item.appId).join(', ')||'[none]'}.`);
+        if(!app)fail(`Unknown app "${appId}".`);
     }else if(apps.length===1){
         [app]=apps;
     }else if(apps.length===0){

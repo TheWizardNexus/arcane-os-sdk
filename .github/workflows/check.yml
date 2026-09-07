@@ -25,6 +25,8 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Validate the package source boundary
         run: node tools/check-source.mjs --package-only
+      - name: Verify selected application scope
+        run: node bin/arcane-test.mjs test/app-selection.test.mjs
 
   pack_npm_release:
     name: Pack npm release

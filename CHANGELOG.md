@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.16.2
+
+- Scope explicit application selection and workspace resolution to the named
+  app before reading its descriptor. An unrelated invalid descriptor no longer
+  blocks that operation. Selected descriptors and unscoped discovery retain
+  their existing validation. Named resolution reports only the selected app in
+  `appIds`; unknown selections report the requested missing identifier without
+  validating or listing unrelated apps.
+
 ## 0.16.1
 
 - Remove raw script elements and inline event-handler attributes at the
