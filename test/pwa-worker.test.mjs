@@ -422,10 +422,10 @@ async function developmentNetworkAndOffline() {
     const refreshing = fixture.refresh();
     await changedRequest;
     const request = fixture.request(`${scope}app.mjs`);
-    const networkResponse = await request.response;
+    const cachedResponse = await request.response;
     assert.equal(
-        await networkResponse.text(),
-        content
+        await cachedResponse.text(),
+        'first saved source'
     );
     storage.resumeWrites();
     assert.deepEqual(
@@ -457,7 +457,7 @@ async function developmentNetworkAndOffline() {
 }
 
 test(
-    'PWA due conditional updates stream before cache writes and preserve complete cached content on offline failure',
+    'PWA serves cached content while conditional updates are saved and preserves complete content on offline failure',
     developmentNetworkAndOffline
 );
 
@@ -686,7 +686,7 @@ test(
 );
 
 test(
-    'PWA background checks coalesce page requests while unrelated resources continue through four workers',
+    'PWA serves cached page requests before pending conditional checks complete through four workers',
     async function concurrentPageRefresh() {
         let now = 1000000;
         let updating = false;
@@ -733,20 +733,25 @@ test(
         await pool;
         const first = fixture.request(`${scope}one.mjs`);
         const second = fixture.request(`${scope}one.mjs`);
-        releases.get(`${scope}one.mjs`)();
-        assert.equal(await (await first.response).text(), `updated complete body:${scope}one.mjs`);
-        assert.equal(await (await second.response).text(), `updated complete body:${scope}one.mjs`);
-        assert.equal(active, 3);
-        for (const [url, release] of releases) {
-            if (url !== `${scope}one.mjs`) {
-                release();
-            }
-        }
-        await refresh;
+        const queued = fixture.request(`${scope}five.mjs`);
+        assert.equal(await (await first.response).text(), 'original complete body');
+        assert.equal(await (await second.response).text(), 'original complete body');
+        assert.equal(await (await queued.response).text(), 'original complete body');
         await first.background;
         await second.background;
+        await queued.background;
+        assert.equal(active, 4);
+        for (const release of releases.values()) {
+            release();
+        }
+        const refreshed = await refresh;
+        assert.equal(refreshed.error, null);
+        assert.equal(refreshed.lastChecked, now);
+        assert.equal(await (await fixture.request(`${scope}one.mjs`).response).text(), `updated complete body:${scope}one.mjs`);
+        assert.equal(await (await fixture.request(`${scope}five.mjs`).response).text(), 'original complete body');
         assert.equal(maximum, 4);
         assert.equal(fixture.requests.filter(function firstResource(request) { return request.url === `${scope}one.mjs`; }).length, 2);
+        assert.equal(fixture.requests.filter(function queuedResource(request) { return request.url === `${scope}five.mjs`; }).length, 2);
     }
 );
 

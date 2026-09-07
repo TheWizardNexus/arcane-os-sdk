@@ -19,7 +19,7 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This checkout defines the `0.12.0` SDK contract. Applications pin one exact npm
+This checkout defines the `0.13.0` SDK contract. Applications pin one exact npm
 version and lockfile; registry state is deliberately not baked into application
 artifacts.
 
@@ -30,6 +30,9 @@ page-load revalidation and persistent resource caches. The SDK records one
 completed-check timestamp per app/cache in DBOPFS and checks after 120 seconds
 in development or 15 minutes in packaged browser delivery. Apps retain ownership
 of branding, offline page selection and network-dependent product behavior.
+Enabled browser delivery also mounts the shared, themed installation suggestion.
+It appears when the browser offers installation, includes Install and Close,
+and remembers dismissal for the tab session without interrupting page startup.
 
 That registry query is a maintainer action, not an application behavior. Apps
 never poll npm for SDK updates or replace their own SDK or synchronized runtime.

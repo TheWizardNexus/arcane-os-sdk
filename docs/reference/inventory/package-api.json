@@ -6,7 +6,7 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 205,
+  "memberCount": 208,
   "members": [
     {
       "id": "root:APP_BUNDLE_DESCRIPTOR_NAME",
@@ -2995,6 +2995,48 @@
       "availability": "Browser service workers; explicit unsupported state elsewhere",
       "protocol": "Native registration, updatefound, statechange and controllerchange events",
       "normalization": "Synchronous owner exposes ready, state, subscribe, update and dispose; current state replays by default, failures remain observable, disposal does not unregister the worker or delete saved data."
+    },
+    {
+      "id": "pwa:PWA_INSTALL_STATE_EVENT",
+      "name": "PWA_INSTALL_STATE_EVENT",
+      "displayName": "PWA_INSTALL_STATE_EVENT",
+      "kind": "constant",
+      "signature": "const PWA_INSTALL_STATE_EVENT",
+      "entrypoints": ["arcane-os/pwa"],
+      "primaryImport": "arcane-os/pwa",
+      "group": "Progressive web applications",
+      "summary": "Names the shared native installation availability and choice state event.",
+      "availability": "Browser installation lifecycle; importable without starting observation",
+      "protocol": "Existing Arcane event owner and native browser installation events",
+      "normalization": "The exact event name is arcane.pwa.install.state."
+    },
+    {
+      "id": "pwa:getPwaInstall",
+      "name": "getPwaInstall",
+      "displayName": "getPwaInstall()",
+      "kind": "function",
+      "signature": "getPwaInstall()",
+      "entrypoints": ["arcane-os/pwa"],
+      "primaryImport": "arcane-os/pwa",
+      "group": "Progressive web applications",
+      "summary": "Returns one shared page owner for native installation availability, prompt choices and session dismissal.",
+      "availability": "Browser native installation events; waiting state while no prompt is available",
+      "protocol": "Native beforeinstallprompt, appinstalled and display-mode change events",
+      "normalization": "Synchronous owner exposes state, subscribe, prompt, dismiss and dispose; subscriptions replay current state, prompt invokes the native event directly in the user click and consumes it once, and session dismissal preserves a retained event for explicit inline installation."
+    },
+    {
+      "id": "pwa:mountPwaInstallPrompt",
+      "name": "mountPwaInstallPrompt",
+      "displayName": "mountPwaInstallPrompt()",
+      "kind": "function",
+      "signature": "mountPwaInstallPrompt({appName = ''} = {})",
+      "entrypoints": ["arcane-os/pwa"],
+      "primaryImport": "arcane-os/pwa",
+      "group": "Progressive web applications",
+      "summary": "Starts shared installation observation and mounts one initially hidden, themed installation suggestion without delaying application rendering.",
+      "availability": "Browser document and managed HTML import; resolves to null without a document",
+      "protocol": "Shared native install owner and pwa-install.html component lifecycle",
+      "normalization": "Repeated calls return the same mounting promise; the first appName initializes the component, success resolves to its ready html-import host, absence of a document or disposal before mounting resolves to null, and component loading failures reject. Removal or disposal during loading rejects with AbortError. A rejected mount permits another explicit attempt. Generated PWA bootstraps invoke it automatically."
     },
     {
       "id": "browser-speech:BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL",

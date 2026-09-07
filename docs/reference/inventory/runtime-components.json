@@ -7,7 +7,7 @@
     "path": "runtime/arcane/components",
     "sdkVersion": "0.7.2"
   },
-  "componentCount": 40,
+  "componentCount": 41,
   "loader": "/arcane/modules/HTMLImport.js",
   "artifacts": [
     {
@@ -644,6 +644,34 @@
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
       "normalization": "Normalized form values"
+    },
+    {
+      "file": "runtime/arcane/components/pwa-install.html",
+      "name": "pwa-install.html",
+      "purpose": "Presents a dismissible browser installation action with floating or inline placement.",
+      "methods": [
+        "configure()",
+        "install()",
+        "dismiss()",
+        "destroy()",
+        "state",
+        "ready"
+      ],
+      "events": [
+        "pwa-install-ready",
+        "pwa-install-change",
+        "pwa-install-dismissed"
+      ],
+      "slots": [],
+      "dependencies": [
+        "strong-type",
+        "arcane-os/pwa",
+        "arcane-os/event-manager",
+        "arcane-os/logging"
+      ],
+      "availability": "Browser installation requires a browser-provided beforeinstallprompt event; otherwise hidden",
+      "transport": "HTMLImport + DOM; shared PWA installation owner and browser-native prompt",
+      "normalization": "Browser install availability and outcome supplied by the shared PWA owner"
     },
     {
       "file": "runtime/arcane/components/record-timeline.html",

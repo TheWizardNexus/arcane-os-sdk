@@ -403,12 +403,10 @@ function installPwaWorker(manifest, clientUrl) {
         if (!ownedUrls.has(url)) {
             return {response: await fetch(request), done: Promise.resolve(null)};
         }
-        if (!pendingChecks.has(url) && !resourceJobs.has(url)) {
-            const cache = await caches.open(cacheName);
-            const cached = await cache.match(url);
-            if (cached) {
-                return {response: cached, done: Promise.resolve(null)};
-            }
+        const cache = await caches.open(cacheName);
+        const cached = await cache.match(url);
+        if (cached) {
+            return {response: cached, done: Promise.resolve(null)};
         }
         const job = resourceJob(request, url, pendingChecks.has(url));
         return {response: resourceResponse(await job.result), done: job.done};

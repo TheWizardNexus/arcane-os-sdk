@@ -82,6 +82,7 @@ appropriate.
 | [`modal.html`](#modalhtml) | Generic modal with population, open/close, actions, and sequential task execution. | `populate()`<br>`open()`<br>`close()`<br>`runTasks()`<br>`destroy()` | `modal-ready`<br>`modal-opened`<br>`modal-closed`<br>`modal-action` | Modal state normalized; injected task results mixed |
 | [`output-panel.html`](#output-panelhtml) | Presents status, output, body, coverage, actions, pending, error, and cleared states. | `configure()`<br>`setOutput()`<br>`setBody()`<br>`setCoverage()`<br>`setActions()`<br>`setPending()`<br>`setStatus()`<br>`setError()`<br>`clear()`<br>`destroy()` | `output-panel-ready`<br>`output-panel-state`<br>`output-panel-change`<br>`output-panel-action`<br>`output-panel-error`<br>`output-panel-cleared` | DOM-normalized |
 | [`preferences-form.html`](#preferences-formhtml) | Builds a schema-driven preferences form with submit, reset, busy, and status behavior. | `configure()`<br>`getValues()`<br>`setValues()`<br>`setBusy()`<br>`setStatus()`<br>`destroy()` | `preferences-form-ready`<br>`preferences-change`<br>`preferences-submit`<br>`preferences-reset` | Normalized form values |
+| [`pwa-install.html`](#pwa-installhtml) | Presents a dismissible browser installation action with floating or inline placement. | `configure()`<br>`install()`<br>`dismiss()`<br>`destroy()`<br>`state`<br>`ready` | `pwa-install-ready`<br>`pwa-install-change`<br>`pwa-install-dismissed` | Browser install availability and outcome supplied by the shared PWA owner |
 | [`record-timeline.html`](#record-timelinehtml) | Displays complete chronological records/evidence and emits open actions. | `setItems()`<br>`populate()`<br>`destroy()` | `record-timeline-ready`<br>`record-timeline-open` | Complete item fields and inventories preserved |
 | [`relationship-board.html`](#relationship-boardhtml) | Displays complete normalized relationship nodes/edges in graph and list forms. | `setGraph()`<br>`populate()`<br>`destroy()` | `relationship-board-ready`<br>`relationship-node-open`<br>`relationship-edge-open` | Complete graph inventories and fields preserved |
 | [`screen-capture.html`](#screen-capturehtml) | Presents image, video, or GIF display-capture workflow. | `capture` (`ScreenCapture` instance)<br>`destroy()` | `screen-capture-ready`<br>`screen-capture-result` | State/result normalized; media permission/codec failures mixed |
@@ -1015,6 +1016,69 @@ Events: `preferences-form-ready`, `preferences-change`, `preferences-submit`, `p
 <html-import
   id="preferences-form.html"
   href="/arcane/components/preferences-form.html">
+</html-import>
+```
+
+## pwa-install.html
+
+### Overview
+
+A compact installation suggestion using the shared [PWA installation owner](pwa.md).
+The default floating panel appears near the top right only when the browser offers
+installation. It has an Install action and an explicit close button, takes no
+focus automatically, and has no dismissal timer. It uses the Arcane theme and
+primitives, wraps complete labels and errors, and scrolls its own content when
+the available height is limited. The parent page loads `ThemeBootstrap.js` to
+apply the user's appearance preferences.
+
+### Public surface
+
+`configure({appName, installLabel, closeLabel, promptingLabel, description,
+presentation})` updates display configuration and returns its current record.
+Labels remain complete strings. `appName` initially uses `data-app-name` or
+`this app`; the default button label is `Install`. `presentation` is `floating`
+by default or `inline`, initially read from `data-presentation`. Inline placement
+uses the parent's layout. Set `description` to an empty string when a compact
+placement needs no supporting text; supplied descriptions remain visible.
+
+`install()` calls the shared owner's native prompt synchronously and returns its
+promise of the browser outcome or `null` when no prompt is available. Call it
+directly from a user action. The component's Install button already does this.
+An explicit request's complete failure message remains visible until dismissed;
+the method rejects with the same error. The browser controls actual installation.
+Acceptance hides the suggestion without claiming installation has completed.
+
+`dismiss()` closes the component. Floating dismissal also uses the owner's
+session dismissal; an explicit inline component ignores that shared dismissal
+and closes only its own instance. Closing retains any unused native prompt at
+the shared owner. `destroy()` removes the component's listeners and subscription,
+disposes its event source, hides its host, and marks `ready` false; it does not
+dispose the shared owner or change browser installation state. Both methods
+return true while active and false after destruction; `destroy()` is idempotent.
+
+The readonly `state` property returns the shared owner's current install-state
+record; `ready` becomes true after methods and the state subscription are attached.
+`pwa-install-ready` carries `{ready, state}`; `pwa-install-change` carries
+`{state, visible}` for each observed owner update; `pwa-install-dismissed` carries
+`{presentation, state}`. These follow the canonical event projection contract.
+
+### Availability and normalization
+
+The component requires HTMLImport and a DOM renderer. Native installation
+availability comes from the browser's `beforeinstallprompt` event through
+`getPwaInstall()`. Without an available event, the suggestion stays hidden;
+absence does not identify why installation is unavailable. Installed-app events,
+accepted prompts, and an already running installed display mode hide it.
+
+### Example
+
+```html
+<html-import
+  id="install-app"
+  href="/arcane/components/pwa-install.html"
+  data-app-name="Example Library"
+  data-presentation="inline"
+  hidden>
 </html-import>
 ```
 

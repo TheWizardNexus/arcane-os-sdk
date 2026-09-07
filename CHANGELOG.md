@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.13.0
+
+- Add the reusable `pwa-install.html` component and shared browser installation
+  lifecycle through `arcane-os/pwa`. Offer a compact themed Install action and
+  explicit Close, retain session dismissal, support inline placement, and surface
+  native prompt errors without claiming installation completion.
+- Mount the component from generated PWA bootstraps independently of service
+  worker registration and application rendering. Use native installation and
+  display-mode events without polling, automatic native prompts, or focus capture.
+- Return cached resources immediately while conditional background refreshes
+  are pending or in flight, so page requests do not wait on network revalidation.
+- Document browser icon eligibility and the separate responsibilities of the
+  Web App Manifest, application file selection, and offline resource inventory.
+
 ## 0.12.0
 
 - Refresh the selected authored app descriptor's package projection before

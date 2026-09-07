@@ -1,0 +1,216 @@
+<link rel="stylesheet" href="./arcane/css/theme.css?v=1">
+<link rel="stylesheet" href="./arcane/css/primitives.css?v=1">
+<style>
+    :host{
+        display:block;
+        inset-block-start:4.5rem;
+        inset-inline-end:1rem;
+        max-width:calc(100vw - 2rem);
+        min-width:0;
+        position:fixed;
+        width:22rem;
+        z-index:110;
+    }
+    :host([hidden]){display:none}
+    :host([data-presentation="inline"]){
+        max-width:100%;
+        position:static;
+        width:fit-content;
+    }
+    .panel{
+        background:var(--arcane-surface-raised);
+        border:1px solid var(--arcane-border);
+        border-radius:var(--arcane-radius-medium);
+        box-shadow:var(--arcane-shadow-medium);
+        box-sizing:border-box;
+        color:var(--text-color);
+        display:grid;
+        gap:var(--arcane-space-2);
+        max-height:calc(100vh - 5.5rem);
+        max-height:calc(100dvh - 5.5rem);
+        overflow:auto;
+        padding:var(--arcane-space-3);
+    }
+    .heading{align-items:start;display:flex;gap:var(--arcane-space-2)}
+    .copy{flex:1;min-width:0}
+    h2,p{margin:0;overflow-wrap:anywhere;white-space:pre-wrap}
+    h2{font-size:1rem;line-height:1.4}
+    .description{color:var(--arcane-muted);font-size:.9rem;line-height:1.45}
+    .close{flex:none}
+    .install{justify-self:start;max-width:100%;overflow-wrap:anywhere;white-space:normal}
+    .status{font-size:.9rem;line-height:1.45}
+    .status[data-error="true"]{color:var(--arcane-danger)}
+    :host([data-presentation="inline"]) .panel{box-shadow:none}
+    @media(prefers-reduced-motion:reduce){.install{transition:none}}
+    @media(forced-colors:active){.panel,.install,.close{border:1px solid CanvasText}}
+</style>
+
+<section class="panel" aria-labelledby="installTitle">
+    <div class="heading">
+        <div class="copy">
+            <h2 id="installTitle">Install this app</h2>
+            <p id="description" class="description">Open this app directly from your device.</p>
+        </div>
+        <button id="close" class="close arcane-close-button" type="button" aria-label="Close installation suggestion">&#x2715;</button>
+    </div>
+    <button id="install" class="install arcane-button" type="button">Install</button>
+    <p id="status" class="status" role="status" aria-live="polite" hidden></p>
+</section>
+
+<script type="module">
+    const host=this;
+    host.hidden=true;
+    const [
+        {default:Is},
+        {getPwaInstall},
+        {createArcaneEventSource,projectArcaneDOMEvent},
+        {arcaneLogging}
+    ]=await Promise.all([
+        import('strong-type'),
+        import('arcane-os/pwa'),
+        import('arcane-os/event-manager'),
+        import('arcane-os/logging')
+    ]);
+    const is=new Is(false);
+    const root=host.shadowRoot;
+    const title=root.querySelector('#installTitle');
+    const description=root.querySelector('#description');
+    const installButton=root.querySelector('#install');
+    const closeButton=root.querySelector('#close');
+    const status=root.querySelector('#status');
+    const lifecycleController=new AbortController();
+    const events=createArcaneEventSource(host,{
+        source:'arcane.component.pwa-install',
+        eventTypes:['pwa-install-ready','pwa-install-change','pwa-install-dismissed']
+    });
+    const owner=getPwaInstall();
+    let options={
+        appName:host.dataset.appName||'this app',
+        installLabel:'Install',
+        closeLabel:'Close installation suggestion',
+        promptingLabel:'Choose an option in the browser installation prompt.',
+        description:'Open this app directly from your device.',
+        presentation:host.dataset.presentation||'floating'
+    };
+    let currentState=owner.state;
+    let locallyDismissed=false;
+    let pending=false;
+    let requestError=null;
+    let destroyed=false;
+
+    host.configure=configure;
+    host.install=install;
+    host.dismiss=dismiss;
+    host.destroy=destroy;
+    Object.defineProperty(host,'state',{configurable:true,get:getState});
+
+    function emit(type,detail){
+        if(destroyed)return false;
+        const publication=events.dispatch(type,detail);
+        return projectArcaneDOMEvent(host,publication.occurrence,{bubbles:true,composed:true});
+    }
+
+    function getState(){
+        return {...currentState};
+    }
+
+    function configure(input={}){
+        if(destroyed)return false;
+        if(input===null||!is.object(input)||is.array(input)){
+            throw new TypeError('PWA install configuration must be an object.');
+        }
+        const next={...options,...input};
+        for(const key of ['appName','installLabel','closeLabel','promptingLabel','description']){
+            if(!is.string(next[key]))throw new TypeError(`PWA install ${key} must be a string.`);
+        }
+        if(next.presentation!=='floating'&&next.presentation!=='inline'){
+            throw new TypeError('PWA install presentation must be floating or inline.');
+        }
+        options=next;
+        host.dataset.presentation=options.presentation;
+        title.textContent=`Install ${options.appName}`;
+        description.textContent=options.description;
+        installButton.textContent=options.installLabel;
+        closeButton.setAttribute('aria-label',options.closeLabel);
+        render();
+        return {...options};
+    }
+
+    function render(){
+        if(destroyed)return;
+        const terminal=['accepted','installed','running','disposed'].includes(currentState.status);
+        if(terminal)requestError=null;
+        const dismissed=locallyDismissed
+            ||(options.presentation==='floating'&&currentState.dismissed);
+        host.hidden=terminal||dismissed||(!currentState.available&&!pending&&!requestError);
+        installButton.disabled=pending||!currentState.available;
+        const message=requestError
+            ?is.string(requestError.message)?requestError.message:String(requestError)
+            :pending?options.promptingLabel:'';
+        status.textContent=message;
+        status.hidden=!message;
+        status.dataset.error=String(Boolean(requestError));
+    }
+
+    function observeInstallState(state){
+        if(destroyed)return;
+        currentState=state;
+        render();
+        emit('pwa-install-change',{state:getState(),visible:!host.hidden});
+    }
+
+    function install(){
+        if(destroyed||pending||!currentState.available)return Promise.resolve(null);
+        locallyDismissed=false;
+        requestError=null;
+        pending=true;
+        render();
+        let operation;
+        try{
+            // Keep the browser prompt inside the initiating click's user activation.
+            operation=owner.prompt();
+        }catch(error){
+            operation=Promise.reject(error);
+        }
+        return Promise.resolve(operation).catch(function reportPromptError(error){
+            if(!destroyed)requestError=error;
+            throw error;
+        }).finally(function settlePrompt(){
+            if(destroyed)return;
+            pending=false;
+            render();
+        });
+    }
+
+    function dismiss(){
+        if(destroyed)return false;
+        locallyDismissed=true;
+        requestError=null;
+        if(options.presentation==='floating')owner.dismiss();
+        render();
+        emit('pwa-install-dismissed',{presentation:options.presentation,state:getState()});
+        return true;
+    }
+
+    function destroy(){
+        if(destroyed)return false;
+        destroyed=true;
+        lifecycleController.abort('pwa-install-destroyed');
+        events.dispose();
+        host.hidden=true;
+        host.ready=false;
+        return true;
+    }
+
+    installButton.addEventListener('click',function requestInstallation(){
+        install().catch(function reportInstallationFailure(error){
+            arcaneLogging.error('Unable to open the browser installation prompt:',error);
+        });
+    },{signal:lifecycleController.signal});
+    closeButton.addEventListener('click',dismiss,{signal:lifecycleController.signal});
+
+    configure();
+    owner.subscribe(observeInstallState,{signal:lifecycleController.signal});
+    host.ready=true;
+    emit('pwa-install-ready',{ready:true,state:getState()});
+</script>

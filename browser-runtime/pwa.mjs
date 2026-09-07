@@ -1,5 +1,7 @@
 import {createArcaneEventSource} from './event-manager.mjs';
 
+export {PWA_INSTALL_STATE_EVENT, getPwaInstall, mountPwaInstallPrompt} from './pwa-install.mjs';
+
 export const PWA_STATE_EVENT = 'arcane.pwa.state';
 
 export function registerPwa({workerUrl = './arcane-sw.js', scope} = {}) {

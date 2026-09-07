@@ -39,7 +39,7 @@ for the installed-inventory-derived physical-runtime contract in SDK `0.5.18`.
 | `arcane-os/speech-playback` | Portable speech preparation, playback state, and injected media adapters. |
 | `arcane-os/speech-text` | Speech-input formatting cleanup for complete text and streamed chunks. |
 | `arcane-os/browser-device` | Synchronous mobile or desktop identity hints for application-owned settings. |
-| `arcane-os/pwa` | Nonblocking PWA registration, native worker updates and observable lifecycle state. |
+| `arcane-os/pwa` | Nonblocking PWA registration, worker updates, native installation state and a dismissible installation component. |
 | `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, complete DBOPFS model storage, streaming, cancellation, and structural tool-call results. |
 | `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS provider mechanisms, ordinary upstream assets, materialized/native routing, Workers, and cancellation. |
 | `arcane-os/mail` | Portable Mail runtime, durable outbox, complete transport responses, and provider-neutral acceptance contracts. |
@@ -129,6 +129,9 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `getBrowserDeviceClass()` | function | `arcane-os/browser-device` | Browser device settings | Node and Browser; synchronous identity hint with no model, storage, or GPU operation |
 | `PWA_STATE_EVENT` | constant | `arcane-os/pwa` | Progressive web applications | Browser lifecycle event name; importable without registration |
 | `registerPwa()` | function | `arcane-os/pwa` | Progressive web applications | Browser service workers; synchronous unsupported state when unavailable |
+| `PWA_INSTALL_STATE_EVENT` | constant | `arcane-os/pwa` | Progressive web applications | Browser installation event name; importable without starting observation |
+| `getPwaInstall()` | function | `arcane-os/pwa` | Progressive web applications | Browser native installation events; waiting state while no prompt is available |
+| `mountPwaInstallPrompt()` | function | `arcane-os/pwa` | Progressive web applications | Browser document and managed HTML import; resolves to null without a document |
 | `createDbopfsSpeechArtifactStore()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with ready DBOPFS, Web Locks, Fetch, File/Blob, and object URLs |
 | `removeBrowserSpeechModelCache()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser CacheStorage; explicit removal of one selected upstream model |
 | `createNativeBuildPlan()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
@@ -6123,6 +6126,99 @@ The [PWA guide](pwa.md) defines inputs, native registration results, error state
 current-state replay, disposal, offline resource ownership and update behavior.
 The generated bootstrap registers automatically; a manual caller owns a separate
 entry point and must observe its `ready` rejection.
+
+## PWA_INSTALL_STATE_EVENT
+
+### Overview
+
+The exact event name `arcane.pwa.install.state` identifies native installation
+availability and choice state through the existing Arcane event owner. It is
+separate from service-worker registration state. Importing it starts no
+observation or installation.
+
+### Example
+
+```javascript
+import {PWA_INSTALL_STATE_EVENT} from 'arcane-os/pwa';
+console.log(PWA_INSTALL_STATE_EVENT);
+```
+
+See the [installation state contract](pwa.md#getpwainstall) for the complete
+payload and current-state subscription behavior.
+
+## getPwaInstall()
+
+### Overview
+
+`getPwaInstall()` returns one synchronous page owner exposing `state`,
+`subscribe`, `prompt`, `dismiss` and `dispose`. It captures the browser's
+`beforeinstallprompt` event and observes `appinstalled` and app display-mode
+changes. A missing event leaves installation availability unknown and the owner
+waiting; it does not prove browser incompatibility.
+
+State contains `status`, `available`, `dismissed`, `outcome` and `error`.
+Subscriptions replay current state by default. `prompt()` must be called
+directly within the install click to preserve native user activation. It
+consumes the event once and returns the browser choice, resolves to `null` when
+unavailable, or rejects with the actual error. `dismiss()` remembers the
+session's floating-suggestion dismissal without consuming a retained event.
+
+### Example
+
+```javascript
+import {getPwaInstall} from 'arcane-os/pwa';
+
+const install = getPwaInstall();
+const button = document.querySelector('#install');
+install.subscribe(function updateInstallButton(state) {
+    button.hidden = !state.available;
+});
+button.addEventListener('click', function requestInstallation() {
+    install.prompt().catch(function reportInstallFailure(error) {
+        console.error(error);
+    });
+});
+```
+
+The [PWA guide](pwa.md#getpwainstall) defines every status, event lifetime,
+session dismissal, errors and disposal. Disposing this shared owner removes
+its page-level observation; components normally unsubscribe only their own
+listener. Installation state does not establish offline readiness or completed
+Android WebAPK creation.
+
+## mountPwaInstallPrompt()
+
+### Overview
+
+`mountPwaInstallPrompt({appName = ''} = {})` starts the shared install observer
+before asynchronously mounting one initially hidden `pwa-install.html`
+component. Repeated calls return the same mounting promise. It resolves to the
+ready `html-import` host, or `null` without a document or when the owner is
+disposed before mounting. Component-load failure rejects; removal or disposal
+during loading rejects with `AbortError`. A rejected mount permits another
+explicit attempt. The first call
+supplies the initial app name.
+
+The generated PWA bootstrap calls this automatically with the manifest name.
+Component mounting and worker registration run independently, and application
+rendering must not await them. The floating component offers Install and a
+manual close control; an application can also place the same component inline.
+
+### Example
+
+```javascript
+import {mountPwaInstallPrompt} from 'arcane-os/pwa';
+
+mountPwaInstallPrompt({appName: 'Example Library'}).catch(
+    function reportInstallComponentFailure(error) {
+        console.error(error);
+    }
+);
+```
+
+See the [mounting contract](pwa.md#mountpwainstallprompt) and
+[component reference](runtime-components.md#pwa-installhtml). The browser owns
+native installation eligibility and URL-bar promotion.
 
 ## createBrowserWasmLlmProvider()
 

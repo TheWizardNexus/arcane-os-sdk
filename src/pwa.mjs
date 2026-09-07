@@ -277,7 +277,13 @@ export function createPwaArtifacts(
         ),
         navigationAliases: navigationAliases ?? {[basePath]: app.entry}
     };
-    const bootstrap = `import {registerPwa} from ${JSON.stringify(`${runtimeBase}pwa.mjs`)};
+    const bootstrap = `import {registerPwa, mountPwaInstallPrompt} from ${JSON.stringify(`${runtimeBase}pwa.mjs`)};
+
+mountPwaInstallPrompt({appName: ${JSON.stringify(manifest.name)}}).catch(
+    function reportPwaInstallComponentFailure(error) {
+        console.error('Arcane PWA install component failed:', error);
+    }
+);
 
 const controller = registerPwa(
     {

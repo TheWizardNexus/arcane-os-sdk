@@ -2,7 +2,9 @@
 
 An application supplies its installation identity and offline resource selection.
 The SDK generates the Web App Manifest, offline inventory, service worker and
-nonblocking registration module. Native packages keep their existing lifecycle.
+nonblocking registration module. Its shared installation owner and dismissible
+component expose the browser's available install action. Native packages keep
+their existing lifecycle.
 
 ## Application configuration
 
@@ -63,7 +65,7 @@ Browser packaging emits these files at the selected deployment root:
 | `arcane.webmanifest` | Browser installation metadata. |
 | `arcane-offline.json` | App ID/version, SDK version, deployment revision, resource URLs and explicit navigation aliases. |
 | `arcane-sw.js` | Stable worker URL with the selected offline manifest embedded in its source. |
-| `arcane-pwa.mjs` | Independent registration module importing the SDK client. |
+| `arcane-pwa.mjs` | Independent registration and installation-component bootstrap importing the SDK client. |
 
 Each packaged output gets one deployment revision shared by its offline
 manifest and worker. It distinguishes separately generated outputs even when
@@ -74,6 +76,9 @@ It follows actual resource references to include meaningful query variants.
 Generated application pages receive a manifest link and an `async` module
 marked `data-arcane-pwa`. Existing application scripts retain their order.
 PWA registration does not wait for models, storage, preferences or page rendering.
+The same bootstrap starts one initially hidden `pwa-install.html` component with
+the generated manifest's app name. Component loading and worker registration
+proceed independently.
 
 The selected PWA browser delivery removes `v` and `arcaneVersion` from actual
 local resource references, including the managed import map. Other query fields,
@@ -91,7 +96,10 @@ Package-only applications retain their existing descriptor workflow.
 
 Add a file or directory to `package.include` to make it part of the app's
 resources. A new file inside an already included directory needs no separate
-entry. If `package.pwa.offline.include` is nonempty, the resource must also
+entry. `package.include` is an application resource selection, not a file list
+inside the Web App Manifest. `arcane.webmanifest` contains browser installation
+metadata; `arcane-offline.json` contains the selected offline resource inventory.
+If `package.pwa.offline.include` is nonempty, the resource must also
 match that offline selection and must not match `offline.exclude`. Adding a
 path only to the offline selection does not add it to the app's resources.
 Restart after changing descriptor settings. Edits to selected source files are
@@ -104,6 +112,8 @@ and packaged-preview serving, including conditional resource responses.
 Every Arcane development server and packaged browser preview serves HTTPS,
 including localhost. Configure the workspace certificate pair before starting
 the ordinary command; see [development HTTPS setup](cli.md#development-https-setup).
+`--public` selects the IPv4 wildcard bind address; it does not enable PWA
+configuration, change manifest metadata, or determine browser installability.
 
 Source inventory work begins when the browser requests the worker or current
 offline manifest, after the page can start. It traverses the selected route
@@ -153,7 +163,15 @@ the previous timestamp so the next page load can retry. Each cached response
 retains its own `Last-Modified` header, but there are no per-file check times.
 The SDK imposes no age-based cache deletion and
 retains resource bodies across app and SDK version changes. Requests for a page
-do not wait for the complete resource inventory to finish checking. The SDK
+do not wait for the complete resource inventory to finish checking. A file
+already in the current resource cache also returns immediately when its own
+conditional check is pending or in flight. That background check keeps its
+existing owner and updates the stored response for subsequent requests.
+The page receives the cached response's original status, commonly `200`, even
+when the separate conditional network response is `304`. Status alone does
+not identify a network transfer; use the browser's response source and timing
+details to distinguish cache access from worker startup, queueing and network.
+The SDK
 uses at most four concurrent background resource requests and starts no timer
 or polling loop between page loads.
 
@@ -204,6 +222,151 @@ activation without forcing a page reload.
 Switching a server from a packaged release to live development does not replace
 an already active release worker inside an open document. The same native
 worker lifecycle applies.
+
+## Installation component
+
+Starting with SDK `0.13.0`, enabled PWA pages automatically mount the shared
+[`pwa-install.html` component](runtime-components.md#pwa-installhtml). It appears
+when the browser supplies an installation prompt, offers **Install** and a
+clearly labeled close control, and does not move focus when it appears.
+The floating suggestion has no automatic dismissal timer. Closing it remembers
+the choice for the current tab session and manifest URL, so another page
+load does not immediately show it again. A storage failure leaves the current
+page's dismissal functional and reports the error through console diagnostics.
+
+An application can also place the same component inline through `html-import`
+with `data-presentation="inline"`. Both presentations share one page-owned
+native installation event. Dismissing the floating suggestion does not consume
+that event or disable an explicitly placed inline component. Closing an inline
+instance hides only that instance. See the component reference for its
+configuration, methods and events.
+
+The browser controls the URL-bar installation indicator and native prompt.
+The SDK cannot force either to appear. Without a captured
+`beforeinstallprompt`, the component remains hidden; that waiting state does
+not establish that installation is unsupported. The browser may still be
+evaluating the app, may already have it installed, or may only support a
+manual browser-menu installation path.
+
+### Browser installation requirements
+
+Inspect the loaded page's manifest link and the browser's manifest diagnostics
+when an install action is missing. Confirm that the generated manifest has the
+intended name, `start_url`, scope and app display mode, and that its icon URLs
+resolve to actual images with the declared dimensions. For Chromium's manifest
+install promotion, provide a `purpose: "any"` icon, or omit `purpose` to use
+that default, in PNG, SVG or WebP format. Its strict installation icon selector
+excludes JPEG even when the same image renders successfully on the page.
+Do not change a file's extension or MIME declaration without converting the
+actual image at the application's asset owner. See Chromium's
+[icon selection implementation](https://raw.githubusercontent.com/chromium/chromium/main/third_party/blink/common/manifest/manifest_icon_selector.cc).
+
+Providing 192-by-192 and 512-by-512 raster icons follows the
+[browser guidance](https://web.dev/articles/add-manifest). Their absence alone
+does not prove the failure: Chromium can select one larger supported icon.
+Keep actual icon dimensions in `sizes`. Browser diagnostics about missing
+`screenshots` concern the richer installation dialog; screenshots are optional
+and are separate from a usable installation icon.
+
+Browser installation requires HTTPS or the browser's localhost/loopback
+exception. A device-facing LAN address is not loopback. Arcane's development
+server still follows its own HTTPS serving contract above. Browser engagement,
+installation state and platform support also affect whether native promotion
+appears; worker cache readiness is not an installation UI prerequisite. See
+[browser installation requirements](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable).
+
+Browsers without `beforeinstallprompt` can offer manual installation. For
+example, current iPhone Safari uses Share, **Add to Home Screen**, **Open as
+Web App**, then **Add**. A product may explain that browser-owned path in its
+help, but should not present it as a programmatic SDK install action. The SDK
+does not infer installation support from the user-agent string. See
+[Apple's installation instructions](https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios).
+
+## getPwaInstall()
+
+Import `getPwaInstall` and `PWA_INSTALL_STATE_EVENT` from `arcane-os/pwa`.
+`getPwaInstall()` synchronously returns the shared page owner with `state`,
+`subscribe`, `prompt`, `dismiss` and `dispose`. Call it early when owning a
+separate install entry point so it can capture `beforeinstallprompt` before
+loading the UI. The generated bootstrap already does this through
+`mountPwaInstallPrompt()`.
+
+`state` contains `status`, `available`, `dismissed`, `outcome` and `error`.
+Status is `waiting`, `available`, `prompting`, `accepted`, `dismissed`,
+`installed`, `running`, `error` or `disposed`. `available` means a native event
+is retained; a dismissed floating suggestion can still have `available: true`.
+`outcome` is the browser's `accepted` or `dismissed` choice, or `null` before a
+choice. `error` carries the complete prompt error, or `null`.
+
+`subscribe(listener, {emitCurrent: true, signal} = {})` immediately replays
+state by default and returns an unsubscribe function. Later state travels
+through the existing Arcane event owner using `PWA_INSTALL_STATE_EVENT`
+(`arcane.pwa.install.state`). A subscription does not wait for worker
+registration, storage initialization or model readiness.
+
+Call `prompt()` directly from the user's install click, before any asynchronous
+wait. It invokes the browser prompt in the same call stack, consumes the event
+once, and returns a promise for the browser's choice. It resolves to `null`
+when there is no retained event or the owner is disposed. Failure publishes
+`error` state and rejects. A new native event is required for another prompt.
+
+```javascript
+import {getPwaInstall} from 'arcane-os/pwa';
+
+const install = getPwaInstall();
+const installButton = document.querySelector('#install');
+
+install.subscribe(function showInstallAvailability(state) {
+    installButton.hidden = !state.available;
+});
+installButton.addEventListener('click', function requestInstallation() {
+    install.prompt().catch(function reportInstallFailure(error) {
+        console.error(error);
+    });
+});
+```
+
+`dismiss()` remembers the session choice without consuming the retained event
+and returns the current state. A browser-native dismissed choice is remembered
+too. `appinstalled` clears the event and publishes `installed`; running in an
+app display mode publishes `running` and suppresses the prompt. These states
+do not establish offline readiness. On Android, `appinstalled` can arrive
+before WebAPK creation finishes. See the
+[browser lifecycle distinction](https://web.dev/learn/pwa/detection/).
+
+`dispose()` removes the shared owner's native listeners and subscriptions.
+Leaving the page disposes it automatically, except when the browser retains
+the page in its back/forward cache.
+Because the owner is shared, an individual component should dispose its own
+subscription instead. A later `getPwaInstall()` creates a new owner after
+disposal; it cannot recover a native event that was already consumed.
+
+## mountPwaInstallPrompt()
+
+`mountPwaInstallPrompt({appName = ''} = {})` starts native install observation
+synchronously, then loads the shared HTML import and theme modules concurrently
+and appends one initially hidden component when the document body is available.
+It returns the same mounting promise on repeated calls; the first call supplies
+the initial app name. The promise resolves to the ready `html-import` host, or
+`null` without a document or when the owner is disposed before mounting. It
+rejects if component loading fails, or with `AbortError` when the loading host
+is removed or its owner disposed. A rejected mount releases its slot so an
+explicit later call can try again. Observe the rejection without making page
+rendering wait for it.
+
+The generated PWA bootstrap calls this automatically using the manifest name.
+Applications need not add another floating suggestion. A separate entry point
+can call it explicitly:
+
+```javascript
+import {mountPwaInstallPrompt} from 'arcane-os/pwa';
+
+mountPwaInstallPrompt({appName: 'Example Library'}).catch(
+    function reportInstallComponentFailure(error) {
+        console.error(error);
+    }
+);
+```
 
 ## registerPwa()
 
