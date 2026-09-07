@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.15.1
+
+- Use the published `node-http-server` public lifecycle for the mail gateway.
+  Pass original requests and responses through its raw-request hook to the
+  existing mail handler, preserving complete content, provider results,
+  cancellation, and the returned native listener. Retain the disabled socket
+  inactivity timeout and use the module's listener shutdown and malformed-client
+  response handling.
+
 ## 0.15.0
 
 - Add explicit `arcane dev --http` and source API `http:true` for HTTP

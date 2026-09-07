@@ -197,6 +197,7 @@ test('mail gateway exposes an exact, credential-free lifecycle contract',async f
     assert.equal(instance.callerAuthentication,'app-key');
     assert.equal(instance.url,`${instance.origin}${RESEND_MAIL_PATH}`);
     assert.equal(instance.host,'127.0.0.1');
+    assert.equal(instance.server.timeout,0);
     assert.equal(instance.closed,instance.lifecycle);
     for(const secretProperty of ['apiKey','appKey','from','recipientAllowlist','allowedOrigins']){
         assert.equal(Object.hasOwn(instance,secretProperty),false);

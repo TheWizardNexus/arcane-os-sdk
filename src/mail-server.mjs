@@ -1,6 +1,6 @@
 import Is from 'strong-type';
 import {createHash,randomUUID,timingSafeEqual} from 'node:crypto';
-import http from 'node:http';
+import {Server} from 'node-http-server';
 
 const is = new Is(false);
 
@@ -1283,40 +1283,16 @@ export function createResendMailRequestHandler(options={}){
     };
 }
 
-function listen(server,{host,port}){
+function deployMailServer(mailServer){
     return new Promise(function waitForMailListener(resolve,reject){
-        function cleanup(){
-            server.removeListener('error',onError);
-            server.removeListener('listening',onListening);
-        }
         function onError(error){
-            cleanup();
             reject(error);
         }
-        function onListening(){
-            cleanup();
-            resolve();
-        }
-        server.once('error',onError);
-        server.once('listening',onListening);
-        server.listen({exclusive:true,host,port});
-    });
-}
-
-function closeHttpServer(server){
-    return new Promise(function waitForHttpServerClose(resolve,reject){
-        if(!server.listening){
-            resolve();
-            return;
-        }
-        server.close(function finishHttpServerClose(error){
-            if(error){
-                reject(error);
-            }else{
-                resolve();
-            }
+        mailServer.deploy(function onListening(instance,server){
+            server.removeListener('error',onError);
+            resolve(server);
         });
-        server.closeIdleConnections?.();
+        mailServer.server.once('error',onError);
     });
 }
 
@@ -1325,29 +1301,27 @@ export async function startResendMailServer(options={}){
     if(configuration.signal?.aborted){
         throw configuration.signal.reason??new Error('Mail server start was cancelled.');
     }
-    const requestHandler=createResendMailRequestHandler(options);
-    const server=http.createServer(requestHandler.handle);
-    server.on('clientError',function rejectMalformedClient(error,socket){
-        if(!socket.writable){
-            return;
-        }
-        socket.end(
-            'HTTP/1.1 400 Bad Request\r\n'
-            +'Connection: close\r\n'
-            +'Content-Length: 0\r\n'
-            +'\r\n'
-        );
+    const mailServer=new Server({
+        host:configuration.host,
+        port:configuration.port,
+        server:{timeout:0}
     });
+    const requestHandler=createResendMailRequestHandler(options);
+    mailServer.onRawRequest=function handleMailRequest(request,response){
+        requestHandler.handle(request,response);
+        return true;
+    };
 
+    let server;
     try{
-        await listen(server,{host:configuration.host,port:configuration.port});
+        server=await deployMailServer(mailServer);
     }catch(error){
-        await requestHandler.close();
+        await Promise.allSettled([mailServer.close(),requestHandler.close()]);
         throw error;
     }
     const address=server.address();
     if(!address||is.string(address)||!isNumericLoopback(address.address)){
-        await Promise.allSettled([closeHttpServer(server),requestHandler.close()]);
+        await Promise.allSettled([mailServer.close(),requestHandler.close()]);
         throw configurationError('Mail server did not bind to a numeric loopback address.');
     }
     const displayHost=address.address.includes(':')?`[${address.address}]`:address.address;
@@ -1365,7 +1339,7 @@ export async function startResendMailServer(options={}){
         configuration.signal?.removeEventListener('abort',closeFromSignal);
         const handlerClosing=requestHandler.close();
         try{
-            await Promise.all([closeHttpServer(server),handlerClosing]);
+            await Promise.all([mailServer.close(),handlerClosing]);
             resolveLifecycle();
         }catch(error){
             rejectLifecycle(error);

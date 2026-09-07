@@ -283,6 +283,12 @@ Non-interactive structured output requires `--app-key-stdin` and redirected
 stdin. The server binds numeric loopback only; the default is
 `127.0.0.1:8025/v1/mail`.
 
+The gateway uses the published `node-http-server` instance lifecycle. Its raw
+request hook hands the original request and response directly to the mail
+handler before body parsing or static routing. Socket inactivity timeout remains
+disabled; caller-selected mail deadlines, cancellation, and complete responses
+remain owned by the mail handler.
+
 The gateway protects the provider credential by requiring:
 
 - its exact numeric-loopback `Host` authority and `/v1/mail` route;
