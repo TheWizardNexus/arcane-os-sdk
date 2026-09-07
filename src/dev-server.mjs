@@ -326,13 +326,15 @@ async function openSafeFile(root, segments, {readContent = true} = {}) {
 async function serveGeneratedRepresentation(fileServer, request, response, {
     lastModified, contentType, body
 }) {
-    const modified = lastModified.toUTCString();
-    response.setHeader('Last-Modified', modified);
-    const requested = Date.parse(request.headers['if-modified-since']);
-    if (Number.isFinite(requested) && Date.parse(modified) <= requested) {
-        response.writeHead(304);
-        response.end();
-        return;
+    if (lastModified) {
+        const modified = lastModified.toUTCString();
+        response.setHeader('Last-Modified', modified);
+        const requested = Date.parse(request.headers['if-modified-since']);
+        if (Number.isFinite(requested) && Date.parse(modified) <= requested) {
+            response.writeHead(304);
+            response.end();
+            return;
+        }
     }
     response.setHeader('Content-Type', contentType);
     await fileServer.serve(request, response, await body());
@@ -1122,7 +1124,9 @@ async function startOwnedDevServer({
                     request,
                     response,
                     {
-                        lastModified: generated.lastModified,
+                        // An older in-flight snapshot may finish after a newer
+                        // selection. Its body cannot validate that newer output.
+                        lastModified: selectedRoutes === currentSourceRoutes ? generated.lastModified : undefined,
                         contentType: MIME_TYPES.get(path.extname(generated.path)),
                         body: function generatedPwaBody() {
                             return generated.content;
