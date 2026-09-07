@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.2
+
+- Show mobile speech feedback only during requested or active voice loading.
+  Align pending local-model activation to the top of the chat area at viewport
+  widths up to `44rem`. Preserve existing mobile controls, complete status and
+  error data, desktop layout, and model lifecycle.
+
 ## 0.11.1
 
 - Keep the shared Chat transcript, composer, speech controls, language selector,
