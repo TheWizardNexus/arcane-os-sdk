@@ -146,8 +146,11 @@ bar is indeterminate. Downloaded-file completion is not activation completion.
 The metadata tensor count and GPU layer assignment are descriptive only:
 upstream reports assigned layers before model-weight loading has finished.
 The pinned runtime does not expose a measured overall initialization fraction
-or a shader-compilation completion count. Readiness still requires the load
-operation to resolve and the runtime to confirm the model is loaded.
+or a shader-compilation completion count. Readiness requires the load operation
+to resolve, Wllama to report the model loaded, and its public
+`getLoadedContextInfo()` result to report `success:true`. A failed model context
+rejects loading with `ARCANE_AI_LOAD_FAILED`, releases the owned session, and
+leaves the provider in `error` with `loaded:false` before inference can begin.
 
 While a load remains active, the provider repeats its current record every five
 seconds with `heartbeat:true` and an updated `elapsedMs`. During initialization,

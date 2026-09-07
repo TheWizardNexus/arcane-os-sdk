@@ -43,11 +43,20 @@ function deferred() {
     return {promise, resolve: resolvePromise};
 }
 
-function fixture({webgpu = false, loadDefaults = {}, onLoad = null, onCompletion = null} = {}) {
+function fixture(
+    {
+        webgpu = false,
+        loadDefaults = {},
+        onLoad = null,
+        onCompletion = null,
+        contextInfo = {success: true}
+    } = {}
+) {
     const loads = [];
     const completions = [];
     const events = [];
     const terminations = [];
+    const contextReads = [];
     let telemetryRequests = 0;
     let adapterRequests = 0;
     let ensured = 0;
@@ -92,6 +101,14 @@ function fixture({webgpu = false, loadDefaults = {}, onLoad = null, onCompletion
 
         isModelLoaded() {
             return this.loaded;
+        }
+
+        getLoadedContextInfo() {
+            const result = {...contextInfo};
+            contextReads.push(
+                {loaded: this.loaded, result}
+            );
+            return result;
         }
 
         async arcaneTelemetry() {
@@ -212,6 +229,7 @@ function fixture({webgpu = false, loadDefaults = {}, onLoad = null, onCompletion
         completions,
         events,
         terminations,
+        contextReads,
         counters() {
             return {telemetryRequests, adapterRequests, ensured};
         }
@@ -265,6 +283,64 @@ test(
         assert.equal(current.provider.capabilities().executionDevice, 'cpu');
     }
 );
+
+for (const executionDevice of ['cpu', 'webgpu']) {
+    test(
+        `${executionDevice} context failure rejects a falsely loaded Wllama session before provider readiness`,
+        async function rejectFailedModelContext() {
+            const contextInfo = {success: false};
+            const current = fixture(
+                {
+                    webgpu: executionDevice === 'webgpu',
+                    loadDefaults: {gpuLayers: executionDevice === 'cpu' ? 0 : 99_999},
+                    contextInfo
+                }
+            );
+            await assert.rejects(
+                current.adapted.load(
+                    {selection: current.selection}
+                ),
+                {code: 'ARCANE_AI_LOAD_FAILED', message: 'Wllama failed to create the model context.'}
+            );
+            assert.equal(current.contextReads.length, 1);
+            assert.equal(current.contextReads[0].loaded, true);
+            assert.equal(current.contextReads[0].result.success, false);
+            assert.equal(current.loads.length, 1);
+            assert.equal(current.terminations.length, 1);
+            assert.equal(current.counters().telemetryRequests, 0);
+            assert.equal(current.runtime.isLoaded(), false);
+            assert.equal(current.runtime.isLoading(), false);
+            assert.equal(current.runtime.evidence().state, 'unloaded');
+            assert.equal(current.provider.status().state, 'error');
+            assert.equal(current.provider.status().loaded, false);
+            assert.equal(current.provider.status().error.code, 'ARCANE_AI_LOAD_FAILED');
+            assert.equal(current.adapted.status().state, 'error');
+            assert.equal(current.adapted.status().loaded, false);
+            assert.equal(current.adapted.status().busy, false);
+            await assert.rejects(
+                current.provider.chat(
+                    {messages: [{role: 'user', content: 'Begin the conversation.'}]}
+                ),
+                {code: 'ARCANE_AI_NOT_READY'}
+            );
+            assert.equal(current.completions.length, 0);
+
+            await current.provider.unload();
+            assert.equal(current.terminations.length, 1);
+            contextInfo.success = true;
+            await current.adapted.load(
+                {selection: current.selection}
+            );
+            assert.equal(current.contextReads.length, 2);
+            assert.equal(current.adapted.status().state, 'ready');
+            assert.equal(current.adapted.status().loaded, true);
+            assert.equal(current.runtime.isLoaded(), true);
+            assert.equal(current.counters().telemetryRequests, executionDevice === 'webgpu' ? 1 : 0);
+            await current.provider.unload();
+            assert.equal(current.terminations.length, 2);
+        }
+    );
+}
 
 test(
     'CPU per-load overrides preserve GPU defaults and require unload before device changes',
@@ -356,6 +432,7 @@ test(
         await cancellation;
         assert.equal(current.provider.status().loaded, false);
         assert.equal(current.terminations.length, 1);
+        assert.equal(current.contextReads.length, 0);
         assert.equal(current.counters().telemetryRequests, 0);
         await current.provider.unload();
         await current.provider.load();

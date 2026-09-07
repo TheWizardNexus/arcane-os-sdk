@@ -575,6 +575,13 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
           "Wllama did not confirm a successfully loaded model.",
         );
       }
+        const loadedContext = next.getLoadedContextInfo();
+        if (loadedContext.success !== true) {
+            throw runtimeFailure(
+                'ARCANE_AI_LOAD_FAILED',
+                'Wllama failed to create the model context.'
+            );
+        }
       let adapter = null;
       if (webgpuRequired) {
           const telemetryOperation = trackOperation(

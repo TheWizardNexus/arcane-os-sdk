@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.3
+
+- Require Wllama's model-context load result to report success before publishing
+  model readiness. Failed initialization now follows the existing cleanup and
+  error path instead of allowing conversation requests against a failed context.
+  Preserve CPU and GPU selection, cached models, complete payloads, and cancellation.
+
 ## 0.11.2
 
 - Show mobile speech feedback only during requested or active voice loading.
