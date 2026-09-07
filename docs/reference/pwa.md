@@ -293,18 +293,29 @@ does not infer installation support from the user-agent string. See
 ## getPwaInstall()
 
 Import `getPwaInstall` and `PWA_INSTALL_STATE_EVENT` from `arcane-os/pwa`.
-`getPwaInstall()` synchronously returns the shared page owner with `state`,
+`getPwaInstall()` synchronously returns the shared page owner with `state`, `ready`,
 `subscribe`, `prompt`, `dismiss` and `dispose`. Call it early when owning a
 separate install entry point so it can capture `beforeinstallprompt` before
 loading the UI. The generated bootstrap already does this through
 `mountPwaInstallPrompt()`.
 
-`state` contains `status`, `available`, `dismissed`, `outcome` and `error`.
+`state` contains `status`, `available`, `installed`, `dismissed`, `outcome`,
+`error` and `storageError`.
 Status is `waiting`, `available`, `prompting`, `accepted`, `dismissed`,
 `installed`, `running`, `error` or `disposed`. `available` means a native event
-is retained; a dismissed floating suggestion can still have `available: true`.
+is retained, the initial installation-record read has settled, and installation
+has not been recorded or detected. A dismissed floating suggestion can still
+have `available: true`. `installed` is true after browser-reported installation
+or restoration of that app's saved installation record.
 `outcome` is the browser's `accepted` or `dismissed` choice, or `null` before a
-choice. `error` carries the complete prompt error, or `null`.
+choice. `error` carries the complete prompt error, or `null`; `storageError`
+carries the complete DBOPFS read or write error, or `null`.
+
+`ready` resolves to the state after the initial DBOPFS read settles. Native
+events are captured synchronously while this read runs. Only installation
+availability waits for it; page rendering, component loading and worker
+registration continue independently. A storage failure is logged and published
+as `storageError`; `ready` still resolves and native installation remains usable.
 
 `subscribe(listener, {emitCurrent: true, signal} = {})` immediately replays
 state by default and returns an unsubscribe function. Later state travels
@@ -315,7 +326,8 @@ registration, storage initialization or model readiness.
 Call `prompt()` directly from the user's install click, before any asynchronous
 wait. It invokes the browser prompt in the same call stack, consumes the event
 once, and returns a promise for the browser's choice. It resolves to `null`
-when there is no retained event or the owner is disposed. Failure publishes
+when installation is unavailable, including while the saved state is loading
+or after installation is remembered. Failure publishes
 `error` state and rejects. A new native event is required for another prompt.
 
 ```javascript
@@ -336,8 +348,24 @@ installButton.addEventListener('click', function requestInstallation() {
 
 `dismiss()` remembers the session choice without consuming the retained event
 and returns the current state. A browser-native dismissed choice is remembered
-too. `appinstalled` clears the event and publishes `installed`; running in an
-app display mode publishes `running` and suppresses the prompt. These states
+too. `appinstalled` clears the event, publishes `installed`, and saves
+`{installed: true}` as `pwa/installed.json` through the current app-scoped
+DBOPFS singleton. An installed-app launch in standalone, minimal-ui or
+window-controls-overlay mode, or with `navigator.standalone === true`, also
+records installation. Ordinary fullscreen suppresses the current prompt but
+does not record installation because browsers can enter fullscreen without
+installing an app; see the [display-mode specification](https://drafts.csswg.org/mediaqueries-5/#display-modes).
+
+Every new owner reads the saved flag, so both floating and explicit inline
+controls stay hidden on subsequent visits in that browser origin's app scope.
+The SDK never clears this flag or resets it when display mode changes. Prompt
+acceptance and dismissal alone do not write it. The record is independent of
+resource-check history and other application data. A pending read cannot undo
+newly observed installation, and a confirmed installation's pending write is
+retained through owner disposal. A write failure remains observable without
+making the current installed session eligible again.
+
+Running in an app display mode publishes `running`. These states
 do not establish offline readiness. On Android, `appinstalled` can arrive
 before WebAPK creation finishes. See the
 [browser lifecycle distinction](https://web.dev/learn/pwa/detection/).

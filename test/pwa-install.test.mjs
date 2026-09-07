@@ -6,34 +6,117 @@ import {createPwaArtifacts} from '../src/pwa.mjs';
 import Is from '../browser-runtime/dependencies/strong-type/index.js';
 import {createArcaneEventSource} from '../browser-runtime/event-manager.mjs';
 
-function browserFixture(context, {stored = new Map(), running = false} = {}) {
+function installStorageFixture({
+    records = new Map(),
+    readyPromise = Promise.resolve(),
+    readGate = Promise.resolve(),
+    writeGate = Promise.resolve(),
+    readError = null,
+    writeError = null
+} = {}) {
+    let resolveReadStarted;
+    let resolveWriteStarted;
+    let resolveWriteFinished;
+    const readStarted = new Promise(function captureReadStart(resolve) {
+        resolveReadStarted = resolve;
+    });
+    const writeStarted = new Promise(function captureWriteStart(resolve) {
+        resolveWriteStarted = resolve;
+    });
+    const writeFinished = new Promise(function captureWriteFinish(resolve) {
+        resolveWriteFinished = resolve;
+    });
+    const reads = [];
+    const writes = [];
+    return {
+        records,
+        reads,
+        writes,
+        readyPromise,
+        readStarted,
+        writeStarted,
+        writeFinished,
+        async get(table, key, force) {
+            reads.push([table, key, force]);
+            const record = records.get(`${table}/${key}`) ?? null;
+            resolveReadStarted();
+            await readGate;
+            if (readError) throw readError;
+            return record;
+        },
+        async set(table, key, value) {
+            writes.push([table, key, value]);
+            resolveWriteStarted();
+            try {
+                await writeGate;
+                if (writeError) throw writeError;
+                records.set(`${table}/${key}`, value);
+                return value;
+            } finally {
+                resolveWriteFinished();
+            }
+        }
+    };
+}
+
+function browserFixture(context, {
+    stored = new Map(),
+    running = false,
+    fullscreen = false,
+    standalone = false,
+    storage = installStorageFixture()
+} = {}) {
     const window = new EventTarget();
     const display = new EventTarget();
+    const installedDisplay = new EventTarget();
     display.matches = running;
+    installedDisplay.matches = running && !fullscreen;
     const globals = {
         addEventListener: window.addEventListener.bind(window),
         removeEventListener: window.removeEventListener.bind(window),
-        matchMedia: function matchDisplayMode() { return display; },
+        matchMedia: function matchDisplayMode(query) {
+            return query.includes('(display-mode: fullscreen)') ? display : installedDisplay;
+        },
         document: {querySelector() { return {href: 'https://example.test/arcane.webmanifest'}; }},
         sessionStorage: {
             getItem(key) { return stored.get(key) ?? null; },
             setItem(key, value) { stored.set(key, value); }
         },
-        navigator: {}
+        navigator: {standalone},
+        dbopfs: storage
     };
     const previous = new Map();
     for (const [key, value] of Object.entries(globals)) {
         previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
         Object.defineProperty(globalThis, key, {configurable: true, value});
     }
-    context.after(function restoreBrowser() {
-        getPwaInstall().dispose();
+    context.after(async function restoreBrowser() {
+        const owner = getPwaInstall();
+        await owner.ready;
+        owner.dispose();
         for (const [key, descriptor] of previous) {
             if (descriptor) Object.defineProperty(globalThis, key, descriptor);
             else delete globalThis[key];
         }
     });
-    return {window, display, stored};
+    return {window, display, installedDisplay, stored, storage};
+}
+
+function captureStorageWarnings(context) {
+    const originalWarn = console.warn;
+    const warnings = [];
+    let resolveWarning;
+    const warned = new Promise(function captureWarning(resolve) {
+        resolveWarning = resolve;
+    });
+    console.warn = function observeStorageWarning(...args) {
+        warnings.push(args);
+        resolveWarning();
+    };
+    context.after(function restoreConsoleWarning() {
+        console.warn = originalWarn;
+    });
+    return {warnings, warned};
 }
 
 function offerInstall(window, prompt) {
@@ -45,11 +128,14 @@ function offerInstall(window, prompt) {
 
 test('Installation state replays availability and calls each native prompt once in the click stack',
     async function nativeInstallLifecycle(context) {
-        const {window} = browserFixture(context);
+        const {window, storage} = browserFixture(context);
         const owner = getPwaInstall();
         assert.equal(getPwaInstall(), owner);
         assert.equal(PWA_INSTALL_STATE_EVENT, 'arcane.pwa.install.state');
         assert.equal(owner.state.status, 'waiting');
+        assert.equal(owner.state.installed, false);
+        assert.equal(owner.state.storageError, null);
+        assert.deepEqual(await owner.ready, owner.state);
         let calls = 0;
         let resolveChoice;
         const choice = new Promise(function waitForChoice(resolve) { resolveChoice = resolve; });
@@ -68,35 +154,43 @@ test('Installation state replays availability and calls each native prompt once 
         assert.equal(calls, 1);
         window.dispatchEvent(new Event('appinstalled'));
         assert.equal(owner.state.status, 'installed');
+        await storage.writeFinished;
         unsubscribe();
     }
 );
 
 test('Closing promotion persists for the tab session and retains installation for explicit controls',
     async function retainedInstallAfterDismissal(context) {
-        const {window} = browserFixture(context);
+        const {window, storage} = browserFixture(context);
         const owner = getPwaInstall();
+        await owner.ready;
         offerInstall(window, function nativePrompt() { return {outcome: 'accepted'}; });
         owner.dismiss();
         assert.equal(owner.state.dismissed, true);
         assert.equal(owner.state.available, true);
         assert.deepEqual(await owner.prompt(), {outcome: 'accepted'});
+        assert.deepEqual(storage.writes, []);
         owner.dispose();
         const nextPage = getPwaInstall();
         assert.equal(nextPage.state.dismissed, true);
         assert.equal(nextPage.state.available, false);
+        await nextPage.ready;
+        assert.equal(nextPage.state.installed, false);
+        assert.deepEqual(storage.writes, []);
     }
 );
 
 test('Older prompt results use userChoice and browser dismissal suppresses later promotion',
     async function nativeUserChoice(context) {
-        const {window} = browserFixture(context);
+        const {window, storage} = browserFixture(context);
         const owner = getPwaInstall();
+        await owner.ready;
         const event = offerInstall(window, function nativePrompt() { return Promise.resolve(); });
         event.userChoice = Promise.resolve({outcome: 'dismissed'});
         assert.deepEqual(await owner.prompt(), {outcome: 'dismissed'});
         assert.equal(owner.state.status, 'dismissed');
         assert.equal(owner.state.dismissed, true);
+        assert.deepEqual(storage.writes, []);
         offerInstall(window, function laterPrompt() { return {outcome: 'accepted'}; });
         assert.equal(owner.state.available, true);
         assert.equal(owner.state.dismissed, true);
@@ -107,6 +201,7 @@ test('Native prompt errors remain observable and do not reuse the consumed event
     async function installPromptErrors(context) {
         const {window} = browserFixture(context);
         const owner = getPwaInstall();
+        await owner.ready;
         const failure = new Error('The native prompt could not open.');
         offerInstall(window, function rejectedPrompt() { throw failure; });
         await assert.rejects(owner.prompt(), function sameFailure(error) { return error === failure; });
@@ -121,9 +216,12 @@ test('Native prompt errors remain observable and do not reuse the consumed event
 
 test('App display mode suppresses promotion and final page detach removes native listeners',
     async function displayAndDetach(context) {
-        const {window, display} = browserFixture(context, {running: true});
+        const {window, display, storage} = browserFixture(context, {running: true, fullscreen: true});
         const owner = getPwaInstall();
         assert.equal(owner.state.status, 'running');
+        await owner.ready;
+        assert.equal(owner.state.installed, false);
+        assert.deepEqual(storage.writes, []);
         offerInstall(window, function unexpectedPrompt() { throw new Error('Already running as an app'); });
         assert.equal(owner.state.available, false);
         display.matches = false;
@@ -140,10 +238,11 @@ test('App display mode suppresses promotion and final page detach removes native
     }
 );
 
-test('A late prompt choice cannot replace installed or disposed state',
+test('A late prompt choice cannot replace installed state',
     async function lateInstallChoice(context) {
-        const {window} = browserFixture(context);
+        const {window, storage} = browserFixture(context);
         const owner = getPwaInstall();
+        await owner.ready;
         let resolveChoice;
         offerInstall(window, function pendingPrompt() {
             return new Promise(function pendingChoice(resolve) { resolveChoice = resolve; });
@@ -154,9 +253,18 @@ test('A late prompt choice cannot replace installed or disposed state',
         await result;
         assert.equal(owner.state.status, 'installed');
         assert.equal(owner.state.outcome, 'accepted');
+        await storage.writeFinished;
         owner.dispose();
         assert.equal(owner.state.status, 'disposed');
+    }
+);
+
+test('A late prompt choice cannot replace disposed state',
+    async function lateDisposedChoice(context) {
+        const {window, storage} = browserFixture(context);
         const nextOwner = getPwaInstall();
+        await nextOwner.ready;
+        let resolveChoice;
         offerInstall(window, function pendingNextPrompt() {
             return new Promise(function pendingNextChoice(resolve) { resolveChoice = resolve; });
         });
@@ -166,6 +274,226 @@ test('A late prompt choice cannot replace installed or disposed state',
         await nextResult;
         assert.equal(nextOwner.state.status, 'disposed');
         assert.equal(nextOwner.state.outcome, null);
+        assert.deepEqual(storage.writes, []);
+    }
+);
+
+test('Remembered installation restores before promotion without rewriting other PWA records',
+    async function restoredInstallation(context) {
+        const records = new Map(
+            [
+                ['pwa/installed.json', {installed: true}],
+                ['pwa/resources.json', {lastChecked: 1700000000000}]
+            ]
+        );
+        const storage = installStorageFixture({records});
+        const {window} = browserFixture(context, {storage});
+        const owner = getPwaInstall();
+        const event = offerInstall(window, function forbiddenRestoredPrompt() {
+            throw new Error('A remembered installation must not prompt again.');
+        });
+        assert.equal(event.defaultPrevented, true);
+        assert.equal(owner.state.available, false);
+        assert.equal(await owner.prompt(), null);
+        const state = await owner.ready;
+        assert.equal(state.status, 'installed');
+        assert.equal(state.installed, true);
+        assert.equal(state.available, false);
+        assert.equal(await owner.prompt(), null);
+        assert.equal(getPwaInstall(), owner);
+        await owner.ready;
+        assert.deepEqual(storage.reads, [['pwa', 'installed.json', true]]);
+        assert.deepEqual(storage.writes, []);
+        assert.deepEqual(records.get('pwa/resources.json'), {lastChecked: 1700000000000});
+    }
+);
+
+test('Native install events are captured while DBOPFS is pending without losing click activation later',
+    async function pendingStorageAvailability(context) {
+        let releaseStorage;
+        const readyPromise = new Promise(function pendingDatabase(resolve) {
+            releaseStorage = resolve;
+        });
+        context.after(function releasePendingDatabase() { releaseStorage(); });
+        const storage = installStorageFixture({readyPromise});
+        const {window} = browserFixture(context, {storage});
+        const owner = getPwaInstall();
+        let calls = 0;
+        const event = offerInstall(window, function promptAfterRestore() {
+            calls += 1;
+            return {outcome: 'accepted'};
+        });
+        assert.equal(event.defaultPrevented, true);
+        assert.deepEqual(storage.reads, []);
+        assert.equal(owner.state.available, false);
+        assert.equal(await owner.prompt(), null);
+        assert.equal(calls, 0);
+        releaseStorage();
+        const state = await owner.ready;
+        assert.equal(state.available, true);
+        assert.equal(state.installed, false);
+        assert.deepEqual(storage.reads, [['pwa', 'installed.json', true]]);
+        const result = owner.prompt();
+        assert.equal(calls, 1);
+        assert.deepEqual(await result, {outcome: 'accepted'});
+        assert.equal(owner.state.installed, false);
+        assert.deepEqual(storage.writes, []);
+    }
+);
+
+test('A pending older read cannot undo installation and a new owner restores the saved result',
+    async function installationDuringRestore(context) {
+        let releaseRead;
+        const readGate = new Promise(function pendingInstalledRecord(resolve) {
+            releaseRead = resolve;
+        });
+        context.after(function releasePendingRecordRead() { releaseRead(); });
+        const storage = installStorageFixture({readGate});
+        const {window} = browserFixture(context, {storage});
+        const owner = getPwaInstall();
+        await storage.readStarted;
+        offerInstall(window, function unusedPromptBeforeInstallation() {
+            throw new Error('Installation must clear the retained event.');
+        });
+        window.dispatchEvent(new Event('appinstalled'));
+        window.dispatchEvent(new Event('appinstalled'));
+        assert.equal(owner.state.installed, true);
+        assert.equal(owner.state.status, 'installed');
+        assert.equal(owner.state.available, false);
+        assert.deepEqual(storage.writes, []);
+        releaseRead();
+        await owner.ready;
+        await storage.writeFinished;
+        assert.equal(owner.state.installed, true);
+        assert.deepEqual(storage.writes, [['pwa', 'installed.json', {installed: true}]]);
+        owner.dispose();
+        const restored = getPwaInstall();
+        await restored.ready;
+        assert.equal(restored.state.status, 'installed');
+        assert.equal(restored.state.installed, true);
+        const event = offerInstall(window, function forbiddenLaterPrompt() {
+            throw new Error('Saved installation must remain suppressed on another page owner.');
+        });
+        assert.equal(event.defaultPrevented, false);
+        assert.equal(restored.state.available, false);
+        assert.equal(await restored.prompt(), null);
+        assert.deepEqual(storage.reads, [
+            ['pwa', 'installed.json', true],
+            ['pwa', 'installed.json', true]
+        ]);
+        assert.deepEqual(storage.writes, [['pwa', 'installed.json', {installed: true}]]);
+    }
+);
+
+test('Restoration failure settles readiness visibly and leaves the browser install path usable',
+    async function failedInstallationRestore(context) {
+        const failure = new Error('The installed record could not be read.');
+        const storage = installStorageFixture({readError: failure});
+        const {window} = browserFixture(context, {storage});
+        const {warnings} = captureStorageWarnings(context);
+        const owner = getPwaInstall();
+        offerInstall(window, function promptWithoutStoredRecord() {
+            return {outcome: 'dismissed'};
+        });
+        const state = await owner.ready;
+        assert.equal(state.storageError, failure);
+        assert.equal(state.installed, false);
+        assert.equal(state.available, true);
+        assert.equal(state.error, null);
+        assert.equal(warnings.length, 1);
+        assert.equal(warnings[0][1], failure);
+        assert.deepEqual(await owner.prompt(), {outcome: 'dismissed'});
+        assert.equal(owner.state.storageError, failure);
+        assert.deepEqual(storage.writes, []);
+    }
+);
+
+test('An already requested installation write completes after final page detach',
+    async function durableInstallationAfterDetach(context) {
+        let releaseWrite;
+        const writeGate = new Promise(function pendingInstallationWrite(resolve) {
+            releaseWrite = resolve;
+        });
+        context.after(function releasePendingRecordWrite() { releaseWrite(); });
+        const storage = installStorageFixture({writeGate});
+        const {window} = browserFixture(context, {storage});
+        const owner = getPwaInstall();
+        await owner.ready;
+        window.dispatchEvent(new Event('appinstalled'));
+        await storage.writeStarted;
+        window.dispatchEvent(new Event('pagehide'));
+        assert.equal(owner.state.status, 'disposed');
+        assert.equal(owner.state.installed, true);
+        releaseWrite();
+        await storage.writeFinished;
+        assert.deepEqual(storage.records.get('pwa/installed.json'), {installed: true});
+        assert.equal(owner.state.status, 'disposed');
+        assert.equal(owner.state.available, false);
+    }
+);
+
+test('A failed installation write remains observable after disposal without reopening promotion',
+    async function failedInstallationWriteAfterDetach(context) {
+        let releaseWrite;
+        const writeGate = new Promise(function pendingFailedInstallationWrite(resolve) {
+            releaseWrite = resolve;
+        });
+        context.after(function releasePendingFailedWrite() { releaseWrite(); });
+        const failure = new Error('The installed record could not be written.');
+        const storage = installStorageFixture({writeGate, writeError: failure});
+        const {window} = browserFixture(context, {storage});
+        const {warnings, warned} = captureStorageWarnings(context);
+        const owner = getPwaInstall();
+        await owner.ready;
+        window.dispatchEvent(new Event('appinstalled'));
+        await storage.writeStarted;
+        owner.dispose();
+        releaseWrite();
+        await warned;
+        assert.equal(owner.state.status, 'disposed');
+        assert.equal(owner.state.installed, true);
+        assert.equal(owner.state.available, false);
+        assert.equal(owner.state.storageError, failure);
+        assert.equal(owner.state.error, null);
+        assert.equal(warnings.length, 1);
+        assert.equal(warnings[0][1], failure);
+        assert.equal(storage.records.has('pwa/installed.json'), false);
+        assert.deepEqual(storage.writes, [['pwa', 'installed.json', {installed: true}]]);
+    }
+);
+
+test('Installed app display mode is remembered and returning to a browser does not reopen promotion',
+    async function durableInstalledDisplay(context) {
+        const {window, display, installedDisplay, storage} = browserFixture(context, {running: true});
+        const owner = getPwaInstall();
+        assert.equal(owner.state.status, 'running');
+        assert.equal(owner.state.installed, true);
+        await owner.ready;
+        await storage.writeFinished;
+        display.matches = false;
+        installedDisplay.matches = false;
+        display.dispatchEvent(new Event('change'));
+        installedDisplay.dispatchEvent(new Event('change'));
+        assert.equal(owner.state.status, 'installed');
+        assert.equal(owner.state.installed, true);
+        assert.equal(owner.state.available, false);
+        offerInstall(window, function forbiddenDisplayExitPrompt() {
+            throw new Error('Leaving installed display mode must preserve the remembered installation.');
+        });
+        assert.equal(await owner.prompt(), null);
+        assert.deepEqual(storage.writes, [['pwa', 'installed.json', {installed: true}]]);
+    }
+);
+
+test('The iOS standalone signal records installation without a matching media query',
+    async function durableNavigatorStandalone(context) {
+        const {storage} = browserFixture(context, {standalone: true});
+        const owner = getPwaInstall();
+        assert.equal(owner.state.status, 'running');
+        assert.equal(owner.state.installed, true);
+        await owner.ready;
+        await storage.writeFinished;
+        assert.deepEqual(storage.writes, [['pwa', 'installed.json', {installed: true}]]);
     }
 );
 

@@ -1069,6 +1069,12 @@ availability comes from the browser's `beforeinstallprompt` event through
 `getPwaInstall()`. Without an available event, the suggestion stays hidden;
 absence does not identify why installation is unavailable. Installed-app events,
 accepted prompts, and an already running installed display mode hide it.
+The shared SDK owner persists browser-reported installation in app-scoped
+DBOPFS. Both floating and inline controls stay hidden while that record is
+loading and remain hidden on later visits when installation is remembered.
+Acceptance alone does not save installation. The component's `ready` means
+its methods and subscription are attached; storage completion belongs to the
+shared owner's `ready` promise and does not delay page rendering.
 
 ### Example
 

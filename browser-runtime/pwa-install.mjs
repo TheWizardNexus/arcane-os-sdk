@@ -11,7 +11,11 @@ export function getPwaInstall() {
     if (sharedOwner && sharedOwner.state.status !== 'disposed') {
         return sharedOwner;
     }
-    const owner = {get state() { return snapshot(); }, subscribe, prompt, dismiss, dispose};
+    const owner = {
+        get state() { return snapshot(); },
+        get ready() { return ready; },
+        subscribe, prompt, dismiss, dispose
+    };
     const source = createArcaneEventSource(owner, {
         source: 'arcane.pwa.install', eventTypes: [PWA_INSTALL_STATE_EVENT]
     });
@@ -19,6 +23,9 @@ export function getPwaInstall() {
     const displayMode = globalThis.matchMedia?.(
         '(display-mode: standalone), (display-mode: minimal-ui), '
         + '(display-mode: fullscreen), (display-mode: window-controls-overlay)'
+    );
+    const installedDisplayMode = globalThis.matchMedia?.(
+        '(display-mode: standalone), (display-mode: minimal-ui), (display-mode: window-controls-overlay)'
     );
     const manifestUrl = globalThis.document?.querySelector('link[rel~="manifest"]')?.href;
     const dismissalKey = `arcane.pwa.install.dismissed:${manifestUrl ?? globalThis.location?.href ?? ''}`;
@@ -28,6 +35,11 @@ export function getPwaInstall() {
     let status = isRunningAsApp() ? 'running' : 'waiting';
     let outcome = null;
     let error = null;
+    let installed = isInstalledApp();
+    let storedInstalled = false;
+    let storageReady = false;
+    let storageError = null;
+    let saveTask = null;
     try {
         dismissed = globalThis.sessionStorage?.getItem(dismissalKey) === 'true';
     } catch (storageError) {
@@ -38,9 +50,17 @@ export function getPwaInstall() {
         return displayMode?.matches === true || globalThis.navigator?.standalone === true;
     }
 
+    function isInstalledApp() {
+        // Ordinary browser fullscreen is not evidence of installation.
+        return installedDisplayMode?.matches === true || globalThis.navigator?.standalone === true;
+    }
+
     function snapshot() {
-        return {status, available: deferredPrompt !== null && !disposed,
-            dismissed, outcome, error};
+        return {
+            status,
+            available: storageReady && deferredPrompt !== null && !installed && !isRunningAsApp() && !disposed,
+            installed, dismissed, outcome, error, storageError
+        };
     }
 
     function publish(nextStatus, nextError = null) {
@@ -67,24 +87,92 @@ export function getPwaInstall() {
         }
     }
 
+    async function loadInstallStorage() {
+        if (!globalThis.dbopfs) {
+            await import('arcane/DBOPFS');
+        }
+        const storage = globalThis.dbopfs;
+        if (!storage) {
+            throw new Error('PWA installation state could not open DBOPFS.');
+        }
+        await storage.readyPromise;
+        return storage;
+    }
+
+    function reportStorageError(failure) {
+        storageError = failure;
+        console.warn('Arcane PWA installation state could not be persisted or restored:', failure);
+        publish(status, error);
+    }
+
+    async function restoreInstallation() {
+        try {
+            const storage = await storageTask;
+            const record = await storage.get('pwa', 'installed.json', true);
+            storedInstalled = record?.installed === true;
+            if (!disposed && storedInstalled) {
+                installed = true;
+                deferredPrompt = null;
+            }
+        } catch (failure) {
+            reportStorageError(failure);
+        }
+        storageReady = true;
+        if (!disposed) {
+            if (installed) {
+                publish(isRunningAsApp() ? 'running' : 'installed', error);
+            } else if (deferredPrompt && !isRunningAsApp()) {
+                publish('available', error);
+            } else {
+                publish(status, error);
+            }
+        }
+        return snapshot();
+    }
+
+    async function saveInstallation() {
+        // The initial read avoids rewriting an already remembered installation.
+        await ready;
+        if (storedInstalled) return;
+        const storage = await storageTask;
+        await storage.set(
+            'pwa',
+            'installed.json',
+            {installed: true}
+        );
+        storedInstalled = true;
+        storageError = null;
+        publish(status, error);
+    }
+
+    function rememberInstallation() {
+        installed = true;
+        deferredPrompt = null;
+        // Retain and observe this durable write even if the page owner detaches.
+        saveTask ??= saveInstallation().catch(reportStorageError);
+    }
+
     function onBeforeInstallPrompt(event) {
-        if (disposed || isRunningAsApp() || status === 'installed' || status === 'accepted') return;
+        if (disposed || installed || isRunningAsApp() || status === 'accepted') return;
         event.preventDefault();
         deferredPrompt = event;
         outcome = null;
-        publish('available');
+        publish(storageReady ? 'available' : 'waiting');
     }
 
     function onInstalled() {
-        deferredPrompt = null;
+        rememberInstallation();
         // This event may precede Android's completion of WebAPK creation.
         publish('installed');
     }
 
     function onDisplayModeChange() {
+        if (isInstalledApp()) rememberInstallation();
         if (isRunningAsApp()) {
             deferredPrompt = null;
             publish('running');
+        } else if (installed) {
+            publish('installed');
         } else if (status === 'running') {
             publish('waiting');
         }
@@ -108,7 +196,7 @@ export function getPwaInstall() {
     }
 
     function prompt() {
-        if (disposed || !deferredPrompt) return Promise.resolve(null);
+        if (!snapshot().available) return Promise.resolve(null);
         const event = deferredPrompt;
         deferredPrompt = null;
         publish('prompting');
@@ -162,8 +250,12 @@ export function getPwaInstall() {
     observe(globalThis, 'beforeinstallprompt', onBeforeInstallPrompt);
     observe(globalThis, 'appinstalled', onInstalled);
     observe(displayMode, 'change', onDisplayModeChange);
+    observe(installedDisplayMode, 'change', onDisplayModeChange);
     observe(globalThis, 'pagehide', onPageHide);
     sharedOwner = owner;
+    const storageTask = loadInstallStorage();
+    const ready = restoreInstallation();
+    if (installed) rememberInstallation();
     return owner;
 }
 

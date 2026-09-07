@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.16.3
+
+- Remember browser-reported PWA installation in app-scoped DBOPFS and suppress
+  the SDK's floating and inline installation controls on later visits. Capture
+  native events immediately while restoring the saved flag; keep rendering,
+  component loading and worker registration independent.
+- Preserve confirmed installation across late reads, prompt results and display
+  changes. Save installed-app launches as well as `appinstalled`, without
+  mistaking prompt acceptance or ordinary fullscreen for installation. Expose
+  initial storage readiness and complete persistence errors through the shared
+  install owner, and retain confirmed-install writes through owner disposal.
+
 ## 0.16.2
 
 - Scope explicit application selection and workspace resolution to the named

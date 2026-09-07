@@ -6231,13 +6231,24 @@ payload and current-state subscription behavior.
 
 ### Overview
 
-`getPwaInstall()` returns one synchronous page owner exposing `state`,
+`getPwaInstall()` returns one synchronous page owner exposing `state`, `ready`,
 `subscribe`, `prompt`, `dismiss` and `dispose`. It captures the browser's
 `beforeinstallprompt` event and observes `appinstalled` and app display-mode
 changes. A missing event leaves installation availability unknown and the owner
 waiting; it does not prove browser incompatibility.
 
-State contains `status`, `available`, `dismissed`, `outcome` and `error`.
+State contains `status`, `available`, `installed`, `dismissed`, `outcome`,
+`error` and `storageError`. The owner restores `pwa/installed.json` through the
+app-scoped DBOPFS singleton and saves `{installed: true}` after `appinstalled`
+or an installed-app launch. Remembered installation suppresses both floating
+and inline controls on later visits. Acceptance alone and ordinary fullscreen
+do not record installation.
+
+`ready` resolves to the state once the initial read settles. Native events are
+captured immediately, while install availability waits for that read. Rendering
+and worker registration remain independent. Storage failures are logged and
+published in `storageError`; they do not reject `ready` or reverse an observed
+installation. Confirmed-install writes remain owned after disposal.
 Subscriptions replay current state by default. `prompt()` must be called
 directly within the install click to preserve native user activation. It
 consumes the event once and returns the browser choice, resolves to `null` when
