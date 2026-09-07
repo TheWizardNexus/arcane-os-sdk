@@ -531,6 +531,10 @@
             padding: var(--arcane-space-2, .5rem);
         }
 
+        .chat_area[data-model-start-required="true"]:not([data-conversation-complete="true"]) {
+            justify-content: flex-start;
+        }
+
         .chat_output > li {
             max-width: 96%;
         }

@@ -417,6 +417,8 @@ local LLM, the transcript, session status, composer, upload, speech panel
 (including application-supplied controls), language selector, and timer stay
 hidden until that exact sticky role is `ready` and `loaded`. The existing model
 activation area remains available for Start, progress, cancellation, and retry.
+At viewport widths up to `44rem`, that pending local-model activation area sits
+at the top of the chat area; wider layouts retain their existing placement.
 A selected cloud route (`localOnly:false`) shows the conversation surfaces
 immediately; Send still follows actual LLM availability. Later unload, failure,
 or selection changes update visibility from the same runtime subscription
@@ -1180,8 +1182,12 @@ selects a Speech interface for voice output. Transcription activation,
 recording, sending recorded audio, and their status/progress are unavailable;
 `requestSTTActivation()` returns `false` without requesting a provider action.
 The keyboard remains the voice-input path. The existing TTS mute/unmute control
-and voice status remain available, and Chat retains its End control. Desktop
-speech and the dedicated `voice-transcription.html` component retain their
+remains available alongside application-supplied controls such as End. Mobile
+voice feedback participates in layout only while a voice load is requested or
+the TTS role is `loading`; it collapses in other states, including unloaded, ready, and
+speaking. Complete status text and error events remain maintained by the same
+owner, and the voice control retains its state-specific labels and retry action.
+Desktop speech and the dedicated `voice-transcription.html` component retain their
 existing behavior.
 
 On desktop, the Hold to talk control remains disabled unless sticky STT state

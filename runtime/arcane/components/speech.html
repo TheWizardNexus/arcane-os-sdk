@@ -147,6 +147,10 @@
         grid-column: 1;
     }
 
+    :host([data-device-class="mobile"]:not([data-voice-loading="true"])) .speech_feedback {
+        display: none;
+    }
+
     :host([data-device-class="mobile"]) #muteButton {
         grid-row: 1;
         grid-column: 2;
@@ -725,6 +729,9 @@
     }
 
     function renderStatus() {
+        host.dataset.voiceLoading = String(
+            pendingTTSIntent === 'load' || ttsRole.state === 'loading'
+        );
         const messages = [];
         let tone = '';
 
