@@ -1,10 +1,83 @@
 import assert from 'node:assert/strict';
-import {cp,mkdir} from 'node:fs/promises';
+import {cp,mkdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {createWorkspace} from '../src/scaffold.mjs';
 import {getTargetAdapter,listTargets} from '../src/targets/index.mjs';
-import {repositoryRoot,temporaryDirectory} from './helpers.mjs';
+import {
+    fetchSyntheticTls,repositoryRoot,temporaryDirectory,useSyntheticTls,writeSyntheticTlsFiles
+} from './helpers.mjs';
+
+test(
+    'browser run preserves TLS inputs and the selected HTTP redirect port',
+    async function browserRunTlsOptions(context) {
+        const fixture = useSyntheticTls(context);
+        const workspaceRoot = await temporaryDirectory(context, {prefix: 'arcane-browser-tls-'});
+        const appId = 'tls-preview';
+        const releaseRoot = path.join(workspaceRoot, 'dist', appId);
+        await mkdir(releaseRoot, {recursive: true});
+        const content = '  Complete packaged preview content.\nSecond line.  ';
+        await writeFile(path.join(releaseRoot, 'index.html'), content);
+        await writeSyntheticTlsFiles(workspaceRoot);
+        const selected = await writeSyntheticTlsFiles(
+            workspaceRoot,
+            {certPath: 'selected/cert.pem', keyPath: 'selected/key.pem'}
+        );
+        await writeFile(selected.certPath, 'Selected synthetic certificate input.');
+        await writeFile(selected.keyPath, 'Selected synthetic key input.');
+        const tls = {
+            cert: ['Raw synthetic certificate input.'],
+            key: 'Raw synthetic key input.',
+            SNICallback: function selectSyntheticContext() {}
+        };
+        let httpPort = 0;
+        for (const options of [{}, selected, {tls}]) {
+            const instance = await getTargetAdapter('browser').run(
+                {workspaceRoot, appId, host: '127.0.0.1', port: 0, httpPort, ...options}
+            );
+            context.after(
+                async function closeSyntheticBrowserPreview() {
+                    await instance.close();
+                }
+            );
+            assert.equal(instance.protocol, 'https:');
+            assert.equal(instance.origin, `https://127.0.0.1:${instance.port}`);
+            assert.equal(instance.url, `${instance.origin}/index.html`);
+            if (httpPort !== 0) assert.equal(instance.httpPort, httpPort);
+            assert.ok(instance.httpPort > 0);
+            assert.equal(instance.httpOrigin, `http://127.0.0.1:${instance.httpPort}`);
+            assert.equal(instance.httpUrl, `${instance.httpOrigin}/index.html`);
+            assert.equal(instance.releaseRoot, releaseRoot);
+            if (options.tls) {
+                assert.equal(fixture.options.at(-1), tls);
+            } else {
+                assert.equal(
+                    fixture.options.at(-1).cert.toString(),
+                    options.certPath
+                        ? 'Selected synthetic certificate input.'
+                        : 'Synthetic certificate input; not a certificate.'
+                );
+                assert.equal(
+                    fixture.options.at(-1).key.toString(),
+                    options.keyPath
+                        ? 'Selected synthetic key input.'
+                        : 'Synthetic key input; not a private key.'
+                );
+            }
+            const response = await fetchSyntheticTls(instance.url);
+            assert.equal(response.status, 200);
+            assert.equal(await response.text(), content);
+            const redirect = await fetch(
+                `${instance.httpOrigin}/index.html?mode=a%20b`,
+                {redirect: 'manual'}
+            );
+            assert.equal(redirect.status, 308);
+            assert.equal(redirect.headers.get('location'), `${instance.origin}/index.html?mode=a%20b`);
+            await instance.close();
+            httpPort = instance.httpPort;
+        }
+    }
+);
 
 async function installSdkPayload(workspaceRoot){
     const installedRoot=path.join(workspaceRoot,'node_modules','arcane-os');

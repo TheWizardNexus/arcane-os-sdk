@@ -1,11 +1,60 @@
 import {execFile} from 'node:child_process';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdir,mkdtemp,rm,writeFile} from 'node:fs/promises';
+import http from 'node:http';
+import https from 'node:https';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 export const repositoryRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 export const cliPath=path.join(repositoryRoot,'bin','arcane.mjs');
+
+// These fixtures exercise routing and native TLS option delegation, not a TLS
+// handshake or browser certificate trust. No certificate or private key is stored.
+export function useSyntheticTls(context) {
+    const createServer = https.createServer;
+    const options = [];
+    https.createServer = function createSyntheticTlsServer(tlsOptions, requestHandler) {
+        options.push(tlsOptions);
+        return http.createServer(function syntheticTlsRequest(request, response) {
+            request.socket.encrypted = true;
+            return requestHandler(request, response);
+        });
+    };
+    context.after(
+        function restoreTlsConstructor() {
+            https.createServer = createServer;
+        }
+    );
+    return {options};
+}
+
+export async function writeSyntheticTlsFiles(workspaceRoot, {
+    certPath = '.arcane/dev/server-cert.pem',
+    keyPath = '.arcane/dev/server-key.pem'
+} = {}) {
+    const certificatePath = path.resolve(workspaceRoot, certPath);
+    const privateKeyPath = path.resolve(workspaceRoot, keyPath);
+    await Promise.all(
+        [
+            mkdir(path.dirname(certificatePath), {recursive: true}),
+            mkdir(path.dirname(privateKeyPath), {recursive: true})
+        ]
+    );
+    await Promise.all(
+        [
+            writeFile(certificatePath, 'Synthetic certificate input; not a certificate.'),
+            writeFile(privateKeyPath, 'Synthetic key input; not a private key.')
+        ]
+    );
+    return {certPath: certificatePath, keyPath: privateKeyPath};
+}
+
+export function fetchSyntheticTls(input, options) {
+    const url = new URL(input);
+    url.protocol = 'http:';
+    return fetch(url, options);
+}
 
 export async function temporaryDirectory(t,{prefix='arcane-sdk-test-'}={}){
     const directory=await mkdtemp(path.join(tmpdir(),prefix));

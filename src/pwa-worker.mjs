@@ -1,40 +1,60 @@
-export function createPwaWorkerScript(manifest) {
-    return `(${installPwaWorker.toString()})(${JSON.stringify(manifest, null, 4)});\n`;
+export function createPwaWorkerScript(manifest, clientUrl = 'arcane/sdk/pwa.mjs') {
+    return `(${installPwaWorker.toString()})(${JSON.stringify(manifest, null, 4)}, ${JSON.stringify(clientUrl)});\n`;
 }
 
-function installPwaWorker(manifest) {
+function installPwaWorker(manifest, clientUrl) {
     const scope = self.registration.scope;
-    const cachePrefix = `arcane-pwa|${JSON.stringify(
-        [manifest.appId, scope]
-    )}|`;
-    const cacheName = cachePrefix + JSON.stringify(
-        [
-            manifest.appVersion,
-            manifest.sdkVersion,
-            manifest.mode,
-            manifest.revision
-        ]
-    );
+    const scopeOrigin = new URL(scope).origin;
+    const cachePrefix = `arcane-pwa|${JSON.stringify([manifest.appId, scope])}|`;
+    const cacheName = `${cachePrefix}resources`;
+    const manifestUrl = cacheUrl('arcane-offline.json');
+    const protocolUrls = new Set([cacheUrl('arcane-pwa.mjs'), cacheUrl(clientUrl)]);
+    const installationAssets = [...new Set(manifest.assets.map(cacheUrl))];
+    const resourceJobs = new Map();
+    const pendingChecks = new Set();
+    const refreshJobs = new Map();
+    const ownedUrls = new Set();
+    const navigationAliases = new Map();
+    let currentManifest = manifest;
+    let refreshTask = null;
+    let previousCaches = null;
+    let manifestRestored = false;
+    let lastChecked = null;
 
     function cacheUrl(value) {
         const url = new URL(value, scope);
-        // Cache matching excludes fragments; preserve queries and the original network request.
+        // Fragments identify document positions; query variants remain distinct resources.
         url.hash = '';
         return url.href;
     }
 
-    const assetUrls = [
-        ...new Set(
-            manifest.assets.map(cacheUrl)
-        )
-    ];
-    const ownedUrls = new Set(assetUrls);
-    const navigationAliases = new Map();
-    for (const [alias, asset] of Object.entries(manifest.navigationAliases)) {
-        navigationAliases.set(
-            cacheUrl(alias),
-            new URL(asset, scope).href
+    function manifestResources(value) {
+        if (!Array.isArray(value.assets) || !value.navigationAliases || typeof value.navigationAliases !== 'object') {
+            throw new TypeError('The PWA offline inventory requires assets and navigationAliases.');
+        }
+        const assets = value.assets.map(cacheUrl);
+        const aliases = Object.entries(value.navigationAliases).map(
+            function navigationAlias([alias, asset]) {
+                return [cacheUrl(alias), new URL(asset, scope).href];
+            }
         );
+        return {value, assets, aliases};
+    }
+
+    function useManifest({value, assets, aliases}) {
+        currentManifest = value;
+        ownedUrls.clear();
+        for (const asset of assets) {
+            ownedUrls.add(asset);
+        }
+        navigationAliases.clear();
+        for (const [alias, asset] of aliases) {
+            navigationAliases.set(alias, asset);
+        }
+    }
+
+    async function readManifest(response) {
+        return manifestResources(await response.json());
     }
 
     function errorDetails(error) {
@@ -55,56 +75,12 @@ function installPwaWorker(manifest) {
     }
 
     async function reportFailure(error) {
-        const clients = await self.clients.matchAll(
-            {type: 'window', includeUncontrolled: true}
-        );
+        const clients = await self.clients.matchAll({type: 'window', includeUncontrolled: true});
         const message = {type: 'arcane.pwa.error', error: errorDetails(error)};
         for (const client of clients) {
             if (client.url.startsWith(scope)) {
                 client.postMessage(message);
             }
-        }
-    }
-
-    async function populateCache() {
-        const cache = await caches.open(cacheName);
-        const failures = [];
-        let nextAsset = 0;
-
-        async function fetchAssets() {
-            while (nextAsset < assetUrls.length) {
-                const url = assetUrls[nextAsset++];
-                try {
-                    const response = await fetch(
-                        new Request(
-                            url,
-                            {cache: manifest.mode === 'development' ? 'no-cache' : 'reload'}
-                        )
-                    );
-                    if (!response.ok) {
-                        throw new Error(`PWA resource returned HTTP ${response.status} ${response.statusText}: ${url}`);
-                    }
-                    await cache.put(url, response);
-                } catch (cause) {
-                    const error = new Error(
-                        `PWA resource could not be cached: ${url}`,
-                        {cause}
-                    );
-                    error.url = url;
-                    failures.push(error);
-                }
-            }
-        }
-
-        const workers = [];
-        for (let index = 0; index < Math.min(4, assetUrls.length); index += 1) {
-            workers.push(
-                fetchAssets()
-            );
-        }
-        await Promise.all(workers);
-        if (failures.length > 0) {
-            throw new AggregateError(failures, 'The PWA resource generation could not be installed.');
         }
     }
 
@@ -117,75 +93,325 @@ function installPwaWorker(manifest) {
         throw error;
     }
 
-    function onInstall(event) {
-        event.waitUntil(
-            populateCache().catch(reportFailureAndReject)
-        );
+    function resourceError(url, cause) {
+        const error = new Error(`PWA resource could not be cached: ${url}`, {cause});
+        error.url = url;
+        return error;
     }
 
-    async function retireOldCaches() {
-        const names = await caches.keys();
-        const retirements = [];
-        for (const name of names) {
-            if (name.startsWith(cachePrefix) && name !== cacheName) {
-                retirements.push(
-                    caches.delete(name)
+    async function findCachedResource(url) {
+        const cache = await caches.open(cacheName);
+        const response = await cache.match(url);
+        if (response) {
+            return {cache, response, current: true};
+        }
+        // Carry existing app resources forward without deleting older generations.
+        previousCaches ??= caches.keys().then(
+            function openPriorCaches(names) {
+                return Promise.all(
+                    names.reverse().filter(
+                        function priorAppCache(name) {
+                            return name.startsWith(cachePrefix) && name !== cacheName;
+                        }
+                    ).map(
+                        function openPriorCache(name) {
+                            return caches.open(name);
+                        }
+                    )
                 );
             }
-        }
-        await Promise.all(retirements);
-    }
-
-    function onActivate(event) {
-        event.waitUntil(
-            retireOldCaches().catch(reportFailureAndReject)
         );
-    }
-
-    async function releaseResource(request, url) {
-        const cache = await caches.open(cacheName);
-        const cached = await cache.match(url);
-        if (cached) {
-            return cached;
+        for (const previous of await previousCaches) {
+            const retained = await previous.match(url);
+            if (retained) {
+                return {cache, response: retained, current: false};
+            }
         }
-        return fetch(
-            new Request(
-                request,
-                {cache: 'no-cache'}
-            )
-        );
+        return {cache, response: null, current: true};
     }
 
-    async function developmentResource(request, url) {
-        let response;
+    async function restoreManifest() {
+        const cached = await findCachedResource(manifestUrl);
+        if (cached.response) {
+            const inventory = await readManifest(cached.response);
+            if (['appVersion', 'sdkVersion', 'mode', 'revision'].every(
+                function sameWorkerDeclaration(field) {
+                    return inventory.value[field] === manifest[field];
+                }
+            )) {
+                useManifest(inventory);
+            }
+        }
+    }
+
+    useManifest(manifestResources(manifest));
+    const restored = restoreManifest().catch(
+        async function reportManifestRestoreFailure(error) {
+            try {
+                await reportFailure(error);
+            } catch (reportError) {
+                console.error('PWA manifest restore failure could not be reported.', reportError, error);
+            }
+        }
+    ).finally(
+        function manifestRestoreComplete() {
+            manifestRestored = true;
+        }
+    );
+
+    async function fetchResource(request, url, validate) {
+        const cached = await findCachedResource(url);
+        // Earlier clients cannot initiate this protocol; upgrade only its owners on migration.
+        const protocolMigration = cached.response && !cached.current && protocolUrls.has(url);
+        if (cached.response && !validate && !protocolMigration) {
+            return {
+                response: cached.response,
+                saved: cached.current ? Promise.resolve() : cached.cache.put(url, cached.response.clone()),
+                checked: false,
+                error: null
+            };
+        }
         try {
-            response = await fetch(
-                new Request(
-                    request,
-                    {cache: 'no-cache'}
-                )
+            const headers = new Headers(request.headers);
+            const modified = protocolMigration ? null : cached.response?.headers.get('last-modified');
+            headers.delete('if-none-match');
+            if (modified) {
+                headers.set('if-modified-since', modified);
+            } else {
+                headers.delete('if-modified-since');
+            }
+            // This conditional request owns validation; CacheStorage owns the durable body.
+            const response = await fetch(new Request(request, {headers, cache: 'no-store'}));
+            if (response.status === 304 && cached.response) {
+                return {
+                    response: cached.response,
+                    saved: cached.current ? Promise.resolve() : cached.cache.put(url, cached.response.clone()),
+                    checked: true,
+                    error: null
+                };
+            }
+            if (!response.ok) {
+                throw new Error(`PWA resource returned HTTP ${response.status} ${response.statusText}: ${url}`);
+            }
+            if (url === manifestUrl) {
+                // Parse the control document before replacing the last usable inventory.
+                await readManifest(response.clone());
+            }
+            return {
+                response,
+                saved: cached.cache.put(url, response.clone()),
+                checked: true,
+                error: null
+            };
+        } catch (cause) {
+            const error = resourceError(url, cause);
+            if (!cached.response) {
+                throw error;
+            }
+            return {response: cached.response, saved: Promise.resolve(), checked: false, error};
+        }
+    }
+
+    function resourceJob(request, url, validate = false) {
+        if (resourceJobs.has(url)) {
+            return resourceJobs.get(url);
+        }
+        const job = {result: fetchResource(request, url, validate), done: null, checked: false};
+        resourceJobs.set(url, job);
+        if (pendingChecks.has(url)) {
+            refreshJobs.set(url, job);
+        }
+        job.done = job.result.then(
+            async function finishResource(result) {
+                job.checked = result.checked;
+                try {
+                    await result.saved;
+                    return result.error;
+                } catch (cause) {
+                    return resourceError(url, cause);
+                }
+            },
+            function missingResource(error) {
+                return error;
+            }
+        ).then(
+            function releaseResource(error) {
+                resourceJobs.delete(url);
+                pendingChecks.delete(url);
+                if (refreshJobs.get(url) === job) {
+                    // Retain cycle outcomes without retaining every completed response stream.
+                    refreshJobs.set(url, {
+                        result: Promise.resolve({checked: job.checked}),
+                        done: Promise.resolve(error)
+                    });
+                }
+                return error;
+            }
+        );
+        return job;
+    }
+
+    function resourceResponse(result) {
+        return result.response.clone();
+    }
+
+    async function populateResources(urls, validate = false) {
+        let nextAsset = 0;
+        const failures = [];
+        let allChecked = true;
+        async function fetchAssets() {
+            while (nextAsset < urls.length) {
+                const url = urls[nextAsset++];
+                let job = (validate ? refreshJobs.get(url) : null) ?? resourceJob(new Request(url), url, validate);
+                let error = await job.done;
+                if (validate && !error && !(await job.result).checked) {
+                    // A concurrent cache carry-forward is complete, but has not checked this file.
+                    job = resourceJob(new Request(url), url, true);
+                    error = await job.done;
+                }
+                if (error) {
+                    failures.push(error);
+                }
+                if (error || !(await job.result).checked) {
+                    allChecked = false;
+                }
+            }
+        }
+        const workers = [];
+        for (let index = 0; index < Math.min(4, urls.length); index += 1) {
+            workers.push(fetchAssets());
+        }
+        await Promise.all(workers);
+        return {failures, allChecked};
+    }
+
+    async function populateCache() {
+        await restored;
+        const {failures, allChecked} = await populateResources(installationAssets);
+        if (failures.length > 0) {
+            throw new AggregateError(failures, 'The PWA resource generation could not be installed.');
+        }
+        if (allChecked) {
+            lastChecked = Date.now();
+        }
+    }
+
+    function onInstall(event) {
+        event.waitUntil(populateCache().catch(reportFailureAndReject));
+    }
+
+    function checkDue() {
+        const interval = currentManifest.mode === 'development' ? 120000 : 900000;
+        return lastChecked === null || Date.now() - lastChecked > interval;
+    }
+
+    async function refreshResources() {
+        await restored;
+        if (!checkDue()) {
+            return {lastChecked, error: null};
+        }
+        const failures = [];
+        let inventory = resourceJob(new Request(manifestUrl), manifestUrl, true);
+        let error = await inventory.done;
+        if (!error && !(await inventory.result).checked) {
+            inventory = resourceJob(new Request(manifestUrl), manifestUrl, true);
+            error = await inventory.done;
+        }
+        if (error) {
+            failures.push(error);
+        } else {
+            try {
+                const result = await inventory.result;
+                useManifest(await readManifest(result.response.clone()));
+            } catch (cause) {
+                failures.push(resourceError(manifestUrl, cause));
+            }
+        }
+        const urls = [...ownedUrls].filter(
+            function selectedResource(url) {
+                return url !== manifestUrl;
+            }
+        );
+        for (const url of urls) {
+            pendingChecks.add(url);
+        }
+        const checked = await populateResources(urls, true);
+        failures.push(...checked.failures);
+        if (failures.length === 0) {
+            lastChecked = Date.now();
+        }
+        return {
+            lastChecked,
+            error: failures.length > 0
+                ? errorDetails(new AggregateError(failures, 'PWA resources could not all be updated.'))
+                : null
+        };
+    }
+
+    function refresh(checked) {
+        if (Number.isFinite(checked)) {
+            lastChecked = Math.max(lastChecked ?? 0, checked);
+        }
+        if (!refreshTask) {
+            refreshTask = refreshResources().finally(
+                function releaseRefresh() {
+                    refreshTask = null;
+                    refreshJobs.clear();
+                }
             );
-        } catch (error) {
+        }
+        return refreshTask;
+    }
+
+    function onMessage(event) {
+        if (event.data?.type === 'arcane.pwa.capabilities') {
+            try {
+                event.source?.postMessage({type: 'arcane.pwa.capabilities', refresh: true, cacheName});
+            } catch (error) {
+                event.waitUntil(reportFailureAndReject(error));
+            }
+            return;
+        }
+        if (event.data?.type !== 'arcane.pwa.refresh') {
+            return;
+        }
+        const port = event.ports?.[0];
+        event.waitUntil(
+            refresh(event.data.lastChecked).then(
+                async function completeRefresh(result) {
+                    port?.postMessage({type: 'arcane.pwa.refreshed', ...result});
+                    port?.close();
+                    if (result.error) {
+                        await reportFailure(result.error);
+                    }
+                },
+                async function failRefresh(error) {
+                    port?.postMessage({type: 'arcane.pwa.refreshed', lastChecked, error: errorDetails(error)});
+                    port?.close();
+                    await reportFailure(error);
+                }
+            ).catch(reportFailureAndReject)
+        );
+    }
+
+    async function requestedResource(request, url) {
+        await restored;
+        const redirect = request.mode === 'navigate' ? navigationAliases.get(url) : null;
+        if (redirect && cacheUrl(redirect) !== url && ownedUrls.has(cacheUrl(redirect))) {
+            return {response: Response.redirect(redirect, 302), done: Promise.resolve(null)};
+        }
+        if (!ownedUrls.has(url)) {
+            return {response: await fetch(request), done: Promise.resolve(null)};
+        }
+        if (!pendingChecks.has(url) && !resourceJobs.has(url)) {
             const cache = await caches.open(cacheName);
             const cached = await cache.match(url);
             if (cached) {
-                return {response: cached, fromNetwork: false, url};
+                return {response: cached, done: Promise.resolve(null)};
             }
-            throw error;
         }
-        return {response, fromNetwork: true, url};
-    }
-
-    function resourceResponse(resource) {
-        return resource.response;
-    }
-
-    async function saveDevelopmentResource(resource) {
-        if (resource.fromNetwork && resource.response.ok) {
-            const response = resource.response.clone();
-            const cache = await caches.open(cacheName);
-            await cache.put(resource.url, response);
-        }
+        const job = resourceJob(request, url, pendingChecks.has(url));
+        return {response: resourceResponse(await job.result), done: job.done};
     }
 
     function onFetch(event) {
@@ -193,35 +419,35 @@ function installPwaWorker(manifest) {
         if (request.method !== 'GET' || request.headers.has('range')) {
             return;
         }
-        const requestUrl = cacheUrl(request.url);
-        const redirect = request.mode === 'navigate' ? navigationAliases.get(requestUrl) : null;
-        if (redirect && cacheUrl(redirect) !== requestUrl && ownedUrls.has(cacheUrl(redirect))) {
-            // Navigation retains its requested document URL unless it follows a redirect.
-            event.respondWith(
-                Response.redirect(redirect, 302)
-            );
+        const url = cacheUrl(request.url);
+        if (new URL(url).origin !== scopeOrigin && !ownedUrls.has(url)) {
             return;
         }
-        const url = requestUrl;
-        if (!ownedUrls.has(url)) {
+        if (manifestRestored && !ownedUrls.has(url)
+            && !(request.mode === 'navigate' && navigationAliases.has(url))) {
             return;
         }
-        if (manifest.mode === 'development') {
-            const resource = developmentResource(request, url);
-            event.waitUntil(
-                resource.then(saveDevelopmentResource).catch(reportFailureAndReject)
-            );
-            event.respondWith(
-                resource.then(resourceResponse)
-            );
-            return;
-        }
+        const resource = requestedResource(request, url);
         event.respondWith(
-            releaseResource(request, url).catch(reportFailureAndReject)
+            resource.then(
+                function requestedResponse(result) {
+                    return result.response;
+                }
+            )
+        );
+        event.waitUntil(
+            resource.then(
+                async function completeRequestedResource(result) {
+                    const error = await result.done;
+                    if (error) {
+                        throw error;
+                    }
+                }
+            ).catch(reportFailureAndReject)
         );
     }
 
     self.addEventListener('install', onInstall);
-    self.addEventListener('activate', onActivate);
     self.addEventListener('fetch', onFetch);
+    self.addEventListener('message', onMessage);
 }

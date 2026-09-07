@@ -1,7 +1,8 @@
 import Is from 'strong-type';
 import {isDeepStrictEqual} from 'node:util';
-import {readFile} from 'node:fs/promises';
+import {readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
+import {throwIfAborted} from './errors.mjs';
 import {normalizePwaConfig} from './pwa.mjs';
 import {
     ARCANE_MACHINE_BUNDLE_VERSION,
@@ -422,6 +423,47 @@ async function readJsonFile(filePath,label,{optional=false}={}){
         if(error instanceof SyntaxError)fail(`${label} is not valid JSON: ${error.message}`);
         throw error;
     }
+}
+
+export async function refreshAppPackageProjection({workspaceRoot, appId, signal, onEvent}) {
+    throwIfAborted(signal);
+    const appRoot = path.join(workspaceRoot, 'apps', appId);
+    const descriptorPath = path.join(appRoot, APP_DESCRIPTOR_NAME);
+    const authored = await readJsonFile(
+        descriptorPath,
+        `apps/${appId}/${APP_DESCRIPTOR_NAME}`,
+        {optional: true}
+    );
+    if (authored === null) return {updated: false};
+
+    validateAppDescriptor(
+        authored,
+        {appId}
+    );
+    const projection = projectPackageManifest(authored);
+    const packagePath = path.join(appRoot, 'arcane-package.json');
+    const packageManifest = await readJsonFile(
+        packagePath,
+        `apps/${appId}/arcane-package.json`
+    );
+    const packageProjection = packageManifest.pwa === undefined ? packageManifest : {
+        ...packageManifest,
+        pwa: normalizePwaConfig(packageManifest.pwa)
+    };
+    if (isDeepStrictEqual(projection, packageProjection)) return {updated: false};
+
+    // Development updates the generated projection before strict workspace readers run.
+    throwIfAborted(signal);
+    await writeFile(packagePath, `${JSON.stringify(projection, null, 2)}\n`, 'utf8');
+    await onEvent?.(
+        {
+            type: 'workspace.application.projection.updated',
+            workspaceRoot,
+            appId,
+            path: packagePath
+        }
+    );
+    return {updated: true};
 }
 
 export async function loadAppDescriptor({workspaceRoot,appRoot,appId,packageManifest}){

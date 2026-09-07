@@ -70,7 +70,7 @@ function cacheStore() {
     };
 }
 
-function workerFixture({manifest = workerManifest(), storage = cacheStore(), fetchResource} = {}) {
+function workerFixture({manifest = workerManifest(), storage = cacheStore(), fetchResource, now = Date.now, clientUrl} = {}) {
     const handlers = new Map();
     const requests = [];
     const messages = [];
@@ -81,6 +81,12 @@ function workerFixture({manifest = workerManifest(), storage = cacheStore(), fet
             URL,
             Request,
             Response,
+            Headers,
+            Date: class WorkerDate extends Date {
+                static now() {
+                    return now();
+                }
+            },
             Error,
             AggregateError,
             caches: storage,
@@ -91,7 +97,13 @@ function workerFixture({manifest = workerManifest(), storage = cacheStore(), fet
             },
             async fetch(request) {
                 requests.push(request);
-                return fetchResource ? fetchResource(request) : new Response(`original:${request.url}`);
+                if (fetchResource) {
+                    return fetchResource(request);
+                }
+                return new Response(
+                    request.url === `${scope}arcane-offline.json` ? JSON.stringify(manifest) : `original:${request.url}`,
+                    {headers: {'last-modified': 'Mon, 07 Sep 2026 00:00:00 GMT'}}
+                );
             },
             self: {
                 registration: {scope},
@@ -126,7 +138,7 @@ function workerFixture({manifest = workerManifest(), storage = cacheStore(), fet
         }
     );
     new Script(
-        createPwaWorkerScript(manifest)
+        createPwaWorkerScript(manifest, clientUrl)
     ).runInContext(context);
     return {
         requests,
@@ -136,7 +148,7 @@ function workerFixture({manifest = workerManifest(), storage = cacheStore(), fet
         storage,
         lifecycle(type) {
             const pending = [];
-            handlers.get(type)(
+            handlers.get(type)?.(
                 {
                     waitUntil(value) {
                         pending.push(value);
@@ -144,6 +156,24 @@ function workerFixture({manifest = workerManifest(), storage = cacheStore(), fet
                 }
             );
             return Promise.all(pending);
+        },
+        refresh(lastChecked = null) {
+            const pending = [];
+            let result;
+            handlers.get('message')(
+                {
+                    data: {type: 'arcane.pwa.refresh', lastChecked},
+                    ports: [{postMessage(value) { result = value; }, close() {}}],
+                    waitUntil(value) {
+                        pending.push(value);
+                    }
+                }
+            );
+            return Promise.all(pending).then(
+                function refreshCompleted() {
+                    return result;
+                }
+            );
         },
         request(url, {method = 'GET', mode = 'cors', headers = {}} = {}) {
             const pending = [];
@@ -193,7 +223,8 @@ async function releaseGenerations() {
         }
     );
     await second.lifecycle('install');
-    assert.equal(storage.stores.size, 3);
+    assert.equal(storage.stores.size, 2);
+    assert.equal(second.requests.length, 0);
     const moduleResponse = await first.request(`${scope}app.mjs`).response;
     assert.equal(
         await moduleResponse.text(),
@@ -244,14 +275,14 @@ async function releaseGenerations() {
     assert.ok(
         [...storage.stores.keys()].some(
             function currentGeneration(name) {
-                return name.includes('second-output');
+                return name.endsWith('|resources');
             }
         )
     );
 }
 
 test(
-    'PWA release generations preserve cached resources and retire only their own previous cache at activation',
+    'PWA release generations retain the same cached resources and preserve unrelated storage at activation',
     releaseGenerations
 );
 
@@ -307,7 +338,7 @@ async function concurrentInstall() {
     assert.ok(
         fixture.requests.every(
             function reloadRequest(request) {
-                return request.cache === 'reload';
+                return request.cache === 'no-store';
             }
         )
     );
@@ -349,55 +380,84 @@ test(
 
 async function developmentNetworkAndOffline() {
     let content = 'first saved source';
+    let modified = 'Mon, 07 Sep 2026 00:00:00 GMT';
     let offline = false;
+    let now = 1000000;
+    let changedRequestStarted;
     const storage = cacheStore();
+    const manifest = workerManifest(
+        {mode: 'development', revision: 'development', assets: ['app.mjs', 'arcane-offline.json']}
+    );
     const fixture = workerFixture(
         {
             storage,
-            manifest: workerManifest(
-                {mode: 'development', revision: 'development'}
-            ),
-            fetchResource() {
+            manifest,
+            now() { return now; },
+            fetchResource(request) {
                 if (offline) {
                     throw new Error('The network is offline.');
                 }
-                return new Response(content);
+                const inventory = request.url === `${scope}arcane-offline.json`;
+                const lastModified = inventory ? 'Mon, 07 Sep 2026 00:00:00 GMT' : modified;
+                if (request.headers.get('if-modified-since') === lastModified) {
+                    return new Response(null, {status: 304});
+                }
+                if (!inventory) {
+                    changedRequestStarted?.();
+                }
+                return new Response(inventory ? JSON.stringify(manifest) : content, {headers: {'last-modified': lastModified}});
             }
         }
     );
     await fixture.lifecycle('install');
-    content = 'second saved source';
+    content = '  second saved source\ncomplete second line\n';
+    modified = 'Mon, 07 Sep 2026 00:02:01 GMT';
+    now += 120001;
+    const changedRequest = new Promise(
+        function observeChangedRequest(resolve) {
+            changedRequestStarted = resolve;
+        }
+    );
     storage.pauseWrites();
+    const refreshing = fixture.refresh();
+    await changedRequest;
     const request = fixture.request(`${scope}app.mjs`);
     const networkResponse = await request.response;
     assert.equal(
         await networkResponse.text(),
-        'second saved source'
+        content
     );
     storage.resumeWrites();
     assert.deepEqual(
         await request.background,
         [{status: 'fulfilled', value: undefined}]
     );
+    const updated = await refreshing;
+    assert.equal(updated.error, null);
+    assert.equal(updated.lastChecked, now);
     offline = true;
+    now += 120001;
+    const failed = await fixture.refresh(updated.lastChecked);
+    assert.equal(failed.error.errors.length, 2);
+    assert.equal(failed.lastChecked, updated.lastChecked);
     const cached = fixture.request(`${scope}app.mjs`);
     const offlineResponse = await cached.response;
     assert.equal(
         await offlineResponse.text(),
-        'second saved source'
+        content
     );
     await cached.background;
     assert.ok(
         fixture.requests.every(
             function revalidatedRequest(value) {
-                return value.cache === 'no-cache';
+                return value.cache === 'no-store';
             }
         )
     );
 }
 
 test(
-    'PWA development returns network content before cache writes and reuses it when offline',
+    'PWA due conditional updates stream before cache writes and preserve complete cached content on offline failure',
     developmentNetworkAndOffline
 );
 
@@ -444,5 +504,279 @@ test(
             undefined
         );
         assert.equal(fixture.requests.length, 2);
+    }
+);
+
+for (const [mode, interval] of [['development', 120000], ['release', 900000]]) {
+    test(
+        `PWA ${mode} page checks retain 304 bodies and wait until strictly after the app check interval`,
+        async function pageLoadCadence() {
+            let now = 1000000;
+            const modified = 'Mon, 07 Sep 2026 00:00:00 GMT';
+            const manifest = workerManifest({mode, assets: ['app.mjs?language=en', 'arcane-offline.json']});
+            const fixture = workerFixture({
+                manifest,
+                now() { return now; },
+                fetchResource(request) {
+                    if (request.headers.get('if-modified-since') === modified) {
+                        return new Response(null, {status: 304});
+                    }
+                    return new Response(
+                        request.url.endsWith('arcane-offline.json') ? JSON.stringify(manifest) : '  complete cached text\nsecond line\n',
+                        {headers: {'last-modified': modified}}
+                    );
+                }
+            });
+            await fixture.lifecycle('install');
+            const cache = [...fixture.storage.stores.values()][0];
+            const retained = cache.get(`${scope}app.mjs?language=en`);
+            const installed = await fixture.refresh();
+            assert.equal(fixture.requests.length, 2);
+            now += interval;
+            await fixture.refresh(installed.lastChecked);
+            assert.equal(fixture.requests.length, 2);
+            now += 1;
+            const checked = await fixture.refresh(installed.lastChecked);
+            assert.equal(fixture.requests.length, 4);
+            assert.equal(cache.get(`${scope}app.mjs?language=en`), retained);
+            assert.equal(checked.lastChecked, now);
+            const result = await fixture.request(`${scope}app.mjs?language=en`).response;
+            assert.equal(await result.text(), '  complete cached text\nsecond line\n');
+            assert.equal(fixture.requests.length, 4);
+            assert.equal(fixture.requests[3].method, 'GET');
+            assert.equal(fixture.requests[3].cache, 'no-store');
+            assert.equal(fixture.requests[3].headers.get('if-modified-since'), modified);
+            assert.equal(fixture.request(`${scope}api/live-records`).response, undefined);
+            assert.equal(fixture.request(`${scope}app.mjs?language=fr`).response, undefined);
+        }
+    );
+}
+
+test(
+    'PWA page refresh persists newly selected inventory and repairs evicted resources without a version bump',
+    async function liveInventoryAndEviction() {
+        let now = 1000000;
+        let offline = false;
+        const initial = workerManifest({mode: 'development', assets: ['app.mjs', 'arcane-offline.json']});
+        let current = initial;
+        let modified = 'Mon, 07 Sep 2026 00:00:00 GMT';
+        const storage = cacheStore();
+        const fixture = workerFixture({
+            manifest: initial,
+            storage,
+            now() { return now; },
+            fetchResource(request) {
+                if (offline) {
+                    throw new Error('The origin is offline.');
+                }
+                const control = request.url.endsWith('arcane-offline.json');
+                const lastModified = control ? modified : 'Mon, 07 Sep 2026 00:00:00 GMT';
+                if (request.headers.get('if-modified-since') === lastModified) {
+                    return new Response(null, {status: 304});
+                }
+                return new Response(control ? JSON.stringify(current, null, 4) : `complete:${request.url}\n`, {headers: {'last-modified': lastModified}});
+            }
+        });
+        await fixture.lifecycle('install');
+        const firstChecks = await fixture.refresh();
+        current = {...initial, assets: [...initial.assets, 'downloads/new%20notes.txt']};
+        modified = 'Mon, 07 Sep 2026 00:02:01 GMT';
+        now += 120001;
+        const refreshed = await fixture.refresh(firstChecks.lastChecked);
+        assert.equal(refreshed.error, null);
+        const newUrl = `${scope}downloads/new%20notes.txt`;
+        const selected = await fixture.request(newUrl).response;
+        assert.equal(await selected.text(), `complete:${newUrl}\n`);
+        const cache = [...storage.stores.values()][0];
+        assert.equal(await cache.get(`${scope}arcane-offline.json`).clone().text(), JSON.stringify(current, null, 4));
+        cache.delete(newUrl);
+        const recovered = fixture.request(newUrl);
+        assert.equal(await (await recovered.response).text(), `complete:${newUrl}\n`);
+        await recovered.background;
+        assert.equal(fixture.requests.at(-1).headers.get('if-modified-since'), null);
+        offline = true;
+        const restarted = workerFixture({manifest: initial, storage, fetchResource() { throw new Error('No network during offline restart.'); }});
+        assert.equal(await (await restarted.request(newUrl).response).text(), `complete:${newUrl}\n`);
+        assert.equal(restarted.requests.length, 0);
+    }
+);
+
+test(
+    'PWA installation carries earlier caches forward and retains a new worker declaration over older cached metadata',
+    async function olderCacheNewWorker() {
+        const storage = cacheStore();
+        const oldManifest = workerManifest({mode: 'development', assets: ['old.html', 'arcane-offline.json'], navigationAliases: {'./': 'old.html'}});
+        const legacyName = `arcane-pwa|${JSON.stringify([oldManifest.appId, scope])}|previous-output`;
+        const legacy = await storage.open(legacyName);
+        await legacy.put(`${scope}old.html`, new Response('retained old page'));
+        await legacy.put(`${scope}arcane-offline.json`, new Response(JSON.stringify(oldManifest)));
+        const current = workerManifest({mode: 'release', revision: 'new-output', sdkVersion: '0.11.1', assets: ['new.html', 'old.html', 'arcane-offline.json'], navigationAliases: {'./': 'new.html'}});
+        let now = 1000000;
+        let offline = false;
+        const fixture = workerFixture({
+            manifest: current,
+            storage,
+            now() { return now; },
+            fetchResource(request) {
+                if (offline) {
+                    throw new Error('The new deployment is offline.');
+                }
+                return new Response(`original:${request.url}`);
+            }
+        });
+        await fixture.lifecycle('install');
+        await fixture.lifecycle('activate');
+        assert.equal(storage.stores.has(legacyName), true);
+        assert.deepEqual(fixture.requests.map(function requestedUrl(request) { return request.url; }), [`${scope}new.html`]);
+        const navigation = await fixture.request(scope, {mode: 'navigate'}).response;
+        assert.equal(navigation.headers.get('location'), `${scope}new.html`);
+        const recentCheck = now;
+        now += 120001;
+        await fixture.refresh(recentCheck);
+        assert.equal(fixture.requests.length, 1);
+        assert.equal(await (await fixture.request(`${scope}old.html`).response).text(), 'retained old page');
+        offline = true;
+        now = recentCheck + 900001;
+        const failed = await fixture.refresh(recentCheck);
+        assert.equal(failed.lastChecked, recentCheck);
+        assert.equal(failed.error.errors.length, 3);
+        const offlineNavigation = await fixture.request(scope, {mode: 'navigate'}).response;
+        assert.equal(offlineNavigation.headers.get('location'), `${scope}new.html`);
+    }
+);
+
+test(
+    'PWA partial refresh retains cached failures and does not advance the app check timestamp',
+    async function failedRefreshRetainsCache() {
+        let now = 1000000;
+        let fail = false;
+        let invalidInventory = '{"assets":null,"navigationAliases":{}}';
+        const manifest = workerManifest({mode: 'development', assets: ['app.mjs', 'changed.mjs', 'arcane-offline.json']});
+        const fixture = workerFixture({
+            manifest,
+            now() { return now; },
+            fetchResource(request) {
+                const control = request.url.endsWith('arcane-offline.json');
+                if (fail) {
+                    if (request.url.endsWith('changed.mjs')) {
+                        return new Response('complete updated module\n', {headers: {'last-modified': 'Mon, 07 Sep 2026 00:02:01 GMT'}});
+                    }
+                    return control ? new Response(invalidInventory) : new Response('complete upstream failure', {status: 503});
+                }
+                return new Response(control ? JSON.stringify(manifest) : 'complete retained module\n', {headers: {'last-modified': 'Mon, 07 Sep 2026 00:00:00 GMT'}});
+            }
+        });
+        await fixture.lifecycle('install');
+        const initial = await fixture.refresh();
+        fail = true;
+        now += 120001;
+        const result = await fixture.refresh(initial.lastChecked);
+        assert.equal(result.error.errors.length, 2);
+        assert.deepEqual(result.lastChecked, initial.lastChecked);
+        assert.equal(await (await fixture.request(`${scope}app.mjs`).response).text(), 'complete retained module\n');
+        assert.equal(await (await fixture.request(`${scope}changed.mjs`).response).text(), 'complete updated module\n');
+        assert.equal(await (await fixture.request(`${scope}arcane-offline.json`).response).text(), JSON.stringify(manifest));
+        assert.equal(fixture.messages.at(-1).error.errors.length, 2);
+        invalidInventory = '{"assets":["http://["],"navigationAliases":{}}';
+        const unreadableUrl = await fixture.refresh(initial.lastChecked);
+        assert.equal(unreadableUrl.error.errors.length, 2);
+        assert.equal(unreadableUrl.lastChecked, initial.lastChecked);
+        assert.equal(await (await fixture.request(`${scope}arcane-offline.json`).response).text(), JSON.stringify(manifest));
+    }
+);
+
+test(
+    'PWA background checks coalesce page requests while unrelated resources continue through four workers',
+    async function concurrentPageRefresh() {
+        let now = 1000000;
+        let updating = false;
+        let active = 0;
+        let maximum = 0;
+        let poolStarted;
+        const releases = new Map();
+        const pool = new Promise(function observeRefreshPool(resolve) { poolStarted = resolve; });
+        const assets = ['one.mjs', 'two.mjs', 'three.mjs', 'four.mjs', 'five.mjs', 'six.mjs', 'arcane-offline.json'];
+        const manifest = workerManifest({mode: 'development', assets});
+        const fixture = workerFixture({
+            manifest,
+            now() { return now; },
+            fetchResource(request) {
+                if (request.url.endsWith('arcane-offline.json')) {
+                    return updating ? new Response(null, {status: 304}) : new Response(JSON.stringify(manifest), {headers: {'last-modified': 'Mon, 07 Sep 2026 00:00:00 GMT'}});
+                }
+                if (!updating) {
+                    return new Response('original complete body', {headers: {'last-modified': 'Mon, 07 Sep 2026 00:00:00 GMT'}});
+                }
+                active += 1;
+                maximum = Math.max(maximum, active);
+                if (request.url.endsWith('five.mjs') || request.url.endsWith('six.mjs')) {
+                    active -= 1;
+                    return new Response(null, {status: 304});
+                }
+                return new Promise(
+                    function pendingResource(resolve) {
+                        releases.set(request.url, function releaseResource() {
+                            active -= 1;
+                            resolve(new Response(`updated complete body:${request.url}`, {headers: {'last-modified': 'Mon, 07 Sep 2026 00:02:01 GMT'}}));
+                        });
+                        if (releases.size === 4) {
+                            poolStarted();
+                        }
+                    }
+                );
+            }
+        });
+        await fixture.lifecycle('install');
+        updating = true;
+        now += 120001;
+        const refresh = fixture.refresh();
+        await pool;
+        const first = fixture.request(`${scope}one.mjs`);
+        const second = fixture.request(`${scope}one.mjs`);
+        releases.get(`${scope}one.mjs`)();
+        assert.equal(await (await first.response).text(), `updated complete body:${scope}one.mjs`);
+        assert.equal(await (await second.response).text(), `updated complete body:${scope}one.mjs`);
+        assert.equal(active, 3);
+        for (const [url, release] of releases) {
+            if (url !== `${scope}one.mjs`) {
+                release();
+            }
+        }
+        await refresh;
+        await first.background;
+        await second.background;
+        assert.equal(maximum, 4);
+        assert.equal(fixture.requests.filter(function firstResource(request) { return request.url === `${scope}one.mjs`; }).length, 2);
+    }
+);
+
+test(
+    'PWA old-cache migration refreshes only the exact SDK protocol owners once',
+    async function protocolOwnerMigration() {
+        const storage = cacheStore();
+        const clientUrl = '../shared/sdk/pwa.mjs';
+        const assets = ['app.mjs', 'arcane-pwa.mjs', clientUrl, 'arcane-offline.json'];
+        const previousManifest = workerManifest({assets});
+        const legacyName = `arcane-pwa|${JSON.stringify([previousManifest.appId, scope])}|old-worker`;
+        const legacy = await storage.open(legacyName);
+        for (const asset of assets) {
+            const url = new URL(asset, scope).href;
+            await legacy.put(url, new Response(
+                asset === 'arcane-offline.json' ? JSON.stringify(previousManifest) : `retained:${url}`,
+                {headers: {'last-modified': 'Mon, 07 Sep 2026 00:00:00 GMT'}}
+            ));
+        }
+        const manifest = workerManifest({assets, revision: 'new-worker'});
+        const fixture = workerFixture({storage, manifest, clientUrl});
+        await fixture.lifecycle('install');
+        const protocolUrls = [`${scope}arcane-pwa.mjs`, new URL(clientUrl, scope).href].sort();
+        assert.deepEqual(fixture.requests.map(function requestedProtocol(request) { return request.url; }).sort(), protocolUrls);
+        assert.ok(fixture.requests.every(function protocolTransfer(request) { return request.cache === 'no-store' && request.headers.get('if-modified-since') === null; }));
+        assert.equal(await (await fixture.request(`${scope}app.mjs`).response).text(), `retained:${scope}app.mjs`);
+        assert.equal(await (await fixture.request(new URL(clientUrl, scope).href).response).text(), `original:${new URL(clientUrl, scope).href}`);
+        assert.equal(storage.stores.has(legacyName), true);
+        const next = workerFixture({storage, manifest, clientUrl});
+        await next.lifecycle('install');
+        assert.equal(next.requests.length, 0);
     }
 );

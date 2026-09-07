@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.12.0
+
+- Refresh the selected authored app descriptor's package projection before
+  development startup, so file and PWA configuration changes take effect through
+  the ordinary dev command without packaging.
+- Use published `node-http-server` 9.1.1 for development and packaged-preview HTTPS
+  serving, preserving source mounts and generated resource transformations.
+  Supply modification dates for conditional GET and HEAD requests.
+  Enforce HTTPS for every Arcane app, including localhost and packaged browser
+  previews, using the configured workspace certificate pair or public TLS options.
+  Redirect the paired HTTP listener with status 308 while preserving the request
+  path and query; select its port with `httpPort` or CLI `--http-port`.
+- Keep complete PWA resource responses across app and SDK version changes.
+  Check on page load after 120 seconds in development or 15 minutes otherwise,
+  with one DBOPFS timestamp updated only after the whole check succeeds. Reuse
+  cached responses on `304`, replace them after a successful current response, and retain offline
+  copies on network failures. No SDK cache expiration or polling is added.
+
 ## 0.11.3
 
 - Require Wllama's model-context load result to report success before publishing

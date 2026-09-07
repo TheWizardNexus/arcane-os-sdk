@@ -1,7 +1,7 @@
 import Is from 'strong-type';
+import {Server} from 'node-http-server';
 import {constants as FS_CONSTANTS} from 'node:fs';
 import {lstat,open,readFile,readdir,realpath} from 'node:fs/promises';
-import http from 'node:http';
 import https from 'node:https';
 import os from 'node:os';
 import path from 'node:path';
@@ -70,6 +70,7 @@ function throwIfAborted(signal){
 }
 
 function deny(response,status,message){
+    response.removeHeader('Last-Modified');
     response.writeHead(status,{
         'content-type':'text/plain; charset=utf-8'
     });
@@ -276,7 +277,7 @@ function createFileWorkLimiter(){
     return async work=>work();
 }
 
-async function openSafeFile(root,segments){
+async function openSafeFile(root, segments, {readContent = true} = {}) {
     const candidate=resolveInside(root,segments);
     if(!candidate)return null;
     let current=root;
@@ -305,13 +306,13 @@ async function openSafeFile(root,segments){
     try{
         const opened=await handle.stat();
         if(!opened.isFile())return null;
-        const content=await handle.readFile();
+        const content = readContent ? await handle.readFile() : undefined;
         const servedCandidate=await realpath(candidate);
         if(!pathIsWithin(root,servedCandidate)
             ||canonicalLocationKey(servedCandidate)!==canonicalLocationKey(canonicalCandidate)){
             return null;
         }
-        return {candidate:servedCandidate,content};
+        return {candidate: servedCandidate, content, modifiedAt: opened.mtime};
     }catch(error){
         if(error?.code==='ENOENT')return null;
         throw error;
@@ -320,54 +321,87 @@ async function openSafeFile(root,segments){
     }
 }
 
-async function sendFile(response,opened,{head=false,assetVersion,revalidate=false,onReference,pwaEntry=false}={}){
-    const extension=path.extname(opened.candidate).toLowerCase();
-    let content=assetVersion!==undefined&&/\.(?:m?js|html?|css|json)$/iu.test(extension)
-        ?Buffer.from(rewriteAssetReferences(opened.content.toString('utf8'),{
-            filePath:opened.candidate,
-            version:assetVersion,
-            onReference
-        }),'utf8')
-        :opened.content;
-    if (pwaEntry) {
-        content = Buffer.from(
-            applyPwaEntryReferences(
-                content.toString('utf8'),
-                {manifestUrl: '/arcane.webmanifest', bootstrapUrl: '/arcane-pwa.mjs'}
-            ),
-            'utf8'
-        );
+async function serveGeneratedRepresentation(fileServer, request, response, {
+    lastModified, contentType, body
+}) {
+    const modified = lastModified.toUTCString();
+    response.setHeader('Last-Modified', modified);
+    const requested = Date.parse(request.headers['if-modified-since']);
+    if (Number.isFinite(requested) && Date.parse(modified) <= requested) {
+        response.writeHead(304);
+        response.end();
+        return;
     }
-    // Stable PWA URLs and entry documents revalidate while retaining HTTP caching.
-    response.writeHead(200,{
-        'content-type':MIME_TYPES.get(extension)||'application/octet-stream',
-        'content-length':content.byteLength,
-        ...(revalidate?{'cache-control':'no-cache'}:{})
-    });
-    await new Promise((resolve,reject)=>{
-        let settled=false;
-        const cleanup=()=>{
-            response.removeListener('error',failed);
-            response.removeListener('finish',completed);
-            response.removeListener('close',completed);
+    response.setHeader('Content-Type', contentType);
+    await fileServer.serve(request, response, await body());
+}
+
+async function serveSourceFile(fileServer, request, response, opened, {
+    assetVersion, revalidate = false, onReference, pwaEntry = false, lastModified
+} = {}) {
+    const extension = path.extname(opened.candidate).toLowerCase();
+    const rewrite = assetVersion !== undefined && /\.(?:m?js|html?|css|json)$/iu.test(extension);
+    if (revalidate) response.setHeader('Cache-Control', 'no-cache');
+    if (!rewrite && !pwaEntry) {
+        // Preserve the SDK's response headers while the module owns static
+        // streaming and conditional requests, including its early 304 path.
+        const writeHead = response.writeHead;
+        response.writeHead = function writeDevelopmentHeaders(...arguments_) {
+            this.removeHeader('ETag');
+            this.removeHeader('X-Content-Type-Options');
+            return writeHead.apply(this, arguments_);
         };
-        const completed=()=>{
-            if(settled)return;
-            settled=true;
-            cleanup();
-            resolve();
-        };
-        const failed=error=>{
-            if(settled)return;
-            settled=true;
-            cleanup();
-            reject(error);
-        };
-        response.once('error',failed);
-        response.once('finish',completed);
-        response.once('close',completed);
-        response.end(head?undefined:content);
-    });
+        await fileServer.serveFile(opened.candidate, request, response);
+        return;
+    }
+    await serveGeneratedRepresentation(
+        fileServer,
+        request,
+        response,
+        {
+            lastModified,
+            contentType: MIME_TYPES.get(extension) || 'application/octet-stream',
+            body: async function createSourceRepresentation() {
+                let content = opened.content ?? await readFile(opened.candidate);
+                if (rewrite) {
+                    content = rewriteAssetReferences(
+                        content.toString('utf8'),
+                        {filePath: opened.candidate, version: assetVersion, onReference}
+                    );
+                }
+                if (pwaEntry) {
+                    content = applyPwaEntryReferences(
+                        content.toString('utf8'),
+                        {manifestUrl: '/arcane.webmanifest', bootstrapUrl: '/arcane-pwa.mjs'}
+                    );
+                }
+                return content;
+            }
+        }
+    );
+}
+
+function observeResponseCompletion(response) {
+    return new Promise(
+        function observeOwnedResponse(resolve, reject) {
+            function releaseResponseListeners() {
+                response.removeListener('error', responseFailed);
+                response.removeListener('finish', responseCompleted);
+                response.removeListener('close', responseCompleted);
+            }
+            function responseCompleted() {
+                releaseResponseListeners();
+                resolve();
+            }
+            function responseFailed(error) {
+                releaseResponseListeners();
+                reject(error);
+            }
+            response.once('error', responseFailed);
+            response.once('finish', responseCompleted);
+            response.once('close', responseCompleted);
+        }
+    );
 }
 
 function sourcePathAllowed(relative,manifest){
@@ -628,27 +662,71 @@ async function sourcePwaAssets(routeSet, mappings, signal, resourceUrls, resourc
     return [...selectedUrls].sort();
 }
 
-function listen(server,{host,port,signal}){
-    return new Promise((resolve,reject)=>{
-        const cleanup=()=>{
-            signal?.removeEventListener('abort',abort);
-            server.removeListener('error',failed);
-        };
-        const abort=()=>server.close(()=>{
-            cleanup();
-            reject(signal.reason||new Error('Operation cancelled.'));
-        });
-        const failed=error=>{
-            cleanup();
-            reject(error);
-        };
-        signal?.addEventListener('abort',abort,{once:true});
-        server.once('error',failed);
-        server.listen(port,host,()=>{
-            cleanup();
-            resolve();
-        });
-    });
+function closeDevelopmentListeners(fileServer, tlsServer) {
+    const closeTls = tlsServer ? new Promise(
+        function closeRawTlsListener(resolve, reject) {
+            tlsServer.close(function rawTlsClosed(error) {
+                if (error && error.code !== 'ERR_SERVER_NOT_RUNNING') reject(error);
+                else resolve();
+            });
+        }
+    ) : Promise.resolve();
+    return Promise.allSettled([fileServer.close(), closeTls]).then(
+        function developmentListenersClosed(results) {
+            const errors = results.filter(result => result.status === 'rejected').map(result => result.reason);
+            if (errors.length === 1) throw errors[0];
+            if (errors.length > 1) throw new AggregateError(errors, 'Development listener shutdown failed.');
+        }
+    );
+}
+
+function deployDevelopmentServer(fileServer, signal, {tlsServer, host, port}) {
+    return new Promise(
+        function deployOwnedListeners(resolve, reject) {
+            let listeners = [];
+            const ready = new Set();
+            let settled = false;
+            function cleanupDeployment() {
+                signal?.removeEventListener('abort', abortDeployment);
+                for (const listener of listeners) listener.removeListener('error', failedDeployment);
+            }
+            async function failedDeployment(error) {
+                if (settled) return;
+                settled = true;
+                try {
+                    await closeDevelopmentListeners(fileServer, tlsServer);
+                } catch (closeError) {
+                    error = new AggregateError([error, closeError], 'Development listener startup failed.');
+                } finally {
+                    cleanupDeployment();
+                }
+                reject(error);
+            }
+            function abortDeployment() {
+                void failedDeployment(signal.reason || new Error('Operation cancelled.'));
+            }
+            function listenerReady(instance, readyListener) {
+                if (settled) return;
+                ready.add(readyListener);
+                if (!listeners.every(listener => ready.has(listener))) return;
+                settled = true;
+                cleanupDeployment();
+                resolve(tlsServer ?? fileServer.secureServer);
+            }
+            try {
+                throwIfAborted(signal);
+                signal?.addEventListener('abort', abortDeployment, {once: true});
+                fileServer.deploy(listenerReady);
+                listeners = [fileServer.server, fileServer.secureServer, tlsServer].filter(Boolean);
+                for (const listener of listeners) listener.on('error', failedDeployment);
+                tlsServer?.listen(port, host, function rawTlsListenerReady() {
+                    listenerReady(fileServer, tlsServer);
+                });
+            } catch (error) {
+                void failedDeployment(error);
+            }
+        }
+    );
 }
 
 function browserHostname(host){
@@ -674,14 +752,13 @@ function networkUrlsForAddress(address,startPath,protocol){
     return [...urls];
 }
 
-async function resolveDevelopmentTls({workspaceRoot,https:useHttps,tls,certPath,keyPath,signal}){
+async function resolveDevelopmentTls({workspaceRoot,tls,certPath,keyPath,signal}){
     if(tls!==undefined&&tls!==null&&tls!==false){
         if(!is.object(tls)||is.array(tls)){
             fail('Development server tls must be a Node HTTPS options object.','ARCANE_USAGE');
         }
         return {options:tls};
     }
-    if(certPath===undefined&&keyPath===undefined&&!useHttps)return undefined;
     if((certPath===undefined)!==(keyPath===undefined)){
         fail('HTTPS development requires both certPath and keyPath when either is supplied.','ARCANE_USAGE');
     }
@@ -689,21 +766,22 @@ async function resolveDevelopmentTls({workspaceRoot,https:useHttps,tls,certPath,
     const privateKeyPath=path.resolve(workspaceRoot,keyPath??'.arcane/dev/server-key.pem');
     try{
         const reads=await Promise.allSettled([
-            readFile(certificatePath,{signal}),
-            readFile(privateKeyPath,{signal})
+            realpath(certificatePath),
+            realpath(privateKeyPath)
         ]);
         for(const read of reads){
             if(read.status==='rejected')throw read.reason;
         }
         return {
-            options:{cert:reads[0].value,key:reads[1].value},
-            privateKeyPath:await realpath(privateKeyPath)
+            certificatePath: reads[0].value,
+            privateKeyPath: reads[1].value
         };
     }catch(error){
         if(error.code==='ENOENT'){
             fail(
-                `HTTPS development requires a certificate at ${certificatePath} and a key at ${privateKeyPath}. `
-                +'Provide that pair or select existing files with --cert and --key.',
+                `Arcane development and packaged previews require HTTPS. `
+                +`Provide a certificate at ${certificatePath} and a key at ${privateKeyPath}, `
+                +'or select existing files with --cert and --key.',
                 'ARCANE_DEV_TLS_MISSING'
             );
         }
@@ -718,7 +796,7 @@ async function startOwnedDevServer({
     releaseRoot,
     host='127.0.0.1',
     port=0,
-    https:useHttps=false,
+    httpPort=0,
     tls,
     certPath,
     keyPath,
@@ -734,6 +812,9 @@ async function startOwnedDevServer({
         fail('Development server host must be a nonempty string.','ARCANE_USAGE');
     }
     if(!is.integer(port)||port<0||port>65535)fail('port must be an integer from 0 through 65535.','ARCANE_USAGE');
+    if (!is.integer(httpPort) || httpPort < 0 || httpPort > 65535) {
+        fail('httpPort must be an integer from 0 through 65535.', 'ARCANE_USAGE');
+    }
     const requestedRuntimeMode=mode==='source'&&sdkRuntimeSourceRoot!==undefined
         ?'sdk-source'
         :null;
@@ -742,13 +823,14 @@ async function startOwnedDevServer({
         mode,
         host,
         port,
+        httpPort,
         appId,
         ...(requestedRuntimeMode?{runtimeMode:requestedRuntimeMode}:{})
     });
     const selectedTls=await resolveDevelopmentTls({
-        workspaceRoot,https:useHttps,tls,certPath,keyPath,signal
+        workspaceRoot,tls,certPath,keyPath,signal
     });
-    const protocol=selectedTls?'https:':'http:';
+    const protocol = 'https:';
     throwIfAborted(signal);
     const routeSet=mode==='source'
         ?await sourceRoutes(workspaceRoot,appId,{
@@ -759,6 +841,37 @@ async function startOwnedDevServer({
         :await packagedRoutes(releaseRoot);
     const mappings=deterministicMappings(routeSet.mappings);
     const pwaEnabled = mode === 'source' ? routeSet.app?.pwa?.enabled === true : routeSet.pwa;
+    const versionPath = mode === 'source'
+        ? sdkRuntimeSourceRoot === undefined
+            ? path.join(routeSet.workspaceRoot, 'arcane.lock.json')
+            : path.join(routeSet.runtime.sourceRoot, 'package.json')
+        : undefined;
+    const [generatorInputs, initialAssetVersion, versionInput] = await Promise.all(
+        [
+            mode === 'source' ? Promise.all(
+                [
+                    lstat(new URL('./dev-server.mjs', import.meta.url)),
+                    lstat(new URL('./import-map.mjs', import.meta.url)),
+                    lstat(new URL('../package.json', import.meta.url))
+                ]
+            ) : [],
+            selectedAssetVersion(),
+            versionPath ? lstat(versionPath).catch(
+                function optionalVersionMetadata(error) {
+                    if (error.code !== 'ENOENT') throw error;
+                    return null;
+                }
+            ) : null
+        ]
+    );
+    const generatorModifiedAt = Math.max(
+        0,
+        ...generatorInputs.map(
+            function generatorModification(input) {
+                return input.mtimeMs;
+            }
+        )
+    );
     async function selectedAssetVersion(){
         if(mode!=='source')return undefined;
         return sdkRuntimeSourceRoot===undefined
@@ -767,7 +880,49 @@ async function startOwnedDevServer({
                 path.join(routeSet.runtime.sourceRoot,'package.json'),'utf8'
             )).version;
     }
-    let assetVersion=await selectedAssetVersion();
+    let assetVersion = initialAssetVersion;
+    let assetVersionModifiedAt = Math.max(generatorModifiedAt, versionInput?.mtimeMs ?? 0);
+    function rememberAssetVersion(version) {
+        if (version !== assetVersion) assetVersionModifiedAt = Date.now();
+        assetVersion = version;
+    }
+    const documentMetadata = new Map();
+    const representationMetadata = new Map();
+    async function isManagedDocument(opened) {
+        const previous = documentMetadata.get(opened.candidate);
+        const modifiedAt = opened.modifiedAt.getTime();
+        if (previous?.modifiedAt === modifiedAt) return previous.managed;
+        opened.content = await readFile(opened.candidate);
+        let managed = false;
+        if (opened.content.includes(MANAGED_IMPORT_MAP_ATTRIBUTE)) {
+            try {
+                managed = inspectImportMapHtml(opened.content.toString('utf8')).managedMaps.length > 0;
+            } catch {
+                // An unrelated document is not a source validation surface.
+            }
+        }
+        documentMetadata.set(
+            opened.candidate,
+            {modifiedAt, managed}
+        );
+        return managed;
+    }
+    function sourceRepresentationModifiedAt(opened, version, pwaEntry) {
+        const modifiedAt = opened.modifiedAt.getTime();
+        const previous = representationMetadata.get(opened.candidate);
+        if (previous?.modifiedAt === modifiedAt
+            && previous.version === version && previous.pwaEntry === pwaEntry) {
+            return previous.lastModified;
+        }
+        const lastModified = new Date(
+            Math.max(modifiedAt, generatorModifiedAt, assetVersionModifiedAt, previous ? Date.now() : 0)
+        );
+        representationMetadata.set(
+            opened.candidate,
+            {modifiedAt, version, pwaEntry, lastModified}
+        );
+        return lastModified;
+    }
     for(const mapping of mappings){
         const info=await lstat(mapping.root);
         if(info.isSymbolicLink()||!info.isDirectory())fail(`Server route root must be a real directory: ${mapping.root}.`);
@@ -775,6 +930,7 @@ async function startOwnedDevServer({
     }
     let pwaArtifacts;
     let pwaInventoryTask;
+    const generatedMetadata = new Map();
     const pwaResourceUrls = new Set();
     function developmentPwaArtifacts(assets = []) {
         return createPwaArtifacts(
@@ -797,17 +953,30 @@ async function startOwnedDevServer({
             }
         );
     }
+    function rememberPwaArtifacts(artifacts) {
+        for (const file of artifacts.files) {
+            const previous = generatedMetadata.get(file.path);
+            const lastModified = previous?.content === file.content
+                ? previous.lastModified
+                : new Date();
+            generatedMetadata.set(
+                file.path,
+                {content: file.content, lastModified}
+            );
+        }
+        pwaArtifacts = artifacts;
+        return artifacts;
+    }
     async function sourcePwaArtifact(targetPath) {
         if (targetPath === '/arcane-sw.js'
-            || (targetPath === '/arcane-offline.json' && !pwaArtifacts)) {
+            || targetPath === '/arcane-offline.json') {
             if (!pwaInventoryTask) {
                 pwaInventoryTask = Promise.all(
                     [sourcePwaAssets(routeSet, mappings, signal, pwaResourceUrls, resourcePaths), selectedAssetVersion()]
                 ).then(
                     function prepareSourceOfflineInventory([assets, version]) {
-                        assetVersion = version;
-                        pwaArtifacts = developmentPwaArtifacts(assets);
-                        return pwaArtifacts;
+                        rememberAssetVersion(version);
+                        return rememberPwaArtifacts(developmentPwaArtifacts(assets));
                     }
                 ).finally(
                     function releaseSourceInventoryTask() {
@@ -817,21 +986,31 @@ async function startOwnedDevServer({
             }
             await pwaInventoryTask;
         }
-        const artifacts = pwaArtifacts ?? developmentPwaArtifacts();
-        return artifacts.files.find(
+        const artifacts = pwaArtifacts ?? rememberPwaArtifacts(developmentPwaArtifacts());
+        const file = artifacts.files.find(
             function requestedPwaFile(file) {
                 return `/${file.path}` === targetPath;
             }
         );
+        return {...file, lastModified: generatedMetadata.get(file.path).lastModified};
     }
     // Remember actual resource edges as their owners are served, not every
     // HTML/JS/CSS file in an application's document or attachment corpus.
     const resourcePaths=new Set([routeSet.startPath]);
     const requestTasks=new Set();
     const runFileWork=createFileWorkLimiter();
-    function serveDevelopmentRequest(request,response){
+    async function serveDevelopmentRequest(request, response) {
         let task;
-        task=(async()=>{
+        async function routeDevelopmentRequest() {
+            if (!request.socket.encrypted) {
+                const address = (tlsServer ?? fileServer.secureServer).address();
+                const authority = new URL(`http://${request.headers.host || browserHostname(host)}`);
+                authority.protocol = 'https:';
+                authority.port = String(address.port);
+                response.writeHead(308, {Location: `${authority.origin}${request.url || '/'}`});
+                response.end();
+                return;
+            }
             if(request.method!=='GET'&&request.method!=='HEAD'){
                 deny(response,405,'Method not allowed.');
                 return;
@@ -842,10 +1021,18 @@ async function startOwnedDevServer({
             if (mode === 'source' && pwaEnabled
                 && ['/arcane.webmanifest', '/arcane-offline.json', '/arcane-sw.js', '/arcane-pwa.mjs'].includes(target.path)) {
                 const generated = await sourcePwaArtifact(target.path);
-                await sendFile(
+                response.setHeader('Cache-Control', 'no-cache');
+                await serveGeneratedRepresentation(
+                    fileServer,
+                    request,
                     response,
-                    {candidate: generated.path, content: Buffer.from(generated.content, 'utf8')},
-                    {head: request.method === 'HEAD', revalidate: true}
+                    {
+                        lastModified: generated.lastModified,
+                        contentType: MIME_TYPES.get(path.extname(generated.path)),
+                        body: function generatedPwaBody() {
+                            return generated.content;
+                        }
+                    }
                 );
                 return;
             }
@@ -861,8 +1048,12 @@ async function startOwnedDevServer({
             const relative=segments.slice(mapping.prefix.length);
             if(relative.length===0){deny(response,404,'Not found.');return;}
             if(mapping.allow&&!mapping.allow(relative)){deny(response,404,'Not found.');return;}
-            await runFileWork(async()=>{
-                const opened=await openSafeFile(mapping.root,relative);
+            await runFileWork(async function serveMappedResource() {
+                const opened = await openSafeFile(
+                    mapping.root,
+                    relative,
+                    {readContent: false}
+                );
                 if(!opened){deny(response,404,'Not found.');return;}
                 if(selectedTls?.privateKeyPath
                     &&canonicalLocationKey(opened.candidate)===canonicalLocationKey(selectedTls.privateKeyPath)){
@@ -871,24 +1062,16 @@ async function startOwnedDevServer({
                 }
                 const extension=path.extname(opened.candidate).toLowerCase();
                 const html=extension==='.html'||extension==='.htm';
-                let managedDocument=false;
-                if(html&&opened.content.includes(MANAGED_IMPORT_MAP_ATTRIBUTE)){
-                    try{
-                        managedDocument=inspectImportMapHtml(
-                            opened.content.toString('utf8')
-                        ).managedMaps.length>0;
-                    }catch{
-                        // An unrelated document is not a source validation surface.
-                    }
-                }
                 const selectedPwaDocument = mode === 'source' && pwaEnabled && html
                     && mapping.prefix[0] === 'apps' && mapping.prefix[1] === routeSet.appId
                     && routeSet.app.include.includes(relative.join('/'));
-                const entryDocument=target.path===routeSet.startPath||managedDocument||selectedPwaDocument;
+                const selectedDocument = target.path === routeSet.startPath || selectedPwaDocument;
+                const managedDocument = !selectedDocument && html && await isManagedDocument(opened);
+                const entryDocument = selectedDocument || managedDocument;
                 const managedMap=path.basename(opened.candidate)==='arcane.importmap.json';
                 // A live server can span an SDK upgrade. Refresh the small
                 // version record on navigation, not on each resource request.
-                if(entryDocument||managedMap)assetVersion=await selectedAssetVersion();
+                if(entryDocument||managedMap)rememberAssetVersion(await selectedAssetVersion());
                 const runtimeResource=segments[0]==='arcane';
                 const browserResource=['script','style','worker','sharedworker','serviceworker']
                     .includes(request.headers['sec-fetch-dest']);
@@ -920,33 +1103,85 @@ async function startOwnedDevServer({
                         }
                     }catch{ /* Non-URL values remain under their existing owner. */ }
                 };
-                await sendFile(response,opened,{
-                    head:request.method==='HEAD',
-                    assetVersion:rewrite&&mode==='source'?(pwaEnabled?null:assetVersion):undefined,
-                    revalidate:pwaEnabled||entryDocument||managedMap,
-                    pwaEntry:mode==='source'&&pwaEnabled&&entryDocument,
-                    onReference
-                });
+                const selectedVersion = rewrite && mode === 'source' ? (pwaEnabled ? null : assetVersion) : undefined;
+                const pwaEntry = mode === 'source' && pwaEnabled && entryDocument;
+                const transformed = pwaEntry || (selectedVersion !== undefined
+                    && /\.(?:m?js|html?|css|json)$/iu.test(extension));
+                await serveSourceFile(
+                    fileServer,
+                    request,
+                    response,
+                    opened,
+                    {
+                        assetVersion: selectedVersion,
+                        revalidate: pwaEnabled || entryDocument || managedMap,
+                        pwaEntry,
+                        onReference,
+                        lastModified: transformed
+                            ? sourceRepresentationModifiedAt(opened, selectedVersion, pwaEntry)
+                            : undefined
+                    }
+                );
             });
-        })().catch(async error=>{
-            await events.enqueue({type:'server.request.failed',message:error.message});
-            if(!response.headersSent){
-                const status=error?.code==='ARCANE_BACKPRESSURE'?503:500;
-                deny(response,status,'Internal server error.');
+        }
+        const responseCompletion = observeResponseCompletion(response);
+        task = Promise.all(
+            [routeDevelopmentRequest(), responseCompletion]
+        ).catch(
+            async function failedDevelopmentRequest(error) {
+                await events.enqueue({type: 'server.request.failed', message: error.message});
+                if (!response.headersSent) {
+                    const status = error?.code === 'ARCANE_BACKPRESSURE' ? 503 : 500;
+                    deny(response, status, 'Internal server error.');
+                } else if (!response.destroyed) {
+                    response.destroy(error);
+                }
             }
-            else response.destroy(error);
-        }).finally(()=>{
-            requestTasks.delete(task);
-        });
+        ).finally(
+            function releaseDevelopmentRequest() {
+                requestTasks.delete(task);
+            }
+        );
         requestTasks.add(task);
+        await task;
+        return true;
     }
-    const server=selectedTls
-        ?https.createServer(selectedTls.options,serveDevelopmentRequest)
-        :http.createServer(serveDevelopmentRequest);
-    await listen(server,{host,port,signal});
+    const contentType = Object.fromEntries(
+        [...MIME_TYPES].map(
+            function serverContentType([extension, value]) {
+                return [extension.substring(1), value];
+            }
+        )
+    );
+    const fileServer = new Server(
+        {
+            root: mappings[0].root,
+            host,
+            port: httpPort,
+            server: {noCache: false, timeout: 0},
+            https: {
+                only: false,
+                port,
+                ...(selectedTls.options ? {} : {
+                    privateKey: selectedTls.privateKeyPath,
+                    certificate: selectedTls.certificatePath
+                })
+            }
+        }
+    );
+    fileServer.config.contentType = contentType;
+    fileServer.onRawRequest = serveDevelopmentRequest;
+    // The module's public HTTPS configuration accepts PEM paths. Its HTTPS
+    // guide leaves advanced TLS inputs to application code; preserve that
+    // existing SDK input while the same public module methods serve all content.
+    const tlsServer = selectedTls.options
+        ? https.createServer(selectedTls.options, serveDevelopmentRequest)
+        : null;
+    const server = await deployDevelopmentServer(fileServer, signal, {tlsServer, host, port});
+    const listeners = [fileServer.server, server];
     const address=server.address();
     if(!address||is.string(address)){
-        server.close();
+        await closeDevelopmentListeners(fileServer, tlsServer);
         fail('Development server did not expose a TCP address.');
     }
     const visibleHost=address.address==='0.0.0.0'||address.address==='::'
@@ -954,6 +1189,9 @@ async function startOwnedDevServer({
         :browserHostname(address.address);
     const endpoint=new URL(`${protocol}//${visibleHost}:${address.port}`);
     const origin=endpoint.origin;
+    const httpAddress = fileServer.server.address();
+    const httpOrigin = new URL(`http://${visibleHost}:${httpAddress.port}`).origin;
+    const httpUrl = `${httpOrigin}${routeSet.startPath}`;
     const cleanUrl=`${origin}${routeSet.startPath}`;
     const url=cleanUrl;
     let closeInitiated=false;
@@ -975,7 +1213,7 @@ async function startOwnedDevServer({
         }
         lifecycleSettlementStarted=true;
         signal?.removeEventListener('abort',abort);
-        server.removeListener('error',serverFailed);
+        for (const listener of listeners) listener.removeListener('error', serverFailed);
         try{
             while(requestTasks.size>0){
                 await Promise.allSettled([...requestTasks]);
@@ -1016,12 +1254,15 @@ async function startOwnedDevServer({
         if(!closeInitiated){
             closeInitiated=true;
             try{
-                server.close(closeError=>{
-                    if(closeError){
-                        operationalError??=closeError;
+                closeDevelopmentListeners(fileServer, tlsServer).then(
+                    function developmentServerClosed() {
+                        void finishLifecycle();
+                    },
+                    function developmentServerCloseFailed(closeError) {
+                        operationalError ??= closeError;
                         void finishLifecycle();
                     }
-                });
+                );
             }catch(closeError){
                 operationalError??=closeError;
                 void finishLifecycle();
@@ -1032,8 +1273,12 @@ async function startOwnedDevServer({
     const abort=()=>{void close().catch(()=>{});};
     const serverFailed=error=>{void close(error).catch(()=>{});};
     signal?.addEventListener('abort',abort,{once:true});
-    server.on('error',serverFailed);
-    server.once('close',()=>{void finishLifecycle();});
+    for (const listener of listeners) {
+        listener.on('error', serverFailed);
+        listener.once('close', function ownedListenerClosed() {
+            if (!closeInitiated) void close().catch(() => {});
+        });
+    }
     const result={
         server,
         protocol,
@@ -1046,6 +1291,9 @@ async function startOwnedDevServer({
         }:{}),
         host:address.address,
         port:address.port,
+        httpPort: httpAddress.port,
+        httpOrigin,
+        httpUrl,
         origin,
         cleanUrl,
         url,
@@ -1062,6 +1310,9 @@ async function startOwnedDevServer({
             mode,
             host:result.host,
             port:result.port,
+            httpPort: result.httpPort,
+            httpOrigin,
+            httpUrl,
             url,
             networkUrls:result.networkUrls,
             appId:result.appId,

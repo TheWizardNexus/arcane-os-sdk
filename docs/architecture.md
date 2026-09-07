@@ -110,21 +110,37 @@ behavior or claiming that the capability exists.
 
 Rapid development uses `arcane dev`. The development server maps the selected
 application's canonical source tree and the live installed SDK/runtime routes.
-Each request reads and returns the complete current saved source, so a browser
-refresh shows source changes without packaging, copying
-files into `dist`, or restarting the server. Restarting is not a content
-synchronization step; when a refresh is stale, first verify the command, URL,
-workspace, selected app, and resolved source route.
+At startup, the SDK refreshes only the selected authored app descriptor's
+schema-1 package projection and managed import maps under the existing
+development-refresh lock, then releases the lock before binding the listener.
+The authored descriptor remains unchanged, and package-only apps retain their
+existing path. An enabled PWA receives generated manifests directly from this
+source server without creating `dist` output.
+Changed resource requests return the complete current saved source without
+packaging, copying files into `dist`, or restarting the server. Conditional
+requests for unchanged resources return `304`. Enabled PWAs check on page load
+when their single DBOPFS `lastChecked` value is older than 120 seconds in
+development or 15 minutes in packaged browser delivery. Cached resource bodies have no SDK
+expiration. The timestamp advances only after the whole resource check succeeds.
+Restarting is not a content synchronization step; inspect the
+selected source route and the last successful check when evaluating freshness.
 
-The shared dev server owns HTTP and HTTPS transport for the same selected
-routes. `arcane dev --public` selects HTTPS on the IPv4 wildcard address;
-explicit `--host` controls the bind address, while `--https` selects HTTPS
-without changing it. Public/HTTPS CLI startup reads one workspace-local PEM
-pair before binding. The certificate covers the device-facing address, and
+The shared dev server uses RIAEvangelist's `node-http-server` public interface
+for HTTPS and conditional responses on those selected routes. The SDK
+owns source selection and generated representations. Every Arcane development
+server and packaged browser preview serves content on HTTPS and redirects its
+paired HTTP listener with status 308 through the public request hook.
+`arcane dev --public` selects the IPv4 wildcard address;
+explicit `--host` controls the bind address. CLI startup reads one workspace-local
+PEM pair before binding, including ordinary localhost startup.
+The certificate covers the device-facing address, and
 each client trusts its issuing CA through that platform's certificate setup.
 This supplies the secure origin required by OPFS/DBOPFS on LAN devices. The
 server does not install trust, generate certificates, or expose private TLS
-material through CLI events. Ordinary localhost development remains HTTP.
+material through CLI events. `port` selects HTTPS; `httpPort` selects the HTTP
+redirect listener, defaulting to an OS-assigned port. Existing raw `tls` inputs
+retain their native HTTPS transport under the SDK, as described by the module's
+advanced TLS extension guidance; all content uses its public serving methods.
 
 Development is an intentionally fast feedback loop. Keep each increment small
 and independently understandable so its effect has one clear cause and a

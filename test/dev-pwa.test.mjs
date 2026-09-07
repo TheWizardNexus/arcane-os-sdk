@@ -1,13 +1,20 @@
 import assert from 'node:assert/strict';
-import {mkdir, readFile, writeFile} from 'node:fs/promises';
+import {lstat, mkdir, readFile, unlink, writeFile} from 'node:fs/promises';
 import path from 'node:path';
+import {setTimeout as waitForHttpDateChange} from 'node:timers/promises';
 import test from '../src/testing.mjs';
 import {startDevServer} from '../src/dev-server.mjs';
+import {createWorkspace} from '../src/scaffold.mjs';
+import {developApplication} from '../src/toolchain.mjs';
 import {SDK_VERSION} from '../src/constants.mjs';
-import {temporaryDirectory} from './helpers.mjs';
+import {
+    fetchSyntheticTls as fetch,temporaryDirectory,useSyntheticTls,writeSyntheticTlsFiles
+} from './helpers.mjs';
 
 async function sourceFixture(context, {enabled = true} = {}) {
+    useSyntheticTls(context);
     const workspaceRoot = await temporaryDirectory(context, {prefix: 'arcane-dev-pwa-'});
+    await writeSyntheticTlsFiles(workspaceRoot);
     const rootConfig = {
         schemaVersion: 1,
         appsRoot: 'apps',
@@ -174,3 +181,187 @@ test('ordinary source serving keeps versioned URLs and does not add PWA routes',
     assert.equal(await runtime.text(), "export {child} from './child.js?arcaneVersion=9.8.7';");
     assert.equal(await (await fetch(`${instance.origin}/apps/fixture/documents/payload.html`)).text(), documentHtml);
 });
+
+test(
+    'conditional offline requests discover added and removed files while retaining unchanged generated responses',
+    async function refreshConditionalOfflineInventory(context) {
+        const {workspaceRoot, instance} = await sourceFixture(context);
+        const documentRoot = path.join(workspaceRoot, 'apps', 'fixture', 'documents');
+        const removedPath = path.join(documentRoot, 'removed.txt');
+        await writeFile(removedPath, 'Complete previously selected document.');
+        const controlUrl = `${instance.origin}/arcane-offline.json`;
+        const initial = await fetch(controlUrl);
+        const initialModified = initial.headers.get('last-modified');
+        const initialManifest = await initial.json();
+        assert.ok(initialManifest.assets.includes('/apps/fixture/documents/removed.txt'));
+        const unchanged = await fetch(
+            controlUrl,
+            {headers: {'If-Modified-Since': initialModified}}
+        );
+        assert.equal(unchanged.status, 304);
+        assert.equal(await unchanged.text(), '');
+
+        const stableGenerated = new Map();
+        for (const resource of ['/arcane.webmanifest', '/arcane-pwa.mjs']) {
+            const response = await fetch(`${instance.origin}${resource}`);
+            stableGenerated.set(resource, response.headers.get('last-modified'));
+            await response.text();
+        }
+        const initialWorker = await fetch(`${instance.origin}/arcane-sw.js`);
+        const initialWorkerModified = initialWorker.headers.get('last-modified');
+        await initialWorker.text();
+        // Separate actual changes at HTTP-date precision without changing app versions.
+        await waitForHttpDateChange(1100);
+        const addedContent = '  Complete new document.\nIts formatting stays intact.  ';
+        await Promise.all(
+            [
+                unlink(removedPath),
+                writeFile(path.join(documentRoot, 'added notes.txt'), addedContent)
+            ]
+        );
+        const current = await fetch(
+            controlUrl,
+            {headers: {'If-Modified-Since': initialModified}}
+        );
+        assert.equal(current.status, 200);
+        const currentModified = current.headers.get('last-modified');
+        assert.notEqual(currentModified, initialModified);
+        const currentManifest = await current.json();
+        assert.equal(currentManifest.appVersion, initialManifest.appVersion);
+        assert.equal(currentManifest.sdkVersion, initialManifest.sdkVersion);
+        assert.equal(currentManifest.assets.includes('/apps/fixture/documents/removed.txt'), false);
+        assert.ok(currentManifest.assets.includes('/apps/fixture/documents/added%20notes.txt'));
+        const unchangedCurrent = await fetch(
+            controlUrl,
+            {headers: {'If-Modified-Since': currentModified}}
+        );
+        assert.equal(unchangedCurrent.status, 304);
+        assert.equal(await unchangedCurrent.text(), '');
+        for (const [resource, lastModified] of stableGenerated) {
+            const response = await fetch(
+                `${instance.origin}${resource}`,
+                {headers: {'If-Modified-Since': lastModified}}
+            );
+            assert.equal(response.status, 304);
+            assert.equal(response.headers.get('last-modified'), lastModified);
+            assert.equal(await response.text(), '');
+        }
+        const worker = await fetch(
+            `${instance.origin}/arcane-sw.js`,
+            {headers: {'If-Modified-Since': initialWorkerModified}}
+        );
+        assert.equal(worker.status, 200);
+        assert.ok((await worker.text()).includes('/apps/fixture/documents/added%20notes.txt'));
+        const document = await fetch(`${instance.origin}/apps/fixture/documents/added%20notes.txt`);
+        assert.equal(await document.text(), addedContent);
+        await assert.rejects(lstat(path.join(workspaceRoot, 'dist')), {code: 'ENOENT'});
+    }
+);
+
+test(
+    'development startup projects authored file and PWA changes before serving the current offline inventory',
+    async function authoredPwaDevelopmentStartup(context) {
+        useSyntheticTls(context);
+        const workspaceRoot = await temporaryDirectory(
+            context,
+            {prefix: 'arcane-authored-pwa-startup-'}
+        );
+        const appId = 'authored-pwa';
+        await createWorkspace(
+            {targetPath: workspaceRoot, appId, displayName: 'Authored PWA', target: 'browser'}
+        );
+        await writeSyntheticTlsFiles(workspaceRoot);
+        // Use the existing integrated fixture profile with the scaffolded runtime.
+        await writeFile(
+            path.join(workspaceRoot, 'package.json'),
+            JSON.stringify(
+                {name: 'arcane-os', private: true, type: 'module'}
+            )
+        );
+        const configPath = path.join(workspaceRoot, 'arcane-packager.json');
+        const config = JSON.parse(
+            await readFile(configPath, 'utf8')
+        );
+        config.sharedPayloads['browser-runtime'] = [config.sharedPayloads['browser-runtime'][0]];
+        await writeFile(configPath, `${JSON.stringify(config, null, 4)}\n`);
+
+        const appRoot = path.join(workspaceRoot, 'apps', appId);
+        const descriptorPath = path.join(appRoot, 'arcane-app.json');
+        const packagePath = path.join(appRoot, 'arcane-package.json');
+        const previousPackage = JSON.parse(
+            await readFile(packagePath, 'utf8')
+        );
+        const descriptor = JSON.parse(
+            await readFile(descriptorPath, 'utf8')
+        );
+        descriptor.package.include.push('downloads', 'settings.html');
+        descriptor.package.pwa = {
+            enabled: true,
+            manifest: {
+                short_name: 'Current app',
+                description: '  Keep this complete description.\nSecond line.  '
+            },
+            offline: {
+                include: ['arcane', 'downloads', 'settings.html'],
+                exclude: ['downloads/excluded.txt']
+            }
+        };
+        Reflect.deleteProperty(descriptor, 'security');
+        const authoredSource = `${JSON.stringify(descriptor, null, 4)}\n`;
+        await writeFile(descriptorPath, authoredSource);
+        const settingsPath = path.join(appRoot, 'settings.html');
+        await writeFile(
+            settingsPath,
+            await readFile(path.join(appRoot, descriptor.package.entry), 'utf8')
+        );
+        await mkdir(path.join(appRoot, 'downloads'));
+        const selectedContent = '  Complete newly selected content.\nSecond line.  ';
+        await Promise.all(
+            [
+                writeFile(path.join(appRoot, 'downloads', 'new notes.txt'), selectedContent),
+                writeFile(path.join(appRoot, 'downloads', 'excluded.txt'), 'Excluded from offline selection.')
+            ]
+        );
+
+        const instance = await developApplication(
+            {workspaceRoot, appId, host: '127.0.0.1', port: 0}
+        );
+        context.after(
+            async function closeAuthoredPwaDevelopmentServer() {
+                await instance.close();
+                await instance.lifecycle;
+            }
+        );
+        const projected = JSON.parse(
+            await readFile(packagePath, 'utf8')
+        );
+        assert.equal(previousPackage.include.includes('settings.html'), false);
+        assert.equal(projected.include.includes('settings.html'), true);
+        assert.equal(projected.include.includes('downloads'), true);
+        assert.equal(projected.version, previousPackage.version);
+        assert.deepEqual(projected.pwa, descriptor.package.pwa);
+        assert.equal(Object.hasOwn(projected, 'security'), false);
+        assert.equal(await readFile(descriptorPath, 'utf8'), authoredSource);
+        assert.ok((await readFile(settingsPath, 'utf8')).includes('data-arcane-import-map'));
+
+        const resource = await fetch(`${instance.origin}/apps/${appId}/downloads/new%20notes.txt`);
+        assert.equal(resource.status, 200);
+        assert.equal(await resource.text(), selectedContent);
+        const settings = await fetch(`${instance.origin}/apps/${appId}/settings.html`);
+        assert.equal(settings.status, 200);
+        assert.ok((await settings.text()).includes('async data-arcane-pwa'));
+        const manifest = await (await fetch(`${instance.origin}/arcane.webmanifest`)).json();
+        assert.equal(manifest.short_name, descriptor.package.pwa.manifest.short_name);
+        assert.equal(manifest.description, descriptor.package.pwa.manifest.description);
+        const offline = await (await fetch(`${instance.origin}/arcane-offline.json`)).json();
+        assert.ok(offline.assets.includes(`/apps/${appId}/settings.html`));
+        assert.ok(offline.assets.includes(`/apps/${appId}/downloads/new%20notes.txt`));
+        assert.equal(offline.assets.includes(`/apps/${appId}/downloads/excluded.txt`), false);
+        assert.equal(offline.assets.includes(`/apps/${appId}/manifest.json`), false);
+        assert.equal(offline.appVersion, previousPackage.version);
+        await assert.rejects(
+            lstat(path.join(workspaceRoot, 'dist')),
+            {code: 'ENOENT'}
+        );
+    }
+);

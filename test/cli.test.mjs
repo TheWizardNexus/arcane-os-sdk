@@ -32,6 +32,7 @@ test('CLI help and version succeed through the shipped executable',async()=>{
     assert.match(help.stdout,/import-map \[--workspace <directory>\] \[--app <id>\]/u);
     assert.match(help.stdout,/dev .*--sdk-runtime-source <sdk-root>/u);
     assert.match(help.stdout,/dev .*\[--public\]/u);
+    assert.match(help.stdout,/dev .*\[--http-port 0\]/u);
     assert.match(help.stdout,/verify-bundle <file[.]arcane-app[.]tar[.]gz>/);
 
     const version=await runCli(['--version']);
@@ -70,7 +71,7 @@ test('CLI maps the SDK runtime source only for explicit development',async()=>{
                 appId:'fixture-app',
                 host:'127.0.0.1',
                 port:8000,
-                url:'http://127.0.0.1:8000/apps/fixture-app/index.html',
+                url:'https://127.0.0.1:8000/apps/fixture-app/index.html',
                 lifecycle:Promise.resolve(),
                 close:async function closeDevelopmentServer(){}
             };
@@ -119,9 +120,9 @@ test('CLI maps the SDK runtime source only for explicit development',async()=>{
 
 test('CLI public development preserves app selection and explicit host precedence',async function publicDevelopmentOptions(){
     for(const selection of [
-        {appId:'example-app',args:[],host:'127.0.0.1',https:false},
+        {appId:'example-app',args:[],host:'127.0.0.1',https:true},
         {appId:'another-app',args:['--public'],host:'0.0.0.0',https:true},
-        {appId:'example-app',args:['--host','192.0.2.10'],host:'192.0.2.10',https:false},
+        {appId:'example-app',args:['--host','192.0.2.10'],host:'192.0.2.10',https:true},
         {appId:'another-app',args:['--public','--host','127.0.0.1'],host:'127.0.0.1',https:true},
         {appId:'example-app',args:['--host','192.0.2.10','--public'],host:'192.0.2.10',https:true},
         {appId:'example-app',args:['--https'],host:'127.0.0.1',https:true}
@@ -129,7 +130,7 @@ test('CLI public development preserves app selection and explicit host precedenc
         const stdout=memoryStream();
         const stderr=memoryStream();
         const invocations=[];
-        const protocol=selection.https?'https:':'http:';
+        const protocol='https:';
         const networkUrls=selection.host==='127.0.0.1'?[]:[
             `${protocol}//192.0.2.10:8123/apps/${selection.appId}/index.html`
         ];
@@ -159,6 +160,7 @@ test('CLI public development preserves app selection and explicit host precedenc
         assert.equal(invocations[0].options.appId,selection.appId);
         assert.equal(invocations[0].options.host,selection.host);
         assert.equal(invocations[0].options.port,8123);
+        assert.equal(invocations[0].options.httpPort,0);
         assert.equal(invocations[0].options.https,selection.https);
         const events=parseNdjson(stdout.read());
         const ready=events.find(function serverReady(event){return event.type==='server.ready';});
@@ -182,44 +184,139 @@ test('CLI prints every public development network URL in human output',async fun
             return {
                 mode:'source',appId:'example-app',host:'0.0.0.0',port:8123,
                 protocol:'https:',url:'https://localhost:8123/apps/example-app/index.html',
+                httpPort:8124,httpOrigin:'http://localhost:8124',
+                httpUrl:'http://localhost:8124/apps/example-app/index.html',
                 networkUrls,lifecycle:Promise.resolve(),
                 close:async function closePublicServerFixture(){}
             };
         }
     });
     assert.equal(exitCode,0,stderr.read());
+    assert.ok(stderr.read().includes('HTTP redirect: http://localhost:8124/apps/example-app/index.html'));
     for(const url of networkUrls)assert.ok(stderr.read().includes(`Network: ${url}`));
 });
 
-test('CLI certificate paths select HTTPS relative to the chosen workspace',async function developmentCertificateOptions(){
+test(
+    'CLI browser serving preserves the selected HTTP redirect port and reports both endpoints',
+    async function browserRedirectPortOptions() {
+        for (const selection of [
+            {args: ['dev'], httpPort: 0},
+            {args: ['dev', '--http-port', '8124'], httpPort: 8124},
+            {args: ['run', '--http-port=65535'], httpPort: 65535},
+            {args: ['run', '--target', 'browser', '--http-port', '0'], httpPort: 0}
+        ]) {
+            const stdout = memoryStream();
+            let selectedOptions;
+            const httpPort = selection.httpPort || 3211;
+            const httpOrigin = `http://127.0.0.1:${httpPort}`;
+            const httpUrl = `${httpOrigin}/apps/fixture-app/index.html`;
+            const exitCode = await runCliInProcess(
+                [...selection.args, '--port', '8123', '--output', 'ndjson'],
+                {
+                    stdout: stdout.stream,
+                    stderr: memoryStream().stream,
+                    execute: async function selectBrowserRedirectPort(command, options) {
+                        selectedOptions = options;
+                        return {
+                            mode: command === 'dev' ? 'source' : 'packaged',
+                            host: '127.0.0.1',
+                            port: options.port,
+                            protocol: 'https:',
+                            url: 'https://127.0.0.1:8123/apps/fixture-app/index.html',
+                            httpPort,
+                            httpOrigin,
+                            httpUrl,
+                            lifecycle: Promise.resolve(),
+                            close: async function closeBrowserRedirectFixture() {}
+                        };
+                    }
+                }
+            );
+            assert.equal(exitCode, 0);
+            assert.equal(selectedOptions.port, 8123);
+            assert.equal(selectedOptions.httpPort, selection.httpPort);
+            const events = parseNdjson(stdout.read());
+            const ready = events.find(
+                function isBrowserRedirectReady(event) {
+                    return event.type === 'server.ready';
+                }
+            );
+            for (const result of [ready.data, events.at(-1).data.result]) {
+                assert.equal(result.port, 8123);
+                assert.equal(result.httpPort, httpPort);
+                assert.equal(result.httpOrigin, httpOrigin);
+                assert.equal(result.httpUrl, httpUrl);
+            }
+        }
+
+        for (const args of [
+            ['dev', '--http-port'],
+            ['dev', '--http-port=65536'],
+            ['dev', '--http-port=-1'],
+            ['run', '--http-port=1.5'],
+            ['run', '--http-port=invalid'],
+            ['package', '--http-port', '0'],
+            ['mail', 'serve', '--http-port', '0'],
+            ['run', '--target', 'windows-x64', '--http-port', '0']
+        ]) {
+            const stdout = memoryStream();
+            let executed = false;
+            const exitCode = await runCliInProcess(
+                [...args, '--output', 'ndjson'],
+                {
+                    stdout: stdout.stream,
+                    stderr: memoryStream().stream,
+                    execute: async function rejectInvalidRedirectPortExecution() {
+                        executed = true;
+                    }
+                }
+            );
+            assert.equal(exitCode, 1);
+            assert.equal(executed, false);
+            assert.equal(parseNdjson(stdout.read()).at(-1).data.error.code, 'ARCANE_USAGE');
+        }
+    }
+);
+
+test('CLI development and browser run certificate paths are relative to the chosen workspace',async function developmentCertificateOptions(){
     const cwd=path.resolve('cli-certificate-fixture');
     const workspaceRoot=path.join(cwd,'selected-workspace');
-    const stdout=memoryStream();
-    let selectedOptions;
-    const exitCode=await runCliInProcess([
-        'dev','--workspace','selected-workspace','--cert','tls/cert.pem','--key','tls/key.pem'
-    ],{
-        cwd,
-        stdout:stdout.stream,
-        stderr:memoryStream().stream,
-        execute:async function selectCertificatePair(_command,options){
-            selectedOptions=options;
-            return {
-                mode:'source',host:options.host,port:8000,protocol:'https:',
-                url:'https://127.0.0.1:8000/apps/example-app/index.html',
-                lifecycle:Promise.resolve(),close:async function closeCertificateFixture(){}
-            };
-        }
-    });
-    assert.equal(exitCode,0);
-    assert.equal(selectedOptions.workspaceRoot,workspaceRoot);
-    assert.equal(selectedOptions.host,'127.0.0.1');
-    assert.equal(selectedOptions.https,true);
-    assert.equal(selectedOptions.certPath,path.join(workspaceRoot,'tls','cert.pem'));
-    assert.equal(selectedOptions.keyPath,path.join(workspaceRoot,'tls','key.pem'));
-    assert.equal(stdout.read().includes('key.pem'),false);
+    for (const command of [['dev'], ['run'], ['run', '--target', 'browser']]) {
+        const stdout = memoryStream();
+        let selectedOptions;
+        const exitCode = await runCliInProcess(
+            [...command, '--workspace', 'selected-workspace', '--cert', 'tls/cert.pem', '--key', 'tls/key.pem'],
+            {
+                cwd,
+                stdout: stdout.stream,
+                stderr: memoryStream().stream,
+                execute: async function selectCertificatePair(selectedCommand, options) {
+                    selectedOptions = options;
+                    return {
+                        mode: selectedCommand === 'dev' ? 'source' : 'packaged',
+                        host: options.host, port: 8000, protocol: 'https:',
+                        url: 'https://127.0.0.1:8000/index.html',
+                        lifecycle: Promise.resolve(),
+                        close: async function closeCertificateFixture() {}
+                    };
+                }
+            }
+        );
+        assert.equal(exitCode, 0);
+        assert.equal(selectedOptions.workspaceRoot, workspaceRoot);
+        assert.equal(selectedOptions.host, '127.0.0.1');
+        assert.equal(selectedOptions.https, true);
+        assert.equal(selectedOptions.certPath, path.join(workspaceRoot, 'tls', 'cert.pem'));
+        assert.equal(selectedOptions.keyPath, path.join(workspaceRoot, 'tls', 'key.pem'));
+        assert.equal(stdout.read().includes('key.pem'), false);
+    }
 
-    for(const args of [['dev','--cert','cert.pem'],['dev','--key','key.pem'],['run','--https']]){
+    for(const args of [
+        ['dev','--cert','cert.pem'],
+        ['dev','--key','key.pem'],
+        ['run','--cert','cert.pem'],
+        ['run','--target','windows-x64','--https']
+    ]){
         let executed=false;
         const output=memoryStream();
         const rejectedCode=await runCliInProcess([...args,'--output','ndjson'],{
@@ -467,7 +564,7 @@ test('CLI reports a server lifecycle event failure as one terminal failure',asyn
             appId:'fixture-app',
             host:'127.0.0.1',
             port:3210,
-            url:'http://127.0.0.1:3210/apps/fixture-app/index.html',
+            url:'https://127.0.0.1:3210/apps/fixture-app/index.html',
             lifecycle,
             close:()=>lifecycle
         };

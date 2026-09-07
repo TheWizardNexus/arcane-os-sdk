@@ -13,7 +13,9 @@ import {loadArcaneIntegratedProvider} from './integrated-provider-loader.mjs';
 import {startDevServer} from './dev-server.mjs';
 import {generateImportMap,readApplicationTestImportMapContext} from './import-map.mjs';
 import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
+import {refreshAppPackageProjection} from './app-descriptor.mjs';
 import {
+    discoverApps as discoverPackagerApps,
     inspectApp as inspectPackagedApp,
     packageApp,
     verifyApp
@@ -444,18 +446,65 @@ export async function checkApplication(options={}){
     };
 }
 
-export async function developApplication(options={}){
-    assertApplicationScope(options,'Development serving');
-    const prepared=await preparedWorkspace({...options,allowMissingManagedImportMap:true});
-    await withWorkspaceOperationLock({
-        workspaceRoot:prepared.workspaceRoot,
-        operation:'dev-refresh',
-        signal:options.signal,
-        onEvent:options.onEvent
-    },workspaceOperationLease=>refreshPreparedImportMap(prepared,{
-        ...options,
-        workspaceOperationLease
-    }));
+export async function developApplication(options = {}) {
+    assertApplicationScope(options, 'Development serving');
+    throwIfAborted(options.signal);
+    const profile = await inspectWorkspaceProfile(options.workspaceRoot);
+    const appIds = await discoverPackagerApps(
+        {workspaceRoot: profile.workspaceRoot}
+    );
+    let appId = options.appId;
+    if (appId !== undefined && (!is.string(appId) || !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/u.test(appId))) {
+        throw new ArcaneError(ERROR_CODES.usage, `Invalid app id: ${String(appId)}.`);
+    }
+    if (appId) {
+        if (!appIds.includes(appId)) {
+            throw new ArcaneError(
+                ERROR_CODES.workspaceInvalid,
+                `Unknown app "${appId}". Available apps: ${appIds.join(', ') || '[none]'}.`
+            );
+        }
+    } else if (appIds.length === 1) {
+        [appId] = appIds;
+    } else if (appIds.length === 0) {
+        throw new ArcaneError(ERROR_CODES.workspaceInvalid, 'No Arcane applications were found under apps/.');
+    } else {
+        throw new ArcaneError(
+            ERROR_CODES.usage,
+            `This workspace contains multiple apps; select one explicitly: ${appIds.join(', ')}.`
+        );
+    }
+    const prepared = await withWorkspaceOperationLock(
+        {
+            workspaceRoot: profile.workspaceRoot,
+            operation: 'dev-refresh',
+            signal: options.signal,
+            onEvent: options.onEvent
+        },
+        async function refreshDevelopmentWorkspace(workspaceOperationLease) {
+            await refreshAppPackageProjection(
+                {
+                    workspaceRoot: profile.workspaceRoot,
+                    appId,
+                    signal: options.signal,
+                    onEvent: options.onEvent
+                }
+            );
+            const current = await preparedWorkspace(
+                {
+                    ...options,
+                    workspaceRoot: profile.workspaceRoot,
+                    appId,
+                    allowMissingManagedImportMap: true
+                }
+            );
+            await refreshPreparedImportMap(
+                current,
+                {...options, workspaceOperationLease}
+            );
+            return current;
+        }
+    );
     const server=await startDevServer({
         workspaceRoot:prepared.workspaceRoot,
         appId:prepared.appId,
@@ -466,6 +515,7 @@ export async function developApplication(options={}){
         }),
         host:options.host,
         port:options.port,
+        httpPort:options.httpPort,
         https:options.https,
         tls:options.tls,
         certPath:options.certPath,

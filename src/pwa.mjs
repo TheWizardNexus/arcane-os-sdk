@@ -301,7 +301,10 @@ controller.ready.catch(
         files: [
             {path: PWA_MANIFEST_NAME, content: json(manifest)},
             {path: PWA_OFFLINE_MANIFEST_NAME, content: json(offlineManifest)},
-            {path: PWA_WORKER_NAME, content: createPwaWorkerScript(offlineManifest)},
+            {
+                path: PWA_WORKER_NAME,
+                content: createPwaWorkerScript(offlineManifest, `${runtimeBase}pwa.mjs`)
+            },
             {path: PWA_BOOTSTRAP_NAME, content: bootstrap}
         ],
         entryAssets,

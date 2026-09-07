@@ -4,13 +4,22 @@ import https from 'node:https';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import {setTimeout as waitForHttpDateChange} from 'node:timers/promises';
 import test from '../src/testing.mjs';
-import {createWorkspace} from '../src/scaffold.mjs';
+import {createWorkspace as scaffoldWorkspace} from '../src/scaffold.mjs';
 import {startDevServer} from '../src/dev-server.mjs';
 import {materializeInstalledSdkRuntime} from '../src/installed-sdk-runtime.mjs';
 import {projectPackageManifest} from '../src/app-descriptor.mjs';
 import {SDK_NAME,SDK_VERSION} from '../src/constants.mjs';
-import {repositoryRoot,temporaryDirectory} from './helpers.mjs';
+import {
+    fetchSyntheticTls,repositoryRoot,temporaryDirectory,useSyntheticTls,writeSyntheticTlsFiles
+} from './helpers.mjs';
+
+async function createWorkspace(options) {
+    const result = await scaffoldWorkspace(options);
+    await writeSyntheticTlsFiles(options.targetPath);
+    return result;
+}
 
 function assertPermissiveDevelopmentHeaders(response){
     for(const name of [
@@ -30,7 +39,7 @@ function assertPermissiveDevelopmentHeaders(response){
 }
 
 async function request(origin,requestPath,options={}){
-    return fetch(`${origin}${requestPath}`,{redirect:'manual',...options});
+    return fetchSyntheticTls(`${origin}${requestPath}`,{redirect:'manual',...options});
 }
 
 function developmentOrigin(instance){
@@ -155,7 +164,107 @@ async function assertPortCanBeReused(port){
     await new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));
 }
 
+test(
+    'module serving reuses unchanged files and rewrites changed source through conditional GET',
+    async function conditionalDevelopmentResources(context) {
+        useSyntheticTls(context);
+        const parent = await temporaryDirectory(context, {prefix: 'arcane-conditional-source-'});
+        const workspaceRoot = path.join(parent, 'workspace');
+        const appId = 'conditional-app';
+        await createWorkspace({targetPath: workspaceRoot, appId});
+        const sourceRoot = await createSdkRuntimeSource(parent, {version: '9.8.7'});
+        const documentPath = path.join(workspaceRoot, 'apps', appId, 'modules', 'raw notes.txt');
+        const runtimePath = path.join(sourceRoot, 'runtime', 'arcane', 'modules', 'AI.js');
+        const firstDocument = '  Complete document content.\nSecond line.  ';
+        await Promise.all(
+            [
+                writeFile(documentPath, firstDocument),
+                writeFile(runtimePath, "import './child.js?v=4'; export const state = 'first';")
+            ]
+        );
+        const instance = await startDevServer(
+            {workspaceRoot, appId, sdkRuntimeSourceRoot: sourceRoot}
+        );
+        context.after(
+            async function closeConditionalSourceServer() {
+                await instance.close();
+            }
+        );
+        const resources = [
+            `/apps/${appId}/modules/raw%20notes.txt?format=a%20b`,
+            '/arcane/modules/AI.js?mode=worker',
+            `/apps/${appId}/index.html`
+        ];
+        const modified = new Map();
+        for (const resource of resources) {
+            const response = await request(instance.origin, resource);
+            assert.equal(response.status, 200);
+            const lastModified = response.headers.get('last-modified');
+            assert.ok(Number.isFinite(Date.parse(lastModified)));
+            assert.equal(response.headers.get('etag'), null);
+            assert.equal(response.headers.get('x-content-type-options'), null);
+            const body = await response.text();
+            if (resource === resources[0]) assert.equal(body, firstDocument);
+            if (resource === resources[1]) assert.ok(body.includes('child.js?arcaneVersion=9.8.7'));
+            modified.set(resource, lastModified);
+            const unchanged = await request(
+                instance.origin,
+                resource,
+                {headers: {'If-Modified-Since': lastModified}}
+            );
+            assert.equal(unchanged.status, 304);
+            assert.equal(await unchanged.text(), '');
+            const head = await request(instance.origin, resource, {method: 'HEAD'});
+            assert.equal(head.status, 200);
+            assert.equal(head.headers.get('last-modified'), lastModified);
+            assert.equal(await head.text(), '');
+        }
+
+        // HTTP-date represents whole seconds, so the changed fixtures use the next second.
+        await waitForHttpDateChange(1100);
+        const updatedDocument = '  Updated complete document.\nSecond line remains.  ';
+        const updatedRuntime = "import './child.js?v=4'; export const state = 'updated';";
+        await Promise.all(
+            [
+                writeFile(documentPath, updatedDocument),
+                writeFile(runtimePath, updatedRuntime),
+                writeFile(
+                    path.join(sourceRoot, 'package.json'),
+                    JSON.stringify({name: SDK_NAME, version: '9.8.8'})
+                )
+            ]
+        );
+        // Navigation refreshes the selected SDK metadata before dependent resources.
+        const entry = await request(
+            instance.origin,
+            resources[2],
+            {headers: {'If-Modified-Since': modified.get(resources[2])}}
+        );
+        assert.equal(entry.status, 200);
+        assert.ok((await entry.text()).includes('arcaneVersion=9.8.8'));
+        for (const resource of [resources[0], resources[1]]) {
+            const response = await request(
+                instance.origin,
+                resource,
+                {headers: {'If-Modified-Since': modified.get(resource)}}
+            );
+            assert.equal(response.status, 200);
+            assert.notEqual(response.headers.get('last-modified'), modified.get(resource));
+            const body = await response.text();
+            assert.equal(
+                body,
+                resource === resources[0]
+                    ? updatedDocument
+                    : "import './child.js?arcaneVersion=9.8.8'; export const state = 'updated';"
+            );
+        }
+        assert.equal(await readFile(documentPath, 'utf8'), updatedDocument);
+        assert.equal(await readFile(runtimePath, 'utf8'), updatedRuntime);
+    }
+);
+
 test('source server versions local references from selected SDK metadata and revalidates entry HTML',async t=>{
+    useSyntheticTls(t);
     const parent=await temporaryDirectory(t,{prefix:'arcane-versioned-source-'});
     const workspaceRoot=path.join(parent,'workspace');
     await createWorkspace({targetPath:workspaceRoot,appId:'served-app'});
@@ -177,11 +286,11 @@ test('source server versions local references from selected SDK metadata and rev
     assert.equal(module.status,200);
     assert.equal(module.headers.get('cache-control'),null);
     const source=await module.text();
-    assert.ok(source.includes('child.js?v=2&arcaneVersion=9.8.7'));
+    assert.ok(source.includes('child.js?arcaneVersion=9.8.7'));
     assert.ok(source.includes('worker.js?arcaneVersion=9.8.7'));
     const worker=await request(instance.origin,'/arcane/modules/worker.js?arcaneVersion=9.8.7');
     assert.equal(worker.status,200);
-    assert.ok((await worker.text()).includes('child.js?v=2&arcaneVersion=9.8.7'));
+    assert.ok((await worker.text()).includes('child.js?arcaneVersion=9.8.7'));
     assert.equal(await readFile(path.join(sourceRoot,'runtime/arcane/modules/worker.js'),'utf8'),
         "import './child.js?v=2';\n");
     const document=await request(instance.origin,'/apps/served-app/modules/document.html');
@@ -198,10 +307,11 @@ test('source server versions local references from selected SDK metadata and rev
     const refreshedEntry=await request(instance.origin,'/apps/served-app/index.html');
     assert.ok((await refreshedEntry.text()).includes('arcaneVersion=9.8.8'));
     const refreshedWorker=await request(instance.origin,'/arcane/modules/worker.js?arcaneVersion=9.8.8');
-    assert.ok((await refreshedWorker.text()).includes('child.js?v=2&arcaneVersion=9.8.8'));
+    assert.ok((await refreshedWorker.text()).includes('child.js?arcaneVersion=9.8.8'));
 });
 
 test('source server exposes the selected app and installed SDK browser routes',async t=>{
+    useSyntheticTls(t);
     const parent=await temporaryDirectory(t,{prefix:'arcane-server-'});
     const workspaceRoot=path.join(parent,'workspace');
     await createWorkspace({targetPath:workspaceRoot,appId:'served-app'});
@@ -228,7 +338,7 @@ test('source server exposes the selected app and installed SDK browser routes',a
         onEvent:event=>events.push(event)
     });
     t.after(()=>instance.close());
-    const origin=`http://127.0.0.1:${instance.port}`;
+    const origin=instance.origin;
 
     assert.ok(events.find(event=>event.type==='server.starting'));
     assert.equal(events.at(-1).type,'server.started');
@@ -336,6 +446,7 @@ test('source server exposes the selected app and installed SDK browser routes',a
 });
 
 test('direct source serving is independent of the installed package dependency name',async t=>{
+    useSyntheticTls(t);
     const parent=await temporaryDirectory(t,{prefix:'arcane-alias-source-server-'});
     const workspaceRoot=path.join(parent,'workspace');
     const appId='alias-served-app';
@@ -357,6 +468,7 @@ test('direct source serving is independent of the installed package dependency n
 });
 
 test('explicit SDK runtime source mount is live, narrow, and observable',async t=>{
+    useSyntheticTls(t);
     const parent=await temporaryDirectory(t,{prefix:'arcane-sdk-source-server-'});
     const workspaceRoot=path.join(parent,'workspace');
     await createWorkspace({targetPath:workspaceRoot,appId:'source-mounted-app'});
@@ -450,6 +562,7 @@ test('explicit SDK runtime source mount is live, narrow, and observable',async t
 });
 
 test('explicit SDK runtime source mount rejects overlap and linked roots',async t=>{
+    useSyntheticTls(t);
     const parent=await temporaryDirectory(t,{prefix:'arcane-sdk-source-policy-'});
     const workspaceRoot=path.join(parent,'workspace');
     await createWorkspace({targetPath:workspaceRoot,appId:'source-policy-app'});
@@ -492,7 +605,9 @@ test('explicit SDK runtime source mount rejects overlap and linked roots',async 
 });
 
 test('packaged development server serves its selected real directory without admission gates',async t=>{
+    useSyntheticTls(t);
     const parent=await temporaryDirectory(t,{prefix:'arcane-packaged-server-'});
+    await writeSyntheticTlsFiles(parent);
     const releaseRoot=path.join(parent,'packaged-app');
     await mkdir(path.join(releaseRoot,'arcane','css'),{recursive:true});
     await Promise.all([
@@ -501,6 +616,7 @@ test('packaged development server serves its selected real directory without adm
     ]);
     const instance=await startDevServer({
         mode:'packaged',
+        workspaceRoot:parent,
         releaseRoot,
         host:'127.0.0.1',
         port:0
@@ -516,6 +632,24 @@ test('packaged development server serves its selected real directory without adm
     assert.equal(entry.status,200);
     assertPermissiveDevelopmentHeaders(entry);
     assert.match(await entry.text(),/Packaged App/);
+    const lastModified = entry.headers.get('last-modified');
+    assert.ok(Number.isFinite(Date.parse(lastModified)));
+    assert.equal(entry.headers.get('etag'), null);
+    const unchanged = await request(
+        origin,
+        '/index.html',
+        {headers: {'If-Modified-Since': lastModified}}
+    );
+    assert.equal(unchanged.status, 304);
+    assert.equal(await unchanged.text(), '');
+    const head = await request(
+        origin,
+        '/index.html',
+        {method: 'HEAD'}
+    );
+    assert.equal(head.status, 200);
+    assert.equal(head.headers.get('last-modified'), lastModified);
+    assert.equal(await head.text(), '');
 
     await writeFile(path.join(releaseRoot,'index.html'),'changed package content\n');
     const changedRelease=await request(origin,'/index.html');
@@ -524,6 +658,7 @@ test('packaged development server serves its selected real directory without adm
 });
 
 test('development server keeps local defaults and supports explicit public binding',async function serverBindAddresses(t){
+    useSyntheticTls(t);
     const parent=await temporaryDirectory(t,{prefix:'arcane-server-addresses-'});
     const workspaceRoot=path.join(parent,'workspace');
     const appId='network-app';
@@ -557,13 +692,13 @@ test('development server keeps local defaults and supports explicit public bindi
                 });
                 context.after(function closeSelectedServer(){return instance.close();});
                 const publicBinding=host==='0.0.0.0';
-                assert.equal(instance.protocol,'http:');
+                assert.equal(instance.protocol,'https:');
                 if(publicBinding){
                     assert.equal(instance.server.address().address,'0.0.0.0');
-                    assert.equal(instance.origin,`http://localhost:${instance.port}`);
+                    assert.equal(instance.origin,`https://localhost:${instance.port}`);
                     assert.deepEqual(instance.networkUrls,[
-                        `http://192.0.2.10:${instance.port}/apps/${appId}/index.html`,
-                        `http://198.51.100.20:${instance.port}/apps/${appId}/index.html`
+                        `https://192.0.2.10:${instance.port}/apps/${appId}/index.html`,
+                        `https://198.51.100.20:${instance.port}/apps/${appId}/index.html`
                     ]);
                 }else{
                     assert.ok(['127.0.0.1','::1'].includes(instance.host));
@@ -573,7 +708,7 @@ test('development server keeps local defaults and supports explicit public bindi
                 assert.equal(instance.url,`${instance.origin}/apps/${appId}/index.html`);
                 assert.equal(instance.cleanUrl,instance.url);
                 assert.deepEqual(events.at(-1).networkUrls,instance.networkUrls);
-                const requestOrigin=publicBinding?`http://127.0.0.1:${instance.port}`:instance.origin;
+                const requestOrigin=publicBinding?`https://127.0.0.1:${instance.port}`:instance.origin;
                 const response=await request(requestOrigin,`/apps/${appId}/index.html`);
                 assert.equal(response.status,200);
                 assert.ok((await response.text()).includes(`content="${appId}"`));
@@ -582,6 +717,66 @@ test('development server keeps local defaults and supports explicit public bindi
         assert.equal(interfaceReads,1);
     }finally{
         os.networkInterfaces=originalNetworkInterfaces;
+    }
+});
+
+test('HTTP redirects preserve request targets and close with either HTTPS transport', async function developmentRedirects(t) {
+    const fixture = useSyntheticTls(t);
+    const parent = await temporaryDirectory(t, {prefix: 'arcane-redirect-server-'});
+    const workspaceRoot = path.join(parent, 'workspace');
+    const appId = 'redirect-app';
+    await createWorkspace({targetPath: workspaceRoot, appId});
+    const sdkRuntimeSourceRoot = await createSdkRuntimeSource(parent);
+    const tls = {cert: 'Synthetic raw certificate.', key: 'Synthetic raw key.'};
+    for (const options of [{}, {tls}]) {
+        const events = [];
+        const instance = await startDevServer({
+            workspaceRoot, appId, sdkRuntimeSourceRoot, ...options,
+            onEvent: function rememberRedirectEvent(event) {events.push(event);}
+        });
+        t.after(function closeRedirectFixture() {return instance.close();});
+        assert.equal(instance.httpUrl, `${instance.httpOrigin}/apps/${appId}/index.html`);
+        assert.equal(events.at(-1).httpUrl, instance.httpUrl);
+        assert.equal(events.at(-1).httpPort, instance.httpPort);
+        if (options.tls) assert.equal(fixture.options.at(-1), tls);
+        for (const method of ['GET', 'HEAD', 'POST']) {
+            const target = `/apps/${appId}/file%20name.html?first=a%20b&first=c%2Fd`;
+            const response = await fetch(`${instance.httpOrigin}${target}`, {method, redirect: 'manual'});
+            assert.equal(response.status, 308);
+            assert.equal(response.headers.get('location'), `${instance.origin}${target}`);
+            assert.equal(await response.text(), '');
+        }
+        const entry = await request(instance.origin, `/apps/${appId}/index.html`);
+        assert.equal(entry.status, 200);
+        await entry.text();
+        instance.server.close();
+        await instance.closed;
+        await assertPortCanBeReused(instance.port);
+        await assertPortCanBeReused(instance.httpPort);
+    }
+});
+
+test('a failed paired listener releases both selected ports', async function pairedListenerFailure(t) {
+    useSyntheticTls(t);
+    const parent = await temporaryDirectory(t, {prefix: 'arcane-paired-failure-'});
+    const workspaceRoot = path.join(parent, 'workspace');
+    const appId = 'paired-failure';
+    await createWorkspace({targetPath: workspaceRoot, appId});
+    const sdkRuntimeSourceRoot = await createSdkRuntimeSource(parent);
+    const occupied = net.createServer();
+    await new Promise(resolve => occupied.listen(0, '127.0.0.1', resolve));
+    t.after(function closeOccupiedPort() {return new Promise(resolve => occupied.close(resolve));});
+    const occupiedPort = occupied.address().port;
+    for (const selected of ['port', 'httpPort']) {
+        const available = await availablePort();
+        const options = selected === 'port'
+            ? {port: occupiedPort, httpPort: available}
+            : {port: available, httpPort: occupiedPort};
+        await assert.rejects(
+            startDevServer({workspaceRoot, appId, sdkRuntimeSourceRoot, ...options}),
+            error => error.code === 'EADDRINUSE'
+        );
+        await assertPortCanBeReused(available);
     }
 });
 
@@ -611,17 +806,32 @@ test('development server selects the HTTPS listener without exposing TLS setting
 
 test('HTTPS development reports missing certificate files without starting HTTP',async function missingDevelopmentCertificates(t){
     const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-missing-certificates-'});
-    const events=[];
-    await assert.rejects(startDevServer({
-        workspaceRoot,https:true,
-        onEvent:function collectCertificateFailureEvent(event){events.push(event);}
-    }),function isMissingCertificatePair(error){
-        assert.equal(error.code,'ARCANE_DEV_TLS_MISSING');
-        assert.ok(error.message.includes(path.join(workspaceRoot,'.arcane','dev','server-cert.pem')));
-        assert.ok(error.message.includes(path.join(workspaceRoot,'.arcane','dev','server-key.pem')));
-        return true;
-    });
-    assert.deepEqual(events.map(function certificateEventType(event){return event.type;}),['server.starting']);
+    for (const options of [{}, {https: false}, {https: true}, {mode: 'packaged'}]) {
+        const events = [];
+        await assert.rejects(
+            startDevServer(
+                {
+                    workspaceRoot, ...options,
+                    onEvent: function collectCertificateFailureEvent(event) {
+                        events.push(event);
+                    }
+                }
+            ),
+            function isMissingCertificatePair(error) {
+                assert.equal(error.code, 'ARCANE_DEV_TLS_MISSING');
+                assert.ok(error.message.includes('require HTTPS'));
+                assert.ok(error.message.includes(path.join(workspaceRoot, '.arcane', 'dev', 'server-cert.pem')));
+                assert.ok(error.message.includes(path.join(workspaceRoot, '.arcane', 'dev', 'server-key.pem')));
+                return true;
+            }
+        );
+        assert.deepEqual(
+            events.map(
+                function certificateEventType(event) {return event.type;}
+            ),
+            ['server.starting']
+        );
+    }
     await assert.rejects(
         startDevServer({workspaceRoot,certPath:'cert.pem'}),
         function isIncompleteCertificatePair(error){return error.code==='ARCANE_USAGE';}
@@ -638,6 +848,7 @@ test('development server reports malformed host options before binding',async fu
 });
 
 test('source server uses the application materialization without authenticating installed content',async t=>{
+    useSyntheticTls(t);
     const parent=await temporaryDirectory(t,{prefix:'arcane-server-runtime-' });
     const workspaceRoot=path.join(parent,'workspace');
     await createWorkspace({targetPath:workspaceRoot,appId:'tampered-runtime'});
@@ -658,6 +869,7 @@ test('source server uses the application materialization without authenticating 
 });
 
 test('server startup callback rejection closes the listener before rejection',async t=>{
+    useSyntheticTls(t);
     const parent=await temporaryDirectory(t,{prefix:'arcane-server-event-start-'});
     const workspaceRoot=path.join(parent,'workspace');
     await createWorkspace({targetPath:workspaceRoot,appId:'event-start'});
@@ -683,6 +895,7 @@ test('server startup callback rejection closes the listener before rejection',as
 });
 
 test('server close drains stopped delivery and propagates its first rejection',async t=>{
+    useSyntheticTls(t);
     const parent=await temporaryDirectory(t,{prefix:'arcane-server-event-stop-'});
     const workspaceRoot=path.join(parent,'workspace');
     await createWorkspace({targetPath:workspaceRoot,appId:'event-stop'});

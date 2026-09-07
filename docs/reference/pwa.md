@@ -83,31 +83,90 @@ the [existing asset version contract](asset-versioning.md).
 
 ## Development and hosting
 
+Use the ordinary `arcane dev --app <id>` command after editing the selected
+app's `arcane-app.json`. Startup refreshes that app's generated
+`arcane-package.json` from the authored descriptor before refreshing its import
+maps and starting the server. No packaging or `dist` output is required.
+Package-only applications retain their existing descriptor workflow.
+
+Add a file or directory to `package.include` to make it part of the app's
+resources. A new file inside an already included directory needs no separate
+entry. If `package.pwa.offline.include` is nonempty, the resource must also
+match that offline selection and must not match `offline.exclude`. Adding a
+path only to the offline selection does not add it to the app's resources.
+Restart after changing descriptor settings. Edits to selected source files are
+picked up by the next due page-load check while the server remains running.
+
 For an enabled application, `arcane dev` serves the generated PWA files at the
 origin root and starts at the selected app page under `/apps/<id>/`. Use one
-selected app per development origin. Its worker uses network revalidation first
-and retains successful selected resource responses for offline use, so saved
-source edits remain visible on an ordinary online refresh.
+selected app per development origin. The SDK uses `node-http-server` for source
+and packaged-preview serving, including conditional resource responses.
+Every Arcane development server and packaged browser preview serves HTTPS,
+including localhost. Configure the workspace certificate pair before starting
+the ordinary command; see [development HTTPS setup](cli.md#development-https-setup).
 
-Source inventory work begins when the browser requests the worker update, after
-the page can start. It traverses the selected route inventory once for that
-request, follows application page and runtime resource references to retain
-selected query variants, and shares an in-flight traversal with concurrent
-manifest requests. Each referenced source file is read once per traversal;
+Source inventory work begins when the browser requests the worker or current
+offline manifest, after the page can start. It traverses the selected route
+inventory once for that request, follows page and runtime resource references
+to retain selected query variants, and shares an in-flight traversal with
+concurrent requests. Each referenced source file is read once per traversal;
 document corpus bodies remain under their existing owner. It does not rebuild
-the application. Generated metadata and bootstrap requests reuse the current
-bundle.
+the application. Installation metadata and bootstrap requests reuse the current
+generated bundle.
 
-Packaged workers use their selected cache generation first. During installation,
-at most four resource requests run together; each response is fetched from the
-network with the browser's reload cache mode before it enters the candidate
-cache. The candidate must finish
-installation before the browser activates it. Failures retain the prior active
-worker and remain observable through native worker state and SDK diagnostics.
+The SDK owns version information in `arcane-offline.json`:
+
+| Field | Owner and update rule |
+| --- | --- |
+| `schemaVersion` | SDK offline-manifest format; currently `1`. |
+| `appVersion` | The app descriptor's top-level `version`. |
+| `sdkVersion` | The selected installed SDK or explicit live SDK source version. |
+| `revision` | `development` for the source server; a fresh generated deployment ID for each packaged output. |
+
+Do not hand-edit generated manifests or bump a version for every source edit.
+`arcane.webmanifest` holds installation metadata and has no separate SDK-managed
+release counter. Resource freshness uses each response's `Last-Modified` header.
+
+On each page load, the SDK reads one `lastChecked` value for the app and worker
+scope from DBOPFS in the background. When that value is missing or older than
+the delivery mode's interval, it checks the current offline manifest and every
+selected resource:
+
+| Mode | Page-load check interval |
+| --- | --- |
+| Development | 120 seconds |
+| Packaged browser delivery | 15 minutes |
+
+These intervals schedule revalidation; they never expire a cached file. The
+worker sends `GET` with `If-Modified-Since` using the cached response's
+`Last-Modified`. A `304 Not Modified` retains the complete cached response. A
+successful `200` replaces it after the new response is stored. Missing cached
+resources are downloaded. Network and server failures retain an existing
+offline copy and remain observable through SDK diagnostics. A host without
+modification headers must send the current response because freshness cannot
+be established from a missing header.
+
+Complete resource responses remain in browser CacheStorage. DBOPFS stores one
+successful whole-cycle timestamp, updated only after the manifest and every
+selected resource have been checked successfully. A partial failure preserves
+the previous timestamp so the next page load can retry. Each cached response
+retains its own `Last-Modified` header, but there are no per-file check times.
+The SDK imposes no age-based cache deletion and
+retains resource bodies across app and SDK version changes. Requests for a page
+do not wait for the complete resource inventory to finish checking. The SDK
+uses at most four concurrent background resource requests and starts no timer
+or polling loop between page loads.
+
+During initial installation, selected resources are cached before the browser
+activates the worker. Failures remain observable through native worker state
+and SDK diagnostics. HTTP modification dates have second-level precision;
+hosts must report changes to the served representation, including generated
+output, rather than only the date of an unrelated source file.
 
 The SDK development server sends `Cache-Control: no-cache` for PWA resources.
-An independent static host must also revalidate stable HTML, module, style,
-import-map and worker URLs, and serve JavaScript with a JavaScript content type.
+An independent static host should support `Last-Modified` and conditional GET
+for stable HTML, module, style and import-map URLs, revalidate worker URLs, and
+serve JavaScript with a JavaScript content type.
 Keep the worker beside the deployment root it controls. The browser requires a
 supported secure context, such as trusted HTTPS or localhost, to register it.
 The SDK does not change certificates or browser permissions.
@@ -132,9 +191,15 @@ worker while they are open. Closing those pages allows activation; a refresh
 can leave overlapping document clients and keep the update waiting.
 
 The SDK does not call `skipWaiting`, claim the initial page, reload a page,
-restart a model or poll for updates. Activation retires only obsolete resource
-caches belonging to that exact app and registration scope. Saved application
-data and caches owned by other capabilities are untouched.
+restart a model or poll for updates. Worker activation preserves cached
+resources and the DBOPFS check history for the same app and registration scope.
+Saved application data and caches owned by other capabilities are untouched.
+
+When importing caches from an older SDK worker, the new worker fetches the
+SDK-owned registration bootstrap and PWA client once so the page can use the
+current cache-check protocol. Other cached resource bodies retain the normal
+check cadence. This transition follows native worker installation and
+activation without forcing a page reload.
 
 Switching a server from a packaged release to live development does not replace
 an already active release worker inside an open document. The same native

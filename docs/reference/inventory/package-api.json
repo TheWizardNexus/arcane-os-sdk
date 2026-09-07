@@ -2991,7 +2991,7 @@
       "entrypoints": ["arcane-os/pwa"],
       "primaryImport": "arcane-os/pwa",
       "group": "Progressive web applications",
-      "summary": "Starts PWA registration without blocking page rendering and returns an observable lifecycle owner.",
+      "summary": "Starts PWA registration and DBOPFS-backed page-load resource checks without blocking rendering, returning an observable lifecycle owner.",
       "availability": "Browser service workers; explicit unsupported state elsewhere",
       "protocol": "Native registration, updatefound, statechange and controllerchange events",
       "normalization": "Synchronous owner exposes ready, state, subscribe, update and dispose; current state replays by default, failures remain observable, disposal does not unregister the worker or delete saved data."

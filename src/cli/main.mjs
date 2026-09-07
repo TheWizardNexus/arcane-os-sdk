@@ -18,6 +18,7 @@ const VALUE_OPTIONS=new Set([
     'arcane-root',
     'host',
     'port',
+    'http-port',
     'cert',
     'key',
     'target',
@@ -64,7 +65,7 @@ Usage:
   ${CLI_NAME} upgrade [--workspace <directory>] [--app <id>]
   ${CLI_NAME} doctor [--workspace <directory>] [--arcane-root <directory>]
   ${CLI_NAME} import-map [--workspace <directory>] [--app <id>]
-  ${CLI_NAME} dev [--app <id>] [--public] [--https] [--cert <pem>] [--key <pem>] [--host <address>] [--port 8000] [--sdk-runtime-source <sdk-root>]
+  ${CLI_NAME} dev [--app <id>] [--public] [--https] [--cert <pem>] [--key <pem>] [--host <address>] [--port 8000] [--http-port 0] [--sdk-runtime-source <sdk-root>]
   ${CLI_NAME} test [--app <id>] [--scope app]
   ${CLI_NAME} test --scope shared --test-file <repo-relative.test.mjs>
   ${CLI_NAME} check [--app <id>] [--scope app] [--skip-tests]
@@ -76,7 +77,7 @@ Usage:
   ${CLI_NAME} native-doctor --target <native-target> --arcane-root <directory>
   ${CLI_NAME} native-prepare --target <native-target> --arcane-root <directory>
   ${CLI_NAME} build --target <target> [--arcane-root <directory>] [--output-root <directory>] [--format <format>] [--signing <mode>]
-  ${CLI_NAME} run [--target <target>] [--app <id>] [--arcane-root <directory>] [--output-root <directory>] [--format <format>] [--signing <mode>]
+  ${CLI_NAME} run [--target <target>] [--app <id>] [--cert <pem>] [--key <pem>] [--port 8000] [--http-port 0] [--arcane-root <directory>] [--output-root <directory>] [--format <format>] [--signing <mode>]
   ${CLI_NAME} update-check
   ${CLI_NAME} targets
   ${CLI_NAME} repo status|pull|push
@@ -88,9 +89,10 @@ Usage:
 
 Development:
   --public                      Serve HTTPS on all IPv4 interfaces (0.0.0.0) and print network URLs.
-  --https                       Use HTTPS with .arcane/dev/server-cert.pem and server-key.pem.
+  --https                       Accepted for compatibility; Arcane browser serving always uses HTTPS.
   --cert <pem> --key <pem>        Use an existing certificate pair; paths are relative to the workspace.
   --host <address>               Override the bind address; takes precedence over --public.
+  --http-port <port>             Browser dev/run HTTP redirect port; 0 selects an available port (default).
   --sdk-runtime-source <sdk-root>  Dev-only live SDK checkout; omitted preserves the workspace runtime mode.
 
 Global:
@@ -456,9 +458,25 @@ function operationOptions(command,parsed,cwd){
     if(flags.has('public')&&command!=='dev'){
         usage('--public is supported only by dev.');
     }
-    if((flags.has('https')||values.cert!==undefined||values.key!==undefined)&&command!=='dev'){
-        usage('--https, --cert, and --key are supported only by dev.');
+    const browserServing = command === 'dev'
+        || (command === 'run' && (values.target ?? 'browser') === 'browser');
+    if ((flags.has('https') || values.cert !== undefined || values.key !== undefined) && !browserServing) {
+        usage('--https, --cert, and --key are supported only by dev and run --target browser.');
     }
+    if (values['http-port'] !== undefined && !browserServing) {
+        usage('--http-port is supported only by dev and run --target browser.');
+    }
+    if (browserServing && (values.cert === undefined) !== (values.key === undefined)) {
+        usage('Arcane HTTPS serving requires --cert and --key together.');
+    }
+    const browserServerOptions = browserServing ? {
+        https: true,
+        httpPort: readPort(values['http-port'], 0),
+        ...(values.cert === undefined ? {} : {
+            certPath: path.resolve(workspaceRoot, values.cert),
+            keyPath: path.resolve(workspaceRoot, values.key)
+        })
+    } : {};
     if(flags.has('overwrite')&&command!=='bundle'){
         usage('--overwrite is supported only by bundle.');
     }
@@ -518,18 +536,11 @@ function operationOptions(command,parsed,cwd){
     }
     if(command==='dev'){
         noExtraPositionals(command,positionals);
-        if((values.cert===undefined)!==(values.key===undefined)){
-            usage('HTTPS development requires --cert and --key together.');
-        }
         return {
             ...common,
+            ...browserServerOptions,
             host:values.host??(flags.has('public')?'0.0.0.0':'127.0.0.1'),
             port:readPort(values.port,8000),
-            https:flags.has('public')||flags.has('https')||values.cert!==undefined,
-            ...(values.cert===undefined?{}:{
-                certPath:path.resolve(workspaceRoot,values.cert),
-                keyPath:path.resolve(workspaceRoot,values.key)
-            }),
             ...(values['sdk-runtime-source']===undefined?{}:{
                 sdkRuntimeSourceRoot:path.resolve(cwd,values['sdk-runtime-source'])
             })
@@ -609,6 +620,7 @@ function operationOptions(command,parsed,cwd){
         noExtraPositionals(command,positionals);
         return {
             ...common,
+            ...browserServerOptions,
             target:values.target??'browser',
             arcaneRoot:values['arcane-root']?path.resolve(cwd,values['arcane-root']):undefined,
             outputRoot:values['output-root']?path.resolve(cwd,values['output-root']):undefined,
@@ -853,6 +865,9 @@ function serverSummary(result){
         host:result.host,
         port:result.port,
         url:result.url,
+        ...(result.httpPort===undefined?{}:{httpPort:result.httpPort}),
+        ...(result.httpOrigin===undefined?{}:{httpOrigin:result.httpOrigin}),
+        ...(result.httpUrl===undefined?{}:{httpUrl:result.httpUrl}),
         ...(result.protocol===undefined?{}:{protocol:result.protocol}),
         ...(result.networkUrls===undefined?{}:{networkUrls:result.networkUrls}),
         ...(result.callerAuthentication
@@ -867,6 +882,7 @@ function serverSummary(result){
 async function waitForServer(result,signal,reporter){
     const readyMessage=[
         `Development server ready at ${result.url}`,
+        ...(result.httpUrl ? [`HTTP redirect: ${result.httpUrl}`] : []),
         ...(result.networkUrls??[]).map(function networkAddress(url){return `Network: ${url}`;})
     ].join('\n');
     reporter.emit('server.ready',serverSummary(result),readyMessage);

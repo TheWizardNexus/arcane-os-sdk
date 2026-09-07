@@ -95,6 +95,15 @@ settles it: an exact matching executed, declined, cancelled, or not-executed
 - Applications use a browser-first plain HTML, CSS, and JavaScript baseline. Native targets progressively enhance that same application through explicitly available Arcane Core capabilities; ordinary browser development must not depend on native or Core access.
 - Keep development increments small and independently understandable so each observed change has one clear cause and mistakes remain easy to isolate. Development commands do not automatically run tests, checks, packaging, or distribution work. Run tests or checks only when the user explicitly requests them or when building, verifying, or releasing a selected `dist`, package, artifact, or other release output.
 - For rapid browser development, use `arcane dev`. It serves the selected application's canonical source files with the live mapped SDK/runtime dependencies, so saved source changes appear on browser refresh without packaging, copying files into `dist`, or restarting the server.
+- Development and packaged-preview HTTPS serving use RIAEvangelist's
+  `node-http-server` through its published public interface, as explicitly
+  selected by the user. Keep SDK source mappings and generated representations
+  here; reuse the module's existing static-file and conditional-request behavior.
+  Do not replace the selected module with a custom Node HTTP serving stack.
+  Every Arcane app serves its content over HTTPS, including localhost and
+  packaged browser previews. The SDK redirects its paired HTTP listener with
+  status 308 through the public request hook. Keep all module source changes
+  and release operations inside that module's owning project.
 - Native and executable development uses an Arcane-owned, capability-gated wrapper as an escalated browser around those same source files. It adds only the app-declared local Core access needed for progressive enhancement and does not package, serve `dist`, or run tests automatically.
 - Distribution does not silently add testing or hardening authority. Run only
   checks that the user explicitly requests or that an explicitly selected

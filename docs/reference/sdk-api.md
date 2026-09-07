@@ -3459,6 +3459,15 @@ async function useselectApp(...arguments_) {
 
 Starts one owned browser development server with exact runtime/app route mappings and a caller-selected bind address.
 
+HTTPS serving uses the published `node-http-server` module. The SDK
+selects source routes and supplies generated representations; the module owns
+static-file conditional GET/HEAD handling and response delivery. The SDK
+retains modification dates for its generated representations. Unchanged
+resources can return `304` with no body while changed resources return their
+complete current representation. PEM-path listeners use module deployment;
+explicit raw `tls` options retain native HTTPS transport with the same module
+response and static-file operations.
+
 ### Signature, modes, and result
 
 ```text
@@ -3466,53 +3475,64 @@ async startDevServer(options={})
 ```
 
 Import it from `arcane-os`. Source mode accepts
-`{workspaceRoot=process.cwd(), appId, mode='source', host='127.0.0.1', port=0,
-https=false, certPath, keyPath, tls, signal, onEvent}` and serves one validated
+`{workspaceRoot=process.cwd(), appId, mode='source', host='127.0.0.1', port=0, httpPort=0,
+certPath, keyPath, tls, signal, onEvent}` and serves one validated
 workspace application plus its complete SDK or integrated runtime. Packaged mode uses
-`{mode:'packaged', releaseRoot, host, port, signal, onEvent}` and serves the
-complete selected release files. `host` defaults to `127.0.0.1` and accepts an
+`{mode:'packaged', releaseRoot, workspaceRoot, host, port, httpPort, certPath, keyPath, tls,
+signal, onEvent}` and serves the complete selected release files.
+`host` defaults to `127.0.0.1` and accepts an
 explicit network address or hostname. Use `0.0.0.0` for all IPv4 interfaces or
-`::` for the platform's IPv6 wildcard listener; port `0` asks the operating
-system for an available port.
+`::` for the platform's IPv6 wildcard listeners. `port` selects the HTTPS
+application port, and `httpPort` selects the paired HTTP redirect port. Each
+defaults to `0`, which asks the operating system for an available port.
+The SDK request hook returns `308` for HTTP with a `Location` pointing to the
+actual HTTPS port while preserving the original request path and query. Both listeners
+use the selected host.
 
-`https:true` reads `.arcane/dev/server-cert.pem` and
+Every source server and packaged browser preview enforces HTTPS, including
+localhost. The legacy `https` option is accepted but cannot disable it.
+Startup reads `.arcane/dev/server-cert.pem` and
 `.arcane/dev/server-key.pem` relative to `workspaceRoot` unless explicit
-`certPath` and `keyPath` are supplied together. The path pair also selects
-HTTPS without `https:true`; relative paths resolve from the workspace. A
-direct `tls` object instead supplies Node HTTPS server options, including
+`certPath` and `keyPath` are supplied together; relative paths resolve from the
+workspace. A direct `tls` object instead supplies Node HTTPS server options, including
 `cert` and `key`, without reading certificate files. Keep private material
 server-side. Missing PEM files and Node certificate/key parse errors reject
 startup without falling back to HTTP. Node owns TLS option handling and the
 handshake; browser trust and address matching are evaluated when a client
-connects. The CLI's `--public` selects HTTPS and the wildcard bind;
+connects. The CLI's `--public` selects the wildcard bind;
 the API's `host` option alone changes only the bind address.
 
-The promise settles after the listener is ready and resolves to
+The promise settles after both listeners are ready and resolves to
 `{server, protocol, mode, workspaceRoot, appId, host, port, origin, cleanUrl, url,
-networkUrls, close, closed, lifecycle}`. `server` is the raw Node HTTP or HTTPS
-server; `protocol` is `'http:'` or `'https:'`.
+networkUrls, httpPort, httpOrigin, httpUrl, close, closed, lifecycle}`. `server` is the raw Node HTTPS
+server; `protocol` is `'https:'`.
 `url` and `cleanUrl` are the same application URL. Wildcard listeners use
 `localhost` in that local URL; `host` retains the actual bound address.
+`httpPort` is the actual HTTP listener port, `httpOrigin` is its HTTP origin,
+and `httpUrl` combines that origin with the application start path. These
+fields identify the redirect endpoint; `origin`, `url`, `cleanUrl`, and
+`networkUrls` identify HTTPS application endpoints.
 `networkUrls` lists application URLs for applicable non-loopback interface
 addresses discovered once at startup. These URLs are connection candidates,
 not evidence of reachability from another device. The server adds no session
 capability or authentication. In packaged mode, `workspaceRoot` and `appId`
 are `null`.
 
-All returned application URLs use the selected transport's scheme. The server
-reads one PEM pair per startup and does not create certificates or modify trust
-stores. Each client must trust the issuing CA and open an address covered by the
+PEM-path startup reads the selected pair. The server does not create
+certificates or modify trust stores. Each client must trust the issuing CA and open an address covered by the
 server certificate. Lifecycle events and CLI summaries exclude TLS options and
 private key contents. See [development HTTPS setup](cli.md#development-https-setup).
 
-Starting the server opens the selected listener and emits awaited,
-backpressured `server.starting` and `server.started` events. Request failures
-emit `server.request.failed`; shutdown emits `server.stopped` after owned
+Starting the server opens both selected listeners and emits awaited,
+backpressured `server.starting` and `server.started` events. `server.started`
+includes `httpPort`, `httpOrigin`, and `httpUrl` alongside the HTTPS endpoint.
+Request failures emit `server.request.failed`; shutdown emits `server.stopped` after owned
 requests and event delivery drain. Call `await result.close()` in a `finally`
 block, or abort `signal`; `close()` is idempotent and returns the
-same settlement represented by both `closed` and `lifecycle`. A listener error
-or event-callback failure closes the server and rejects its lifecycle. Invalid
-mode/host/port, malformed workspace or release content, an occupied port,
+same settlement represented by both `closed` and `lifecycle`. Closing the
+operation closes both listeners. An error from either listener or an
+event-callback failure closes both and rejects the lifecycle. Invalid
+mode/host/port/httpPort, malformed workspace or release content, an occupied port,
 or an already-aborted signal rejects startup.
 
 ### Availability and normalization
@@ -3907,9 +3927,16 @@ async function usedescribeTargets(...arguments_) {
 Starts one owned browser development server for the selected application.
 
 `https`, `certPath`, `keyPath`, and `tls` follow the
-[`startDevServer()` TLS contract](#startdevserver), alongside `host` and `port`.
-The operation refreshes the selected app's managed import maps once, then owns
-one source listener and returns its protocol, URLs, and shutdown lifecycle.
+[`startDevServer()` TLS contract](#startdevserver), alongside `host`, `port`, and
+`httpPort`. `port` selects HTTPS and `httpPort` selects the HTTP `308` redirect
+listener; each defaults to an available port.
+The operation refreshes the selected authored descriptor's `arcane-package.json`
+projection and managed import maps under one development-refresh lock, then
+releases that lock before opening the HTTPS source listener and its HTTP
+redirect listener. It returns both endpoints and their shared shutdown
+lifecycle. Legacy package-only apps remain unchanged. The operation generates
+no packaged output; enabled PWA manifests
+are served directly from the selected source resources.
 
 ### Signature and result
 
@@ -6074,6 +6101,13 @@ current-state subscriptions. Importing the constant does not register a worker.
 registration and returns a synchronous owner with `ready`, `state`, `subscribe`,
 `update` and `dispose`. It does not block page rendering or load models.
 Unsupported environments receive an explicit unsupported state.
+
+The generated page bootstrap also starts the SDK's background resource check.
+It stores one `lastChecked` timestamp per app/cache in DBOPFS, advancing it only
+after the full resource check succeeds, and revalidates on page load after
+120 seconds in development or 15 minutes in packaged delivery. Complete
+responses remain cached without SDK expiration; `304` retains the response
+and a successful replacement updates it. See the [PWA guide](pwa.md).
 
 ### Example
 

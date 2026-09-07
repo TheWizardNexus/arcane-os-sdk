@@ -48,10 +48,11 @@ meaning and cardinality rules:
 | `--workspace` | directory | Commands that select an external or integrated workspace; defaults to `.`. |
 | `--app` | app id | Workspace/app operations except shared scope and `verify-bundle`; also the exact `mail serve` caller id. |
 | `--arcane-root` | directory | `doctor`, native `build`/`run`, `native-doctor`, `native-prepare` |
-| `--host` / `--port` | host / integer 0–65535 | Browser `dev`/`run` default to `127.0.0.1:8000`; `mail serve` defaults to `127.0.0.1:8025` and admits numeric loopback only. |
+| `--host` / `--port` | host / integer 0–65535 | Browser `dev`/`run` default to HTTPS at `127.0.0.1:8000`; `mail serve` defaults to HTTP at `127.0.0.1:8025` and admits numeric loopback only. |
+| `--http-port` | integer 0–65535 | Browser `dev`/`run` HTTP redirect listener; defaults to `0`, which selects an available port. |
 | `--public` | flag | `dev`; serves HTTPS and binds to `0.0.0.0` unless `--host` explicitly selects another address. |
-| `--https` | flag | `dev`; serves HTTPS with the configured or default workspace PEM pair. |
-| `--cert` / `--key` | PEM file paths | `dev`; supply both to select HTTPS with an explicit certificate chain and private key. Relative paths resolve from the workspace. |
+| `--https` | flag | Browser `dev`/`run`; retained explicitly, while HTTPS is always enabled. |
+| `--cert` / `--key` | PEM file paths | Browser `dev`/`run`; supply both for an explicit certificate chain and private key. Relative paths resolve from the workspace. |
 | `--target` | target id | `new`, `init`, native diagnostics, `build`, `run` |
 | `--format` / `--signing` | target-supported values | Native diagnostics, `build`, `run` |
 | `--output-root` | directory | Native `build` and `run` |
@@ -311,7 +312,7 @@ npm exec -- arcane upgrade --workspace . --app hello-world
 ### Overview
 
 Starts one development server for one selected app and maps the exact
-workspace/runtime routes. It defaults to localhost; `--public` enables access
+workspace/runtime routes. It defaults to HTTPS on localhost; `--public` enables access
 from other devices on the network over HTTPS.
 
 For an external workspace, the server exposes the selected projected
@@ -321,10 +322,18 @@ The explicit live-source SDK mapping remains unchanged and does not replace the
 installed projection.
 
 ```text
-arcane dev [--app <id>] [--public] [--https] [--cert <file> --key <file>] [--host <address>] [--port 8000]
+arcane dev [--app <id>] [--public] [--https] [--cert <file> --key <file>] [--host <address>] [--port 8000] [--http-port 0]
 ```
 
 ### Lifecycle
+
+Startup refreshes the selected authored `arcane-app.json` projection into
+`arcane-package.json`, then refreshes its managed import maps under one
+development-refresh operation lock. The lock is released before the server
+starts. Package-only apps retain their existing manifest. This operation does
+not package the app or produce `dist` output. With PWA enabled, the server
+generates the installation and offline manifests directly; see
+[PWA development and versioning](pwa.md#development-and-hosting).
 
 The command reports acceptance before bind/start work, emits the final URL,
 owns the server until cancellation, and restores failure to the process exit.
@@ -335,25 +344,33 @@ device, since `localhost` refers to that device and `0.0.0.0` is a bind address.
 Network URLs come from one interface snapshot at startup and do not establish
 remote reachability through the machine's firewall or network.
 
-Public mode also selects HTTPS. Plain localhost development stays HTTP.
-`--https` selects HTTPS without changing the bind address; supplying both
-`--cert` and `--key` also selects HTTPS. The command does not configure a
-firewall, router forwarding, or an internet tunnel.
+Every Arcane app uses HTTPS for development and packaged browser previews.
+`--https` remains accepted but is no longer needed to select the transport.
+`--port` selects the HTTPS application port. A second HTTP listener returns
+`308` redirects to that HTTPS port, preserving the requested path and query.
+`--http-port` selects its port; the default `0` lets the operating system choose
+an available port. Both listeners use the selected host and must be ready
+before startup completes. Cancellation or a listener failure closes both.
+Human output prints `HTTP redirect: <url>` alongside the HTTPS application URL;
+JSON/NDJSON server results include `httpPort`, `httpOrigin`, and `httpUrl` for
+the redirect endpoint.
+Supplying both `--cert` and `--key` selects an explicit PEM pair. The command
+does not configure a firewall, router forwarding, or an internet tunnel.
 
 ### Development HTTPS setup
 
-Before starting public mode, place the development server's PEM certificate
-chain at `.arcane/dev/server-cert.pem` and its PEM private key at
+Before starting `arcane dev` or a packaged browser preview, place the server's
+PEM certificate chain at `.arcane/dev/server-cert.pem` and its PEM private key at
 `.arcane/dev/server-key.pem`, relative to the workspace. Alternatively, pass
-`--cert <file> --key <file>` together. The certificate must cover the LAN IP
+`--cert <file> --key <file>` together. The certificate must cover localhost or the LAN IP
 address or hostname opened by each device. Certificate creation and renewal
 belong to the developer's certificate tooling; the server does not generate a
 CA or alter device trust stores. Keep `.arcane/dev/` ignored by Git and keep the
 private key on the development computer.
 
-The server reads the selected pair once asynchronously per startup, before
-binding. Missing files or certificate/key parse errors produce a startup error; public
-mode never silently falls back to HTTP. Certificate/key contents are not
+The server reads the selected pair during startup, before binding.
+Missing files or certificate/key parse errors produce a startup error;
+Arcane never silently falls back to HTTP. Certificate/key contents are not
 included in operation events or JSON/NDJSON output. Restart the server after
 replacing its certificate pair; ordinary app source edits still appear on
 refresh without restarting.
@@ -383,6 +400,9 @@ npm run dev -- --app hello-world --public
 
 # Equivalent direct CLI invocation, with an optional port.
 npm exec -- arcane dev --app hello-world --public --port 8000
+
+# Select a stable HTTP entry that redirects to HTTPS on port 8000.
+npm exec -- arcane dev --app hello-world --port 8000 --http-port 8080
 ```
 
 ## `arcane test`
@@ -617,11 +637,17 @@ npm exec -- arcane build \
 
 For `--target browser`, starts the existing current `dist/<app>` release; it
 does not package, rebuild, test, check, or verify that release automatically.
+The preview always uses HTTPS with the workspace certificate pair. Supply
+`--cert <file> --key <file>` together to use another pair; see
+[development HTTPS setup](#development-https-setup).
+`--port` selects the HTTPS application port, and `--http-port` selects the
+paired HTTP `308` redirect port. The HTTP port defaults to an available port;
+the CLI prints its actual redirect URL and reports both listener endpoints.
 For a paired native target, it performs package, prepare, plan, build, launch,
 readiness, and owned cancellation in one process.
 
 ```text
-arcane run [--target <target>] [--app <id>] [--arcane-root <directory>] [--output-root <directory>] [--format <format>] [--signing <mode>]
+arcane run [--target <target>] [--app <id>] [--cert <file> --key <file>] [--port 8000] [--http-port 0] [--arcane-root <directory>] [--output-root <directory>] [--format <format>] [--signing <mode>]
 ```
 
 ### Availability

@@ -19,15 +19,17 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This checkout defines the `0.11.3` SDK contract. Applications pin one exact npm
+This checkout defines the `0.12.0` SDK contract. Applications pin one exact npm
 version and lockfile; registry state is deliberately not baked into application
 artifacts.
 
 Applications can enable [PWA installation and offline resources](docs/reference/pwa.md)
 through their app descriptor. The SDK generates manifests, an independent
 registration module and a service worker, with clean browser resource URLs,
-live-source revalidation and selected release caches. Apps retain ownership of
-branding, offline page selection and network-dependent product behavior.
+page-load revalidation and persistent resource caches. The SDK records one
+completed-check timestamp per app/cache in DBOPFS and checks after 120 seconds
+in development or 15 minutes in packaged browser delivery. Apps retain ownership
+of branding, offline page selection and network-dependent product behavior.
 
 That registry query is a maintainer action, not an application behavior. Apps
 never poll npm for SDK updates or replace their own SDK or synchronized runtime.
@@ -41,9 +43,15 @@ Create one browser application, install its pinned SDK, and start its source
 server:
 
 ```bash
-npx arcane-os@0.11.3 new hello-speech --path ./hello-speech --target browser
+npx arcane-os@0.12.0 new hello-speech --path ./hello-speech --target browser
 cd hello-speech
 npm install
+```
+
+Configure the workspace's HTTPS certificate pair as described in
+[development HTTPS setup](docs/reference/cli.md#development-https-setup), then start:
+
+```bash
 npm run dev
 ```
 
@@ -62,9 +70,12 @@ each device. Keep these local files ignored by Git. The same certificate pair
 works for any selected app in that workspace. The command reports missing TLS
 files instead of starting an HTTP listener.
 
-Plain `npm run dev` keeps its HTTP localhost default. An explicit `--host`
-overrides the public bind address, and `--port` selects the port. Use `--https`
-for HTTPS on localhost, or `--cert <file> --key <file>` for an explicit PEM pair;
+Every Arcane app uses HTTPS for development and packaged browser previews.
+Plain `npm run dev` binds to localhost with the same workspace certificate pair.
+An explicit `--host` overrides the bind address, and `--port` selects the HTTPS port.
+The paired HTTP listener returns 308 redirects and uses an OS-assigned port
+unless selected with `--http-port`. The command prints its redirect URL.
+Use `--cert <file> --key <file>` for an explicit PEM pair;
 relative paths resolve from the workspace. The server prints HTTPS network URLs
 for public mode. Network reachability depends on the machine's firewall and
 network. See the [development HTTPS setup](docs/reference/cli.md#development-https-setup)
@@ -392,7 +403,7 @@ uses the same controller for automatic memory extraction.
 Create a new repository-shaped Arcane application with the exact stable SDK:
 
 ```bash
-npx arcane-os@0.11.3 new my-app --path ./my-app --target portable --git
+npx arcane-os@0.12.0 new my-app --path ./my-app --target portable --git
 cd my-app
 npm install
 npm run dev
@@ -402,7 +413,7 @@ To enroll an existing repository, install the exact SDK and initialize only
 missing Arcane files:
 
 ```bash
-npm install --save-dev --save-exact arcane-os@0.11.3
+npm install --save-dev --save-exact arcane-os@0.12.0
 npm exec -- arcane init my-app --target portable
 ```
 
@@ -418,7 +429,7 @@ npm exec -- arcane-os targets
 No global SDK install or standalone Arcane CLI is required. The application
 repository's exact npm dependency and lockfile own the CLI and toolchain version.
 
-Use `npx arcane-os@0.11.3` for the initial bootstrap because it names this npm
+Use `npx arcane-os@0.12.0` for the initial bootstrap because it names this npm
 package explicitly; bare `npx arcane` outside an installed project could resolve
 a different package. Both installed commands invoke the same headless toolchain.
 Project-local npm scripts use the SDK pinned by that app's `package-lock.json`,
@@ -438,7 +449,7 @@ node ./bin/arcane.mjs new local-app --path ../local-app --target portable --git
 
 # From the generated app repository
 cd ../local-app
-npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.11.3.tgz
+npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.12.0.tgz
 npm ci
 ```
 
@@ -447,7 +458,7 @@ same location. The lockfile retains the selected package dependency while
 Arcane uses the installed package name and version. Local directory `file:` dependencies are not
 accepted because npm may install them as links; use a packed `.tgz`. A GitHub
 runner also needs that tarball at the locked path. After publication, replace
-the local declaration with the exact `arcane-os@0.11.3` registry package and
+the local declaration with the exact `arcane-os@0.12.0` registry package and
 commit the regenerated lock.
 
 Generated repositories use `npm ci --ignore-scripts` in CI. Run dependency
@@ -586,7 +597,7 @@ package installation, or assertions.
 
 ## Current target support
 
-Version `0.11.3` exposes one browser target and five explicitly paired
+Version `0.12.0` exposes one browser target and five explicitly paired
 native development targets: a non-runnable portable directory, a
 Windows x64 unsigned-local-test EXE bundle, Linux x64 and Linux ARM64
 unsigned-local-test DEBs, and an Android development-signed APK. The
