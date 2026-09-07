@@ -94,6 +94,29 @@ function setupNavigation() {
   });
 }
 
+function setupBackToTop({ message }) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "back-to-top";
+  button.textContent = message;
+  button.hidden = true;
+
+  const updateBackToTopVisibility = () => {
+    button.hidden = window.scrollY <= 400;
+  };
+
+  const returnToTop = () => {
+    document.querySelector(".site-header .brand")?.focus({ preventScroll: true });
+    // The shared scroll styles respect the reader's reduced-motion preference.
+    window.scrollTo({ top: 0, behavior: "auto" });
+  };
+
+  button.addEventListener("click", returnToTop);
+  document.body.append(button);
+  window.addEventListener("scroll", updateBackToTopVisibility, { passive: true });
+  updateBackToTopVisibility();
+}
+
 function setupPlayground() {
   const form = document.querySelector("[data-playground-form]");
   const workspace = document.querySelector("[data-playground-workspace]");
@@ -367,6 +390,7 @@ function setupSpaceMotion() {
 }
 
 setupNavigation();
+setupBackToTop({ message: "Back to top" });
 setupCopyButtons();
 setupPlayground();
 setupSpaceMotion();

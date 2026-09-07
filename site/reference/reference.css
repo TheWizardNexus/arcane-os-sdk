@@ -360,46 +360,6 @@
   }
 }
 
-@media (max-width: 1200px) {
-  .site-header .nav-toggle {
-    display: block;
-    cursor: pointer;
-  }
-
-  .site-header .primary-navigation {
-    position: absolute;
-    top: calc(100% + 1px);
-    right: 14px;
-    left: 14px;
-    display: none;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 4px;
-    padding: 12px;
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    background: rgb(5 12 28 / 0.98);
-    box-shadow: var(--shadow);
-  }
-
-  .site-header .primary-navigation.is-open {
-    display: flex;
-  }
-
-  .site-header .primary-navigation a {
-    padding: 10px 12px;
-    border-radius: 10px;
-  }
-
-  .site-header .primary-navigation a:hover {
-    background: rgb(127 142 255 / 0.08);
-  }
-
-  .site-header .primary-navigation .repo-link {
-    margin-top: 5px;
-  }
-}
-
 @media (max-width: 980px) {
   .reference-sidebar {
     max-height: none;

@@ -412,46 +412,6 @@ const referenceCss=String.raw`.reference-prose {
   }
 }
 
-@media (max-width: 1200px) {
-  .site-header .nav-toggle {
-    display: block;
-    cursor: pointer;
-  }
-
-  .site-header .primary-navigation {
-    position: absolute;
-    top: calc(100% + 1px);
-    right: 14px;
-    left: 14px;
-    display: none;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 4px;
-    padding: 12px;
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    background: rgb(5 12 28 / 0.98);
-    box-shadow: var(--shadow);
-  }
-
-  .site-header .primary-navigation.is-open {
-    display: flex;
-  }
-
-  .site-header .primary-navigation a {
-    padding: 10px 12px;
-    border-radius: 10px;
-  }
-
-  .site-header .primary-navigation a:hover {
-    background: rgb(127 142 255 / 0.08);
-  }
-
-  .site-header .primary-navigation .repo-link {
-    margin-top: 5px;
-  }
-}
-
 @media (max-width: 980px) {
   .reference-sidebar {
     max-height: none;
@@ -1465,19 +1425,18 @@ function renderPage({
     const siteHome=relativeOutputHref(output,'site/index.html');
     const referenceHome=relativeOutputHref(output,'site/reference/index.html');
     const canonical=canonicalUrl(route);
-    const stylesheet=relativeOutputHref(output,'site/styles.css');
-    const referenceStylesheet=relativeOutputHref(output,referenceCssOutput);
-    const script=relativeOutputHref(output,'site/app.js');
+    const stylesheet=`${relativeOutputHref(output,'site/styles.css')}?v=back-to-top`;
+    const referenceStylesheet=`${relativeOutputHref(output,referenceCssOutput)}?v=visible-toolbar`;
+    const script=`${relativeOutputHref(output,'site/app.js')}?v=back-to-top`;
     const referenceScriptHref=relativeOutputHref(output,referenceScriptOutput);
     const icon=relativeOutputHref(output,'site/assets/arcane-sigil-512.png');
     const headerImage=`${canonicalRoot}assets/arcane-os-sdk-readme-header.png`;
     const guides=relativeOutputHref(output,'site/guides/index.html');
     const examples=relativeOutputHref(output,'site/examples/index.html');
-    const playground=relativeOutputHref(output,'site/playground/index.html');
-    const testing=relativeOutputHref(output,'site/testing/index.html');
     const architecture=relativeOutputHref(output,'site/architecture/index.html');
     const compatibility=relativeOutputHref(output,'site/compatibility/index.html');
     const sdkApi=relativeOutputHref(output,'site/reference/sdk-api/index.html');
+    const isSdkApi=output==='site/reference/sdk-api/index.html';
     const compactTableOfContents=tableOfContents.length
         ?`<details class="reference-toc-compact"><summary>On this page</summary>${tableOfContentsHtml(tableOfContents)}</details>`
         :'';
@@ -1494,7 +1453,7 @@ function renderPage({
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
-  <header class="site-header" data-site-header><a class="brand" href="${escapeHtml(siteHome)}" aria-label="Arcane OS SDK documentation home"><img src="${escapeHtml(icon)}" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="${escapeHtml(siteHome)}">Overview</a><a href="${escapeHtml(guides)}">Guides</a><a href="${escapeHtml(examples)}">Examples</a><a href="${escapeHtml(playground)}">Playground</a><a href="${escapeHtml(testing)}">Testing</a><a href="${escapeHtml(referenceHome)}" aria-current="page">Reference</a><a class="repo-link" href="${escapeHtml(sdkApi)}">API</a></nav></header>
+  <header class="site-header" data-site-header><a class="brand" href="${escapeHtml(siteHome)}" aria-label="Arcane OS SDK documentation home"><img src="${escapeHtml(icon)}" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="${escapeHtml(examples)}">Hello World</a><a href="${escapeHtml(guides)}">Guides</a><a href="${escapeHtml(sdkApi)}"${isSdkApi?' aria-current="page"':''}>API</a><a href="${escapeHtml(referenceHome)}"${isSdkApi?'':' aria-current="page"'}>Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
     <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb">${breadcrumbsHtml({output,title,source,kind})}</nav><p class="eyebrow">Capability first · transport second</p><h1 id="${escapeHtml(titleId)}">${escapeHtml(title)}</h1><p class="doc-lead">${escapeHtml(description)}</p><div class="doc-meta"><span>SDK ${publishedVersions.sdk}</span><span>Runtime ${publishedVersions.runtime}</span><span>Protocol ${publishedVersions.protocol}</span></div></header>
     <div class="docs-layout section-shell">

@@ -186,8 +186,10 @@ code {
   z-index: 100;
   top: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: 10px 24px;
   min-height: var(--header-height);
   padding: 12px max(20px, calc((100vw - 1180px) / 2));
   border-bottom: 1px solid transparent;
@@ -246,6 +248,7 @@ code {
 }
 
 .primary-navigation a {
+  white-space: nowrap;
   transition: color 150ms ease;
 }
 
@@ -278,6 +281,38 @@ code {
   margin: 4px 0;
   border-radius: 99px;
   background: var(--text);
+}
+
+.back-to-top {
+  position: fixed;
+  z-index: 90;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: rgb(10 20 44 / 0.98);
+  color: var(--text);
+  box-shadow: 0 4px 20px rgb(0 0 0 / 0.3);
+  font-size: 0.875rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.back-to-top::after {
+  content: "\2191";
+}
+
+.back-to-top:hover {
+  border-color: var(--gold);
+}
+
+.back-to-top[hidden] {
+  display: none;
 }
 
 .hero {
@@ -560,7 +595,7 @@ code {
 .sigil-core {
   position: absolute;
   z-index: 3;
-  inset: 21%;
+  inset: 24%;
   display: grid;
   place-items: center;
 }
@@ -569,6 +604,9 @@ code {
   position: relative;
   z-index: 1;
   width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
   border-radius: 32%;
   filter: drop-shadow(0 0 24px rgb(139 150 255 / 0.4));
 }
@@ -669,12 +707,10 @@ code {
 }
 
 .system-label {
-  position: absolute;
+  position: relative;
   z-index: 5;
-  right: 20%;
-  bottom: -5px;
-  left: 20%;
-  margin: 0;
+  margin: 20px 0 0;
+  padding-inline: 16px;
   color: var(--muted);
   font-size: 0.72rem;
   letter-spacing: 0.14em;
@@ -1290,7 +1326,7 @@ tbody tr:last-child td {
   grid-template-columns: auto 1fr auto;
   gap: 30px;
   align-items: center;
-  padding-block: 32px;
+  padding-block: 32px 88px;
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 0.75rem;
@@ -1444,6 +1480,11 @@ tbody tr:last-child td {
 .prose {
   min-width: 0;
   color: rgb(198 211 239);
+}
+
+.prose pre {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .prose > section {
@@ -2182,42 +2223,14 @@ tbody tr:last-child td {
     padding-inline: 15px;
   }
 
-  .nav-toggle {
-    display: block;
-    cursor: pointer;
-  }
-
   .primary-navigation {
-    position: absolute;
-    top: calc(100% + 1px);
-    right: 14px;
-    left: 14px;
-    display: none;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 4px;
-    padding: 12px;
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    background: rgb(5 12 28 / 0.98);
-    box-shadow: var(--shadow);
-  }
-
-  .primary-navigation.is-open {
-    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    width: 100%;
   }
 
   .primary-navigation a {
-    padding: 10px 12px;
-    border-radius: 10px;
-  }
-
-  .primary-navigation a:hover {
-    background: rgb(127 142 255 / 0.08);
-  }
-
-  .primary-navigation .repo-link {
-    margin-top: 5px;
+    padding-block: 10px;
   }
 
   .hero {
@@ -2322,10 +2335,6 @@ tbody tr:last-child td {
   .hero-system {
     width: 100%;
     transform: none;
-  }
-
-  .system-label {
-    bottom: -14px;
   }
 
   .section-heading h2,
@@ -2545,6 +2554,7 @@ tbody tr:last-child td {
   }
 
   .site-header,
+  .back-to-top,
   .primary-navigation,
   .workflow-grid li,
   .readiness-card,
