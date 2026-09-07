@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.2
+
+- Rename the private mail configuration helper to `optionalTimeoutMs` so its
+  name describes the optional timeout duration it validates. Preserve accepted
+  values, defaults, and request lifecycle behavior.
+
 ## 0.15.1
 
 - Use the published `node-http-server` public lifecycle for the mail gateway.

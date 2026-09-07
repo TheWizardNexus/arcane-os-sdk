@@ -65,7 +65,7 @@ function positiveInteger(value,fallback,{label,allowZero=false}={}){
     return resolved;
 }
 
-function optionalTimerDelay(value,label){
+function optionalTimeoutMs(value,label){
     if(value===undefined||value===null) return null;
     if(!is.safeInteger(value)||value<1||value>MAX_NODE_TIMER_DELAY_MS){
         throw configurationError(
@@ -258,7 +258,7 @@ function normalizeConfiguration(options={}){
         apiKey:validateApiKey(options.apiKey),
         appKeyDigest:callerAuthentication.appKeyDigest,
         appId:validateAppId(options.appId),
-        bodyTimeoutMs:optionalTimerDelay(options.bodyTimeoutMs,'bodyTimeoutMs'),
+        bodyTimeoutMs:optionalTimeoutMs(options.bodyTimeoutMs,'bodyTimeoutMs'),
         errorRecipients,
         fetchImpl,
         from:validateFrom(options.from),
@@ -266,7 +266,7 @@ function normalizeConfiguration(options={}){
         callerAuthentication:callerAuthentication.callerAuthentication,
         onEvent:options.onEvent,
         port:portNumber(options.port,8025),
-        providerTimeoutMs:optionalTimerDelay(options.providerTimeoutMs,'providerTimeoutMs'),
+        providerTimeoutMs:optionalTimeoutMs(options.providerTimeoutMs,'providerTimeoutMs'),
         requestIdFactory:options.requestIdFactory??randomUUID,
         retryableDelayMs:positiveInteger(
             options.retryableDelayMs,
@@ -978,7 +978,7 @@ function normalizeDirectSendOptions(options){
         errorRecipients:[],
         fetchImpl,
         from:validateFrom(options.from),
-        providerTimeoutMs:optionalTimerDelay(options.providerTimeoutMs,'providerTimeoutMs'),
+        providerTimeoutMs:optionalTimeoutMs(options.providerTimeoutMs,'providerTimeoutMs'),
         requestIdFactory:options.requestIdFactory??randomUUID,
         retryableDelayMs:positiveInteger(
             options.retryableDelayMs,
