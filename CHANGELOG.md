@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.16.1
+
+- Remove raw script elements and inline event-handler attributes at the
+  `markdown-document` insertion boundary, including nested template contents.
+  Preserve literal fenced and inline code examples, formatting, navigation,
+  and asynchronous document loading. This targeted reader correction does not
+  provide a general-purpose HTML sanitizer or alter other Markdown consumers.
+
 ## 0.16.0
 
 - Make mail hosting domain-based: use the current browser origin by default,

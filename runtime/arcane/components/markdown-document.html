@@ -616,8 +616,8 @@
             return true;
         }
 
-        // MD.safeRendered owns Markdown rendering. The detached template keeps
-        // source-relative links and images coherent before insertion.
+        // MD renders Markdown; the detached fragment removes active script
+        // markup and resolves source-relative assets before insertion.
         const safeRendered=new MD(markdown).safeRendered;
         const fragment=renderedMarkdownFragment(safeRendered,sourceURL);
         const meaningful=Boolean(
@@ -647,6 +647,27 @@
     function renderedMarkdownFragment(html='',sourceURL=options.sourceURL){
         const template=document.createElement('template');
         template.innerHTML=html;
+
+        // Code examples are text nodes, so their literal markup stays intact.
+        // Visit nested template contents too, without reparsing cleaned HTML.
+        const pendingFragments=[template.content];
+        while(pendingFragments.length){
+            const fragment=pendingFragments.pop();
+            for(const element of fragment.querySelectorAll('*')){
+                if(element.localName.toLowerCase()==='script'){
+                    element.remove();
+                    continue;
+                }
+                for(const attribute of Array.from(element.attributes)){
+                    if(attribute.name.toLowerCase().startsWith('on')){
+                        element.removeAttributeNode(attribute);
+                    }
+                }
+                if(element.localName==='template'&&element.content){
+                    pendingFragments.push(element.content);
+                }
+            }
+        }
 
         for(const link of template.content.querySelectorAll('a[href]')){
             const originalHref=link.getAttribute('href')||'';
