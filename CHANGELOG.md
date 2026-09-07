@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.15.0
+
+- Add explicit `arcane dev --http` and source API `http:true` for HTTP
+  development, including LAN device use. Reuse `node-http-server` and the same
+  application, PWA, source-mapping and conditional-response routes without
+  certificate setup. Report the actual HTTP endpoint and own one listener's
+  readiness, cancellation, errors and shutdown.
+- Preserve HTTPS and its HTTP `308` redirect as the default; packaged browser
+  previews continue using HTTPS. Browser settings, certificate validation,
+  application content and caching remain unchanged.
+
 ## 0.14.0
 
 - Add opt-in `toolText: {name, field}` and `onToolText(text, call, displayId)`

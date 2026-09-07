@@ -50,8 +50,9 @@ meaning and cardinality rules:
 | `--arcane-root` | directory | `doctor`, native `build`/`run`, `native-doctor`, `native-prepare` |
 | `--host` / `--port` | host / integer 0–65535 | Browser `dev`/`run` default to HTTPS at `127.0.0.1:8000`; `mail serve` defaults to HTTP at `127.0.0.1:8025` and admits numeric loopback only. |
 | `--http-port` | integer 0–65535 | Browser `dev`/`run` HTTP redirect listener; defaults to `0`, which selects an available port. |
-| `--public` | flag | `dev`; serves HTTPS and binds to `0.0.0.0` unless `--host` explicitly selects another address. |
-| `--https` | flag | Browser `dev`/`run`; retained explicitly, while HTTPS is always enabled. |
+| `--public` | flag | `dev`; binds to `0.0.0.0` unless `--host` explicitly selects another address. |
+| `--http` | flag | `dev` only; serves source and PWA routes on one HTTP listener selected by `--port`, without TLS. |
+| `--https` | flag | Browser `dev`/`run`; explicitly selects the default HTTPS transport. |
 | `--cert` / `--key` | PEM file paths | Browser `dev`/`run`; supply both for an explicit certificate chain and private key. Relative paths resolve from the workspace. |
 | `--target` | target id | `new`, `init`, native diagnostics, `build`, `run` |
 | `--format` / `--signing` | target-supported values | Native diagnostics, `build`, `run` |
@@ -313,7 +314,7 @@ npm exec -- arcane upgrade --workspace . --app hello-world
 
 Starts one development server for one selected app and maps the exact
 workspace/runtime routes. It defaults to HTTPS on localhost; `--public` enables access
-from other devices on the network over HTTPS.
+from other devices on the network, using HTTPS by default.
 
 For an external workspace, the server exposes the selected projected
 `arcane/` root, including `arcane/sdk` and `arcane/dependencies`, alongside the
@@ -322,7 +323,7 @@ The explicit live-source SDK mapping remains unchanged and does not replace the
 installed projection.
 
 ```text
-arcane dev [--app <id>] [--public] [--https] [--cert <file> --key <file>] [--host <address>] [--port 8000] [--http-port 0]
+arcane dev [--app <id>] [--public] [--http | --https] [--cert <file> --key <file>] [--host <address>] [--port 8000] [--http-port 0]
 ```
 
 ### Lifecycle
@@ -344,7 +345,7 @@ device, since `localhost` refers to that device and `0.0.0.0` is a bind address.
 Network URLs come from one interface snapshot at startup and do not establish
 remote reachability through the machine's firewall or network.
 
-Every Arcane app uses HTTPS for development and packaged browser previews.
+HTTPS is the default for development and required for packaged browser previews.
 `--https` remains accepted but is no longer needed to select the transport.
 `--port` selects the HTTPS application port. A second HTTP listener returns
 `308` redirects to that HTTPS port, preserving the requested path and query.
@@ -357,9 +358,41 @@ the redirect endpoint.
 Supplying both `--cert` and `--key` selects an explicit PEM pair. The command
 does not configure a firewall, router forwarding, or an internet tunnel.
 
+### Explicit HTTP development
+
+`--http` selects source development over HTTP. Combine it with `--public` or
+`--host` to use a LAN address, and choose the content listener with `--port`:
+
+```bash
+npm run dev -- --app hello-world --public --http --port 8000
+```
+
+The command starts one HTTP listener through `node-http-server`, skips all TLS
+file reads, and serves the same selected source files, generated manifest,
+service worker and offline inventory. PWA configuration and caching are
+unchanged. Startup prints the actual HTTP local and network URLs. Structured
+results contain `protocol:'http:'`; `httpPort`, `httpOrigin`, and `httpUrl`
+identify that content listener and equal `port`, `origin`, and `url`.
+There is no separate redirect endpoint. Cancellation and listener failure
+close the owned HTTP listener and settle the same lifecycle.
+
+`--http` is supported only by `dev`. Combining it with `--https`, `--cert`,
+`--key`, or `--http-port` is a usage error. Omitting it preserves HTTPS;
+certificate errors never select HTTP automatically.
+
+A LAN HTTP origin does not receive the browser's localhost secure-context
+exception. For Chrome development, Chromium documents
+`chrome://flags/#unsafely-treat-insecure-origin-as-secure` with the exact HTTP
+origin, such as `http://192.0.2.10:8000`; see
+[Chromium's development guidance](https://www.chromium.org/Home/chromium-security/deprecating-powerful-features-on-insecure-origins/).
+The developer owns that browser setting. The SDK does not change it, alter
+certificate validation, or claim a PWA is installable merely because its server
+started. HTTP and HTTPS are distinct origins with separate browser storage and
+registrations; existing HTTPS data is preserved.
+
 ### Development HTTPS setup
 
-Before starting `arcane dev` or a packaged browser preview, place the server's
+Before starting HTTPS `arcane dev` or a packaged browser preview, place the server's
 PEM certificate chain at `.arcane/dev/server-cert.pem` and its PEM private key at
 `.arcane/dev/server-key.pem`, relative to the workspace. Alternatively, pass
 `--cert <file> --key <file>` together. The certificate must cover localhost or the LAN IP

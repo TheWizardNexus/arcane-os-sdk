@@ -73,7 +73,7 @@ each device. Keep these local files ignored by Git. The same certificate pair
 works for any selected app in that workspace. The command reports missing TLS
 files instead of starting an HTTP listener.
 
-Every Arcane app uses HTTPS for development and packaged browser previews.
+HTTPS is the default for development and required for packaged browser previews.
 Plain `npm run dev` binds to localhost with the same workspace certificate pair.
 An explicit `--host` overrides the bind address, and `--port` selects the HTTPS port.
 The paired HTTP listener returns 308 redirects and uses an OS-assigned port
@@ -83,6 +83,17 @@ relative paths resolve from the workspace. The server prints HTTPS network URLs
 for public mode. Network reachability depends on the machine's firewall and
 network. See the [development HTTPS setup](docs/reference/cli.md#development-https-setup)
 for device trust and DBOPFS's secure-context requirement.
+
+For explicit HTTP source development, including LAN device testing, use:
+
+```bash
+npm run dev -- --app hello-speech --public --http --port 8000
+```
+
+This selects one HTTP content listener and prints HTTP network URLs. It reads
+no certificate pair and serves the same application and generated PWA routes.
+PWA and storage availability still depend on the browser's secure-context
+rules; see [HTTP development](docs/reference/cli.md#explicit-http-development).
 
 Open the URL printed by the server. The generated page owns its import map and
 Arcane theme; its application module is `apps/hello-speech/modules/App.js`.
@@ -518,7 +529,7 @@ arcane new <id> [--path <directory>] [--display-name <name>] [--target <target>]
 arcane init [id] [--workspace <directory>] [--display-name <name>] [--target <target>]
 arcane doctor [--workspace <directory>] [--arcane-root <directory>]
 arcane import-map [--workspace <directory>] [--app <id>]
-arcane dev [--app <id>] [--public] [--https] [--cert <file> --key <file>] [--host <address>] [--port 8000]
+arcane dev [--app <id>] [--public] [--http | --https] [--cert <file> --key <file>] [--host <address>] [--port 8000]
 arcane test [--app <id>] [--scope app]
 arcane test --scope shared --test-file <repo-relative.test.mjs>
 arcane check [--app <id>] [--scope app] [--skip-tests]

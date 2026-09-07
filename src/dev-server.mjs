@@ -718,7 +718,7 @@ function deployDevelopmentServer(fileServer, signal, {tlsServer, host, port}) {
                 if (!listeners.every(listener => ready.has(listener))) return;
                 settled = true;
                 cleanupDeployment();
-                resolve(tlsServer ?? fileServer.secureServer);
+                resolve(tlsServer ?? fileServer.secureServer ?? fileServer.server);
             }
             try {
                 throwIfAborted(signal);
@@ -804,6 +804,8 @@ async function startOwnedDevServer({
     host='127.0.0.1',
     port=0,
     httpPort=0,
+    http = false,
+    https: requestedHttps,
     tls,
     certPath,
     keyPath,
@@ -822,22 +824,33 @@ async function startOwnedDevServer({
     if (!is.integer(httpPort) || httpPort < 0 || httpPort > 65535) {
         fail('httpPort must be an integer from 0 through 65535.', 'ARCANE_USAGE');
     }
+    if (!is.boolean(http)) {
+        fail('http must be a boolean.', 'ARCANE_USAGE');
+    }
+    if (http && mode !== 'source') {
+        fail('HTTP serving is supported only in source development mode.', 'ARCANE_USAGE');
+    }
+    if (http && (requestedHttps === true || (tls !== undefined && tls !== null && tls !== false)
+        || certPath !== undefined || keyPath !== undefined || httpPort !== 0)) {
+        fail('HTTP development cannot combine TLS options or a separate httpPort; select its listener with port.', 'ARCANE_USAGE');
+    }
+    const protocol = http ? 'http:' : 'https:';
     const requestedRuntimeMode=mode==='source'&&sdkRuntimeSourceRoot!==undefined
         ?'sdk-source'
         :null;
     await events.send({
         type:'server.starting',
+        protocol,
         mode,
         host,
         port,
-        httpPort,
+        httpPort: http ? port : httpPort,
         appId,
         ...(requestedRuntimeMode?{runtimeMode:requestedRuntimeMode}:{})
     });
-    const selectedTls=await resolveDevelopmentTls({
-        workspaceRoot,tls,certPath,keyPath,signal
-    });
-    const protocol = 'https:';
+    const selectedTls = http ? null : await resolveDevelopmentTls(
+        {workspaceRoot, tls, certPath, keyPath, signal}
+    );
     throwIfAborted(signal);
     const routeSet=mode==='source'
         ?await sourceRoutes(workspaceRoot,appId,{
@@ -1093,7 +1106,7 @@ async function startOwnedDevServer({
     async function serveDevelopmentRequest(request, response) {
         let task;
         async function routeDevelopmentRequest() {
-            if (!request.socket.encrypted) {
+            if (!http && !request.socket.encrypted) {
                 const address = (tlsServer ?? fileServer.secureServer).address();
                 const authority = new URL(`http://${request.headers.host || browserHostname(host)}`);
                 authority.protocol = 'https:';
@@ -1262,16 +1275,18 @@ async function startOwnedDevServer({
         {
             root: mappings[0].root,
             host,
-            port: httpPort,
+            port: http ? port : httpPort,
             server: {noCache: false, timeout: 0},
-            https: {
-                only: false,
-                port,
-                ...(selectedTls.options ? {} : {
-                    privateKey: selectedTls.privateKeyPath,
-                    certificate: selectedTls.certificatePath
-                })
-            }
+            ...(http ? {} : {
+                https: {
+                    only: false,
+                    port,
+                    ...(selectedTls.options ? {} : {
+                        privateKey: selectedTls.privateKeyPath,
+                        certificate: selectedTls.certificatePath
+                    })
+                }
+            })
         }
     );
     fileServer.config.contentType = contentType;
@@ -1279,11 +1294,11 @@ async function startOwnedDevServer({
     // The module's public HTTPS configuration accepts PEM paths. Its HTTPS
     // guide leaves advanced TLS inputs to application code; preserve that
     // existing SDK input while the same public module methods serve all content.
-    const tlsServer = selectedTls.options
+    const tlsServer = selectedTls?.options
         ? https.createServer(selectedTls.options, serveDevelopmentRequest)
         : null;
     const server = await deployDevelopmentServer(fileServer, signal, {tlsServer, host, port});
-    const listeners = [fileServer.server, server];
+    const listeners = [...new Set([fileServer.server, server])];
     const address=server.address();
     if(!address||is.string(address)){
         await closeDevelopmentListeners(fileServer, tlsServer);

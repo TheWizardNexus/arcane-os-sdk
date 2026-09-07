@@ -11,10 +11,10 @@ import {
     fetchSyntheticTls as fetch,temporaryDirectory,useSyntheticTls,writeSyntheticTlsFiles
 } from './helpers.mjs';
 
-async function sourceFixture(context, {enabled = true, authored = false} = {}) {
-    useSyntheticTls(context);
+async function sourceFixture(context, {enabled = true, authored = false, http = false} = {}) {
+    if (!http) useSyntheticTls(context);
     const workspaceRoot = await temporaryDirectory(context, {prefix: 'arcane-dev-pwa-'});
-    await writeSyntheticTlsFiles(workspaceRoot);
+    if (!http) await writeSyntheticTlsFiles(workspaceRoot);
     const rootConfig = {
         schemaVersion: 1,
         appsRoot: 'apps',
@@ -113,12 +113,63 @@ async function sourceFixture(context, {enabled = true, authored = false} = {}) {
         await mkdir(path.dirname(location), {recursive: true});
         await writeFile(location, content, 'utf8');
     }));
-    const instance = await startDevServer({workspaceRoot, appId: 'fixture', port: 0});
+    const instance = await startDevServer({workspaceRoot, appId: 'fixture', port: 0, http});
     context.after(async function closeFixtureServer() {
         await instance.close();
     });
     return {workspaceRoot, instance, entry, documentHtml, documentJavaScript};
 }
+
+test(
+    'explicit HTTP development serves the same generated PWA and conditional offline routes',
+    async function httpPwaSourceRoutes(context) {
+        const {workspaceRoot, instance, documentHtml} = await sourceFixture(context, {http: true});
+        assert.equal(instance.protocol, 'http:');
+        await assert.rejects(
+            readFile(path.join(workspaceRoot, '.arcane', 'dev', 'server-cert.pem')),
+            {code: 'ENOENT'}
+        );
+        const response = await globalThis.fetch(instance.url, {redirect: 'manual'});
+        assert.equal(response.status, 200);
+        const html = await response.text();
+        assert.ok(html.includes('<link rel="manifest" href="/arcane.webmanifest">'));
+        assert.ok(html.includes('async data-arcane-pwa src="/arcane-pwa.mjs"'));
+        const generated = new Map();
+        for (const route of ['/arcane.webmanifest', '/arcane-pwa.mjs', '/arcane-sw.js', '/arcane-offline.json']) {
+            const url = `${instance.origin}${route}`;
+            const resource = await globalThis.fetch(url, {redirect: 'manual'});
+            assert.equal(resource.status, 200, route);
+            assert.equal(resource.headers.get('location'), null, route);
+            assert.equal(resource.headers.get('cache-control'), 'no-cache', route);
+            generated.set(route, await resource.text());
+            const lastModified = resource.headers.get('last-modified');
+            assert.ok(lastModified, route);
+            const unchanged = await globalThis.fetch(
+                url,
+                {headers: {'If-Modified-Since': lastModified}, redirect: 'manual'}
+            );
+            assert.equal(unchanged.status, 304, route);
+            assert.equal(await unchanged.text(), '', route);
+        }
+        const manifest = JSON.parse(generated.get('/arcane.webmanifest'));
+        assert.equal(manifest.start_url, '/apps/fixture/index.html');
+        assert.equal(manifest.scope, '/apps/fixture/');
+        assert.equal(manifest.short_name, 'Fixture');
+        assert.equal(manifest.icons[0].src, '/apps/fixture/icon.svg');
+        assert.ok(generated.get('/arcane-pwa.mjs').includes('import {registerPwa} from "/arcane/sdk/pwa.mjs";'));
+        assert.ok(generated.get('/arcane-sw.js').includes('/apps/fixture/modules/leaf.js?mode=worker'));
+        const offline = JSON.parse(generated.get('/arcane-offline.json'));
+        assert.equal(offline.mode, 'development');
+        assert.equal(offline.appVersion, '1.2.3');
+        assert.equal(offline.sdkVersion, '9.8.7');
+        assert.ok(offline.assets.includes('/apps/fixture/documents/payload.html'));
+        assert.ok(offline.assets.includes('/arcane/modules/child.js'));
+        assert.equal(offline.assets.includes('/apps/fixture/documents/excluded.txt'), false);
+        const document = await globalThis.fetch(`${instance.origin}/apps/fixture/documents/payload.html`);
+        assert.equal(await document.text(), documentHtml);
+        await assert.rejects(lstat(path.join(workspaceRoot, 'dist')), {code: 'ENOENT'});
+    }
+);
 
 test('PWA source routes serve clean entries and current saved content without restart', async function pwaSourceRoutes(context) {
     const {workspaceRoot, instance, entry} = await sourceFixture(context);

@@ -100,9 +100,12 @@ settles it: an exact matching executed, declined, cancelled, or not-executed
   selected by the user. Keep SDK source mappings and generated representations
   here; reuse the module's existing static-file and conditional-request behavior.
   Do not replace the selected module with a custom Node HTTP serving stack.
-  Every Arcane app serves its content over HTTPS, including localhost and
-  packaged browser previews. The SDK redirects its paired HTTP listener with
-  status 308 through the public request hook. Keep all module source changes
+  HTTPS is the default for source development and required for packaged browser
+  previews. The SDK redirects its paired HTTP listener with status 308 through
+  the public request hook. Explicit `arcane dev --http` / API `http:true` selects
+  one HTTP content listener for source development only, through the same module
+  and SDK routes. It does not select TLS or change browser settings.
+  Keep all module source changes
   and release operations inside that module's owning project.
 - Native and executable development uses an Arcane-owned, capability-gated wrapper as an escalated browser around those same source files. It adds only the app-declared local Core access needed for progressive enhancement and does not package, serve `dist`, or run tests automatically.
 - Distribution does not silently add testing or hardening authority. Run only

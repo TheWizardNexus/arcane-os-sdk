@@ -32,6 +32,7 @@ test('CLI help and version succeed through the shipped executable',async()=>{
     assert.match(help.stdout,/import-map \[--workspace <directory>\] \[--app <id>\]/u);
     assert.match(help.stdout,/dev .*--sdk-runtime-source <sdk-root>/u);
     assert.match(help.stdout,/dev .*\[--public\]/u);
+    assert.match(help.stdout,/dev .*\[--http \| --https\]/u);
     assert.match(help.stdout,/dev .*\[--http-port 0\]/u);
     assert.match(help.stdout,/verify-bundle <file[.]arcane-app[.]tar[.]gz>/);
 
@@ -169,6 +170,107 @@ test('CLI public development preserves app selection and explicit host precedenc
         assert.deepEqual(events.at(-1).data.result.networkUrls,networkUrls);
     }
 });
+
+test(
+    'CLI explicit HTTP development preserves app selection and reports content endpoints in every output mode',
+    async function httpDevelopmentCliOutput() {
+        for (const output of ['human', 'json', 'ndjson']) {
+            const stdout = memoryStream();
+            const stderr = memoryStream();
+            const invocations = [];
+            const origin = 'http://localhost:8123';
+            const url = `${origin}/apps/fixture-app/index.html`;
+            const networkUrls = ['http://192.0.2.10:8123/apps/fixture-app/index.html'];
+            const exitCode = await runCliInProcess(
+                ['dev', '--app', 'fixture-app', '--public', '--http', '--port', '8123', '--output', output],
+                {
+                    stdout: stdout.stream,
+                    stderr: stderr.stream,
+                    execute: async function executeHttpDevelopment(command, options) {
+                        invocations.push({command, options});
+                        return {
+                            mode: 'source', appId: options.appId,
+                            host: options.host, port: options.port,
+                            protocol: 'http:', origin, url, cleanUrl: url,
+                            httpPort: options.port, httpOrigin: origin, httpUrl: url,
+                            networkUrls, lifecycle: Promise.resolve(),
+                            close: async function closeHttpCliFixture() {}
+                        };
+                    }
+                }
+            );
+            assert.equal(exitCode, 0, stderr.read());
+            assert.equal(invocations.length, 1);
+            assert.equal(invocations[0].command, 'dev');
+            assert.equal(invocations[0].options.appId, 'fixture-app');
+            assert.equal(invocations[0].options.host, '0.0.0.0');
+            assert.equal(invocations[0].options.port, 8123);
+            assert.equal(invocations[0].options.http, true);
+            assert.notEqual(invocations[0].options.https, true);
+            assert.equal(stderr.read().includes('HTTP redirect:'), false);
+            if (output === 'human') {
+                assert.ok(stderr.read().includes(`Development server ready at ${url}`));
+                assert.ok(stderr.read().includes(`Network: ${networkUrls[0]}`));
+            } else {
+                const events = parseNdjson(output === 'json' ? stderr.read() : stdout.read());
+                const ready = events.find(
+                    function isHttpCliReady(event) {
+                        return event.type === 'server.ready';
+                    }
+                );
+                const result = output === 'json'
+                    ? JSON.parse(stdout.read()).result
+                    : events.at(-1).data.result;
+                for (const endpoint of [ready.data, result]) {
+                    assert.equal(endpoint.protocol, 'http:');
+                    assert.equal(endpoint.port, 8123);
+                    assert.equal(endpoint.httpPort, 8123);
+                    assert.equal(endpoint.url, url);
+                    assert.equal(endpoint.httpOrigin, origin);
+                    assert.equal(endpoint.httpUrl, url);
+                    assert.deepEqual(endpoint.networkUrls, networkUrls);
+                }
+                assert.equal(ready.message.includes('HTTP redirect:'), false);
+            }
+        }
+    }
+);
+
+test(
+    'CLI HTTP development rejects conflicting HTTPS and redirect options and other commands',
+    async function invalidHttpCliOptions() {
+        for (const args of [
+            ['dev', '--http', '--https'],
+            ['dev', '--http', '--cert', 'cert.pem', '--key', 'key.pem'],
+            ['dev', '--http', '--cert', 'cert.pem'],
+            ['dev', '--http', '--key', 'key.pem'],
+            ['dev', '--http', '--http-port', '0'],
+            ['dev', '--http', '--http-port', '8124'],
+            ['dev', '--http=true'],
+            ['run', '--http'],
+            ['run', '--target', 'browser', '--http'],
+            ['run', '--target', 'windows-x64', '--http'],
+            ['package', '--http'],
+            ['mail', 'serve', '--http']
+        ]) {
+            const stdout = memoryStream();
+            let executed = false;
+            const exitCode = await runCliInProcess(
+                [...args, '--output', 'ndjson'],
+                {
+                    stdout: stdout.stream,
+                    stderr: memoryStream().stream,
+                    execute: async function rejectInvalidHttpExecution() {
+                        executed = true;
+                    }
+                }
+            );
+            assert.equal(exitCode, 1);
+            assert.equal(executed, false);
+            assert.equal(parseNdjson(stdout.read()).at(-1).data.error.code, 'ARCANE_USAGE');
+        }
+    }
+);
 
 test('CLI prints every public development network URL in human output',async function publicDevelopmentOutput(){
     const stdout=memoryStream();

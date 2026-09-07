@@ -3464,7 +3464,7 @@ async function useselectApp(...arguments_) {
 
 Starts one owned browser development server with exact runtime/app route mappings and a caller-selected bind address.
 
-HTTPS serving uses the published `node-http-server` module. The SDK
+HTTP and HTTPS serving use the published `node-http-server` module. The SDK
 selects source routes and supplies generated representations; the module owns
 static-file conditional GET/HEAD handling and response delivery. The SDK
 retains modification dates for its generated representations. Unchanged
@@ -3480,7 +3480,7 @@ async startDevServer(options={})
 ```
 
 Import it from `arcane-os`. Source mode accepts
-`{workspaceRoot=process.cwd(), appId, mode='source', host='127.0.0.1', port=0, httpPort=0,
+`{workspaceRoot=process.cwd(), appId, mode='source', host='127.0.0.1', port=0, httpPort=0, http=false,
 certPath, keyPath, tls, signal, onEvent}` and serves one validated
 workspace application plus its complete SDK or integrated runtime. Packaged mode uses
 `{mode:'packaged', releaseRoot, workspaceRoot, host, port, httpPort, certPath, keyPath, tls,
@@ -3494,9 +3494,9 @@ The SDK request hook returns `308` for HTTP with a `Location` pointing to the
 actual HTTPS port while preserving the original request path and query. Both listeners
 use the selected host.
 
-Every source server and packaged browser preview enforces HTTPS, including
-localhost. The legacy `https` option is accepted but cannot disable it.
-Startup reads `.arcane/dev/server-cert.pem` and
+Source servers default to HTTPS, including localhost; packaged browser previews
+require HTTPS. The legacy `https` option is accepted but `https:false` and
+`tls:false` alone do not disable HTTPS. HTTPS startup reads `.arcane/dev/server-cert.pem` and
 `.arcane/dev/server-key.pem` relative to `workspaceRoot` unless explicit
 `certPath` and `keyPath` are supplied together; relative paths resolve from the
 workspace. A direct `tls` object instead supplies Node HTTPS server options, including
@@ -3507,16 +3507,27 @@ handshake; browser trust and address matching are evaluated when a client
 connects. The CLI's `--public` selects the wildcard bind;
 the API's `host` option alone changes only the bind address.
 
-The promise settles after both listeners are ready and resolves to
+Explicit `http:true` selects one HTTP content listener in source mode and skips
+certificate loading. `port` selects that listener's port, including `0` for an
+available port. The same application, runtime and generated PWA routes are
+served. `http` must be boolean; `http:true` rejects packaged mode, `https:true`,
+explicit certificate/key paths, a `tls` value other than `undefined`, `null` or
+`false`, and a nonzero `httpPort`. Browser secure-context and installation
+requirements remain browser-owned; see [explicit HTTP development](cli.md#explicit-http-development).
+
+The promise settles after all selected listeners are ready and resolves to
 `{server, protocol, mode, workspaceRoot, appId, host, port, origin, cleanUrl, url,
-networkUrls, httpPort, httpOrigin, httpUrl, close, closed, lifecycle}`. `server` is the raw Node HTTPS
-server; `protocol` is `'https:'`.
+networkUrls, httpPort, httpOrigin, httpUrl, close, closed, lifecycle}`. `server` is the raw Node
+server for application content; `protocol` is `'https:'` by default or `'http:'`
+with explicit HTTP source mode.
 `url` and `cleanUrl` are the same application URL. Wildcard listeners use
 `localhost` in that local URL; `host` retains the actual bound address.
 `httpPort` is the actual HTTP listener port, `httpOrigin` is its HTTP origin,
 and `httpUrl` combines that origin with the application start path. These
-fields identify the redirect endpoint; `origin`, `url`, `cleanUrl`, and
-`networkUrls` identify HTTPS application endpoints.
+fields identify the redirect endpoint in HTTPS mode; `origin`, `url`, `cleanUrl`,
+and `networkUrls` identify application endpoints. In HTTP mode, `httpPort`,
+`httpOrigin`, and `httpUrl` equal `port`, `origin`, and `url`; they identify the
+single content listener, with no redirect listener.
 `networkUrls` lists application URLs for applicable non-loopback interface
 addresses discovered once at startup. These URLs are connection candidates,
 not evidence of reachability from another device. The server adds no session
@@ -3528,15 +3539,15 @@ certificates or modify trust stores. Each client must trust the issuing CA and o
 server certificate. Lifecycle events and CLI summaries exclude TLS options and
 private key contents. See [development HTTPS setup](cli.md#development-https-setup).
 
-Starting the server opens both selected listeners and emits awaited,
+Starting the server opens the selected listener or listeners and emits awaited,
 backpressured `server.starting` and `server.started` events. `server.started`
-includes `httpPort`, `httpOrigin`, and `httpUrl` alongside the HTTPS endpoint.
+includes the selected `protocol`, `httpPort`, `httpOrigin`, and `httpUrl` alongside the application endpoint.
 Request failures emit `server.request.failed`; shutdown emits `server.stopped` after owned
 requests and event delivery drain. Call `await result.close()` in a `finally`
 block, or abort `signal`; `close()` is idempotent and returns the
 same settlement represented by both `closed` and `lifecycle`. Closing the
-operation closes both listeners. An error from either listener or an
-event-callback failure closes both and rejects the lifecycle. Invalid
+operation closes every selected listener once. A listener error or an
+event-callback failure closes the operation and rejects the lifecycle. Invalid
 mode/host/port/httpPort, malformed workspace or release content, an occupied port,
 or an already-aborted signal rejects startup.
 
@@ -3931,14 +3942,15 @@ async function usedescribeTargets(...arguments_) {
 
 Starts one owned browser development server for the selected application.
 
-`https`, `certPath`, `keyPath`, and `tls` follow the
-[`startDevServer()` TLS contract](#startdevserver), alongside `host`, `port`, and
-`httpPort`. `port` selects HTTPS and `httpPort` selects the HTTP `308` redirect
-listener; each defaults to an available port.
+`http`, `https`, `certPath`, `keyPath`, and `tls` follow the
+[`startDevServer()` transport contract](#startdevserver), alongside `host`, `port`, and
+`httpPort`. By default, `port` selects HTTPS and `httpPort` selects the HTTP `308`
+redirect listener; each defaults to an available port. Explicit `http:true`
+selects one source HTTP content listener at `port`, without certificate loading.
 The operation refreshes the selected authored descriptor's `arcane-package.json`
 projection and managed import maps under one development-refresh lock, then
-releases that lock before opening the HTTPS source listener and its HTTP
-redirect listener. It returns both endpoints and their shared shutdown
+releases that lock before opening the selected source listener or listeners.
+It returns their application endpoints and shared shutdown
 lifecycle. Legacy package-only apps remain unchanged. The operation generates
 no packaged output; enabled PWA manifests
 are served directly from the selected source resources.

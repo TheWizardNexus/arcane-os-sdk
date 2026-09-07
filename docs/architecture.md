@@ -136,8 +136,8 @@ selected source route and the last successful check when evaluating freshness.
 
 The shared dev server uses RIAEvangelist's `node-http-server` public interface
 for HTTPS and conditional responses on those selected routes. The SDK
-owns source selection and generated representations. Every Arcane development
-server and packaged browser preview serves content on HTTPS and redirects its
+owns source selection and generated representations. By default, source development
+and every packaged browser preview serve content on HTTPS and redirect their
 paired HTTP listener with status 308 through the public request hook.
 `arcane dev --public` selects the IPv4 wildcard address;
 explicit `--host` controls the bind address. CLI startup reads one workspace-local
@@ -150,6 +150,14 @@ material through CLI events. `port` selects HTTPS; `httpPort` selects the HTTP
 redirect listener, defaulting to an OS-assigned port. Existing raw `tls` inputs
 retain their native HTTPS transport under the SDK, as described by the module's
 advanced TLS extension guidance; all content uses its public serving methods.
+
+Explicit `arcane dev --http` or source API `http:true` selects the module's
+single HTTP listener on `port`. It skips certificate resolution and serves the
+same selected source mappings, generated PWA routes, and conditional responses.
+No HTTPS listener or redirect is started in this mode. Listener readiness,
+failure, cancellation and shutdown retain the same operation owner; reported
+URLs use the actual HTTP protocol and bound port. Browser secure-context
+requirements remain browser-owned. Packaged previews retain HTTPS.
 
 Development is an intentionally fast feedback loop. Keep each increment small
 and independently understandable so its effect has one clear cause and a

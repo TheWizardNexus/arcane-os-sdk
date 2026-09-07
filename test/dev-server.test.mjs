@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {cp,mkdir,readFile,realpath,symlink,writeFile} from 'node:fs/promises';
+import http from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
 import os from 'node:os';
@@ -720,6 +721,135 @@ test('development server keeps local defaults and supports explicit public bindi
     }
 });
 
+test(
+    'explicit HTTP source development serves unchanged routes without certificates and owns one listener',
+    async function explicitHttpDevelopment(context) {
+        const parent = await temporaryDirectory(context, {prefix: 'arcane-http-source-'});
+        const workspaceRoot = path.join(parent, 'workspace');
+        const appId = 'http-source';
+        await scaffoldWorkspace({targetPath: workspaceRoot, appId});
+        const sdkRuntimeSourceRoot = await createSdkRuntimeSource(parent);
+        const controller = new AbortController();
+        const events = [];
+        const instance = await startDevServer(
+            {
+                workspaceRoot, appId, sdkRuntimeSourceRoot, http: true, https: false, tls: false, port: 0,
+                signal: controller.signal,
+                onEvent: function rememberHttpSourceEvent(event) {
+                    events.push(event);
+                }
+            }
+        );
+        context.after(
+            async function closeHttpSourceFixture() {
+                await instance.close();
+            }
+        );
+        assert.ok(instance.server instanceof http.Server);
+        assert.equal(instance.protocol, 'http:');
+        assert.equal(instance.origin, `http://127.0.0.1:${instance.port}`);
+        assert.equal(instance.url, `${instance.origin}/apps/${appId}/index.html`);
+        assert.equal(instance.cleanUrl, instance.url);
+        assert.equal(instance.httpPort, instance.port);
+        assert.equal(instance.httpOrigin, instance.origin);
+        assert.equal(instance.httpUrl, instance.url);
+        assert.equal(events.at(-1).protocol, 'http:');
+        assert.equal(events.at(-1).httpPort, instance.port);
+        await assert.rejects(
+            readFile(path.join(workspaceRoot, '.arcane', 'dev', 'server-cert.pem')),
+            {code: 'ENOENT'}
+        );
+        const root = await fetch(`${instance.origin}/`, {redirect: 'manual'});
+        assert.equal(root.status, 302);
+        assert.equal(root.headers.get('location'), `/apps/${appId}/index.html`);
+        await root.text();
+        const entry = await fetch(instance.url, {redirect: 'manual'});
+        assert.equal(entry.status, 200);
+        assert.equal(entry.headers.get('location'), null);
+        await entry.text();
+        const resourceUrl = `${instance.origin}/arcane/modules/AI.js?mode=worker`;
+        const resource = await fetch(resourceUrl, {redirect: 'manual'});
+        assert.equal(resource.status, 200);
+        assert.equal(await resource.text(), 'export const liveSource=true;\n');
+        const lastModified = resource.headers.get('last-modified');
+        assert.ok(lastModified);
+        const unchanged = await fetch(
+            resourceUrl,
+            {headers: {'If-Modified-Since': lastModified}, redirect: 'manual'}
+        );
+        assert.equal(unchanged.status, 304);
+        assert.equal(await unchanged.text(), '');
+        const head = await fetch(resourceUrl, {method: 'HEAD', redirect: 'manual'});
+        assert.equal(head.status, 200);
+        assert.equal(head.headers.get('last-modified'), lastModified);
+        assert.equal(await head.text(), '');
+        const unsupported = await fetch(instance.url, {method: 'POST', redirect: 'manual'});
+        assert.equal(unsupported.status, 405);
+        await unsupported.text();
+        controller.abort();
+        await instance.closed;
+        await instance.lifecycle;
+        assert.equal(
+            events.filter(
+                function isHttpSourceStopped(event) {
+                    return event.type === 'server.stopped';
+                }
+            ).length,
+            1
+        );
+        await assertPortCanBeReused(instance.port);
+    }
+);
+
+test(
+    'explicit HTTP development releases its listener when startup event delivery fails',
+    async function httpStartupEventFailure(context) {
+        const parent = await temporaryDirectory(context, {prefix: 'arcane-http-start-failure-'});
+        const workspaceRoot = path.join(parent, 'workspace');
+        const appId = 'http-start-failure';
+        await scaffoldWorkspace({targetPath: workspaceRoot, appId});
+        const sdkRuntimeSourceRoot = await createSdkRuntimeSource(parent);
+        const port = await availablePort();
+        const callbackFailure = new Error('HTTP startup event failed.');
+        await assert.rejects(
+            startDevServer(
+                {
+                    workspaceRoot, appId, sdkRuntimeSourceRoot, http: true, port,
+                    onEvent: function rejectHttpStartedEvent(event) {
+                        if (event.type === 'server.started') throw callbackFailure;
+                    }
+                }
+            ),
+            function isHttpStartupCallbackFailure(error) {
+                return error === callbackFailure;
+            }
+        );
+        await assertPortCanBeReused(port);
+    }
+);
+
+test(
+    'HTTP development rejects conflicting transport inputs and packaged mode before startup',
+    async function invalidHttpDevelopmentOptions() {
+        for (const options of [
+            {http: null}, {http: 1}, {http: 'true'}, {http: {}},
+            {http: true, mode: 'packaged'},
+            {http: true, https: true},
+            {http: true, tls: {}},
+            {http: true, certPath: 'certificate.pem'},
+            {http: true, keyPath: 'private-key.pem'},
+            {http: true, httpPort: 8124}
+        ]) {
+            await assert.rejects(
+                startDevServer(options),
+                function isHttpOptionUsageError(error) {
+                    return error.code === 'ARCANE_USAGE';
+                }
+            );
+        }
+    }
+);
+
 test('HTTP redirects preserve request targets and close with either HTTPS transport', async function developmentRedirects(t) {
     const fixture = useSyntheticTls(t);
     const parent = await temporaryDirectory(t, {prefix: 'arcane-redirect-server-'});
@@ -806,7 +936,7 @@ test('development server selects the HTTPS listener without exposing TLS setting
 
 test('HTTPS development reports missing certificate files without starting HTTP',async function missingDevelopmentCertificates(t){
     const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-missing-certificates-'});
-    for (const options of [{}, {https: false}, {https: true}, {mode: 'packaged'}]) {
+    for (const options of [{}, {http: false}, {https: false}, {https: true}, {tls: false}, {mode: 'packaged'}]) {
         const events = [];
         await assert.rejects(
             startDevServer(

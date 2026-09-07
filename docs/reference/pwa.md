@@ -112,9 +112,11 @@ For an enabled application, `arcane dev` serves the generated PWA files at the
 origin root and starts at the selected app page under `/apps/<id>/`. Use one
 selected app per development origin. The SDK uses `node-http-server` for source
 and packaged-preview serving, including conditional resource responses.
-Every Arcane development server and packaged browser preview serves HTTPS,
-including localhost. Configure the workspace certificate pair before starting
-the ordinary command; see [development HTTPS setup](cli.md#development-https-setup).
+Arcane development servers default to HTTPS, including localhost, and packaged
+browser previews require HTTPS. Configure the workspace certificate pair before
+starting the ordinary command; see [development HTTPS setup](cli.md#development-https-setup).
+Explicit source-only `arcane dev --http` serves the same generated PWA routes
+without loading certificates; see [explicit HTTP development](cli.md#explicit-http-development).
 `--public` selects the IPv4 wildcard bind address; it does not enable PWA
 configuration, change manifest metadata, or determine browser installability.
 
@@ -272,8 +274,11 @@ Keep actual icon dimensions in `sizes`. Browser diagnostics about missing
 and are separate from a usable installation icon.
 
 Browser installation requires HTTPS or the browser's localhost/loopback
-exception. A device-facing LAN address is not loopback. Arcane's development
-server still follows its own HTTPS serving contract above. Browser engagement,
+exception. A device-facing LAN address is not loopback. Selecting HTTP serving
+does not make that LAN origin a secure context. Chromium documents a separate
+[explicit developer origin setting](https://www.chromium.org/Home/chromium-security/deprecating-powerful-features-on-insecure-origins/);
+the SDK does not configure that setting or claim that starting the server proves
+installation eligibility. Browser engagement,
 installation state and platform support also affect whether native promotion
 appears; worker cache readiness is not an installation UI prerequisite. See
 [browser installation requirements](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable).

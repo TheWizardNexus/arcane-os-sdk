@@ -516,6 +516,7 @@ export async function developApplication(options = {}) {
         host:options.host,
         port:options.port,
         httpPort:options.httpPort,
+        http: options.http,
         https:options.https,
         tls:options.tls,
         certPath:options.certPath,

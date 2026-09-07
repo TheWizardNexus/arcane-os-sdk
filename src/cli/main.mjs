@@ -39,6 +39,7 @@ const VALUE_OPTIONS=new Set([
 const FLAG_OPTIONS=new Set([
     'git',
     'public',
+    'http',
     'https',
     'skip-tests',
     'dry-run',
@@ -65,7 +66,7 @@ Usage:
   ${CLI_NAME} upgrade [--workspace <directory>] [--app <id>]
   ${CLI_NAME} doctor [--workspace <directory>] [--arcane-root <directory>]
   ${CLI_NAME} import-map [--workspace <directory>] [--app <id>]
-  ${CLI_NAME} dev [--app <id>] [--public] [--https] [--cert <pem>] [--key <pem>] [--host <address>] [--port 8000] [--http-port 0] [--sdk-runtime-source <sdk-root>]
+  ${CLI_NAME} dev [--app <id>] [--public] [--http | --https] [--cert <pem>] [--key <pem>] [--host <address>] [--port 8000] [--http-port 0] [--sdk-runtime-source <sdk-root>]
   ${CLI_NAME} test [--app <id>] [--scope app]
   ${CLI_NAME} test --scope shared --test-file <repo-relative.test.mjs>
   ${CLI_NAME} check [--app <id>] [--scope app] [--skip-tests]
@@ -88,8 +89,9 @@ Usage:
   ${CLI_NAME} mail serve --profile <profile> --from <address> --app <id> --origin <origin> [--allow-to <addresses>] [--app-key-stdin] [--host 127.0.0.1] [--port 8025] [--request-timeout <ms>]
 
 Development:
-  --public                      Serve HTTPS on all IPv4 interfaces (0.0.0.0) and print network URLs.
-  --https                       Accepted for compatibility; Arcane browser serving always uses HTTPS.
+  --public                      Bind dev to all IPv4 interfaces (0.0.0.0) and print network URLs.
+  --http                        Dev-only HTTP content on --port; no TLS or HTTPS redirect listener.
+  --https                       Explicitly select the default HTTPS browser transport.
   --cert <pem> --key <pem>        Use an existing certificate pair; paths are relative to the workspace.
   --host <address>               Override the bind address; takes precedence over --public.
   --http-port <port>             Browser dev/run HTTP redirect port; 0 selects an available port (default).
@@ -458,6 +460,14 @@ function operationOptions(command,parsed,cwd){
     if(flags.has('public')&&command!=='dev'){
         usage('--public is supported only by dev.');
     }
+    const http = flags.has('http');
+    if (http && command !== 'dev') {
+        usage('--http is supported only by dev.');
+    }
+    if (http && (flags.has('https') || values.cert !== undefined
+        || values.key !== undefined || values['http-port'] !== undefined)) {
+        usage('--http cannot combine --https, --cert, --key, or --http-port; select its listener with --port.');
+    }
     const browserServing = command === 'dev'
         || (command === 'run' && (values.target ?? 'browser') === 'browser');
     if ((flags.has('https') || values.cert !== undefined || values.key !== undefined) && !browserServing) {
@@ -470,7 +480,7 @@ function operationOptions(command,parsed,cwd){
         usage('Arcane HTTPS serving requires --cert and --key together.');
     }
     const browserServerOptions = browserServing ? {
-        https: true,
+        ...(http ? {http: true} : {https: true}),
         httpPort: readPort(values['http-port'], 0),
         ...(values.cert === undefined ? {} : {
             certPath: path.resolve(workspaceRoot, values.cert),
@@ -882,7 +892,7 @@ function serverSummary(result){
 async function waitForServer(result,signal,reporter){
     const readyMessage=[
         `Development server ready at ${result.url}`,
-        ...(result.httpUrl ? [`HTTP redirect: ${result.httpUrl}`] : []),
+        ...(result.httpUrl && result.protocol !== 'http:' ? [`HTTP redirect: ${result.httpUrl}`] : []),
         ...(result.networkUrls??[]).map(function networkAddress(url){return `Network: ${url}`;})
     ].join('\n');
     reporter.emit('server.ready',serverSummary(result),readyMessage);
