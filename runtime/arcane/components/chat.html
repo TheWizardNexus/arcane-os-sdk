@@ -112,6 +112,15 @@
         display:none;
     }
 
+    .chat_area[data-model-start-required="true"]:not([data-conversation-complete="true"]) > .conversation_timebox,
+    .chat_area[data-model-start-required="true"]:not([data-conversation-complete="true"]) > .chat_output,
+    .chat_area[data-model-start-required="true"]:not([data-conversation-complete="true"]) > .chat_session_status,
+    .chat_area[data-model-start-required="true"]:not([data-conversation-complete="true"]) > .chat_input_area,
+    .chat_area[data-model-start-required="true"]:not([data-conversation-complete="true"]) > #speech,
+    .chat_area[data-model-start-required="true"]:not([data-conversation-complete="true"]) > .controls {
+        display: none;
+    }
+
     .conversation_timebox[data-error="true"]{
         color:var(--danger-color,var(--text-color));
     }
@@ -570,7 +579,7 @@
     }
 </style>
 
-<section class="chat_area">
+<section class="chat_area" data-model-start-required="true">
     <section
         id="conversation_timebox"
         class="conversation_timebox"
@@ -1985,6 +1994,14 @@
 
     function applyAIAvailability(availability){
         host.aiAvailability={...availability};
+        const selectedRole = hasSelectedAIRuntimeRole('llm')
+            ? latestAIRuntimeRoles.llm
+            : null;
+        const conversationVisible = selectedRole
+            ? selectedRole.localOnly === false
+                || (selectedRole.state === 'ready' && selectedRole.loaded)
+            : availability.llm;
+        chatArea.dataset.modelStartRequired = String(!conversationVisible);
         send.disabled=host.conversationComplete
             ||!availability.llm
             ||sessionMessagePending

@@ -411,6 +411,18 @@ comes from sticky runtime role state; the method never forwards standalone
 speech booleans or synthesizes ready speech roles without a selected, loaded
 provider.
 
+Before model selection is available, conversation surfaces remain hidden unless
+the host supplies LLM availability through `setAIAvailability()`. For a selected
+local LLM, the transcript, session status, composer, upload, speech panel
+(including application-supplied controls), language selector, and timer stay
+hidden until that exact sticky role is `ready` and `loaded`. The existing model
+activation area remains available for Start, progress, cancellation, and retry.
+A selected cloud route (`localOnly:false`) shows the conversation surfaces
+immediately; Send still follows actual LLM availability. Later unload, failure,
+or selection changes update visibility from the same runtime subscription
+without starting model work or changing retained conversation content. A
+completed conversation keeps its transcript visible and its controls hidden.
+
 When a selected LLM route is `unloaded` or in `error`, the component exposes a
 keyboard-operable Start/Try again control while Send stays disabled. During
 `loading`, the control becomes Cancel loading and reflects sticky progress
