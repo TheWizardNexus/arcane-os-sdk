@@ -79,7 +79,7 @@ appropriate.
 | [`markdown-document.html`](#markdown-documenthtml) | Renders and navigates a complete Markdown document with focusable fragments. | `configure()`<br>`load()`<br>`render()`<br>`clear()`<br>`fail()`<br>`focus()`<br>`focusFragment()`<br>`destroy()` | `markdown-document-ready`<br>`markdown-document-state`<br>`markdown-document-loading`<br>`markdown-document-rendered`<br>`markdown-document-empty`<br>`markdown-document-error`<br>`markdown-document-navigate` | Complete Markdown/state normalized; malformed input and Marked/DOM failures remain visible |
 | [`markdown-editor.html`](#markdown-editorhtml) | Configurable Markdown authoring, toolbar, preview, title, and save surface. | `configure()`<br>`focus()`<br>`clear()`<br>`saveEntry()`<br>`destroy()` | `markdown-editor-ready`<br>`markdown-editor-change`<br>`markdown-editor-saved` | Editor values normalized; injected save result mixed |
 | [`media-embed.html`](#media-embedhtml) | Loads a parsed YouTube video or playlist embed with ordinary hosting by default, optional privacy enhancement, and an external-platform action. | `configure()`<br>`load()`<br>`destroy()` | `media-embed-ready`<br>`media-load`<br>`media-error`<br>`media-open-platform` | URL/error normalized; iframe/platform behavior native |
-| [`modal.html`](#modalhtml) | Generic modal with population, open/close, actions, and sequential task execution. | `populate()`<br>`open()`<br>`close()`<br>`runTasks()`<br>`destroy()` | `modal-ready`<br>`modal-opened`<br>`modal-closed`<br>`modal-action` | Modal state normalized; injected task results mixed |
+| [`modal.html`](#modalhtml) | Generic modal with population, configurable user dismissal, actions, and concurrent task execution. | `configure()`<br>`populate()`<br>`open()`<br>`close()`<br>`runTasks()`<br>`destroy()`<br>`running`<br>`opened` | `modal-ready`<br>`modal-opened`<br>`modal-closed`<br>`modal-action` | Modal state normalized; injected task results mixed |
 | [`output-panel.html`](#output-panelhtml) | Presents status, output, body, coverage, actions, pending, error, and cleared states. | `configure()`<br>`setOutput()`<br>`setBody()`<br>`setCoverage()`<br>`setActions()`<br>`setPending()`<br>`setStatus()`<br>`setError()`<br>`clear()`<br>`destroy()` | `output-panel-ready`<br>`output-panel-state`<br>`output-panel-change`<br>`output-panel-action`<br>`output-panel-error`<br>`output-panel-cleared` | DOM-normalized |
 | [`preferences-form.html`](#preferences-formhtml) | Builds a schema-driven preferences form with submit, reset, busy, and status behavior. | `configure()`<br>`getValues()`<br>`setValues()`<br>`setBusy()`<br>`setStatus()`<br>`destroy()` | `preferences-form-ready`<br>`preferences-change`<br>`preferences-submit`<br>`preferences-reset` | Normalized form values |
 | [`pwa-install.html`](#pwa-installhtml) | Presents a dismissible browser installation action with floating or inline placement. | `configure()`<br>`install()`<br>`dismiss()`<br>`destroy()`<br>`state`<br>`ready` | `pwa-install-ready`<br>`pwa-install-change`<br>`pwa-install-dismissed` | Browser install availability and outcome supplied by the shared PWA owner |
@@ -944,11 +944,28 @@ Shared dependencies: [`YouTubeMedia.js`](runtime-modules.md#youtubemediajs).
 
 ### Overview
 
-Generic modal with population, open/close, actions, and sequential task execution.
+Generic modal with population, configurable user dismissal, actions, and concurrent task execution.
 
 ### Public surface
 
-Methods/properties: `populate()`, `open()`, `close()`, `runTasks()`, `destroy()`.
+Methods/properties: `configure()`, `populate()`, `open()`, `close()`, `runTasks()`,
+`destroy()`, `running`, `opened`.
+
+`configure({dismissible})` synchronously returns the current `{dismissible}`
+configuration, or `false` after destruction. `dismissible` starts as `true`;
+omitting it preserves the current choice. A supplied value must be a boolean.
+Setting it to `false` hides the close button and prevents user dismissal through
+Escape, backdrop clicks and the close button. Setting it back to `true` restores
+normal user dismissal. The choice persists across population, open/close cycles
+and task completion. If the close button held focus when disabled, focus moves
+to a content control or the focusable modal body.
+
+This option does not prevent the owning application from calling `close()` or
+`destroy()`. The existing running-task behavior remains: `close()` leaves a
+running modal open unless called with its existing second `force` argument set
+to `true`; `destroy()` releases the component. Product-specific conditions for
+closing a modal belong to the application. Content, actions and task results
+are preserved, and `runTasks()` continues to execute independent jobs concurrently.
 
 Events: `modal-ready`, `modal-opened`, `modal-closed`, `modal-action`.
 

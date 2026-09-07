@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.17.0
+
+- Add neutral `modal.configure({dismissible})` configuration, defaulting to
+  `true`. Setting it to `false` hides the close button and prevents Escape,
+  backdrop and close-button dismissal while preserving the owner's existing
+  programmatic close/destroy lifecycle and running-task behavior.
+- Retain the configuration through population, open/close cycles and task
+  completion. Keep focus within useful content when hiding a focused close
+  control, and preserve default modal behavior for existing consumers.
+
 ## 0.16.3
 
 - Remember browser-reported PWA installation in app-scoped DBOPFS and suppress

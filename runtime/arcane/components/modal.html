@@ -150,7 +150,7 @@
         <button id="close" class="modal-button" part="close" type="button" aria-label="Close" title="Close">&#10005;</button>
         <header id="modal-header" class="modal-header" part="header" hidden><slot id="header-slot" name="header"></slot></header>
         <input type="search" id="modal-search" class="modal-search hidden" part="search" placeholder="Search..." aria-label="Search modal content">
-        <div id="modal-content" class="modal-content" part="body"><slot name="body"></slot></div>
+        <div id="modal-content" class="modal-content" part="body" tabindex="-1"><slot name="body"></slot></div>
         <footer id="modal-footer" class="modal-footer" part="footer" hidden><slot id="footer-slot" name="footer"></slot></footer>
     </div>
 </dialog>
@@ -174,11 +174,13 @@
     const modalStack=window.modalStack=window.modalStack||[];
 
     let running=false;
+    let dismissible = true;
     let disposed=false;
     let activeRun=Promise.resolve([]);
     let returnFocus=null;
 
     host.ready=false;
+    host.configure = configure;
     host.populate=populate;
     host.open=open;
     host.close=close;
@@ -195,13 +197,18 @@
         opened:{get:function getOpenedState(){return dialog.open;}}
     });
 
-    dialog.addEventListener('cancel',function preventRunningDialogCancellation(event){
-        event.preventDefault();
-        close(event);
-    });
+    dialog.addEventListener(
+        'cancel',
+        function handleDialogCancellation(event) {
+            event.preventDefault();
+            if (dismissible) {
+                close(event);
+            }
+        }
+    );
 
     dialog.addEventListener('click',function closeFromDialogBackdrop(event){
-        if(event.target!==dialog||running){
+        if (event.target !== dialog || running || !dismissible) {
             return;
         }
         const bounds=dialog.getBoundingClientRect();
@@ -214,9 +221,45 @@
         }
     });
 
-    closeButton.addEventListener('click',function closeFromButton(event){
-        close(event);
-    });
+    closeButton.addEventListener(
+        'click',
+        function closeFromButton(event) {
+            if (dismissible) {
+                close(event);
+            }
+        }
+    );
+
+    function configure(input = {}) {
+        if (disposed) return false;
+        if (input === null || !is.object(input) || is.array(input)) {
+            throw new TypeError('Modal configuration must be an object.');
+        }
+        if (input.dismissible !== undefined) {
+            if (!is.boolean(input.dismissible)) {
+                throw new TypeError('Modal dismissible must be a boolean.');
+            }
+            dismissible = input.dismissible;
+        }
+        const closeButtonFocused = shadowRoot.activeElement === closeButton;
+        updateCloseButton();
+        if (dialog.open && !dismissible && closeButtonFocused) {
+            focusOpenedModal();
+        }
+        return {dismissible};
+    }
+
+    function updateCloseButton() {
+        closeButton.classList.toggle('hidden', running || !dismissible);
+    }
+
+    function focusOpenedModal() {
+        const focusTarget = modalContent.querySelector('[autofocus],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),a[href]')
+            || (running || !dismissible ? modalContent : closeButton);
+        focusTarget.focus(
+            {preventScroll: true}
+        );
+    }
 
     for(const slot of [headerSlot,footerSlot]){
         const region=slot.parentElement;
@@ -253,10 +296,7 @@
                 ?document.activeElement
                 :null;
             dialog.showModal();
-            queueMicrotask(function focusOpenedModal(){
-                const focusTarget=modalContent.querySelector('[autofocus],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),a[href]')||closeButton;
-                focusTarget?.focus({preventScroll:true});
-            });
+            queueMicrotask(focusOpenedModal);
             emit('modal-opened',{}, {opened:true});
         }
         return true;
@@ -274,7 +314,7 @@
         if(wasOpen){
             dialog.close();
         }
-        closeButton.classList.remove('hidden');
+        updateCloseButton();
 
         const stackIndex=modalStack.indexOf(host);
         if(stackIndex>-1){
@@ -317,7 +357,7 @@
     }
 
     async function populate(content='<p>Content goes here</p>',search=false){
-        closeButton.classList.remove('hidden');
+        updateCloseButton();
         modalSearch.classList.toggle('hidden',!search);
         if(content instanceof Node){
             modalContent.replaceChildren(content);
@@ -349,7 +389,7 @@
         }
 
         running=true;
-        closeButton.classList.add('hidden');
+        updateCloseButton();
         modalSearch.classList.add('hidden');
         modalContent.replaceChildren();
 
@@ -399,16 +439,20 @@
             return result.status==='rejected';
         });
         running=false;
-        closeButton.classList.remove('hidden');
+        updateCloseButton();
 
         if(failed){
             heading.innerText='Some Tasks Could Not Be Completed';
-            message.innerText='You may close this message and try again.';
+            message.innerText = dismissible
+                ? 'You may close this message and try again.'
+                : 'Review the failed tasks and try again.';
             return results;
         }
 
         heading.innerText='All Tasks Complete';
-        message.innerText='Every task completed. You may close this message.';
+        message.innerText = dismissible
+            ? 'Every task completed. You may close this message.'
+            : 'Every task completed.';
         return results;
     }
 
