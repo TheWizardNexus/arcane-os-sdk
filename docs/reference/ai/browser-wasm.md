@@ -80,6 +80,19 @@ GPU request, model operation, listener, or viewport-dependent reload. Its
 dependency-free entrypoint does not import the inference runtime. Profile
 selection does not alter prompts, documents, history, or output limits.
 
+## CPU selection
+
+Set `loadDefaults:{gpuLayers:0}` when creating the provider, or pass
+`gpuLayers:0` to `ai.load()` or `provider.load()`, to run the selected model on
+CPU through the packaged Wllama WebAssembly runtime. CPU selection skips
+WebGPU capability checks, adapter initialization, and GPU execution reporting.
+It uses the same complete model sources, cache, request, streaming, and
+cancellation contracts. Existing context, batch, micro-batch, and thread
+settings remain independently configurable.
+
+Omitting `gpuLayers` preserves full GPU offload (`99999`). CPU is an explicit
+selection; a failed GPU load does not silently switch to CPU.
+
 ## Lifecycle at a glance
 
 `createArcaneAI()` owns one LLM controller. Its default `loadPolicy` is
@@ -206,15 +219,16 @@ Applications remain responsible for model selection and license compliance.
 cannot download. Source downloads use CORS, omit credentials and referrer,
 disable HTTP caching, and honor `AbortSignal`.
 
-After a model loads, its existing Worker reports the adapter it selected.
+After a GPU model loads, its existing Worker reports the adapter it selected.
 The runtime retains that adapter in `evidence().webgpu.adapter`, including
 optional browser-reported `type` and `isFallbackAdapter` fields. This reads
 the loaded Worker's metadata once; it does not request another adapter.
 Missing fields remain unknown. Cancellation also cancels the metadata wait;
 an unavailable observation is logged without rejecting an otherwise loaded model.
 
-On Windows desktop Chromium browsers, an explicitly reported integrated GPU,
-CPU, or fallback adapter triggers one GPU-only browser alert per page session.
+For GPU loads on Windows desktop Chromium browsers, an explicitly reported
+integrated GPU, CPU, or fallback adapter triggers one GPU-only browser alert
+per page session.
 The alert names the selected adapter and **Force High Performance GPU**
 (`#force-high-performance-gpu`), conditional on the computer also having a
 discrete GPU. It contains the address to paste manually and asks the user to
@@ -278,9 +292,10 @@ serialized; provider status exposes `busy` and `queued`. Supported request
 generation fields include temperature, top-K, top-P, min-P, repeat penalty,
 and seed. Load settings separately include
 `contextTokens`, `batchTokens`, `microBatchTokens`, `threads`, and GPU-layer
-count. The shipped runtime always sets `gpuLayers: 99999`: WebGPU and proved
-full offload are mandatory, and there is no CPU fallback. Secure context and
-WebGPU/full-offload availability remain browser platform requirements;
+count. The shipped runtime defaults to `gpuLayers:99999` for full GPU offload;
+`gpuLayers:0` explicitly selects CPU. WebGPU/full-offload availability applies
+only to the GPU route, which has no automatic CPU fallback. Secure context
+remains a browser platform requirement;
 cross-origin isolation and coarse hardware fields remain observations.
 
 Tool definitions, tool choice, parallel-tool-call preference, and JSON or JSON
@@ -528,11 +543,11 @@ intent. They do not activate checking in the ordinary development contract.
 
 ### Availability and normalization
 
-**Browser secure context with WebAssembly, OPFS/DBOPFS, WebGPU, and full-offload
-support.** Inference is local after a successful Wllama load.
-The runtime forces `gpuLayers: 99999`; callers cannot select CPU or partial
-offload. Status discloses the optional `secure` intent, capability state,
-storage/model compatibility, and lifecycle state; it does not claim that
+**Browser secure context with WebAssembly and OPFS/DBOPFS.** The default GPU
+route additionally requires WebGPU and full-offload support; `gpuLayers:0`
+selects CPU without those GPU requirements. Inference is local after a
+successful Wllama load. Status discloses the optional `secure` intent,
+capability state, storage/model compatibility, and lifecycle state; it does not claim that
 hardening ran.
 
 ### Example

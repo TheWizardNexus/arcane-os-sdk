@@ -137,10 +137,24 @@
             grid-column: 3;
         }
     }
+
+    :host([data-device-class="mobile"]) {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    :host([data-device-class="mobile"]) .speech_feedback {
+        grid-row: 1;
+        grid-column: 1;
+    }
+
+    :host([data-device-class="mobile"]) #muteButton {
+        grid-row: 1;
+        grid-column: 2;
+    }
 </style>
 
 <p class="hidden">Will auto send after X seconds of silence set in code.</p>
-<button id="recordButton" type="button" aria-label="Transcription unavailable" disabled>Hold to talk</button>
+<button id="recordButton" type="button" aria-label="Transcription unavailable" hidden disabled>Hold to talk</button>
 <button id="sttActivationButton" type="button" hidden disabled>Start transcription</button>
 <button id="stopButton" type="button" class="hidden" disabled>Send</button>
 <div class="speech_feedback">
@@ -155,6 +169,7 @@
 <button id="muteButton" type="button" class="mute" aria-pressed="true" aria-label="Voice unavailable" disabled>Voice unavailable</button>
 
 <script type="module">
+    const browserDeviceImport = import('arcane-os/browser-device');
     const {default:Is}=await import('strong-type');
     const is=new Is(false);
 
@@ -180,8 +195,12 @@
         createSTTActivationController,
         formatAIRuntimeProgress
     } = await import('../modules/ComponentContracts.js');
+    const {getBrowserDeviceClass} = await browserDeviceImport;
 
     const host = this;
+    const deviceClass = getBrowserDeviceClass();
+    const transcriptionEnabled = deviceClass !== 'mobile';
+    host.dataset.deviceClass = deviceClass;
     const events = createArcaneEventSource(
         host,
         {
@@ -326,28 +345,36 @@
     host.configure = configure;
     host.destroy = destroy;
     host.reportTTSError = reportTTSError;
-    host.requestSTTActivation = host.requestSTTActivation
-        || function requestSTTActivation(intent) {
-            return requestAIRuntimeIntent(intent);
+    if (transcriptionEnabled) {
+        host.requestSTTActivation = host.requestSTTActivation
+            || function requestSTTActivation(intent) {
+                return requestAIRuntimeIntent(intent);
+            };
+    } else {
+        host.requestSTTActivation = function unavailableMobileSTTActivation() {
+            return false;
         };
+    }
     host.setMuted = setMuted;
     host.availability = {
-        microphone: Boolean(
+        microphone: transcriptionEnabled && Boolean(
             navigator.mediaDevices?.getUserMedia
             && globalThis.MediaRecorder
         ),
         stt: false,
         tts: false
     };
-    const sttActivationController = createSTTActivationController(
-        {
-            host,
-            button: sttActivationButton,
-            progress: sttActivationProgress,
-            onChange: renderSTTActivationState,
-            eventSource: events
-        }
-    );
+    const sttActivationController = transcriptionEnabled
+        ? createSTTActivationController(
+            {
+                host,
+                button: sttActivationButton,
+                progress: sttActivationProgress,
+                onChange: renderSTTActivationState,
+                eventSource: events
+            }
+        )
+        : null;
 
     const lifecycleListenerOptions = completeValue(
         { signal: runtimeStateAbortController.signal }
@@ -516,13 +543,13 @@
     }
 
     function applyRoleTransitions(previousSTTRole, previousTTSRole) {
-        sttActivationController.synchronize(sttRole);
+        sttActivationController?.synchronize(sttRole);
         const sttBecameUnready = previousSTTRole.state === 'ready'
             && sttRole.state !== 'ready';
         const ttsBecameUnready = previousTTSRole.state === 'ready'
             && ttsRole.state !== 'ready';
 
-        host.availability.stt = sttRole.state === 'ready';
+        host.availability.stt = transcriptionEnabled && sttRole.state === 'ready';
         host.availability.tts = ttsRole.state === 'ready';
 
         if (sttBecameUnready) {
@@ -571,6 +598,17 @@
     }
 
     function renderControls() {
+        if (!transcriptionEnabled) {
+            recordButton.hidden = true;
+            recordButton.disabled = true;
+            sttActivationButton.hidden = true;
+            sttActivationButton.disabled = true;
+            stopButton.hidden = true;
+            stopButton.disabled = true;
+            sttActivationProgress.hidden = true;
+            renderTTSControl();
+            return;
+        }
         const transcriptionReady = sttRole.state === 'ready';
         const microphoneReady = host.availability.microphone
             && is.function(globalThis.MediaRecorder)
@@ -693,17 +731,19 @@
         if (localStatus?.message) {
             messages.push(localStatus.message);
             tone = localStatus.tone;
-            if (sttActivationController.pending
-                || ['loading', 'unloading'].includes(sttRole.state)) {
+            if (transcriptionEnabled
+                && (sttActivationController.pending
+                    || ['loading', 'unloading'].includes(sttRole.state))) {
                 messages.push(
                     describeSTTRole()
                 );
             }
-        } else {
+        } else if (transcriptionEnabled) {
             messages.push(describeSTTRole());
         }
         messages.push(describeTTSRole());
-        if (sttRole.state === 'error' || ttsRole.state === 'error') {
+        if ((transcriptionEnabled && sttRole.state === 'error')
+            || ttsRole.state === 'error') {
             tone = 'error';
         }
 
@@ -712,13 +752,14 @@
         speechStatus.setAttribute(
             'aria-busy',
             String(
-                sttRole.state === 'loading'
-                || sttRole.state === 'unloading'
+                (transcriptionEnabled
+                    && (sttRole.state === 'loading'
+                        || sttRole.state === 'unloading'
+                        || sttRole.busy
+                        || sttActivationController.pending
+                        || transcriptionActive))
                 || ttsRole.state === 'loading'
-                || sttRole.busy
                 || ttsRole.busy
-                || sttActivationController.pending
-                || transcriptionActive
             )
         );
     }
@@ -776,7 +817,9 @@
     }
 
     async function observeMicrophonePermission() {
-        if (!navigator.permissions?.query || !navigator.mediaDevices?.getUserMedia) {
+        if (!transcriptionEnabled
+            || !navigator.permissions?.query
+            || !navigator.mediaDevices?.getUserMedia) {
             return;
         }
 
@@ -1226,7 +1269,8 @@
 
     async function record() {
         if (
-            destroyed
+            !transcriptionEnabled
+            || destroyed
             || sttRole.state !== 'ready'
             || sttRole.busy
             || !host.availability.microphone
@@ -1725,7 +1769,7 @@
 
         destroyed = true;
         runtimeStateAbortController.abort();
-        sttActivationController.destroy();
+        sttActivationController?.destroy();
         window.removeEventListener('pagehide', handlePageHide);
         window.removeEventListener('pageshow', handlePageShow);
         microphonePermissionStatus?.removeEventListener?.(

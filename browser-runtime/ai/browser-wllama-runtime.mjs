@@ -20,7 +20,9 @@ export const BROWSER_WASM_RUNTIME_AUTHORITY = completeValue({
   protocol: "arcane-ai-browser-wasm/2",
   provider: "wllama",
   executionPolicy: {
-    webgpuRequired: true,
+    webgpuRequired: false,
+    defaultGpuLayers: FULL_GPU_LAYERS,
+    cpuGpuLayers: 0,
     cpuFallback: false,
     cancellation: "abortSignal-plus-llama-cancel-acknowledgement",
     cleanup: "worker-termination-only",
@@ -71,6 +73,7 @@ function runtimeCapabilitySnapshot(evidence) {
     webgpu: webgpuOperational,
     webgpuApiPresent: Boolean(navigatorObject?.gpu),
     webgpuOperational,
+    executionDevice: evidence?.executionDevice ?? null,
     webgpuEvidenceProtocol: RUNTIME_EVIDENCE_PROTOCOL,
     crossOriginIsolated: globalThis.crossOriginIsolated === true,
     secureContext: globalThis.isSecureContext === true,
@@ -329,6 +332,7 @@ function initialEvidence() {
   return completeValue({
     protocol: RUNTIME_EVIDENCE_PROTOCOL,
     state: "unloaded",
+    executionDevice: null,
     webgpu: {
       observed: false,
       apiPresent: Boolean(globalThis.navigator?.gpu),
@@ -339,7 +343,8 @@ function initialEvidence() {
 }
 
 /**
- * Creates one packaged, WebGPU-required Wllama session. This factory has no
+ * Creates one packaged Wllama session. GPU loading is the default; gpuLayers: 0
+ * selects the upstream CPU path. This factory has no
  * network or browser side effects until load() is called. Runtime URLs are
  * fixed relative to this module for npm and materialized /arcane/sdk trees.
  */
@@ -473,7 +478,12 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
     if (!is.object(globalThis.WebAssembly)) {
       throw new Error("WebAssembly is unavailable in this browser.");
     }
-    if (!globalThis.navigator?.gpu) {
+    const gpuLayers = options.gpuLayers === 0
+      ? 0
+      : normalizePositiveInteger(options.gpuLayers, FULL_GPU_LAYERS);
+    const webgpuRequired = gpuLayers > 0;
+    const executionDevice = webgpuRequired ? 'webgpu' : 'cpu';
+    if (webgpuRequired && !globalThis.navigator?.gpu) {
       throw runtimeFailure(
         "ARCANE_AI_WEBGPU_REQUIRED",
         "A WebGPU API is required, but navigator presence alone will not establish operational execution.",
@@ -486,9 +496,6 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
     const next = newEngine();
     const threads = normalizePositiveInteger(options.threads, 1);
     const contextTokens = normalizePositiveInteger(options.contextTokens, 4_096);
-    const gpuLayers = options.gpuLayers === undefined
-      ? FULL_GPU_LAYERS
-      : normalizePositiveInteger(options.gpuLayers, FULL_GPU_LAYERS);
     const loadOptions = {
       n_threads: threads,
       n_ctx: contextTokens,
@@ -527,7 +534,8 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
 
     publishEvidence({
       state: "loading",
-      webgpu: { observed: false, apiPresent: true },
+      executionDevice,
+      webgpu: { observed: false, apiPresent: Boolean(globalThis.navigator?.gpu) },
       cancellation: null,
       cleanup: null,
     });
@@ -568,43 +576,45 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
         );
       }
       let adapter = null;
-      const telemetryOperation = trackOperation(
-          Promise.resolve().then(
-              function observeLoadedGpu() {
-                  return next.arcaneTelemetry();
-              }
-          )
-      );
-      function cancelGpuObservation() {
-          telemetryOperation.cancel(loadController.signal.reason);
-      }
-      loadController.signal.addEventListener(
-          'abort',
-          cancelGpuObservation,
-          {once: true}
-      );
-      if (loadController.signal.aborted) cancelGpuObservation();
-      try {
-          // Observe the adapter this loaded Worker already selected; do not probe
-          // a second adapter in the page and attribute it to the model.
-          const telemetry = await telemetryOperation.result;
-          if (telemetry?.worker?.invalid === true) {
-              arcaneLogging.warn("The loaded model's GPU adapter observation is inconsistent.", telemetry.worker);
-          } else {
-              adapter = telemetry?.worker?.adapter ?? null;
+      if (webgpuRequired) {
+          const telemetryOperation = trackOperation(
+              Promise.resolve().then(
+                  function observeLoadedGpu() {
+                      return next.arcaneTelemetry();
+                  }
+              )
+          );
+          function cancelGpuObservation() {
+              telemetryOperation.cancel(loadController.signal.reason);
           }
-      } catch (error) {
-          if (loadController.signal.aborted || error instanceof WllamaRuntimeError) throw error;
-          arcaneLogging.warn("The loaded model's GPU adapter details are unavailable.", error);
-      } finally {
-          loadController.signal.removeEventListener('abort', cancelGpuObservation);
+          loadController.signal.addEventListener(
+              'abort',
+              cancelGpuObservation,
+              {once: true}
+          );
+          if (loadController.signal.aborted) cancelGpuObservation();
+          try {
+              // Observe the adapter this loaded Worker already selected; do not probe
+              // a second adapter in the page and attribute it to the model.
+              const telemetry = await telemetryOperation.result;
+              if (telemetry?.worker?.invalid === true) {
+                  arcaneLogging.warn("The loaded model's GPU adapter observation is inconsistent.", telemetry.worker);
+              } else {
+                  adapter = telemetry?.worker?.adapter ?? null;
+              }
+          } catch (error) {
+              if (loadController.signal.aborted || error instanceof WllamaRuntimeError) throw error;
+              arcaneLogging.warn("The loaded model's GPU adapter details are unavailable.", error);
+          } finally {
+              loadController.signal.removeEventListener('abort', cancelGpuObservation);
+          }
       }
       if (progressFailure) throw progressFailure;
       if (loadController.signal.aborted) throw cancellationError(loadController.signal.reason);
       if (pending?.engine !== next) throw new Error('Wllama load was cancelled.');
       const webgpu = {
-          observed: true,
-          apiPresent: true,
+          observed: webgpuRequired,
+          apiPresent: Boolean(globalThis.navigator?.gpu),
           adapter
       };
       pending = null;
@@ -638,6 +648,7 @@ export function createPackagedWllamaRuntime({ logger = arcaneLogging } = {}) {
       contextTokens,
       threads,
       gpuLayers,
+      executionDevice,
       evidence: evidenceState,
       metadata: engine.getModelMetadata?.() ?? null,
     });

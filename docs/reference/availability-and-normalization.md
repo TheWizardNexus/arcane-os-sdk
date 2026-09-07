@@ -70,7 +70,7 @@ version; WebKitGTK availability must not be generalized to macOS.
 | Publish application events or review a complete event history | `arcane-os/event-manager` | **Node** and **Browser**; optional DOM capture needs a browser DOM or compatible host | Live listeners receive original arguments. Ordinary `secure:false` recording preserves complete URLs, public details, and captured stack text in deeply frozen `arcane-event-stack/1` snapshots while credential-named fields remain redacted. The stack format is local diagnostic data, not a host transport. |
 | Build browser UI and app-local behavior | `/arcane/modules/*.js`, shared entities, and components | **Browser**; many modules also run inside every native renderer | Pure modules own their result contracts. Modules that call `Arcane` inherit the bridge boundary described below. |
 | Select and observe independent LLM/STT/TTS roles | `/arcane/modules/AIProviderRuntime.js` and `AIRuntimeState.js` | **Cross-host** controller/state; registered providers retain their own host requirements | Required/projected provider members, route/configuration records, and status fields; per-role lifecycle, cancellation, stream cleanup, sticky state, and startup barriers are normalized. `localOnly` creates no fallback. |
-| Run a caller-selected local LLM entirely in a browser renderer | `arcane-os/ai/browser-wasm` through `createArcaneAI()` | **Browser** only; secure context, WebAssembly, OPFS/DBOPFS, WebGPU, and requested full offload are required; no CPU fallback | The public AI API module normalizes multi-model lifecycle, status, complete all-choice streaming, cancellation, exact ordered structural tool-call visibility, and session persistence. Model sources are canonical ordered file descriptors; licenses and model choice remain application policy. |
+| Run a caller-selected local LLM entirely in a browser renderer | `arcane-os/ai/browser-wasm` through `createArcaneAI()` | **Browser** only; secure context, WebAssembly, and OPFS/DBOPFS; full WebGPU offload by default or explicit CPU with `gpuLayers:0` | The public AI API module normalizes multi-model lifecycle, status, complete all-choice streaming, cancellation, exact ordered structural tool-call visibility, and session persistence. Model sources are canonical ordered file descriptors; licenses and model choice remain application policy. |
 | Run caller-selected Whisper or Kokoro in a browser renderer | `arcane-os/ai/browser-speech` registered with `AIProviderRuntime` | **Browser** only; DBOPFS, Web Locks, Workers, Fetch/object URLs, and a caller-supplied self-contained runtime/model closure are required | STT/TTS use independent provider/2 lifecycle and status. Kokoro adds bounded Worker/session concurrency and explicit `auto`, `webgpu`, or `wasm` execution. Complete model/runtime selection, offline behavior, cancellation, Worker teardown, and request/result shapes are normalized. No runtime/model content or cloud fallback is supplied. |
 | Prepare ordered speech playback or reuse the speech-input formatting filter | `arcane-os/speech-playback` and `arcane-os/speech-text` | **Node** with injected media adapters, or **Browser / Native WebView** media; the text filter itself is **Cross-host** | Stored and caller-owned text stays exact. Only the outbound synthesis copy automatically loses repeated same formatting marks. A capacity-advertising provider receives complete segments immediately while retaining indexed playback; native/custom synthesis stays serialized. |
 | Preserve complete chat history and memory | `/arcane/modules/PersistentAIChatSession.js` | **Browser / native WebView** with ChatEntity/DBOPFS and a configured chat function | Existing DBOPFS names and memory semantics are preserved. Live-context commit is atomic; durable persistence is explicit and coherent across user/assistant turns and atomic all-ID tool-result batches. |
@@ -133,9 +133,12 @@ surface does not require an Arcane Core method grant because it does not call a
 Core host. Browser Fetch, CORS, storage policy, secure-context behavior, and
 resource limits still apply.
 
-The current browser runtime requires WebGPU and has no CPU fallback. A successful
-load requests full GPU offload (`gpuLayers: 99999`). `navigator.gpu` presence by
-itself is not readiness. The provider emits the instrumented
+The browser runtime defaults to full GPU offload (`gpuLayers:99999`). Explicit
+`loadDefaults:{gpuLayers:0}` or `load({gpuLayers:0})` selects CPU and skips
+WebGPU requirements and adapter work; GPU failure never selects CPU implicitly.
+Both routes wait for Wllama to report the complete model loaded.
+`navigator.gpu` presence by itself is not readiness. On the GPU route, the
+provider emits the instrumented
 `arcane.ai.browser-wasm.webgpu.adapter.selected` capability event after adapter
 selection.
 

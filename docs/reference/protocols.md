@@ -355,10 +355,12 @@ does not silently delete the app-owned cache. A complete whole member supersedes
 its current resumable fragments. Cleanup failure is warned without hiding the
 usable model.
 
-SDK `0.5.17` requires WebGPU. Load requests full offload and waits for the runtime
-to report a loaded model. `navigator.gpu` presence alone is
-not readiness. There is no CPU fallback, partial-offload success mode, or
-silent switch to native/Core/cloud inference.
+Browser-WASM loads default to full WebGPU offload. Explicit
+`loadDefaults:{gpuLayers:0}` or `load({gpuLayers:0})` selects CPU through the
+same packaged Wllama runtime without GPU initialization or GPU-only
+requirements. Both routes wait for the runtime to report the complete model
+loaded. `navigator.gpu` presence alone is not readiness. There is no automatic
+CPU fallback or silent switch to native/Core/cloud inference.
 
 ### Browser speech lifecycle
 
@@ -556,6 +558,11 @@ model or selects a fallback. `speech.html` and `voice-transcription.html` consum
 one shared `createSTTActivationController()` contract for selected, unloaded,
 loading, unloading, error, and ready presentation plus cancelable user intent.
 Both keep capture unavailable until sticky STT state is exactly ready.
+On mobile browsers, `speech.html` additionally omits transcription activation,
+capture, and transcription status/progress while retaining its TTS control and
+voice status. Its public activation callback returns `false` without dispatch.
+This uses the SDK's browser-device classification, including tablets, and does
+not change the dedicated `voice-transcription.html` workflow or provider APIs.
 
 Each shared speech component owns an `AbortController` for its STT request and
 passes its signal through `AI.fetchSTT()`. `voice-transcription.html` also adds

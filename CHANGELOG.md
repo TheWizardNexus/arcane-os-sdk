@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.11.0
+
+- Add explicit browser chat CPU selection with `loadDefaults:{gpuLayers:0}`
+  or `load({gpuLayers:0})`. Use the packaged Wllama CPU path without WebGPU
+  requirements or adapter initialization. Omission retains full GPU offload;
+  model sources, cache, complete responses, streaming, and cancellation remain
+  on their existing owners.
+- On mobile browsers and tablets, keep shared Speech focused on voice output:
+  hide and disable transcription activation and recording, omit transcription
+  status/progress, and retain mute/unmute. Chat retains End. Desktop speech and
+  the dedicated transcription component retain their existing behavior.
+
 ## 0.10.1
 
 - Open developer error modals only for newly captured live incidents. Restoring

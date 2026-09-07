@@ -1163,8 +1163,17 @@ Shared dependencies: [`AI.js`](runtime-modules.md#aijs),
 [`ComponentContracts.js`](runtime-modules.md#componentcontractsjs), and
 [`DBLS.js`](runtime-modules.md#dblsjs).
 
-The Hold to talk control remains disabled unless sticky STT state is `ready`,
-the role is not busy, and microphone capture is available. For an explicitly
+On mobile browsers, including tablets, the shared browser-device classifier
+selects a Speech interface for voice output. Transcription activation,
+recording, sending recorded audio, and their status/progress are unavailable;
+`requestSTTActivation()` returns `false` without requesting a provider action.
+The keyboard remains the voice-input path. The existing TTS mute/unmute control
+and voice status remain available, and Chat retains its End control. Desktop
+speech and the dedicated `voice-transcription.html` component retain their
+existing behavior.
+
+On desktop, the Hold to talk control remains disabled unless sticky STT state
+is `ready`, the role is not busy, and microphone capture is available. For an explicitly
 selected STT route, a separate keyboard-operable control presents Start
 transcription while `unloaded`, Cancel loading while `loading`, a disabled
 Canceling state while `unloading`, and Try again with the sticky error while

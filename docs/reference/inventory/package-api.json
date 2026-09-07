@@ -2932,7 +2932,7 @@
       "primaryImport": "arcane-os/ai/browser-wasm",
       "group": "Browser-WASM local AI",
       "summary": "Creates the packaged Wllama browser provider with complete serialized inference, streaming, abort, unload, and probe operations.",
-      "availability": "Browser context with WebAssembly, OPFS/DBOPFS, and WebGPU; no CPU fallback",
+      "availability": "Browser context with WebAssembly and OPFS/DBOPFS; WebGPU by default or explicit CPU with gpuLayers:0",
       "protocol": "arcane-ai-adapter/1 with OpenAI-like chat completion and streaming envelopes",
       "normalization": "Mutable complete lifecycle/status records, declaration/history validation, atomic nonblank all-ID tool-result sequencing, complete all-choice nonstructural ordinary iterator projections, all-choice terminal validation, terminal-only structural-call acceptance, and exact structured tool-call data with required user-facing message and retained extension fields; the SDK never invokes application tools"
     },

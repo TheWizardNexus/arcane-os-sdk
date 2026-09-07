@@ -2605,7 +2605,7 @@ function capabilityLoadPlan(runtimeCapabilities, defaults, options = {}) {
     contextTokens,
     batchTokens,
     microBatchTokens,
-    gpuLayers: 99_999,
+    gpuLayers: configured.gpuLayers === 0 ? 0 : 99_999,
     ...(reasoning!==undefined?{ reasoning }:{}),
     ...(chatTemplate!==undefined?{ chatTemplate }:{}),
     ...(jinja!==undefined?{ jinja }:{}),
@@ -2625,14 +2625,20 @@ function sameLoadPlan(left, right) {
     && JSON.stringify(left?.templateDefaults) === JSON.stringify(right?.templateDefaults);
 }
 
-function stableModelFailure(error) {
+function stableModelFailure(error, loadPlan) {
   const code = is.string(error?.code) ? error.code : "";
   const message = is.string(error?.message) ? error.message : "";
   if (code === "ARCANE_AI_MODEL_SHARD_TOO_LARGE") {
     return completeValue({ code });
   }
   if (/(?:out of memory|allocation failed|failed to allocate|memory exhausted)/iu.test(message)) {
-    return completeValue({ code: "ARCANE_AI_MODEL_GPU_MEMORY_INSUFFICIENT" });
+    return completeValue(
+        {
+            code: loadPlan.gpuLayers === 0
+                ? 'ARCANE_AI_MODEL_CPU_MEMORY_INSUFFICIENT'
+                : 'ARCANE_AI_MODEL_GPU_MEMORY_INSUFFICIENT'
+        }
+    );
   }
   if (code === "ARCANE_AI_WEBGPU_EVIDENCE_INVALID") {
     return completeValue({ code: "ARCANE_AI_MODEL_FULL_OFFLOAD_UNPROVEN" });
@@ -2667,10 +2673,10 @@ function capabilityPolicy(
   if (runtimeCapabilities.secureContext !== true) {
     add("ARCANE_AI_SECURE_CONTEXT_REQUIRED", "incompatible");
   }
-  if (runtimeCapabilities.webgpuApiPresent !== true) {
+  if (loadPlan.gpuLayers > 0 && runtimeCapabilities.webgpuApiPresent !== true) {
     add("ARCANE_AI_WEBGPU_API_UNAVAILABLE", "incompatible");
   }
-  if (failure) {
+  if (failure && failure.gpuLayers === loadPlan.gpuLayers) {
     add(failure.code, "incompatible");
   }
   if (storage?.compatibility === "incompatible") {
@@ -2679,7 +2685,13 @@ function capabilityPolicy(
     add(storage?.code ?? "ARCANE_AI_STORAGE_NOT_MEASURED", "unknown");
   }
   const webgpu = runtimeEvidence?.webgpu;
-  if (state === "ready" && webgpu?.observed === true) {
+  if (loadPlan.gpuLayers === 0) {
+    const cpuLoaded = state === 'ready' && runtimeEvidence?.executionDevice === 'cpu';
+    add(
+      cpuLoaded ? 'ARCANE_AI_CPU_MODEL_LOADED' : 'ARCANE_AI_CPU_MODEL_NOT_LOADED',
+      cpuLoaded ? 'compatible' : 'unknown',
+    );
+  } else if (state === "ready" && webgpu?.observed === true) {
     add(
       "ARCANE_AI_WEBGPU_EXECUTION_OBSERVED",
       "compatible",
@@ -2799,6 +2811,8 @@ export function createBrowserWasmLlmProvider({
       webgpu: runtimeCapabilities.webgpu,
       webgpuApiPresent: runtimeCapabilities.webgpuApiPresent,
       webgpuOperational: runtimeCapabilities.webgpuOperational,
+      webgpuRequired: activeLoadPlan.gpuLayers > 0,
+      executionDevice: activeLoadPlan.gpuLayers === 0 ? 'cpu' : 'webgpu',
       webgpuEvidenceProtocol: runtimeCapabilities.webgpuEvidenceProtocol,
       webgpuAdapterSelectionEvent: WEBGPU_ADAPTER_SELECTED_EVENT,
       crossOriginIsolated: runtimeCapabilities.crossOriginIsolated,
@@ -2920,7 +2934,7 @@ export function createBrowserWasmLlmProvider({
       if (!sameLoadPlan(activeLoadPlan, requestedLoadPlan)) {
         throw fail(
           "ARCANE_AI_LOAD_PLAN_RELOAD_REQUIRED",
-          "Unload the browser-WASM model before changing its context or batch load plan.",
+          "Unload the browser-WASM model before changing its execution device, context, or batch load plan.",
         );
       }
       activeSecurity = effectiveSecurity;
@@ -2936,7 +2950,7 @@ export function createBrowserWasmLlmProvider({
       if (!sameLoadPlan(activeLoadPlan, requestedLoadPlan)) {
         throw fail(
           "ARCANE_AI_LOAD_PLAN_RELOAD_REQUIRED",
-          "The in-flight browser-WASM load uses a different context or batch plan.",
+          "The in-flight browser-WASM load uses a different execution device, context, or batch plan.",
         );
       }
       activeSecurity = effectiveSecurity;
@@ -3082,8 +3096,13 @@ export function createBrowserWasmLlmProvider({
           operation: "load",
           signal: normalizationSignal(surfaced, signal),
         });
-        const modelFailure = stableModelFailure(normalized);
-        if (modelFailure) modelFailures.set(activeSource.id, modelFailure);
+        const modelFailure = stableModelFailure(normalized, activeLoadPlan);
+        if (modelFailure) {
+          modelFailures.set(
+              activeSource.id,
+              {...modelFailure, gpuLayers: activeLoadPlan.gpuLayers}
+          );
+        }
         if (generation === lifecycleGeneration && state === "loading") {
           state = "error";
           errorState = completeValue({ code: normalized.code, message: normalized.message });
@@ -3196,6 +3215,10 @@ export function createBrowserWasmLlmProvider({
         state = "unloaded";
         errorState = null;
         activeSecurity = null;
+        activeLoadPlan = capabilityLoadPlan(
+          measuredRuntimeCapabilities(runtime.capabilities()),
+          runtimeLoadDefaults,
+        );
         return status();
       } catch (error) {
         const normalized = normalizeArcaneAIError(error, {
@@ -3394,7 +3417,7 @@ export function adaptV1LlmProvider(provider) {
         [capabilities?.webAssembly === true, "WebAssembly"],
         [capabilities?.opfs === true, "OPFS"],
         [capabilities?.secureContext === true, "a secure context"],
-        [capabilities?.webgpuApiPresent === true, "the WebGPU API"],
+        [capabilities?.webgpuRequired === false || capabilities?.webgpuApiPresent === true, "the WebGPU API"],
       ];
       const missing = requirements.find(([available]) => !available)?.[1] ?? null;
       if (missing) {

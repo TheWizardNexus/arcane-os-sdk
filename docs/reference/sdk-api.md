@@ -122,7 +122,7 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `createBrowserModelSource()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser Fetch with a readable response body |
 | `createBrowserSpeechArtifactGraph()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser metadata; construction starts no fetch, cache, Worker, provider, or event operation |
 | `createBrowserSpeechAuthority()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser descriptor construction; use requires the selected storage and provider Web APIs |
-| `createBrowserWasmLlmProvider()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser context with WebAssembly, OPFS/DBOPFS, and WebGPU; no CPU fallback |
+| `createBrowserWasmLlmProvider()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser context with WebAssembly and OPFS/DBOPFS; WebGPU by default or explicit CPU with gpuLayers:0 |
 | `createBrowserWhisperProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with Workers, object URLs, caller-selected Whisper runtime/model artifacts, and an SDK DBOPFS speech store |
 | `createCanonicalUstarHeader()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `createDbopfsModelStore()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser with a ready DBOPFS instance and OPFS |
@@ -6112,8 +6112,9 @@ exposes `protocol`, `id`, default `model`, `catalog`, `capabilities`, `status`,
 Direct `load()` selects a catalog model and returns `{model,status}`; the
 public AI API module's `ai.load()` returns the flat controller status. Load settings include
 offline mode, `AbortSignal`, progress, threads, and context/batch/micro-batch
-tokens. The runtime always forces `gpuLayers:99999`; callers cannot request CPU
-or partial offload.
+tokens. `loadDefaults:{gpuLayers:0}` or `load({gpuLayers:0})` explicitly selects
+CPU. Omission retains full GPU offload (`gpuLayers:99999`); GPU failures never
+silently switch to CPU.
 
 Chat supports OpenAI-like message/generation fields, tools, tool choice,
 parallel tool-call preference, and JSON/JSON-Schema structured output.
@@ -6133,11 +6134,13 @@ turn.
 
 ### Availability and normalization
 
-**Browser context with WebAssembly, OPFS/DBOPFS, and WebGPU.** A load succeeds
-after Wllama confirms the complete model is loaded. There is no CPU fallback.
+**Browser context with WebAssembly and OPFS/DBOPFS.** The default GPU route
+also requires WebGPU; explicit `gpuLayers:0` CPU loading skips GPU requirements
+and adapter work. A load succeeds after Wllama confirms the complete model is
+loaded. There is no automatic CPU fallback.
 Cross-origin isolation and coarse hardware fields remain observations rather
 than hard gates. Ordinary status reports complete catalog compatibility and
-lifecycle state. Adapter selection is instrumented as
+lifecycle state. GPU adapter selection is instrumented as
 `arcane.ai.browser-wasm.webgpu.adapter.selected`.
 Cancellation normalizes to `ARCANE_AI_REQUEST_ABORTED`; load or availability failures
 surface stable `ARCANE_AI_*` codes such as `ARCANE_AI_WEBGPU_REQUIRED`,
@@ -6278,8 +6281,8 @@ Re-adapting the same provider returns the same adapter object.
 ### Availability and normalization
 
 **Browser; the wrapped provider retains its own secure-context, WebAssembly,
-OPFS/DBOPFS, WebGPU, model, and lifecycle requirements.** The adapter normalizes
-provider/2 selection and lifecycle without adding Node, native, cloud, network,
+OPFS/DBOPFS, selected CPU or WebGPU route, model, and lifecycle requirements.**
+The adapter normalizes provider/2 selection and lifecycle without adding Node, native, cloud, network,
 or CPU fallback behavior.
 
 ### Example
