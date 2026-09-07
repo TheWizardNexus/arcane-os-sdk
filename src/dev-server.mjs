@@ -6,6 +6,8 @@ import https from 'node:https';
 import os from 'node:os';
 import path from 'node:path';
 import {resolveWorkspace} from './workspace.mjs';
+import {APP_DESCRIPTOR_NAME, projectPackageManifest} from './app-descriptor.mjs';
+import {APP_CONFIG_NAME, validateAppConfig} from './packager/core.mjs';
 import {createEventQueue} from './event-queue.mjs';
 import {
     applyPwaEntryReferences,inspectImportMapHtml,MANAGED_IMPORT_MAP_ATTRIBUTE,
@@ -459,6 +461,7 @@ async function sourceRoutes(workspaceRoot,appId,{
         return {
             workspaceRoot:resolved.workspaceRoot,
             workspaceMode:resolved.config.workspaceMode,
+            config:resolved.config,
             appId:resolved.appId,
             app:resolved.app.manifest,
             startPath:`/apps/${resolved.appId}/${resolved.app.manifest.entry}`,
@@ -470,6 +473,7 @@ async function sourceRoutes(workspaceRoot,appId,{
         return {
             workspaceRoot:resolved.workspaceRoot,
             workspaceMode:'integrated',
+            config:resolved.config,
             appId:resolved.appId,
             app:resolved.app.manifest,
             startPath:`/apps/${resolved.appId}/${resolved.app.manifest.entry}`,
@@ -488,6 +492,7 @@ async function sourceRoutes(workspaceRoot,appId,{
     return {
         workspaceRoot:resolved.workspaceRoot,
         workspaceMode:'external',
+        config:resolved.config,
         appId:resolved.appId,
         app:resolved.app.manifest,
         startPath:`/apps/${resolved.appId}/${resolved.app.manifest.entry}`,
@@ -840,7 +845,6 @@ async function startOwnedDevServer({
         })
         :await packagedRoutes(releaseRoot);
     const mappings=deterministicMappings(routeSet.mappings);
-    const pwaEnabled = mode === 'source' ? routeSet.app?.pwa?.enabled === true : routeSet.pwa;
     const versionPath = mode === 'source'
         ? sdkRuntimeSourceRoot === undefined
             ? path.join(routeSet.workspaceRoot, 'arcane.lock.json')
@@ -928,24 +932,89 @@ async function startOwnedDevServer({
         if(info.isSymbolicLink()||!info.isDirectory())fail(`Server route root must be a real directory: ${mapping.root}.`);
         mapping.root=await realpath(mapping.root);
     }
-    let pwaArtifacts;
-    let pwaInventoryTask;
-    const generatedMetadata = new Map();
+    let currentSourceRoutes = {...routeSet, mappings};
+    let sourceManifestInput;
+    let sourceManifestTask;
+    const appMapping = mappings.find(
+        function selectedApplicationMapping(mapping) {
+            return mapping.prefix[0] === 'apps' && mapping.prefix[1] === routeSet.appId;
+        }
+    );
+    async function refreshSourceRoutes() {
+        // Share concurrent metadata reads; unchanged descriptors need no parse
+        // or projection, and unrelated runtime requests do not wait here.
+        if (!sourceManifestTask) {
+            sourceManifestTask = readCurrentSourceRoutes().finally(
+                function releaseSourceManifestTask() {
+                    sourceManifestTask = null;
+                }
+            );
+        }
+        return sourceManifestTask;
+    }
+    async function readCurrentSourceRoutes() {
+        throwIfAborted(signal);
+        let manifestPath = path.join(appMapping.root, APP_DESCRIPTOR_NAME);
+        let authored = true;
+        let input;
+        try {
+            input = await lstat(manifestPath);
+        } catch (error) {
+            if (error.code !== 'ENOENT') throw error;
+            authored = false;
+            manifestPath = path.join(appMapping.root, APP_CONFIG_NAME);
+            input = await lstat(manifestPath);
+        }
+        if (sourceManifestInput?.path === manifestPath
+            && sourceManifestInput.modifiedAt === input.mtimeMs) {
+            return currentSourceRoutes;
+        }
+        const value = JSON.parse(await readFile(manifestPath, 'utf8'));
+        const manifest = validateAppConfig(
+            authored ? projectPackageManifest(value) : value,
+            routeSet.appId,
+            routeSet.config,
+            manifestPath
+        );
+        const currentAppMapping = {
+            ...appMapping,
+            include: manifest.include,
+            allow: function currentSourcePathAllowed(relative) {
+                return sourcePathAllowed(relative, manifest);
+            }
+        };
+        // Each request retains its own selection while an inventory or file read
+        // runs. HTTP reads never rewrite the consumer's authored projections.
+        currentSourceRoutes = {
+            ...routeSet,
+            app: manifest,
+            startPath: `/apps/${routeSet.appId}/${manifest.entry}`,
+            mappings: mappings.map(
+                function currentSourceMapping(mapping) {
+                    return mapping === appMapping ? currentAppMapping : mapping;
+                }
+            )
+        };
+        sourceManifestInput = {path: manifestPath, modifiedAt: input.mtimeMs};
+        return currentSourceRoutes;
+    }
+    const pwaStates = new WeakMap();
+    let currentPwaState;
     const pwaResourceUrls = new Set();
-    function developmentPwaArtifacts(assets = []) {
+    function developmentPwaArtifacts(selectedRoutes, assets = [], version = assetVersion) {
         return createPwaArtifacts(
             {
                 app: {
                     id: routeSet.appId,
-                    displayName: routeSet.app.displayName,
-                    version: routeSet.app.version,
-                    entry: routeSet.startPath
+                    displayName: selectedRoutes.app.displayName,
+                    version: selectedRoutes.app.version,
+                    entry: selectedRoutes.startPath
                 },
-                sdkVersion: assetVersion,
-                pwa: routeSet.app.pwa,
+                sdkVersion: version,
+                pwa: selectedRoutes.app.pwa,
                 files: [],
                 assets,
-                navigationAliases: {'/': routeSet.startPath},
+                navigationAliases: {'/': selectedRoutes.startPath},
                 basePath: '/',
                 appBase: `/apps/${routeSet.appId}/`,
                 runtimeBase: '/arcane/sdk/',
@@ -953,46 +1022,66 @@ async function startOwnedDevServer({
             }
         );
     }
-    function rememberPwaArtifacts(artifacts) {
+    function rememberPwaArtifacts(state, artifacts, generatedAt = new Date()) {
         for (const file of artifacts.files) {
-            const previous = generatedMetadata.get(file.path);
+            const previous = state.metadata.get(file.path);
             const lastModified = previous?.content === file.content
                 ? previous.lastModified
-                : new Date();
-            generatedMetadata.set(
+                : generatedAt;
+            state.metadata.set(
                 file.path,
                 {content: file.content, lastModified}
             );
         }
-        pwaArtifacts = artifacts;
+        state.artifacts = artifacts;
         return artifacts;
     }
-    async function sourcePwaArtifact(targetPath) {
+    async function sourcePwaArtifact(targetPath, selectedRoutes) {
+        let state = pwaStates.get(selectedRoutes);
+        if (!state) {
+            state = {metadata: new Map(currentPwaState?.metadata)};
+            pwaStates.set(selectedRoutes, state);
+            if (selectedRoutes === currentSourceRoutes) currentPwaState = state;
+        }
         if (targetPath === '/arcane-sw.js'
             || targetPath === '/arcane-offline.json') {
-            if (!pwaInventoryTask) {
-                pwaInventoryTask = Promise.all(
-                    [sourcePwaAssets(routeSet, mappings, signal, pwaResourceUrls, resourcePaths), selectedAssetVersion()]
+            if (!state.inventoryTask) {
+                // Timestamp selection before traversal, so an older snapshot
+                // finishing later cannot acquire a newer HTTP modification date.
+                const generatedAt = new Date();
+                state.inventoryTask = Promise.all(
+                    [
+                        sourcePwaAssets(selectedRoutes, selectedRoutes.mappings, signal, pwaResourceUrls, resourcePaths),
+                        selectedAssetVersion().then(
+                            function rememberCurrentInventoryVersion(version) {
+                                if (selectedRoutes === currentSourceRoutes) rememberAssetVersion(version);
+                                return version;
+                            }
+                        )
+                    ]
                 ).then(
                     function prepareSourceOfflineInventory([assets, version]) {
-                        rememberAssetVersion(version);
-                        return rememberPwaArtifacts(developmentPwaArtifacts(assets));
+                        return rememberPwaArtifacts(
+                            state,
+                            developmentPwaArtifacts(selectedRoutes, assets, version),
+                            generatedAt
+                        );
                     }
                 ).finally(
                     function releaseSourceInventoryTask() {
-                        pwaInventoryTask = null;
+                        state.inventoryTask = null;
                     }
                 );
             }
-            await pwaInventoryTask;
+            await state.inventoryTask;
         }
-        const artifacts = pwaArtifacts ?? rememberPwaArtifacts(developmentPwaArtifacts());
+        const artifacts = state.artifacts ?? rememberPwaArtifacts(state, developmentPwaArtifacts(selectedRoutes));
         const file = artifacts.files.find(
             function requestedPwaFile(file) {
                 return `/${file.path}` === targetPath;
             }
         );
-        return {...file, lastModified: generatedMetadata.get(file.path).lastModified};
+        return {...file, lastModified: state.metadata.get(file.path).lastModified};
     }
     // Remember actual resource edges as their owners are served, not every
     // HTML/JS/CSS file in an application's document or attachment corpus.
@@ -1018,9 +1107,15 @@ async function startOwnedDevServer({
             const target=parseRequestTarget(request.url);
             if(!target){deny(response,400,'Invalid request path.');return;}
             const {segments}=target;
+            const generatedPwaPath = ['/arcane.webmanifest', '/arcane-offline.json', '/arcane-sw.js', '/arcane-pwa.mjs']
+                .includes(target.path);
+            const appRequest = segments[0] === 'apps' && segments[1] === routeSet.appId;
+            const selectedRoutes = mode === 'source' && (appRequest || segments.length === 0 || generatedPwaPath)
+                ? await refreshSourceRoutes() : currentSourceRoutes;
+            const pwaEnabled = mode === 'source' ? selectedRoutes.app?.pwa?.enabled === true : routeSet.pwa;
             if (mode === 'source' && pwaEnabled
-                && ['/arcane.webmanifest', '/arcane-offline.json', '/arcane-sw.js', '/arcane-pwa.mjs'].includes(target.path)) {
-                const generated = await sourcePwaArtifact(target.path);
+                && generatedPwaPath) {
+                const generated = await sourcePwaArtifact(target.path, selectedRoutes);
                 response.setHeader('Cache-Control', 'no-cache');
                 await serveGeneratedRepresentation(
                     fileServer,
@@ -1037,12 +1132,18 @@ async function startOwnedDevServer({
                 return;
             }
             if(segments.length===0){
-                response.writeHead(302,{location:routeSet.startPath});
+                response.writeHead(302,{location:selectedRoutes.startPath});
                 response.end();
                 return;
             }
-            const mapping=mappings.find(route=>
-                route.prefix.every((segment,index)=>segments[index]===segment)
+            const mapping = selectedRoutes.mappings.find(
+                function requestedSourceMapping(route) {
+                    return route.prefix.every(
+                        function matchingSourcePrefix(segment, index) {
+                            return segments[index] === segment;
+                        }
+                    );
+                }
             );
             if(!mapping){deny(response,404,'Not found.');return;}
             const relative=segments.slice(mapping.prefix.length);
@@ -1064,8 +1165,8 @@ async function startOwnedDevServer({
                 const html=extension==='.html'||extension==='.htm';
                 const selectedPwaDocument = mode === 'source' && pwaEnabled && html
                     && mapping.prefix[0] === 'apps' && mapping.prefix[1] === routeSet.appId
-                    && routeSet.app.include.includes(relative.join('/'));
-                const selectedDocument = target.path === routeSet.startPath || selectedPwaDocument;
+                    && selectedRoutes.app.include.includes(relative.join('/'));
+                const selectedDocument = target.path === selectedRoutes.startPath || selectedPwaDocument;
                 const managedDocument = !selectedDocument && html && await isManagedDocument(opened);
                 const entryDocument = selectedDocument || managedDocument;
                 const managedMap=path.basename(opened.candidate)==='arcane.importmap.json';

@@ -6,12 +6,12 @@ import test from '../src/testing.mjs';
 import {startDevServer} from '../src/dev-server.mjs';
 import {createWorkspace} from '../src/scaffold.mjs';
 import {developApplication} from '../src/toolchain.mjs';
-import {SDK_VERSION} from '../src/constants.mjs';
+import {ARCANE_PROTOCOL, SDK_VERSION} from '../src/constants.mjs';
 import {
     fetchSyntheticTls as fetch,temporaryDirectory,useSyntheticTls,writeSyntheticTlsFiles
 } from './helpers.mjs';
 
-async function sourceFixture(context, {enabled = true} = {}) {
+async function sourceFixture(context, {enabled = true, authored = false} = {}) {
     useSyntheticTls(context);
     const workspaceRoot = await temporaryDirectory(context, {prefix: 'arcane-dev-pwa-'});
     await writeSyntheticTlsFiles(workspaceRoot);
@@ -51,6 +51,7 @@ async function sourceFixture(context, {enabled = true} = {}) {
             offline: {exclude: ['documents/excluded.txt']}
         };
     }
+    if (authored) app.include.sort();
     const entry = '<!doctype html><html lang="en"><head><base href="../../">'
         + '<script type="importmap" data-arcane-import-map>{"imports":{"arcane/State":"./arcane/modules/State.js?v=1&arcaneVersion=old"}}</script>'
         + '<link rel="stylesheet" href="./apps/fixture/styles.css?v=4">'
@@ -86,6 +87,27 @@ async function sourceFixture(context, {enabled = true} = {}) {
         ['arcane/modules/child.js', 'export const child = true;'],
         ['arcane/sdk/pwa.mjs', 'export const servingFixture = true;']
     ]);
+    if (authored) {
+        files.set('apps/fixture/arcane-app.json', JSON.stringify({
+            schemaVersion: 2,
+            id: app.id,
+            displayName: app.displayName,
+            description: 'Authored live source fixture.',
+            version: app.version,
+            publisher: {id: 'fixture-publisher', name: 'Fixture Publisher'},
+            package: {
+                entry: app.entry,
+                strategy: app.strategy,
+                include: app.include,
+                exclude: app.exclude,
+                shared: app.shared,
+                ...(app.pwa === undefined ? {} : {pwa: app.pwa})
+            },
+            native: {type: 'app', icon: null, order: 100, bundledApps: []},
+            requirements: {arcaneProtocol: ARCANE_PROTOCOL, features: []},
+            targets: ['browser']
+        }));
+    }
     await Promise.all([...files].map(async function writeFixtureFile([relative, content]) {
         const location = path.join(workspaceRoot, ...relative.split('/'));
         await mkdir(path.dirname(location), {recursive: true});
@@ -254,6 +276,145 @@ test(
         assert.ok((await worker.text()).includes('/apps/fixture/documents/added%20notes.txt'));
         const document = await fetch(`${instance.origin}/apps/fixture/documents/added%20notes.txt`);
         assert.equal(await document.text(), addedContent);
+        await assert.rejects(lstat(path.join(workspaceRoot, 'dist')), {code: 'ENOENT'});
+    }
+);
+
+test(
+    'running package-only source server follows current membership, entry, and PWA configuration',
+    async function refreshLivePackageSourceSelection(context) {
+        const {workspaceRoot, instance, entry} = await sourceFixture(context);
+        const appRoot = path.join(workspaceRoot, 'apps', 'fixture');
+        const packagePath = path.join(appRoot, 'arcane-package.json');
+        const app = JSON.parse(await readFile(packagePath, 'utf8'));
+        const previousManifest = await (await fetch(`${instance.origin}/arcane.webmanifest`)).json();
+        const previousBootstrap = await (await fetch(`${instance.origin}/arcane-pwa.mjs`)).text();
+        const previousOffline = await (await fetch(`${instance.origin}/arcane-offline.json`)).json();
+        assert.ok(previousOffline.assets.includes('/apps/fixture/secondary.html'));
+        assert.ok(previousOffline.assets.includes('/apps/fixture/modules/leaf.js'));
+
+        const addedSource = "  export const history = 'Complete newly selected source.';\n";
+        await Promise.all([
+            writeFile(path.join(appRoot, 'added script.js'), addedSource),
+            writeFile(path.join(appRoot, 'current.html'), entry)
+        ]);
+        const addedUrl = `${instance.origin}/apps/fixture/added%20script.js`;
+        assert.equal((await fetch(addedUrl)).status, 404);
+        app.include = app.include.filter(function retainCurrentSelection(file) {
+            return file !== 'secondary.html';
+        });
+        app.include.push('added script.js', 'current.html');
+        app.entry = 'current.html';
+        app.exclude.push('modules/leaf.js');
+        app.pwa.manifest.name = 'Current package application';
+        app.pwa.manifest.description = '  Complete updated description.\nSecond line.  ';
+        app.pwa.offline.exclude.push('modules/worker.js');
+        const packageSource = `${JSON.stringify(app, null, 4)}\n`;
+        await writeFile(packagePath, packageSource);
+
+        const added = await fetch(addedUrl);
+        assert.equal(added.status, 200);
+        assert.equal(await added.text(), addedSource);
+        for (const removed of ['secondary.html', 'modules/leaf.js']) {
+            assert.equal((await fetch(`${instance.origin}/apps/fixture/${removed}`)).status, 404);
+            assert.equal((await lstat(path.join(appRoot, removed))).isFile(), true);
+        }
+        const root = await fetch(`${instance.origin}/`, {redirect: 'manual'});
+        assert.equal(root.status, 302);
+        assert.equal(root.headers.get('location'), '/apps/fixture/current.html');
+        const currentEntry = await fetch(`${instance.origin}/apps/fixture/current.html`);
+        assert.equal(currentEntry.status, 200);
+        assert.ok((await currentEntry.text()).includes('async data-arcane-pwa'));
+
+        // Metadata requests must refresh without waiting for a subsequent inventory request.
+        const manifest = await (await fetch(`${instance.origin}/arcane.webmanifest`)).json();
+        assert.notEqual(manifest.name, previousManifest.name);
+        assert.equal(manifest.name, app.pwa.manifest.name);
+        assert.equal(manifest.description, app.pwa.manifest.description);
+        assert.equal(manifest.start_url, '/apps/fixture/current.html');
+        const bootstrap = await (await fetch(`${instance.origin}/arcane-pwa.mjs`)).text();
+        assert.notEqual(bootstrap, previousBootstrap);
+        assert.ok(bootstrap.includes(`appName: ${JSON.stringify(manifest.name)}`));
+        const offline = await (await fetch(`${instance.origin}/arcane-offline.json`)).json();
+        assert.ok(offline.assets.includes('/apps/fixture/added%20script.js'));
+        assert.ok(offline.assets.includes('/apps/fixture/current.html'));
+        for (const removed of ['secondary.html', 'modules/leaf.js', 'modules/worker.js']) {
+            assert.equal(offline.assets.includes(`/apps/fixture/${removed}`), false);
+        }
+        assert.equal(offline.appVersion, previousOffline.appVersion);
+        assert.equal((await fetch(`${instance.origin}/apps/fixture/modules/worker.js`)).status, 200);
+        assert.equal(await readFile(packagePath, 'utf8'), packageSource);
+
+        app.pwa.enabled = false;
+        await writeFile(packagePath, `${JSON.stringify(app, null, 4)}\n`);
+        assert.equal((await fetch(`${instance.origin}/arcane.webmanifest`)).status, 404);
+        const ordinaryEntry = await (await fetch(`${instance.origin}/apps/fixture/current.html`)).text();
+        assert.equal(ordinaryEntry.includes('data-arcane-pwa'), false);
+        assert.ok(ordinaryEntry.includes('arcaneVersion=9.8.7'));
+        await assert.rejects(lstat(path.join(workspaceRoot, 'dist')), {code: 'ENOENT'});
+    }
+);
+
+test(
+    'running authored source server projects current selections in memory without rewriting the package',
+    async function refreshLiveAuthoredSourceSelection(context) {
+        const {workspaceRoot, instance} = await sourceFixture(context, {authored: true});
+        const appRoot = path.join(workspaceRoot, 'apps', 'fixture');
+        const descriptorPath = path.join(appRoot, 'arcane-app.json');
+        const packagePath = path.join(appRoot, 'arcane-package.json');
+        const packageSource = await readFile(packagePath, 'utf8');
+        const descriptor = JSON.parse(await readFile(descriptorPath, 'utf8'));
+        const previousManifest = await (await fetch(`${instance.origin}/arcane.webmanifest`)).json();
+        const previousBootstrap = await (await fetch(`${instance.origin}/arcane-pwa.mjs`)).text();
+        const previousOffline = await (await fetch(`${instance.origin}/arcane-offline.json`)).json();
+        assert.ok(previousOffline.assets.includes('/apps/fixture/secondary.html'));
+        const addedSource = "export const history = 'Authored selection after server startup.';\n";
+        await writeFile(path.join(appRoot, 'history.js'), addedSource);
+        const addedUrl = `${instance.origin}/apps/fixture/history.js`;
+        assert.equal((await fetch(addedUrl)).status, 404);
+
+        descriptor.package.include = descriptor.package.include.filter(function retainAuthoredSelection(file) {
+            return file !== 'secondary.html';
+        });
+        descriptor.package.include.push('history.js');
+        descriptor.package.include.sort();
+        descriptor.package.exclude.push('modules/leaf.js');
+        descriptor.package.pwa.manifest.name = 'Current authored application';
+        descriptor.package.pwa.manifest.description = '  Complete authored description.\nSecond line.  ';
+        descriptor.package.pwa.offline.exclude.push('modules/worker.js');
+        const authoredSource = `${JSON.stringify(descriptor, null, 4)}\n`;
+        await writeFile(descriptorPath, authoredSource);
+
+        const added = await fetch(addedUrl);
+        assert.equal(added.status, 200);
+        assert.equal(await added.text(), addedSource);
+        for (const removed of ['secondary.html', 'modules/leaf.js']) {
+            assert.equal((await fetch(`${instance.origin}/apps/fixture/${removed}`)).status, 404);
+            assert.equal((await lstat(path.join(appRoot, removed))).isFile(), true);
+        }
+        const manifest = await (await fetch(`${instance.origin}/arcane.webmanifest`)).json();
+        assert.notEqual(manifest.name, previousManifest.name);
+        assert.equal(manifest.name, descriptor.package.pwa.manifest.name);
+        assert.equal(manifest.description, descriptor.package.pwa.manifest.description);
+        const bootstrap = await (await fetch(`${instance.origin}/arcane-pwa.mjs`)).text();
+        assert.notEqual(bootstrap, previousBootstrap);
+        assert.ok(bootstrap.includes(`appName: ${JSON.stringify(manifest.name)}`));
+        const [offlineResponse, workerResponse] = await Promise.all([
+            fetch(`${instance.origin}/arcane-offline.json`),
+            fetch(`${instance.origin}/arcane-sw.js`)
+        ]);
+        const offline = await offlineResponse.json();
+        const worker = await workerResponse.text();
+        assert.ok(offline.assets.includes('/apps/fixture/history.js'));
+        assert.ok(worker.includes('/apps/fixture/history.js'));
+        for (const removed of ['secondary.html', 'modules/leaf.js', 'modules/worker.js']) {
+            assert.equal(offline.assets.includes(`/apps/fixture/${removed}`), false);
+        }
+        assert.equal(offline.appVersion, previousOffline.appVersion);
+        assert.equal((await fetch(`${instance.origin}/apps/fixture/modules/worker.js`)).status, 200);
+        assert.equal(await readFile(packagePath, 'utf8'), packageSource);
+        assert.equal(await readFile(descriptorPath, 'utf8'), authoredSource);
+        assert.equal(await readFile(path.join(appRoot, 'history.js'), 'utf8'), addedSource);
         await assert.rejects(lstat(path.join(workspaceRoot, 'dist')), {code: 'ENOENT'});
     }
 );

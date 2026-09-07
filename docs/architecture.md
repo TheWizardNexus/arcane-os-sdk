@@ -116,6 +116,15 @@ development-refresh lock, then releases the lock before binding the listener.
 The authored descriptor remains unchanged, and package-only apps retain their
 existing path. An enabled PWA receives generated manifests directly from this
 source server without creating `dist` output.
+While serving, the SDK rereads changed metadata for the selected app before
+application, root-navigation, and generated-PWA requests. It projects the current
+authored descriptor in memory, or reads the current package configuration for a
+package-only app, without writing either file. Include/exclude rules, entry
+selection, and PWA settings share one request snapshot. Overlapping reads reuse
+one metadata task; unchanged files reuse their parsed selection. Shared runtime
+requests do not wait for that refresh. Full offline inventories are enumerated
+only for worker/offline-manifest requests, with separate state for each selected
+app snapshot so an older inventory cannot overwrite newer generated metadata.
 Changed resource requests return the complete current saved source without
 packaging, copying files into `dist`, or restarting the server. Conditional
 requests for unchanged resources return `304`. Enabled PWAs check on page load

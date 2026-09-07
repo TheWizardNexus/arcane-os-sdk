@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.13.1
+
+- Refresh live development app membership from the current authored descriptor
+  or package-only configuration. New explicit includes, exclusions, entry paths,
+  and PWA settings take effect on the next relevant request without a server
+  restart or writes to consumer projections.
+- Generate PWA metadata and offline inventories from the same app snapshot.
+  Coalesce concurrent metadata reads and inventory work within that snapshot,
+  and keep older inventory completion from replacing newer metadata.
+
 ## 0.13.0
 
 - Add the reusable `pwa-install.html` component and shared browser installation
