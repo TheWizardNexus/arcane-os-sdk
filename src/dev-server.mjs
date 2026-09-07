@@ -1,6 +1,6 @@
 import Is from 'strong-type';
 import {constants as FS_CONSTANTS} from 'node:fs';
-import {lstat,open,readFile,realpath} from 'node:fs/promises';
+import {lstat,open,readFile,readdir,realpath} from 'node:fs/promises';
 import http from 'node:http';
 import https from 'node:https';
 import os from 'node:os';
@@ -8,9 +8,10 @@ import path from 'node:path';
 import {resolveWorkspace} from './workspace.mjs';
 import {createEventQueue} from './event-queue.mjs';
 import {
-    inspectImportMapHtml,MANAGED_IMPORT_MAP_ATTRIBUTE,
-    readWorkspaceAssetVersion,rewriteAssetReferences
+    applyPwaEntryReferences,inspectImportMapHtml,MANAGED_IMPORT_MAP_ATTRIBUTE,
+    readWorkspaceAssetVersion,rewriteAssetReferences,versionAssetUrl
 } from './import-map.mjs';
+import {createPwaArtifacts,selectPwaFiles} from './pwa.mjs';
 
 const is = new Is(false);
 
@@ -29,6 +30,7 @@ const MIME_TYPES=new Map([
     ['.svg','image/svg+xml; charset=utf-8'],
     ['.txt','text/plain; charset=utf-8'],
     ['.wasm','application/wasm'],
+    ['.webmanifest','application/manifest+json; charset=utf-8'],
     ['.webp','image/webp'],
     ['.woff','font/woff'],
     ['.woff2','font/woff2']
@@ -318,17 +320,25 @@ async function openSafeFile(root,segments){
     }
 }
 
-async function sendFile(response,opened,{head=false,assetVersion,revalidate=false,onReference}={}){
+async function sendFile(response,opened,{head=false,assetVersion,revalidate=false,onReference,pwaEntry=false}={}){
     const extension=path.extname(opened.candidate).toLowerCase();
-    const content=assetVersion&&/\.(?:m?js|html?|css)$/iu.test(extension)
+    let content=assetVersion!==undefined&&/\.(?:m?js|html?|css|json)$/iu.test(extension)
         ?Buffer.from(rewriteAssetReferences(opened.content.toString('utf8'),{
             filePath:opened.candidate,
             version:assetVersion,
             onReference
         }),'utf8')
         :opened.content;
-    // Entry documents must discover the current generated graph on navigation.
-    // no-cache permits storage and revalidation; ordinary asset caching is unchanged.
+    if (pwaEntry) {
+        content = Buffer.from(
+            applyPwaEntryReferences(
+                content.toString('utf8'),
+                {manifestUrl: '/arcane.webmanifest', bootstrapUrl: '/arcane-pwa.mjs'}
+            ),
+            'utf8'
+        );
+    }
+    // Stable PWA URLs and entry documents revalidate while retaining HTTP caching.
     response.writeHead(200,{
         'content-type':MIME_TYPES.get(extension)||'application/octet-stream',
         'content-length':content.byteLength,
@@ -402,6 +412,7 @@ async function sourceRoutes(workspaceRoot,appId,{
     const appMapping={
         prefix:['apps',resolved.appId],
         root:resolved.appRoot,
+        include:resolved.app.manifest.include,
         allow:relative=>sourcePathAllowed(relative,resolved.app.manifest)
     };
     if(sdkRuntimeSourceRoot!==undefined){
@@ -415,6 +426,7 @@ async function sourceRoutes(workspaceRoot,appId,{
             workspaceRoot:resolved.workspaceRoot,
             workspaceMode:resolved.config.workspaceMode,
             appId:resolved.appId,
+            app:resolved.app.manifest,
             startPath:`/apps/${resolved.appId}/${resolved.app.manifest.entry}`,
             runtime:sdkSource.runtime,
             mappings:[appMapping,...sdkSource.mappings]
@@ -425,12 +437,14 @@ async function sourceRoutes(workspaceRoot,appId,{
             workspaceRoot:resolved.workspaceRoot,
             workspaceMode:'integrated',
             appId:resolved.appId,
+            app:resolved.app.manifest,
             startPath:`/apps/${resolved.appId}/${resolved.app.manifest.entry}`,
             mappings:[
                 appMapping,
                 ...resolved.config.sharedPayloads['browser-runtime'].map(route=>({
                     prefix:route.destination.split('/'),
                     root:path.join(resolved.workspaceRoot,...route.source.split('/')),
+                    include:route.include,
                     allow:relative=>sharedPathAllowed(relative,route)
                 }))
             ]
@@ -441,12 +455,14 @@ async function sourceRoutes(workspaceRoot,appId,{
         workspaceRoot:resolved.workspaceRoot,
         workspaceMode:'external',
         appId:resolved.appId,
+        app:resolved.app.manifest,
         startPath:`/apps/${resolved.appId}/${resolved.app.manifest.entry}`,
         mappings:[
             appMapping,
             {
                 prefix:['arcane'],
                 root:runtimeRoot,
+                include:[...SDK_INSTALLED_ARCANE_ROOTS],
                 allow:sdkInstalledArcanePathAllowed
             }
         ]
@@ -457,15 +473,159 @@ async function packagedRoutes(releaseRoot){
     if(!is.string(releaseRoot)||!releaseRoot.trim())fail('releaseRoot is required in packaged mode.','ARCANE_USAGE');
     const requested=path.resolve(releaseRoot);
     const canonical=await canonicalRealDirectory(requested,'Packaged release root');
+    let pwa = false;
+    let startPath = '/index.html';
+    try {
+        const manifest = JSON.parse(await readFile(path.join(canonical, 'arcane-offline.json'), 'utf8'));
+        pwa = manifest.schemaVersion === 1;
+        if (pwa) {
+            const release = JSON.parse(
+                await readFile(path.join(canonical, 'ARCANE_APP_RELEASE.json'), 'utf8')
+            );
+            startPath = `/${release.app.entry}`;
+        }
+    } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+    }
     return {
         workspaceRoot:null,
         appId:null,
-        startPath:'/index.html',
+        pwa,
+        startPath,
         mappings:[{
             prefix:[],
             root:canonical
         }]
     };
+}
+
+async function sourcePwaAssets(routeSet, mappings, signal, resourceUrls, resourcePaths) {
+    const records = new Map();
+    const resources = new Map();
+    for (const mapping of mappings) {
+        const visited = new Set();
+        async function visitSourceResource(relative) {
+            throwIfAborted(signal);
+            const key = relative.join('/');
+            if (visited.has(key)) return;
+            visited.add(key);
+            if (relative.length > 0 && mapping.allow && !mapping.allow(relative)) return;
+            const location = path.join(mapping.root, ...relative);
+            let info;
+            try {
+                info = await lstat(location);
+            } catch (error) {
+                if (error.code === 'ENOENT') return;
+                throw error;
+            }
+            if (info.isDirectory()) {
+                const entries = await readdir(location, {withFileTypes: true});
+                for (const entry of entries) {
+                    await visitSourceResource([...relative, entry.name]);
+                }
+            } else if (info.isFile()) {
+                const segments = [...mapping.prefix, ...relative];
+                const url = `/${segments.map(encodeURIComponent).join('/')}`;
+                const appResource = mapping.prefix[0] === 'apps'
+                    && mapping.prefix[1] === routeSet.appId;
+                const logical = (appResource ? relative : segments).join('/');
+                records.set(logical, url);
+                resources.set(url, {mapping, relative});
+            }
+        }
+        for (const selected of mapping.include ?? ['']) {
+            await visitSourceResource(selected ? selected.split('/') : []);
+        }
+    }
+    const origin = 'http://arcane.invalid';
+    const entryUrl = new URL(routeSet.startPath, origin);
+    const pending = [{url: entryUrl, documentUrl: entryUrl}];
+    const visited = new Set();
+    const referencesByPath = new Map();
+    for (const selected of routeSet.app.include) {
+        if (!/\.html?$/iu.test(selected)) continue;
+        const url = new URL(
+            `/apps/${routeSet.appId}/${selected.split('/').map(encodeURIComponent).join('/')}`,
+            origin
+        );
+        pending.push({url, documentUrl: url});
+    }
+    let runtimeRootsAdded = false;
+    for (const current of pending) {
+        throwIfAborted(signal);
+        const pathname = current.url.pathname;
+        const record = resources.get(pathname);
+        const context = `${pathname}\n${current.documentUrl.origin}${current.documentUrl.pathname}${current.documentUrl.search}`;
+        if (!record || visited.has(context)) continue;
+        const managedMap = path.posix.basename(pathname) === 'arcane.importmap.json';
+        if (!/\.(?:m?js|html?|css)$/iu.test(pathname) && !managedMap) continue;
+        visited.add(context);
+        resourcePaths.add(decodeURIComponent(pathname));
+        let references = referencesByPath.get(pathname);
+        if (!references) {
+            const opened = await openSafeFile(record.mapping.root, record.relative);
+            if (!opened) continue;
+            references = [];
+            rewriteAssetReferences(
+                opened.content.toString('utf8'),
+                {
+                    filePath: opened.candidate,
+                    version: null,
+                    onReference: function rememberSourceReference(reference) {
+                        references.push(reference);
+                    }
+                }
+            );
+            referencesByPath.set(pathname, references);
+        }
+        const authoredBase = references.find(function documentBaseReference(reference) {
+            return reference.baseHref;
+        })?.baseHref;
+        const documentUrl = authoredBase ? new URL(authoredBase, current.url) : current.documentUrl;
+        if (!runtimeRootsAdded && pathname === entryUrl.pathname) {
+            runtimeRootsAdded = true;
+            for (const url of resources.keys()) {
+                if (/^\/arcane\/.*\.(?:m?js|html?|css)$/iu.test(url)
+                    || path.posix.basename(url) === 'arcane.importmap.json') {
+                    pending.push({url: new URL(url, origin), documentUrl});
+                }
+            }
+        }
+        for (const {url, kind, baseHref, baseKind} of references) {
+            if (kind === 'import' && !/^(?:\.{1,2}\/|\/)/u.test(url)) continue;
+            let target;
+            let base;
+            try {
+                base = baseHref ? new URL(baseHref, current.url)
+                    : managedMap || baseKind === 'document' ? documentUrl : current.url;
+                target = new URL(versionAssetUrl(url, null), base);
+            } catch {
+                // Non-URL source values retain their authored behavior.
+                continue;
+            }
+            if (target.origin !== origin || !resources.has(target.pathname)) continue;
+            resourceUrls.add(`${target.pathname}${target.search}`);
+            const traversable = kind !== 'fetch'
+                && (kind !== 'asset' || /\.css(?:[?#]|$)/iu.test(url));
+            if (traversable) {
+                pending.push({
+                    url: target,
+                    documentUrl: kind === 'document' ? target : documentUrl
+                });
+            }
+        }
+    }
+    const assets = selectPwaFiles([...records.keys()].sort(), routeSet.app.pwa).map(
+        function selectedSourceUrl(relative) {
+            return records.get(relative);
+        }
+    );
+    const selectedUrls = new Set(assets);
+    for (const resourceUrl of resourceUrls) {
+        const url = new URL(resourceUrl, 'http://arcane.invalid');
+        if (selectedUrls.has(url.pathname)) selectedUrls.add(resourceUrl);
+    }
+    return [...selectedUrls].sort();
 }
 
 function listen(server,{host,port,signal}){
@@ -598,6 +758,7 @@ async function startOwnedDevServer({
         })
         :await packagedRoutes(releaseRoot);
     const mappings=deterministicMappings(routeSet.mappings);
+    const pwaEnabled = mode === 'source' ? routeSet.app?.pwa?.enabled === true : routeSet.pwa;
     async function selectedAssetVersion(){
         if(mode!=='source')return undefined;
         return sdkRuntimeSourceRoot===undefined
@@ -611,6 +772,57 @@ async function startOwnedDevServer({
         const info=await lstat(mapping.root);
         if(info.isSymbolicLink()||!info.isDirectory())fail(`Server route root must be a real directory: ${mapping.root}.`);
         mapping.root=await realpath(mapping.root);
+    }
+    let pwaArtifacts;
+    let pwaInventoryTask;
+    const pwaResourceUrls = new Set();
+    function developmentPwaArtifacts(assets = []) {
+        return createPwaArtifacts(
+            {
+                app: {
+                    id: routeSet.appId,
+                    displayName: routeSet.app.displayName,
+                    version: routeSet.app.version,
+                    entry: routeSet.startPath
+                },
+                sdkVersion: assetVersion,
+                pwa: routeSet.app.pwa,
+                files: [],
+                assets,
+                navigationAliases: {'/': routeSet.startPath},
+                basePath: '/',
+                appBase: `/apps/${routeSet.appId}/`,
+                runtimeBase: '/arcane/sdk/',
+                mode: 'development'
+            }
+        );
+    }
+    async function sourcePwaArtifact(targetPath) {
+        if (targetPath === '/arcane-sw.js'
+            || (targetPath === '/arcane-offline.json' && !pwaArtifacts)) {
+            if (!pwaInventoryTask) {
+                pwaInventoryTask = Promise.all(
+                    [sourcePwaAssets(routeSet, mappings, signal, pwaResourceUrls, resourcePaths), selectedAssetVersion()]
+                ).then(
+                    function prepareSourceOfflineInventory([assets, version]) {
+                        assetVersion = version;
+                        pwaArtifacts = developmentPwaArtifacts(assets);
+                        return pwaArtifacts;
+                    }
+                ).finally(
+                    function releaseSourceInventoryTask() {
+                        pwaInventoryTask = null;
+                    }
+                );
+            }
+            await pwaInventoryTask;
+        }
+        const artifacts = pwaArtifacts ?? developmentPwaArtifacts();
+        return artifacts.files.find(
+            function requestedPwaFile(file) {
+                return `/${file.path}` === targetPath;
+            }
+        );
     }
     // Remember actual resource edges as their owners are served, not every
     // HTML/JS/CSS file in an application's document or attachment corpus.
@@ -627,6 +839,16 @@ async function startOwnedDevServer({
             const target=parseRequestTarget(request.url);
             if(!target){deny(response,400,'Invalid request path.');return;}
             const {segments}=target;
+            if (mode === 'source' && pwaEnabled
+                && ['/arcane.webmanifest', '/arcane-offline.json', '/arcane-sw.js', '/arcane-pwa.mjs'].includes(target.path)) {
+                const generated = await sourcePwaArtifact(target.path);
+                await sendFile(
+                    response,
+                    {candidate: generated.path, content: Buffer.from(generated.content, 'utf8')},
+                    {head: request.method === 'HEAD', revalidate: true}
+                );
+                return;
+            }
             if(segments.length===0){
                 response.writeHead(302,{location:routeSet.startPath});
                 response.end();
@@ -659,7 +881,10 @@ async function startOwnedDevServer({
                         // An unrelated document is not a source validation surface.
                     }
                 }
-                const entryDocument=target.path===routeSet.startPath||managedDocument;
+                const selectedPwaDocument = mode === 'source' && pwaEnabled && html
+                    && mapping.prefix[0] === 'apps' && mapping.prefix[1] === routeSet.appId
+                    && routeSet.app.include.includes(relative.join('/'));
+                const entryDocument=target.path===routeSet.startPath||managedDocument||selectedPwaDocument;
                 const managedMap=path.basename(opened.candidate)==='arcane.importmap.json';
                 // A live server can span an SDK upgrade. Refresh the small
                 // version record on navigation, not on each resource request.
@@ -667,9 +892,22 @@ async function startOwnedDevServer({
                 const runtimeResource=segments[0]==='arcane';
                 const browserResource=['script','style','worker','sharedworker','serviceworker']
                     .includes(request.headers['sec-fetch-dest']);
-                const rewrite=runtimeResource||entryDocument||browserResource
+                const rewrite=runtimeResource||entryDocument||browserResource||managedMap
                     ||resourcePaths.has(target.path);
-                const onReference=({url,kind,baseHref,baseKind})=>{
+                const onReference = function observeServedResource({url,kind,baseHref,baseKind}) {
+                    if (pwaEnabled && kind !== 'fetch'
+                        && !(kind === 'import' && !/^(?:\.{1,2}\/|\/)/u.test(url))) {
+                        try {
+                            const documentUrl = new URL(target.path, 'http://arcane.invalid');
+                            const base = baseHref ? new URL(baseHref, documentUrl) : documentUrl;
+                            const resource = new URL(versionAssetUrl(url, null), base);
+                            if (resource.origin === documentUrl.origin) {
+                                pwaResourceUrls.add(`${resource.pathname}${resource.search}`);
+                            }
+                        } catch {
+                            // Non-URL resource values remain under their existing owner.
+                        }
+                    }
                     if(baseKind==='document'||kind==='fetch'||(kind==='asset'&&!/\.css(?:[?#]|$)/iu.test(url))
                         ||(kind==='import'&&!/^(?:\.{1,2}\/|\/)/u.test(url)))return;
                     try{
@@ -684,8 +922,9 @@ async function startOwnedDevServer({
                 };
                 await sendFile(response,opened,{
                     head:request.method==='HEAD',
-                    assetVersion:rewrite?assetVersion:undefined,
-                    revalidate:entryDocument||managedMap,
+                    assetVersion:rewrite&&mode==='source'?(pwaEnabled?null:assetVersion):undefined,
+                    revalidate:pwaEnabled||entryDocument||managedMap,
+                    pwaEntry:mode==='source'&&pwaEnabled&&entryDocument,
                     onReference
                 });
             });

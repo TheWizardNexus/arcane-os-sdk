@@ -40,6 +40,7 @@
         "entry": { "$ref": "#/$defs/relativePath" },
         "strategy": { "enum": ["static", "adapter"] },
         "localAIModelPolicy": { "$ref": "#/$defs/localAIModelPolicy" },
+        "pwa": { "$ref": "#/$defs/pwa" },
         "include": { "$ref": "#/$defs/nonemptyPathList" },
         "exclude": { "$ref": "#/$defs/pathList" },
         "shared": {
@@ -224,6 +225,33 @@
     }
   ],
   "$defs": {
+    "pwa": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "manifest": {
+          "type": "object",
+          "description": "Application-owned Web App Manifest members, including branding, icons, and presentation."
+        },
+        "offline": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "include": {
+              "type": "array",
+              "description": "Literal package paths or directories to cache. Omitted or empty selects all emitted files.",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "exclude": {
+              "type": "array",
+              "description": "Literal package paths or directories excluded from offline assets. Generated shell records and the entry remain available.",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
     "appId": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
     "presentationText": {
       "type": "string",

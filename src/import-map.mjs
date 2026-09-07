@@ -24,6 +24,7 @@ const SDK_BROWSER_SELF_IMPORTS=new Map([
     ['arcane-os/event-manager',SDK_BROWSER_ENTRY],
     ['arcane-os/logging','sdk/logging.mjs'],
     ['arcane-os/browser-device','sdk/browser-device.mjs'],
+    ['arcane-os/pwa','sdk/pwa.mjs'],
     ['arcane-os/speech-text','sdk/speech-text.mjs'],
     ['arcane-os/ai/browser-wasm',SDK_BROWSER_AI_ENTRY],
     ['arcane-os/ai/browser-speech',SDK_BROWSER_SPEECH_ENTRY]
@@ -803,7 +804,7 @@ export function versionAssetUrl(value,version=SDK_VERSION){
 }
 
 function assetUrlVersionEdits(value,version){
-    if(!is.string(value)||!value||!version||value.startsWith('#')
+    if(!is.string(value)||!value||(!version&&version!==null)||value.startsWith('#')
         ||value.startsWith('//')||/^[A-Za-z][A-Za-z0-9+.-]*:/u.test(value)
         ||/^\s/u.test(value))return [];
     const fragmentStart=value.indexOf('#');
@@ -811,7 +812,9 @@ function assetUrlVersionEdits(value,version){
     const queryStart=address.indexOf('?');
     const pathname=queryStart<0?address:address.slice(0,queryStart);
     if(!pathname)return [];
-    const versionValue=encodeURIComponent(String(version));
+    const clean=version===null;
+    if(clean&&queryStart<0)return [];
+    const versionValue=clean?'':encodeURIComponent(String(version));
     if(queryStart<0)return [{start:address.length,end:address.length,value:`?arcaneVersion=${versionValue}`}];
     const query=address.slice(queryStart+1);
     const edits=[];
@@ -824,9 +827,9 @@ function assetUrlVersionEdits(value,version){
         let decodedKey=key;
         try{decodedKey=decodeURIComponent(key.replaceAll('+',' '));}
         catch{decodedKey=key;}
-        const remove=decodedKey==='v'||(decodedKey==='arcaneVersion'&&versionFound);
+        const remove=decodedKey==='v'||(decodedKey==='arcaneVersion'&&(clean||versionFound));
         parameters.push({start:offset,end:offset+parameter.length,remove});
-        if(decodedKey==='arcaneVersion'&&!versionFound){
+        if(decodedKey==='arcaneVersion'&&!versionFound&&!clean){
             versionFound=true;
             edits.push({
                 start:offset+(equals<0?parameter.length:equals+1),
@@ -836,6 +839,9 @@ function assetUrlVersionEdits(value,version){
         }
         offset+=parameter.length+1;
     }
+    if(clean&&!parameters.some(function hasRemainingField(parameter){
+        return !parameter.remove&&parameter.end>parameter.start;
+    }))return [{start:queryStart,end:address.length,value:''}];
     // Remove adjacent obsolete fields together, including only their separator.
     // Other field spelling and source-level escapes remain untouched.
     for(let index=0;index<parameters.length;index+=1){
@@ -851,7 +857,7 @@ function assetUrlVersionEdits(value,version){
     const lastRetained=parameters.findLast(function retainedParameter(parameter){
         return !parameter.remove;
     });
-    if(!versionFound)edits.push({
+    if(!clean&&!versionFound)edits.push({
         start:address.length,
         end:address.length,
         value:`${lastRetained&&lastRetained.end>lastRetained.start?'&':''}arcaneVersion=${versionValue}`
@@ -1161,6 +1167,66 @@ function importMapReferenceEdits(source,version,onReference){
         prependAliases(start,aliases,selectedEdits);
         return selectedEdits;
     }
+    if(version===null){
+        function cleanProperties(properties,{scopes=false}={}){
+            const groups=new Map();
+            const removed=new Set();
+            for(const property of properties){
+                const key=scopes
+                    ?versionImportMapUrl(property.key,null)
+                    :versionImportMapSpecifier(property.key,null);
+                if(!groups.has(key))groups.set(key,[]);
+                groups.get(key).push(property);
+            }
+            for(const [key,group] of groups){
+                if(group.every(function unchangedKey(property){return property.key===key;}))continue;
+                // An authored clean key owns the target when old generated aliases converge.
+                const selected=group.findLast(function existingCleanKey(property){
+                    return property.key===key;
+                })??group.at(-1);
+                for(const property of group){
+                    if(property!==selected)removed.add(property);
+                }
+                const edit=stringReferenceEdit(
+                    source,
+                    selected.keyToken,
+                    null,
+                    importMapUrlVersionEdits(selected.key,null)
+                );
+                if(edit)edits.push(edit);
+            }
+            for(let index=0;index<properties.length;index+=1){
+                if(!removed.has(properties[index]))continue;
+                const first=index;
+                while(removed.has(properties[index+1]))index+=1;
+                edits.push({
+                    start:first===0?properties[first].keyToken.start:properties[first-1].end,
+                    end:first===0&&index<properties.length-1
+                        ?properties[index+1].keyToken.start:properties[index].end,
+                    value:''
+                });
+            }
+            return properties.filter(function retainedProperty(property){return !removed.has(property);});
+        }
+        function cleanImports(start){
+            const properties=cleanProperties(objectProperties(start));
+            for(const property of properties){
+                if(property.value.type!=='string'||property.key.endsWith('/'))continue;
+                reportAssetReference(onReference,property.value.value,'import');
+                if(property.value.value.split(/[?#]/u)[0].endsWith('/'))continue;
+                const edit=stringReferenceEdit(source,property.value,null);
+                if(edit)edits.push(edit);
+            }
+        }
+        for(const property of objectProperties(0)){
+            if(property.key==='imports')cleanImports(property.valueIndex);
+            if(property.key==='scopes'){
+                const scopes=cleanProperties(objectProperties(property.valueIndex),{scopes:true});
+                for(const scope of scopes)cleanImports(scope.valueIndex);
+            }
+        }
+        return edits;
+    }
     for(const property of objectProperties(0)){
         if(property.key==='imports')edits.push(...addImports(property.valueIndex));
         if(property.key==='scopes'){
@@ -1190,6 +1256,9 @@ export function rewriteAssetReferences(source,{filePath,version=SDK_VERSION,onRe
     if(extension==='.css')return applyReferenceEdits(source,cssReferenceEdits(source,version,onReference));
     if(extension==='.html'||extension==='.htm'){
         return applyReferenceEdits(source,htmlReferenceEdits(source,version,onReference));
+    }
+    if(extension==='.json'&&path.basename(String(filePath)).toLowerCase()==='arcane.importmap.json'){
+        return applyReferenceEdits(source,importMapReferenceEdits(source,version,onReference));
     }
     return source;
 }
@@ -1356,9 +1425,11 @@ async function physicalRuntime(workspaceRoot,signal){
     return {files};
 }
 
-async function managedImportMapBuild(resolvedWorkspace,signal){
-    const runtime=await physicalRuntime(resolvedWorkspace,signal);
-    const version=await readWorkspaceAssetVersion(resolvedWorkspace);
+async function managedImportMapBuild(resolvedWorkspace,signal,pwaEnabled=false){
+    const [runtime,version]=await Promise.all([
+        physicalRuntime(resolvedWorkspace,signal),
+        pwaEnabled?null:readWorkspaceAssetVersion(resolvedWorkspace)
+    ]);
     const built=await buildImportMap({files:runtime.files,signal,version});
     const json=`${JSON.stringify({imports:built.imports},null,2).replaceAll('<','\\u003c')}\n`;
     return {built,json,version};
@@ -1416,11 +1487,13 @@ function parseTagAttributes(openTag){
         const start=index;
         while(index<openTag.length&&!/[\t\n\f\r =>/]/u.test(openTag[index]))index+=1;
         const name=asciiLower(openTag.slice(start,index));
+        const nameEnd=index;
         while(/[\t\n\f\r ]/u.test(openTag[index]??''))index+=1;
         let value='';
         let valueStart=index;
         let valueEnd=index;
         let quote='';
+        const assigned=openTag[index]==='=';
         if(openTag[index]==='='){
             index+=1;
             while(/[\t\n\f\r ]/u.test(openTag[index]??''))index+=1;
@@ -1444,7 +1517,7 @@ function parseTagAttributes(openTag){
             if(attributes.has(name))duplicates.add(name);
             else{
                 attributes.set(name,value);
-                positions.set(name,{start:valueStart,end:valueEnd,quote});
+                positions.set(name,{start:valueStart,end:valueEnd,quote,nameEnd,assigned});
             }
         }
     }
@@ -1736,6 +1809,101 @@ function scanHtmlStructure(html){
     return {scripts,links,bases,metas,elements,styles,headClose,bodyClose};
 }
 
+/** Update only active PWA entry references; registration never orders application startup. */
+export function applyPwaEntryReferences(html,{manifestUrl,bootstrapUrl}={}){
+    if(!is.string(html))throw new TypeError('PWA entry HTML must be a string.');
+    if(!is.string(manifestUrl)||!manifestUrl||!is.string(bootstrapUrl)||!bootstrapUrl){
+        throw new TypeError('PWA manifestUrl and bootstrapUrl must be nonempty strings.');
+    }
+    const structure=scanHtmlStructure(html);
+    const edits=[];
+    const additions=[];
+    function attributeText(value){
+        return value.replaceAll('&','&amp;').replaceAll('"','&quot;')
+            .replaceAll("'",'&#39;').replaceAll('<','&lt;');
+    }
+    function updateTag(element,values,booleans=[]){
+        const attributes=parseTagAttributes(element.open);
+        const tagEdits=[];
+        const missing=[];
+        for(const [name,value] of Object.entries(values)){
+            const position=attributes.positions.get(name);
+            const encoded=attributeText(value);
+            if(!position){
+                missing.push(`${name}="${encoded}"`);
+            }else if(!position.assigned){
+                tagEdits.push({start:position.nameEnd,end:position.nameEnd,value:`="${encoded}"`});
+            }else{
+                tagEdits.push({
+                    start:position.start,
+                    end:position.end,
+                    value:position.quote?encoded:`"${encoded}"`
+                });
+            }
+        }
+        for(const name of booleans){
+            if(!attributes.has(name))missing.push(name);
+        }
+        let updated=applyReferenceEdits(element.open,tagEdits);
+        if(missing.length){
+            const end=updated.length-1;
+            const slash=end-1;
+            const positions=parseTagAttributes(updated).positions;
+            const slashIsValue=[...positions.values()].some(function trailingAttributeSlash(position){
+                return position.assigned&&position.start<=slash&&position.end>slash;
+            });
+            const close=updated[slash]==='/'&&!slashIsValue?slash:end;
+            updated=updated.slice(0,close)+` ${missing.join(' ')}`+updated.slice(close);
+        }
+        edits.push({start:element.start,end:element.start+element.open.length,value:updated});
+    }
+    let manifestFound=false;
+    for(const link of structure.links){
+        const attributes=parseTagAttributes(link.open);
+        const raw=attributes.get('rel')??'';
+        const view=htmlAttributeView(raw);
+        if(!view)continue;
+        const manifestTokens=[...view.decoded.matchAll(/[^\t\n\f\r ]+/gu)]
+            .filter(function manifestRelationship(token){return asciiLower(token[0])==='manifest';});
+        if(manifestTokens.length===0)continue;
+        if(!manifestFound){
+            manifestFound=true;
+            updateTag(link,{href:manifestUrl});
+            continue;
+        }
+        // Retire duplicate manifest relationships while retaining other link attributes and roles.
+        const position=attributes.positions.get('rel');
+        for(const token of manifestTokens){
+            edits.push({
+                start:link.start+position.start+view.positions[token.index],
+                end:link.start+position.start+view.positions[token.index+token[0].length],
+                value:''
+            });
+        }
+    }
+    if(!manifestFound)additions.push(`<link rel="manifest" href="${attributeText(manifestUrl)}">`);
+    let bootstrapFound=false;
+    for(const script of structure.scripts){
+        if(!parseTagAttributes(script.open).has('data-arcane-pwa'))continue;
+        if(bootstrapFound){
+            edits.push({start:script.start,end:script.end,value:''});
+            continue;
+        }
+        bootstrapFound=true;
+        updateTag(script,{type:'module',src:bootstrapUrl},['async']);
+    }
+    if(!bootstrapFound){
+        additions.push(`<script type="module" async data-arcane-pwa src="${attributeText(bootstrapUrl)}"></script>`);
+    }
+    if(additions.length){
+        const newline=html.includes('\r\n')?'\r\n':'\n';
+        const offset=structure.headClose>=0?structure.headClose
+            :structure.bodyClose>=0?structure.bodyClose:html.length;
+        edits.push({start:offset,end:offset,value:`${additions.join(newline)}${newline}`});
+    }
+    return applyReferenceEdits(html,edits);
+}
+
 function htmlAttributeView(value){
     let decoded='';
     const positions=[];
@@ -1815,7 +1983,7 @@ function htmlReferenceEdits(source,version,onReference){
     const linkResources=new Set(['stylesheet','modulepreload','preload','icon','manifest']);
     const base=structure.bases[0];
     const baseHref=base?structuralAttribute(parseTagAttributes(base.open),'href','base'):null;
-    if(baseHref&&(/^[A-Za-z][A-Za-z0-9+.-]*:/u.test(baseHref)||baseHref.startsWith('//')))version=null;
+    if(baseHref&&(/^[A-Za-z][A-Za-z0-9+.-]*:/u.test(baseHref)||baseHref.startsWith('//')))version='';
     function reportHtmlReference(reference){
         if(is.function(onReference))onReference({...reference,baseHref});
     }
@@ -2313,7 +2481,14 @@ async function generateImportMapUnlocked({
         renderManagedHtml(html,'{"imports":{}}\n',baseHref);
         documentStates.push({filePath:documentPath,html,label,baseHref});
     }
-    const {built,json,version}=await managedImportMapBuild(resolvedWorkspace,signal);
+    let pwaEnabled=false;
+    try{
+        const packageSource=await readFileFromDisk(path.join(resolvedApp,'arcane-package.json'),'utf8');
+        pwaEnabled=JSON.parse(packageSource)?.pwa?.enabled===true;
+    }catch(error){
+        if(error?.code!=='ENOENT')throw error;
+    }
+    const {built,json,version}=await managedImportMapBuild(resolvedWorkspace,signal,pwaEnabled);
     const renderedDocuments=documentStates.map(item=>({
         ...item,
         content:rewriteAssetReferences(renderManagedHtml(item.html,json,item.baseHref),{

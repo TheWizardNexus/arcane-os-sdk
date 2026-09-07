@@ -2,6 +2,7 @@ import Is from 'strong-type';
 import {isDeepStrictEqual} from 'node:util';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
+import {normalizePwaConfig} from './pwa.mjs';
 import {
     ARCANE_MACHINE_BUNDLE_VERSION,
     ARCANE_PROTOCOL,
@@ -107,7 +108,7 @@ function validateLocalAIModelPolicy(value,label){
 
 function validatePackage(value,appId){
     assertOnlyKeys(value,new Set([
-        'entry','strategy','include','exclude','shared','adapter','localAIModelPolicy'
+        'entry','strategy','include','exclude','shared','adapter','localAIModelPolicy','pwa'
     ]),'descriptor.package');
     const entry=normalizeRelativePath(value.entry,'descriptor.package.entry');
     if(!['static','adapter'].includes(value.strategy))fail('descriptor.package.strategy must be static or adapter.');
@@ -135,6 +136,7 @@ function validatePackage(value,appId){
         include,
         exclude,
         shared,
+        ...(value.pwa===undefined?{}:{pwa:normalizePwaConfig(value.pwa)}),
         ...(adapter?{adapter}:{}),
         ...(value.localAIModelPolicy===undefined?{}:{
             localAIModelPolicy:validateLocalAIModelPolicy(
@@ -320,6 +322,7 @@ export function projectPackageManifest(descriptor){
             mediaOrigins:[...value.security.mediaOrigins]
         }}:{}),
         ...(value.package.localAIModelPolicy?{localAIModelPolicy:value.package.localAIModelPolicy}:{}),
+        ...(value.package.pwa===undefined?{}:{pwa:value.package.pwa}),
         include:[...value.package.include],
         exclude:[...value.package.exclude],
         shared:[...value.package.shared],
@@ -378,6 +381,7 @@ function synthesizedDescriptor(packageManifest,nativeDescriptor){
             entry:packageManifest.entry,
             strategy:packageManifest.strategy,
             ...(packageManifest.localAIModelPolicy?{localAIModelPolicy:packageManifest.localAIModelPolicy}:{}),
+            ...(packageManifest.pwa===undefined?{}:{pwa:packageManifest.pwa}),
             include:[...packageManifest.include],
             exclude:[...(packageManifest.exclude??[])],
             shared:[...packageManifest.shared],
@@ -426,7 +430,11 @@ export async function loadAppDescriptor({workspaceRoot,appRoot,appId,packageMani
     if(authored){
         const descriptor=validateAppDescriptor(authored,{appId});
         const projection=projectPackageManifest(authored);
-        if(!isDeepStrictEqual(projection,packageManifest)){
+        const packageProjection=packageManifest.pwa===undefined?packageManifest:{
+            ...packageManifest,
+            pwa:normalizePwaConfig(packageManifest.pwa)
+        };
+        if(!isDeepStrictEqual(projection,packageProjection)){
             fail(`${APP_DESCRIPTOR_NAME} does not project exactly to arcane-package.json.`);
         }
         return completeValue({descriptor,source:'authored',descriptorPath});

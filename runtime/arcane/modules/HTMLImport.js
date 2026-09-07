@@ -19,8 +19,13 @@ let htmlImportScriptId=0;
 const htmlImportModuleURL=new URL(import.meta.url);
 const htmlImportAssetVersion=htmlImportModuleURL.searchParams.get('arcaneVersion');
 
+function pwaResourceUrlsEnabled(){
+  return Boolean(document.querySelector?.('script[data-arcane-pwa]'));
+}
+
 function versionComponentResource(value,baseHref){
-  if(!htmlImportAssetVersion||!is.string(value)||!value||value.startsWith('#')){
+  const clean=pwaResourceUrlsEnabled();
+  if((!htmlImportAssetVersion&&!clean)||!is.string(value)||!value||value.startsWith('#')){
     return value;
   }
   let resolvedURL;
@@ -46,7 +51,7 @@ function versionComponentResource(value,baseHref){
     const parameter=new URLSearchParams(field);
     if(parameter.has('v'))return null;
     if(!parameter.has('arcaneVersion'))return field;
-    if(replaced)return null;
+    if(clean||replaced)return null;
     replaced=true;
     const equals=field.indexOf('=');
     const key=equals<0?field:field.slice(0,equals);
@@ -54,6 +59,11 @@ function versionComponentResource(value,baseHref){
   }).filter(function retainQueryField(field){
     return field!==null;
   }):[];
+  if(clean){
+    return fields.some(function hasRemainingField(field){return field!=='';})
+      ?`${pathname}?${fields.join('&')}${fragment}`
+      :`${pathname}${fragment}`;
+  }
   if(!replaced){
     if(fields.at(-1)==='')fields[fields.length-1]=versionField;
     else fields.push(versionField);
@@ -81,7 +91,7 @@ function resolveComponentResource(value,runtimeRoot){
 }
 
 function resolveComponentStyleResources(styleText,runtimeRoot){
-  if(!runtimeRoot&&!htmlImportAssetVersion)return styleText;
+  if(!runtimeRoot&&!htmlImportAssetVersion&&!pwaResourceUrlsEnabled())return styleText;
   const parts=[];
   let copiedThrough=0;
   let index=0;

@@ -14,6 +14,7 @@ test(
         const html = '<p>Shared component content</p>';
         const hostRegistryKey = Symbol.for('arcane.html-import.hosts');
         const replacements = new Map();
+        let pwaEnabled = false;
 
         class RegistryHTMLElement extends EventTarget {
             constructor() {
@@ -96,6 +97,10 @@ test(
         replaceGlobal(hostRegistryKey, new Map());
         replaceGlobal('document', {
             baseURI: new URL('./components/', import.meta.url).href,
+            querySelector(selector) {
+                assert.equal(selector, 'script[data-arcane-pwa]');
+                return pwaEnabled ? {} : null;
+            },
             createElement(name) {
                 if (name === 'html-import') return new (registry.get(name))();
                 assert.equal(name, 'template');
@@ -189,5 +194,28 @@ test(
         assert.notEqual(readyEvents[0].detail.instanceId, readyEvents[1].detail.instanceId);
         assert.deepEqual(errorEvents, []);
         assert.equal(definitionCalls.length, 1);
+
+        pwaEnabled = true;
+        imported.isConnected = false;
+        await imported.disconnectedCallback();
+        imported.isConnected = true;
+        await imported.connectedCallback();
+        assert.equal(requests.at(-1).url, new URL(
+            './component.html?mode=a%20b#part',
+            document.baseURI
+        ).href);
+        assert.equal(imported.ready, true);
+        assert.equal(definitionCalls.length, 1);
+
+        pwaEnabled = false;
+        imported.isConnected = false;
+        await imported.disconnectedCallback();
+        imported.isConnected = true;
+        await imported.connectedCallback();
+        assert.equal(requests.at(-1).url, new URL(
+            './component.html?mode=a%20b&arcaneVersion=0.7.3#part',
+            document.baseURI
+        ).href);
+        assert.deepEqual(errorEvents, []);
     }
 );

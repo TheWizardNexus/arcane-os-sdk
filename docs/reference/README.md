@@ -36,6 +36,7 @@ alone does not make bare module names resolve in a browser.
 | Publish central events, capture complete time-travel history, or observe the DOM | [EventManager and event-stack reference](event-manager.md) |
 | Inspect complete AI and speech calls using the shared developer-mode preference | [Shared logger](sdk-api.md#arcanelogging) and [speech developer diagnostics](ai/browser-speech.md#developer-diagnostics) |
 | Use the `arcane` command | [CLI reference](cli.md) |
+| Install an app and cache selected resources offline | [Progressive web applications](pwa.md) |
 | Generate named browser imports or inspect the selected physical runtime | [`arcane import-map`](cli.md#arcane-import-map) and [browser runtime delivery](protocols.md#browser-runtime-delivery) |
 | Choose browser, native, cloud, or cross-host behavior | [Availability and normalization](availability-and-normalization.md) |
 | Import a shipped renderer module | [Runtime module catalog](runtime-modules.md) |
@@ -124,13 +125,13 @@ Public reference entries follow the established Arcane documentation model:
 
 ## Public runtime inventory
 
-The package exposes 203 semantic JavaScript records across 19 JavaScript
+The package exposes 205 semantic JavaScript records across 20 JavaScript
 entrypoints, plus eight JSON Schemas and package metadata. Ten entrypoints are
 Node.js control-plane surfaces,
 `arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`, `arcane-os/preference-store`, and
 `arcane-os/speech-playback`, `arcane-os/speech-text`, and `arcane-os/browser-device`
 run in Node and browsers, and
-`arcane-os/ai/browser-wasm` plus `arcane-os/ai/browser-speech` are browser-only.
+`arcane-os/pwa`, `arcane-os/ai/browser-wasm` plus `arcane-os/ai/browser-speech` are browser-only.
 The [machine-readable package
 inventory](inventory/package-api.json) and [SDK member reference](sdk-api.md)
 are checked bidirectionally against every declared JavaScript export.

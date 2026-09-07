@@ -863,6 +863,7 @@ async function packageNativeRelease(prepared,app,{
     const release=await packageApp({
         workspaceRoot:prepared.workspaceRoot,
         appId:app.appId,
+        browserPwa:false,
         workspaceOperationLease,
         signal,
         onEvent

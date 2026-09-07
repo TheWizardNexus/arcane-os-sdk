@@ -1,5 +1,13 @@
 # Release-derived browser asset URLs
 
+Applications that enable [PWA delivery](pwa.md) use clean local resource URLs.
+Their generated offline manifest and service worker own the selected application
+and SDK release information. In that mode, the delivery transformer removes
+both `v` and `arcaneVersion`, preserving other query fields and fragments.
+The behavior below continues to apply when PWA delivery is disabled and to native
+packages. Workspace runtime materialization remains usable by either target;
+the selected browser delivery applies its PWA URL policy.
+
 The SDK's public import-map generator, runtime materializer, source server and
 application packager use the selected SDK package version for local browser
 resource references. The query field is `arcaneVersion`. Its value comes from
@@ -48,6 +56,11 @@ The SDK server sends `Cache-Control: no-cache` for application entry/managed
 HTML and managed import-map JSON. This allows storage but requests revalidation, so an ordinary navigation
 or refresh obtains the current entry document and release URLs. Other assets
 retain ordinary caching; no cache or user storage is cleared.
+
+For PWA delivery the SDK server revalidates all served resources, including
+the stable worker script. A static host serving a PWA package must likewise
+revalidate stable resource URLs. The service worker maintains its own selected
+offline resource cache independently of the HTTP cache.
 
 An independently configured static host must likewise revalidate entry HTML
 and managed import-map JSON. The generated package supplies versioned resource

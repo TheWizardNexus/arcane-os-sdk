@@ -13,7 +13,22 @@ import {
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {withWorkspaceOperationLock} from '../workspace-operation-lock.mjs';
-import {inspectImportMapHtml,readWorkspaceAssetVersion,rewriteAssetReferences} from '../import-map.mjs';
+import {
+    applyPwaEntryReferences,
+    inspectImportMapHtml,
+    readWorkspaceAssetVersion,
+    rewriteAssetReferences,
+    versionAssetUrl
+} from '../import-map.mjs';
+import {
+    createPwaArtifacts,
+    normalizePwaConfig,
+    selectPwaFiles,
+    PWA_MANIFEST_NAME,
+    PWA_OFFLINE_MANIFEST_NAME,
+    PWA_WORKER_NAME,
+    PWA_BOOTSTRAP_NAME
+} from '../pwa.mjs';
 
 const is = new Is(false);
 
@@ -286,7 +301,7 @@ function normalizeOptionalRecord(value,label){
 export function validateAppConfig(value,appId,rootConfig,configPath=`apps/${appId}/${APP_CONFIG_NAME}`){
     assertOnlyKeys(value,new Set([
         'schemaVersion','id','displayName','version','entry','strategy','security',
-        'localAIModelPolicy','include','exclude','shared','adapter'
+        'localAIModelPolicy','include','exclude','shared','adapter','pwa'
     ]),`${appId}/${APP_CONFIG_NAME}`);
     if(value.schemaVersion!==1)fail(`${appId}/${APP_CONFIG_NAME}.schemaVersion must be 1.`);
     if(value.id!==appId||!APP_ID_PATTERN.test(value.id)){
@@ -331,6 +346,7 @@ export function validateAppConfig(value,appId,rootConfig,configPath=`apps/${appI
         version:value.version,
         entry,
         strategy:value.strategy,
+        ...(value.pwa===undefined?{}:{pwa:normalizePwaConfig(value.pwa)}),
         ...(value.security===undefined?{}:{security:normalizeOptionalRecord(
             value.security,
             `${appId}/${APP_CONFIG_NAME}.security`
@@ -541,6 +557,7 @@ async function inspectContext(context,{signal}={}){
         version:context.config.version,
         entry:context.config.entry,
         strategy:context.config.strategy,
+        ...(context.config.pwa===undefined?{}:{pwa:copyJson(context.config.pwa)}),
         include:[...context.config.include],
         exclude:[...context.config.exclude],
         shared:[...context.config.shared],
@@ -625,7 +642,7 @@ async function loadAdapter(context){
     return module;
 }
 
-function releaseManifest(context,files){
+function releaseManifest(context,files,pwaArtifacts){
     return {
         schemaVersion:1,
         kind:'arcane-app-release',
@@ -637,6 +654,13 @@ function releaseManifest(context,files){
             entry:context.config.entry,
             strategy:context.config.strategy,
             shared:[...context.config.shared],
+            ...(pwaArtifacts?{pwa:{
+                manifest:pwaArtifacts.entryAssets.manifest,
+                offlineManifest:PWA_OFFLINE_MANIFEST_NAME,
+                worker:PWA_WORKER_NAME,
+                sdkVersion:pwaArtifacts.offlineManifest.sdkVersion,
+                revision:pwaArtifacts.offlineManifest.revision
+            }}:{}),
             ...(context.config.security===undefined?{}:{security:copyJson(context.config.security)}),
             ...(context.config.localAIModelPolicy===undefined?{}:{
                 localAIModelPolicy:copyJson(context.config.localAIModelPolicy)
@@ -669,7 +693,8 @@ async function replaceDirectory(stagingRoot,outputRoot){
 }
 
 async function packageWithContext(context,options={}){
-    const {signal,onEvent}=options;
+    const {signal,onEvent,browserPwa=true}=options;
+    const pwaEnabled=browserPwa&&context.config.pwa?.enabled===true;
     const inspected=await inspectContext(context,{signal});
     if(options.dryRun){
         return {
@@ -677,7 +702,15 @@ async function packageWithContext(context,options={}){
             version:context.config.version,
             output:inspected.output,
             dryRun:true,
-            files:[...inspected.files]
+            files:[
+                ...inspected.files,
+                ...(pwaEnabled?[
+                    PWA_MANIFEST_NAME,
+                    PWA_OFFLINE_MANIFEST_NAME,
+                    PWA_WORKER_NAME,
+                    PWA_BOOTSTRAP_NAME
+                ]:[])
+            ].sort(compareText)
         };
     }
     await mkdir(context.distRoot,{recursive:true});
@@ -709,23 +742,67 @@ async function packageWithContext(context,options={}){
         const files=await listOutputFiles(stagingRoot,{signal});
         // Traverse actual browser resources after the adapter finishes. Files
         // included only as application documents retain their original content.
-        const version=await readWorkspaceAssetVersion(context.workspaceRoot);
+        const assetVersion=await readWorkspaceAssetVersion(context.workspaceRoot);
+        const version=pwaEnabled?null:assetVersion;
         const inventory=new Set(files);
+        const offlineInventory=pwaEnabled?new Set(selectPwaFiles(files,context.config.pwa)):null;
+        const offlineReferences=new Set();
         const entryUrl=new URL(context.config.entry,'http://arcane.invalid/');
-        const entryDocument=inspected.browserDocuments.find(document=>document.path===context.config.entry);
+        const pwaDocumentSources=new Map();
+        if(pwaEnabled){
+            const documentPaths=new Set([context.config.entry]);
+            for(const selected of context.config.include){
+                if(/\.html?$/iu.test(selected)&&inventory.has(selected))documentPaths.add(selected);
+            }
+            for(const document of inspected.browserDocuments){
+                const appDocument=context.config.include.some(function includesAppDocument(selected){
+                    return sameOrDescendant(document.path,selected);
+                });
+                if(appDocument&&document.managedMaps.length>0&&inventory.has(document.path)){
+                    documentPaths.add(document.path);
+                }
+            }
+            await Promise.all(
+                [...documentPaths].map(
+                    async function readPwaDocument(documentPath) {
+                        const source = await readFile(
+                            path.join(stagingRoot, ...documentPath.split('/')),
+                            'utf8'
+                        );
+                        pwaDocumentSources.set(
+                            documentPath,
+                            {source, inspected: inspectImportMapHtml(source)}
+                        );
+                    }
+                )
+            );
+        }
+        const entryDocument=pwaEnabled?pwaDocumentSources.get(context.config.entry).inspected
+            :inspected.browserDocuments.find(function matchingEntryDocument(document){
+                return document.path===context.config.entry;
+            });
         const documentUrl=entryDocument?.bases[0]?.href
             ?new URL(entryDocument.bases[0].href,entryUrl):entryUrl;
         const pending=[{file:context.config.entry,documentUrl}];
         for(const file of files){
             if(/^arcane\/(?:modules|entities|components|css|sdk|dependencies)\//u.test(file)
                 &&/\.(?:m?js|html?|css)$/iu.test(file))pending.push({file,documentUrl});
+            if(pwaEnabled&&path.posix.basename(file)==='arcane.importmap.json'){
+                pending.push({file,documentUrl});
+            }
         }
         for(const document of inspected.browserDocuments){
-            if(document.managedMaps.length>0){
+            if(document.managedMaps.length>0&&!pwaDocumentSources.has(document.path)){
                 const url=new URL(document.path,entryUrl.origin);
                 pending.push({file:document.path,documentUrl:document.bases[0]?.href
                     ?new URL(document.bases[0].href,url):url});
             }
+        }
+        for(const [file,document] of pwaDocumentSources){
+            if(file===context.config.entry)continue;
+            const url=new URL(file,entryUrl.origin);
+            pending.push({file,documentUrl:document.inspected.bases[0]?.href
+                ?new URL(document.inspected.bases[0].href,url):url});
         }
         const visited=new Set();
         const resources=new Map();
@@ -734,31 +811,39 @@ async function packageWithContext(context,options={}){
             throwIfAborted(signal);
             const contextKey=`${relative}\n${current.documentUrl.href}`;
             if(visited.has(contextKey)||!inventory.has(relative)
-                ||!/\.(?:m?js|html?|css)$/iu.test(relative))continue;
+                ||(!/\.(?:m?js|html?|css)$/iu.test(relative)
+                    &&!(pwaEnabled&&path.posix.basename(relative)==='arcane.importmap.json')))continue;
             visited.add(contextKey);
             const filePath=path.join(stagingRoot,...relative.split('/'));
             let resource=resources.get(relative);
             if(!resource){
-                const original=await readFile(filePath,'utf8');
+                const original=pwaDocumentSources.get(relative)?.source??await readFile(filePath,'utf8');
                 const references=[];
                 const content=rewriteAssetReferences(original,{
                     filePath:relative,version,onReference:reference=>references.push(reference)
                 });
                 if(content!==original)await writeFile(filePath,content,'utf8');
-                resource={references};
+                resource={references,...(pwaDocumentSources.has(relative)?{content}:{})};
                 resources.set(relative,resource);
             }
             for(const {url,kind,baseHref,baseKind} of resource.references){
-                if(kind==='fetch'||(kind==='asset'&&!/\.css(?:[?#]|$)/iu.test(url))
-                    ||(kind==='import'&&!/^(?:\.{1,2}\/|\/)/u.test(url)))continue;
+                const traversable=kind!=='fetch'&&(kind!=='asset'||/\.css(?:[?#]|$)/iu.test(url))
+                    &&(kind!=='import'||/^(?:\.{1,2}\/|\/)/u.test(url));
+                if(!pwaEnabled&&!traversable)continue;
+                if(kind==='import'&&!/^(?:\.{1,2}\/|\/)/u.test(url))continue;
                 try{
                     const ownerUrl=new URL(relative,entryUrl.origin);
                     const base=baseHref?new URL(baseHref,ownerUrl)
-                        :baseKind==='document'?current.documentUrl:ownerUrl;
+                        :baseKind==='document'||path.posix.basename(relative)==='arcane.importmap.json'
+                            ?current.documentUrl:ownerUrl;
                     const target=new URL(url,base);
                     if(target.origin===entryUrl.origin){
-                        pending.push({
-                            file:decodeURIComponent(target.pathname).replace(/^\//u,''),
+                        const file=decodeURIComponent(target.pathname).replace(/^\//u,'');
+                        if(pwaEnabled&&offlineInventory.has(file)){
+                            offlineReferences.add(versionAssetUrl(`.${target.pathname}${target.search}`,null));
+                        }
+                        if(traversable)pending.push({
+                            file,
                             documentUrl:kind==='document'?target
                                 :baseHref?new URL(baseHref,ownerUrl):current.documentUrl
                         });
@@ -772,7 +857,45 @@ async function packageWithContext(context,options={}){
         if(!files.some(file=>pathKey(file)===pathKey(context.config.entry))){
             fail(`Package output is missing its entry file: ${context.config.entry}.`);
         }
-        const manifest=releaseManifest(context,files);
+        const pwaArtifacts=pwaEnabled?createPwaArtifacts({
+            app:{
+                id:context.appId,
+                displayName:context.config.displayName,
+                version:context.config.version,
+                entry:context.config.entry
+            },
+            sdkVersion:assetVersion,
+            pwa:context.config.pwa,
+            files,
+            assets:[...offlineReferences]
+        }):null;
+        if(pwaArtifacts){
+            for(const artifact of pwaArtifacts.files){
+                if(inventory.has(artifact.path)){
+                    fail(`Package content overlaps generated PWA file: ${artifact.path}.`);
+                }
+                await writeFile(path.join(stagingRoot,artifact.path),artifact.content,'utf8');
+                files.push(artifact.path);
+            }
+            for(const [documentPath,document] of pwaDocumentSources){
+                const documentUrl=new URL(documentPath,entryUrl.origin);
+                const outputBase=document.inspected.bases[0]?.href
+                    ?new URL(document.inspected.bases[0].href,documentUrl):documentUrl;
+                const outputDirectory=new URL('./',outputBase).pathname;
+                function entryReference(relative){
+                    const target=path.posix.relative(outputDirectory,`/${relative}`);
+                    return target.startsWith('.')?target:`./${target}`;
+                }
+                const content=resources.get(documentPath)?.content??document.source;
+                await writeFile(path.join(stagingRoot,...documentPath.split('/')),
+                    applyPwaEntryReferences(content,{
+                        manifestUrl:entryReference(pwaArtifacts.entryAssets.manifest),
+                        bootstrapUrl:entryReference(pwaArtifacts.entryAssets.bootstrap)
+                    }),'utf8');
+            }
+            files.sort(compareText);
+        }
+        const manifest=releaseManifest(context,files,pwaArtifacts);
         await writeFile(
             path.join(stagingRoot,RELEASE_MANIFEST_NAME),
             `${JSON.stringify(manifest,null,2)}\n`,

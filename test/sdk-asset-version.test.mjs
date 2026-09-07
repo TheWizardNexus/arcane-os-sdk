@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from '../src/testing.mjs';
 import {SDK_VERSION} from '../src/constants.mjs';
 import {
+    applyPwaEntryReferences,
     buildImportMap,
     createApplicationTestImportMapContext,
     generateImportMap,
@@ -374,4 +375,106 @@ test('workspace version drives generated document and map while test paths retai
     const target='./arcane/modules/State.js?v=4&arcaneVersion=2.3.4#part';
     const context=await createApplicationTestImportMapContext({applicationRoot:workspace,imports:{fixture:target}});
     assert.equal(context.imports.fixture,target);
+});
+
+test('explicit null removes resource versions and preserves remaining query spelling',function cleanAssetUrls(){
+    const cases=[
+        ['./module.js?v=4&arcaneVersion=old#part','./module.js#part'],
+        ['./module.js?arcaneVersion=&v&%76=5&&','./module.js'],
+        ['./module.js?v=4&mode=a%20b&%61rcaneVersion=old&flag=#part','./module.js?mode=a%20b&flag=#part'],
+        ['./module.js?mode=a+b&&v=4&','./module.js?mode=a+b&&'],
+        ['./module.js?value=v%3D4&flag','./module.js?value=v%3D4&flag'],
+        ['./module.js','./module.js'],
+        ['https://example.test/module.js?v=4','https://example.test/module.js?v=4']
+    ];
+    for(const [source,expected] of cases){
+        assert.equal(versionAssetUrl(source,null),expected,source);
+        assert.equal(versionAssetUrl(expected,null),expected);
+    }
+    assert.equal(versionAssetUrl('./module.js?v=4',''),'./module.js?v=4');
+});
+
+test('clean resources preserve JavaScript escapes, HTML entities, and unrelated payloads',function cleanResourceSourceSpelling(){
+    const source=String.raw`import '.\u002fmodule.js?v=4\u0026mode=a%20b\x26arcaneVersion=old#part'; const payload='./module.js?v=4&arcaneVersion=old';`;
+    const expected=String.raw`import '.\u002fmodule.js?mode=a%20b#part'; const payload='./module.js?v=4&arcaneVersion=old';`;
+    assert.equal(rewriteAssetReferences(source,{filePath:'entry.js',version:null}),expected);
+    const html='<script type="module" src="./module.js?v=4&#38;mode=a%20b&amp;arcaneVersion=old&#x26;flag#part"></script><a href="./document.html?v=4">keep</a><script type="application/json">{"url":"./data.js?v=4"}</script>';
+    const clean='<script type="module" src="./module.js?mode=a%20b&#x26;flag#part"></script><a href="./document.html?v=4">keep</a><script type="application/json">{"url":"./data.js?v=4"}</script>';
+    assert.equal(rewriteAssetReferences(html,{filePath:'index.html',version:null}),clean);
+    const remote='<base href="https://example.test/"><script src="./script.js?v=4"></script><style>@import "./theme.css?v=4";</style>';
+    assert.equal(rewriteAssetReferences(remote,{filePath:'index.html',version:null}),remote);
+    assert.equal(rewriteAssetReferences('.card{background:url(./image.png?v=4&mode=a+b)}',{filePath:'theme.css',version:null}),
+        '.card{background:url(./image.png?mode=a+b)}');
+});
+
+test('clean import maps converge URL keys without rewriting other JSON payloads',function cleanImportMapIdentity(){
+    const source=String.raw`{ "imports": { ".\u002fentry.js?v=4": "./obsolete.js?arcaneVersion=old", "./entry.js": "./selected.js?v=4", "./helper.js?mode=a%20b&arcaneVersion=old": "./helper.js?mode=a+b&v=4", "pkg/": "./pkg/", "bare": "./bare.js?arcaneVersion=old" }, "scopes": { "./entry.js?arcaneVersion=old": { "entry": "./obsolete-scoped.js?v=4" }, "./entry.js": { "./helper.js?v=4": "./scoped.js?v=4" } }, "data": { "url": "./payload.js?v=4&arcaneVersion=old" } }`;
+    const clean=rewriteAssetReferences(source,{filePath:'modules/arcane.importmap.json',version:null});
+    const map=JSON.parse(clean);
+    assert.deepEqual(map.imports,{
+        './entry.js':'./selected.js',
+        './helper.js?mode=a%20b':'./helper.js?mode=a+b',
+        'pkg/':'./pkg/',
+        bare:'./bare.js'
+    });
+    assert.deepEqual(map.scopes,{'./entry.js':{'./helper.js':'./scoped.js'}});
+    assert.ok(clean.includes('"data": { "url": "./payload.js?v=4&arcaneVersion=old" }'));
+    assert.equal(rewriteAssetReferences(clean,{filePath:'modules/arcane.importmap.json',version:null}),clean);
+    assert.equal(rewriteAssetReferences(source,{filePath:'document.json',version:null}),source);
+    const inline=`<script type="importmap">${source}</script>`;
+    assert.equal(rewriteAssetReferences(inline,{filePath:'index.html',version:null}),`<script type="importmap">${clean}</script>`);
+});
+
+test('PWA entry references retain inactive content, other attributes and script order',function pwaEntryReferences(){
+    const source=[
+        '<head><base href="../../">',
+        '<!-- <link rel="manifest" href="./comment.json"> -->',
+        '<template><script data-arcane-pwa>kept()</script></template>',
+        '<link rel="manifest" href=old.json crossorigin="use-credentials" data-name="kept">',
+        '<link rel="icon manifest" href="./icon.png" data-secondary="kept">',
+        '<script type="module" src="./first.js"></script>',
+        '<script data-arcane-pwa type="module" src="old.mjs" data-name="kept"></script>',
+        '<script type="module" src="./last.js"></script></head>'
+    ].join('\n');
+    const options={manifestUrl:'/apps/fixture/manifest.webmanifest',bootstrapUrl:'/apps/fixture/pwa.mjs?mode=a&flag=b'};
+    const result=applyPwaEntryReferences(source,options);
+    assert.ok(result.includes('<link rel="manifest" href="/apps/fixture/manifest.webmanifest" crossorigin="use-credentials" data-name="kept">'));
+    assert.ok(result.includes('<link rel="icon " href="./icon.png" data-secondary="kept">'));
+    assert.ok(result.includes('<script data-arcane-pwa type="module" src="/apps/fixture/pwa.mjs?mode=a&amp;flag=b" data-name="kept" async></script>'));
+    assert.ok(result.includes('<!-- <link rel="manifest" href="./comment.json"> -->'));
+    assert.ok(result.includes('<template><script data-arcane-pwa>kept()</script></template>'));
+    assert.ok(result.indexOf('src="./first.js"')<result.indexOf('src="/apps/fixture/pwa.mjs'));
+    assert.ok(result.indexOf('src="/apps/fixture/pwa.mjs')<result.indexOf('src="./last.js"'));
+    assert.equal(applyPwaEntryReferences(result,options),result);
+    const inserted=applyPwaEntryReferences('<head><base href="../../"></head><body>kept</body>',{
+        manifestUrl:'./apps/fixture/manifest.webmanifest',bootstrapUrl:'./apps/fixture/pwa.mjs'
+    });
+    assert.ok(inserted.includes('<link rel="manifest" href="./apps/fixture/manifest.webmanifest">'));
+    assert.ok(inserted.includes('<script type="module" async data-arcane-pwa src="./apps/fixture/pwa.mjs"></script>'));
+    assert.ok(inserted.endsWith('</head><body>kept</body>'));
+    const emptySource=applyPwaEntryReferences('<link rel="manifest"/><script data-arcane-pwa src=></script>',options);
+    assert.ok(emptySource.includes('<link rel="manifest" href="/apps/fixture/manifest.webmanifest"/>'));
+    assert.ok(emptySource.includes('<script data-arcane-pwa src="/apps/fixture/pwa.mjs?mode=a&amp;flag=b" type="module" async></script>'));
+    const slashValue=applyPwaEntryReferences('<link rel="manifest" href="old"><script data-arcane-pwa src="old.mjs" data-name=kept/></script>',options);
+    assert.ok(slashValue.includes('data-name=kept/ async>'));
+});
+
+test('PWA import-map generation uses clean URLs without changing shared runtime source',async function pwaWorkspaceProjection(t){
+    const workspace=await temporaryDirectory(t);
+    await writeFile(path.join(workspace,'arcane.lock.json'),JSON.stringify({sdk:{version:'2.3.4'}}),'utf8');
+    const runtimeRoot=path.join(workspace,'arcane','modules');
+    await mkdir(runtimeRoot,{recursive:true});
+    const runtimeSource="import './helper.js?arcaneVersion=2.3.4';";
+    await writeFile(path.join(runtimeRoot,'State.js'),runtimeSource,'utf8');
+    const appRoot=path.join(workspace,'apps','fixture');
+    await mkdir(appRoot,{recursive:true});
+    await writeFile(path.join(appRoot,'arcane-package.json'),JSON.stringify({pwa:{enabled:true}}),'utf8');
+    await writeFile(path.join(appRoot,'index.html'),'<base href="../../"><script type="module" src="./apps/fixture/entry.js?v=4&arcaneVersion=old"></script>','utf8');
+    const generated=await generateImportMap({workspaceRoot:workspace,appId:'fixture'});
+    assert.equal(generated.imports['arcane/State'],'./arcane/modules/State.js');
+    assert.equal(generated.imports['./arcane/modules/State.js?arcaneVersion=2.3.4'],undefined);
+    assert.ok((await readFile(path.join(appRoot,'index.html'),'utf8')).includes('src="./apps/fixture/entry.js"'));
+    assert.equal(await readFile(path.join(runtimeRoot,'State.js'),'utf8'),runtimeSource);
+    const built=await buildImportMap({files:['sdk/pwa.mjs'],version:null});
+    assert.equal(built.imports['arcane-os/pwa'],'./arcane/sdk/pwa.mjs');
 });

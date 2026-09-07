@@ -136,6 +136,7 @@ const browserAdapter={
         const release=await packageApp({
             workspaceRoot,
             appId,
+            browserPwa:true,
             dryRun,
             signal,
             onEvent,

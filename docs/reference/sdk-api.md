@@ -4,7 +4,7 @@ The npm package exposes a Node.js ESM control plane, the portable
 `arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`,
 `arcane-os/preference-store`, `arcane-os/speech-playback`,
 `arcane-os/speech-text`, and `arcane-os/browser-device` entrypoints, and the browser-only
-`arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints.
+`arcane-os/pwa`, `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints.
 Those package subpaths are distinct from application-facing projection modules
 in the managed browser map, such as `arcane/AIProviderRuntime`,
 `arcane/AIRuntimeState`, and `arcane/ThemeBootstrap`. Applications use those
@@ -39,6 +39,7 @@ for the installed-inventory-derived physical-runtime contract in SDK `0.5.18`.
 | `arcane-os/speech-playback` | Portable speech preparation, playback state, and injected media adapters. |
 | `arcane-os/speech-text` | Speech-input formatting cleanup for complete text and streamed chunks. |
 | `arcane-os/browser-device` | Synchronous mobile or desktop identity hints for application-owned settings. |
+| `arcane-os/pwa` | Nonblocking PWA registration, native worker updates and observable lifecycle state. |
 | `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, complete DBOPFS model storage, streaming, cancellation, and structural tool-call results. |
 | `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS provider mechanisms, ordinary upstream assets, materialized/native routing, Workers, and cancellation. |
 | `arcane-os/mail` | Portable Mail runtime, durable outbox, complete transport responses, and provider-neutral acceptance contracts. |
@@ -126,6 +127,8 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `createCanonicalUstarHeader()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `createDbopfsModelStore()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser with a ready DBOPFS instance and OPFS |
 | `getBrowserDeviceClass()` | function | `arcane-os/browser-device` | Browser device settings | Node and Browser; synchronous identity hint with no model, storage, or GPU operation |
+| `PWA_STATE_EVENT` | constant | `arcane-os/pwa` | Progressive web applications | Browser lifecycle event name; importable without registration |
+| `registerPwa()` | function | `arcane-os/pwa` | Progressive web applications | Browser service workers; synchronous unsupported state when unavailable |
 | `createDbopfsSpeechArtifactStore()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with ready DBOPFS, Web Locks, Fetch, File/Blob, and object URLs |
 | `removeBrowserSpeechModelCache()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser CacheStorage; explicit removal of one selected upstream model |
 | `createNativeBuildPlan()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
@@ -6045,6 +6048,47 @@ import {getBrowserDeviceClass} from 'arcane-os/browser-device';
 const deviceClass = getBrowserDeviceClass();
 console.log(deviceClass); // mobile or desktop
 ```
+
+## PWA_STATE_EVENT
+
+### Overview
+
+The event name `arcane.pwa.state` identifies PWA registration and native worker
+lifecycle state published through the existing Arcane event owner.
+
+### Example
+
+```javascript
+import {PWA_STATE_EVENT} from 'arcane-os/pwa';
+console.log(PWA_STATE_EVENT);
+```
+
+See the [PWA state contract](pwa.md#registerpwa) for complete payload fields and
+current-state subscriptions. Importing the constant does not register a worker.
+
+## registerPwa()
+
+### Overview
+
+`registerPwa({workerUrl = './arcane-sw.js', scope} = {})` starts native browser
+registration and returns a synchronous owner with `ready`, `state`, `subscribe`,
+`update` and `dispose`. It does not block page rendering or load models.
+Unsupported environments receive an explicit unsupported state.
+
+### Example
+
+```javascript
+import {registerPwa} from 'arcane-os/pwa';
+const pwa = registerPwa();
+pwa.ready.catch(function reportRegistrationError(error) {
+    console.error(error);
+});
+```
+
+The [PWA guide](pwa.md) defines inputs, native registration results, error state,
+current-state replay, disposal, offline resource ownership and update behavior.
+The generated bootstrap registers automatically; a manual caller owns a separate
+entry point and must observe its `ready` rejection.
 
 ## createBrowserWasmLlmProvider()
 

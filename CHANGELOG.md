@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.10.0
+
+- Add opt-in application PWA configuration, generated installation and offline
+  manifests, a stable service worker and asynchronous registration bootstrap.
+  Keep branding and offline resource selection application-owned.
+- Expose `registerPwa()` and `PWA_STATE_EVENT` through `arcane-os/pwa`, with
+  current-state replay, native update lifecycle, complete errors and disposal.
+  Keep registration independent of rendering, preferences and model startup.
+- Use clean local resource URLs for enabled PWA browser delivery. Remove `v`
+  and `arcaneVersion` from actual references and managed import-map aliases,
+  preserving meaningful queries, fragments and unrelated payloads. Dynamic
+  HTML imports follow the same document-owned selection.
+- Revalidate PWA source resources for live development and retain selected
+  successful responses offline. Packaged output uses a separate cache generation
+  for each deployment revision, bounded concurrent installation and normal
+  browser activation. Preserve user data, model caches and native packaging.
+
 ## 0.9.0
 
 - Add `getBrowserDeviceClass()` through the dependency-free
