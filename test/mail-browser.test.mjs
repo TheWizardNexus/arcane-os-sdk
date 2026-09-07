@@ -15,9 +15,14 @@ test('mail browser acceptance fixture proves an empty offline start and event-ow
 
     assert.match(html,/<meta name="arcane-app-id" content="mail-browser-proof">/u);
     assert.match(html,/type="password"/u);
+    assert.match(html,/id="mail-application"/u);
+    assert.match(html,/id="subscription-key"/u);
     assert.match(html,/"arcane\/Mail": "[.]\/arcane\/modules\/Mail[.]js"/u);
     assert.match(html,/"[.][.]\/[.][.]\/node_modules\/strong-type\/index[.]js": "[.]\/arcane\/dependencies\/strong-type\/index[.]js"/u);
     assert.match(app,/import Mail from 'arcane\/Mail'/u);
+    assert.match(app,/requireValue\(applicationInput,'Application name'\)/u);
+    assert.match(app,/appName,/u);
+    assert.match(app,/subscriptionKey,/u);
     assert.match(app,/isOnline:function acceptanceOnlineState/u);
     assert.match(app,/let simulatedOnline=false;/u);
     assert.match(app,/candidate[.]dispose\(\)/u);
@@ -71,6 +76,6 @@ test('mail browser acceptance fixture proves an empty offline start and event-ow
     assert.match(server,/sdkRuntimeSourceRoot/u);
     assert.equal('permissions' in descriptor,false);
     assert.equal('minimumCoreVersion' in descriptor.requirements,false);
-    assert.deepEqual(descriptor.security,{connectOrigins:['http://127.0.0.1:8025']});
-    assert.deepEqual(packageDocument.security,descriptor.security);
+    assert.equal('security' in descriptor,false);
+    assert.equal('security' in packageDocument,false);
 });

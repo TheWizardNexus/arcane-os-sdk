@@ -7,22 +7,18 @@ import {
     sendMailReport,
 } from './MailTransport.mjs';
 
-let userInstance=null;
-
-function completeResult(value){return value;}
-
 const MAIL_TYPES=new Set(['error','report','crisis_detected']);
-const MAIL_OUTBOX_EVENTS=completeResult([
+const MAIL_OUTBOX_EVENTS=[
     'mail-outbox-state',
     'mail-outbox-delivery',
     'mail-outbox-drain'
-]);
+];
 const PENDING_OUTBOX_STATES=new Set(['queued','sending','retry_wait']);
-const NATIVE_MAIL_RESPONSE_STATUS_CODES=completeResult({
+const NATIVE_MAIL_RESPONSE_STATUS_CODES={
     accepted:202,
     delivery_uncertain:207,
     partially_accepted:207
-});
+};
 const NATIVE_MAIL_REQUEST_ID_PATTERN=/^[A-Za-z0-9-]+$/;
 const NATIVE_MAIL_UNCERTAIN_ERROR_CODES=new Set([
     'ARCANE_REQUEST_TIMEOUT',
@@ -37,7 +33,6 @@ const NATIVE_MAIL_RETRYABLE_ERROR_CODES=new Set([
     'ARCANE_TRANSPORT_UNAVAILABLE'
 ]);
 const EMAIL_PATTERN=/^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i;
-const ARCANE_APP_ID_PATTERN=/^[a-z0-9](?:[a-z0-9-]{0,62})$/;
 
 function codedError(message,code,ErrorType=Error){
     const error=new ErrorType(message);
@@ -71,10 +66,10 @@ function linkedMailSignal(primary,secondary){
         if(signal&&!signals.includes(signal)) signals.push(signal);
     }
     if(signals.length===0){
-        return completeResult({signal:null,dispose:function disposeEmptyMailSignal(){}});
+        return {signal:null,dispose:function disposeEmptyMailSignal(){}};
     }
     if(signals.length===1){
-        return completeResult({signal:signals[0],dispose:function disposeSingleMailSignal(){}});
+        return {signal:signals[0],dispose:function disposeSingleMailSignal(){}};
     }
     const controller=new AbortController();
     const listeners=[];
@@ -86,14 +81,14 @@ function linkedMailSignal(primary,secondary){
         if(signal.aborted) listener();
         else signal.addEventListener('abort',listener,{once:true});
     }
-    return completeResult({
+    return {
         signal:controller.signal,
         dispose:function disposeLinkedMailSignal(){
             for(const entry of listeners){
                 entry.signal.removeEventListener('abort',entry.listener);
             }
         }
-    });
+    };
 }
 
 function waitForMailOperation(operation,signal){
@@ -190,58 +185,23 @@ async function loadRequiredMailStorage(){
     return storage;
 }
 
-async function loadOptionalMailUser(injectedUser){
+async function resolveMailUserEntity(injectedUser){
     if(injectedUser!==undefined) return injectedUser;
-    if(!userInstance){
-        const {default:UserEntity}=await import('../entities/User.js');
-        userInstance=new UserEntity();
-    }
-    return userInstance;
+    if(globalThis.window?.user) return globalThis.window.user;
+    const {default:UserEntity}=await import('../entities/User.js');
+    return new UserEntity();
 }
 
 function declaredApplicationId(document=globalThis.document){
-    const value=document?.querySelector?.('meta[name="arcane-app-id"]')?.content?.trim();
-    return ARCANE_APP_ID_PATTERN.test(value||'') ? value:'';
+    const appName=document?.querySelector?.('meta[name="arcane-app-id"]')?.content;
+    return is.string(appName)?appName:'';
 }
 
-function declaredMailBaseDomain(document=globalThis.document){
-    return normalizeBaseDomain(
-        document?.querySelector?.('meta[name="arcane-mail-base-domain"]')?.content,
-    );
-}
-
-function normalizeBaseDomain(value){
-    const domain=String(value||'').trim().toLowerCase();
-    if(!domain||domain.length>253
-        || !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(domain)){
-        return '';
-    }
-    return domain;
-}
-
-function hostedBaseDomain(hostname,configuredBaseDomain=''){
-    const configured=normalizeBaseDomain(configuredBaseDomain);
-    return configured&&(hostname===configured||hostname.endsWith(`.${configured}`)) ? configured:'';
-}
-
-function defaultMailEndpoint(location=globalThis.location,baseDomain=''){
+function defaultMailEndpoint(location=globalThis.location){
     if(!location||!['http:','https:'].includes(location.protocol)){
         return '';
     }
-    const hostname=String(location.hostname||'').toLowerCase();
-    const loopback=['localhost','127.0.0.1','::1','[::1]'].includes(hostname);
-    if(loopback&&location.protocol==='http:'&&String(location.port||'')!=='8025'){
-        const authority=hostname==='::1' ? '[::1]':hostname;
-        return `http://${authority}:8025/v1/mail`;
-    }
-    if(loopback){
-        return new URL('/v1/mail',location.origin).href;
-    }
-    const root=hostedBaseDomain(hostname,baseDomain);
-    if(!root){
-        return '';
-    }
-    return `https://mail.${root}/v1/mail`;
+    return new URL('/v1/mail',location.origin).href;
 }
 
 export function resolveMailConfig(
@@ -249,19 +209,19 @@ export function resolveMailConfig(
     {document=globalThis.document,location=globalThis.location}={}
 ){
     const supplied=config&&is.object(config)&&!is.array(config)?config:{};
-    const appName=is.string(supplied.appName)&&supplied.appName.trim()
-        ? supplied.appName.trim()
+    const appName=is.string(supplied.appName)
+        ? supplied.appName
         : declaredApplicationId(document);
-    return completeResult({
-        appName:ARCANE_APP_ID_PATTERN.test(appName) ? appName:'',
-        appKey:is.string(supplied.appKey) ? supplied.appKey:'',
-        endpoint:is.string(supplied.endpoint)&&supplied.endpoint.trim()
-            ? supplied.endpoint.trim()
-            : defaultMailEndpoint(location,supplied.baseDomain||declaredMailBaseDomain(document)),
+    return {
+        appName,
+        subscriptionKey:supplied.subscriptionKey,
+        endpoint:is.string(supplied.endpoint)
+            ? supplied.endpoint
+            : defaultMailEndpoint(location),
         requestTimeout:is.finite(supplied.requestTimeout)
             ? supplied.requestTimeout
             : null,
-    });
+    };
 }
 
 function escapeHtml(value){
@@ -384,12 +344,12 @@ function publicSendResult(record){
 }
 
 function safeDrainDetail(summary){
-    return completeResult({
+    return {
         ...summary,
         records:[...summary.records],
         invalidRecords:[...summary.invalidRecords],
-        states:completeResult({...summary.states})
-    });
+        states:{...summary.states}
+    };
 }
 
 function normalizeMailOptions(options){
@@ -505,7 +465,7 @@ class Mail {
             );
         }
         this.appName=resolved.appName;
-        this.appKey=resolved.appKey;
+        this.subscriptionKey=resolved.subscriptionKey;
         this.endpoint=resolved.endpoint;
         this.requestTimeout=resolved.requestTimeout;
         this.#storageInjected=options.storageInjected;
@@ -599,8 +559,19 @@ class Mail {
     async #transportDelivery(request){
         if(this.#deliver) return this.#deliver(request);
         if(this.endpoint){
+            throwIfMailAborted(request.signal);
+            let subscriptionKey=this.subscriptionKey;
+            if(subscriptionKey===undefined){
+                const user=await resolveMailUserEntity(this.#user);
+                throwIfMailAborted(request.signal);
+                if(is.function(user?.load)){
+                    await waitForMailOperation(user.load(),request.signal);
+                }
+                subscriptionKey=user?.subscription_key;
+            }
+            throwIfMailAborted(request.signal);
             return sendMailReport({
-                appKey:this.appKey,
+                subscriptionKey,
                 appName:this.appName,
                 endpoint:this.endpoint,
                 report:request.report,
@@ -697,7 +668,7 @@ class Mail {
     async #optionalProfile(){
         const fallback={email:'',language:'',phone:'',username:''};
         try{
-            const user=await loadOptionalMailUser(this.#user);
+            const user=await resolveMailUserEntity(this.#user);
             if(!user) return fallback;
             try{
                 await user.load?.();

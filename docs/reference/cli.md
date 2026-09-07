@@ -34,7 +34,7 @@ and exits nonzero on failure. Machine output is defined by
 | `arcane repo status\|pull\|push` | Runs one selected repository operation for the current app workspace. |
 | `arcane mail key set\|status\|delete` | Manages one server-only Resend API-key profile in Windows Credential Manager. |
 | `arcane mail send` | Performs one explicit, idempotency-keyed Resend attempt from a complete JSON report on redirected stdin. |
-| `arcane mail serve` | Starts one credential-protected numeric-loopback Arcane-to-Resend gateway for the selected app, Origin, and recipients. |
+| `arcane mail serve` | Starts one Arcane-to-Resend gateway with a server-only provider profile, a selected listener, and optional CORS and recipient configuration. |
 
 ## Parser-wide options
 
@@ -46,9 +46,9 @@ meaning and cardinality rules:
 | `--path` | directory | `new` |
 | `--display-name` | string | `new`, `init` |
 | `--workspace` | directory | Commands that select an external or integrated workspace; defaults to `.`. |
-| `--app` | app id | Workspace/app operations except shared scope and `verify-bundle`; also the exact `mail serve` caller id. |
+| `--app` | app id or label | Workspace/app operations except shared scope and `verify-bundle`; optional diagnostic label for `mail serve`. |
 | `--arcane-root` | directory | `doctor`, native `build`/`run`, `native-doctor`, `native-prepare` |
-| `--host` / `--port` | host / integer 0–65535 | Browser `dev`/`run` default to HTTPS at `127.0.0.1:8000`; `mail serve` defaults to HTTP at `127.0.0.1:8025` and admits numeric loopback only. |
+| `--host` / `--port` | host / integer 0–65535 | Browser `dev`/`run` default to HTTPS at `127.0.0.1:8000`; `mail serve` defaults to HTTP at `0.0.0.0:8025` and accepts an explicit bind host. |
 | `--http-port` | integer 0–65535 | Browser `dev`/`run` HTTP redirect listener; defaults to `0`, which selects an available port. |
 | `--public` | flag | `dev`; binds to `0.0.0.0` unless `--host` explicitly selects another address. |
 | `--http` | flag | `dev` only; serves source and PWA routes on one HTTP listener selected by `--port`, without TLS. |
@@ -61,10 +61,10 @@ meaning and cardinality rules:
 | `--test-file` | repository-relative `.test.mjs` | `test --scope shared` only |
 | `--artifact` | bundle path | `bundle`, `verify-bundle` |
 | `--profile` | credential profile id | `mail send`, `mail serve` |
-| `--from` | verified sender | `mail send`, `mail serve` |
-| `--origin` | exact browser origin | `mail serve` |
+| `--from` | optional sender override | `mail send`, `mail serve`; otherwise the report or provider template supplies the sender. |
+| `--origin` | optional exact browser origin | `mail serve`; selects an explicit CORS allowed origin. |
 | `--allow-to` | optional comma-separated addresses | `mail serve` |
-| `--report-key` | nonempty safe-character string | `mail send`; caller-owned stable Resend idempotency key |
+| `--report-key` | nonempty string | `mail send`; caller-owned stable Resend idempotency key, forwarded unchanged |
 | `--request-timeout` | optional integer from 1 through 2147483647 milliseconds | `mail send`, `mail serve` |
 | `--output` | `human`, `json`, `ndjson` | Every invocation; the final occurrence wins. |
 | `--git` | flag | `new` |
@@ -73,7 +73,6 @@ meaning and cardinality rules:
 | `--require-local-ai` | flag | `doctor` |
 | `--overwrite` | flag | `bundle` only |
 | `--secret-stdin` | flag | `mail key set`; requires redirected input |
-| `--app-key-stdin` | flag | `mail serve`; requires redirected input |
 | `--report-stdin` | flag | `mail send`; requires redirected JSON input |
 | `--help`, `-h` | flag | Prints help and exits zero. |
 | `--version`, `-v` | flag | Prints the exact SDK version and exits zero. |
@@ -835,10 +834,10 @@ or positional values.
 ### One-shot provider send
 
 `mail send` performs exactly one Resend provider attempt without starting a
-loopback server:
+server:
 
 ```text
-arcane mail send --profile <profile> --from <verified-sender> --report-key <id> --report-stdin [--request-timeout <ms>]
+arcane mail send --profile <profile> [--from <verified-sender>] --report-key <id> --report-stdin [--request-timeout <ms>]
 ```
 
 `--report-stdin` is mandatory and rejects a terminal before attaching input
@@ -854,15 +853,16 @@ shape:
 }
 ```
 
-The required fields are `type`, `to`, `subject`, and at least one of `text` or
-`html`; additional JSON-compatible provider fields are preserved. Direct CLI
-sending requires at least one explicit recipient, including for `error`
-reports. The Resend credential comes only from the selected Windows Credential
-Manager profile; neither it nor report content is accepted through argv or
-environment variables.
+The CLI forwards the complete provider fields, including template requests.
+Resend owns their accepted shape. The adapter removes the application-only
+`type` field and applies `--from` when supplied; otherwise the report or provider
+template supplies the sender. Direct CLI sending has
+no configured fallback recipients. The Resend credential comes only from the
+selected Windows Credential Manager profile; neither it nor report content is
+accepted through argv or environment variables.
 
-The caller owns `--report-key`. It must contain one or more ASCII letters, digits,
-periods, underscores, colons, or hyphens. Reuse the same key only with the same
+The caller owns the nonempty `--report-key`, which is forwarded unchanged.
+Reuse the same key only with the same
 logical report when deliberately reconciling or retrying an
 ambiguous attempt. The CLI never retries automatically.
 
@@ -875,32 +875,46 @@ available request and outcome detail. Cancellation before the
 provider attempt exits 130 without sending; cancellation, timeout, or transport
 loss after the attempt begins is ambiguous because Resend may have accepted it.
 
-### Authenticated local gateway
+### Mail gateway
 
 `mail serve` starts one owned Node HTTP gateway:
 
 ```text
-arcane mail serve --profile <profile> --from <verified-sender> --app <id> --origin <exact-origin> [--allow-to <addresses>] [--app-key-stdin] [--host 127.0.0.1] [--port 8025] [--request-timeout <ms>]
+arcane mail serve --profile <profile> [--from <verified-sender>] [--app <label>] [--origin <exact-origin>] [--allow-to <addresses>] [--host 0.0.0.0] [--port 8025] [--request-timeout <ms>]
 ```
 
 The selected credential profile supplies only the server-side Resend API key.
-A separate local mail app key is read through a hidden prompt. Structured
-output requires `--app-key-stdin` with redirected input; the app key is never an
-argv value or part of the server result. The browser must use the same value as
-`arcane.config.mail.appKey`.
+The CLI does not read a browser app key. Its optional `--app` value labels the
+server; the incoming request's `X-Mail-App` identifies the application for
+subscription verification. The HTTP authentication contract pairs that
+application with `Authorization: Bearer <subscription_key>`.
 
-The CLI admits only numeric loopback host values accepted by the gateway. The
-gateway also binds the exact app id, Origin, and sender, and it requires the
-separate app key by default. `--allow-to` optionally supplies a comma-separated
-recipient allowlist with no fixed recipient-count ceiling. `--request-timeout`
+Subscription verification is disabled for this initial service setup. The
+programmatic `createToolchain().mail({action: 'serve', ...})` path accepts
+`verifySubscription({appName, subscriptionKey, signal})`; supplying that callback
+enables verification before each provider attempt. It must resolve to `true`
+to accept the request. An invalid subscription receives 401; verifier service
+failure receives retryable 503; cancellation stops verification before sending.
+The callback connects the actual TWiN Stripe endpoint when its contract is
+ready. There is no guessed URL, response schema, or command-line endpoint flag.
+
+The listener defaults to `0.0.0.0`; `--host` selects another bind host. Browser
+mail defaults to `/v1/mail` on the current domain. `--origin` is optional and
+selects an explicit CORS allowlist when supplied. `--allow-to` optionally
+supplies a comma-separated recipient allowlist. CLI parsing preserves supplied
+address spelling and repeated entries. Programmatic `errorTo` selects fallback
+recipients for error reports; when omitted, the selected `allowTo` list supplies
+that fallback. `--request-timeout`
 adds a caller-selected provider-attempt timeout from 1 through 2147483647
 milliseconds, the Node timer range. When it is omitted, the SDK adds no
 provider timeout.
 
 After binding, `server.ready` reports lifecycle fields such as
-protocol, app id, loopback address, port, URL, and caller-authentication mode.
+protocol, optional app label, bind address, port, URL, and `callerAuthentication`
+(`none` or `subscription`). Human output states whether verification is disabled
+or configured.
 The command owns the server until its lifecycle ends or `SIGINT`/`SIGTERM`
-cancels it. Resend and local app credentials never appear in results or events;
+cancels it. The server's Resend credential remains outside results and events;
 per-request observer events preserve the complete delivery, report, provider
 outcome, and failure detail available to the gateway.
 

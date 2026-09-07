@@ -123,7 +123,7 @@ test('enqueue durably writes the complete serialized content before the first de
         deliver:async function deliver(request){
             const stored=await storage.get('mail_outbox',`${request.reportKey}.mail-outbox.json`);
             observed.push({request,stored});
-            return accepted();
+            return accepted('request-accepted','provider/id accepted');
         }
     });
     const report={type:'report',subject:'Durable',to:['person@example.com'],text:'hello'};
@@ -142,15 +142,15 @@ test('enqueue durably writes the complete serialized content before the first de
     assert.equal(observed[0].request.note,'caller-local metadata');
     assert.equal(observed[0].request.serializedReport,JSON.stringify(report));
     assert.equal(record.state,'accepted');
-    assert.equal(record.result.providerId,'provider-accepted');
+    assert.equal(record.result.providerId,'provider/id accepted');
     assert.deepEqual(record.result.providerResponse,{
-        id:'provider-accepted',
+        id:'provider/id accepted',
         note:'complete provider result'
     });
     assert.equal(record.protocol,MAIL_OUTBOX_PROTOCOL);
     record.result.providerId='caller-local provider';
     assert.equal(record.result.providerId,'caller-local provider');
-    assert.equal((await outbox.get('report-durable-1')).result.providerId,'provider-accepted');
+    assert.equal((await outbox.get('report-durable-1')).result.providerId,'provider/id accepted');
 });
 
 test('an accepted delivery result outranks a late caller cancellation',async function acceptedAfterCancellation(){
@@ -694,6 +694,7 @@ test('uncertain delivery retries the exact key and body inside the Resend window
                     status:'delivery_uncertain',
                     classification:'ambiguous',
                     requestId:'request-uncertain',
+                    providerCode:'provider retry/temporary issue',
                     statusCode:207,
                     details:{message:'complete uncertain provider detail'},
                     providerResponse:{trace:'complete uncertain provider response'}
@@ -706,6 +707,9 @@ test('uncertain delivery retries the exact key and body inside the Resend window
     const retrying=await outbox.enqueue({report,reportKey:'report-retry-1'});
     assert.equal(retrying.state,'retry_wait');
     assert.equal(retrying.failure.uncertain,true);
+    assert.equal(retrying.result.providerCode,'provider retry/temporary issue');
+    assert.equal(retrying.failure.code,'provider retry/temporary issue');
+    assert.equal((await outbox.get('report-retry-1')).failure.code,'provider retry/temporary issue');
     assert.deepEqual(retrying.failure.details,{
         message:'complete uncertain provider detail'
     });
@@ -761,7 +765,7 @@ test('only explicit retryable or uncertain thrown failures enter retry_wait',asy
             clock:function clock(){return 6000;},
             deliver:async function deliver(){
                 const error=new Error('safe synthetic failure');
-                error.code='MAIL_PROVIDER_RETRYABLE';
+                error.code='provider failure/temporary issue';
                 error.details={message:'complete synthetic provider detail'};
                 error.retryable=true;
                 error.retryAfterSeconds=3;
@@ -773,6 +777,8 @@ test('only explicit retryable or uncertain thrown failures enter retry_wait',asy
             reportKey:'report-explicit-retry'
         });
         assert.equal(record.state,'retry_wait');
+        assert.equal(record.failure.code,'provider failure/temporary issue');
+        assert.equal((await outbox.get('report-explicit-retry')).failure.code,'provider failure/temporary issue');
         assert.equal(record.failure.retryable,true);
         assert.equal(record.failure.uncertain,false);
         assert.equal(record.failure.message,'safe synthetic failure');

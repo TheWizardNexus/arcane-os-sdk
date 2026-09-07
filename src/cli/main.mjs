@@ -46,7 +46,6 @@ const FLAG_OPTIONS=new Set([
     'require-local-ai',
     'overwrite',
     'secret-stdin',
-    'app-key-stdin',
     'report-stdin',
     'help',
     'version'
@@ -85,8 +84,8 @@ Usage:
   ${CLI_NAME} mail key set <profile> [--secret-stdin]
   ${CLI_NAME} mail key status <profile>
   ${CLI_NAME} mail key delete <profile>
-  ${CLI_NAME} mail send --profile <profile> --from <address> --report-key <id> --report-stdin [--request-timeout <ms>]
-  ${CLI_NAME} mail serve --profile <profile> --from <address> --app <id> --origin <origin> [--allow-to <addresses>] [--app-key-stdin] [--host 127.0.0.1] [--port 8025] [--request-timeout <ms>]
+  ${CLI_NAME} mail send --profile <profile> [--from <address>] --report-key <id> --report-stdin [--request-timeout <ms>]
+  ${CLI_NAME} mail serve --profile <profile> [--from <address>] [--app <label>] [--origin <origin>] [--allow-to <addresses>] [--host 0.0.0.0] [--port 8025] [--request-timeout <ms>]
 
 Development:
   --public                      Bind dev to all IPv4 interfaces (0.0.0.0) and print network URLs.
@@ -190,7 +189,7 @@ function readPort(value,defaultValue){
     return port;
 }
 
-function readRequestTimeout(value){
+function readMailRequestTimeout(value){
     if(value===undefined)return undefined;
     if(!/^\d+$/u.test(value)){
         usage(`Invalid request timeout: ${value}.`);
@@ -205,7 +204,7 @@ function readRequestTimeout(value){
     return timeout;
 }
 
-function normalizedSecret(value){
+function normalizeMailCredentialInput(value){
     const secret=String(value??'').trim();
     if(!secret){
         usage('Mail credential input must not be empty.');
@@ -235,7 +234,7 @@ function readPipedMailSecret(input,signal){
         };
         const onEnd=function finishPipedMailSecret(){
             try{
-                finish(resolve,normalizedSecret(Buffer.concat(chunks).toString('utf8')));
+                finish(resolve,normalizeMailCredentialInput(Buffer.concat(chunks).toString('utf8')));
             }catch(error){
                 finish(reject,error);
             }
@@ -304,7 +303,7 @@ function readMaskedMailSecret(input,output,signal,label,stdinOption){
                 }
                 if(character==='\r'||character==='\n'){
                     try{
-                        finish(resolve,normalizedSecret(secret));
+                        finish(resolve,normalizeMailCredentialInput(secret));
                     }catch(error){
                         finish(reject,error);
                     }
@@ -500,9 +499,6 @@ function operationOptions(command,parsed,cwd){
     if(command!=='mail'&&flags.has('secret-stdin')){
         usage('--secret-stdin is supported only by mail key set.');
     }
-    if(command!=='mail'&&flags.has('app-key-stdin')){
-        usage('--app-key-stdin is supported only by mail serve.');
-    }
     if(command!=='mail'&&flags.has('report-stdin')){
         usage('--report-stdin is supported only by mail send.');
     }
@@ -674,9 +670,6 @@ function operationOptions(command,parsed,cwd){
             if(flags.has('secret-stdin')&&action!=='set'){
                 usage('--secret-stdin is supported only by mail key set.');
             }
-            if(flags.has('app-key-stdin')){
-                usage('--app-key-stdin is supported only by mail serve.');
-            }
             if(flags.has('report-stdin')){
                 usage('--report-stdin is supported only by mail send.');
             }
@@ -694,14 +687,7 @@ function operationOptions(command,parsed,cwd){
             if(flags.has('report-stdin')||values['report-key']!==undefined){
                 usage('--report-stdin and --report-key are supported only by mail send.');
             }
-            for(const [name,value]of Object.entries({
-                profile:values.profile,
-                from:values.from,
-                app:values.app,
-                origin:values.origin
-            })){
-                if(!value)usage(`mail serve requires --${name} <value>.`);
-            }
+            if(!values.profile)usage('mail serve requires --profile <value>.');
             return {
                 action:'serve',
                 profile:values.profile,
@@ -709,15 +695,14 @@ function operationOptions(command,parsed,cwd){
                 appId:values.app,
                 origin:values.origin,
                 allowTo:values['allow-to'],
-                appKeyStdin:flags.has('app-key-stdin'),
-                host:values.host??'127.0.0.1',
+                host:values.host??'0.0.0.0',
                 port:readPort(values.port,8025),
-                requestTimeout:readRequestTimeout(values['request-timeout']),
+                requestTimeout:readMailRequestTimeout(values['request-timeout']),
             };
         }
         if(area==='send'){
             noExtraPositionals(command,positionals,1);
-            if(flags.has('secret-stdin')||flags.has('app-key-stdin')){
+            if(flags.has('secret-stdin')){
                 usage('mail send accepts report input only through --report-stdin.');
             }
             if(values.app!==undefined||values.origin!==undefined
@@ -727,7 +712,6 @@ function operationOptions(command,parsed,cwd){
             }
             for(const [name,value]of Object.entries({
                 profile:values.profile,
-                from:values.from,
                 'report-key':values['report-key'],
             })){
                 if(!value)usage(`mail send requires --${name} <value>.`);
@@ -741,7 +725,7 @@ function operationOptions(command,parsed,cwd){
                 from:values.from,
                 reportKey:values['report-key'],
                 reportStdin:true,
-                requestTimeout:readRequestTimeout(values['request-timeout']),
+                requestTimeout:readMailRequestTimeout(values['request-timeout']),
             };
         }
         usage('mail requires key set|status|delete <profile>, send, or serve.');
@@ -879,10 +863,8 @@ function serverSummary(result){
         ...(result.httpOrigin===undefined?{}:{httpOrigin:result.httpOrigin}),
         ...(result.httpUrl===undefined?{}:{httpUrl:result.httpUrl}),
         ...(result.protocol===undefined?{}:{protocol:result.protocol}),
+        ...(result.callerAuthentication===undefined?{}:{callerAuthentication:result.callerAuthentication}),
         ...(result.networkUrls===undefined?{}:{networkUrls:result.networkUrls}),
-        ...(result.callerAuthentication
-            ?{callerAuthentication:result.callerAuthentication}
-            :{}),
         ...(result.runtimeMode?{runtimeMode:result.runtimeMode}:{}),
         ...(result.runtime?{runtime:result.runtime}:{}),
         ...(result.verified?{verified:result.verified}:{})
@@ -891,7 +873,8 @@ function serverSummary(result){
 
 async function waitForServer(result,signal,reporter){
     const readyMessage=[
-        `Development server ready at ${result.url}`,
+        `${result.target==='mail'?'Mail':'Development'} server ready at ${result.url}`,
+        ...(result.target==='mail'?[`Subscription verification: ${result.callerAuthentication==='subscription'?'configured':'disabled'}`]:[]),
         ...(result.httpUrl && result.protocol !== 'http:' ? [`HTTP redirect: ${result.httpUrl}`] : []),
         ...(result.networkUrls??[]).map(function networkAddress(url){return `Network: ${url}`;})
     ].join('\n');
@@ -981,21 +964,6 @@ export async function runCli(argv=process.argv.slice(2),{
                     output:stderr,
                     secretStdin:operation.secretStdin,
                     signal:controller.signal,
-                });
-            };
-        }
-        if(command==='mail'&&operation.action==='serve'){
-            operation.readAppKey=function readMailGatewayAppKeyForOperation(){
-                if(reporter.output!=='human'&&!operation.appKeyStdin){
-                    usage('Structured output requires mail serve --app-key-stdin.');
-                }
-                return readMailSecretInput({
-                    input:stdin,
-                    output:stderr,
-                    secretStdin:operation.appKeyStdin,
-                    signal:controller.signal,
-                    label:'Mail gateway app key',
-                    stdinOption:'--app-key-stdin',
                 });
             };
         }

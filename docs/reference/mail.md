@@ -1,8 +1,8 @@
 # Mail gateway and durable outbox
 
 Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is
-network and durable-state work, while the Resend credential belongs in the
-local Node gateway rather than in browser or WebAssembly state.
+network and durable-state work. The Resend credential belongs in the Node
+gateway and is never included in browser or WebAssembly state.
 
 ## Ownership and availability
 
@@ -12,7 +12,7 @@ local Node gateway rather than in browser or WebAssembly state.
 | `MailOutbox.mjs` | Browser or compatible injected storage | Stores exact requests in the `mail_outbox` DBOPFS table before delivery and normalizes terminal, retry, and reconciliation states. |
 | `MailTransport.mjs` | Browser, WebView, or compatible Fetch host | Sends one already-persisted request to the configured Arcane gateway with the stable report key as its idempotency key. |
 | `arcane mail send` | Node on the local machine | Reads one complete provider-neutral report from redirected stdin and performs one explicit Resend attempt with a caller-owned idempotency key. |
-| `arcane mail serve` | Node on the local machine | Authenticates the local caller, protects the provider credential, applies any explicitly configured recipient policy, and makes the single server-side Resend request. |
+| `arcane mail serve` | Node on the configured host | Owns caller verification, protects the provider credential, applies explicitly configured recipient and origin settings, and makes one server-side Resend request. |
 | `arcane mail key ...` | Node on Windows | Stores, inspects, or deletes a Resend API key in Windows Credential Manager. |
 
 The browser never receives the Resend API key. The gateway never writes that
@@ -49,52 +49,81 @@ boundary; ordinary operators use `arcane mail send`, `arcane mail serve`, and
 `arcane mail key ...`. This keeps Node credential and server authority out of a
 browser import while preserving one shared CLI/toolchain implementation.
 
-## Two separate credential boundaries
+## Provider and subscription credentials
 
 Arcane Mail deliberately separates two credentials:
 
 - The **Resend API key** is provider authority. `arcane mail key set <profile>`
   stores it in Windows Credential Manager. `mail send --profile <profile>` and
   `mail serve --profile <profile>` read it only inside the owning Node process.
-- The **mail app key** authenticates one browser/application caller to the
-  loopback gateway. It is supplied to `mail serve` through hidden terminal
-  input, or through redirected input with `--app-key-stdin`, and must match the
-  browser's `arcane.config.mail.appKey`. It is a nonempty printable ASCII
-  bearer-like local authentication value, never the Resend API key.
+- The **subscription key** is the application user's subscription credential.
+  When present, the browser sends it as `Authorization: Bearer <subscriptionKey>`,
+  with the exact application name in `X-Mail-App`. The application name identifies the
+  subscription account to verify; it is a separate field from the key and the
+  report content.
 
 Do not put either secret on the command line. Command-line arguments may be
-recorded by the operating system or shell history. Structured CLI output
-requires the matching explicit redirected-input flag and rejects TTY input so
-the terminal cannot echo a secret.
+recorded by the operating system or shell history. The credential-store
+command uses hidden terminal input or explicitly selected redirected input;
+subscription credentials are supplied through runtime configuration.
 
-The mail app key is not confidential from scripts executing in the same page:
-same-runtime script or XSS can read browser configuration and issue the same
-request. Inject it at runtime, never hardcode it in shipped assets, protect the
-page's script boundary, restrict the exact gateway destination, and rotate it
-when page or process trust is lost. It protects the loopback server from
-unadmitted local callers; it is not provider authority or a replacement for
-browser application security.
+Subscription credentials stay in runtime configuration or the canonical User
+entity. They are not added to reports, outbox records, delivery events, or
+provider payloads. Supply credentials at runtime; do not hardcode them in
+shipped source or fixtures.
 
 ## Configure the browser runtime
 
-One application declares an exact app id, gateway endpoint, and local app key:
+Configure Mail before its durable lifecycle starts:
 
 ```javascript
 globalThis.arcane = globalThis.arcane || {};
 globalThis.arcane.config = globalThis.arcane.config || {};
 globalThis.arcane.config.mail = {
-    appName: 'arcane-dev',
-    appKey: localMailAppKey,
-    endpoint: 'http://127.0.0.1:8025/v1/mail'
+    appName: 'My application'
 };
 ```
 
-The transport endpoint must be HTTPS or loopback HTTP at `localhost`,
-`127.0.0.1`, or `[::1]`. The SDK CLI gateway itself binds numeric loopback only. An
-explicit HTTPS endpoint receives the app key as `X-Mail-Key`, so its ownership
-and trust must be verified before configuration. A hosted default is derived
-only when the page declares an admitted Arcane mail base domain; otherwise
-configuration fails rather than selecting an arbitrary remote host.
+`appName` is an arbitrary nonempty string, preserved as supplied. `BOSS` and
+`TWiN` are examples, not an enum or an admission list. When `appName` is omitted,
+Mail reads the page's `arcane-app-id` metadata without changing its value.
+
+On an HTTP or HTTPS page, the default endpoint is `/v1/mail` on the current
+origin, including its port. Mail does not infer a base domain, select a mail
+subdomain, or treat loopback addresses specially. An explicit `endpoint` may
+select a shared server on another domain. The transport resolves it through
+the URL parser and accepts HTTP or HTTPS; relative URLs and query strings are
+supported. The gateway routes by pathname. Its configured CORS origins must
+include a caller on another origin.
+
+An explicit `endpoint: ''` disables HTTP delivery and selects the existing
+native `Arcane.mail.send` fallback when available. Pages with a non-HTTP origin
+also have no default HTTP endpoint. Configured HTTP delivery takes precedence
+over an available native bridge.
+
+An explicit nonempty string `subscriptionKey` supplies the HTTP credential.
+When it is omitted, Mail resolves the current canonical User entity at the actual HTTP delivery,
+waits for its existing `load()` operation, and reads `subscription_key`.
+An injected `options.user` retains precedence, including an explicit `null`.
+Mail does not retain a separate User instance, so later deliveries observe a
+replacement canonical User. This adds no page-startup wait, polling, new
+credential storage, or migration of saved data.
+
+An absent key, `null`, or an empty string omits the Authorization header; the
+transport does not block initial setup because a key is missing. Explicit
+`subscriptionKey: null` or `subscriptionKey: ''` also skips User lookup.
+A supplied value of another type is rejected. A gateway with subscription
+verification configured owns rejection of requests without a usable key.
+
+For a caller-owned key and shared endpoint:
+
+```javascript
+globalThis.arcane.config.mail = {
+    appName: 'Another application',
+    subscriptionKey: currentSubscriptionKey,
+    endpoint: 'https://mail.example.test/v1/mail'
+};
+```
 
 The ordinary browser transport has no automatic request deadline and reads the
 complete gateway response. A caller may explicitly supply a positive
@@ -107,7 +136,7 @@ accepted the request.
 `Mail.send(to, subject, payload, messageStyle, messageType)` preserves the
 existing signature. `messageType` is `error`, `report`, or `crisis_detected`.
 Report and crisis mail require at least one recipient; error mail may use the
-gateway's configured allowlisted fallback recipients.
+gateway's configured fallback recipients.
 
 In a browser, the module owns the one `window.mail` singleton. An explicit
 `new Mail(config, options)` may configure that owned singleton only before its
@@ -124,9 +153,10 @@ option `{includeContext:true}`, every message also captures
 current User entity and add its `username`, `email`, `language`, and `phone`
 values to the locally rendered content. Those fields are then stored and sent
 unencrypted as part of the message, so the application owns consent, purpose,
-recipient scope, retention, and disclosure. Without that option, Mail neither
-loads the User profile nor adds the path/profile fields. The generated
-`source_at` timestamp, caller-supplied payload, subject, type, and recipients
+recipient scope, retention, and disclosure. Without that option, Mail adds no
+path/profile fields to the report. HTTP subscription lookup may still load
+the User at delivery without copying profile fields into the report. The
+generated `source_at` timestamp, caller-supplied payload, subject, type, and recipients
 remain part of the requested report in either mode.
 
 The public `Mail` integration requires its compatible DBOPFS adapter. Before the
@@ -145,8 +175,9 @@ durable claims then belong to that adapter's implemented `get`, `set`,
 default uses `navigator.locks`; when that cross-context authority is absent,
 the outbox reports `MAIL_OUTBOX_LOCK_UNAVAILABLE` and does not start the drain.
 
-Call `await mail.start()` during application startup so pre-existing records
-are scanned even when the application does not send a new report. The first
+Start `mail.start()` during application startup so pre-existing records are
+scanned even when the application does not send a new report. Observe its
+completion or error without holding page rendering behind the drain. The first
 `send()` also starts the lifecycle if needed.
 
 | Mail method/property | Contract |
@@ -218,9 +249,14 @@ boundary.
 Mail publishes complete semantic events through the SDK singleton event
 authority. Public detail includes the full mutable durable record, serialized
 report, result or failure, provider details, and complete drain inventory
-available at that transition. It never includes the Resend API key or mail app
-key. Listener exceptions are observational and cannot change a committed mail
-operation result.
+available at that transition. It never includes the Resend API key or
+subscription key. Listener exceptions are observational and cannot change a
+committed mail operation result.
+
+Provider IDs, provider codes, and nonempty failure codes retain their complete
+string values through delivery, persistence, and retrieval. They have no SDK
+character grammar. Missing values retain the existing fallback behavior.
+Request IDs and outbox filenames retain their existing contracts.
 
 When both an explicit endpoint and native `Arcane.mail.send` exist, Mail uses
 the configured HTTP endpoint so the authenticated SDK gateway can return its
@@ -232,7 +268,7 @@ unavailability is a non-ambiguous retryable failure. Once a valid accepted
 result has returned, a racing lifecycle cancellation cannot erase that
 committed acceptance result.
 
-## Operate the CLI and local gateway
+## Operate the CLI and gateway
 
 Store one Resend key under a local profile:
 
@@ -251,19 +287,20 @@ Perform one provider attempt directly from the SDK CLI:
 arcane mail send --profile arcane-dev --from "Arcane <verified@example.com>" --report-key <stable-id> --report-stdin
 ```
 
-The redirected UTF-8 JSON input is read completely. A report requires `type`,
-`to`, `subject`, and at least one of `text` or `html`; additional
-JSON-compatible provider fields are preserved. Direct CLI sends require at
-least one explicit recipient, including for `error` reports. Message content is
-not accepted in argv. Programmatic results and observer events preserve the
-complete report, provider request, provider response, and error detail while
+The redirected UTF-8 JSON object is read completely. Its fields and values
+are retained; the Resend adapter removes the SDK's `type` routing field,
+uses `from` when configured (otherwise the report or provider template supplies
+the sender), and applies configured error-recipient fallback
+when applicable. Resend evaluates its own required provider fields. Message
+content is not accepted in argv. Programmatic results and observer events
+preserve the complete report, provider request, provider response, and error detail while
 never exposing either credential.
 
-The caller must create and retain a safe-character `--report-key` before the
+The caller must create and retain a nonempty `--report-key` before the
 attempt. It is the Resend idempotency key and may be reused only with the same
 serialized report content for an intentional retry or reconciliation. The
 CLI performs exactly one attempt and never retries automatically. Exit zero
-requires a successful Resend response containing a valid provider id; that is
+requires a successful Resend response containing a nonempty string provider id; that is
 provider acceptance, not an inbox-delivery claim. Timeout, connection loss, or
 cancellation after the provider attempt begins is returned as an ambiguous
 nonzero outcome because the provider may already have accepted the request.
@@ -272,16 +309,80 @@ For both CLI mail operations, `--request-timeout` accepts 1 through 2147483647
 milliseconds, the Node timer range. When omitted, the SDK adds no provider
 deadline.
 
-Start the authenticated gateway:
+Start the gateway:
 
 ```text
-arcane mail serve --profile arcane-dev --from "Arcane <verified@example.com>" --app arcane-dev --origin http://127.0.0.1:8000 --allow-to recipient@example.com
+arcane mail serve --profile arcane-dev --from "Arcane <verified@example.com>"
 ```
 
-Human output prompts for the separate mail app key with hidden input.
-Non-interactive structured output requires `--app-key-stdin` and redirected
-stdin. The server binds numeric loopback only; the default is
-`127.0.0.1:8025/v1/mail`.
+The default listener is `0.0.0.0:8025`; `--host` and `--port` select its bind
+address and port. The server can serve callers from multiple domains on the
+same machine. Route the page's `/v1/mail` to this listener, or configure an
+explicit shared endpoint in the caller.
+
+`--app` is an optional server event label and does not restrict incoming
+application names. `--from` is an optional shared sender override; omit it to
+preserve each report's sender or its provider template's default.
+`--origin` selects an exact allowed caller origin; the
+programmatic `origin` option also accepts an array for multiple origins. With
+no origins configured, the gateway accepts an Origin matching its request
+Host using HTTP or HTTPS. Requests without Origin continue normally.
+Cross-origin preflight permits `Content-Type`, `Idempotency-Key`, `X-Mail-App`,
+and `Authorization`. This is origin configuration, not a loopback policy.
+
+`--allow-to` explicitly limits recipients when supplied. With it omitted, the
+gateway imposes no recipient allowlist. When configured, the list applies to
+every recipient in the resolved `to`, `cc`, and `bcc` fields, whether supplied
+as a string or an array. Sender, recipient, subject, and body
+values are not trimmed, lowercased, or filtered by an SDK email grammar at
+the gateway. Error reports with an empty `to` array use configured fallback
+recipients; other report content is preserved.
+
+## Configure subscription verification
+
+Subscription verification is disabled during initial setup when
+`verifySubscription` is omitted. The server reports
+`callerAuthentication: 'none'` and can perform mail delivery without a
+subscription key. Starting the ordinary CLI gateway uses this mode. This does
+not claim that a subscription was checked.
+
+The hosting process enables verification by supplying the programmatic
+`verifySubscription` function through
+`createToolchain().mail({action:'serve', verifySubscription, ...options})`.
+The server then reports `callerAuthentication: 'subscription'`. The callback
+contract is:
+
+```javascript
+verifySubscription({appName, subscriptionKey, signal})
+```
+
+It may return a promise. Return exactly `true` for a valid subscription;
+return `false` for an invalid one, and throw when the verifier service fails.
+The gateway also treats any other returned value as invalid. `appName` is the
+exact incoming `X-Mail-App` value, `subscriptionKey` is the incoming Bearer
+key, and `signal` follows the request lifecycle. These control fields stay
+separate from the mail report and Resend payload. The verifier runs for each
+POST request before any provider attempt; results are not cached.
+
+| Configured-verifier outcome | Gateway response |
+| --- | --- |
+| Missing, empty, or repeated `X-Mail-App` | `400 mail_invalid_headers` |
+| Missing or malformed Bearer credential | `401 mail_subscription_required` |
+| Callback returns anything except `true` | `401 mail_subscription_invalid` |
+| Callback throws | `503 mail_subscription_verification_failed`, retryable with the configured `retryableDelayMs` |
+| Request cancelled while verifying | `408 mail_request_cancelled`, with no provider attempt |
+
+The `401` responses include `WWW-Authenticate: Bearer`. A successful callback
+permits the existing mail-delivery path; it is not itself a mail-acceptance
+result. The SDK supplies no default verification URL or built-in Stripe
+endpoint adapter. Connecting the actual subscription endpoint is a separate
+hosting integration.
+
+CLI startup output says `Subscription verification: disabled` or
+`Subscription verification: configured`. Structured `server.ready` output
+includes the corresponding `callerAuthentication` value.
+
+## Gateway request lifecycle
 
 The gateway uses the published `node-http-server` instance lifecycle. Its raw
 request hook hands the original request and response directly to the mail
@@ -289,17 +390,15 @@ handler before body parsing or static routing. Socket inactivity timeout remains
 disabled; caller-selected mail deadlines, cancellation, and complete responses
 remain owned by the mail handler.
 
-The gateway protects the provider credential by requiring:
+The gateway handles POST requests to `/v1/mail` and the corresponding OPTIONS
+preflight. JSON parsing owns request readability; the gateway does not reject
+a parseable body because of its Content-Type spelling. One nonempty
+`Idempotency-Key` is forwarded unchanged to the fixed Resend endpoint. The
+browser and gateway preserve complete request and response content without
+body-size gates. With no event observer, the gateway does not construct event
+payloads or parse a second provider-request representation for observation.
 
-- its exact numeric-loopback `Host` authority and `/v1/mail` route;
-- an exact configured `Origin`, app id, and constant-time app-key match;
-- complete JSON requests with at least one recipient, or configured fallback
-  recipients for an `error` report;
-- an optional explicit recipient allowlist when one is configured; and
-- one fixed Resend endpoint with the stable Arcane report key forwarded as
-  `Idempotency-Key`.
-
-The gateway returns `202` only after Resend returns a valid provider id.
+The gateway returns `202` only after Resend returns a nonempty string provider id.
 Transport loss, an explicit caller-selected timeout, an invalid success body,
 or an unreadable provider response returns an explicit uncertain result and never claims
 delivery. Rate limits, concurrent idempotency requests, permanent validation
@@ -308,8 +407,8 @@ results with the complete available provider response or error detail.
 
 ## Operational verification
 
-The focused SDK tests use only synthetic keys, addresses, responses, storage,
-and loopback requests. They do not contact Resend or send email. A live
+The focused SDK tests use synthetic keys, addresses, responses, storage,
+and local HTTP requests. They do not contact Resend or send email. A live
 acceptance send is a separate operational boundary: use a disposable message,
-the real allowlist, and the selected credential profile, then verify both the
+the selected recipient configuration and credential profile, then verify both the
 gateway's provider-acceptance id and the intended inbox outcome.

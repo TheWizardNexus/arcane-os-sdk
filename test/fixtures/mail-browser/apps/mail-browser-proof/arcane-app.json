@@ -15,9 +15,6 @@
     "exclude": [],
     "shared": ["browser-runtime"]
   },
-  "security": {
-    "connectOrigins": ["http://127.0.0.1:8025"]
-  },
   "native": {
     "type": "app",
     "icon": null,

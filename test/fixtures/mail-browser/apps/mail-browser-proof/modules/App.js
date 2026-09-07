@@ -1,7 +1,8 @@
 import arcaneThemeReady from 'arcane/ThemeBootstrap';
 import Mail from 'arcane/Mail';
 
-const appKeyInput=document.querySelector('#app-key');
+const applicationInput=document.querySelector('#mail-application');
+const subscriptionKeyInput=document.querySelector('#subscription-key');
 const recipientInput=document.querySelector('#recipient');
 const configureButton=document.querySelector('#configure');
 const onlineButton=document.querySelector('#send-online');
@@ -43,7 +44,7 @@ function projectedSend(result){
 }
 
 function requireValue(input,label){
-    const value=input.value.trim();
+    const value=input.value;
     if(!value) throw new Error(`${label} is required.`);
     return value;
 }
@@ -105,13 +106,13 @@ function waitForOnlineDrain(){
 }
 
 async function configureMail(){
-    const appKey=requireValue(appKeyInput,'Local gateway app key');
-    recipient=requireValue(recipientInput,'Acceptance recipient').toLowerCase();
+    const appName=requireValue(applicationInput,'Application name');
+    const subscriptionKey=subscriptionKeyInput.value;
+    recipient=requireValue(recipientInput,'Acceptance recipient');
     simulatedOnline=false;
     const config={
-        appName:'mail-browser-proof',
-        appKey,
-        endpoint:'http://127.0.0.1:8025/v1/mail',
+        appName,
+        subscriptionKey,
         requestTimeout:45_000
     };
     globalThis.arcane??={};
@@ -137,7 +138,7 @@ async function configureMail(){
             throw new Error('Offline startup did not preserve the empty outbox without an attempt.');
         }
         mail=candidate;
-        appKeyInput.value='';
+        subscriptionKeyInput.value='';
         recipientInput.value='';
         appendEvidence('configured',{
             dbopfs:true,

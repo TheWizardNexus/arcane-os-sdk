@@ -405,12 +405,20 @@ test('Mail preserves exact subject, payload, and profile content',async function
     mail.dispose();
 });
 
-test('configured HTTP transport takes precedence over a native bridge',async function preferConfiguredHttp(){
+test('configured HTTP transport loads the current user subscription only at delivery and takes precedence over a native bridge',async function preferConfiguredHttp(){
     const storage=new MemoryMailStorage();
     const previousArcane=globalThis.Arcane;
     const previousFetch=globalThis.fetch;
+    const previousWindow=globalThis.window;
     let nativeCalls=0;
+    let userLoadCalls=0;
+    let replacementUserLoadCalls=0;
     let httpRequest=null;
+    const currentUser={
+        subscription_key:'synthetic-subscription-key',
+        async load(){userLoadCalls+=1;}
+    };
+    globalThis.window={user:currentUser};
     globalThis.Arcane={
         mail:{
             async send(){
@@ -433,17 +441,16 @@ test('configured HTTP transport takes precedence over a native bridge',async fun
         });
     };
     const mail=new Mail({
-        appName:'mail-test',
-        appKey:'synthetic-local-app-key',
+        appName:'TWiN',
         endpoint:'https://mail.invalid/v1/mail'
     },{
         storage,
-        user:null,
         clock:function clock(){return 3_500;},
         isOnline:function online(){return true;},
         onlineTarget:null
     });
     try{
+        assert.equal(userLoadCalls,0);
         const result=await mail.send(
             ['http@example.com'],
             'HTTP preferred',
@@ -454,16 +461,40 @@ test('configured HTTP transport takes precedence over a native bridge',async fun
         assert.equal(result.state,'accepted');
         assert.equal(result.providerId,'provider-http-preferred');
         assert.equal(nativeCalls,0);
+        assert.equal(userLoadCalls,1);
         assert.equal(httpRequest.url,'https://mail.invalid/v1/mail');
+        assert.equal(httpRequest.options.headers['X-Mail-App'],'TWiN');
+        assert.equal(httpRequest.options.headers.Authorization,'Bearer synthetic-subscription-key');
+        assert.equal(Object.hasOwn(httpRequest.options.headers,'X-Mail-Key'),false);
         assert.equal(
             httpRequest.options.headers['Idempotency-Key'],
             result.reportKey
         );
+        currentUser.load=async function rejectDisposedUserLoad(){
+            throw new Error('The previous User has been disposed.');
+        };
+        globalThis.window.user={
+            subscription_key:'synthetic-replacement-subscription-key',
+            async load(){replacementUserLoadCalls+=1;}
+        };
+        const replacementResult=await mail.send(
+            ['http@example.com'],
+            'Replacement User',
+            {kind:'synthetic'},
+            '',
+            'report'
+        );
+        assert.equal(replacementResult.state,'accepted');
+        assert.equal(userLoadCalls,1);
+        assert.equal(replacementUserLoadCalls,1);
+        assert.equal(httpRequest.options.headers.Authorization,'Bearer synthetic-replacement-subscription-key');
     }finally{
         mail.dispose();
         if(previousArcane===undefined) delete globalThis.Arcane;
         else globalThis.Arcane=previousArcane;
         globalThis.fetch=previousFetch;
+        if(previousWindow===undefined) delete globalThis.window;
+        else globalThis.window=previousWindow;
     }
 });
 

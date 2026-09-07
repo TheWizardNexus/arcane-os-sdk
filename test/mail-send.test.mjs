@@ -29,19 +29,26 @@ function options(overrides={}){
 
 test('one-shot send accepts once and returns the complete mutable result',async function(){
     let calls=0;
+    const providerResponse={
+        id:'provider id / 0001',
+        detail:{apiKey:'ordinary response field',appKey:'ordinary application field'},
+        messages:['Complete provider response','Second provider message']
+    };
     const result=await sendResendMail(options({
+        appId:'BOSS & TWiN / EU',
+        from:'Sender Name <Sender+Reports@example.test>',
         fetchImpl:async function captureAttempt(url,request){
             calls+=1;
             assert.equal(url,'https://api.resend.com/emails');
             assert.equal(request.headers.Authorization,`Bearer ${SECRET}`);
             assert.equal(request.headers['Idempotency-Key'],'synthetic-report-key-0001');
             assert.deepEqual(JSON.parse(request.body),{
-                from:'sender@example.test',
+                from:'Sender Name <Sender+Reports@example.test>',
                 to:['recipient@example.test'],
                 subject:'Synthetic report',
                 text:'Synthetic body.'
             });
-            return response({id:'provider-id-0001'});
+            return response(providerResponse);
         }
     }));
     assert.equal(calls,1);
@@ -51,11 +58,11 @@ test('one-shot send accepts once and returns the complete mutable result',async 
     assert.equal(result.requestId,'synthetic-request-0001');
     assert.equal(result.providerStatus,200);
     assert.equal(result.recipientCount,1);
-    assert.equal(result.providerId,'provider-id-0001');
-    assert.deepEqual(result.providerResponse,{id:'provider-id-0001'});
+    assert.equal(result.providerId,providerResponse.id);
+    assert.deepEqual(result.providerResponse,providerResponse);
     assert.deepEqual(result.report,REPORT);
     assert.deepEqual(result.providerRequest,{
-        from:'sender@example.test',
+        from:'Sender Name <Sender+Reports@example.test>',
         to:['recipient@example.test'],
         subject:'Synthetic report',
         text:'Synthetic body.'
@@ -65,16 +72,34 @@ test('one-shot send accepts once and returns the complete mutable result',async 
     assert.equal(JSON.stringify(result).includes('recipient@example.test'),true);
 });
 
-test('direct send requires explicit recipients and a safe caller key before fetch',async function(){
+test('direct send preserves template fields and leaves recipient decisions to the provider',async function(){
     let calls=0;
-    const fetchImpl=async()=>{calls+=1;return response({id:'unused'});};
-    await assert.rejects(sendResendMail(options({
-        fetchImpl,report:{...REPORT,to:[]}
-    })),/mail_recipients_required/u);
-    await assert.rejects(sendResendMail(options({
-        fetchImpl,reportKey:'unsafe key'
-    })),/reportKey/u);
-    assert.equal(calls,0);
+    const report={
+        from:'Report Sender <Sender@example.test>',
+        to:[],
+        template:{id:'receipt-template',variables:{customer:'Exact customer value'}},
+        metadata:{apiKey:'ordinary report field',appKey:'ordinary application field'}
+    };
+    const reportKey='report 2026/09#1';
+    const providerDetail={name:'validation_error',message:'The provider requires a recipient.'};
+    const result=await sendResendMail(options({
+        appId:undefined,
+        from:undefined,
+        report,
+        reportKey,
+        fetchImpl:async function rejectEmptyRecipients(_url,request){
+            calls+=1;
+            assert.equal(request.headers['Idempotency-Key'],reportKey);
+            assert.deepEqual(JSON.parse(request.body),report);
+            return response(providerDetail,{status:422});
+        }
+    }));
+    assert.equal(calls,1);
+    assert.equal(result.classification,'permanent');
+    assert.equal(result.providerStatus,422);
+    assert.equal(result.report,report);
+    assert.deepEqual(result.providerRequest,report);
+    assert.deepEqual(result.details,providerDetail);
 });
 
 test('pre-attempt cancellation makes no provider request',async function(){
@@ -116,9 +141,33 @@ test('provider rejection classifications preserve complete provider detail',asyn
     assert.equal(permanent.retryable,false);
     assert.equal(JSON.stringify([retryable,permanent]).includes('private'),true);
     assert.equal(JSON.stringify([retryable,permanent]).includes(SECRET),false);
+
+    for(const providerDetail of [
+        ['first provider detail',{message:'second provider detail'}],
+        'complete provider string',
+        429,
+        false,
+        null
+    ]){
+        const result=await sendResendMail(options({
+            fetchImpl:async function rejectWithCompleteValue(){
+                return response(providerDetail,{status:422});
+            }
+        }));
+        assert.equal(result.classification,'permanent');
+        assert.deepEqual(result.details,providerDetail);
+    }
+    const providerText='First provider line\nSecond provider line: complete non-JSON response';
+    const plainText=await sendResendMail(options({
+        fetchImpl:async function rejectWithPlainText(){
+            return new Response(providerText,{status:422});
+        }
+    }));
+    assert.equal(plainText.classification,'permanent');
+    assert.equal(plainText.details,providerText);
 });
 
-test('transport failure and in-flight abort are ambiguous after one attempt',async function(){
+test('transport failure, in-flight abort, and a provider deadline remain ambiguous after one attempt',async function(){
     let calls=0;
     const transport=await sendResendMail(options({
         fetchImpl:async()=>{calls+=1;throw new Error('private network detail');}
@@ -140,8 +189,23 @@ test('transport failure and in-flight abort are ambiguous after one attempt',asy
     assert.equal(aborted.classification,'ambiguous');
     assert.equal(aborted.code,'resend_transport_uncertain');
     assert.equal(calls,2);
-    assert.equal(JSON.stringify([transport,aborted]).includes('private'),true);
-    assert.equal(JSON.stringify([transport,aborted]).includes(SECRET),false);
+
+    let providerSignal;
+    const expired=await sendResendMail(options({
+        providerTimeoutMs:1,
+        fetchImpl:function leaveProviderRequestPending(_url,request){
+            calls+=1;
+            providerSignal=request.signal;
+            return new Promise(function waitForProvider(){});
+        }
+    }));
+    assert.equal(expired.classification,'ambiguous');
+    assert.equal(expired.code,'resend_timeout');
+    assert.equal(expired.uncertain,true);
+    assert.equal(providerSignal.aborted,true);
+    assert.equal(calls,3);
+    assert.equal(JSON.stringify([transport,aborted,expired]).includes('private'),true);
+    assert.equal(JSON.stringify([transport,aborted,expired]).includes(SECRET),false);
 });
 
 test('a valid accepted response wins over a late abort',async function(){

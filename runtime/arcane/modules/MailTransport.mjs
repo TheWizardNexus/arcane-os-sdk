@@ -1,10 +1,7 @@
 import Is from 'strong-type';
 const is=new Is(false);
 
-const REPORT_KEY_PATTERN=/^[a-zA-Z0-9._:-]+$/;
 const REQUEST_ID_PATTERN=/^[a-zA-Z0-9-]+$/;
-const PROVIDER_ID_PATTERN=/^[a-zA-Z0-9._:-]+$/;
-const ERROR_CODE_PATTERN=/^[a-zA-Z0-9._:-]+$/;
 const RETRYABLE_STATUS_CODES=new Set([408,425,429,500,502,503,504]);
 const NON_RETRYABLE_RATE_CODES=new Set(['daily_quota_exceeded','monthly_quota_exceeded']);
 const RESPONSE_CONTRACT={
@@ -39,12 +36,8 @@ export function normalizeMailEndpoint(endpoint,base=globalThis.location?.href){
     }catch{
         throw new Error('Mail endpoint is invalid');
     }
-    const loopback=['localhost','127.0.0.1','[::1]'].includes(url.hostname.toLowerCase());
-    if(url.protocol!=='https:'&&!(url.protocol==='http:'&&loopback)){
-        throw new Error('Mail endpoint must use HTTPS or loopback HTTP');
-    }
-    if(url.username||url.password||url.search||url.hash){
-        throw new Error('Mail endpoint must not contain credentials, a query, or a fragment');
+    if(url.protocol!=='https:'&&url.protocol!=='http:'){
+        throw new Error('Mail endpoint must use HTTP or HTTPS');
     }
     return url.href;
 }
@@ -125,7 +118,7 @@ function parseDeliveryResponse(response,responseText){
         }
     }
     if(body.providerId!==undefined
-        && (!is.string(body.providerId)||!PROVIDER_ID_PATTERN.test(body.providerId))){
+        && (!is.string(body.providerId)||!body.providerId)){
         throw invalidSuccessResponse(response,responseText);
     }
 
@@ -150,7 +143,7 @@ function parseRejection(response,responseText){
         ? body.error
         : body;
     const rawCode=source?.code;
-    const code=is.string(rawCode)&&ERROR_CODE_PATTERN.test(rawCode)
+    const code=is.string(rawCode)
         ? rawCode
         : `MAIL_HTTP_${String(response.status)}`;
     let retryable=is.boolean(source?.retryable)
@@ -218,7 +211,7 @@ function requestBodyFrom({report,serializedReport}){
 }
 
 export async function sendMailReport({
-    appKey,
+    subscriptionKey,
     appName,
     endpoint,
     fetchImpl=globalThis.fetch,
@@ -232,18 +225,18 @@ export async function sendMailReport({
         throw new MailTransportError('Mail transport is unavailable',{code:'MAIL_UNAVAILABLE'});
     }
     const resolvedEndpoint=normalizeMailEndpoint(endpoint);
-    if(!is.string(appName)||!/^[a-z0-9](?:[a-z0-9-]{0,62})$/.test(appName)){
-        throw new Error('Mail application identity is invalid');
+    if(!is.string(appName)||!appName){
+        throw new Error('Mail application name is required');
     }
-    if(!is.string(reportKey)||!REPORT_KEY_PATTERN.test(reportKey)){
-        throw new Error('Mail report key must contain safe characters');
+    if(!is.string(reportKey)||!reportKey){
+        throw new Error('Mail report key is required');
     }
     if(requestTimeout!==null&&requestTimeout!==undefined
         &&(!is.safeInteger(requestTimeout)||requestTimeout<1)){
         throw new Error('Mail request timeout must be a positive integer');
     }
-    if(appKey!==undefined&&appKey!==null&&!is.string(appKey)){
-        throw new Error('Mail application key must be a string');
+    if(subscriptionKey!==undefined&&subscriptionKey!==null&&!is.string(subscriptionKey)){
+        throw new TypeError('Mail subscription key must be a string');
     }
     if(signal!==undefined&&!(signal instanceof AbortSignal)){
         throw new TypeError('Mail signal must be an AbortSignal');
@@ -255,9 +248,7 @@ export async function sendMailReport({
         'Idempotency-Key':reportKey,
         'X-Mail-App':appName,
     };
-    if(is.string(appKey)&&appKey){
-        headers['X-Mail-Key']=appKey;
-    }
+    if(subscriptionKey)headers.Authorization=`Bearer ${subscriptionKey}`;
 
     const controller=new AbortController();
     let timedOut=false;

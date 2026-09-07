@@ -17,8 +17,9 @@ function jsonResponse(body,{headers={},status=202}={}){
 
 function baseRequest(overrides={}){
     return {
-        appName:'mail-test',
-        endpoint:'http://127.0.0.1:8025/v1/mail',
+        appName:'BOSS',
+        subscriptionKey:'synthetic-subscription-key',
+        endpoint:'https://app.example.test/v1/mail',
         report:{subject:'Synthetic test',text:'No external delivery.',to:['test@example.com'],type:'report'},
         reportKey:REPORT_KEY,
         requestTimeout:5_000,
@@ -26,12 +27,14 @@ function baseRequest(overrides={}){
     };
 }
 
-test('MailTransport sends the immutable serialized body and exposes accepted provider identity',async function acceptedMailTransport(){
+test('MailTransport sends the exact serialized body with subscription authentication and provider identity',async function acceptedMailTransport(){
     const report=baseRequest().report;
+    const reportKey='report/key with spaces';
     const serializedReport=serializeMailReport(report);
     let observed;
     const result=await sendMailReport(baseRequest({
         report,
+        reportKey,
         serializedReport,
         fetchImpl:async function captureMailRequest(url,options){
             observed={url,options};
@@ -40,20 +43,23 @@ test('MailTransport sends the immutable serialized body and exposes accepted pro
                 status:'accepted',
                 accepted:1,
                 rejected:0,
-                providerId:'00000000-0000-4000-8000-000000000003',
+                providerId:'provider/id accepted',
             });
         },
     }));
 
-    assert.equal(observed.url,'http://127.0.0.1:8025/v1/mail');
+    assert.equal(observed.url,'https://app.example.test/v1/mail');
     assert.equal(observed.options.body,serializedReport);
-    assert.equal(observed.options.headers['Idempotency-Key'],REPORT_KEY);
+    assert.equal(observed.options.headers['Idempotency-Key'],reportKey);
+    assert.equal(observed.options.headers['X-Mail-App'],'BOSS');
+    assert.equal(observed.options.headers.Authorization,'Bearer synthetic-subscription-key');
+    assert.equal(Object.hasOwn(observed.options.headers,'X-Mail-Key'),false);
     assert.equal(result.sent,true);
     assert.equal(result.uncertain,false);
-    assert.equal(result.providerId,'00000000-0000-4000-8000-000000000003');
+    assert.equal(result.providerId,'provider/id accepted');
 });
 
-test('MailTransport rejects a changed report paired with an immutable serialized body',async function changedMailPayload(){
+test('MailTransport rejects a changed report paired with its stored serialized body',async function changedMailPayload(){
     const report=baseRequest().report;
     const serializedReport=serializeMailReport(report);
     await assert.rejects(
@@ -64,14 +70,16 @@ test('MailTransport rejects a changed report paired with an immutable serialized
                 throw new Error('fetch must not run');
             },
         })),
-        /does not match its immutable serialized request body/u
+        /does not match its stored serialized request body/u
     );
 });
 
 test('MailTransport distinguishes permanent and retryable idempotency conflicts',async function idempotencyConflicts(){
     await assert.rejects(
         sendMailReport(baseRequest({
-            fetchImpl:async function changedPayloadConflict(){
+            subscriptionKey:'',
+            fetchImpl:async function changedPayloadConflict(url,options){
+                assert.equal(Object.hasOwn(options.headers,'Authorization'),false);
                 return jsonResponse({error:{code:'invalid_idempotent_request'}},{status:409});
             },
         })),
@@ -105,7 +113,9 @@ test('MailTransport distinguishes permanent and retryable idempotency conflicts'
 
 test('MailTransport reports gateway ambiguity without claiming delivery',async function ambiguousGatewayResponse(){
     const result=await sendMailReport(baseRequest({
-        fetchImpl:async function uncertainProviderAttempt(){
+        subscriptionKey:null,
+        fetchImpl:async function uncertainProviderAttempt(url,options){
+            assert.equal(Object.hasOwn(options.headers,'Authorization'),false);
             return jsonResponse({
                 requestId:'00000000-0000-4000-8000-000000000004',
                 status:'delivery_uncertain',
@@ -122,9 +132,12 @@ test('MailTransport reports gateway ambiguity without claiming delivery',async f
 });
 
 test('MailTransport converts an unconfirmed network failure into retryable ambiguity',async function networkAmbiguity(){
+    let requestHeaders;
     await assert.rejects(
         sendMailReport(baseRequest({
-            fetchImpl:async function failedNetwork(){
+            subscriptionKey:undefined,
+            fetchImpl:async function failedNetwork(url,options){
+                requestHeaders=options.headers;
                 throw new TypeError('synthetic network failure');
             },
         })),
@@ -137,4 +150,5 @@ test('MailTransport converts an unconfirmed network failure into retryable ambig
             return true;
         }
     );
+    assert.equal(Object.hasOwn(requestHeaders,'Authorization'),false);
 });

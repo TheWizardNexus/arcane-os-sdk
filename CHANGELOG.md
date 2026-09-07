@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.16.0
+
+- Make mail hosting domain-based: use the current browser origin by default,
+  preserve explicit endpoints, support any application name, and remove
+  loopback-only binding and request admission. Keep exact configured CORS
+  allowlists and recipient policy for To, Cc, and Bcc. Make the CLI sender
+  override optional so reports and provider templates can supply their sender.
+- Replace the local app-key and digest mechanism with optional
+  `verifySubscription({appName, subscriptionKey, signal})` configuration.
+  Verification is disabled until configured for the staged service setup.
+  A configured verifier must accept each app and bearer key before provider
+  delivery; rejection, service failure, and cancellation remain distinct.
+- Remove redundant header reconstruction, address/origin rewriting, local
+  provider payload and identifier grammars, duplicate setup, manual response
+  length calculation, unused CLI queue options, and absent-observer work.
+  Preserve complete provider fields and responses, idempotency, caller-selected
+  deadlines, concurrent requests, and owned shutdown. Report observer and
+  escaped handler failures without changing provider acceptance.
+- Resolve subscription credentials from the current User at HTTP delivery,
+  preserving explicit credentials and User replacement. Update mail references
+  and include the method-by-method gate report.
+
 ## 0.15.2
 
 - Rename the private mail configuration helper to `optionalTimeoutMs` so its

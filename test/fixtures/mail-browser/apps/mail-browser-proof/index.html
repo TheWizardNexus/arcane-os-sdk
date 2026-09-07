@@ -32,8 +32,12 @@
             </header>
             <div class="arcane-card__body proof-grid">
                 <label>
-                    Local gateway app key
-                    <input id="app-key" type="password" autocomplete="off" spellcheck="false">
+                    Application name
+                    <input id="mail-application" type="text" autocomplete="off" spellcheck="false">
+                </label>
+                <label>
+                    Subscription key (when verification is configured)
+                    <input id="subscription-key" type="password" autocomplete="off" spellcheck="false">
                 </label>
                 <label>
                     Acceptance recipient
@@ -46,7 +50,7 @@
                     <button id="reconnect" class="arcane-button" type="button" disabled>4. Reconnect and drain</button>
                     <button id="cleanup" class="arcane-button" type="button" disabled>5. Clean up</button>
                 </div>
-                <p id="status" role="status" aria-live="polite">Enter the local app key and recipient.</p>
+                <p id="status" role="status" aria-live="polite">Enter the application name and recipient. Provide a subscription key when required.</p>
                 <pre id="evidence" aria-label="Privacy-safe acceptance evidence"></pre>
             </div>
         </section>

@@ -19,9 +19,17 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This checkout defines the `0.15.2` SDK contract. Applications pin one exact npm
+This checkout defines the `0.16.0` SDK contract. Applications pin one exact npm
 version and lockfile; registry state is deliberately not baked into application
 artifacts.
+
+The [mail gateway](docs/reference/mail.md) serves the configured host and defaults
+browser mail to `/v1/mail` on the current domain. Multiple applications can share
+one server with explicit allowed origins. Subscription verification is disabled
+until a `verifySubscription` callback is configured; that callback receives the
+application name and bearer subscription key before each provider attempt.
+See the [method and action gate report](docs/reviews/mail-server-purpose-review.md)
+for the removals, retained responsibilities, and naming decisions.
 
 Applications can enable [PWA installation and offline resources](docs/reference/pwa.md)
 through their app descriptor. The SDK generates manifests, an independent

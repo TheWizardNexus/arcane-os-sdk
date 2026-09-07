@@ -119,15 +119,14 @@ test('mail CLI never reports accidental positional or unknown-option secrets',as
     }
 });
 
-test('mail serve rejects --app-key-stdin on a TTY before reading',async function ttyAppKeyStdin(){
-    const secret='synthetic-mail-gateway-app-key-must-not-echo';
-    const stdin=Readable.from([`${secret}\n`]);
+test('mail serve defaults to all interfaces without reading an app key',async function mailServeDefaults(){
+    const stdin=Readable.from([]);
     const stdout=memoryStream();
     const stderr=memoryStream();
     let resumed=false;
     const resume=stdin.resume.bind(stdin);
     stdin.isTTY=true;
-    stdin.resume=function observeUnexpectedAppKeyRead(){
+    stdin.resume=function observeUnexpectedMailInput(){
         resumed=true;
         return resume();
     };
@@ -135,28 +134,39 @@ test('mail serve rejects --app-key-stdin on a TTY before reading',async function
     const exitCode=await runCli([
         'mail','serve',
         '--profile','arcane-dev',
-        '--from','sender@example.com',
-        '--app','mail-test',
-        '--origin','http://127.0.0.1:8000',
-        '--allow-to','recipient@example.com',
-        '--app-key-stdin',
         '--output','ndjson'
     ],{
         stdin,
         stdout:stdout.stream,
         stderr:stderr.stream,
-        execute:async function attemptTtyMailServe(command,options){
+        execute:async function startMailWithoutInput(command,options){
             assert.equal(command,'mail');
-            await options.readAppKey();
+            assert.equal(options.host,'0.0.0.0');
+            assert.equal(options.port,8025);
+            assert.equal(options.appId,undefined);
+            assert.equal(options.from,undefined);
+            assert.equal(options.origin,undefined);
+            assert.equal(Object.hasOwn(options,'readAppKey'),false);
+            return {
+                target:'mail',
+                mode:'mail',
+                host:options.host,
+                port:options.port,
+                url:'http://0.0.0.0:8025/v1/mail',
+                callerAuthentication:'none',
+                lifecycle:Promise.resolve(),
+                close:async function closeMailServer(){}
+            };
         }
     });
 
-    assert.equal(exitCode,1);
+    assert.equal(exitCode,0,stderr.read());
     assert.equal(resumed,false);
-    assert.equal(stdout.read().includes(secret),false);
-    assert.equal(stderr.read().includes(secret),false);
-    const events=parseNdjson(stdout.read());
-    assert.match(events.at(-1).data.error.message,/--app-key-stdin requires redirected/u);
+    assert.equal(stderr.read(),'');
+    const ready=parseNdjson(stdout.read()).find(function serverReady(event){
+        return event.type==='server.ready';
+    });
+    assert.equal(ready.data.callerAuthentication,'none');
 });
 
 test('mail key status dispatches a sanitized profile operation',async function mailKeyStatus(){
@@ -208,8 +218,7 @@ test('headless toolchain dispatches the mail operation without exposing credenti
     });
 });
 
-test('mail serve admits exact loopback gateway options and reports its lifecycle',async function mailServe(){
-    const appKey='synthetic-mail-gateway-app-key-0001';
+test('mail serve preserves an explicit host, CORS origin, and diagnostic app label',async function mailServe(){
     const stdout=memoryStream();
     const stderr=memoryStream();
     let invocation;
@@ -218,25 +227,22 @@ test('mail serve admits exact loopback gateway options and reports its lifecycle
         '--profile','arcane-dev',
         '--from','sender@example.com',
         '--app','mail-test',
-        '--origin','http://127.0.0.1:8000',
-        '--app-key-stdin',
+        '--origin','https://boss.example.com',
+        '--host','192.0.2.10',
         '--port','8123',
         '--output','ndjson'
     ],{
-        stdin:Readable.from([`${appKey}\n`]),
         stdout:stdout.stream,
         stderr:stderr.stream,
         execute:async function executeMailServe(command,options){
             invocation={command,options};
-            assert.equal(await options.readAppKey(),appKey);
             return {
                 target:'mail',
                 mode:'mail',
                 appId:options.appId,
-                host:'127.0.0.1',
+                host:options.host,
                 port:8123,
-                url:'http://127.0.0.1:8123/v1/mail',
-                callerAuthentication:'app-key',
+                url:'http://192.0.2.10:8123/v1/mail',
                 lifecycle:Promise.resolve(),
                 close:async function closeMailServer(){}
             };
@@ -248,27 +254,22 @@ test('mail serve admits exact loopback gateway options and reports its lifecycle
     assert.equal(invocation.options.action,'serve');
     assert.equal(invocation.options.profile,'arcane-dev');
     assert.equal(invocation.options.appId,'mail-test');
-    assert.equal(invocation.options.origin,'http://127.0.0.1:8000');
+    assert.equal(invocation.options.origin,'https://boss.example.com');
+    assert.equal(invocation.options.host,'192.0.2.10');
     assert.equal(invocation.options.allowTo,undefined);
-    assert.equal(invocation.options.appKeyStdin,true);
+    assert.equal(Object.hasOwn(invocation.options,'readAppKey'),false);
     assert.equal(invocation.options.port,8123);
     assert.equal(invocation.options.requestTimeout,undefined);
     const events=parseNdjson(stdout.read());
     assert.equal(events.some(function isReady(event){return event.type==='server.ready';}),true);
-    assert.equal(
-        events.find(function isReady(event){return event.type==='server.ready';})
-            .data.callerAuthentication,
-        'app-key'
-    );
     assert.equal(events.at(-1).data.result.target,'mail');
-    assert.equal(events.at(-1).data.result.callerAuthentication,'app-key');
 });
 
-test('mail serve fails before execution when the required origin is missing',async function invalidMailServe(){
+test('mail serve requires its provider credential profile before execution',async function invalidMailServe(){
     const stdout=memoryStream();
     let executed=false;
     const exitCode=await runCli([
-        'mail','serve','--profile','arcane-dev','--from','sender@example.com',
+        'mail','serve','--from','sender@example.com',
         '--app','mail-test','--output','ndjson'
     ],{
         stdout:stdout.stream,
@@ -277,7 +278,7 @@ test('mail serve fails before execution when the required origin is missing',asy
     });
     assert.equal(exitCode,1);
     assert.equal(executed,false);
-    assert.match(parseNdjson(stdout.read()).at(-1).data.error.message,/--origin/u);
+    assert.match(parseNdjson(stdout.read()).at(-1).data.error.message,/--profile/u);
 });
 
 test('mail rejects a request timeout outside the Node timer range before execution',async function invalidMailTimeout(){
@@ -324,22 +325,22 @@ test('mail command controller keeps credential values inside the selected operat
     assert.equal(result.exists,true);
 });
 
-test('mail command controller binds a credential profile to one loopback server configuration',async function mailControllerServe(){
+test('mail command controller binds a provider profile and preserves explicit recipient configuration',async function mailControllerServe(){
     const secret='re_test_server_only_0000000000000000000001';
-    const appKey='synthetic-mail-gateway-app-key-0002';
+    const verifySubscription=async function verifyConfiguredSubscription(){return true;};
     let observed;
     const result=await executeMailCommand({
         action:'serve',
         profile:'arcane-dev',
         appId:'mail-test',
         from:'sender@example.com',
-        origin:'http://127.0.0.1:8000',
-        allowTo:'first@example.com,second@example.com',
-        host:'127.0.0.1',
+        origin:'https://boss.example.com',
+        allowTo:'First@example.com, First@example.com',
+        host:'192.0.2.10',
         port:8025,
         requestTimeout:45_000,
+        verifySubscription,
         readCredential:async function readSyntheticCredential(){return secret;},
-        readAppKey:async function readSyntheticAppKey(){return appKey;},
         startServer:async function startSyntheticMailServer(options){
             observed=options;
             return {
@@ -348,18 +349,19 @@ test('mail command controller binds a credential profile to one loopback server 
                 appId:options.appId,
                 host:options.host,
                 port:options.port,
-                url:'http://127.0.0.1:8025/v1/mail',
+                url:'http://192.0.2.10:8025/v1/mail',
                 lifecycle:Promise.resolve(),
                 close:async function closeSyntheticMailServer(){}
             };
         }
     });
     assert.equal(observed.apiKey,secret);
-    assert.equal(observed.appKey,appKey);
-    assert.deepEqual(observed.allowedOrigins,['http://127.0.0.1:8000']);
-    assert.deepEqual(observed.recipientAllowlist,['first@example.com','second@example.com']);
+    assert.equal(Object.hasOwn(observed,'appKey'),false);
+    assert.deepEqual(observed.allowedOrigins,['https://boss.example.com']);
+    assert.deepEqual(observed.recipientAllowlist,['First@example.com',' First@example.com']);
     assert.deepEqual(observed.errorRecipients,observed.recipientAllowlist);
     assert.equal(observed.providerTimeoutMs,45_000);
+    assert.equal(observed.verifySubscription,verifySubscription);
     assert.equal(JSON.stringify(result).includes(secret),false);
 });
 
@@ -368,13 +370,10 @@ test('mail command controller treats an explicit empty recipient list as unrestr
     await executeMailCommand({
         action:'serve',
         profile:'arcane-dev',
-        appId:'mail-test',
         from:'sender@example.com',
-        origin:'http://127.0.0.1:8000',
         allowTo:[],
         errorTo:[],
         readCredential:async function readSyntheticCredential(){return 're_synthetic';},
-        readAppKey:async function readSyntheticAppKey(){return 'synthetic-app-key';},
         startServer:async function startSyntheticMailServer(options){
             observed=options;
             return {target:'mail'};
@@ -382,6 +381,8 @@ test('mail command controller treats an explicit empty recipient list as unrestr
     });
     assert.deepEqual(observed.recipientAllowlist,[]);
     assert.deepEqual(observed.errorRecipients,[]);
+    assert.deepEqual(observed.allowedOrigins,[]);
+    assert.equal(observed.host,'0.0.0.0');
 });
 
 test('mail send reads one complete report from stdin and returns complete acceptance detail',async function mailSend(){
@@ -493,13 +494,14 @@ test('mail send rejects malformed report input before credential access',async f
     assert.equal(credentialReads,0);
 });
 
-test('mail send controller performs one credential-backed attempt with complete noncredential detail',async function mailSendController(){
+test('mail send controller keeps provider credentials separate and preserves complete payload fields',async function mailSendController(){
     const secret='re_test_send_controller_only_00000000000001';
     const report={
         subject:'Synthetic controller acceptance',
         text:'private synthetic controller body',
         to:['recipient@example.com'],
-        type:'report'
+        type:'report',
+        metadata:{apiKey:'ordinary report field',appKey:'ordinary application field'}
     };
     let sends=0;
     let observed;
@@ -526,7 +528,7 @@ test('mail send controller performs one credential-backed attempt with complete 
                 providerRequest:{...report,from:'sender@example.com'},
                 providerResponse:{
                     id:'synthetic-provider-0004',
-                    credentials:{apiKey:secret,appKey:'synthetic-app-key'}
+                    metadata:{apiKey:'ordinary provider field',appKey:'ordinary provider app field'}
                 }
             };
         }
@@ -538,7 +540,11 @@ test('mail send controller performs one credential-backed attempt with complete 
     assert.equal(observed.reportKey,'synthetic-cli-report-key-0004');
     assert.deepEqual(observed.report,report);
     assert.equal(JSON.stringify(result).includes(secret),false);
-    assert.equal(JSON.stringify(result).includes('synthetic-app-key'),false);
+    assert.equal(result.report,report);
+    assert.deepEqual(result.providerResponse.metadata,{
+        apiKey:'ordinary provider field',
+        appKey:'ordinary provider app field'
+    });
     assert.equal(JSON.stringify(result).includes(report.text),true);
     assert.equal(JSON.stringify(result).includes(report.to[0]),true);
     assert.equal(result.status,'accepted');
@@ -579,7 +585,7 @@ test('mail send controller preserves complete ambiguous outcome detail without c
                     providerRequest:{...options.report,from:options.from},
                     providerResponse:{
                         message:'complete synthetic provider response',
-                        credentials:{apiKey:secret,appKey:'synthetic-app-key'}
+                        metadata:{apiKey:'ordinary failure field',appKey:'ordinary application field'}
                     }
                 };
             }
@@ -590,7 +596,8 @@ test('mail send controller preserves complete ambiguous outcome detail without c
                 &&error.details?.classification==='ambiguous'
                 &&error.details?.uncertain===true
                 &&!serialized.includes(secret)
-                &&!serialized.includes('synthetic-app-key')
+                &&error.details.providerResponse.metadata.apiKey==='ordinary failure field'
+                &&error.details.providerResponse.metadata.appKey==='ordinary application field'
                 &&serialized.includes(privateBody)
                 &&serialized.includes('recipient@example.com')
                 &&serialized.includes('complete synthetic provider response');

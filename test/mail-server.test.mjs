@@ -10,13 +10,13 @@ import {
 import {sendMailReport} from '../runtime/arcane/modules/MailTransport.mjs';
 
 const API_KEY='re_synthetic_gateway_secret';
-const APP_KEY='synthetic-local-caller-key-0001';
-const APP_ID='mail-test-app';
+const SUBSCRIPTION_KEY='synthetic-subscription-key-0001';
+const APP_ID='BOSS & TWiN / EU';
 const ALLOWED_ORIGIN='https://app.example.test';
 const ALLOWED_RECIPIENT='recipient@example.test';
 const ERROR_RECIPIENT='errors@example.test';
 const FROM='Arcane Mail <sender@example.test>';
-const ACCEPTED_PROVIDER_ID='49a3999c-0ce1-4ea6-ab68-afcd6dc2e794';
+const ACCEPTED_PROVIDER_ID='provider id / 49a3999c-0ce1-4ea6-ab68-afcd6dc2e794';
 
 function validReport(overrides={}){
     return {
@@ -43,13 +43,17 @@ function gatewayOptions(overrides={}){
     return {
         allowedOrigins:[ALLOWED_ORIGIN],
         apiKey:API_KEY,
-        appKey:APP_KEY,
         appId:APP_ID,
         errorRecipients:[ERROR_RECIPIENT],
         fetchImpl:defaultFetch,
         from:FROM,
+        host:'127.0.0.1',
         port:0,
         recipientAllowlist:[ALLOWED_RECIPIENT,ERROR_RECIPIENT],
+        verifySubscription:async function verifySyntheticSubscription({appName,subscriptionKey,signal}){
+            assert.equal(signal instanceof AbortSignal,true);
+            return appName===APP_ID&&subscriptionKey===SUBSCRIPTION_KEY;
+        },
         ...overrides
     };
 }
@@ -64,7 +68,7 @@ async function startGateway(t,overrides={}){
 
 async function requestMail(instance,{
     body=validReport(),
-    callerKey=APP_KEY,
+    subscriptionKey=SUBSCRIPTION_KEY,
     headers={},
     method='POST',
     origin=ALLOWED_ORIGIN,
@@ -86,8 +90,8 @@ async function requestMail(instance,{
         if(!Object.hasOwn(requestHeaders,'X-Mail-App')){
             requestHeaders['X-Mail-App']=APP_ID;
         }
-        if(callerKey!==null&&!Object.hasOwn(requestHeaders,'X-Mail-Key')){
-            requestHeaders['X-Mail-Key']=callerKey;
+        if(subscriptionKey!==null&&!Object.hasOwn(requestHeaders,'Authorization')){
+            requestHeaders.Authorization=`Bearer ${subscriptionKey}`;
         }
     }
     const response=await fetch(`${instance.origin}${path}`,{
@@ -160,18 +164,8 @@ async function settleSoon(promise,timeoutMs=1_000){
     }
 }
 
-test('mail gateway rejects malformed credential and endpoint configuration before binding',function testUnsafeConfiguration(){
+test('mail gateway rejects deadlines outside the Node timer range before binding',function testTimerConfiguration(){
     const invalidOptions=[
-        {host:'localhost'},
-        {host:'0.0.0.0'},
-        {allowedOrigins:['https://app.example.test/path']},
-        {allowedOrigins:[]},
-        {appKey:undefined},
-        {appKey:'contains whitespace'},
-        {allowUnauthenticatedCaller:true},
-        {appId:'Invalid App'},
-        {from:'sender@example.test\r\nBcc: attacker@example.test'},
-        {errorRecipients:['outside@example.test']},
         {bodyTimeoutMs:2_147_483_648},
         {providerTimeoutMs:2_147_483_648}
     ];
@@ -194,12 +188,12 @@ test('mail gateway exposes an exact, credential-free lifecycle contract',async f
     assert.equal(instance.mode,'mail');
     assert.equal(instance.target,'mail');
     assert.equal(instance.appId,APP_ID);
-    assert.equal(instance.callerAuthentication,'app-key');
+    assert.equal(instance.callerAuthentication,'subscription');
     assert.equal(instance.url,`${instance.origin}${RESEND_MAIL_PATH}`);
     assert.equal(instance.host,'127.0.0.1');
     assert.equal(instance.server.timeout,0);
     assert.equal(instance.closed,instance.lifecycle);
-    for(const secretProperty of ['apiKey','appKey','from','recipientAllowlist','allowedOrigins']){
+    for(const secretProperty of ['apiKey','subscriptionKey','from','recipientAllowlist','allowedOrigins']){
         assert.equal(Object.hasOwn(instance,secretProperty),false);
     }
     const firstClose=instance.close();
@@ -209,63 +203,117 @@ test('mail gateway exposes an exact, credential-free lifecycle contract',async f
     await instance.lifecycle;
 });
 
-test('mail gateway authenticates local callers with a separate app key',async function testCallerAuthentication(t){
+test('mail gateway verifies the exact incoming application and bearer subscription key',async function testCallerAuthentication(t){
     let authenticatedProviderCalls=0;
     const authenticated=await startGateway(t,{
+        appId:'Server diagnostic label / any application',
         fetchImpl:function countAuthenticatedProviderCall(){
             authenticatedProviderCalls+=1;
             return defaultFetch();
         }
     });
     const missing=await requestMail(authenticated,{
-        callerKey:null,
-        reportKey:'missing-caller-key-0001'
+        subscriptionKey:null,
+        reportKey:'missing-subscription-key-0001'
     });
     assert.equal(missing.response.status,401);
-    assert.equal(missing.body.error.code,'mail_app_key_invalid');
+    assert.equal(missing.body.error.code,'mail_subscription_required');
     const mismatch=await requestMail(authenticated,{
-        callerKey:'synthetic-wrong-caller-key-0002',
-        reportKey:'wrong-caller-key-0002'
+        subscriptionKey:'synthetic-wrong-subscription-key-0002',
+        reportKey:'wrong-subscription-key-0002'
     });
     assert.equal(mismatch.response.status,401);
-    assert.equal(mismatch.body.error.code,'mail_app_key_invalid');
+    assert.equal(mismatch.body.error.code,'mail_subscription_invalid');
+    const otherApplication=await requestMail(authenticated,{
+        headers:{'X-Mail-App':'Another application / exact name'},
+        reportKey:'other-application-key-0001'
+    });
+    assert.equal(otherApplication.response.status,401);
+    assert.equal(otherApplication.body.error.code,'mail_subscription_invalid');
+    const missingApplication=await requestMail(authenticated,{
+        headers:{'X-Mail-App':''},
+        reportKey:'missing-application-key-0001'
+    });
+    assert.equal(missingApplication.response.status,400);
+    assert.equal(missingApplication.body.error.code,'mail_invalid_headers');
+    const malformedAuthorization=await requestMail(authenticated,{
+        headers:{Authorization:'Basic synthetic-value'},
+        reportKey:'malformed-authorization-key-0001'
+    });
+    assert.equal(malformedAuthorization.response.status,401);
+    assert.equal(malformedAuthorization.body.error.code,'mail_subscription_required');
     const accepted=await requestMail(authenticated,{
-        reportKey:'valid-caller-key-0003'
+        reportKey:'valid-subscription-key-0003'
     });
     assert.equal(accepted.response.status,202);
     assert.equal(authenticatedProviderCalls,1);
 
-    const shortCredential=await startGateway(t,{appKey:'x'});
+    const shortCredential=await startGateway(t,{
+        verifySubscription:async function verifyShortSubscription({appName,subscriptionKey}){
+            return appName===APP_ID&&subscriptionKey==='x';
+        }
+    });
     const shortCredentialAccepted=await requestMail(shortCredential,{
-        callerKey:'x',
-        reportKey:'short-caller-key'
+        subscriptionKey:'x',
+        reportKey:'short-subscription-key'
     });
     assert.equal(shortCredentialAccepted.response.status,202);
 
+    const unavailableVerifier=await startGateway(t,{
+        verifySubscription:async function rejectUnavailableVerification(){
+            throw new Error('Synthetic subscription service failure');
+        },
+        fetchImpl:function countProviderCallAfterVerificationFailure(){
+            authenticatedProviderCalls+=1;
+            return defaultFetch();
+        }
+    });
+    const unavailable=await requestMail(unavailableVerifier,{
+        reportKey:'unavailable-subscription-service'
+    });
+    assert.equal(unavailable.response.status,503);
+    assert.equal(unavailable.body.error.code,'mail_subscription_verification_failed');
+    assert.equal(unavailable.body.error.retryable,true);
+    assert.equal(unavailable.body.error.retryAfterMs,1_000);
+    assert.equal(authenticatedProviderCalls,1);
+
+    const nonBooleanVerifier=await startGateway(t,{
+        verifySubscription:async function returnNonBooleanVerification(){return {active:true};},
+        fetchImpl:function countProviderCallWithoutVerifiedSubscription(){
+            authenticatedProviderCalls+=1;
+            return defaultFetch();
+        }
+    });
+    const nonBoolean=await requestMail(nonBooleanVerifier,{
+        reportKey:'non-boolean-subscription-result'
+    });
+    assert.equal(nonBoolean.response.status,401);
+    assert.equal(nonBoolean.body.error.code,'mail_subscription_invalid');
+    assert.equal(authenticatedProviderCalls,1);
+
     let unauthenticatedProviderCalls=0;
-    const explicitlyUnauthenticated=await startGateway(t,{
-        allowUnauthenticatedCaller:true,
-        appKey:undefined,
+    const unconfiguredGateway=await startGateway(t,{
+        verifySubscription:undefined,
         fetchImpl:function countExplicitNoKeyProviderCall(){
             unauthenticatedProviderCalls+=1;
             return defaultFetch();
         }
     });
     assert.equal(
-        explicitlyUnauthenticated.callerAuthentication,
-        'origin-app-id-only'
+        unconfiguredGateway.callerAuthentication,
+        'none'
     );
-    const noKeyAccepted=await requestMail(explicitlyUnauthenticated,{
-        callerKey:null,
-        reportKey:'explicit-no-key-mode-0001'
+    const noKeyAccepted=await requestMail(unconfiguredGateway,{
+        subscriptionKey:null,
+        headers:{'X-Mail-App':''},
+        reportKey:'unconfigured-verifier-no-key-0001'
     });
     assert.equal(noKeyAccepted.response.status,202);
-    const unexpectedKey=await requestMail(explicitlyUnauthenticated,{
-        reportKey:'unexpected-key-no-key-mode-0002'
+    const suppliedKey=await requestMail(unconfiguredGateway,{
+        reportKey:'unconfigured-verifier-supplied-key-0002'
     });
-    assert.equal(unexpectedKey.response.status,403);
-    assert.equal(unexpectedKey.body.error.code,'mail_app_key_unexpected');
-    assert.equal(unauthenticatedProviderCalls,1);
+    assert.equal(suppliedKey.response.status,202);
+    assert.equal(unauthenticatedProviderCalls,2);
 });
 
 test('mail gateway answers only an exact allowed CORS preflight',async function testCorsPreflight(t){
@@ -278,9 +326,8 @@ test('mail gateway answers only an exact allowed CORS preflight',async function 
     });
     const accepted=await fetch(instance.url,{
         headers:{
-            'Access-Control-Request-Headers':'content-type, idempotency-key, x-mail-app, x-mail-key',
+            'Access-Control-Request-Headers':'content-type, idempotency-key, x-mail-app, authorization',
             'Access-Control-Request-Method':'POST',
-            'Access-Control-Request-Private-Network':'true',
             'Origin':ALLOWED_ORIGIN
         },
         method:'OPTIONS'
@@ -290,12 +337,11 @@ test('mail gateway answers only an exact allowed CORS preflight',async function 
     assert.equal(accepted.headers.get('access-control-allow-methods'),'POST, OPTIONS');
     assert.equal(
         accepted.headers.get('access-control-allow-headers'),
-        'Content-Type, Idempotency-Key, X-Mail-App, X-Mail-Key'
+        'Content-Type, Idempotency-Key, X-Mail-App, Authorization'
     );
-    assert.equal(accepted.headers.get('access-control-allow-private-network'),'true');
     assert.equal(accepted.headers.get('access-control-allow-credentials'),null);
 
-    const extraHeader=await fetch(instance.url,{
+    const bearerPreflight=await fetch(instance.url,{
         headers:{
             'Access-Control-Request-Headers':'content-type, authorization',
             'Access-Control-Request-Method':'POST',
@@ -303,11 +349,11 @@ test('mail gateway answers only an exact allowed CORS preflight',async function 
         },
         method:'OPTIONS'
     });
-    assert.equal(extraHeader.status,403);
+    assert.equal(bearerPreflight.status,204);
 
     const deniedOrigin=await fetch(instance.url,{
         headers:{
-            'Access-Control-Request-Headers':'content-type, idempotency-key, x-mail-app, x-mail-key',
+            'Access-Control-Request-Headers':'content-type, idempotency-key, x-mail-app, authorization',
             'Access-Control-Request-Method':'POST',
             'Origin':'https://attacker.example.test'
         },
@@ -358,7 +404,7 @@ test('mail gateway accepts only a Resend response containing an email id',async 
         text:secretBody
     });
     const eventText=JSON.stringify(events);
-    for(const forbiddenValue of [API_KEY,APP_KEY]){
+    for(const forbiddenValue of [API_KEY,SUBSCRIPTION_KEY]){
         assert.equal(eventText.includes(forbiddenValue),false);
     }
     for(const completeValue of [
@@ -372,7 +418,7 @@ test('mail gateway accepts only a Resend response containing an email id',async 
     }
 });
 
-test('MailTransport reaches the loopback gateway with one stable provider attempt',async function testTransportGatewayIntegration(t){
+test('MailTransport reaches the configured gateway with one stable provider attempt',async function testTransportGatewayIntegration(t){
     const providerCalls=[];
     const report=validReport({text:'Synthetic transport integration body.'});
     const reportKey='transport-integration-key-0001';
@@ -383,7 +429,7 @@ test('MailTransport reaches the loopback gateway with one stable provider attemp
         }
     });
     const result=await sendMailReport({
-        appKey:APP_KEY,
+        subscriptionKey:SUBSCRIPTION_KEY,
         appName:APP_ID,
         endpoint:instance.url,
         fetchImpl:async function addSyntheticBrowserOrigin(url,options){
@@ -447,7 +493,7 @@ test('ordinary gateway delivery needs no recipient allowlist and preserves recip
     assert.deepEqual(providerReport.to,recipients);
 });
 
-test('request validation rejects malformed and unauthorized input before any provider attempt',async function testRequestValidation(t){
+test('mail gateway preserves explicit origin and recipient decisions and rejects unreadable JSON',async function testRequestValidation(t){
     let providerCalls=0;
     const instance=await startGateway(t,{
         fetchImpl:function countProviderAttempts(){
@@ -462,29 +508,19 @@ test('request validation rejects malformed and unauthorized input before any pro
             options:{origin:'https://attacker.example.test'}
         },
         {
-            expectedCode:'mail_app_not_allowed',
-            expectedStatus:403,
-            options:{headers:{'X-Mail-App':'another-app'}}
-        },
-        {
-            expectedCode:'invalid_idempotency_key',
-            expectedStatus:400,
-            options:{reportKey:'unsafe key'}
-        },
-        {
-            expectedCode:'mail_unsupported_content_type',
-            expectedStatus:415,
-            options:{headers:{'Content-Type':'text/plain'}}
-        },
-        {
             expectedCode:'mail_recipient_not_allowed',
             expectedStatus:403,
             options:{body:validReport({to:['outside@example.test']})}
         },
         {
-            expectedCode:'mail_invalid_type',
-            expectedStatus:422,
-            options:{body:validReport({type:'unknown'})}
+            expectedCode:'mail_recipient_not_allowed',
+            expectedStatus:403,
+            options:{body:validReport({cc:'outside@example.test'})}
+        },
+        {
+            expectedCode:'mail_recipient_not_allowed',
+            expectedStatus:403,
+            options:{body:validReport({bcc:[ALLOWED_RECIPIENT,'outside@example.test']})}
         },
         {
             expectedCode:'mail_invalid_json',
@@ -499,10 +535,6 @@ test('request validation rejects malformed and unauthorized input before any pro
         assert.equal(result.body.error.retryable,false);
         assert.equal(result.body.error.uncertain,false);
     }
-    const missingOrigin=await requestMail(instance,{origin:null});
-    assert.equal(missingOrigin.response.status,400);
-    assert.equal(missingOrigin.body.error.code,'mail_invalid_headers');
-
     const missingRoute=await requestMail(instance,{path:'/not-mail'});
     assert.equal(missingRoute.response.status,404);
     assert.equal(missingRoute.body.error.code,'mail_route_not_found');
@@ -515,49 +547,78 @@ test('request validation rejects malformed and unauthorized input before any pro
 
 test('mail gateway preserves complete subject and body content for the provider',async function testCompleteProviderContent(t){
     let providerReport=null;
+    let providerKey=null;
     const instance=await startGateway(t,{
         fetchImpl:async function captureCompleteProviderContent(_url,options){
             providerReport=JSON.parse(options.body);
+            providerKey=options.headers['Idempotency-Key'];
             return defaultFetch();
         }
     });
     const report=validReport({
+        cc:ALLOWED_RECIPIENT,
+        bcc:[ERROR_RECIPIENT,ALLOWED_RECIPIENT],
         subject:'  exact subject\nwith control \u0000 content  ',
         text:'   \n\t\u0000complete body\u007f  '
     });
     const result=await requestMail(instance,{
         body:report,
-        reportKey:'complete-provider-content'
+        headers:{'Content-Type':'text/plain'},
+        path:`${RESEND_MAIL_PATH}?source=complete-content`,
+        reportKey:'complete provider/content #1'
     });
     assert.equal(result.response.status,202);
+    assert.equal(result.body.accepted,1);
+    assert.equal(providerReport.cc,report.cc);
+    assert.deepEqual(providerReport.bcc,report.bcc);
     assert.equal(providerReport.subject,report.subject);
     assert.equal(providerReport.text,report.text);
+    assert.equal(providerKey,'complete provider/content #1');
+
+    const templateReport={
+        to:[ALLOWED_RECIPIENT],
+        template:{id:'template-v2',variables:{name:'Exact recipient name'}},
+        metadata:{apiKey:'ordinary report field',appKey:'ordinary application field'}
+    };
+    const templateResult=await requestMail(instance,{
+        body:templateReport,
+        reportKey:'template provider/content #2'
+    });
+    assert.equal(templateResult.response.status,202);
+    assert.deepEqual(providerReport,{...templateReport,from:FROM});
 });
 
-test('numeric loopback Host validation protects the credential endpoint',async function testHostAdmission(t){
+test('mail CORS defaults to the current request authority without a special host policy',async function testCurrentAuthorityCors(t){
     let providerCalls=0;
     const instance=await startGateway(t,{
+        allowedOrigins:undefined,
         fetchImpl:function countProviderAttempts(){
             providerCalls+=1;
             return defaultFetch();
         }
     });
     const serialized=JSON.stringify(validReport());
-    const result=await rawRequest(instance,{
-        body:serialized,
-        headers:{
-            'Content-Length':String(Buffer.byteLength(serialized)),
-            'Content-Type':'application/json',
-            'Host':`attacker.invalid:${String(instance.port)}`,
-            'Idempotency-Key':'host-admission-key-0001',
-            'Origin':ALLOWED_ORIGIN,
-            'X-Mail-App':APP_ID,
-            'X-Mail-Key':APP_KEY
-        }
-    });
-    assert.equal(result.statusCode,421);
-    assert.equal(result.body.error.code,'mail_invalid_host');
-    assert.equal(providerCalls,0);
+    for(const origin of ['https://mail.example.test','http://mail.example.test']){
+        const result=await rawRequest(instance,{
+            body:serialized,
+            headers:{
+                'Content-Type':'application/json',
+                'Host':'mail.example.test',
+                'Idempotency-Key':`current-authority ${origin}`,
+                'Origin':origin,
+                'X-Mail-App':APP_ID,
+                'Authorization':`Bearer ${SUBSCRIPTION_KEY}`
+            }
+        });
+        assert.equal(result.statusCode,202);
+        assert.equal(result.headers['access-control-allow-origin'],origin);
+    }
+    const denied=await requestMail(instance,{origin:ALLOWED_ORIGIN});
+    assert.equal(denied.response.status,403);
+    assert.equal(denied.body.error.code,'mail_origin_not_allowed');
+    const noOrigin=await requestMail(instance,{origin:null});
+    assert.equal(noOrigin.response.status,202);
+    assert.equal(providerCalls,3);
 });
 
 test('provider rejections map to explicit retryable and permanent errors',async function testProviderRejectionMappings(t){
@@ -571,7 +632,12 @@ test('provider rejections map to explicit retryable and permanent errors',async 
         jsonResponse({name:'validation_error'}, {status:400}),
         jsonResponse({name:'application_error'}, {status:500}),
         jsonResponse({name:'daily_quota_exceeded'}, {status:429}),
-        new Response('',{status:409})
+        new Response('',{status:409}),
+        jsonResponse(['first detail',{message:'second detail'}],{status:422}),
+        jsonResponse(false,{status:422}),
+        jsonResponse(null,{status:422}),
+        new Response('First provider line\nComplete second provider line',{status:422}),
+        jsonResponse({name:'Provider Error / exact name',detail:{apiKey:'ordinary field'}},{status:400})
     ];
     let providerCalls=0;
     const instance=await startGateway(t,{
@@ -587,7 +653,12 @@ test('provider rejections map to explicit retryable and permanent errors',async 
         {code:'validation_error',retryable:false,status:422,retryAfterMs:0},
         {code:'application_error',retryable:true,status:503,retryAfterMs:1_000},
         {code:'daily_quota_exceeded',retryable:false,status:422,retryAfterMs:0},
-        {code:'resend_http_409',retryable:true,status:503,retryAfterMs:1_000}
+        {code:'resend_http_409',retryable:true,status:503,retryAfterMs:1_000,details:''},
+        {code:'resend_http_422',retryable:false,status:422,retryAfterMs:0,details:['first detail',{message:'second detail'}]},
+        {code:'resend_http_422',retryable:false,status:422,retryAfterMs:0,details:false},
+        {code:'resend_http_422',retryable:false,status:422,retryAfterMs:0,details:null},
+        {code:'resend_http_422',retryable:false,status:422,retryAfterMs:0,details:'First provider line\nComplete second provider line'},
+        {code:'Provider Error / exact name',retryable:false,status:422,retryAfterMs:0,details:{name:'Provider Error / exact name',detail:{apiKey:'ordinary field'}}}
     ];
     for(let index=0;index<expected.length;index+=1){
         const result=await requestMail(instance,{
@@ -600,6 +671,9 @@ test('provider rejections map to explicit retryable and permanent errors',async 
         assert.equal(result.body.error.uncertain,false);
         assert.equal(result.body.error.retryAfterMs??0,expectation.retryAfterMs);
         assert.equal(typeof result.body.error.message,'string');
+        if(Object.hasOwn(expectation,'details')){
+            assert.deepEqual(result.body.error.details,expectation.details);
+        }
         if(index===0){
             assert.equal(result.body.error.details.message,'not returned');
         }
@@ -611,7 +685,18 @@ test('ambiguous provider outcomes never claim acceptance or delivery',async func
     const responses=[
         new Error('synthetic transport failure'),
         jsonResponse({}),
-        new Response('{invalid json',{status:200})
+        new Response('{invalid json',{status:200}),
+        jsonResponse(['complete array',{message:'complete nested value'}]),
+        jsonResponse(false),
+        jsonResponse(null)
+    ];
+    const expectedDetails=[
+        undefined,
+        {},
+        '{invalid json',
+        ['complete array',{message:'complete nested value'}],
+        false,
+        null
     ];
     let providerCalls=0;
     const instance=await startGateway(t,{
@@ -624,7 +709,7 @@ test('ambiguous provider outcomes never claim acceptance or delivery',async func
             return Promise.resolve(next);
         }
     });
-    for(let index=0;index<3;index+=1){
+    for(let index=0;index<expectedDetails.length;index+=1){
         const result=await requestMail(instance,{
             reportKey:`ambiguous-result-key-${String(index).padStart(4,'0')}`
         });
@@ -637,8 +722,11 @@ test('ambiguous provider outcomes never claim acceptance or delivery',async func
         assert.equal(Object.hasOwn(result.body,'details'),true);
         assert.equal(Object.hasOwn(result.body,'providerId'),false);
         assert.equal(Object.hasOwn(result.body,'delivered'),false);
+        if(index>0){
+            assert.deepEqual(result.body.details,expectedDetails[index]);
+        }
     }
-    assert.equal(providerCalls,3);
+    assert.equal(providerCalls,expectedDetails.length);
 });
 
 test('provider response reads reject unreadable streams and cancellation never blocks',async function testProviderReadBoundaries(t){
@@ -796,6 +884,38 @@ test('complete long request and provider response bodies are accepted',async fun
     assert.equal(result.body.providerResponse.detail,providerDetail);
     assert.equal(providerReport.text,requestText);
     assert.deepEqual(providerReport.metadata,{complete:'Synthetic provider-neutral extension.'});
+});
+
+test('closing the gateway cancels subscription verification before a provider attempt',async function testVerificationCancellation(t){
+    const entered=deferred();
+    const verifierAborted=deferred();
+    let providerCalls=0;
+    const instance=await startResendMailServer(gatewayOptions({
+        verifySubscription:function waitForVerificationCancellation({signal}){
+            entered.resolve();
+            return new Promise(function holdVerification(resolve,reject){
+                signal.addEventListener('abort',function rejectCancelledVerification(){
+                    verifierAborted.resolve();
+                    reject(signal.reason);
+                },{once:true});
+            });
+        },
+        fetchImpl:function countProviderAttemptBeforeVerification(){
+            providerCalls+=1;
+            return defaultFetch();
+        }
+    }));
+    t.after(function ensureVerificationGatewayClosed(){return instance.close();});
+    const request=requestMail(instance,{reportKey:'verification-cancellation-key-0001'});
+    await entered.promise;
+    const closing=instance.close();
+    await verifierAborted.promise;
+    const result=await request;
+    assert.equal(result.response.status,408);
+    assert.equal(result.body.error.code,'mail_request_cancelled');
+    assert.equal(providerCalls,0);
+    await closing;
+    await instance.lifecycle;
 });
 
 test('closing the gateway aborts active provider work and drains lifecycle',async function testCancellationAndDrain(t){

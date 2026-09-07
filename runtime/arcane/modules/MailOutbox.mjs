@@ -176,8 +176,8 @@ function normalizedFailure(value){
     if(!isPlainRecord(value)){
         fail('Mail outbox failure record is invalid.','MAIL_OUTBOX_RECORD_INVALID');
     }
-    const code=safeString(value.code,SAFE_CODE_PATTERN);
-    if(!code||!is.boolean(value.retryable)||!is.boolean(value.uncertain)){
+    const code=value.code;
+    if(!is.string(code)||!code||!is.boolean(value.retryable)||!is.boolean(value.uncertain)){
         fail('Mail outbox failure record is invalid.','MAIL_OUTBOX_RECORD_INVALID');
     }
     return {
@@ -211,12 +211,12 @@ function normalizedResult(value,{invalidCode='MAIL_OUTBOX_RECORD_INVALID'}={}){
         classification:safeString(value.classification,SAFE_CODE_PATTERN),
         acceptanceAuthority,
         requestId:safeString(value.requestId,SAFE_ID_PATTERN),
-        providerId:safeString(value.providerId,SAFE_ID_PATTERN),
+        providerId:is.string(value.providerId)?value.providerId:null,
         providerStatus:is.string(value.providerStatus)
             ||is.safeInteger(value.providerStatus)
             ?value.providerStatus
             :null,
-        providerCode:safeString(value.providerCode,SAFE_CODE_PATTERN),
+        providerCode:is.string(value.providerCode)?value.providerCode:null,
         statusCode:safeStatusCode(value.statusCode),
         retryAfterSeconds:retryAfterSeconds(value.retryAfterSeconds)
     };
@@ -451,7 +451,7 @@ function deliveryFailure(error){
             name:is.string(error?.name)?error.name:'Error',
             message:is.string(error?.message)?error.message:String(error??''),
             ...(is.string(error?.stack)?{stack:error.stack}:{}),
-            code:safeString(error?.code,SAFE_CODE_PATTERN)||'MAIL_DELIVERY_FAILED',
+            code:is.string(error?.code)&&error.code?error.code:'MAIL_DELIVERY_FAILED',
             statusCode:safeStatusCode(error?.statusCode),
             retryable,
             uncertain,

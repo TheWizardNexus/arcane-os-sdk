@@ -1,5 +1,6 @@
 import Is from 'strong-type';
-import {createHash,randomUUID,timingSafeEqual} from 'node:crypto';
+import {randomUUID} from 'node:crypto';
+import {inspect} from 'node:util';
 import {Server} from 'node-http-server';
 
 const is = new Is(false);
@@ -8,18 +9,7 @@ export const RESEND_MAIL_SERVER_PROTOCOL='arcane-resend-mail-gateway/1';
 export const RESEND_MAIL_PATH='/v1/mail';
 
 const RESEND_EMAIL_ENDPOINT='https://api.resend.com/emails';
-const APP_ID_PATTERN=/^[a-z0-9](?:[a-z0-9-]{0,62})$/u;
-const EMAIL_PATTERN=/^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/iu;
-const IDEMPOTENCY_KEY_PATTERN=/^[a-zA-Z0-9._:-]+$/u;
-const PROVIDER_ID_PATTERN=/^[a-zA-Z0-9._:-]+$/u;
-const PROVIDER_CODE_PATTERN=/^[a-z0-9_]+$/u;
 const REQUEST_ID_PATTERN=/^[a-zA-Z0-9-]+$/u;
-const JSON_CONTENT_TYPE_PATTERN=/^application\/json(?:\s*;\s*charset\s*=\s*"?utf-8"?)?$/iu;
-const HEADER_NAME_PATTERN=/^[!#$%&'*+.^_`|~0-9a-z-]+$/iu;
-const MAIL_TYPES=new Set(['error','report','crisis_detected']);
-const PREFLIGHT_HEADERS=new Set([
-    'content-type','idempotency-key','x-mail-app','x-mail-key'
-]);
 const PERMANENT_RATE_CODES=new Set(['daily_quota_exceeded','monthly_quota_exceeded']);
 const RETRYABLE_PROVIDER_STATUSES=new Set([408,425,429,500,502,503,504]);
 const MAX_NODE_TIMER_DELAY_MS=2_147_483_647;
@@ -31,7 +21,7 @@ class MailGatewayFault extends Error {
         this.code=code;
         this.details=details;
         this.retryable=Boolean(retryable);
-        this.retryAfterMs=normalizeRetryAfter(retryAfterMs);
+        this.retryAfterMs=retryDelayOrZero(retryAfterMs);
         this.statusCode=statusCode;
         this.uncertain=Boolean(uncertain);
     }
@@ -52,17 +42,27 @@ function completeErrorDetails(error){
         ...(is.string(error.code)?{code:error.code}:{}),
         message:is.string(error.message)?error.message:String(error),
         name:is.string(error.name)?error.name:'Error',
-        ...(is.string(error.stack)?{stack:error.stack}:{})
+        ...(is.string(error.stack)?{stack:error.stack}:{}),
+        ...(error.cause===undefined?{}:{
+            cause:error.cause instanceof Error?completeErrorDetails(error.cause):error.cause
+        }),
+        ...(error instanceof AggregateError?{errors:error.errors.map(completeErrorDetails)}:{})
     };
 }
 
-function positiveInteger(value,fallback,{label,allowZero=false}={}){
-    const resolved=value===undefined?fallback:value;
-    const minimum=allowZero?0:1;
-    if(!is.safeInteger(resolved)||resolved<minimum){
-        throw configurationError(`${label} must be ${allowZero?'a nonnegative':'a positive'} integer.`);
+function reportMailError(message,error){
+    console.error(message,inspect(error,{
+        depth:null,
+        maxArrayLength:null,
+        maxStringLength:null
+    }));
+}
+
+function readRetryDelayMs(retryDelayMs=1_000){
+    if(!is.safeInteger(retryDelayMs)||retryDelayMs<1){
+        throw configurationError('retryableDelayMs must be a positive integer.');
     }
-    return resolved;
+    return retryDelayMs;
 }
 
 function optionalTimeoutMs(value,label){
@@ -76,171 +76,17 @@ function optionalTimeoutMs(value,label){
     return value;
 }
 
-function normalizeRetryAfter(value){
+function retryDelayOrZero(value){
     return is.safeInteger(value)&&value>0?value:0;
 }
 
-function portNumber(value,fallback){
-    const resolved=value===undefined?fallback:value;
-    if(!is.safeInteger(resolved)||resolved<0||resolved>65_535){
-        throw configurationError('port must be an integer between 0 and 65535.');
-    }
-    return resolved;
-}
-
-function validateSignal(signal){
-    if(signal!==undefined&&!(signal instanceof AbortSignal)){
-        throw new TypeError('Mail server signal must be an AbortSignal.');
-    }
-    return signal;
-}
-
-function validateApiKey(value){
-    if(!is.string(value)||value.length<1||!/^[\x21-\x7e]+$/u.test(value)){
-        throw configurationError('Resend API key must be a nonempty printable ASCII string.');
-    }
-    return value;
-}
-
-function validateAppId(value){
-    if(!is.string(value)||!APP_ID_PATTERN.test(value)){
-        throw configurationError('Mail application identity is invalid.');
-    }
-    return value;
-}
-
-function appKeyDigest(value){
-    return createHash('sha256').update(value,'utf8').digest();
-}
-
-function normalizeCallerAuthentication(options){
-    const allowUnauthenticatedCaller=options.allowUnauthenticatedCaller??false;
-    if(!is.boolean(allowUnauthenticatedCaller)){
-        throw configurationError('allowUnauthenticatedCaller must be a boolean.');
-    }
-    if(allowUnauthenticatedCaller){
-        if(options.appKey!==undefined){
-            throw configurationError(
-                'appKey must be omitted when allowUnauthenticatedCaller is true.'
-            );
-        }
-        return {
-            appKeyDigest:null,
-            callerAuthentication:'origin-app-id-only'
-        };
-    }
-    if(!is.string(options.appKey)||!/^[\x21-\x7e]+$/u.test(options.appKey)){
-        throw configurationError(
-            'appKey must be a nonempty printable ASCII string unless unauthenticated caller mode is explicitly enabled.'
-        );
-    }
-    return {
-        appKeyDigest:appKeyDigest(options.appKey),
-        callerAuthentication:'app-key'
-    };
-}
-
-function normalizedEmail(value,label){
-    if(!is.string(value)){
-        throw configurationError(`${label} must be an email address.`);
-    }
-    const normalized=value.trim().toLowerCase();
-    if(normalized.length<3||normalized.length>254||!EMAIL_PATTERN.test(normalized)){
-        throw configurationError(`${label} must be a valid email address.`);
-    }
-    return normalized;
-}
-
-function validateFrom(value){
-    if(!is.string(value)||value!==value.trim()||value.length<3||value.length>320
-        ||/[\u0000-\u001f\u007f]/u.test(value)){
-        throw configurationError('Mail sender is invalid.');
-    }
-    if(EMAIL_PATTERN.test(value)){
-        return value.toLowerCase();
-    }
-    const match=/^([^<>]{1,64}) <([^<>]+)>$/u.exec(value);
-    if(!match||!match[1].trim()){
-        throw configurationError('Mail sender must be an email address or Name <email> value.');
-    }
-    const address=normalizedEmail(match[2],'Mail sender');
-    return `${match[1]} <${address}>`;
-}
-
-function normalizeEmailList(value,label,{allowEmpty=false}={}){
-    if(!is.array(value)||(!allowEmpty&&value.length===0)){
-        throw configurationError(`${label} must contain ${allowEmpty?'zero or more':'one or more'} addresses.`);
-    }
-    const result=[];
-    for(const entry of value){
-        const address=normalizedEmail(entry,label);
-        result.push(address);
-    }
-    return result;
-}
-
-function normalizeOrigin(value){
-    if(!is.string(value)||!value.trim()){
-        throw configurationError('Every allowed mail origin must be a URL origin.');
-    }
-    let url;
-    try{
-        url=new URL(value.trim());
-    }catch{
-        throw configurationError('Every allowed mail origin must be a valid URL origin.');
-    }
-    if(!['http:','https:'].includes(url.protocol)||url.username||url.password
-        ||url.pathname!=='/'||url.search||url.hash){
-        throw configurationError('Every allowed mail origin must be an HTTP or HTTPS origin without credentials, path, query, or fragment.');
-    }
-    return url.origin;
-}
-
-function normalizeOrigins(value){
-    if(!is.array(value)||value.length===0){
-        throw configurationError('allowedOrigins must contain one or more exact origins.');
-    }
-    const origins=[];
-    const seen=new Set();
-    for(const entry of value){
-        const origin=normalizeOrigin(entry);
-        if(seen.has(origin)){
-            throw configurationError('allowedOrigins must not contain duplicate origins.');
-        }
-        seen.add(origin);
-        origins.push(origin);
-    }
-    return new Set(origins);
-}
-
-function validateLoopbackHost(value){
-    if(value!=='127.0.0.1'&&value!=='::1'){
-        throw configurationError('Mail server host must be the numeric loopback address 127.0.0.1 or ::1.');
-    }
-    return value;
-}
-
-function normalizeConfiguration(options={}){
+function resolveMailServerConfiguration(options={}){
     if(!options||!is.object(options)||is.array(options)){
         throw configurationError('Mail server options must be an object.');
     }
-    const callerAuthentication=normalizeCallerAuthentication(options);
-    const recipientAllowlist=normalizeEmailList(
-        options.recipientAllowlist??[],
-        'recipientAllowlist',
-        {allowEmpty:true}
-    );
-    const errorRecipients=normalizeEmailList(
-        options.errorRecipients??[],
-        'errorRecipients',
-        {allowEmpty:true}
-    );
+    const recipientAllowlist=options.recipientAllowlist??[];
+    const errorRecipients=options.errorRecipients??[];
     const allowedRecipients=new Set(recipientAllowlist);
-    if(recipientAllowlist.length>0&&errorRecipients.some(function errorRecipientIsNotAllowed(address){
-        return !allowedRecipients.has(address);
-    })){
-        throw configurationError('Every error recipient must also be in recipientAllowlist.');
-    }
     const fetchImpl=options.fetchImpl??globalThis.fetch;
     if(!is.function(fetchImpl)){
         throw configurationError('A fetch implementation is required for Resend delivery.');
@@ -251,29 +97,28 @@ function normalizeConfiguration(options={}){
     if(options.requestIdFactory!==undefined&&!is.function(options.requestIdFactory)){
         throw configurationError('requestIdFactory must be a function when supplied.');
     }
+    if(options.verifySubscription!==undefined&&!is.function(options.verifySubscription)){
+        throw configurationError('verifySubscription must be a function when supplied.');
+    }
     return {
         allowAnyRecipient:recipientAllowlist.length===0,
-        allowedOrigins:normalizeOrigins(options.allowedOrigins),
+        allowedOrigins:new Set(options.allowedOrigins??[]),
         allowedRecipients,
-        apiKey:validateApiKey(options.apiKey),
-        appKeyDigest:callerAuthentication.appKeyDigest,
-        appId:validateAppId(options.appId),
+        apiKey:options.apiKey,
+        appId:options.appId,
         bodyTimeoutMs:optionalTimeoutMs(options.bodyTimeoutMs,'bodyTimeoutMs'),
         errorRecipients,
         fetchImpl,
-        from:validateFrom(options.from),
-        host:validateLoopbackHost(options.host??'127.0.0.1'),
-        callerAuthentication:callerAuthentication.callerAuthentication,
+        from:options.from,
+        host:options.host??'0.0.0.0',
+        callerAuthentication:options.verifySubscription?'subscription':'none',
         onEvent:options.onEvent,
-        port:portNumber(options.port,8025),
+        port:options.port??8025,
         providerTimeoutMs:optionalTimeoutMs(options.providerTimeoutMs,'providerTimeoutMs'),
         requestIdFactory:options.requestIdFactory??randomUUID,
-        retryableDelayMs:positiveInteger(
-            options.retryableDelayMs,
-            1_000,
-            {label:'retryableDelayMs'}
-        ),
-        signal:validateSignal(options.signal)
+        retryableDelayMs:readRetryDelayMs(options.retryableDelayMs),
+        signal:options.signal,
+        verifySubscription:options.verifySubscription
     };
 }
 
@@ -289,148 +134,98 @@ function createRequestId(factory){
     return randomUUID();
 }
 
-function isNumericLoopback(value){
-    return value==='127.0.0.1'||value==='::1'||value==='::ffff:127.0.0.1';
-}
-
-function headerValues(request,name){
-    const distinct=request.headersDistinct?.[name];
-    if(is.array(distinct)){
-        return distinct.map(function stringifyDistinctHeader(value){return String(value);});
-    }
-    const values=[];
-    for(let index=0;index<(request.rawHeaders?.length??0);index+=2){
-        if(String(request.rawHeaders[index]).toLowerCase()===name){
-            values.push(String(request.rawHeaders[index+1]??''));
-        }
-    }
-    if(values.length>0){
-        return values;
-    }
-    const fallback=request.headers?.[name];
-    if(fallback===undefined){
-        return [];
-    }
-    return is.array(fallback)?fallback.map(String):[String(fallback)];
-}
-
-function singleHeader(request,name,{required=true}={}){
-    const values=headerValues(request,name);
-    if(values.length===0&&!required){
-        return '';
-    }
-    if(values.length!==1||!values[0]){
+function requireRequestHeader(request,headerName){
+    const headerValues=request.headersDistinct[headerName]??[];
+    if(headerValues.length!==1||!headerValues[0]){
         throw new MailGatewayFault('mail_invalid_headers',{statusCode:400});
     }
-    return values[0];
+    return headerValues[0];
 }
 
-function validateLoopbackRequest(request){
-    if(!isNumericLoopback(request.socket?.remoteAddress)
-        ||!isNumericLoopback(request.socket?.localAddress)){
-        throw new MailGatewayFault('mail_loopback_required',{statusCode:421});
+async function verifyMailSubscription(request,configuration,signal){
+    const appName=requireRequestHeader(request,'x-mail-app');
+    const authorizationHeaders=request.headersDistinct.authorization??[];
+    const subscriptionKey=authorizationHeaders.length===1
+        ?/^Bearer (.+)$/iu.exec(authorizationHeaders[0])?.[1]
+        :undefined;
+    if(!subscriptionKey){
+        throw new MailGatewayFault('mail_subscription_required',{statusCode:401});
     }
-    const rawHost=singleHeader(request,'host');
-    let parsed;
+    let verified;
     try{
-        parsed=new URL(`http://${rawHost}`);
-    }catch{
-        throw new MailGatewayFault('mail_invalid_host',{statusCode:421});
-    }
-    const hostname=parsed.hostname.replace(/^\[|\]$/gu,'');
-    const localPort=request.socket?.localPort;
-    const statedPort=parsed.port?Number(parsed.port):80;
-    const hostLiteral=hostname.includes(':')?`[${hostname}]`:hostname;
-    const expectedAuthority=localPort===80?hostLiteral:`${hostLiteral}:${String(localPort)}`;
-    if(parsed.username||parsed.password||parsed.pathname!=='/'||parsed.search||parsed.hash
-        ||!isNumericLoopback(hostname)||!is.safeInteger(localPort)
-        ||statedPort!==localPort||rawHost!==expectedAuthority){
-        throw new MailGatewayFault('mail_invalid_host',{statusCode:421});
-    }
-}
-
-function allowedOrigin(request,configuration){
-    const origin=singleHeader(request,'origin');
-    if(!configuration.allowedOrigins.has(origin)){
-        throw new MailGatewayFault('mail_origin_not_allowed',{statusCode:403});
-    }
-    return origin;
-}
-
-function authenticateLocalCaller(request,configuration){
-    const values=headerValues(request,'x-mail-key');
-    if(configuration.callerAuthentication==='origin-app-id-only'){
-        if(values.length!==0){
-            throw new MailGatewayFault('mail_app_key_unexpected',{statusCode:403});
+        signal.throwIfAborted();
+        verified=await waitForResultOrAbort(configuration.verifySubscription({
+            appName,
+            subscriptionKey,
+            signal
+        }),signal);
+    }catch(error){
+        if(signal.aborted){
+            throw new MailGatewayFault('mail_request_cancelled',{
+                retryable:true,
+                statusCode:408
+            });
         }
-        return;
+        throw new MailGatewayFault('mail_subscription_verification_failed',{
+            details:completeErrorDetails(error),
+            retryable:true,
+            retryAfterMs:configuration.retryableDelayMs,
+            statusCode:503
+        });
     }
-    const candidate=values.length===1?values[0]:'';
-    const candidateIsValid=/^[\x21-\x7e]+$/u.test(candidate);
-    const digest=appKeyDigest(candidateIsValid?candidate:'');
-    const authenticated=timingSafeEqual(configuration.appKeyDigest,digest);
-    if(values.length!==1||!candidateIsValid||!authenticated){
-        throw new MailGatewayFault('mail_app_key_invalid',{statusCode:401});
+    if(verified!==true){
+        throw new MailGatewayFault('mail_subscription_invalid',{statusCode:401});
     }
+    return appName;
 }
 
-function corsHeaders(origin,{allowPrivateNetwork=false}={}){
+function createCorsResponseHeaders(origin){
     if(!origin){
         return {};
     }
     return {
-        'access-control-allow-headers':'Content-Type, Idempotency-Key, X-Mail-App, X-Mail-Key',
+        'access-control-allow-headers':'Content-Type, Idempotency-Key, X-Mail-App, Authorization',
         'access-control-allow-methods':'POST, OPTIONS',
         'access-control-allow-origin':origin,
         'access-control-expose-headers':'Retry-After',
         'access-control-max-age':'600',
-        ...(allowPrivateNetwork?{'access-control-allow-private-network':'true'}:{}),
         'vary':'Origin'
     };
 }
 
-function baseResponseHeaders(origin){
-    return corsHeaders(origin);
-}
-
-function writeJson(response,statusCode,value,{origin='',retryAfterMs=0}={}){
+function sendJsonResponse(response,statusCode,value,{origin='',retryAfterMs=0}={}){
     if(response.destroyed||response.writableEnded){
         return false;
     }
     const body=JSON.stringify(value);
     const headers={
-        ...baseResponseHeaders(origin),
-        'content-length':String(Buffer.byteLength(body,'utf8')),
+        ...createCorsResponseHeaders(origin),
         'content-type':'application/json; charset=utf-8'
     };
-    const delay=normalizeRetryAfter(retryAfterMs);
-    if(delay){
-        headers['retry-after']=String(Math.max(1,Math.ceil(delay/1000)));
+    if(statusCode===401)headers['www-authenticate']='Bearer';
+    if(retryAfterMs){
+        headers['retry-after']=String(Math.ceil(retryAfterMs/1000));
     }
     response.writeHead(statusCode,headers);
     response.end(body);
     return true;
 }
 
-function writePreflight(response,origin,{allowPrivateNetwork=false}={}){
+function sendCorsPreflightResponse(response,origin){
     if(response.destroyed||response.writableEnded){
         return false;
     }
-    response.writeHead(204,{
-        ...baseResponseHeaders(origin),
-        ...corsHeaders(origin,{allowPrivateNetwork}),
-        'content-length':'0'
-    });
+    response.writeHead(204,createCorsResponseHeaders(origin));
     response.end();
     return true;
 }
 
-function writeFault(response,requestId,fault,origin=''){
-    const retryAfterMs=normalizeRetryAfter(fault.retryAfterMs);
-    return writeJson(response,fault.statusCode,{
+function sendMailFailureResponse(response,requestId,fault,origin=''){
+    const retryAfterMs=fault.retryAfterMs;
+    return sendJsonResponse(response,fault.statusCode,{
         requestId,
         error:{
-            code:PROVIDER_CODE_PATTERN.test(fault.code)?fault.code:'mail_gateway_error',
+            code:fault.code,
             message:fault.message,
             details:fault.details,
             retryable:Boolean(fault.retryable),
@@ -440,7 +235,7 @@ function writeFault(response,requestId,fault,origin=''){
     },{origin,retryAfterMs});
 }
 
-function normalizeFault(error){
+function mailFaultFromError(error){
     if(error instanceof MailGatewayFault){
         return error;
     }
@@ -450,85 +245,62 @@ function normalizeFault(error){
     });
 }
 
-function validatePreflight(request){
-    if(singleHeader(request,'access-control-request-method')!=='POST'){
-        throw new MailGatewayFault('mail_preflight_denied',{statusCode:403});
+function createMailEventObserver(onEvent){
+    const pendingObserverTasks=new Set();
+    function reportObserverFailure(error){
+        reportMailError('Mail event observer failed.',error);
     }
-    const rawHeaders=singleHeader(request,'access-control-request-headers');
-    const requestedHeaders=rawHeaders.split(',').map(function normalizeRequestedHeader(value){
-        return value.trim().toLowerCase();
-    });
-    if(requestedHeaders.length===0||requestedHeaders.some(function headerIsNotAllowed(value){
-        return !value||!HEADER_NAME_PATTERN.test(value)||!PREFLIGHT_HEADERS.has(value);
-    })){
-        throw new MailGatewayFault('mail_preflight_denied',{statusCode:403});
-    }
-    const privateNetwork=singleHeader(
-        request,
-        'access-control-request-private-network',
-        {required:false}
-    );
-    if(privateNetwork&&privateNetwork!=='true'){
-        throw new MailGatewayFault('mail_preflight_denied',{statusCode:403});
-    }
-    return {allowPrivateNetwork:privateNetwork==='true'};
-}
-
-function createObserver(onEvent){
-    const pending=new Set();
     function observe(event){
-        if(!onEvent){
-            return;
-        }
-        let result;
+        let observerResult;
         try{
-            result=onEvent({...event});
-        }catch{
+            observerResult=onEvent(event);
+        }catch(error){
+            reportObserverFailure(error);
             return;
         }
-        if(!result||!is.function(result.then)){
+        if(!observerResult||!is.function(observerResult.then)){
             return;
         }
-        const task=Promise.resolve(result);
-        pending.add(task);
-        task.catch(function ignoreObserverFailure(){})
-            .finally(function releaseObserverTask(){pending.delete(task);});
+        const observerTask=Promise.resolve(observerResult);
+        pendingObserverTasks.add(observerTask);
+        observerTask.catch(reportObserverFailure)
+            .finally(function releaseObserverTask(){pendingObserverTasks.delete(observerTask);});
     }
-    async function drain(){
-        await Promise.allSettled([...pending]);
+    async function drainObserverTasks(){
+        await Promise.allSettled([...pendingObserverTasks]);
     }
-    return {drain,observe};
+    return {drain:drainObserverTasks,observe};
 }
 
-function readRequestBody(request,{timeoutMs,signal}){
-    return new Promise(function collectRequestBody(resolve,reject){
-        const chunks=[];
-        let settled=false;
-        const timer=timeoutMs==null
+function readRequestBodyText(request,{timeoutMs,signal}){
+    return new Promise(function collectRequestBodyText(resolve,reject){
+        const bodyChunks=[];
+        let bodyReadSettled=false;
+        const bodyTimeout=timeoutMs==null
             ?null
             :setTimeout(function expireRequestBody(){
-                finish(new MailGatewayFault('mail_body_timeout',{
+                settleBodyRead(new MailGatewayFault('mail_body_timeout',{
                     retryable:true,
                     statusCode:408
                 }));
                 request.resume();
             },timeoutMs);
 
-        function cleanup(){
-            if(timer!==null) clearTimeout(timer);
-            request.removeListener('data',onData);
-            request.removeListener('end',onEnd);
-            request.removeListener('error',onError);
-            request.removeListener('aborted',onAborted);
-            signal?.removeEventListener('abort',onSignalAbort);
+        function releaseBodyReadResources(){
+            if(bodyTimeout!==null) clearTimeout(bodyTimeout);
+            request.removeListener('data',collectBodyChunk);
+            request.removeListener('end',completeBodyRead);
+            request.removeListener('error',rejectFailedBodyRead);
+            request.removeListener('aborted',rejectAbortedBodyRead);
+            signal?.removeEventListener('abort',cancelBodyReadFromSignal);
         }
 
-        function finish(error,value){
-            if(settled){
+        function settleBodyRead(error,value){
+            if(bodyReadSettled){
                 return;
             }
-            settled=true;
-            cleanup();
+            bodyReadSettled=true;
+            releaseBodyReadResources();
             if(error){
                 reject(error);
             }else{
@@ -536,154 +308,106 @@ function readRequestBody(request,{timeoutMs,signal}){
             }
         }
 
-        function onData(chunk){
-            const bytes=Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk);
-            chunks.push(bytes);
+        function collectBodyChunk(chunk){
+            const bodyChunk=Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk);
+            bodyChunks.push(bodyChunk);
         }
 
-        function onEnd(){
-            finish(null,Buffer.concat(chunks).toString('utf8'));
+        function completeBodyRead(){
+            settleBodyRead(null,Buffer.concat(bodyChunks).toString('utf8'));
         }
 
-        function onError(error){
-            finish(new MailGatewayFault('mail_request_stream_failed',{
+        function rejectFailedBodyRead(error){
+            settleBodyRead(new MailGatewayFault('mail_request_stream_failed',{
                 details:completeErrorDetails(error),
                 retryable:true,
                 statusCode:400
             }));
         }
 
-        function onAborted(){
-            finish(new MailGatewayFault('mail_request_cancelled',{
+        function rejectAbortedBodyRead(){
+            settleBodyRead(new MailGatewayFault('mail_request_cancelled',{
                 retryable:true,
                 statusCode:408
             }));
         }
 
-        function onSignalAbort(){
-            finish(new MailGatewayFault('mail_request_cancelled',{
+        function cancelBodyReadFromSignal(){
+            settleBodyRead(new MailGatewayFault('mail_request_cancelled',{
                 retryable:true,
                 statusCode:408
             }));
             request.resume();
         }
 
-        request.on('data',onData);
-        request.once('end',onEnd);
-        request.once('error',onError);
-        request.once('aborted',onAborted);
-        signal?.addEventListener('abort',onSignalAbort,{once:true});
+        request.on('data',collectBodyChunk);
+        request.once('end',completeBodyRead);
+        request.once('error',rejectFailedBodyRead);
+        request.once('aborted',rejectAbortedBodyRead);
+        signal?.addEventListener('abort',cancelBodyReadFromSignal,{once:true});
         if(signal?.aborted){
-            onSignalAbort();
+            cancelBodyReadFromSignal();
         }
     });
 }
 
-function normalizedReportEmail(value){
-    if(!is.string(value)){
-        throw new MailGatewayFault('mail_invalid_recipient',{statusCode:422});
-    }
-    const address=value.trim().toLowerCase();
-    if(address.length<3||address.length>254||!EMAIL_PATTERN.test(address)){
-        throw new MailGatewayFault('mail_invalid_recipient',{statusCode:422});
-    }
-    return address;
-}
-
-function normalizeReportRecipients(report,configuration){
-    if(!is.array(report.to)){
-        throw new MailGatewayFault('mail_invalid_recipients',{statusCode:422});
-    }
-    const recipients=[];
-    for(const value of report.to){
-        const address=normalizedReportEmail(value);
-        if(!configuration.allowAnyRecipient&&!configuration.allowedRecipients.has(address)){
-            throw new MailGatewayFault('mail_recipient_not_allowed',{statusCode:403});
+function resolveReportRecipients(report,configuration){
+    const recipients=is.array(report.to)&&report.to.length===0&&report.type==='error'
+        ?configuration.errorRecipients
+        :report.to;
+    if(!configuration.allowAnyRecipient){
+        for(const recipientGroup of [recipients,report.cc,report.bcc]){
+            if(recipientGroup===undefined)continue;
+            for(const recipient of is.array(recipientGroup)?recipientGroup:[recipientGroup]){
+                if(configuration.allowedRecipients.has(recipient))continue;
+                throw new MailGatewayFault('mail_recipient_not_allowed',{statusCode:403});
+            }
         }
-        recipients.push(address);
-    }
-    if(recipients.length===0&&report.type==='error'){
-        recipients.push(...configuration.errorRecipients);
-    }
-    if(recipients.length===0){
-        throw new MailGatewayFault('mail_recipients_required',{statusCode:422});
     }
     return recipients;
 }
 
-function normalizeReport(value,configuration){
-    if(!value||!is.object(value)||is.array(value)){
+function prepareProviderDelivery(report,configuration){
+    if(!report||!is.object(report)||is.array(report)){
         throw new MailGatewayFault('mail_invalid_report',{statusCode:422});
     }
-    if(!Object.hasOwn(value,'subject')||!Object.hasOwn(value,'to')
-        ||!Object.hasOwn(value,'type')){
-        throw new MailGatewayFault('mail_invalid_report_shape',{statusCode:422});
-    }
-    if(!is.string(value.type)||!MAIL_TYPES.has(value.type)){
-        throw new MailGatewayFault('mail_invalid_type',{statusCode:422});
-    }
-    if(!is.string(value.subject)){
-        throw new MailGatewayFault('mail_invalid_subject',{statusCode:422});
-    }
-    const hasText=Object.hasOwn(value,'text');
-    const hasHtml=Object.hasOwn(value,'html');
-    if(!hasText&&!hasHtml||(hasText&&!is.string(value.text))
-        ||(hasHtml&&!is.string(value.html))){
-        throw new MailGatewayFault('mail_content_required',{statusCode:422});
-    }
-    const recipients=normalizeReportRecipients(value,configuration);
-    const providerFields={...value};
-    delete providerFields.type;
-    const providerBody={
-        ...providerFields,
-        from:configuration.from,
-        to:recipients,
-        subject:value.subject,
-        ...(hasText?{text:value.text}:{}),
-        ...(hasHtml?{html:value.html}:{})
-    };
-    const serializedProviderBody=JSON.stringify(providerBody);
+    const recipients=resolveReportRecipients(report,configuration);
+    const providerRequest={...report,to:recipients};
+    delete providerRequest.type;
+    if(configuration.from!==undefined)providerRequest.from=configuration.from;
     return {
-        report:{...value},
-        providerBody:serializedProviderBody,
-        recipientCount:recipients.length
+        report,
+        serializedProviderRequest:JSON.stringify(providerRequest),
+        recipientCount:is.array(recipients)?recipients.length:recipients?1:0
     };
 }
 
-function parseReport(serialized,configuration){
-    let value;
+function parseMailRequest(requestText,configuration){
+    let report;
     try{
-        value=JSON.parse(serialized);
+        report=JSON.parse(requestText);
     }catch{
         throw new MailGatewayFault('mail_invalid_json',{statusCode:400});
     }
-    return normalizeReport(value,configuration);
+    return prepareProviderDelivery(report,configuration);
 }
 
-function parseRetryAfter(value,now=Date.now()){
-    if(!is.string(value)||!value.trim()){
+function parseRetryAfterMilliseconds(value,now=Date.now()){
+    if(!is.string(value)){
         return 0;
     }
-    const trimmed=value.trim();
-    if(/^\d+(?:\.\d+)?$/u.test(trimmed)){
-        return normalizeRetryAfter(Math.ceil(Number(trimmed)*1000));
+    const retryAfterValue=value.trim();
+    if(!retryAfterValue)return 0;
+    if(/^\d+(?:\.\d+)?$/u.test(retryAfterValue)){
+        return retryDelayOrZero(Math.ceil(Number(retryAfterValue)*1000));
     }
-    const timestamp=Date.parse(trimmed);
+    const timestamp=Date.parse(retryAfterValue);
     return is.finite(timestamp)
-        ? normalizeRetryAfter(Math.max(0,timestamp-now))
+        ? retryDelayOrZero(Math.max(0,timestamp-now))
         : 0;
 }
 
-function responseHeader(response,name){
-    try{
-        const value=response.headers?.get?.(name);
-        return value===null||value===undefined?'':String(value);
-    }catch{
-        return '';
-    }
-}
-
-function awaitAbortable(value,signal){
+function waitForResultOrAbort(value,signal){
     return new Promise(function waitForAbortable(resolve,reject){
         let settled=false;
         function cleanup(){
@@ -736,7 +460,7 @@ function cancelProviderReader(reader){
     }
 }
 
-async function readProviderBody(response,signal){
+async function readProviderResponseText(response,signal){
     if(response.body===null||response.body===undefined){
         return '';
     }
@@ -749,24 +473,28 @@ async function readProviderBody(response,signal){
     }
     const reader=response.body.getReader();
     const decoder=new TextDecoder();
-    let text='';
+    let providerResponseText='';
     let fullyRead=false;
     try{
         while(true){
-            const result=await awaitAbortable(reader.read(),signal);
+            const result=await waitForResultOrAbort(reader.read(),signal);
             if(result.done){
                 fullyRead=true;
                 break;
             }
-            if(!(result.value instanceof Uint8Array)){
-                throw new MailGatewayFault('resend_unreadable_response',{
-                    statusCode:502,
-                    uncertain:true
-                });
-            }
-            text+=decoder.decode(result.value,{stream:true});
+            providerResponseText+=decoder.decode(result.value,{stream:true});
         }
-        return text+decoder.decode();
+        return providerResponseText+decoder.decode();
+    }catch(error){
+        throw new MailGatewayFault('resend_unreadable_response',{
+            details:{
+                error:completeErrorDetails(error),
+                responseText:providerResponseText+decoder.decode(),
+                responseComplete:false
+            },
+            statusCode:502,
+            uncertain:true
+        });
     }finally{
         if(!fullyRead){
             cancelProviderReader(reader);
@@ -774,40 +502,35 @@ async function readProviderBody(response,signal){
         try{
             reader.releaseLock();
         }catch{
-            // An untrusted stream implementation cannot replace the provider classification.
+            // Stream cleanup cannot replace the provider outcome.
         }
     }
 }
 
-function parseProviderObject(text){
-    if(!text){
-        return null;
-    }
+function parseProviderResponse(providerResponseText){
     try{
-        const value=JSON.parse(text);
-        return value&&is.object(value)&&!is.array(value)?value:null;
+        return JSON.parse(providerResponseText);
     }catch{
-        return null;
+        return providerResponseText;
     }
 }
 
-function providerCode(value,statusCode){
-    const candidate=value?.name;
-    if(is.string(candidate)&&PROVIDER_CODE_PATTERN.test(candidate)){
-        return candidate;
+function resolveProviderErrorCode(providerResponse,statusCode){
+    if(is.string(providerResponse?.name)&&providerResponse.name){
+        return providerResponse.name;
     }
     return `resend_http_${String(statusCode)}`;
 }
 
-function providerRejection(statusCode,value,retryAfterMs,defaultRetryAfterMs){
-    const code=providerCode(value,statusCode);
+function classifyProviderRejection(statusCode,value,retryAfterMs,defaultRetryAfterMs){
+    const code=resolveProviderErrorCode(value,statusCode);
     const permanentRateLimit=PERMANENT_RATE_CODES.has(code);
     const retryable=code==='concurrent_idempotent_requests'
         ||(statusCode===409&&code!=='invalid_idempotent_request')
         ||(!permanentRateLimit&&code!=='invalid_idempotent_request'
             &&RETRYABLE_PROVIDER_STATUSES.has(statusCode));
     const resolvedDelay=retryable
-        ? normalizeRetryAfter(retryAfterMs||defaultRetryAfterMs)
+        ? retryAfterMs||defaultRetryAfterMs
         : 0;
     return {
         kind:'rejected',
@@ -821,50 +544,50 @@ function providerRejection(statusCode,value,retryAfterMs,defaultRetryAfterMs){
     };
 }
 
-function ambiguousResult(code,retryAfterMs,providerStatus=0,details=null){
+function createUncertainProviderResult(code,retryAfterMs,providerStatus=0,details=null){
     return {
         code,
         details,
         kind:'ambiguous',
         providerStatus,
-        retryAfterMs:normalizeRetryAfter(retryAfterMs)
+        retryAfterMs:retryDelayOrZero(retryAfterMs)
     };
 }
 
-async function performResendAttempt(configuration,delivery,idempotencyKey,signal,requestId,observe){
+async function attemptResendDelivery(configuration,delivery,idempotencyKey,signal,requestId,observe,appId=configuration.appId){
     const controller=new AbortController();
     let outcome=null;
     let timedOut=false;
-    function completeAttempt(result){
+    function recordAttemptOutcome(result){
         outcome=result;
         return result;
     }
-    function forwardAbort(){
+    function abortProviderRequest(){
         controller.abort(signal?.reason??new Error('Mail request cancelled.'));
     }
-    signal?.addEventListener('abort',forwardAbort,{once:true});
+    signal?.addEventListener('abort',abortProviderRequest,{once:true});
     if(signal?.aborted){
-        forwardAbort();
+        abortProviderRequest();
     }
     const timeout=configuration.providerTimeoutMs==null
         ?null
-        :setTimeout(function expireResendAttempt(){
+        :setTimeout(function abortTimedOutProviderRequest(){
             timedOut=true;
             controller.abort(new Error('Resend request timed out.'));
         },configuration.providerTimeoutMs);
-    const startedAt=Date.now();
-    observe({
+    const startedAt=configuration.onEvent?Date.now():0;
+    if(configuration.onEvent)observe({
         type:'mail.provider.started',
-        appId:configuration.appId,
+        appId,
         idempotencyKey,
-        providerRequest:JSON.parse(delivery.providerBody),
+        providerRequest:JSON.parse(delivery.serializedProviderRequest),
         report:delivery.report,
         requestId
     });
     let response;
     try{
         try{
-            response=await awaitAbortable(configuration.fetchImpl(RESEND_EMAIL_ENDPOINT,{
+            response=await waitForResultOrAbort(configuration.fetchImpl(RESEND_EMAIL_ENDPOINT,{
                 method:'POST',
                 headers:{
                     'Authorization':`Bearer ${configuration.apiKey}`,
@@ -872,13 +595,12 @@ async function performResendAttempt(configuration,delivery,idempotencyKey,signal
                     'Idempotency-Key':idempotencyKey,
                     'User-Agent':'arcane-os-sdk-mail/1'
                 },
-                body:delivery.providerBody,
+                body:delivery.serializedProviderRequest,
                 redirect:'error',
-                referrerPolicy:'no-referrer',
                 signal:controller.signal
             }),controller.signal);
         }catch(error){
-            return completeAttempt(ambiguousResult(
+            return recordAttemptOutcome(createUncertainProviderResult(
                 timedOut?'resend_timeout':'resend_transport_uncertain',
                 configuration.retryableDelayMs,
                 0,
@@ -887,64 +609,64 @@ async function performResendAttempt(configuration,delivery,idempotencyKey,signal
         }
         const statusCode=Number(response?.status);
         if(!is.safeInteger(statusCode)||statusCode<100||statusCode>599){
-            return completeAttempt(ambiguousResult(
+            return recordAttemptOutcome(createUncertainProviderResult(
                 'resend_invalid_response',
                 configuration.retryableDelayMs,
                 0,
                 {status:response?.status??null}
             ));
         }
-        let text='';
+        let providerResponseText='';
         try{
-            text=await readProviderBody(response,controller.signal);
+            providerResponseText=await readProviderResponseText(response,controller.signal);
         }catch(error){
             if(statusCode>=200&&statusCode<300||controller.signal.aborted){
-                return completeAttempt(ambiguousResult(
+                return recordAttemptOutcome(createUncertainProviderResult(
                     error instanceof MailGatewayFault?error.code:'resend_transport_uncertain',
                     configuration.retryableDelayMs,
                     statusCode,
                     completeErrorDetails(error)
                 ));
             }
-            return completeAttempt(providerRejection(
+            return recordAttemptOutcome(classifyProviderRejection(
                 statusCode,
-                null,
-                parseRetryAfter(responseHeader(response,'retry-after')),
+                completeErrorDetails(error),
+                parseRetryAfterMilliseconds(response.headers.get('retry-after')),
                 configuration.retryableDelayMs
             ));
         }
-        const value=parseProviderObject(text);
+        const providerResponse=parseProviderResponse(providerResponseText);
         if(statusCode>=200&&statusCode<300){
-            if(!value||!is.string(value.id)||!PROVIDER_ID_PATTERN.test(value.id)){
-                return completeAttempt(ambiguousResult(
+            if(!is.string(providerResponse?.id)||!providerResponse.id){
+                return recordAttemptOutcome(createUncertainProviderResult(
                     'resend_invalid_success_response',
                     configuration.retryableDelayMs,
                     statusCode,
-                    value??text
+                    providerResponse
                 ));
             }
-            return completeAttempt({
+            return recordAttemptOutcome({
                 kind:'accepted',
-                providerId:value.id,
-                providerResponse:value,
+                providerId:providerResponse.id,
+                providerResponse,
                 providerStatus:statusCode
             });
         }
-        return completeAttempt(providerRejection(
+        return recordAttemptOutcome(classifyProviderRejection(
             statusCode,
-            value,
-            parseRetryAfter(responseHeader(response,'retry-after')),
+            providerResponse,
+            parseRetryAfterMilliseconds(response.headers.get('retry-after')),
             configuration.retryableDelayMs
         ));
     }finally{
         if(timeout!==null) clearTimeout(timeout);
-        signal?.removeEventListener('abort',forwardAbort);
-        observe({
+        signal?.removeEventListener('abort',abortProviderRequest);
+        if(configuration.onEvent)observe({
             type:'mail.provider.completed',
-            appId:configuration.appId,
+            appId,
             idempotencyKey,
             outcome,
-            providerRequest:JSON.parse(delivery.providerBody),
+            providerRequest:JSON.parse(delivery.serializedProviderRequest),
             report:delivery.report,
             durationMs:Math.max(0,Date.now()-startedAt),
             requestId,
@@ -953,12 +675,12 @@ async function performResendAttempt(configuration,delivery,idempotencyKey,signal
     }
 }
 
-function normalizeDirectSendOptions(options){
+function resolveDirectSendConfiguration(options){
     if(!options||!is.object(options)||is.array(options)){
         throw configurationError('Mail send options must be an object.');
     }
-    if(!is.string(options.reportKey)||!IDEMPOTENCY_KEY_PATTERN.test(options.reportKey)){
-        throw configurationError('reportKey must contain safe identifier characters.');
+    if(!is.string(options.reportKey)||!options.reportKey){
+        throw configurationError('reportKey is required to identify the mail attempt.');
     }
     const fetchImpl=options.fetchImpl??globalThis.fetch;
     if(!is.function(fetchImpl)){
@@ -973,26 +695,22 @@ function normalizeDirectSendOptions(options){
     return {
         allowAnyRecipient:true,
         allowedRecipients:null,
-        apiKey:validateApiKey(options.apiKey),
-        appId:validateAppId(options.appId),
+        apiKey:options.apiKey,
+        appId:options.appId,
         errorRecipients:[],
         fetchImpl,
-        from:validateFrom(options.from),
+        from:options.from,
         providerTimeoutMs:optionalTimeoutMs(options.providerTimeoutMs,'providerTimeoutMs'),
         requestIdFactory:options.requestIdFactory??randomUUID,
-        retryableDelayMs:positiveInteger(
-            options.retryableDelayMs,
-            1_000,
-            {label:'retryableDelayMs'}
-        ),
-        signal:validateSignal(options.signal),
+        retryableDelayMs:readRetryDelayMs(options.retryableDelayMs),
+        signal:options.signal,
         report:options.report,
         reportKey:options.reportKey,
         onEvent:options.onEvent
     };
 }
 
-function directSendResult(result,{delivery,requestId}){
+function createDirectSendResult(result,{delivery,requestId}){
     const common={
         ...result,
         provider:'resend',
@@ -1003,20 +721,16 @@ function directSendResult(result,{delivery,requestId}){
             ?result.fault.retryable?'retryable':'permanent'
             :result.kind,
         requestId,
-        providerStatus:result.providerStatus,
-        providerRequest:JSON.parse(delivery.providerBody),
+        providerRequest:JSON.parse(delivery.serializedProviderRequest),
         report:delivery.report,
         recipientCount:delivery.recipientCount
     };
     if(result.kind==='accepted'){
-        return {...common,providerId:result.providerId};
+        return common;
     }
     if(result.kind==='ambiguous'){
         return {
             ...common,
-            code:result.code,
-            details:result.details,
-            ...(result.retryAfterMs?{retryAfterMs:result.retryAfterMs}:{}),
             retryable:true,
             uncertain:true
         };
@@ -1033,8 +747,7 @@ function directSendResult(result,{delivery,requestId}){
 }
 
 export async function sendResendMail(options={}){
-    const configuration=normalizeDirectSendOptions(options);
-    const delivery=normalizeReport(configuration.report,configuration);
+    const configuration=resolveDirectSendConfiguration(options);
     if(configuration.signal?.aborted){
         const error=new Error('Mail send cancelled before provider attempt.',{
             cause:configuration.signal.reason
@@ -1042,29 +755,30 @@ export async function sendResendMail(options={}){
         error.code='ARCANE_CANCELLED';
         throw error;
     }
+    const delivery=prepareProviderDelivery(configuration.report,configuration);
     const requestId=createRequestId(configuration.requestIdFactory);
-    const observer=createObserver(configuration.onEvent);
+    const observer=configuration.onEvent?createMailEventObserver(configuration.onEvent):null;
     try{
-        const result=await performResendAttempt(
+        const result=await attemptResendDelivery(
             configuration,
             delivery,
             configuration.reportKey,
             configuration.signal,
             requestId,
-            observer.observe
+            observer?.observe
         );
-        return directSendResult(result,{
+        return createDirectSendResult(result,{
             delivery,
             requestId
         });
     }finally{
-        await observer.drain();
+        if(observer)await observer.drain();
     }
 }
 
-function sendProviderResult(response,result,{origin,requestId,recipientCount}){
+function writeProviderDeliveryResponse(response,result,{origin,requestId,recipientCount}){
     if(result.kind==='accepted'){
-        return writeJson(response,202,{
+        return sendJsonResponse(response,202,{
             requestId,
             status:'accepted',
             accepted:recipientCount,
@@ -1074,7 +788,7 @@ function sendProviderResult(response,result,{origin,requestId,recipientCount}){
         },{origin});
     }
     if(result.kind==='ambiguous'){
-        return writeJson(response,207,{
+        return sendJsonResponse(response,207,{
             requestId,
             status:'delivery_uncertain',
             accepted:0,
@@ -1083,120 +797,121 @@ function sendProviderResult(response,result,{origin,requestId,recipientCount}){
             ...(result.retryAfterMs?{retryAfterMs:result.retryAfterMs}:{})
         },{origin,retryAfterMs:result.retryAfterMs});
     }
-    return writeFault(response,requestId,result.fault,origin);
+    return sendMailFailureResponse(response,requestId,result.fault,origin);
 }
 
 export function createResendMailRequestHandler(options={}){
-    const configuration=normalizeConfiguration(options);
+    return createConfiguredMailHandler(resolveMailServerConfiguration(options));
+}
+
+function createConfiguredMailHandler(configuration){
     const ownerController=new AbortController();
     const activeRequests=new Set();
-    const observer=createObserver(configuration.onEvent);
+    const observer=configuration.onEvent?createMailEventObserver(configuration.onEvent):null;
     let closePromise=null;
 
-    function forwardOwnerAbort(){
+    function abortHandlerFromOwner(){
         ownerController.abort(configuration.signal?.reason??new Error('Mail server cancelled.'));
     }
-    configuration.signal?.addEventListener('abort',forwardOwnerAbort,{once:true});
+    configuration.signal?.addEventListener('abort',abortHandlerFromOwner,{once:true});
     if(configuration.signal?.aborted){
-        forwardOwnerAbort();
+        abortHandlerFromOwner();
     }
 
-    async function handleOwnedRequest(request,response){
+    async function handleMailRequest(request,response){
         const requestId=createRequestId(configuration.requestIdFactory);
-        const startedAt=Date.now();
+        let appId=request.headers['x-mail-app']??configuration.appId;
+        const startedAt=configuration.onEvent?Date.now():0;
         const requestController=new AbortController();
         let delivery=null;
         let idempotencyKey=null;
         let origin='';
         let providerAttempted=false;
         let result=null;
-        let serialized=null;
 
-        function abortFromOwner(){
+        function abortRequestFromHandler(){
             requestController.abort(ownerController.signal.reason);
         }
-        function abortFromRequest(){
+        function abortDisconnectedRequest(){
             requestController.abort(new Error('Mail client disconnected.'));
         }
-        function abortFromResponseClose(){
+        function abortRequestOnPrematureResponseClose(){
             if(!response.writableEnded){
-                abortFromRequest();
+                abortDisconnectedRequest();
             }
         }
-        function absorbResponseError(){
-            abortFromRequest();
-        }
         function releaseRequestListeners(){
-            request.removeListener('aborted',abortFromRequest);
-            request.removeListener('error',abortFromRequest);
+            request.removeListener('aborted',abortDisconnectedRequest);
+            request.removeListener('error',abortDisconnectedRequest);
         }
         function releaseResponseListeners(){
-            response.removeListener('close',abortFromResponseClose);
-            response.removeListener('error',absorbResponseError);
+            response.removeListener('close',abortRequestOnPrematureResponseClose);
+            response.removeListener('error',abortDisconnectedRequest);
         }
 
-        ownerController.signal.addEventListener('abort',abortFromOwner,{once:true});
-        request.once('aborted',abortFromRequest);
-        request.once('error',abortFromRequest);
-        response.once('close',abortFromResponseClose);
-        response.once('error',absorbResponseError);
+        ownerController.signal.addEventListener('abort',abortRequestFromHandler,{once:true});
+        request.once('aborted',abortDisconnectedRequest);
+        request.once('error',abortDisconnectedRequest);
+        response.once('close',abortRequestOnPrematureResponseClose);
+        response.once('error',abortDisconnectedRequest);
         if(ownerController.signal.aborted){
-            abortFromOwner();
+            abortRequestFromHandler();
         }
-        observer.observe({
+        if(configuration.onEvent)observer.observe({
             type:'mail.request.received',
-            appId:configuration.appId,
+            appId,
             requestId
         });
 
         try{
-            validateLoopbackRequest(request);
-            origin=allowedOrigin(request,configuration);
-            if(request.url!==RESEND_MAIL_PATH){
+            if(request.url!==RESEND_MAIL_PATH&&!request.url?.startsWith(`${RESEND_MAIL_PATH}?`)){
                 throw new MailGatewayFault('mail_route_not_found',{statusCode:404});
             }
+            const requestOrigin=request.headers.origin;
+            if(requestOrigin){
+                const originAllowed=configuration.allowedOrigins.size>0
+                    ?configuration.allowedOrigins.has(requestOrigin)
+                    :requestOrigin===`https://${request.headers.host}`
+                        ||requestOrigin===`http://${request.headers.host}`;
+                if(!originAllowed){
+                    throw new MailGatewayFault('mail_origin_not_allowed',{statusCode:403});
+                }
+                origin=requestOrigin;
+            }
             if(request.method==='OPTIONS'){
-                const preflight=validatePreflight(request);
-                writePreflight(response,origin,preflight);
+                sendCorsPreflightResponse(response,origin);
                 return;
             }
             if(request.method!=='POST'){
                 throw new MailGatewayFault('mail_method_not_allowed',{statusCode:405});
             }
-            if(singleHeader(request,'x-mail-app')!==configuration.appId){
-                throw new MailGatewayFault('mail_app_not_allowed',{statusCode:403});
+            if(configuration.verifySubscription){
+                appId=await verifyMailSubscription(request,configuration,requestController.signal);
             }
-            authenticateLocalCaller(request,configuration);
-            idempotencyKey=singleHeader(request,'idempotency-key');
-            if(!IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)){
-                throw new MailGatewayFault('invalid_idempotency_key',{statusCode:400});
-            }
-            const contentType=singleHeader(request,'content-type');
-            if(!JSON_CONTENT_TYPE_PATTERN.test(contentType)){
-                throw new MailGatewayFault('mail_unsupported_content_type',{statusCode:415});
-            }
-            serialized=await readRequestBody(request,{
+            idempotencyKey=requireRequestHeader(request,'idempotency-key');
+            const requestText=await readRequestBodyText(request,{
                 signal:requestController.signal,
                 timeoutMs:configuration.bodyTimeoutMs
             });
-            delivery=parseReport(serialized,configuration);
+            delivery=parseMailRequest(requestText,configuration);
             providerAttempted=true;
-            result=await performResendAttempt(
+            result=await attemptResendDelivery(
                 configuration,
                 delivery,
                 idempotencyKey,
                 requestController.signal,
                 requestId,
-                observer.observe
+                observer?.observe,
+                appId
             );
-            sendProviderResult(response,result,{
+            writeProviderDeliveryResponse(response,result,{
                 origin,
                 recipientCount:delivery.recipientCount,
                 requestId
             });
-            observer.observe({
+            if(configuration.onEvent)observer.observe({
                 type:'mail.request.completed',
-                appId:configuration.appId,
+                appId,
                 classification:result.kind,
                 delivery,
                 durationMs:Math.max(0,Date.now()-startedAt),
@@ -1206,14 +921,14 @@ export function createResendMailRequestHandler(options={}){
                 requestId
             });
         }catch(error){
-            const fault=normalizeFault(error);
-            writeFault(response,requestId,fault,origin);
+            const fault=mailFaultFromError(error);
+            sendMailFailureResponse(response,requestId,fault,origin);
             if(!request.readableEnded&&!request.destroyed){
                 request.resume();
             }
-            observer.observe({
+            if(configuration.onEvent)observer.observe({
                 type:'mail.request.completed',
-                appId:configuration.appId,
+                appId,
                 classification:fault.uncertain?'ambiguous':fault.retryable?'retryable':'permanent',
                 delivery,
                 durationMs:Math.max(0,Date.now()-startedAt),
@@ -1231,7 +946,7 @@ export function createResendMailRequestHandler(options={}){
                 requestId
             });
         }finally{
-            ownerController.signal.removeEventListener('abort',abortFromOwner);
+            ownerController.signal.removeEventListener('abort',abortRequestFromHandler);
             if(request.readableEnded||request.destroyed){
                 releaseRequestListeners();
             }else{
@@ -1245,30 +960,31 @@ export function createResendMailRequestHandler(options={}){
         }
     }
 
-    function handle(request,response){
-        const operation=handleOwnedRequest(request,response);
+    function dispatchMailRequest(request,response){
+        const operation=handleMailRequest(request,response);
         activeRequests.add(operation);
-        operation.catch(function closeFailedRequest(){
+        operation.catch(function closeResponseAfterHandlerFailure(error){
+            reportMailError('Mail request handler failed.',error);
             if(!response.destroyed){
-                response.destroy();
+                response.destroy(error);
             }
         }).finally(function releaseActiveRequest(){
             activeRequests.delete(operation);
         });
     }
 
-    async function closeOwnedHandler(){
-        configuration.signal?.removeEventListener('abort',forwardOwnerAbort);
+    async function closeMailRequestHandler(){
+        configuration.signal?.removeEventListener('abort',abortHandlerFromOwner);
         if(!ownerController.signal.aborted){
             ownerController.abort(new Error('Mail server closed.'));
         }
         await Promise.allSettled([...activeRequests]);
-        await observer.drain();
+        if(observer)await observer.drain();
     }
 
     function close(){
         if(!closePromise){
-            closePromise=closeOwnedHandler();
+            closePromise=closeMailRequestHandler();
         }
         return closePromise;
     }
@@ -1277,13 +993,13 @@ export function createResendMailRequestHandler(options={}){
         appId:configuration.appId,
         callerAuthentication:configuration.callerAuthentication,
         close,
-        handle,
+        handle:dispatchMailRequest,
         path:RESEND_MAIL_PATH,
         protocol:RESEND_MAIL_SERVER_PROTOCOL
     };
 }
 
-function deployMailServer(mailServer){
+function listenForMailRequests(mailServer){
     return new Promise(function waitForMailListener(resolve,reject){
         function onError(error){
             reject(error);
@@ -1297,7 +1013,7 @@ function deployMailServer(mailServer){
 }
 
 export async function startResendMailServer(options={}){
-    const configuration=normalizeConfiguration(options);
+    const configuration=resolveMailServerConfiguration(options);
     if(configuration.signal?.aborted){
         throw configuration.signal.reason??new Error('Mail server start was cancelled.');
     }
@@ -1306,23 +1022,23 @@ export async function startResendMailServer(options={}){
         port:configuration.port,
         server:{timeout:0}
     });
-    const requestHandler=createResendMailRequestHandler(options);
-    mailServer.onRawRequest=function handleMailRequest(request,response){
+    const requestHandler=createConfiguredMailHandler(configuration);
+    mailServer.onRawRequest=function routeRawMailRequest(request,response){
         requestHandler.handle(request,response);
         return true;
     };
 
     let server;
     try{
-        server=await deployMailServer(mailServer);
+        server=await listenForMailRequests(mailServer);
     }catch(error){
         await Promise.allSettled([mailServer.close(),requestHandler.close()]);
         throw error;
     }
     const address=server.address();
-    if(!address||is.string(address)||!isNumericLoopback(address.address)){
+    if(!address||is.string(address)){
         await Promise.allSettled([mailServer.close(),requestHandler.close()]);
-        throw configurationError('Mail server did not bind to a numeric loopback address.');
+        throw configurationError('Mail server has no TCP listener address.');
     }
     const displayHost=address.address.includes(':')?`[${address.address}]`:address.address;
     const origin=`http://${displayHost}:${String(address.port)}`;
@@ -1335,8 +1051,8 @@ export async function startResendMailServer(options={}){
     });
     lifecycle.catch(function observeMailLifecycleFailure(){});
 
-    async function closeOwnedServer(){
-        configuration.signal?.removeEventListener('abort',closeFromSignal);
+    async function closeMailServer(){
+        configuration.signal?.removeEventListener('abort',closeServerOnAbort);
         const handlerClosing=requestHandler.close();
         try{
             await Promise.all([mailServer.close(),handlerClosing]);
@@ -1349,21 +1065,21 @@ export async function startResendMailServer(options={}){
 
     function close(){
         if(!closePromise){
-            closePromise=closeOwnedServer();
+            closePromise=closeMailServer();
         }
         return closePromise;
     }
 
-    function closeFromSignal(){
+    function closeServerOnAbort(){
         close().catch(function ignoreSignalCloseFailure(){});
     }
 
-    function closeFromServerError(error){
+    function closeServerAfterError(error){
         rejectLifecycle(error);
         close().catch(function observeOperationalCloseFailure(){});
     }
 
-    server.once('close',function finishExternallyClosedServer(){
+    server.once('close',function finishMailServerAfterExternalClose(){
         if(!closePromise){
             closePromise=requestHandler.close().then(
                 function resolveExternalClose(){resolveLifecycle();},
@@ -1372,10 +1088,10 @@ export async function startResendMailServer(options={}){
             closePromise.catch(function observeExternalCloseFailure(){});
         }
     });
-    server.on('error',closeFromServerError);
-    configuration.signal?.addEventListener('abort',closeFromSignal,{once:true});
+    server.on('error',closeServerAfterError);
+    configuration.signal?.addEventListener('abort',closeServerOnAbort,{once:true});
     if(configuration.signal?.aborted){
-        closeFromSignal();
+        closeServerOnAbort();
     }
 
     return {
