@@ -18,6 +18,7 @@ import {normalizeOllamaModelIdentifier} from './OllamaModelIdentifier.js';
 import {arcaneLogging} from 'arcane-os/logging';
 import {MarkdownSpeech,stripSpeechFormatting} from 'arcane-os/speech-text';
 import {prepareSpeech} from './PreparedSpeech.js';
+import {createToolTextObserver} from 'arcane-os/ai/tool-text-stream';
 
 const completeValue=(value)=>value;
 
@@ -1470,7 +1471,7 @@ class AI {
                     status:statusBuiltInLLMProvider()
                 });
             },
-            request:function requestBuiltInLLMProvider(context={}){
+            request:function requestBuiltInLLMProvider(context={},controls={}){
                 if(context.signal?.aborted){
                     throw normalizeAIRequestAbort(context.signal.reason);
                 }
@@ -1502,7 +1503,8 @@ class AI {
                         function executeBuiltInLLMProviderStream(bridge){
                             return runtime.#requestBuiltInLLMStream(
                                 context.payload,
-                                bridge
+                                bridge,
+                                controls.observeToolText
                             );
                         },
                         context.signal
@@ -4285,7 +4287,7 @@ class AI {
         );
     }
 
-    #requestBuiltInLLMStream(payload={},bridge){
+    #requestBuiltInLLMStream(payload={},bridge,observeToolText=null){
         const parallelToolCalls=payload.parallelToolCalls!==undefined
             ?payload.parallelToolCalls
             :payload.parallel_tool_calls;
@@ -4310,7 +4312,8 @@ class AI {
             true,
             emitBuiltInLLMStreamData,
             function ignoreBuiltInLLMStreamResult(){},
-            payload.reasoningEffort
+            payload.reasoningEffort,
+            observeToolText
         );
     }
 
@@ -4459,6 +4462,8 @@ class AI {
         structuredOutput=false,
         localOnly=false,
         onChunk=function ignoreStreamChunk(){},
+        toolText,
+        onToolText,
         onComplete=function finishIgnoredStream(){},
         onDataChunk=function ignoreStreamDataChunk(){},
         onDataResult=function ignoreStreamDataResult(){},
@@ -4484,6 +4489,15 @@ class AI {
         reasoningEffort
     }={}){
         validateAIStructuralRequest(messages,tools,parallelToolCalls);
+        const observeToolText=createToolTextObserver(
+            toolText,
+            is.function(onToolText)
+                ?function reportAIStreamToolText(text,call){
+                    return onToolText(text,call,`M-${id}`);
+                }
+                :onToolText,
+            {signal}
+        );
         const normalizedReasoningEffort=normalizeAIReasoningEffort(
             reasoningEffort===undefined?this.reasoningEffort:reasoningEffort
         );
@@ -4538,7 +4552,8 @@ class AI {
                         payload:request,
                         localOnly,
                         signal
-                    }
+                    },
+                    {observeToolText}
                 );
                 for await(const chunk of handle){
                     if(signal?.aborted){
@@ -4622,7 +4637,8 @@ class AI {
                 true,
                 onDataChunk,
                 onDataResult,
-                normalizedReasoningEffort
+                normalizedReasoningEffort,
+                observeToolText
             );
             const structuralToolCalls=normalizeAICompletionToolCalls(
                 completion
@@ -4729,7 +4745,8 @@ class AI {
         returnCompletion=false,
         dataChunkHandler=function ignoreBuiltInStreamDataChunk(){},
         dataResultHandler=function ignoreBuiltInStreamDataResult(){},
-        reasoningEffort
+        reasoningEffort,
+        observeToolText=null
     ){
         let speechTurnCompleted=false;
 
@@ -4845,6 +4862,12 @@ class AI {
                                 );
                             }
                             streamedNativeToolCalls=observed;
+                            if(observeToolText){
+                                await observeToolText({message:{tool_calls:observed}});
+                            }
+                        }
+                        if(signal?.aborted){
+                            return;
                         }
                         const thinking=seeThinking
                             ?String(message.thinking||'')
@@ -4918,6 +4941,12 @@ class AI {
                 structuralToolCalls,
                 tool_choice
             );
+            if(observeToolText){
+                await observeToolText(nativeCompletion);
+            }
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort();
+            }
             await dataResultHandler(nativeCompletion,id);
             for(const call of structuralToolCalls){
                 if(signal?.aborted){
@@ -5096,6 +5125,12 @@ class AI {
                     'The AI stream returned a non-object event payload.'
                 );
             }
+            if(observeToolText){
+                await observeToolText(streamedResponse);
+            }
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort();
+            }
             const dataChunk=projectAIStreamChunk(streamedResponse);
             if(dataChunk!==OMITTED_AI_STREAM_DATA){
                 await dataChunkHandler(dataChunk,id);
@@ -5253,6 +5288,13 @@ class AI {
                 await drainSseBuffer(true);
             }
         }catch(error){
+            if(observeToolText){
+                await reader.cancel(error).catch(
+                    function reportToolTextReaderCleanupFailure(cleanupError){
+                        arcaneLogging.error('Arcane tool text reader cleanup failed.',cleanupError);
+                    }
+                );
+            }
             if(isAIRequestAbort(error,signal)){
                 throw normalizeAIRequestAbort(error);
             }
@@ -5383,6 +5425,12 @@ class AI {
             terminalToolCalls,
             'The built-in HTTP stream'
         );
+        if(observeToolText){
+            await observeToolText(completion);
+        }
+        if(signal?.aborted){
+            throw normalizeAIRequestAbort();
+        }
         await dataResultHandler(completion,id);
         for(const call of terminalToolCalls){
             if(signal?.aborted){

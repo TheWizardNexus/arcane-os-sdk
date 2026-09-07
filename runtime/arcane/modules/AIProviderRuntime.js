@@ -3347,14 +3347,14 @@ export class AIProviderRuntime {
         return this.#disposeAllPromise;
     }
 
-    request(role, options = {}, {speechInputPrepared = false} = {}) {
+    request(role, options = {}, {speechInputPrepared = false, observeToolText = null} = {}) {
         if (SPEECH_ROLES.includes(role)) {
             arcaneLogging.debug('[Arcane speech runtime] request', role, options);
         }
-        return this.#requestRole(role, options, false, speechInputPrepared);
+        return this.#requestRole(role, options, false, speechInputPrepared, observeToolText);
     }
 
-    #requestRole(role, options, queued, speechInputPrepared = false) {
+    #requestRole(role, options, queued, speechInputPrepared = false, observeToolText = null) {
         this.#assertOpen();
         this.#assertNotConfiguring();
         assertRole(role);
@@ -3486,7 +3486,7 @@ export class AIProviderRuntime {
         }
         if ((!queued && slot.requestQueue.length)
             || slot.activeRequests.size >= maxConcurrentRequests) {
-            return this.#enqueueRoleRequest(slot, options);
+            return this.#enqueueRoleRequest(slot, options, observeToolText);
         }
         if (!slot.ready
             || providerStatus.state !== 'ready'
@@ -3556,6 +3556,17 @@ export class AIProviderRuntime {
         }
 
         if (options.operation === 'stream') {
+            const observeCurrentToolText = role === 'llm' && observeToolText
+                ? async function observeCurrentAIProviderToolText(chunk) {
+                    runtime.#assertCurrentRequest(
+                        slot, generation, requestSequence, requestRecord, controller.signal
+                    );
+                    await observeToolText(chunk);
+                    runtime.#assertCurrentRequest(
+                        slot, generation, requestSequence, requestRecord, controller.signal
+                    );
+                }
+                : null;
             let providerHandle = null;
             let providerOpenPromise = null;
             let iterator = null;
@@ -3796,7 +3807,8 @@ export class AIProviderRuntime {
                                     operation: options.operation,
                                     payload: options.payload,
                                     signal: controller.signal
-                                }
+                                },
+                                {observeToolText: observeCurrentToolText}
                             );
                         }
                     );
@@ -3862,6 +3874,7 @@ export class AIProviderRuntime {
                                         continue;
                                     }
                                     llmToolCallCorrelation.observe(result.value);
+                                    if (observeCurrentToolText) await observeCurrentToolText(result.value);
                                     const projected = projectLLMStreamChunk(result.value);
                                     if (projected !== OMITTED_LLM_STREAM_DATA) {
                                         publishProjectedAIProviderStreamChunk(projected);
@@ -3902,6 +3915,7 @@ export class AIProviderRuntime {
                                     )
                                     : value;
                                 llmToolCallCorrelation?.assertTerminal(terminalValue);
+                                if (observeCurrentToolText) await observeCurrentToolText(terminalValue);
                                 settleAIProviderStream(null, terminalValue);
                             } catch (error) {
                                 if (cleanupPromise) {
@@ -4208,7 +4222,7 @@ export class AIProviderRuntime {
         );
     }
 
-    #enqueueRoleRequest(slot, options) {
+    #enqueueRoleRequest(slot, options, observeToolText = null) {
         if (SPEECH_ROLES.includes(slot.role)) {
             arcaneLogging.debug('[Arcane speech runtime] queue.enqueue', {
                 role: slot.role,
@@ -4222,6 +4236,7 @@ export class AIProviderRuntime {
         return new Promise(function queueAIProviderRoleRequest(resolve, reject) {
             const entry = {
                 options,
+                observeToolText,
                 resolve,
                 reject,
                 detachSignal: null
@@ -4293,7 +4308,9 @@ export class AIProviderRuntime {
             }
             let operation;
             try {
-                operation = runtime.#requestRole(slot.role, entry.options, true);
+                operation = runtime.#requestRole(
+                    slot.role, entry.options, true, false, entry.observeToolText
+                );
             } catch (error) {
                 if (SPEECH_ROLES.includes(slot.role)) {
                     arcaneLogging.debug('[Arcane speech runtime] queue.error', slot.role, entry.options, error);

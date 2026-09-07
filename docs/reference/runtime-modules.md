@@ -432,7 +432,7 @@ declined, cancelled, or not-executed result.
 That tool-result content must be a nonblank string and is preserved exactly.
 
 `streamRequest()` owns the complete terminal callback sequence. `onDataChunk`
-receives each complete provider chunk before ordinary projection, while
+receives each provider chunk after private structural fields are removed, while
 `onChunk` receives every nonstructural content or reasoning value from every
 choice in provider order. After the stream settles, `onDataResult` receives the
 complete terminal completion, `onResponse` receives that same unprojected
@@ -442,8 +442,29 @@ output is the ordered structural-call array when the selected result contains
 tools, the complete completion object when it contains multiple choices, or
 the ordinary single-result text/completion otherwise; later choices are never
 discarded.
-Partial structural deltas remain private until the matching terminal envelope
-validates. Request observers receive
+Raw structural deltas remain private until the matching terminal envelope
+validates. To display one tool argument's text as it arrives, supply
+`toolText:{name,field}` and `onToolText(text,call,displayId)`. `name` is the exact
+tool name and `field` is one root-level string argument. The callback receives
+each newly decoded text fragment in order, including whitespace and JSON string
+escapes decoded to their original characters. Its `call` record contains
+`{id,name,field,index,choiceIndex}`; `id` is the actual normalized tool-call ID,
+`index` identifies the call within its choice, and `choiceIndex` identifies the
+response choice. Delivery starts once the matching tool name and call ID are
+known. `displayId` is the same `M-${id}` request display ID used by `onChunk`.
+
+`onToolText` is separate from ordinary `onChunk`, so callers can append to the
+tool's existing display without duplicating assistant prose or saved history.
+It observes text only: it does not execute a tool, alter arguments, persist a
+turn, or change the terminal callbacks. A provider that supplies arguments only
+at completion emits text only when that complete response arrives. Repeated
+terminal snapshots do not replay text already emitted. Omitting `toolText`
+preserves the existing callback path. Invalid selection or callback input throws
+`TypeError`; malformed selected argument text reports
+`ARCANE_AI_TOOL_TEXT_INVALID`. Callback errors reach the request owner and
+cancellation prevents later delivery.
+
+Request observers receive
 `onRequest(request,id,metadata)` and any transport metadata supplied by the
 selected route is forwarded unchanged. Every async native, HTTP, provider, and
 built-in callback is observed before the next callback or terminal settlement.
@@ -1609,7 +1630,7 @@ Defines the closing-report tool, instruction, result normalizer, call classifier
 
 ### Public surface
 
-Six constants/helpers for closing reports.
+Seven constants/helpers for closing reports.
 
 The generated sole-call schema requires both `message` and `final_message`.
 `message` is brief user-facing progress shown while the application accepts and
@@ -1617,9 +1638,14 @@ renders the call. `final_message` remains the complete terminal closeout and is
 never replaced by or duplicated into `message`; `remembered_actions` remains
 optional. `normalizeConversationClosingReport()` returns
 `{message,finalMessage,rememberedActions}`, while
-`formatConversationClosingReport()` escapes and renders only `finalMessage`.
+`formatConversationClosingReport()` normalizes the complete report and formats
+only `finalMessage`. Its shared `formatConversationClosingReportText(value)`
+operation accepts a string, including an empty or whitespace-only chunk, and
+replaces `&`, `<`, and `>` with `&amp;`, `&lt;`, and `&gt;` respectively. It
+preserves all other text and does not trim, validate a report, render, or persist
+anything. Use the same operation for live text chunks and complete final text.
 
-Exact exports: `CONVERSATION_CLOSING_REPORT_TOOL_NAME`, `classifyConversationClosingReportCalls`, `conversationClosingReportInstruction`, `createConversationClosingReportTool`, `formatConversationClosingReport`, `normalizeConversationClosingReport`.
+Exact exports: `CONVERSATION_CLOSING_REPORT_TOOL_NAME`, `classifyConversationClosingReportCalls`, `conversationClosingReportInstruction`, `createConversationClosingReportTool`, `formatConversationClosingReport`, `formatConversationClosingReportText`, `normalizeConversationClosingReport`.
 
 ### Availability and normalization
 
@@ -1628,9 +1654,11 @@ Exact exports: `CONVERSATION_CLOSING_REPORT_TOOL_NAME`, `classifyConversationClo
 ### Example
 
 ```javascript
-import * as module from '/arcane/modules/ConversationClosingReport.js';
+import {
+    formatConversationClosingReportText
+} from '/arcane/modules/ConversationClosingReport.js';
 
-console.log(Object.keys(module));
+console.log(formatConversationClosingReportText('Complete <draft> & next step.'));
 ```
 
 ## ConversationTimebox.js

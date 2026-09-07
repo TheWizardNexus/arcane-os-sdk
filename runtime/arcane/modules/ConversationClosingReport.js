@@ -74,7 +74,7 @@ function parseArguments(value){
     return value;
 }
 
-function escapeRawHTML(value){
+export function formatConversationClosingReportText(value){
     return value
         .replaceAll('&','&amp;')
         .replaceAll('<','&lt;')
@@ -240,7 +240,7 @@ export function formatConversationClosingReport(value){
             remembered_actions:value.rememberedActions,
         }
         :value;
-    return escapeRawHTML(
+    return formatConversationClosingReportText(
         normalizeConversationClosingReport(normalizedInput).finalMessage
     );
 }

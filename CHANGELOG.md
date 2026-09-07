@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.14.0
+
+- Add opt-in `toolText: {name, field}` and `onToolText(text, call, displayId)`
+  to model streaming requests. Decode the selected root string field as tool
+  arguments arrive, separately from ordinary text and final tool execution.
+  Preserve actual call identity, whitespace, ordered delivery, and cancellation
+  across HTTP, native, and browser provider routes.
+- Export `formatConversationClosingReportText(value)` so streamed closing text
+  uses the same existing formatting as the complete report.
+
 ## 0.13.3
 
 - Skip automatic TTS finalization calls when a model stream completes while

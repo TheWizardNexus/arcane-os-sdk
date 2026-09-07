@@ -1,6 +1,6 @@
 {
   "name": "arcane-os",
-  "version": "0.13.3",
+  "version": "0.14.0",
   "description": "Arcane OS JavaScript SDK, project-local CLI, browser runtime, and repository-portable application packager.",
   "type": "module",
   "main": "./src/index.mjs",
@@ -20,6 +20,7 @@
     "./speech-playback": "./runtime/arcane/modules/SpeechPlayback.js",
     "./speech-text": "./browser-runtime/speech-text.mjs",
     "./ai/browser-wasm": "./browser-runtime/ai/browser-wasm.mjs",
+    "./ai/tool-text-stream": "./browser-runtime/ai/tool-text-stream.mjs",
     "./ai/browser-speech": "./browser-runtime/ai/browser-speech.mjs",
     "./mail": "./src/mail-api.mjs",
     "./testing": "./src/testing.mjs",

@@ -2271,13 +2271,24 @@ function createCompletionAccumulator(modelId, requestId) {
   return completeValue({ push, result, hasToolCalls, correlateToolCalls });
 }
 
-function callbackStreamHandle({ runtime, request, signal, onSettled }) {
+function callbackStreamHandle({ runtime, request, signal, onSettled, observeToolText = null }) {
   const linked = linkAbortSignal(signal);
   const accumulator = createCompletionAccumulator(request.model ?? null, request.id);
   const chunks = [];
   const waiters = [];
   let ended = false;
   let terminalError = null;
+  let observation = Promise.resolve();
+  let observationError = null;
+
+  function publishChunk(chunk) {
+    if (ended || linked.controller.signal.aborted) return;
+    const publicChunk = projectPublicStreamChunk(chunk);
+    if (publicChunk === OMITTED_PUBLIC_STREAM_DATA) return;
+    const waiter = waiters.shift();
+    if (waiter) waiter.resolve({ value: publicChunk, done: false });
+    else chunks.push(publicChunk);
+  }
 
   function deliver(value) {
     // This gate prevents delivery after public cancellation. It is not proof
@@ -2287,11 +2298,20 @@ function callbackStreamHandle({ runtime, request, signal, onSettled }) {
       ? value
       : { ...value, id: request.id };
     accumulator.push(chunk);
-    const publicChunk = projectPublicStreamChunk(chunk);
-    if (publicChunk === OMITTED_PUBLIC_STREAM_DATA) return;
-    const waiter = waiters.shift();
-    if (waiter) waiter.resolve({ value: publicChunk, done: false });
-    else chunks.push(publicChunk);
+    if (!observeToolText) {
+      publishChunk(chunk);
+      return;
+    }
+    observation = observation.then(async function observeBrowserWasmChunk() {
+      if (ended) return;
+      throwIfAborted(linked.controller.signal);
+      await observeToolText(chunk);
+      publishChunk(chunk);
+    });
+    observation.catch(function cancelFailedBrowserWasmObservation(error) {
+      observationError ??= error;
+      linked.controller.abort(error);
+    });
   }
 
   function finish(error = null) {
@@ -2313,17 +2333,27 @@ function callbackStreamHandle({ runtime, request, signal, onSettled }) {
   );
   const result = (async () => {
     try {
-      await terminal;
+      const terminalValue = await terminal;
+      if (observeToolText) await observation;
+      throwIfAborted(linked.controller.signal);
+      if (observeToolText) await observeToolText(terminalValue);
       throwIfAborted(linked.controller.signal);
       const value = accumulator.result();
+      if (observeToolText) await observeToolText(value);
+      throwIfAborted(linked.controller.signal);
       finish();
       return value;
     } catch (error) {
-      const normalized = normalizeArcaneAIError(error, {
+      const normalized = normalizeArcaneAIError(observationError ?? error, {
         kind: "llm",
         operation: "request",
-        signal: normalizationSignal(error, linked.controller.signal),
+        signal: observationError ? null : normalizationSignal(error, linked.controller.signal),
       });
+      if (observeToolText) {
+        await observation.catch(function retainFirstBrowserWasmStreamFailure() {
+          // The failure captured above remains the terminal outcome.
+        });
+      }
       finish(normalized);
       throw normalized;
     }
@@ -2380,7 +2410,7 @@ function callbackStreamHandle({ runtime, request, signal, onSettled }) {
   return completeValue(handle);
 }
 
-function validatedV1StreamHandle(opened, request) {
+function validatedV1StreamHandle(opened, request, observeToolText = null, signal = null) {
   if (
     !opened
     || !is.object(opened)
@@ -2429,6 +2459,16 @@ function validatedV1StreamHandle(opened, request) {
   let publicStreamSettled = false;
   let publicStreamError = null;
 
+  function stopV1ToolTextObservation(reason) {
+    if (!observeToolText) return;
+    publicStreamError ??= reason instanceof Error ? reason : fail(
+      'ARCANE_AI_REQUEST_ABORTED',
+      'The browser-WASM request was cancelled.',
+      reason,
+    );
+    settlePublicStream(publicStreamError);
+  }
+
   function publishPublicChunk(value) {
     if (publicStreamSettled) return;
     const waiter = publicChunkWaiters.shift();
@@ -2459,10 +2499,24 @@ function validatedV1StreamHandle(opened, request) {
           return true;
         }
         accumulator.push(next.value);
+        if (observeToolText) {
+          if (publicStreamError !== null) throw publicStreamError;
+          throwIfAborted(signal);
+          await observeToolText(next.value);
+          if (publicStreamError !== null) throw publicStreamError;
+          throwIfAborted(signal);
+        }
         const projected = projectPublicStreamChunk(next.value);
         if (projected !== OMITTED_PUBLIC_STREAM_DATA) publishPublicChunk(projected);
       }
     } catch (error) {
+      if (observeToolText) {
+        Promise.resolve().then(function cancelFailedV1ToolTextStream() {
+          return opened.cancel(error);
+        }).catch(function reportFailedV1ToolTextCancellation(cleanupError) {
+          arcaneLogging.error('Arcane v1 tool-text stream cancellation failed.', cleanupError);
+        });
+      }
       settlePublicStream(error);
       throw error;
     }
@@ -2476,8 +2530,15 @@ function validatedV1StreamHandle(opened, request) {
   );
   terminalResult.catch(function retainV1StreamTerminalRejection() {});
   const result = Promise.all([terminalResult, privateStreamPump]).then(
-    function correlateV1StreamTerminal([terminal]) {
+    async function correlateV1StreamTerminal([terminal]) {
+      if (observeToolText && publicStreamError !== null) throw publicStreamError;
       accumulator.correlateToolCalls(terminal);
+      if (observeToolText) {
+        throwIfAborted(signal);
+        await observeToolText(terminal);
+        if (publicStreamError !== null) throw publicStreamError;
+        throwIfAborted(signal);
+      }
       return terminal;
     },
   );
@@ -2485,6 +2546,7 @@ function validatedV1StreamHandle(opened, request) {
   const handle = {
     result,
     cancel: function cancelValidatedV1Stream(reason) {
+      stopV1ToolTextObservation(reason);
       return opened.cancel(reason);
     },
     async next() {
@@ -2496,6 +2558,7 @@ function validatedV1StreamHandle(opened, request) {
       });
     },
     async return(value) {
+      stopV1ToolTextObservation('The stream consumer stopped before completion.');
       if (is.function(iterator.return)) {
         Promise.resolve().then(function returnUnderlyingV1Stream() {
           return iterator.return(value);
@@ -2511,6 +2574,7 @@ function validatedV1StreamHandle(opened, request) {
       return { value, done: true };
     },
     async throw(error) {
+      stopV1ToolTextObservation(error);
       await opened.cancel(error);
       throw error;
     },
@@ -3171,6 +3235,7 @@ export function createBrowserWasmLlmProvider({
         runtime,
         request,
         signal: externalSignal,
+        observeToolText: context.observeToolText,
         onSettled(error) {
           if (settled) return;
           settled = true;
@@ -3452,7 +3517,7 @@ export function adaptV1LlmProvider(provider) {
       });
       return status();
     },
-    request({ role = "llm", selection, operation, payload, signal = null } = {}) {
+    request({ role = "llm", selection, operation, payload, signal = null } = {}, controls = {}) {
       assertSelection(selection, role);
       assertActiveSelection(selection);
       throwIfAborted(signal);
@@ -3466,9 +3531,9 @@ export function adaptV1LlmProvider(provider) {
       }
       if (operation === "stream") {
         validateStructuralRequest(payload);
-        return Promise.resolve(methods.stream(payload, { signal })).then(
+        return Promise.resolve(methods.stream(payload, { signal, observeToolText: controls.observeToolText })).then(
           function wrapV1StreamResult(opened) {
-            return validatedV1StreamHandle(opened, payload);
+            return validatedV1StreamHandle(opened, payload, controls.observeToolText, signal);
           },
         );
       }

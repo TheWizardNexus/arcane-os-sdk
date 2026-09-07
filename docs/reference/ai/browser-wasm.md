@@ -320,6 +320,68 @@ Ordinary iteration exposes only text/reasoning chunks; raw structural deltas
 remain internal until the complete terminal result validates. Explicit
 `onResponse` or inspection consumers retain the complete raw terminal response.
 
+## Stream selected tool text
+
+Both `AI.streamRequest()` and this browser controller's `streamRequest()` accept
+`toolText:{name,field}` with `onToolText(text,call,displayId)`. Select the exact
+tool name and one root-level string argument. The callback receives newly
+decoded text in arrival order, preserving whitespace and JSON string escapes as
+their original characters. Its `call` record is
+`{id,name,field,index,choiceIndex}`: the actual normalized tool-call ID, matching
+tool name, selected field, call index within the response choice, and choice
+index. Delivery waits until the matching name and ID are known. `displayId` is
+the request's existing `M-${id}` display ID.
+
+This callback is distinct from ordinary `onChunk`; display the text in the
+corresponding tool turn and keep ordinary prose in its own existing turn.
+`onToolCall` still receives only the complete normalized call after terminal
+settlement. The text callback does not execute a tool, rewrite arguments, or
+retain a transcript. The application owns the completed call's execution and
+stores its complete visible result once through its normal history path.
+If a provider supplies arguments only at completion, the callback runs only
+when that actual complete response arrives. Repeated terminal snapshots do not
+replay text already emitted. Callback errors reach the request owner, and a
+cancelled or superseded request stops further text delivery.
+
+For example, an application that already supplies a closing-report tool can
+connect its existing display operations without parsing provider protocol:
+
+```javascript
+import {
+    formatConversationClosingReportText
+} from '/arcane/modules/ConversationClosingReport.js';
+
+async function streamClosingReport(ai, messages, closingTool, view, signal) {
+    return ai.streamRequest(
+        {
+            messages,
+            tools:[closingTool],
+            signal,
+            toolText:{name:closingTool.function.name, field:'final_message'},
+            onChunk:function appendOrdinaryText(text, displayId, thinking) {
+                return view.appendAssistantText(text, displayId, thinking);
+            },
+            onToolText:function appendClosingText(text, call, displayId) {
+                return view.appendToolText(
+                    formatConversationClosingReportText(text),
+                    call.id,
+                    displayId
+                );
+            }
+        }
+    );
+}
+```
+
+The application supplies `view` and the existing `closingTool`; those are not
+SDK exports. The formatter applies the same existing `&`, `<`, and `>` escaping
+used for the complete closing report, including whitespace-only chunks. The
+returned terminal call remains available to the application's normal tool
+execution and persistence path. These options do not change the tool schema,
+tool choice, or authored request content. Omitting `toolText` creates no text
+observer. Invalid selection or callback input throws `TypeError`; malformed
+selected argument text reports `ARCANE_AI_TOOL_TEXT_INVALID`.
+
 ## Errors and unavailable states
 
 Invalid configuration can throw `TypeError` or `RangeError`. Operational

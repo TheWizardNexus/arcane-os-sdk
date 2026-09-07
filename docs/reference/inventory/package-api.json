@@ -6,7 +6,7 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 208,
+  "memberCount": 209,
   "members": [
     {
       "id": "root:APP_BUNDLE_DESCRIPTOR_NAME",
@@ -2902,7 +2902,23 @@
       "summary": "Creates the provider-neutral browser AI API module and LLM lifecycle controller around one compatible provider or controller.",
       "availability": "Browser; the selected provider observes its own WebAssembly, storage, and model readiness",
       "protocol": "arcane-ai-adapter/1",
-      "normalization": "Normalizes lazy or manual load, mutable complete lifecycle status, cancellation, complete all-choice nonstructural stream projection, complete provider data callbacks, single-choice text or multi-choice terminal output, required structural arguments.message, and atomic exact matching nonblank all-ID tool-result sequencing without executing tools; an existing ModelController retains its preconfigured load policy and rejects a new security option"
+      "normalization": "Normalizes lazy or manual load, mutable complete lifecycle status, cancellation, complete all-choice nonstructural stream projection, provider chunks with private structural fields removed, complete terminal data callbacks, optional toolText:{name,field} and distinct onToolText(text,call,displayId) delivery of selected decoded argument text, single-choice text or multi-choice terminal output, required structural arguments.message, and atomic exact matching nonblank all-ID tool-result sequencing without executing tools; an existing ModelController retains its preconfigured load policy and rejects a new security option"
+    },
+    {
+      "id": "tool-text-stream:createToolTextObserver",
+      "name": "createToolTextObserver",
+      "displayName": "createToolTextObserver()",
+      "kind": "function",
+      "signature": "createToolTextObserver(selection, onText, {signal}={})",
+      "entrypoints": [
+        "arcane-os/ai/tool-text-stream"
+      ],
+      "primaryImport": "arcane-os/ai/tool-text-stream",
+      "group": "AI provider integration",
+      "summary": "Observes one selected root string argument from actual tool-call chunks before provider structural filtering.",
+      "availability": "Compatible JavaScript module host; no browser capability required",
+      "protocol": "OpenAI-compatible tool-call deltas and complete message snapshots",
+      "normalization": "Returns null for absent selection or an async chunk observer; preserves decoded text and whitespace, emits actual normalized call identity metadata, observes each raw delta once, avoids replay from complete snapshots, awaits callbacks, and stops later observation after cancellation without altering payloads, executing tools, or persisting history"
     },
     {
       "id": "browser-wasm:createBrowserModelSource",

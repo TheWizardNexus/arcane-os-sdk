@@ -27,6 +27,7 @@ const SDK_BROWSER_SELF_IMPORTS=new Map([
     ['arcane-os/pwa','sdk/pwa.mjs'],
     ['arcane-os/speech-text','sdk/speech-text.mjs'],
     ['arcane-os/ai/browser-wasm',SDK_BROWSER_AI_ENTRY],
+    ['arcane-os/ai/tool-text-stream','sdk/ai/tool-text-stream.mjs'],
     ['arcane-os/ai/browser-speech',SDK_BROWSER_SPEECH_ENTRY]
 ]);
 function fail(message,code='ARCANE_IMPORT_MAP_INVALID'){

@@ -1,6 +1,7 @@
 import Is from "../dependencies/strong-type/index.js";
 import { arcaneLogging } from '../logging.mjs';
 import { createArcaneEventSource } from "arcane-os/event-manager";
+import { createToolTextObserver } from './tool-text-stream.mjs';
 
 const is = new Is(false);
 
@@ -1311,13 +1312,22 @@ export class ModelController {
     }
   }
 
-  stream(request = {}) {
+  stream(request = {}, context = {}) {
     this.#assertOperational();
     request=structuralRequest(request);
     localRequirement(request, this.#provider);
     const controller = this;
     const externalSignal = request.signal ?? null;
     const linked = linkedAbortSignal(externalSignal);
+    const observeToolText = context.observeToolText ? async function observeActiveModelToolText(chunk) {
+      if (linked.controller.signal.aborted) {
+        throw normalizeArcaneAIError(null, { operation: 'request', signal: linked.controller.signal });
+      }
+      await context.observeToolText(chunk);
+      if (linked.controller.signal.aborted) {
+        throw normalizeArcaneAIError(null, { operation: 'request', signal: linked.controller.signal });
+      }
+    } : null;
     let opened = null;
     let openedIterator = null;
     let openError = null;
@@ -1363,6 +1373,7 @@ export class ModelController {
           kind: "llm",
           operation: "stream",
           signal: linked.controller.signal,
+          observeToolText,
         },
       );
       if (
@@ -1427,10 +1438,18 @@ export class ModelController {
             return true;
           }
           streamedToolCalls.observe(next.value);
+          if (observeToolText) await observeToolText(next.value);
           const projected=projectPublicStreamChunk(next.value);
           if(projected!==OMITTED_PUBLIC_STREAM_DATA)publishPublicChunk(projected);
         }
       }catch(error){
+        if (observeToolText) {
+          Promise.resolve().then(function cancelFailedModelToolTextStream() {
+            return opened.cancel(error);
+          }).catch(function reportFailedModelToolTextCancellation(cleanupError) {
+            arcaneLogging.error('Arcane model tool-text stream cancellation failed.', cleanupError);
+          });
+        }
         settlePublicStream(error);
         throw error;
       }
@@ -1446,8 +1465,9 @@ export class ModelController {
     });
     terminalResult.catch(()=>undefined);
 
-    const result = Promise.all([terminalResult,privateStreamPump]).then(([terminal]) => {
+    const result = Promise.all([terminalResult,privateStreamPump]).then(async function completeModelStream([terminal]) {
       streamedToolCalls.correlate(terminal);
+      if (observeToolText) await observeToolText(terminal);
       settlePublicStream();
       return terminal;
     }).catch((error)=>{
@@ -1533,10 +1553,18 @@ export class ModelController {
     this.#assertOperational();
     localRequirement(options, this.#provider);
     const id = requestIdentity(options.id);
-    const request = structuralRequest({ ...options, id });
+    const { toolText, onToolText, ...requestOptions } = options;
+    const request = structuralRequest({ ...requestOptions, id });
     const displayId = displayRequestId(id);
+    const observeToolText = createToolTextObserver(
+      toolText,
+      is.function(onToolText) ? function deliverSelectedToolText(text, call) {
+        return onToolText(text, call, displayId);
+      } : onToolText,
+      { signal: options.signal },
+    );
     fireAndForget(options.onRequest, request, id);
-    const handle = this.stream(request);
+    const handle = this.stream(request, { observeToolText });
 
     try {
       for await (const chunk of handle) {

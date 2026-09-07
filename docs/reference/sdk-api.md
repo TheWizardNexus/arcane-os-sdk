@@ -3,7 +3,7 @@
 The npm package exposes a Node.js ESM control plane, the portable
 `arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`,
 `arcane-os/preference-store`, `arcane-os/speech-playback`,
-`arcane-os/speech-text`, and `arcane-os/browser-device` entrypoints, and the browser-only
+`arcane-os/speech-text`, `arcane-os/ai/tool-text-stream`, and `arcane-os/browser-device` entrypoints, and the browser-only
 `arcane-os/pwa`, `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints.
 Those package subpaths are distinct from application-facing projection modules
 in the managed browser map, such as `arcane/AIProviderRuntime`,
@@ -41,6 +41,7 @@ for the installed-inventory-derived physical-runtime contract in SDK `0.5.18`.
 | `arcane-os/browser-device` | Synchronous mobile or desktop identity hints for application-owned settings. |
 | `arcane-os/pwa` | Nonblocking PWA registration, worker updates, native installation state and a dismissible installation component. |
 | `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, complete DBOPFS model storage, streaming, cancellation, and structural tool-call results. |
+| `arcane-os/ai/tool-text-stream` | Shared selected tool-argument text observer for provider integration. |
 | `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS provider mechanisms, ordinary upstream assets, materialized/native routing, Workers, and cancellation. |
 | `arcane-os/mail` | Portable Mail runtime, durable outbox, complete transport responses, and provider-neutral acceptance contracts. |
 
@@ -138,6 +139,7 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `createNativeTargetAdapter()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `createReporter()` | function | `arcane-os` | Events, processes, and testing | Node |
 | `createToolchain()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
+| `createToolTextObserver()` | function | `arcane-os/ai/tool-text-stream` | AI provider integration | Compatible JavaScript module host; no browser capability required |
 | `createWorkspace()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node |
 | `default()` | function | `arcane-os/testing` | Events, processes, and testing | Node |
 | `DEFAULT_TEST_TIMEOUT_MS` | constant | `arcane-os` | Events, processes, and testing | Node |
@@ -5905,8 +5907,20 @@ At least one `llm` or `provider` is required. The mutable API object contains
 delivers every choice's ordinary content/reasoning values in provider order,
 and returns ordinary terminal text for one choice, a structural-call array for
 selected tool output, or complete JSON text for a multi-choice completion.
-`onDataChunk` and `onDataResult` preserve the complete provider chunk and
-terminal record independently of that application-facing projection. Use
+`onDataChunk` receives provider chunks with private structural fields removed;
+`onDataResult` preserves the complete terminal record independently of that
+application-facing projection. Supply `toolText:{name,field}` with
+`onToolText(text,call,displayId)` to receive one selected root string argument
+as it arrives. `call` contains `{id,name,field,index,choiceIndex}` with the real
+normalized call ID, call position, and response-choice index. The SDK decodes
+JSON string escapes, preserves whitespace and order, and starts delivery once
+the matching tool name and call ID are known. `displayId` is the same request
+display ID as `onChunk`. This separate callback does not add ordinary prose,
+execute tools, or persist history. Complete-only providers emit the selected
+text only on actual completion; repeated terminal snapshots do not replay
+emitted text. Callback failures reach the request owner and cancellation
+prevents later delivery. Omitting `toolText` preserves the existing behavior.
+See the [tool-text example](ai/browser-wasm.md#stream-selected-tool-text). Use
 `ai.llm.stream()` for the async iterator; structural fragments remain private
 until the complete terminal result validates.
 
@@ -5990,6 +6004,61 @@ async function openLocalReviewAfterUserChoice() {
     });
 }
 ```
+
+## createToolTextObserver()
+
+### Overview
+
+Creates the shared tool-text observer used by SDK provider integrations before
+private structural fields are removed. Application callers normally use
+`streamRequest({toolText,onToolText})` instead.
+
+### Signature and result
+
+```text
+createToolTextObserver(selection, onText, {signal}={})
+```
+
+`selection` is `{name,field}`: the exact tool name and one root string argument.
+`undefined`, `null`, or `false` selection returns `null`. An active selection
+requires nonblank string `name` and `field` values and an `onText` function;
+invalid configuration throws `TypeError`.
+
+The result is an async `observeToolText(chunk)` function. It accepts raw
+OpenAI-compatible `choices[].delta.tool_calls` fragments and complete
+`choices[].message.tool_calls` or `message.tool_calls` snapshots. `onText` is
+awaited with each newly decoded fragment and
+`{id,name,field,index,choiceIndex}`. It preserves decoded string content and
+whitespace, waits for the matching name and real normalized ID, and reports
+malformed selected argument text with `ARCANE_AI_TOOL_TEXT_INVALID`.
+
+### Availability and normalization
+
+**Compatible JavaScript module host.** One observer owns one request's call
+state. Consume each raw delta once, before any structural filtering; pass the
+same observer through the provider integration instead of creating another
+parser. Complete snapshots may be observed again without replaying emitted
+text. A complete-only response emits only when received. `signal` stops later
+observation after cancellation; callback errors propagate to the caller. The
+observer does not modify the supplied chunk, invoke tools, persist history, or
+start inference.
+
+### Example
+
+```javascript
+import {createToolTextObserver} from 'arcane-os/ai/tool-text-stream';
+
+function createProviderTextObserver(onText, signal) {
+    return createToolTextObserver(
+        {name:'prepare_conversation_closing_report', field:'final_message'},
+        onText,
+        {signal}
+    );
+}
+```
+
+The provider owner passes actual raw chunks to the returned observer and awaits
+it before continuing its existing filtered stream delivery.
 
 ## createBrowserModelSource()
 

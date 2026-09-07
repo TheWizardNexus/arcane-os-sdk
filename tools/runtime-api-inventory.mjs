@@ -22,6 +22,10 @@ const runtimePackageImports=new Map([
     ['arcane-os/event-manager',path.join(repositoryRoot,'src','event-manager.mjs')],
     ['arcane-os/speech-text',path.join(repositoryRoot,'browser-runtime','speech-text.mjs')],
     [
+        'arcane-os/ai/tool-text-stream',
+        path.join(repositoryRoot,'browser-runtime','ai','tool-text-stream.mjs')
+    ],
+    [
         'arcane-os/ai/browser-speech',
         path.join(repositoryRoot,'browser-runtime','ai','browser-speech.mjs')
     ]
