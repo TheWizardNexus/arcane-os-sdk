@@ -4589,7 +4589,7 @@ class AI {
                 if(signal?.aborted){
                     throw normalizeAIRequestAbort();
                 }
-                this.finishTTS();
+                this.#finishStreamingSpeech();
                 return result;
             }catch(error){
                 if(handle){
@@ -4645,7 +4645,7 @@ class AI {
             if(signal?.aborted){
                 throw normalizeAIRequestAbort();
             }
-            this.finishTTS();
+            this.#finishStreamingSpeech();
             return result;
         }catch(error){
             this.stopAudio();
@@ -4928,7 +4928,7 @@ class AI {
 
             const nativeResult=this.#providerCompletionOutput(nativeCompletion);
             if(finishSpeech){
-                this.finishTTS();
+                this.#finishStreamingSpeech();
             }
             await streamComplete(nativeResult,`M-${id}`,isThinking);
             speechTurnCompleted=true;
@@ -5392,7 +5392,7 @@ class AI {
         }
         const streamResult=this.#providerCompletionOutput(completion);
         if(finishSpeech){
-            this.finishTTS();
+            this.#finishStreamingSpeech();
         }
         await streamComplete(streamResult, `M-${id}`,isThinking);
 
@@ -6073,6 +6073,16 @@ class AI {
                 return result;
             }
         );
+    }
+
+    #finishStreamingSpeech(){
+        if(this.muted){
+            for(const playback of this.#preparedSpeechPlaybacks) playback.stop();
+            this.audioMessageChunks='';
+            this.#markdownSpeech.reset();
+            return;
+        }
+        this.finishTTS();
     }
 
     finishTTS(){

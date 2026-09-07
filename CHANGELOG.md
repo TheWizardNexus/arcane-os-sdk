@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.3
+
+- Skip automatic TTS finalization calls when a model stream completes while
+  muted. Preserve pending speech cleanup, unmuted flushing, explicit public
+  speech methods, and model response callbacks across all streaming routes.
+
 ## 0.13.2
 
 - Correct the PWA development guide to describe live descriptor refresh and

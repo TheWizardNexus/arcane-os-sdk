@@ -598,6 +598,12 @@ boundary; `finishTTS()` flushes any remaining text. It is not a playback-ended
 notification. Do not mute or dispose immediately after it if playback should
 continue.
 
+Automatic model-stream completion reads the AI instance's current mute state.
+While muted, it clears pending speech text and formatting state and stops
+prepared playback without invoking `finishTTS()` or `streamTTS()`. Unmuted
+completion keeps its ordinary speech flush. Explicit calls to either public
+speech method retain their existing behavior.
+
 ## Automatic speech-input formatting cleanup
 
 Every TTS entrypoint removes repeated same formatting marks from the outbound
