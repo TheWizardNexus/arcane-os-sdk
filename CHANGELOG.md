@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.1
+
+- Keep the shared Chat transcript, composer, speech controls, language selector,
+  and timer hidden until the selected local language model is ready and loaded.
+  Cloud routes remain visible immediately, and completed transcripts remain readable.
+
 ## 0.11.0
 
 - Add explicit browser chat CPU selection with `loadDefaults:{gpuLayers:0}`
