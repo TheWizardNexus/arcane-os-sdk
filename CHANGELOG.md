@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.13.2
+
+- Correct the PWA development guide to describe live descriptor refresh and
+  remove the superseded restart instruction. Runtime behavior is unchanged.
+
 ## 0.13.1
 
 - Refresh live development app membership from the current authored descriptor

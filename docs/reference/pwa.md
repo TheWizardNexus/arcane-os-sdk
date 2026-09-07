@@ -102,8 +102,11 @@ metadata; `arcane-offline.json` contains the selected offline resource inventory
 If `package.pwa.offline.include` is nonempty, the resource must also
 match that offline selection and must not match `offline.exclude`. Adding a
 path only to the offline selection does not add it to the app's resources.
-Restart after changing descriptor settings. Edits to selected source files are
-picked up by the next due page-load check while the server remains running.
+The running source server reads changed app descriptors before the next app,
+root-navigation or generated-PWA request. Include/exclude rules, the entry and
+PWA settings share the current selection; no restart or package projection
+write is needed. Edits to selected source files are picked up by the next due
+page-load check while the server remains running.
 
 For an enabled application, `arcane dev` serves the generated PWA files at the
 origin root and starts at the selected app page under `/apps/<id>/`. Use one
