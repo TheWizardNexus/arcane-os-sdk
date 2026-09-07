@@ -84,7 +84,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`DirectoryPicker.js`](#directorypickerjs) | esm | Wraps the provider-owned native directory chooser and normalizes selected/cancelled/error results. | Native bridge | Complete mutable caller options and provider result fields; coded cancellation and malformed-result errors. |
 | [`DocumentLexicalSearch.js`](#documentlexicalsearchjs) | esm | Provides dependency-free deterministic metadata/body ranking and complete excerpts. | Cross-host | Mutable complete results with no storage, provider, or network side effects. |
 | [`DocumentNavigation.js`](#documentnavigationjs) | esm | Binds document navigation, filtering, history, current-item reveal, and load initialization. | Browser / native WebView | Normalized filter/navigation state; DOM effects preserved. |
-| [`Errors.js`](#errorsjs) | esm | Normalizes global errors/rejections, fingerprints and deduplicates incidents, persists a complete ledger, and performs complete delivery. | Browser / native WebView hybrid | Incident records normalized; storage/mail failures isolated. |
+| [`Errors.js`](#errorsjs) | esm | Normalizes global errors/rejections, assigns occurrence identifiers, persists a complete ledger, and performs complete delivery. | Browser / native WebView hybrid | Incident records normalized; storage/mail failures isolated. |
 | [`GifEncoder.js`](#gifencoderjs) | esm | Encodes indexed frames into a complete animated GIF using palette mapping and LZW. | Cross-host | Normalized complete binary output. |
 | [`HTMLImport.js`](#htmlimportjs) | esm | Defines the same-origin `<html-import>` loader with open shadow root, inline script execution, and readiness/error events. | Browser / native WebView | Public error detail normalized; fetch/DOM failure preserved. |
 | [`InMemoryCommunicationProvider.js`](#inmemorycommunicationproviderjs) | esm | Implements deterministic in-memory thread/message/send behavior for demos and tests. | Cross-host | Normalized communication entities. |
@@ -1997,6 +1997,12 @@ console.log(Object.keys(module));
 ### Overview
 
 Normalizes global errors/rejections, assigns occurrence identifiers, persists a complete ledger, and performs complete delivery.
+
+Developer modals are offered only for newly captured live incidents. Loading
+pending records from a prior page preserves their complete diagnostics and
+delivery/retry state without reopening their modals. This remains true when
+developer preferences become ready after restoration. A newly captured error
+still follows the ordinary developer-mode presentation path.
 
 ### Public surface
 

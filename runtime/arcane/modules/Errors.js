@@ -477,6 +477,7 @@ class Errors {
             return;
         }
 
+        // Restored records resume delivery; only live capture offers developer modals.
         const timestamp=this.now();
         for(const storedRecord of records){
             if(
@@ -519,7 +520,6 @@ class Errors {
             if(!record.retryRequired){
                 this.scheduleRecord(record,dueAt-timestamp);
             }
-            this.offerDeveloperIncident(record.incident,record.occurrenceId);
         }
 
         this.persistLedger();

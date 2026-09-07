@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import {setImmediate as nextTurn} from 'node:timers/promises';
 import test from '../src/testing.mjs';
 import {arcaneLogging,readArcaneDeveloperMode} from 'arcane-os/logging';
+import {createArcaneEventSource} from 'arcane-os/event-manager';
 import Errors from '../runtime/arcane/modules/Errors.js';
 import {createSpeechWorkerClient} from '../browser-runtime/ai/speech-worker-client.mjs';
 import {SPEECH_WORKER_PROTOCOL} from '../browser-runtime/ai/speech-worker-runtime.mjs';
@@ -168,6 +170,164 @@ test('Errors and console diagnostics use the same live developer preference read
         errors.destroy();
     }
 });
+
+test(
+    'restored error deliveries stay out of developer modals while new matching incidents remain visible',
+    async function restoredErrorsDoNotReopenDeveloperModals(context) {
+        for (const readyAtRestore of [true, false]) {
+            await context.test(
+                `developer preferences ${readyAtRestore ? 'ready during' : 'ready after'} restoration`,
+                async function restoredErrorPreferenceLifecycle() {
+                    const incident = {
+                        type: 'error',
+                        name: 'NotSupportedError',
+                        message: '  Complete original application error.\nSecond line: café, 日本語.  ',
+                        stack: 'NotSupportedError: Complete original application error.\n    at capture (app.js:541:16)',
+                        filename: 'https://app.example.test/app.js?v=6&arcaneVersion=old',
+                        lineno: 541,
+                        colno: 16
+                    };
+                    const storedRecords = [
+                        {capturedAt: 100, dueAt: 2100, incident, occurrenceId: 'stored-scheduled', retryRequired: false},
+                        {capturedAt: 200, dueAt: 2200, incident, occurrenceId: 'stored-retry', retryRequired: true}
+                    ];
+                    let stored = JSON.stringify(
+                        {pending: storedRecords}
+                    );
+                    const storage = {
+                        getItem() { return stored; },
+                        setItem(key, value) { stored = value; }
+                    };
+                    const target = new EventTarget();
+                    target.user = {ready: readyAtRestore, developer: true};
+                    const userEvents = createArcaneEventSource(
+                        target,
+                        {source: 'synthetic-user', eventTypes: ['user-entity-loaded']}
+                    );
+                    const scheduled = new Set();
+                    const presentations = [];
+                    const deliveries = [];
+                    const warnings = [];
+                    let rejectDelivery = false;
+                    const errors = new Errors(
+                        {
+                            target,
+                            storage,
+                            singleton: false,
+                            now: function errorFixtureTime() { return 1000; },
+                            schedule: function retainScheduledError(callback) {
+                                scheduled.add(callback);
+                                return callback;
+                            },
+                            cancel: function cancelScheduledError(callback) {
+                                scheduled.delete(callback);
+                            },
+                            logger: {
+                                warn(...args) { warnings.push(args); }
+                            },
+                            presentDeveloperIncident: function recordDeveloperPresentation(value, occurrenceId) {
+                                presentations.push(
+                                    {incident: value, occurrenceId}
+                                );
+                            },
+                            sendMail: async function recordErrorDelivery(recipients, subject, payload) {
+                                deliveries.push(
+                                    {recipients, subject, payload}
+                                );
+                                if (rejectDelivery) throw new Error('Synthetic mail delivery failed.');
+                            }
+                        }
+                    );
+                    try {
+                        await nextTurn();
+                        assert.deepEqual(
+                            presentations,
+                            []
+                        );
+                        assert.deepEqual(
+                            errors.developerIncidentQueue,
+                            []
+                        );
+                        assert.equal(errors.waitingForUser, false);
+                        assert.deepEqual(JSON.parse(stored).pending, storedRecords);
+                        assert.equal(scheduled.size, 1);
+
+                        errors.capture(incident);
+                        const liveRecord = [...errors.pending.values()].find(
+                            function newlyCapturedRecord(record) {
+                                return !record.occurrenceId.startsWith('stored-');
+                            }
+                        );
+                        assert.ok(liveRecord);
+                        if (!readyAtRestore) {
+                            await nextTurn();
+                            assert.deepEqual(
+                                presentations,
+                                []
+                            );
+                            assert.equal(errors.waitingForUser, true);
+                            target.user.ready = true;
+                            userEvents.dispatch(
+                                'user-entity-loaded',
+                                {reason: 'synthetic-user-ready'}
+                            );
+                        }
+                        await nextTurn();
+                        assert.deepEqual(
+                            presentations,
+                            [{incident, occurrenceId: liveRecord.occurrenceId}]
+                        );
+
+                        for (const callback of [...scheduled]) {
+                            callback();
+                        }
+                        await errors.whenIdle();
+                        assert.deepEqual(
+                            deliveries.map(
+                                function deliveredOccurrence(delivery) { return delivery.payload.occurrence_id; }
+                            ),
+                            ['stored-scheduled', liveRecord.occurrenceId]
+                        );
+                        assert.deepEqual(
+                            deliveries[0].payload,
+                            {...incident, captured_at: new Date(100).toISOString(), occurrence_id: 'stored-scheduled'}
+                        );
+                        assert.deepEqual(
+                            JSON.parse(stored).pending,
+                            [storedRecords[1]]
+                        );
+
+                        rejectDelivery = true;
+                        await errors.flush();
+                        assert.equal(warnings.length, 1);
+                        assert.deepEqual(
+                            JSON.parse(stored).pending,
+                            [storedRecords[1]]
+                        );
+                        rejectDelivery = false;
+                        await errors.flush();
+                        assert.deepEqual(
+                            deliveries[2].payload,
+                            {...incident, captured_at: new Date(200).toISOString(), occurrence_id: 'stored-retry'}
+                        );
+                        assert.deepEqual(deliveries[3].payload, deliveries[2].payload);
+                        assert.deepEqual(
+                            JSON.parse(stored).pending,
+                            []
+                        );
+                        assert.deepEqual(
+                            presentations,
+                            [{incident, occurrenceId: liveRecord.occurrenceId}]
+                        );
+                    } finally {
+                        errors.destroy();
+                        userEvents.dispose();
+                    }
+                }
+            );
+        }
+    }
+);
 
 test('speech Worker diagnostics preserve transferred request content without changing the actual request or result',async function speechWorkerTransferDiagnostics(t){
     const calls=captureLoggingEnvironment(t,{ready:true,developer:true});

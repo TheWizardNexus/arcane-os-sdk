@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.1
+
+- Open developer error modals only for newly captured live incidents. Restoring
+  pending diagnostics after navigation or reload continues scheduled delivery
+  and retry without reopening old modals. Preserve complete stored incidents
+  and the existing behavior for new errors.
+
 ## 0.10.0
 
 - Add opt-in application PWA configuration, generated installation and offline
