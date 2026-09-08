@@ -899,8 +899,16 @@ function createConfiguredMailHandler(configuration){
             if(request.method!=='POST'){
                 throw new MailGatewayFault('mail_method_not_allowed',{statusCode:405});
             }
-            if(configuration.verifySubscription){
-                appId=await verifyMailSubscription(request,configuration,requestController.signal);
+            if (configuration.verifySubscription) {
+                const requesterIp = request.socket?.remoteAddress;
+                const serverIp = request.socket?.localAddress;
+                if (!requesterIp || requesterIp !== serverIp) {
+                    appId = await verifyMailSubscription(
+                        request,
+                        configuration,
+                        requestController.signal
+                    );
+                }
             }
             idempotencyKey=requireRequestHeader(request,'idempotency-key');
             const requestText=await readRequestBodyText(request,{

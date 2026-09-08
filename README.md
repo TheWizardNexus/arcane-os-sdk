@@ -19,7 +19,7 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This checkout defines the `0.24.1` SDK contract. Applications pin one exact npm
+This checkout defines the `0.25.0` SDK contract. Applications pin one exact npm
 version and lockfile; registry state is deliberately not baked into application
 artifacts.
 
@@ -31,7 +31,11 @@ Existing root credential, profile, and TLS settings remain supported. Browser
 mail defaults to `/v1/mail` on the current domain, and multiple applications can
 share one server with explicit allowed origins. Subscription verification is disabled
 until a `verifySubscription` callback is configured; that callback receives the
-application name and bearer subscription key before each provider attempt.
+application name and bearer subscription key before provider attempts from other
+requester IPs. Requests whose actual connection source IP equals the server-side
+IP of that connection automatically skip subscription verification, including
+local development. Other intranet machines still need verification. The exception
+requires no environment setting or domain lookup.
 See the [method and action gate report](docs/reviews/mail-server-purpose-review.md)
 for the removals, retained responsibilities, and naming decisions.
 

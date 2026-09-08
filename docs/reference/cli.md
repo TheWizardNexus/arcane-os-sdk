@@ -985,7 +985,16 @@ application with `Authorization: Bearer <subscription_key>`.
 Subscription verification is disabled when no callback is configured. The
 programmatic `createToolchain().mail({action: 'serve', ...})` path accepts
 `verifySubscription({appName, subscriptionKey, signal})`; supplying that callback
-enables verification before each provider attempt. It must resolve to `true`
+enables verification for requests whose actual connection source IP differs
+from the server-side IP of that connection. The gateway compares the native
+`request.socket.remoteAddress` with `request.socket.localAddress`. A nonempty,
+equal requester IP skips subscription verification and needs neither a bearer
+key nor an application header for that check. No environment setting or domain
+lookup is involved. Local development qualifies under the same rule; another
+machine on an intranet still needs verification. Missing connection metadata
+does not qualify. CORS and the remaining mail requirements still apply.
+
+For requests requiring verification, the callback must resolve to `true`
 to accept the request. An invalid subscription receives 401; verifier service
 failure receives retryable 503; cancellation stops verification before sending.
 The callback connects the actual TWiN Stripe endpoint when its contract is
@@ -1016,7 +1025,7 @@ deadline. `mail.bodyTimeoutMs` selects the optional request-body deadline.
 After binding, `server.ready` reports lifecycle fields such as
 protocol, optional app label, bind address, port, URL, and `callerAuthentication`
 (`none` or `subscription`). Human output states whether verification is disabled
-or configured.
+or configured; configured verification includes the automatic same-IP exception.
 The command owns the server until its lifecycle ends or `SIGINT`/`SIGTERM`
 cancels it. The server's Resend credential remains outside results and events;
 per-request observer events preserve the complete delivery, report, provider

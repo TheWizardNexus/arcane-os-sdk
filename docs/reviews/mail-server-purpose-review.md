@@ -1,5 +1,10 @@
 [Roshi's Codex PRIME] The gateway review and its portable credential follow-up apply the same three purpose gates. The gateway removals preserve complete delivery outcomes, configured CORS and recipient policy, and the optional subscription verifier. Mail credentials now belong in the user-selected `.arcane.env.json`, with one portable Node implementation for Windows, Linux, and macOS and a compatible Node host as the Android adaptation boundary. The original gateway inventory below uses baseline `f055e05`; the credential follow-up reviews the Windows storage implementation present at SDK `0.18.0`. Commit, package, publication, and actual platform execution outcomes belong to the delivery record rather than to this source-review report.
 
+The [same-IP subscription exception follow-up](#same-ip-subscription-exception-follow-up)
+records the later user-selected change to when the optional verifier runs. The
+earlier inventories retain their stated historical scope; current verification
+skips requests whose actual connection source and destination IPs are equal.
+
 | Decision | Behavior | Why it matters | Source status at this review |
 | --- | --- | --- | --- |
 | Remove | Loopback-only admission, manual header reconstruction, address/origin normalization, local payload grammar, manual content-length scan, dead queue knobs | These restrict supported use, rewrite supplied values, or repeat work already owned elsewhere. | Removed from the inspected source; naming-only changes carry no runtime claim. |
@@ -541,3 +546,58 @@ global error handler; it is not an automatic server response to an ordinary
 mail failure. This is a static source-path finding, not an observed production
 incident or an executed reproduction. This documentation clarification changes
 no error, subscription, retry, or delivery behavior.
+
+## Same-IP subscription exception follow-up
+
+The user selected an automatic same-IP exception so the verification service can
+send its own emails without a subscriber key. This supersedes the proposed
+domain exception in `.arcane.env.json`; neither an environment setting nor a
+domain allowlist is needed. The reusable decision belongs in the SDK's existing
+`handleMailRequest`, immediately at its subscription-verification branch.
+Application-owned messages, sender choices, subscription accounts, and the
+verification callback remain with their existing owners.
+
+The condition is a nonempty `request.socket.remoteAddress` equal to
+`request.socket.localAddress`. Matching requests skip `verifyMailSubscription`
+and the configured `verifySubscription` callback, including when the request
+has no subscriber key or supplies an invalid one. Requests with different or
+unavailable socket addresses retain the configured verification path. Omitting
+the callback continues to select the existing no-verification setup.
+
+| Method or action | Gate 1: Do we care? | Gate 2: Why is it worth the work? | Gate 3: Can we remove it without losing the required result? | Decision and concrete effect |
+| --- | --- | --- | --- | --- |
+| Automatic source/destination IP equality at `handleMailRequest` | Yes. The verifier needs to send service mail without a subscriber key. | It identifies the exact connection case the user selected using already-available socket fields. | No. Removing the exception would restore the verifier's dependency on subscription checking for its own mail. | Keep one inline equality decision with a nonempty source address. No new helper or configuration owner. |
+| Subscription checking for a matching connection | The subscription-verification capability matters; this particular call does not. | Requiring it for the verifier's own email adds an unnecessary dependency and can create a circular service call. | Yes. The user expressly permits these senders regardless of their subscription. | Skip the callback and its asynchronous wait for matching requests. A callback that contacts the verification service makes no such request on this path. |
+| Proposed `.arcane.env.json` domain exception, DNS resolution, address cache, and interface enumeration | No. The selected rule is actual IP equality and requires no setup. | These would introduce configuration, I/O, retained state, or a broader machine/domain interpretation absent from the selected outcome. | Yes. Native request socket fields already supply both values. | Add none. Secret files, named provider profiles, and current configuration loading remain unchanged. |
+| `Origin`, `Host`, `Forwarded`, or `X-Forwarded-For` as evidence of matching connection IPs | No. These request fields do not define the native socket endpoints. | Reading them for this exception would change its meaning and duplicate unrelated routing or CORS concerns. | Yes. The actual socket exposes the relevant addresses directly. | Keep header handling at its existing owner; none of these headers selects the exception. |
+| Special loopback, intranet, subnet, or same-machine rules | No. The selected condition is equal IPs. | A larger address policy would grant a different exception and add work. | Yes. Equal local-development addresses already use the ordinary equality path. | Add none. Another intranet machine with a different IP still uses configured verification. Services on one machine using different interface IPs may also require it. |
+| CORS, routing, methods, idempotency, report/recipient handling, provider result, and cancellation | Yes. These continue to determine the actual mail outcome. | Skipping subscription checking does not change the requested delivery or lifecycle contracts. | No. Their retained behavior supports complete delivery and honest results. | Preserve these owners and their current ordering. Provider acceptance remains separate from the subscription decision. |
+
+The operation graph adds one synchronous connection-address comparison at the
+existing request owner. A matching request avoids subscription header checking,
+callback invocation, and its asynchronous verification wait, then uses the
+ordinary provider path. There is no new file read, DNS request, timer, polling,
+cache, helper, shared-state lock, startup barrier, or per-platform process.
+Requests continue independently under the existing handler lifecycle. These are
+source-level operation changes, not measured timing improvements.
+
+The selected `node-http-server` raw-request hook supplies the native Node request.
+HTTP/1.1 and HTTP/2 both expose the needed address properties; the same Node
+contract applies on Windows, Linux, and macOS, with Android requiring a compatible
+Node host. The local socket address is the actual destination used by the
+connection, including when the listener binds `0.0.0.0`.
+[Node socket addresses](https://nodejs.org/api/net.html#socketlocaladdress) and
+[HTTP/2 request sockets](https://nodejs.org/api/http2.html#requestsocket)
+document these properties.
+
+For equal connection IPs, the verification service's own mail proceeds without
+calling that service again. This removes its circular subscription dependency
+on this path. It does not claim that arbitrary callback code or a repeatedly
+failing browser mail-event subscriber cannot create a separate feedback loop.
+The existing error and retry distinctions remain documented in the
+[mail reference](../reference/mail.md#error-reports-and-retries).
+
+This follow-up records the selected behavior and source review. No local test,
+check, build, server launch, live mail send, or platform execution was performed
+by this documentation author. Release and runtime evidence remain with the
+corresponding operation's owner.

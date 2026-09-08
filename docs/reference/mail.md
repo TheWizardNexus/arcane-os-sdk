@@ -115,7 +115,8 @@ An absent key, `null`, or an empty string omits the Authorization header; the
 transport does not block initial setup because a key is missing. Explicit
 `subscriptionKey: null` or `subscriptionKey: ''` also skips User lookup.
 A supplied value of another type is rejected. A gateway with subscription
-verification configured owns rejection of requests without a usable key.
+verification configured owns rejection of requests without a usable key,
+subject to its [automatic same-IP exception](#automatic-same-ip-exception).
 
 For a caller-owned key and shared endpoint:
 
@@ -586,10 +587,40 @@ Subscription verification is disabled during initial setup when
 subscription key. Starting the ordinary CLI gateway uses this mode. This does
 not claim that a subscription was checked.
 
+### Automatic same-IP exception
+
+The gateway automatically skips subscription verification when the incoming
+connection's nonempty `request.socket.remoteAddress` equals
+`request.socket.localAddress`. This also applies when a verifier is configured
+and the request has no subscription key or supplies an invalid one. The
+verification callback is not called for that request.
+
+No `.arcane.env.json` setting or domain allowlist is needed. The comparison uses
+the actual source and destination IP addresses exposed by Node's request socket
+for HTTP/1.1 and HTTP/2. It adds no DNS lookup, configuration read, cache, or
+interface scan. `Origin`, `Host`, `Forwarded`, and `X-Forwarded-For` do not
+establish the connection's IP equality.
+
+| Caller connection | Subscription behavior with a verifier configured |
+| --- | --- |
+| The verification service connects to mail using the same source and destination IP | Skips subscription checking, allowing its service-generated emails without a subscriber key. |
+| A local development request has equal source and destination IPs, including an ordinary loopback connection | Uses the same automatic exception. There is no special loopback rule. |
+| Another machine on the same intranet connects from a different IP | Uses the configured subscription verifier. Sharing a network or subnet supplies no exception. |
+| Two services on one machine connect through different interface IPs | Uses the configured subscription verifier when the actual addresses differ. Machine identity alone supplies no exception. |
+| The request has no usable socket source address | Uses the configured subscription verifier; absent addresses do not count as equal. |
+
+The exception skips only subscription checking. Existing CORS, route, method,
+idempotency-key, report, recipient, and provider handling still apply. The gateway
+continues to require its Resend provider credential and reports acceptance only
+after the provider accepts the email.
+
+### Verification callback contract
+
 The hosting process enables verification by supplying the programmatic
 `verifySubscription` function through
 `createToolchain().mail({action:'serve', verifySubscription, ...options})`.
-The server then reports `callerAuthentication: 'subscription'`. The callback
+The server then reports `callerAuthentication: 'subscription'`, identifying the
+configured mode while retaining the same-IP exception above. The callback
 contract is:
 
 ```javascript
@@ -602,13 +633,15 @@ The gateway also treats any other returned value as invalid. `appName` is the
 exact incoming `X-Mail-App` value, `subscriptionKey` is the incoming Bearer
 key, and `signal` follows the request lifecycle. These control fields stay
 separate from the mail report and Resend payload. The verifier runs for each
-POST request before any provider attempt; results are not cached.
+POST request outside the same-IP exception before any provider attempt; results
+are not cached.
 
 `X-Mail-App` identifies the originating app so the verifier can select that
 app's subscription account, such as the appropriate Stripe account for `BOSS`
 or `TWiN`. It is separate from the gateway's optional `--app` event label.
 The missing-header and Bearer errors below apply only when `verifySubscription`
-is configured. Ordinary `mail serve` does not require either header.
+is configured and the same-IP exception does not apply. Ordinary `mail serve`
+does not require either header.
 
 | Configured-verifier outcome | Gateway response |
 | --- | --- |
@@ -654,10 +687,14 @@ error report, and trigger another mail event. Subscriber failures cannot change
 an already committed mail result, though global capture can report them as new
 errors. This is a source-level possibility, not evidence of a deployed loop.
 
-For a verification service that sends its own emails, its host integration must
-also avoid the circular request path `mail -> verify subscription -> send mail ->
-verify subscription`. The SDK supplies a callback for verification; it does not
-choose that service's caller flow or enable it in ordinary CLI startup.
+For a verification service's own emails sent through the same IP, the gateway
+skips its subscription callback and proceeds to provider delivery. That removes
+the circular dependency `mail -> verify subscription -> send mail -> verify
+subscription` for this connection path. Connections from a different IP still
+use the configured callback, whose owning service must preserve a verification
+path that can return without recursively depending on another verification.
+The exception does not change the separate browser event-subscriber behavior
+described above.
 
 ## Gateway request lifecycle
 

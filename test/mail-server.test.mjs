@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import http2 from 'node:http2';
+import {PassThrough, Readable} from 'node:stream';
 import test from '../src/testing.mjs';
 import {temporaryDirectory, useSyntheticTls, writeSyntheticTlsFiles} from './helpers.mjs';
 import {
@@ -150,6 +151,80 @@ function deferred(){
         reject=rejectPromise;
     });
     return {promise,reject,resolve};
+}
+
+function createGatewayHandler(t, overrides = {}) {
+    const handler = createResendMailRequestHandler(
+        gatewayOptions(overrides)
+    );
+    t.after(
+        function closeGatewayHandler() {
+            return handler.close();
+        }
+    );
+    return handler;
+}
+
+function requestHandlerMail(handler, {
+    body = validReport(),
+    headers = {},
+    reportKey = 'synthetic-handler-report',
+    socket = {remoteAddress: '192.0.2.20', localAddress: '192.0.2.10'},
+    subscriptionKey = SUBSCRIPTION_KEY
+} = {}) {
+    // Socket metadata is synthetic here; native protocol coverage is separate.
+    const request = Readable.from(
+        [typeof body === 'string' ? body : JSON.stringify(body)]
+    );
+    request.method = 'POST';
+    request.url = RESEND_MAIL_PATH;
+    request.socket = socket;
+    request.headers = {
+        'content-type': 'application/json',
+        'idempotency-key': reportKey,
+        'origin': ALLOWED_ORIGIN,
+        'x-mail-app': APP_ID,
+        ...headers
+    };
+    if (subscriptionKey !== null && !Object.hasOwn(request.headers, 'authorization')) {
+        request.headers.authorization = `Bearer ${subscriptionKey}`;
+    }
+    const response = new PassThrough();
+    response.writeHead = function captureHandlerResponseHeaders(statusCode, responseHeaders) {
+        response.statusCode = statusCode;
+        response.headers = responseHeaders;
+        return response;
+    };
+    const result = new Promise(
+        function collectHandlerResponse(resolve, reject) {
+            const chunks = [];
+            response.on(
+                'data',
+                function collectHandlerResponseChunk(chunk) {
+                    chunks.push(chunk);
+                }
+            );
+            response.once('error', reject);
+            response.once(
+                'end',
+                function finishHandlerResponse() {
+                    try {
+                        const text = Buffer.concat(chunks).toString('utf8');
+                        resolve(
+                            {
+                                body: text ? JSON.parse(text) : null,
+                                response: {status: response.statusCode, headers: response.headers}
+                            }
+                        );
+                    } catch (error) {
+                        reject(error);
+                    }
+                }
+            );
+        }
+    );
+    handler.handle(request, response);
+    return result;
 }
 
 function requestHttp2Mail(client, headers, body = '') {
@@ -317,14 +392,48 @@ test(
 );
 
 test(
-    'native HTTP2 mail headers preserve authority CORS, subscription and complete provider content',
+    'native HTTP1 mail accepts a same-IP request without application or subscription headers',
+    async function testHttp1SameIpSubscription(t) {
+        let verificationCalls = 0;
+        const instance = await startGateway(
+            t,
+            {
+                verifySubscription: function countUnexpectedHttp1Verification() {
+                    verificationCalls += 1;
+                    return false;
+                }
+            }
+        );
+        const accepted = await rawRequest(
+            instance,
+            {
+                body: JSON.stringify(validReport()),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Idempotency-Key': 'same-ip-http1-report'
+                }
+            }
+        );
+        assert.equal(accepted.statusCode, 202);
+        assert.equal(accepted.body.providerId, ACCEPTED_PROVIDER_ID);
+        assert.equal(verificationCalls, 0);
+    }
+);
+
+test(
+    'native HTTP2 mail preserves authority CORS, same-IP subscription exemption and complete provider content',
     async function testHttp2MailRequestContract(t) {
         const providerCalls = [];
         const requestProtocols = [];
+        let verificationCalls = 0;
         const handler = createResendMailRequestHandler(
             gatewayOptions(
                 {
                     allowedOrigins: [],
+                    verifySubscription: function countUnexpectedHttp2Verification() {
+                        verificationCalls += 1;
+                        return false;
+                    },
                     fetchImpl: function captureHttp2ProviderRequest(url, options) {
                         providerCalls.push(
                             {url, options}
@@ -341,7 +450,9 @@ test(
                     {
                         authority: request.authority,
                         headersDistinct: request.headersDistinct,
-                        httpVersionMajor: request.httpVersionMajor
+                        httpVersionMajor: request.httpVersionMajor,
+                        localAddress: request.socket.localAddress,
+                        remoteAddress: request.socket.remoteAddress
                     }
                 );
                 handler.handle(request, response);
@@ -399,7 +510,13 @@ test(
         assert.equal(accepted.body.providerId, ACCEPTED_PROVIDER_ID);
         assert.deepEqual(
             requestProtocols[0],
-            {authority, headersDistinct: undefined, httpVersionMajor: 2}
+            {
+                authority,
+                headersDistinct: undefined,
+                httpVersionMajor: 2,
+                localAddress: '127.0.0.1',
+                remoteAddress: '127.0.0.1'
+            }
         );
         assert.equal(providerCalls.length, 1);
         assert.equal(providerCalls[0].options.headers['Idempotency-Key'], headers['idempotency-key']);
@@ -423,11 +540,11 @@ test(
         assert.equal(missingKey.body.error.code, 'mail_invalid_headers');
         const missingSubscription = await requestHttp2Mail(
             client,
-            {...headers, authorization: ''},
+            {...headers, authorization: '', 'x-mail-app': ''},
             JSON.stringify(report)
         );
-        assert.equal(missingSubscription.statusCode, 401);
-        assert.equal(missingSubscription.body.error.code, 'mail_subscription_required');
+        assert.equal(missingSubscription.statusCode, 202);
+        assert.equal(missingSubscription.body.providerId, ACCEPTED_PROVIDER_ID);
         const unrelatedOrigin = await requestHttp2Mail(
             client,
             {...headers, origin: ALLOWED_ORIGIN},
@@ -435,122 +552,223 @@ test(
         );
         assert.equal(unrelatedOrigin.statusCode, 403);
         assert.equal(unrelatedOrigin.body.error.code, 'mail_origin_not_allowed');
-        assert.equal(providerCalls.length, 1);
+        assert.equal(providerCalls.length, 2);
+        assert.equal(verificationCalls, 0);
     }
 );
 
-test('mail gateway verifies the exact incoming application and bearer subscription key',async function testCallerAuthentication(t){
-    let authenticatedProviderCalls=0;
-    const authenticated=await startGateway(t,{
-        appId:'Server diagnostic label / any application',
-        fetchImpl:function countAuthenticatedProviderCall(){
-            authenticatedProviderCalls+=1;
-            return defaultFetch();
-        }
-    });
-    const missing=await requestMail(authenticated,{
-        subscriptionKey:null,
-        reportKey:'missing-subscription-key-0001'
-    });
-    assert.equal(missing.response.status,401);
-    assert.equal(missing.body.error.code,'mail_subscription_required');
-    const mismatch=await requestMail(authenticated,{
-        subscriptionKey:'synthetic-wrong-subscription-key-0002',
-        reportKey:'wrong-subscription-key-0002'
-    });
-    assert.equal(mismatch.response.status,401);
-    assert.equal(mismatch.body.error.code,'mail_subscription_invalid');
-    const otherApplication=await requestMail(authenticated,{
-        headers:{'X-Mail-App':'Another application / exact name'},
-        reportKey:'other-application-key-0001'
-    });
-    assert.equal(otherApplication.response.status,401);
-    assert.equal(otherApplication.body.error.code,'mail_subscription_invalid');
-    const missingApplication=await requestMail(authenticated,{
-        headers:{'X-Mail-App':''},
-        reportKey:'missing-application-key-0001'
-    });
-    assert.equal(missingApplication.response.status,400);
-    assert.equal(missingApplication.body.error.code,'mail_invalid_headers');
-    const malformedAuthorization=await requestMail(authenticated,{
-        headers:{Authorization:'Basic synthetic-value'},
-        reportKey:'malformed-authorization-key-0001'
-    });
-    assert.equal(malformedAuthorization.response.status,401);
-    assert.equal(malformedAuthorization.body.error.code,'mail_subscription_required');
-    const accepted=await requestMail(authenticated,{
-        reportKey:'valid-subscription-key-0003'
-    });
-    assert.equal(accepted.response.status,202);
-    assert.equal(authenticatedProviderCalls,1);
+test(
+    'mail gateway verifies the exact application and bearer key for a different requester IP',
+    async function testCallerAuthentication(t) {
+        let authenticatedProviderCalls = 0;
+        const authenticated = createGatewayHandler(
+            t,
+            {
+                appId: 'Server diagnostic label / any application',
+                fetchImpl: function countAuthenticatedProviderCall() {
+                    authenticatedProviderCalls += 1;
+                    return defaultFetch();
+                }
+            }
+        );
+        const missing = await requestHandlerMail(
+            authenticated,
+            {subscriptionKey: null}
+        );
+        assert.equal(missing.response.status, 401);
+        assert.equal(missing.body.error.code, 'mail_subscription_required');
+        const mismatch = await requestHandlerMail(
+            authenticated,
+            {subscriptionKey: 'synthetic-wrong-subscription-key-0002'}
+        );
+        assert.equal(mismatch.response.status, 401);
+        assert.equal(mismatch.body.error.code, 'mail_subscription_invalid');
+        const otherApplication = await requestHandlerMail(
+            authenticated,
+            {headers: {'x-mail-app': 'Another application / exact name'}}
+        );
+        assert.equal(otherApplication.response.status, 401);
+        assert.equal(otherApplication.body.error.code, 'mail_subscription_invalid');
+        const missingApplication = await requestHandlerMail(
+            authenticated,
+            {headers: {'x-mail-app': ''}}
+        );
+        assert.equal(missingApplication.response.status, 400);
+        assert.equal(missingApplication.body.error.code, 'mail_invalid_headers');
+        const malformedAuthorization = await requestHandlerMail(
+            authenticated,
+            {headers: {authorization: 'Basic synthetic-value'}}
+        );
+        assert.equal(malformedAuthorization.response.status, 401);
+        assert.equal(malformedAuthorization.body.error.code, 'mail_subscription_required');
+        const accepted = await requestHandlerMail(authenticated);
+        assert.equal(accepted.response.status, 202);
+        assert.equal(authenticatedProviderCalls, 1);
 
-    const shortCredential=await startGateway(t,{
-        verifySubscription:async function verifyShortSubscription({appName,subscriptionKey}){
-            return appName===APP_ID&&subscriptionKey==='x';
-        }
-    });
-    const shortCredentialAccepted=await requestMail(shortCredential,{
-        subscriptionKey:'x',
-        reportKey:'short-subscription-key'
-    });
-    assert.equal(shortCredentialAccepted.response.status,202);
+        const shortCredential = createGatewayHandler(
+            t,
+            {
+                verifySubscription: async function verifyShortSubscription({appName, subscriptionKey}) {
+                    return appName === APP_ID && subscriptionKey === 'x';
+                }
+            }
+        );
+        const shortCredentialAccepted = await requestHandlerMail(
+            shortCredential,
+            {subscriptionKey: 'x'}
+        );
+        assert.equal(shortCredentialAccepted.response.status, 202);
 
-    const unavailableVerifier=await startGateway(t,{
-        verifySubscription:async function rejectUnavailableVerification(){
-            throw new Error('Synthetic subscription service failure');
-        },
-        fetchImpl:function countProviderCallAfterVerificationFailure(){
-            authenticatedProviderCalls+=1;
-            return defaultFetch();
-        }
-    });
-    const unavailable=await requestMail(unavailableVerifier,{
-        reportKey:'unavailable-subscription-service'
-    });
-    assert.equal(unavailable.response.status,503);
-    assert.equal(unavailable.body.error.code,'mail_subscription_verification_failed');
-    assert.equal(unavailable.body.error.retryable,true);
-    assert.equal(unavailable.body.error.retryAfterMs,1_000);
-    assert.equal(authenticatedProviderCalls,1);
+        const unavailableVerifier = createGatewayHandler(
+            t,
+            {
+                verifySubscription: async function rejectUnavailableVerification() {
+                    throw new Error('Synthetic subscription service failure');
+                },
+                fetchImpl: function countProviderCallAfterVerificationFailure() {
+                    authenticatedProviderCalls += 1;
+                    return defaultFetch();
+                }
+            }
+        );
+        const unavailable = await requestHandlerMail(unavailableVerifier);
+        assert.equal(unavailable.response.status, 503);
+        assert.equal(unavailable.body.error.code, 'mail_subscription_verification_failed');
+        assert.equal(unavailable.body.error.retryable, true);
+        assert.equal(unavailable.body.error.retryAfterMs, 1_000);
+        assert.equal(authenticatedProviderCalls, 1);
 
-    const nonBooleanVerifier=await startGateway(t,{
-        verifySubscription:async function returnNonBooleanVerification(){return {active:true};},
-        fetchImpl:function countProviderCallWithoutVerifiedSubscription(){
-            authenticatedProviderCalls+=1;
-            return defaultFetch();
-        }
-    });
-    const nonBoolean=await requestMail(nonBooleanVerifier,{
-        reportKey:'non-boolean-subscription-result'
-    });
-    assert.equal(nonBoolean.response.status,401);
-    assert.equal(nonBoolean.body.error.code,'mail_subscription_invalid');
-    assert.equal(authenticatedProviderCalls,1);
+        const nonBooleanVerifier = createGatewayHandler(
+            t,
+            {
+                verifySubscription: async function returnNonBooleanVerification() {
+                    return {active: true};
+                },
+                fetchImpl: function countProviderCallWithoutVerifiedSubscription() {
+                    authenticatedProviderCalls += 1;
+                    return defaultFetch();
+                }
+            }
+        );
+        const nonBoolean = await requestHandlerMail(nonBooleanVerifier);
+        assert.equal(nonBoolean.response.status, 401);
+        assert.equal(nonBoolean.body.error.code, 'mail_subscription_invalid');
+        assert.equal(authenticatedProviderCalls, 1);
 
-    let unauthenticatedProviderCalls=0;
-    const unconfiguredGateway=await startGateway(t,{
-        verifySubscription:undefined,
-        fetchImpl:function countExplicitNoKeyProviderCall(){
-            unauthenticatedProviderCalls+=1;
-            return defaultFetch();
+        let unauthenticatedProviderCalls = 0;
+        const unconfiguredGateway = createGatewayHandler(
+            t,
+            {
+                verifySubscription: undefined,
+                fetchImpl: function countExplicitNoKeyProviderCall() {
+                    unauthenticatedProviderCalls += 1;
+                    return defaultFetch();
+                }
+            }
+        );
+        assert.equal(unconfiguredGateway.callerAuthentication, 'none');
+        const noKeyAccepted = await requestHandlerMail(
+            unconfiguredGateway,
+            {subscriptionKey: null, headers: {'x-mail-app': ''}}
+        );
+        assert.equal(noKeyAccepted.response.status, 202);
+        const suppliedKey = await requestHandlerMail(unconfiguredGateway);
+        assert.equal(suppliedKey.response.status, 202);
+        assert.equal(unauthenticatedProviderCalls, 2);
+    }
+);
+
+test(
+    'mail gateway skips subscription verification only for equal nonempty connection IPs',
+    async function testSameIpSubscriptionBoundary(t) {
+        let verificationCalls = 0;
+        let providerCalls = 0;
+        const handler = createGatewayHandler(
+            t,
+            {
+                verifySubscription: function rejectDifferentRequester() {
+                    verificationCalls += 1;
+                    return false;
+                },
+                fetchImpl: function countSameIpProviderCall() {
+                    providerCalls += 1;
+                    return defaultFetch();
+                }
+            }
+        );
+        const sameIps = ['192.0.2.10', '2001:db8::10', '::ffff:192.0.2.10', '127.0.0.1', '::1'];
+        for (const ip of sameIps) {
+            const accepted = await requestHandlerMail(
+                handler,
+                {
+                    headers: {'x-mail-app': ''},
+                    socket: {remoteAddress: ip, localAddress: ip},
+                    subscriptionKey: null
+                }
+            );
+            assert.equal(accepted.response.status, 202, ip);
+            assert.equal(accepted.body.providerId, ACCEPTED_PROVIDER_ID);
         }
-    });
-    assert.equal(
-        unconfiguredGateway.callerAuthentication,
-        'none'
-    );
-    const noKeyAccepted=await requestMail(unconfiguredGateway,{
-        subscriptionKey:null,
-        headers:{'X-Mail-App':''},
-        reportKey:'unconfigured-verifier-no-key-0001'
-    });
-    assert.equal(noKeyAccepted.response.status,202);
-    const suppliedKey=await requestMail(unconfiguredGateway,{
-        reportKey:'unconfigured-verifier-supplied-key-0002'
-    });
-    assert.equal(suppliedKey.response.status,202);
-    assert.equal(unauthenticatedProviderCalls,2);
-});
+        assert.equal(verificationCalls, 0);
+        assert.equal(providerCalls, sameIps.length);
+
+        const invalidKeyAccepted = await requestHandlerMail(
+            handler,
+            {
+                socket: {remoteAddress: '192.0.2.10', localAddress: '192.0.2.10'},
+                subscriptionKey: 'synthetic-invalid-subscription-key'
+            }
+        );
+        assert.equal(invalidKeyAccepted.response.status, 202);
+        assert.equal(invalidKeyAccepted.body.providerId, ACCEPTED_PROVIDER_ID);
+        assert.equal(verificationCalls, 0);
+        assert.equal(providerCalls, sameIps.length + 1);
+
+        const otherPeers = [
+            {remoteAddress: '192.168.1.20', localAddress: '192.168.1.10'},
+            {remoteAddress: '192.0.2.20', localAddress: '192.0.2.10'},
+            {remoteAddress: '2001:db8::20', localAddress: '2001:db8::10'},
+            {remoteAddress: '::ffff:192.0.2.20', localAddress: '::ffff:192.0.2.10'},
+            {remoteAddress: '192.0.2.10'},
+            {localAddress: '192.0.2.10'},
+            {remoteAddress: '', localAddress: ''},
+            {},
+            null
+        ];
+        for (const socket of otherPeers) {
+            const missingKey = await requestHandlerMail(
+                handler,
+                {socket, subscriptionKey: null}
+            );
+            assert.equal(missingKey.response.status, 401);
+            assert.equal(missingKey.body.error.code, 'mail_subscription_required');
+            const unverified = await requestHandlerMail(
+                handler,
+                {socket}
+            );
+            assert.equal(unverified.response.status, 401);
+            assert.equal(unverified.body.error.code, 'mail_subscription_invalid');
+        }
+        assert.equal(verificationCalls, otherPeers.length);
+        assert.equal(providerCalls, sameIps.length + 1);
+
+        const forwardedClaim = await requestHandlerMail(
+            handler,
+            {
+                headers: {
+                    host: '192.0.2.10',
+                    'x-forwarded-for': '192.0.2.10',
+                    forwarded: 'for=192.0.2.10'
+                },
+                socket: {remoteAddress: '192.0.2.20', localAddress: '192.0.2.10'}
+            }
+        );
+        assert.equal(forwardedClaim.response.status, 401);
+        assert.equal(forwardedClaim.body.error.code, 'mail_subscription_invalid');
+        assert.equal(verificationCalls, otherPeers.length + 1);
+        assert.equal(providerCalls, sameIps.length + 1);
+    }
+);
 
 test('mail gateway answers only an exact allowed CORS preflight',async function testCorsPreflight(t){
     let providerCalls=0;
@@ -1122,37 +1340,47 @@ test('complete long request and provider response bodies are accepted',async fun
     assert.deepEqual(providerReport.metadata,{complete:'Synthetic provider-neutral extension.'});
 });
 
-test('closing the gateway cancels subscription verification before a provider attempt',async function testVerificationCancellation(t){
-    const entered=deferred();
-    const verifierAborted=deferred();
-    let providerCalls=0;
-    const instance=await startResendMailServer(gatewayOptions({
-        verifySubscription:function waitForVerificationCancellation({signal}){
-            entered.resolve();
-            return new Promise(function holdVerification(resolve,reject){
-                signal.addEventListener('abort',function rejectCancelledVerification(){
-                    verifierAborted.resolve();
-                    reject(signal.reason);
-                },{once:true});
-            });
-        },
-        fetchImpl:function countProviderAttemptBeforeVerification(){
-            providerCalls+=1;
-            return defaultFetch();
-        }
-    }));
-    t.after(function ensureVerificationGatewayClosed(){return instance.close();});
-    const request=requestMail(instance,{reportKey:'verification-cancellation-key-0001'});
-    await entered.promise;
-    const closing=instance.close();
-    await verifierAborted.promise;
-    const result=await request;
-    assert.equal(result.response.status,408);
-    assert.equal(result.body.error.code,'mail_request_cancelled');
-    assert.equal(providerCalls,0);
-    await closing;
-    await instance.lifecycle;
-});
+test(
+    'closing the handler cancels a different-IP subscription verification before a provider attempt',
+    async function testVerificationCancellation(t) {
+        const entered = deferred();
+        const verifierAborted = deferred();
+        let providerCalls = 0;
+        const handler = createGatewayHandler(
+            t,
+            {
+                verifySubscription: function waitForVerificationCancellation({signal}) {
+                    entered.resolve();
+                    return new Promise(
+                        function holdVerification(resolve, reject) {
+                            signal.addEventListener(
+                                'abort',
+                                function rejectCancelledVerification() {
+                                    verifierAborted.resolve();
+                                    reject(signal.reason);
+                                },
+                                {once: true}
+                            );
+                        }
+                    );
+                },
+                fetchImpl: function countProviderAttemptBeforeVerification() {
+                    providerCalls += 1;
+                    return defaultFetch();
+                }
+            }
+        );
+        const request = requestHandlerMail(handler);
+        await entered.promise;
+        const closing = handler.close();
+        await verifierAborted.promise;
+        const result = await request;
+        assert.equal(result.response.status, 408);
+        assert.equal(result.body.error.code, 'mail_request_cancelled');
+        assert.equal(providerCalls, 0);
+        await closing;
+    }
+);
 
 test('closing the gateway aborts active provider work and drains lifecycle',async function testCancellationAndDrain(t){
     const entered=deferred();

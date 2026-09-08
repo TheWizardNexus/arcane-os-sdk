@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.25.0
+
+- Automatically skip configured mail subscription verification when the actual
+  requester connection IP equals the server-side IP of that connection. This
+  lets services sharing that IP and local development send without a subscription
+  key. Other requester IPs, including other intranet machines, still use the
+  configured verification callback.
+- Use native connection addresses for HTTP/1 and HTTP/2, with no environment
+  setting, domain lookup, forwarded-header interpretation, or special loopback rule.
+  Preserve CORS, report handling, provider delivery, and existing caller APIs.
+- Document the IP rule and its purpose gates; update focused test source for
+  the exemption and the remaining subscription-verification paths.
+
 ## 0.24.1
 
 - Add a mail CLI parameter table with command scope, purpose, and defaults.
