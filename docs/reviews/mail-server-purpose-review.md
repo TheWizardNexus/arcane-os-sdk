@@ -457,3 +457,53 @@ payloads, profiles, other settings and lifecycle remain unchanged.
 
 Existing credential and CLI test fixtures now use the selected name. Source
 and diff were reviewed; local tests, checks and server execution were not run.
+
+## Capability configuration and secret separation follow-up
+
+The selected outcome is one app-authored mail configuration in
+`arcane.config.json.mail`, with Resend credentials in ignored
+`.arcane.env.json.mail`. The SDK owns reading and applying these settings through
+the existing CLI/toolchain mail operation. Domains, senders, certificates, and
+provider accounts remain deployment-owned data. This increment begins the
+named-capability configuration convention with mail; it does not migrate other
+capabilities or consumer files.
+
+The source audit found no existing `arcane.config.json` reader to reuse. The
+workspace loader owns `arcane-packager.json`, descriptors, and application
+layout. Requiring that loader to start a mail listener would add unrelated work.
+The existing mail JSON reader is the reusable boundary for the two selected
+files. Their explicit precedence and credential compatibility rules are in the
+[mail reference](../reference/mail.md#operate-the-cli-and-gateway).
+
+| Method or action | Gates | Decision, callers, and concrete purpose |
+| --- | --- | --- |
+| `readMailConfiguration` | Y/Y/N | Keep the cohesive configuration at the SDK owner. Send/serve read each required file once, in parallel when both are needed. A send with an injected credential reader skips the unused secrets file; incoming HTTP requests use the resolved configuration without file reads. Other capability settings stay untouched. |
+| CLI's early default host, port, and send/serve profile values | Y/Y/Y | Remove premature default assignment. The same defaults remain after file configuration resolves, while explicit CLI values retain priority. Assigning defaults before reading JSON would conceal the deployment's chosen settings. |
+| `origins` string array and list replacement | Y/Y/N | Keep one exact list for multiple caller domains. Explicit options replace the file list, including empty arrays. Existing `origin`, `allowTo`, `errorTo`, and `requestTimeout` aliases remain compatible and win over their canonical programmatic names when both are supplied. No normalization or list-merging helper is needed. |
+| Root provider-key, named-profile, and TLS compatibility | Y/Y/N | Preserve live deployments using `RESEND_API_KEY`, `MAIL_PROFILES`, `MAIL_TLS_CERT_PATH`, and `MAIL_TLS_KEY_PATH`. Nested selected key presence takes priority even when null or empty. Named profiles never select a different account's default key. |
+| Key set/status/delete operations | Y/Y/N | Preserve credential management and secret-free status. New keys use the nested member; existing legacy keys are updated in place unless a nested key exists. Delete removes both selected representations to prevent an old credential reappearing, preserving other keys, settings, and profile containers. Key commands still default to `mail` independently of the serving profile. |
+| Send configuration | Y/Y/N | Use the same profile, sender, provider-timeout, and retry-guidance settings for direct sending. A send needs provider authority and its report, so listener certificates remain a serve-only prerequisite. Reports and idempotency keys remain per-operation inputs. |
+| Explicit runtime dependencies and callbacks | Y/Y/N | Preserve `readCredential`, provider injection, observation, cancellation, and subscription callbacks as programmatic inputs. A function or signal is not JSON configuration. The portable browser mail import retains its existing dependency boundary. |
+| Shared sender omission | Y/Y/N | Preserve per-report `from` and provider-template sender selection when no shared override is configured. One listener can therefore serve independent application sender identities. |
+| Origin rejection behavior and explanation | Y/Y/N | Document the existing `403 mail_origin_not_allowed`, exact current-authority default, acceptance without Origin, and absence of IP filtering or loopback exceptions. This clarifies the retained behavior without adding admission policy. |
+| New provider selector, per-field helper hierarchy, consumer parser, CLI-generation layer, automatic migration, watcher, and request-time config reads | N/N/Y | Add none. Resend is the sole implemented provider, the selected settings fit one owner, and existing CLI/API options express overrides. These additions would increase work without changing the requested outcome. |
+
+The operation graph is at most two asynchronous JSON reads and one selected
+credential per send/serve invocation, followed by its existing provider attempt
+or listener lifecycle. A send with an injected credential reader reads only
+`arcane.config.json` and calls that reader once. Key operations retain one
+credential-file read and a write only when
+the requested set/delete needs one. Certificate contents are still loaded by
+the published HTTP server module. No dependency, process, polling loop, cache,
+or application/host fan-out is introduced. These are source-level work counts,
+not measured performance claims.
+
+The compatibility audit traces the CLI into `executeMailCommand`, the public
+`createToolchain().mail(...)` / `executeOperation('mail', ...)` entry points,
+credential CRUD, direct send, and serve. The complete report and provider-result
+paths are preserved. Configuration paths use the same portable Node filesystem
+contract on Windows, Linux, and macOS, with a compatible Node host as the Android
+adaptation. Local tests, checks, server launches, live mail sends, and platform
+execution were not performed by this documentation author. Selected package
+verification and publication outcomes belong to the release owner's delivery
+record.

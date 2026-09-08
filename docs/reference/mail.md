@@ -272,31 +272,78 @@ committed acceptance result.
 
 ## Operate the CLI and gateway
 
-Create `.arcane.env.json` in the directory from which the mail command runs, then fill
-in the provider key and the HTTPS certificate paths:
+Keep app-supplied SDK settings under named capability members, starting with
+`mail`. Put the nonsecret mail settings in `arcane.config.json` in the directory
+from which the command runs:
 
 ```json
 {
-  "RESEND_API_KEY": "",
-  "MAIL_TLS_CERT_PATH": "",
-  "MAIL_TLS_KEY_PATH": ""
+  "mail": {
+    "host": "0.0.0.0",
+    "port": 4433,
+    "origins": [
+      "https://dragons.example",
+      "https://www.dragons.example"
+    ],
+    "profile": "mail",
+    "certPath": "certificates/fullchain.pem",
+    "keyPath": "certificates/private-key.pem"
+  }
+}
+```
+
+Put the Resend provider key in the separate `.arcane.env.json`:
+
+```json
+{
+  "mail": {
+    "apiKey": ""
+  }
 }
 ```
 
 The SDK repository ignores `.arcane.env.json`. Keep the same entry in a consuming
-project's `.gitignore`. This is a JSON configuration file; the mail commands
-read it directly without copying its contents into `process.env`.
+project's `.gitignore`. `arcane.config.json` contains settings suitable for source
+control; its certificate fields contain file paths, never PEM contents or provider
+keys. Both files are read directly as JSON without copying values into
+`process.env`. Other top-level capability members remain untouched. The portable
+browser `arcane-os/mail` import does not read these Node-side files.
 
-The default profile is `mail`, which selects top-level `RESEND_API_KEY`.
-The explicit `--profile mail` form selects the same setting. Other profile names
-select exact entries under `MAIL_PROFILES`:
+The supported `arcane.config.json.mail` fields are:
+
+| Field | Type | Purpose and default |
+| --- | --- | --- |
+| `host` | string | Listener bind address; defaults to `0.0.0.0`. |
+| `port` | integer | Listener port; defaults to `4433`. Explicit `0` selects an available port. |
+| `origins` | string array | Exact allowed browser origins. An absent or empty list uses the current request authority as described below. |
+| `profile` | string | Resend credential profile for send/serve; defaults to `mail`. |
+| `from` | string | Optional shared sender override. Omit it to retain each report's sender or provider template default. |
+| `appId` | string | Optional server event label; does not restrict incoming application names. |
+| `recipientAllowlist` | string array | Optional allowed recipients; absent or empty means unrestricted recipients. |
+| `errorRecipients` | string array | Error-report fallback recipients; defaults to the effective recipient allowlist. An explicit empty array supplies no fallback. |
+| `bodyTimeoutMs` | integer or null | Optional request-body deadline in milliseconds; absent or null adds no deadline. |
+| `providerTimeoutMs` | integer or null | Optional provider deadline in milliseconds; absent or null adds no deadline. |
+| `retryableDelayMs` | positive integer | Retry guidance in a retryable result; defaults to `1000`. It does not schedule a retry. |
+| `certPath` | string | PEM certificate-chain file path, required for gateway HTTPS. |
+| `keyPath` | string | PEM private-key file path, required for gateway HTTPS. |
+
+Resend is the supported provider; no provider selector is needed. Keep callbacks,
+injected providers, `fetchImpl`, `onEvent`, `requestIdFactory`,
+`verifySubscription`, and `AbortSignal` values in programmatic options. They are
+runtime inputs, not JSON settings. Reports and their idempotency keys remain
+inputs to each send operation.
+
+The default credential profile `mail` selects `.arcane.env.json.mail.apiKey`.
+Other profile names select exact entries in `.arcane.env.json.mail.profiles`:
 
 ```json
 {
-  "RESEND_API_KEY": "",
-  "MAIL_PROFILES": {
-    "another-provider-account": {
-      "RESEND_API_KEY": ""
+  "mail": {
+    "apiKey": "",
+    "profiles": {
+      "another-provider-account": {
+        "apiKey": ""
+      }
     }
   }
 }
@@ -304,19 +351,50 @@ select exact entries under `MAIL_PROFILES`:
 
 An absent named profile does not fall back to the default key. The profile
 selects Resend provider credentials; it is separate from the incoming
-application name and subscriber key.
+application name and subscriber key. Existing top-level `RESEND_API_KEY` and
+`MAIL_PROFILES[profile].RESEND_API_KEY` remain supported. A nested selected
+`apiKey` takes precedence when the property exists, including null or an empty
+string, which means the selected key is absent. Only an absent nested key
+property permits fallback to the corresponding legacy key.
 
-Programmatic operations resolve `.arcane.env.json` from `options.cwd`, then
+Programmatic operations resolve both files from `options.cwd`, then
 `options.workspaceRoot`, then `process.cwd()`, choosing the first supplied
 directory. The CLI uses its invocation directory. There is no upward directory
 search or dependency on a Windows installation directory or temporary-directory
-environment variable.
+environment variable. Missing files are optional configuration sources; send and
+serve still report their missing required values before attempting delivery or
+binding. Malformed or unreadable files produce an error.
+
+Configuration precedence is explicit:
+
+1. A CLI/API option overrides its file setting when its value is not `undefined`.
+   An explicit null retains the option's existing meaning; it does not select
+   the file value again.
+2. `arcane.config.json.mail` supplies nonsecret settings absent from those options.
+3. Legacy `.arcane.env.json` root `MAIL_TLS_CERT_PATH` and `MAIL_TLS_KEY_PATH`
+   supply certificate paths absent from the selected options and config member.
+4. Remaining settings use the defaults above.
+
+The existing programmatic aliases `origin`, `allowTo`, `errorTo`, and
+`requestTimeout` take precedence over their corresponding canonical options
+`origins`, `recipientAllowlist`, `errorRecipients`, and `providerTimeoutMs` when
+both are supplied. The CLI continues to expose `--origin`, `--allow-to`, and
+`--request-timeout`. `origin` accepts a string or an array; the recipient aliases
+accept address arrays or comma-separated strings. Lists replace the lower-priority
+list completely. The configuration reader does not concatenate or deduplicate
+lists, rewrite case, or automatically add local addresses.
+
+Use the JSON `origins` array for multiple origins. Repeating the current
+`--origin` option keeps only its last value; there is no `--origins` CLI option.
+The CLI leaves omitted host, port, and send/serve profile options unset until
+configuration resolves, so its defaults do not mask file settings.
 
 Keep the configuration in the deployment directory even when the SDK is nested
 below it:
 
 ```text
 my-site/
+├── arcane.config.json
 ├── .arcane.env.json
 └── arcane-os-sdk/
     └── bin/arcane.mjs
@@ -325,13 +403,15 @@ my-site/
 Run from `my-site`, for example:
 
 ```sh
-node ./arcane-os-sdk/bin/arcane.mjs mail serve --port 4433
+node ./arcane-os-sdk/bin/arcane.mjs mail serve
 ```
 
 The SDK directory does not choose the configuration location. When upgrading
 from SDK 0.22.1 or earlier, rename the existing `.env.json` to
 `.arcane.env.json` in the invocation directory, preserving its contents.
-The loader reads only `.arcane.env.json`.
+The secret loader reads only `.arcane.env.json`; it does not read the old filename.
+Existing root key, profile, and TLS fields can remain in that file. Adopting the
+capability members does not perform an automatic rewrite or migration.
 
 The existing key commands manage the same file:
 
@@ -343,8 +423,14 @@ arcane mail key delete
 
 `key set` prompts with hidden input. `--secret-stdin` is the explicit
 non-interactive alternative and rejects a TTY. Each command accepts an optional
-profile argument, defaulting to `mail`. Set and delete preserve other JSON
-settings and profiles; status reports existence without returning the key.
+profile argument, defaulting to `mail` independently of `arcane.config.json.mail.profile`.
+Set and delete preserve other JSON settings and profiles; status reports
+existence without returning the key. A new credential is written to the nested
+mail member. An existing legacy credential is updated at its existing location
+unless the selected nested key property exists, in which case set updates that
+nested property. Delete removes both representations of only the selected key,
+so an older key cannot reappear through fallback. Other settings and profile
+containers remain intact.
 Results identify `storage: '.arcane.env.json'`. An already-absent deletion succeeds
 with `exists: false`.
 
@@ -379,19 +465,28 @@ cancellation after the provider attempt begins is returned as an ambiguous
 nonzero outcome because the provider may already have accepted the request.
 Cancellation before the attempt exits 130 without sending.
 For both CLI mail operations, `--request-timeout` accepts 1 through 2147483647
-milliseconds, the Node timer range. When omitted, the SDK adds no provider
-deadline.
+milliseconds, the Node timer range. The same range applies to configured body
+and provider deadlines. When no provider timeout is selected in options or
+configuration, the SDK adds no provider deadline.
+
+`mail send` consumes the selected profile, sender, provider timeout, and retry
+guidance from the same configuration. It does not require gateway TLS paths.
+Send and serve read each required JSON file once, concurrently when both are
+needed, before consuming their settings. An injected `readCredential` remains
+the credential owner and reads once. With that injection, send reads only
+`arcane.config.json`; serve also reads `.arcane.env.json` for legacy TLS paths
+without interpreting its unused file credential.
 
 Start the gateway:
 
 ```text
-npm exec -- arcane mail serve --profile mail --host 0.0.0.0 --port 4433
+npm exec -- arcane mail serve
 ```
 
-The default listener is `0.0.0.0:4433`; `--host` and `--port` select its bind
-address and port. The server can serve callers from multiple domains on the
-same machine. Route the page's `/v1/mail` to this listener, or configure an
-explicit shared endpoint in the caller.
+The default listener is `0.0.0.0:4433`; `mail.host` and `mail.port` select its
+configured bind address and port, and explicit `--host` / `--port` override them.
+The server can serve callers from multiple domains on the same machine.
+Configure the caller's endpoint to reach that listener.
 
 `mail serve` uses HTTPS with HTTP/2 on that selected port. The published
 `node-http-server` PEM API owns TLS and negotiates HTTP/2 or HTTP/1.1 on the
@@ -399,25 +494,29 @@ same listener. It creates no additional plain-HTTP listener. The returned URL
 uses `https://`; `0.0.0.0` is the bind address, so callers use the deployed
 domain, for example `https://mail.example.com:4433/v1/mail`.
 
-Set `MAIL_TLS_CERT_PATH` to the PEM certificate chain and `MAIL_TLS_KEY_PATH`
-to its PEM private-key file. These top-level settings belong to the listener
-and apply regardless of the selected provider profile. Relative paths resolve
-from the directory containing `.arcane.env.json`; absolute paths are also accepted.
+Set `arcane.config.json.mail.certPath` to the PEM certificate chain and
+`mail.keyPath` to its PEM private-key file. These settings belong to the listener
+and apply regardless of the selected provider profile. The legacy root
+`MAIL_TLS_CERT_PATH` and `MAIL_TLS_KEY_PATH` fields in `.arcane.env.json` remain
+fallbacks. Relative certificate paths resolve from the selected configuration
+directory, including explicit programmatic path options; absolute paths are also accepted.
 The certificate must cover the hostname callers use. One certificate may
 cover multiple names; the gateway does not require one certificate per calling
 application. Keep private-key files outside tracked source, such as in the
 already-ignored `.arcane/` directory or an existing host certificate directory.
 
-Startup reads the JSON configuration once, reports missing TLS settings before
+Startup reads each JSON file once, reports missing TLS settings before
 binding, and lets the TLS owner report unreadable or unusable PEM files. It
 does not generate certificates, modify system trust, or add a renewal watcher.
+No JSON configuration file is reread for an incoming HTTP request.
 Restart the gateway after the configured certificate files are renewed.
 The same Node file and TLS APIs are used on Windows, Linux, and macOS; Android
 requires a compatible Node host and accessible configuration and certificate
 paths. These platform contracts are separate from actual platform execution.
 
 The public `createToolchain().mail({action: 'serve', ...options})` operation
-uses the same JSON certificate pair. Internally, `startResendMailServer` accepts
+uses the same settings with explicit options taking precedence. Internally,
+`startResendMailServer` accepts
 `certPath` and `keyPath` and retains its existing HTTP behavior when neither
 is supplied. That internal function is not an npm package export.
 
@@ -429,18 +528,25 @@ The existing listener remains running; this launch does not retry or select
 another port.
 
 `--app` is an optional server event label and does not restrict incoming
-application names. `--from` is an optional shared sender override; omit it to
-preserve each report's sender or its provider template's default.
-`--origin` selects an exact allowed caller origin; the
-programmatic `origin` option also accepts an array for multiple origins. With
-no origins configured, the gateway accepts an Origin matching its request
+application names. `--from` and `mail.from` are optional shared sender overrides;
+omit both to preserve each report's sender or its provider template's default.
+`mail.origins` supplies an array of exact allowed caller origins. An explicit
+`--origin` replaces that array; the programmatic `origin` alias also accepts an
+array. With no origins configured, the gateway accepts an Origin matching its request
 authority (`:authority` for HTTP/2, `Host` for HTTP/1.1) using HTTP or HTTPS.
-Requests without Origin continue normally.
+An Origin outside the configured list or current-authority default receives
+`403 mail_origin_not_allowed`. Origin strings are compared exactly: include the
+scheme and any nondefault port, with no path or trailing slash. There are no
+wildcards, subdomain expansion, normalization, or loopback exceptions.
+Requests without an `Origin` header continue normally. This is a declared-origin
+CORS list, not a client-IP or connecting-machine allowlist; ordinary
+server-to-server requests commonly omit Origin.
 Cross-origin preflight permits `Content-Type`, `Idempotency-Key`, `X-Mail-App`,
-and `Authorization`. This is origin configuration, not a loopback policy.
+and `Authorization`.
 
-`--allow-to` explicitly limits recipients when supplied. With it omitted, the
-gateway imposes no recipient allowlist. When configured, the list applies to
+`mail.recipientAllowlist` or explicit `--allow-to` limits recipients when
+configured. An absent or empty effective list imposes no recipient allowlist.
+When configured, the list applies to
 every recipient in the resolved `to`, `cc`, and `bcc` fields, whether supplied
 as a string or an array. Sender, recipient, subject, and body
 values are not trimmed, lowercased, or filtered by an SDK email grammar at

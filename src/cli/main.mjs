@@ -86,7 +86,7 @@ Usage:
   ${CLI_NAME} mail key delete [profile]
   ${CLI_NAME} mail send [--profile <profile>] [--from <address>] --report-key <id> --report-stdin [--request-timeout <ms>]
   ${CLI_NAME} mail serve [--profile <profile>] [--from <address>] [--app <label>] [--origin <origin>] [--allow-to <addresses>] [--host 0.0.0.0] [--port 4433] [--request-timeout <ms>]
-    HTTPS/HTTP2; .arcane.env.json supplies RESEND_API_KEY, MAIL_TLS_CERT_PATH, and MAIL_TLS_KEY_PATH.
+    HTTPS/HTTP2; arcane.config.json.mail supplies settings; .arcane.env.json supplies keys.
 
 Development:
   --public                      Bind dev to all IPv4 interfaces (0.0.0.0) and print network URLs.
@@ -692,13 +692,13 @@ function operationOptions(command,parsed,cwd){
             return {
                 action:'serve',
                 cwd,
-                profile:values.profile??'mail',
+                profile:values.profile,
                 from:values.from,
                 appId:values.app,
                 origin:values.origin,
                 allowTo:values['allow-to'],
-                host:values.host??'0.0.0.0',
-                port:readPort(values.port,4433),
+                host:values.host,
+                port:readPort(values.port),
                 requestTimeout:readMailRequestTimeout(values['request-timeout']),
             };
         }
@@ -721,7 +721,7 @@ function operationOptions(command,parsed,cwd){
             return {
                 action:'send',
                 cwd,
-                profile:values.profile??'mail',
+                profile:values.profile,
                 from:values.from,
                 reportKey:values['report-key'],
                 reportStdin:true,

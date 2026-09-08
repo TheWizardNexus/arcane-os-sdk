@@ -5,7 +5,7 @@ import {
     getMailCredentialStatus,
     mailCredentialLocation,
     readMailCredential,
-    readMailServerSettings,
+    readMailConfiguration,
     setMailCredential
 } from './mail-credentials.mjs';
 import {sendResendMail,startResendMailServer} from './mail-server.mjs';
@@ -62,6 +62,12 @@ function mailCredentialOptions(options){
     };
 }
 
+function configuredMailOption(options, settings, name, alias = name) {
+    if (options[alias] !== undefined) return options[alias];
+    if (options[name] !== undefined) return options[name];
+    return settings[name];
+}
+
 async function setMailCredentialFromInput(options){
     const readSecret=resolveMailCommandDependency(options,'readSecret',null);
     const store=resolveMailCommandDependency(options,'setCredential',setMailCredential);
@@ -94,20 +100,23 @@ async function sendMailFromReport(options){
     throwIfAborted(options.signal);
     const report=await readReport();
     throwIfAborted(options.signal);
-    let apiKey=await readMailProviderKey(options);
+    const readConfiguration=resolveMailCommandDependency(options,'readServerSettings',readMailConfiguration);
+    const mailSettings=await readConfiguration(options);
+    throwIfAborted(options.signal);
+    let apiKey=await readMailProviderKey(options,mailSettings);
     try{
         throwIfAborted(options.signal);
         const result=await send({
             apiKey,
             appId:'arcane-cli',
             fetchImpl:options.fetchImpl,
-            from:options.from,
+            from:configuredMailOption(options,mailSettings,'from'),
             onEvent:options.onEvent,
-            providerTimeoutMs:options.requestTimeout,
+            providerTimeoutMs:configuredMailOption(options,mailSettings,'providerTimeoutMs','requestTimeout'),
             report,
             reportKey:options.reportKey,
             requestIdFactory:options.requestIdFactory,
-            retryableDelayMs:options.retryableDelayMs,
+            retryableDelayMs:configuredMailOption(options,mailSettings,'retryableDelayMs'),
             signal:options.signal
         });
         if(result?.classification==='accepted'&&result.status==='accepted'){
@@ -126,16 +135,21 @@ async function sendMailFromReport(options){
     }
 }
 
-async function readMailProviderKey(options, serverSettings){
-    const credentialOptions=mailCredentialOptions(options);
-    const apiKey = serverSettings !== undefined && (options.readCredential ?? null) === null
-        ? serverSettings.apiKey
+async function readMailProviderKey(options, mailSettings){
+    const credentialOptions=mailCredentialOptions(
+        {...options,profile:options.profile??mailSettings?.profile}
+    );
+    const apiKey = mailSettings !== undefined && (options.readCredential ?? null) === null
+        ? mailSettings.apiKey
         : await resolveMailCommandDependency(options, 'readCredential', readMailCredential)(credentialOptions);
     if(apiKey===null){
         const location=mailCredentialLocation(credentialOptions);
+        const nestedSetting = location.profile === 'mail'
+            ? 'mail.apiKey'
+            : `mail.profiles[${JSON.stringify(location.profile)}].apiKey`;
         throw new ArcaneError(
             ERROR_CODES.prerequisiteMissing,
-            `Missing ${location.setting} in ${location.filePath}.`
+            `Missing ${location.setting} or ${nestedSetting} in ${location.filePath}.`
         );
     }
     if(!is.string(apiKey)||!apiKey){
@@ -149,11 +163,9 @@ async function readMailProviderKey(options, serverSettings){
 
 async function serveMailGateway(options){
     const startServer=resolveMailCommandDependency(options,'startServer',startResendMailServer);
-    const readServerSettings = resolveMailCommandDependency(options, 'readServerSettings', readMailServerSettings);
+    const readServerSettings = resolveMailCommandDependency(options, 'readServerSettings', readMailConfiguration);
     throwIfAborted(options.signal);
-    const serverSettings = await readServerSettings(
-        {...mailCredentialOptions(options), readCredential: options.readCredential}
-    );
+    const serverSettings = await readServerSettings(options);
     throwIfAborted(options.signal);
     let apiKey=await readMailProviderKey(options, serverSettings);
     try{
@@ -165,32 +177,36 @@ async function serveMailGateway(options){
             const location = mailCredentialLocation(options);
             throw new ArcaneError(
                 ERROR_CODES.prerequisiteMissing,
-                `Missing ${missingSettings.join(', ')} in ${location.filePath}. Mail HTTPS requires a certificate and private key.`
+                `Missing ${missingSettings.join(', ')} in ${location.filePath}, or the corresponding mail.certPath/mail.keyPath in arcane.config.json. Mail HTTPS requires a certificate and private key.`
             );
         }
-        const recipientAllowlist=mailRecipientOptions(options.allowTo,'allowTo');
-        const errorRecipients=options.errorTo===undefined
+        const recipientAllowlist=mailRecipientOptions(
+            configuredMailOption(options,serverSettings,'recipientAllowlist','allowTo'),'recipientAllowlist'
+        );
+        const errorTo=configuredMailOption(options,serverSettings,'errorRecipients','errorTo');
+        const errorRecipients=errorTo===undefined
             ? recipientAllowlist
-            : mailRecipientOptions(options.errorTo,'errorTo');
+            : mailRecipientOptions(errorTo,'errorRecipients');
+        const origins=configuredMailOption(options,serverSettings,'origins','origin');
         return await startServer({
             apiKey,
-            appId:options.appId,
-            allowedOrigins:options.origin===undefined
+            appId:configuredMailOption(options,serverSettings,'appId'),
+            allowedOrigins:origins===undefined
                 ?[]
-                :is.array(options.origin)?[...options.origin]:[options.origin],
-            bodyTimeoutMs:options.bodyTimeoutMs,
+                :is.array(origins)?[...origins]:[origins],
+            bodyTimeoutMs:configuredMailOption(options,serverSettings,'bodyTimeoutMs'),
             certPath:serverSettings.certPath,
             errorRecipients,
             fetchImpl:options.fetchImpl,
-            from:options.from,
-            host:options.host??'0.0.0.0',
+            from:configuredMailOption(options,serverSettings,'from'),
+            host:configuredMailOption(options,serverSettings,'host')??'0.0.0.0',
             keyPath:serverSettings.keyPath,
             onEvent:options.onEvent,
-            port:options.port,
-            providerTimeoutMs:options.requestTimeout,
+            port:configuredMailOption(options,serverSettings,'port'),
+            providerTimeoutMs:configuredMailOption(options,serverSettings,'providerTimeoutMs','requestTimeout'),
             recipientAllowlist,
             requestIdFactory:options.requestIdFactory,
-            retryableDelayMs:options.retryableDelayMs,
+            retryableDelayMs:configuredMailOption(options,serverSettings,'retryableDelayMs'),
             signal:options.signal,
             verifySubscription:options.verifySubscription
         });

@@ -130,7 +130,7 @@ test('mail CLI never reports accidental positional or unknown-option secrets',as
     }
 });
 
-test('mail serve defaults to all interfaces without reading an app key',async function mailServeDefaults(){
+test('mail serve leaves configuration defaults to the mail owner without reading an app key',async function mailServeDefaults(){
     const stdin=Readable.from([]);
     const stdout=memoryStream();
     const stderr=memoryStream();
@@ -152,10 +152,10 @@ test('mail serve defaults to all interfaces without reading an app key',async fu
         stderr:stderr.stream,
         execute:async function startMailWithoutInput(command,options){
             assert.equal(command,'mail');
-            assert.equal(options.profile,'mail');
+            assert.equal(options.profile,undefined);
             assert.equal(options.cwd,path.resolve('synthetic-mail-workspace'));
-            assert.equal(options.host,'0.0.0.0');
-            assert.equal(options.port,4433);
+            assert.equal(options.host,undefined);
+            assert.equal(options.port,undefined);
             assert.equal(options.appId,undefined);
             assert.equal(options.from,undefined);
             assert.equal(options.origin,undefined);
@@ -163,8 +163,8 @@ test('mail serve defaults to all interfaces without reading an app key',async fu
             return {
                 target:'mail',
                 mode:'mail',
-                host:options.host,
-                port:options.port,
+                host:'0.0.0.0',
+                port:4433,
                 url:'https://0.0.0.0:4433/v1/mail',
                 callerAuthentication:'none',
                 lifecycle:Promise.resolve(),
@@ -298,7 +298,7 @@ test('mail serve reports the missing JSON setting before opening its listener',a
     });
     assert.equal(exitCode,1);
     assert.equal(started,false);
-    assert.match(parseNdjson(stdout.read()).at(-1).data.error.message,/Missing RESEND_API_KEY in .*\.arcane\.env\.json/u);
+    assert.match(parseNdjson(stdout.read()).at(-1).data.error.message,/Missing .*RESEND_API_KEY.*\.arcane\.env\.json/u);
 });
 
 test('mail rejects a request timeout outside the Node timer range before execution',async function invalidMailTimeout(){
@@ -429,7 +429,8 @@ test(
             ),
             function inspectMissingTlsSettings(error) {
                 assert.equal(error.code, 'ARCANE_PREREQUISITE_MISSING');
-                assert.match(error.message, /Missing MAIL_TLS_CERT_PATH, MAIL_TLS_KEY_PATH in .*\.arcane\.env\.json/u);
+                assert.match(error.message, /Missing .*certPath.*keyPath/u);
+                assert.match(error.message, /MAIL_TLS_CERT_PATH, MAIL_TLS_KEY_PATH/u);
                 assert.equal(error.message.includes(secret), false);
                 return true;
             }
@@ -720,3 +721,274 @@ test('mail send controller preserves complete ambiguous outcome detail without c
         }
     );
 });
+
+test(
+    'mail serve CLI consumes the SDK configuration files without masking their settings',
+    async function mailServeCliConfiguration(context) {
+        const cwd = await temporaryDirectory(context);
+        const stdout = memoryStream();
+        const stderr = memoryStream();
+        await writeFile(
+            path.join(cwd, 'arcane.config.json'),
+            JSON.stringify(
+                {
+                    mail: {
+                        profile: 'Dragon dispatch',
+                        host: '192.0.2.30',
+                        port: 5443,
+                        origins: ['https://dragons.example', 'https://postmaster.example'],
+                        certPath: 'certificates/fullchain.pem',
+                        keyPath: 'certificates/private-key.pem',
+                        recipientAllowlist: ['reader@example.com'],
+                        errorRecipients: ['postmaster@example.com'],
+                        appId: 'Dragon dispatch',
+                        bodyTimeoutMs: 25_000,
+                        providerTimeoutMs: 35_000,
+                        retryableDelayMs: 750
+                    }
+                }
+            )
+        );
+        await writeFile(
+            path.join(cwd, '.arcane.env.json'),
+            JSON.stringify(
+                {
+                    mail: {
+                        apiKey: 're_synthetic_default',
+                        profiles: {'Dragon dispatch': {apiKey: 're_synthetic_dragons'}}
+                    }
+                }
+            )
+        );
+        let started;
+        const exitCode = await runCli(
+            ['mail', 'serve', '--output', 'ndjson'],
+            {
+                cwd,
+                stdout: stdout.stream,
+                stderr: stderr.stream,
+                execute: async function executeConfiguredMailCli(command, options) {
+                    assert.equal(command, 'mail');
+                    return executeMailCommand(
+                        {
+                            ...options,
+                            startServer: async function captureConfiguredMailServer(settings) {
+                                started = settings;
+                                return {
+                                    target: 'mail',
+                                    mode: 'mail',
+                                    host: settings.host,
+                                    port: settings.port,
+                                    url: 'https://192.0.2.30:5443/v1/mail',
+                                    lifecycle: Promise.resolve(),
+                                    close: async function closeConfiguredMailServer() {}
+                                };
+                            }
+                        }
+                    );
+                }
+            }
+        );
+
+        assert.equal(exitCode, 0, stderr.read());
+        assert.equal(started.apiKey, 're_synthetic_dragons');
+        assert.equal(started.host, '192.0.2.30');
+        assert.equal(started.port, 5443);
+        assert.deepEqual(started.allowedOrigins, ['https://dragons.example', 'https://postmaster.example']);
+        assert.deepEqual(started.recipientAllowlist, ['reader@example.com']);
+        assert.deepEqual(started.errorRecipients, ['postmaster@example.com']);
+        assert.equal(started.appId, 'Dragon dispatch');
+        assert.equal(started.bodyTimeoutMs, 25_000);
+        assert.equal(started.providerTimeoutMs, 35_000);
+        assert.equal(started.retryableDelayMs, 750);
+        assert.equal(started.certPath, path.join(cwd, 'certificates', 'fullchain.pem'));
+        assert.equal(started.keyPath, path.join(cwd, 'certificates', 'private-key.pem'));
+        assert.equal(started.from, undefined);
+        assert.equal(stdout.read().includes('re_synthetic_dragons'), false);
+    }
+);
+
+test(
+    'explicit mail API aliases replace JSON and canonical API values without merging lists',
+    async function explicitMailConfigurationOverrides(context) {
+        const cwd = await temporaryDirectory(context);
+        const workspaceRoot = await temporaryDirectory(context);
+        await writeFile(
+            path.join(cwd, 'arcane.config.json'),
+            JSON.stringify(
+                {
+                    mail: {
+                        profile: 'Configured app',
+                        host: '192.0.2.30',
+                        port: 5443,
+                        origins: ['https://configured.example'],
+                        certPath: 'configured/fullchain.pem',
+                        keyPath: 'configured/private-key.pem',
+                        from: 'configured@example.com',
+                        recipientAllowlist: ['configured@example.com'],
+                        errorRecipients: ['configured-errors@example.com'],
+                        providerTimeoutMs: 35_000
+                    }
+                }
+            )
+        );
+        await writeFile(
+            path.join(cwd, '.arcane.env.json'),
+            JSON.stringify(
+                {
+                    mail: {
+                        profiles: {
+                            'Configured app': {apiKey: 're_synthetic_configured'},
+                            'Explicit app': {apiKey: 're_synthetic_explicit'}
+                        }
+                    }
+                }
+            )
+        );
+        let started;
+        await executeMailCommand(
+            {
+                action: 'serve',
+                cwd,
+                workspaceRoot,
+                profile: 'Explicit app',
+                host: '127.0.0.1',
+                port: 6443,
+                from: 'explicit@example.com',
+                origins: ['https://canonical-api.example'],
+                origin: [],
+                recipientAllowlist: ['canonical-api@example.com'],
+                allowTo: [],
+                errorRecipients: ['canonical-api-errors@example.com'],
+                errorTo: ['explicit-errors@example.com'],
+                providerTimeoutMs: 45_000,
+                requestTimeout: 55_000,
+                certPath: 'explicit/fullchain.pem',
+                keyPath: 'explicit/private-key.pem',
+                startServer: async function captureExplicitMailConfiguration(settings) {
+                    started = settings;
+                    return {target: 'mail'};
+                }
+            }
+        );
+
+        assert.equal(started.apiKey, 're_synthetic_explicit');
+        assert.equal(started.host, '127.0.0.1');
+        assert.equal(started.port, 6443);
+        assert.equal(started.from, 'explicit@example.com');
+        assert.deepEqual(started.allowedOrigins, []);
+        assert.deepEqual(started.recipientAllowlist, []);
+        assert.deepEqual(started.errorRecipients, ['explicit-errors@example.com']);
+        assert.equal(started.providerTimeoutMs, 55_000);
+        assert.equal(started.certPath, path.join(cwd, 'explicit', 'fullchain.pem'));
+        assert.equal(started.keyPath, path.join(cwd, 'explicit', 'private-key.pem'));
+    }
+);
+
+test(
+    'mail send consumes configured profiles without requiring TLS and preserves each report sender',
+    async function configuredMailSend(context) {
+        const cwd = await temporaryDirectory(context);
+        const report = {
+            type: 'report',
+            from: 'dragons@example.com',
+            to: ['reader@example.com'],
+            subject: 'The dragon parade is airborne',
+            text: 'Bring a fireproof umbrella.\nKeep this complete message. 🐉'
+        };
+        await writeFile(
+            path.join(cwd, 'arcane.config.json'),
+            JSON.stringify(
+                {
+                    mail: {
+                        profile: 'Dragon dispatch',
+                        appId: 'Dragon dispatch',
+                        providerTimeoutMs: 35_000,
+                        retryableDelayMs: 750
+                    }
+                }
+            )
+        );
+        await writeFile(
+            path.join(cwd, '.arcane.env.json'),
+            JSON.stringify(
+                {
+                    mail: {
+                        apiKey: 're_synthetic_default',
+                        profiles: {'Dragon dispatch': {apiKey: 're_synthetic_dragons'}}
+                    }
+                }
+            )
+        );
+        let sent;
+        await executeMailCommand(
+            {
+                action: 'send',
+                cwd,
+                reportKey: 'synthetic-configured-dragon-report',
+                readReport: async function readConfiguredDragonReport() {
+                    return report;
+                },
+                sendMail: async function captureConfiguredDragonReport(settings) {
+                    sent = settings;
+                    return {status: 'accepted', classification: 'accepted', report: settings.report};
+                }
+            }
+        );
+
+        assert.equal(sent.apiKey, 're_synthetic_dragons');
+        assert.equal(sent.appId, 'arcane-cli');
+        assert.equal(sent.providerTimeoutMs, 35_000);
+        assert.equal(sent.retryableDelayMs, 750);
+        assert.equal(sent.report, report);
+        assert.equal(sent.from, undefined);
+        assert.equal(sent.report.from, 'dragons@example.com');
+    }
+);
+
+test(
+    'mail send uses a configured sender and reads an injected selected credential once',
+    async function configuredSenderWithInjectedCredential(context) {
+        const cwd = await temporaryDirectory(context);
+        await writeFile(
+            path.join(cwd, 'arcane.config.json'),
+            JSON.stringify(
+                {
+                    mail: {
+                        profile: 'Dragon dispatch',
+                        from: 'postmaster@example.com'
+                    }
+                }
+            )
+        );
+        await writeFile(
+            path.join(cwd, '.arcane.env.json'),
+            '{ "unused": "This file is not a send input with an injected credential.", broken }'
+        );
+        let credentialReads = 0;
+        let sent;
+        await executeMailCommand(
+            {
+                action: 'send',
+                cwd,
+                readReport: async function readReportWithOwnSender() {
+                    return {from: 'dragons@example.com', text: 'Keep the report sender in the report.'};
+                },
+                readCredential: async function readInjectedConfiguredCredential(options) {
+                    credentialReads += 1;
+                    assert.equal(options.profile, 'Dragon dispatch');
+                    return 're_synthetic_injected';
+                },
+                sendMail: async function captureConfiguredSender(settings) {
+                    sent = settings;
+                    return {status: 'accepted', classification: 'accepted'};
+                }
+            }
+        );
+
+        assert.equal(credentialReads, 1);
+        assert.equal(sent.apiKey, 're_synthetic_injected');
+        assert.equal(sent.from, 'postmaster@example.com');
+        assert.equal(sent.report.from, 'dragons@example.com');
+    }
+);

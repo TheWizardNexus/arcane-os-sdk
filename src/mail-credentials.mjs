@@ -41,38 +41,63 @@ async function readMailSettings(filePath,signal){
     return settings;
 }
 
-function mailProfileSettings(settings,location){
+function mailProfileSettings(settings,location,nested=false){
+    const source=nested?settings.mail:settings;
+    if(source===undefined)return undefined;
+    if(!source||!is.object(source)||is.array(source)){
+        throw new ArcaneError(ERROR_CODES.usage,`mail in ${location.filePath} must be an object.`);
+    }
     if(location.profile==='mail'){
-        return settings;
+        return source;
     }
-    if(settings.MAIL_PROFILES===undefined){
+    const profiles=nested?source.profiles:source.MAIL_PROFILES;
+    const label=nested?'mail.profiles':'MAIL_PROFILES';
+    if(profiles===undefined){
         return undefined;
     }
-    if(!settings.MAIL_PROFILES||!is.object(settings.MAIL_PROFILES)||is.array(settings.MAIL_PROFILES)){
-        throw new ArcaneError(ERROR_CODES.usage,`MAIL_PROFILES in ${location.filePath} must be an object.`);
+    if(!profiles||!is.object(profiles)||is.array(profiles)){
+        throw new ArcaneError(ERROR_CODES.usage,`${label} in ${location.filePath} must be an object.`);
     }
-    if(!Object.hasOwn(settings.MAIL_PROFILES,location.profile)){
+    if(!Object.hasOwn(profiles,location.profile)){
         return undefined;
     }
-    const profileSettings=settings.MAIL_PROFILES[location.profile];
+    const profileSettings=profiles[location.profile];
     if(!profileSettings||!is.object(profileSettings)||is.array(profileSettings)){
         throw new ArcaneError(
             ERROR_CODES.usage,
-            `MAIL_PROFILES[${JSON.stringify(location.profile)}] in ${location.filePath} must be an object.`
+            `${label}[${JSON.stringify(location.profile)}] in ${location.filePath} must be an object.`
         );
     }
     return profileSettings;
 }
 
+function mailCredentialEntry(settings, location) {
+    const nestedSettings = mailProfileSettings(settings, location, true);
+    const nestedEntry = {
+        profileSettings: nestedSettings,
+        key: 'apiKey',
+        setting: location.profile === 'mail'
+            ? 'mail.apiKey'
+            : `mail.profiles[${JSON.stringify(location.profile)}].apiKey`
+    };
+    if (nestedSettings && Object.hasOwn(nestedSettings, 'apiKey')) return nestedEntry;
+    const legacySettings = mailProfileSettings(settings, location);
+    if (legacySettings && Object.hasOwn(legacySettings, 'RESEND_API_KEY')) {
+        return {profileSettings: legacySettings, key: 'RESEND_API_KEY', setting: location.setting};
+    }
+    return nestedEntry;
+}
+
 function configuredMailKey(settings,location){
-    const apiKey=mailProfileSettings(settings,location)?.RESEND_API_KEY;
+    const entry=mailCredentialEntry(settings,location);
+    const apiKey=entry.profileSettings?.[entry.key];
     if(apiKey===undefined||apiKey===null||apiKey===''){
         return null;
     }
     if(!is.string(apiKey)){
         throw new ArcaneError(
             ERROR_CODES.usage,
-            `${location.setting} in ${location.filePath} must be a string.`
+            `${entry.setting} in ${location.filePath} must be a string.`
         );
     }
     return apiKey;
@@ -88,16 +113,22 @@ export async function setMailCredential(options={}){
         throw new ArcaneError(ERROR_CODES.usage,'The Resend API key must be a nonempty string.');
     }
     const settings=await readMailSettings(location.filePath,options.signal);
-    const profileSettings=mailProfileSettings(settings,location);
-    const updatedProfile={...profileSettings,RESEND_API_KEY:options.secret};
-    const updatedSettings=location.profile==='mail'
-        ?updatedProfile
-        :{
-            ...settings,
-            MAIL_PROFILES:{...settings.MAIL_PROFILES,[location.profile]:updatedProfile}
-        };
+    const entry=mailCredentialEntry(settings,location);
+    if(entry.profileSettings){
+        entry.profileSettings[entry.key]=options.secret;
+    }else{
+        settings.mail??={};
+        if(location.profile==='mail'){
+            settings.mail.apiKey=options.secret;
+        }else{
+            settings.mail.profiles={
+                ...settings.mail.profiles,
+                [location.profile]:{apiKey:options.secret}
+            };
+        }
+    }
     throwIfAborted(options.signal);
-    await writeFile(location.filePath,`${JSON.stringify(updatedSettings,null,2)}\n`,{
+    await writeFile(location.filePath,`${JSON.stringify(settings,null,2)}\n`,{
         encoding:'utf8',
         mode:0o600,
         signal:options.signal
@@ -111,30 +142,58 @@ export async function readMailCredential(options={}){
     return configuredMailKey(settings,location);
 }
 
-export async function readMailServerSettings(options = {}) {
-    const location = mailCredentialLocation(options);
-    const settings = await readMailSettings(location.filePath, options.signal);
-    const serverSettings = (options.readCredential ?? null) === null
-        ? {apiKey: configuredMailKey(settings, location)}
-        : {};
+export async function readMailConfiguration(options = {}) {
+    const directory = path.resolve(options.cwd ?? options.workspaceRoot ?? process.cwd());
+    const configPath = path.join(directory, 'arcane.config.json');
+    const envPath = path.join(directory, '.arcane.env.json');
+    const readCredentialFromFile = (options.readCredential ?? null) === null;
+    const [config, secrets] = await Promise.all(
+        [
+            readMailSettings(configPath, options.signal),
+            options.action !== 'send' || readCredentialFromFile
+                ? readMailSettings(envPath, options.signal)
+                : {}
+        ]
+    );
+    const mailSettings = config.mail === undefined ? {} : config.mail;
+    if (!mailSettings || !is.object(mailSettings) || is.array(mailSettings)) {
+        throw new ArcaneError(ERROR_CODES.usage, `mail in ${configPath} must be an object.`);
+    }
+    const location = mailCredentialLocation(
+        {...options, profile: options.profile !== undefined ? options.profile : mailSettings.profile}
+    );
+    const configuration = {profile: location.profile};
+    for (const name of [
+        'host', 'port', 'origins', 'from', 'appId', 'recipientAllowlist',
+        'errorRecipients', 'bodyTimeoutMs', 'providerTimeoutMs', 'retryableDelayMs'
+    ]) {
+        if (mailSettings[name] !== undefined) configuration[name] = mailSettings[name];
+    }
+    if (readCredentialFromFile) {
+        configuration.apiKey = configuredMailKey(secrets, location);
+    }
+    // Sending a report does not consume listener certificate configuration.
+    if (options.action === 'send') return configuration;
     const tlsSettings = {
         MAIL_TLS_CERT_PATH: 'certPath',
         MAIL_TLS_KEY_PATH: 'keyPath'
     };
     for (const [setting, option] of Object.entries(tlsSettings)) {
-        const value = settings[setting];
+        const value = options[option] !== undefined
+            ? options[option]
+            : mailSettings[option] !== undefined ? mailSettings[option] : secrets[setting];
         if (value === undefined || value === null || value === '') {
             continue;
         }
         if (!is.string(value)) {
             throw new ArcaneError(
                 ERROR_CODES.usage,
-                `${setting} in ${location.filePath} must be a PEM file path string.`
+                `mail.${option} (${setting}) must be a PEM file path string.`
             );
         }
-        serverSettings[option] = path.resolve(path.dirname(location.filePath), value);
+        configuration[option] = path.resolve(directory, value);
     }
-    return serverSettings;
+    return configuration;
 }
 
 export async function getMailCredentialStatus(options={}){
@@ -146,17 +205,18 @@ export async function getMailCredentialStatus(options={}){
 export async function deleteMailCredential(options={}){
     const location=mailCredentialLocation(options);
     const settings=await readMailSettings(location.filePath,options.signal);
-    const profileSettings=mailProfileSettings(settings,location);
-    if(profileSettings&&Object.hasOwn(profileSettings,'RESEND_API_KEY')){
-        const {RESEND_API_KEY,...remainingSettings}=profileSettings;
-        const updatedSettings=location.profile==='mail'
-            ?remainingSettings
-            :{
-                ...settings,
-                MAIL_PROFILES:{...settings.MAIL_PROFILES,[location.profile]:remainingSettings}
-            };
+    let changed=false;
+    for(const nested of [true,false]){
+        const profileSettings=mailProfileSettings(settings,location,nested);
+        const key=nested?'apiKey':'RESEND_API_KEY';
+        if(profileSettings&&Object.hasOwn(profileSettings,key)){
+            delete profileSettings[key];
+            changed=true;
+        }
+    }
+    if(changed){
         throwIfAborted(options.signal);
-        await writeFile(location.filePath,`${JSON.stringify(updatedSettings,null,2)}\n`,{
+        await writeFile(location.filePath,`${JSON.stringify(settings,null,2)}\n`,{
             encoding:'utf8',
             signal:options.signal
         });

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.24.0
+
+- Read nonsecret mail settings from `arcane.config.json.mail` and provider keys
+  from `.arcane.env.json.mail`. Keep existing root keys, exact named profiles,
+  and TLS path settings working without migrating or rewriting either file.
+- Let explicit CLI/API options override configuration, replace origin lists,
+  and apply listener defaults after file settings. Share configured profile,
+  sender and provider deadlines with `mail send` without requiring TLS paths.
+- Preserve unrelated settings during credential updates and remove both selected
+  key representations on explicit deletion. Document configuration precedence,
+  origin rejection, startup, platform behavior and the purpose-gate review.
+
 ## 0.23.0
 
 - Rename the mail configuration file to `.arcane.env.json`. Upgrade existing

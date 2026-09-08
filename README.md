@@ -19,15 +19,17 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This checkout defines the `0.23.0` SDK contract. Applications pin one exact npm
+This checkout defines the `0.24.0` SDK contract. Applications pin one exact npm
 version and lockfile; registry state is deliberately not baked into application
 artifacts.
 
-The [mail gateway](docs/reference/mail.md) serves HTTPS with HTTP/2 on port 4433,
-using certificate paths from `.arcane.env.json` in the command's working
-directory, and defaults browser mail to
-`/v1/mail` on the current domain. Multiple applications can share
-one server with explicit allowed origins. Subscription verification is disabled
+The [mail gateway](docs/reference/mail.md) serves HTTPS with HTTP/2 on port 4433
+by default. Configure its host, port, origin list, certificate paths, and other
+mail settings in `arcane.config.json.mail`; keep provider keys in the ignored
+`.arcane.env.json.mail`. Both files belong in the command's working directory.
+Existing root credential, profile, and TLS settings remain supported. Browser
+mail defaults to `/v1/mail` on the current domain, and multiple applications can
+share one server with explicit allowed origins. Subscription verification is disabled
 until a `verifySubscription` callback is configured; that callback receives the
 application name and bearer subscription key before each provider attempt.
 See the [method and action gate report](docs/reviews/mail-server-purpose-review.md)
