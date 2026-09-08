@@ -719,6 +719,12 @@ matching `meta[name="arcane-app-id"]`; unmarked pages with an active `base`
 remain selected for patch compatibility. Included HTML with neither signal is
 retained as a package fragment rather than rewritten as a document.
 
+`entry` and each app browser document's `path` stay relative to the app
+directory. Each browser document also reports `packagePath`, the emitted path
+such as `apps/hello-world/index.html`. The complete `files` inventory uses
+package-relative paths and includes the root `index.html`. Shared
+files retain their configured route destinations.
+
 ### Availability and normalization
 
 **Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
@@ -772,27 +778,22 @@ when explicitly requested or when required for this selected release output.
 async packageApp(options)
 ```
 
-Import it from `arcane-os` or `arcane-os/packager`. Packaging refreshes the
-managed map once and preserves the complete selected source and browser
-document inventory. It rejects malformed configuration, descriptors,
-and the malformed selected release archive while preserving the previously
-selected output on failure. Each selected browser document receives the same
-deterministic map. The package root also contains the public
-`ARCANE_RUNTIME_PROJECTION.json` inventory:
+Import it from `arcane-os` or `arcane-os/packager`. Packaging consumes the saved
+source and managed import maps. Refresh maps through `arcane import-map` or
+ordinary `arcane dev` startup before selecting output that needs updated maps.
+The package preserves the complete selected content, applying the documented
+asset-version and enabled browser-PWA transformations to resource references.
+Malformed configuration or descriptors fail while preserving the prior output.
 
-```javascript
-{
-  schemaVersion: 1,
-  kind: 'arcane-app-runtime-projection',
-  sdkVersion: '0.5.18',
-  pathPrefix: 'arcane/',
-  files: [{path}]
-}
-```
-
-The projection is an inventory, not an ordinary execution gate. Malformed or
-internally inconsistent selected projection data rejects with
-`ARCANE_RUNTIME_PROJECTION_INVALID`.
+Selected app files are emitted beneath `apps/<id>/`; shared files retain their
+configured route destinations. When selected shared content supplies no root
+`index.html`, the SDK generates one that opens the selected app page. The result
+contains `outputRoot`, `manifest`, and the complete `files` inventory.
+`manifest.app.entry` stays app-relative, while `manifest.app.start`
+is the package launch URL, such as `./apps/hello-world/index.html`. Release
+schema `1`, kind `arcane-app-release`, and packager identity
+`arcane-app-packager-v1` remain unchanged. A dry run returns the planned output
+and file inventory without writing source or output.
 
 ### Availability and normalization
 
@@ -808,7 +809,7 @@ const packaged = await packageApp({
     appId: 'hello-world'
 });
 
-console.log(packaged.importMap.documentPaths);
+console.log(packaged.manifest.app.start, packaged.files);
 ```
 
 ## PACKAGER_VERSION
@@ -4038,17 +4039,19 @@ console.log(result.importMap.documentPaths, result.importMap.documentCount);
 ### Overview
 
 Runs the high-level package operation for one selected application. It reads
-the installed SDK/runtime selection, injects one deterministic
-managed import map into every directly navigable included `.html`/`.htm`
-browser document while preserving component fragments as package files, and
-then packages the complete selected content without automatically running tests
-or checks. Verification occurs only when explicitly requested or when required
-for the selected release output. A failure leaves the previously accepted
-distribution untouched. Success returns the low-level package result and
-complete import-map document inventory. External
-packages publish `ARCANE_RUNTIME_PROJECTION.json`; private
-`ARCANE_APP_RELEASE.json` remains an internal verification authority rather
-than an application route.
+the installed SDK/runtime selection and packages the saved source and managed
+import maps through `packageApp()`. Map generation remains the explicit
+`arcane import-map` operation and the ordinary `arcane dev` startup refresh.
+Selected app files retain their `apps/<id>/` paths alongside the shared routes
+and root launcher described by `packageApp()`.
+
+Packaging does not automatically run tests or checks. Verification occurs only
+when explicitly requested or when required for the selected release output.
+A failure leaves the prior distribution untouched. Success returns the selected
+workspace and app identity plus `release`, containing the low-level package
+result, manifest, and complete file inventory. `ARCANE_APP_RELEASE.json` records
+that inventory and the distinct app-relative `app.entry` and package-relative
+`app.start`; it remains package metadata rather than an application route.
 
 ### Signature and result
 
@@ -4072,7 +4075,7 @@ const result = await packageApplication({
     appId: 'hello-world'
 });
 
-console.log(result.release.importMap.documentPaths);
+console.log(result.release.manifest.app.start, result.release.files);
 ```
 
 ## planApplication()

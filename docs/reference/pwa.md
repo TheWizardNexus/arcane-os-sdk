@@ -39,13 +39,20 @@ display preference, routes and descriptions. Use real app icons; the SDK does
 not invent branding or claim that a browser has installed the app.
 
 Manifest URL fields are relative to the application directory. Source delivery
-and packaged delivery resolve those fields into their respective layouts.
-Absolute URL fields retain their authored destination.
+and packaged delivery retain the app tree at `apps/<id>/`. For packaged output,
+the default `start_url` is `./apps/<id>/<entry>`, resolved from the generated
+root manifest. The default `id` and `scope` remain `./`, preserving the existing
+deployment-root installation identity. Authored relative URL fields, including
+explicit `id` and `scope` values, resolve against `./apps/<id>/`; an icon such
+as `img/library.png` therefore remains beneath the app directory. Absolute URL
+fields retain their authored destination.
 
 `offline.include` and `offline.exclude` select literal paths or directory
 prefixes from the selected emitted inventory. An omitted or empty include list
 selects that inventory; exclusions subtract from it. App files use app-relative
 paths and shared runtime files use paths such as `arcane/sdk/pwa.mjs`.
+For example, selecting `modules` matches packaged
+`apps/<id>/modules/...`; emitted offline URLs keep the `apps/<id>/` prefix.
 The application entry and generated PWA shell records are retained. Select the
 resources needed by every offline page, including its shared modules and styles.
 The worker script itself is never an application cache entry.
@@ -66,6 +73,13 @@ Browser packaging emits these files at the selected deployment root:
 | `arcane-offline.json` | App ID/version, SDK version, deployment revision, resource URLs and explicit navigation aliases. |
 | `arcane-sw.js` | Stable worker URL with the selected offline manifest embedded in its source. |
 | `arcane-pwa.mjs` | Independent registration and installation-component bootstrap importing the SDK client. |
+
+The selected app files remain under `apps/<id>/`, with shared runtime routes
+alongside them. The SDK supplies a root `index.html` launcher when selected
+shared content has no root page. The generated PWA files stay at the deployment
+root so their worker can serve the selected app and shared resources. The
+worker is registered for the deployment root independently of any app-authored
+manifest scope.
 
 Each packaged output gets one deployment revision shared by its offline
 manifest and worker. It distinguishes separately generated outputs even when

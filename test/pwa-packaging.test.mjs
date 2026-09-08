@@ -91,7 +91,7 @@ async function workspaceFixture(
         writeText(
             appRoot,
             'index.html',
-            applicationPage('./', './modules/app.js?v=old&amp;language=fr#graph')
+            applicationPage('../../', './apps/pwa-app/modules/app.js?v=old&amp;language=fr#graph')
         ),
         writeText(
             appRoot,
@@ -105,14 +105,14 @@ async function workspaceFixture(
         writeText(
             appRoot,
             'pages/settings.html',
-            applicationPage('../', './modules/app.js?v=old&amp;language=fr#graph')
+            applicationPage('../../../', './apps/pwa-app/modules/app.js?v=old&amp;language=fr#graph')
         ),
         writeText(
             appRoot,
             'pages/help.html',
             applicationPage('./', '../modules/app.js?v=old&amp;language=fr#graph')
         ),
-        writeText(appRoot, 'modules/app.js', 'import \'../arcane/modules/Shared.js?v=old&mode=full\';\n'),
+        writeText(appRoot, 'modules/app.js', 'import \'../../../arcane/modules/Shared.js?v=old&mode=full\';\n'),
         writeJson(
             appRoot,
             'modules/arcane.importmap.json',
@@ -204,6 +204,30 @@ test(
             ),
             ['img/icon.png', 'modules/app.js']
         );
+        assert.deepEqual(
+            selectPwaFiles(
+                [
+                    'index.html',
+                    'apps/pwa-app/img/icon.png',
+                    'apps/pwa-app/img/private/note.txt',
+                    'apps/pwa-app/modules/app.js',
+                    'arcane/modules/Shared.js'
+                ],
+                {
+                    ...normalized,
+                    offline: {
+                        include: ['img', 'modules', 'arcane/modules'],
+                        exclude: ['img/private']
+                    }
+                },
+                'apps/pwa-app'
+            ),
+            [
+                'apps/pwa-app/img/icon.png',
+                'apps/pwa-app/modules/app.js',
+                'arcane/modules/Shared.js'
+            ]
+        );
     }
 );
 
@@ -278,6 +302,19 @@ test(
         assert.equal(release.offlineManifest.revision, 'selected-release-one');
         assert.equal(release.offlineManifest.sdkVersion, '9.8.7');
         assert.deepEqual(metadata, original);
+        const nestedRelease = createPwaArtifacts(
+            {
+                ...releaseOptions,
+                appPath: 'apps/pwa-app',
+                files: ['index.html', 'apps/pwa-app/index.html', 'apps/pwa-app/img/icon.png']
+            }
+        );
+        assert.equal(nestedRelease.manifest.start_url, './apps/pwa-app/index.html?conversation=one#start');
+        assert.equal(nestedRelease.manifest.scope, './apps/pwa-app/');
+        assert.equal(nestedRelease.manifest.id, './apps/pwa-app/');
+        assert.equal(nestedRelease.manifest.icons[0].src, './apps/pwa-app/img/icon.png?color=blue#mark');
+        assert.equal(nestedRelease.manifest.shortcuts[0].url, './apps/pwa-app/pages/settings.html?theme=day#appearance');
+        assert.deepEqual(metadata, original);
     }
 );
 
@@ -301,10 +338,10 @@ test(
         }
         const expectedReferences = new Map(
             [
-                ['index.html', './arcane-pwa.mjs'],
-                ['about.html', './arcane-pwa.mjs'],
-                ['pages/settings.html', './arcane-pwa.mjs'],
-                ['pages/help.html', '../arcane-pwa.mjs']
+                ['apps/pwa-app/index.html', './arcane-pwa.mjs'],
+                ['apps/pwa-app/about.html', '../../arcane-pwa.mjs'],
+                ['apps/pwa-app/pages/settings.html', './arcane-pwa.mjs'],
+                ['apps/pwa-app/pages/help.html', '../../../arcane-pwa.mjs']
             ]
         );
         for (const [file, bootstrapUrl] of expectedReferences) {
@@ -340,7 +377,7 @@ test(
         assert.equal(offline.appVersion, '1.2.3');
         assert.equal(offline.sdkVersion, '9.8.7');
         assert.ok(
-            offline.assets.includes('./modules/app.js?language=fr')
+            offline.assets.includes('./apps/pwa-app/modules/app.js?language=fr')
         );
         assert.ok(
             offline.assets.includes('./arcane/modules/Shared.js?mode=full')
@@ -353,19 +390,19 @@ test(
             false
         );
         assert.equal(
-            offline.assets.includes('./content/document.html'),
+            offline.assets.includes('./apps/pwa-app/content/document.html'),
             false
         );
         const importMap = JSON.parse(
             await readFile(
-                path.join(packaged.outputRoot, 'modules/arcane.importmap.json'),
+                path.join(packaged.outputRoot, 'apps/pwa-app/modules/arcane.importmap.json'),
                 'utf8'
             )
         );
         assert.equal(importMap.imports['arcane/Shared'], './arcane/modules/Shared.js?mode=full');
         assert.equal(
             await readFile(
-                path.join(packaged.outputRoot, 'content/document.html'),
+                path.join(packaged.outputRoot, 'apps/pwa-app/content/document.html'),
                 'utf8'
             ),
             CORPUS_HTML
@@ -388,6 +425,71 @@ test(
         assert.ok(
             authored.includes('app.js?v=old&amp;language=fr#graph')
         );
+        const manifest = JSON.parse(
+            await readFile(
+                path.join(packaged.outputRoot, 'arcane.webmanifest'),
+                'utf8'
+            )
+        );
+        assert.equal(manifest.id, './');
+        assert.equal(manifest.scope, './');
+        assert.equal(manifest.start_url, './apps/pwa-app/index.html');
+        assert.equal(packaged.manifest.app.entry, 'index.html');
+        assert.equal(packaged.manifest.app.start, './apps/pwa-app/index.html');
+        const launcher = await readFile(
+            path.join(packaged.outputRoot, 'index.html'),
+            'utf8'
+        );
+        assert.ok(launcher.includes('url=./apps/pwa-app/index.html'));
+        assert.equal(launcher.includes('data-arcane-pwa'), false);
+    }
+);
+
+test(
+    'PWA entry filenames retain fragment and percent characters while generated links resolve at the deployment root',
+    async function encodedPwaEntryPaths(context) {
+        const fixture = await workspaceFixture(context);
+        const entry = 'pages#review/start%note.html';
+        fixture.packageManifest.entry = entry;
+        fixture.packageManifest.include.push('pages#review');
+        const source = '<!doctype html><html lang="en"><head><title>Review notes</title></head>'
+            + '<body><main>Keep pages#review/start%note.html exactly as authored.</main></body></html>\n';
+        await Promise.all(
+            [
+                writeJson(fixture.appRoot, 'arcane-package.json', fixture.packageManifest),
+                writeText(fixture.appRoot, entry, source)
+            ]
+        );
+        const packaged = await packageApp(
+            {workspaceRoot: fixture.workspaceRoot, appId: 'pwa-app'}
+        );
+        const packagedEntry = `apps/pwa-app/${entry}`;
+        const start = './apps/pwa-app/pages%23review/start%25note.html';
+        assert.ok(packaged.files.includes(packagedEntry));
+        assert.ok(packaged.manifest.files.includes(packagedEntry));
+        assert.equal(packaged.manifest.app.entry, entry);
+        assert.equal(packaged.manifest.app.start, start);
+        const html = await readFile(path.join(packaged.outputRoot, packagedEntry), 'utf8');
+        const bootstrapReference = html.match(/<script\b[^>]*\bsrc="([^"]*arcane-pwa\.mjs)"[^>]*>/u)[1];
+        const manifestReference = html.match(/<link\b[^>]*\bhref="([^"]*arcane\.webmanifest)"[^>]*>/u)[1];
+        assert.equal(bootstrapReference, '../../../arcane-pwa.mjs');
+        assert.equal(manifestReference, '../../../arcane.webmanifest');
+        const mount = new URL('https://example.test/catalog/deep/portable-release/');
+        const documentUrl = new URL(packaged.manifest.app.start, mount);
+        assert.equal(
+            new URL(bootstrapReference, documentUrl).href,
+            new URL('arcane-pwa.mjs', mount).href
+        );
+        assert.equal(
+            new URL(manifestReference, documentUrl).href,
+            new URL('arcane.webmanifest', mount).href
+        );
+        const manifest = JSON.parse(
+            await readFile(path.join(packaged.outputRoot, 'arcane.webmanifest'), 'utf8')
+        );
+        assert.equal(manifest.start_url, start);
+        assert.ok(html.includes('<main>Keep pages#review/start%note.html exactly as authored.</main>'));
+        assert.equal(await readFile(path.join(fixture.appRoot, entry), 'utf8'), source);
     }
 );
 
@@ -415,7 +517,7 @@ test(
                 false
             );
             const html = await readFile(
-                path.join(result.outputRoot, 'index.html'),
+                path.join(result.outputRoot, 'apps/pwa-app/index.html'),
                 'utf8'
             );
             assert.equal(

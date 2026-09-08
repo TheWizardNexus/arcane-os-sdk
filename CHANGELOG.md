@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.20.0
+
+- Restore repository-shaped application packages: selected app files remain
+  under `apps/<id>/`, alongside shared `arcane/` and configured runtime routes.
+  Authored document bases, import maps, module-relative imports and application
+  resource paths retain their development layout without rewriting product
+  documents or application code to relocate them.
+- Restore deployment-relative `ARCANE_APP_RELEASE.app.start` and a root
+  `index.html` launcher while preserving the app-relative `app.entry` identity.
+  Package consumers use `app.start` for navigation. SDK packaged previews honor
+  that field and retain support for earlier flat packages through `app.entry`.
+- Keep generated PWA files at the deployment root, resolve manifest metadata
+  against the packaged app directory, and preserve app-relative offline
+  selections alongside shared runtime paths. Source import-map inspection keeps
+  app-relative document paths and separately reports emitted package paths.
+- Align packaging references with the current public return values and explicit
+  source import-map generation. Add package-layout and nested-deployment test
+  source while retaining complete authored-content coverage.
+
 ## 0.19.0
 
 - Read mail credentials from `.env.json` in the invocation directory through

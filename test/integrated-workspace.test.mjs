@@ -361,6 +361,14 @@ test('selected source app tests consume the managed browser runtime map',()=>{
         assert.equal(packaged.release.appId,appId);
         assert.equal(packaged.release.manifest.app.id,appId);
         assert.ok(packaged.release.files.includes('index.html'));
+        assert.ok(packaged.release.files.includes(`apps/${appId}/index.html`));
+        assert.ok(packaged.release.files.includes(`apps/${appId}/modules/review.html`));
+        assert.equal(packaged.release.manifest.app.entry,'index.html');
+        assert.equal(packaged.release.manifest.app.start,`./apps/${appId}/index.html`);
+        assert.equal(
+            await readFile(path.join(packaged.release.outputRoot,`apps/${appId}/modules/navigation-fragment.html`),'utf8'),
+            fragmentBytes
+        );
         assert.equal(Object.hasOwn(packaged,'tests'),false);
         assert.equal(Object.hasOwn(packaged.release,'contentSha256'),false);
     });
@@ -403,9 +411,16 @@ test('selected source app tests consume the managed browser runtime map',()=>{
         assert.equal(running.mode,'packaged');
         assert.equal(running.verified.verified,true);
         developmentOrigin(running);
-        const packagedEntry=await request(running,'/index.html');
+        assert.equal(new URL(running.url).pathname,`/apps/${appId}/index.html`);
+        const launcher=await request(running,'/index.html');
+        assert.equal(launcher.status,200);
+        assert.ok((await launcher.text()).includes(`url=./apps/${appId}/index.html`));
+        const packagedEntry=await request(running,`/apps/${appId}/index.html`);
         assert.equal(packagedEntry.status,200);
         assert.match(await packagedEntry.text(),/Integrated App/);
+        const packagedAppModule=await request(running,`/apps/${appId}/modules/App.js`);
+        assert.equal(packagedAppModule.status,200);
+        assert.match(await packagedAppModule.text(),/Integrated App/);
         const packagedTheme=await request(running,'/arcane/css/theme.css');
         assert.equal(packagedTheme.status,200);
         assert.match(await packagedTheme.text(),/--background/);

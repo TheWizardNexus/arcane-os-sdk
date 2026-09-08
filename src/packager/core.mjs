@@ -424,6 +424,15 @@ function destinationJoin(root,relative){
     return root==='.'?relative:`${root}/${relative}`;
 }
 
+function appPackagePath(context, relative) {
+    return `apps/${context.appId}/${relative}`;
+}
+
+function packageResourceUrl(relative) {
+    const segments = relative.split('/');
+    return `./${segments.map(encodeURIComponent).join('/')}`;
+}
+
 async function collectSelectedPath({
     sourceRoot,
     selected,
@@ -483,7 +492,7 @@ async function collectPackageRecords(context,{signal}={}){
         await collectSelectedPath({
             sourceRoot:context.appRoot,
             selected,
-            destination:selected,
+            destination:appPackagePath(context, selected),
             excludes:context.config.exclude,
             reject:isAppSourceForbidden,
             records,
@@ -512,23 +521,25 @@ async function collectPackageRecords(context,{signal}={}){
         }
     }
     records.sort((left,right)=>compareText(left.destination,right.destination));
-    if(!records.some(record=>pathKey(record.destination)===pathKey(context.config.entry))){
+    if(!records.some(record=>pathKey(record.destination)===pathKey(appPackagePath(context, context.config.entry)))){
         fail(`Package entry is missing from the selected files: ${context.config.entry}.`);
     }
     return records;
 }
 
-async function browserDocuments(records,entry){
+async function browserDocuments(records,entry,appPrefix){
     let entryDocument=null;
     const documents=[];
     for(const record of records){
         const extension=path.posix.extname(record.destination).toLocaleLowerCase('en-US');
         if(extension!=='.html'&&extension!=='.htm')continue;
+        const documentPath=record.destination.startsWith(appPrefix)
+            ?record.destination.slice(appPrefix.length):record.destination;
         const inspected=inspectImportMapHtml(await readFile(record.source,'utf8'),{
-            documentPath:record.destination
+            documentPath
         });
-        const document={path:record.destination,...copyJson(inspected)};
-        if(record.destination===entry){
+        const document={path:documentPath,packagePath:record.destination,...copyJson(inspected)};
+        if(record.destination===`${appPrefix}${entry}`){
             entryDocument=document;
         }else if(inspected.bases.length>0){
             documents.push(document);
@@ -567,8 +578,8 @@ async function inspectContext(context,{signal}={}){
         }),
         ...(context.config.adapter===undefined?{}:{adapter:context.config.adapter}),
         descriptor:await optionalDescriptor(context),
-        browserDocuments:await browserDocuments(records,context.config.entry),
-        files:records.map(record=>record.destination),
+        browserDocuments:await browserDocuments(records,context.config.entry,appPackagePath(context,'')),
+        files:[...new Set(['index.html',...records.map(record=>record.destination)])].sort(compareText),
         output:path.relative(context.workspaceRoot,context.outputRoot).split(path.sep).join('/')
     };
 }
@@ -609,6 +620,28 @@ async function copyRecords(records,stagingRoot,{signal,onEvent}={}){
         await copyFile(record.source,destination);
         await emit(onEvent,{type:'package.file.copied',path:record.destination});
     }
+}
+
+async function writePackageLauncher(context, stagingRoot) {
+    function escapeHtml(value) {
+        return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;')
+            .replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+    }
+    const start = escapeHtml(packageResourceUrl(appPackagePath(context, context.config.entry)));
+    const title = escapeHtml(context.config.displayName);
+    const content = `<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="refresh" content="0; url=${start}">
+    <title>${title}</title>
+</head>
+<body>
+    <a href="${start}">Open ${title}</a>
+</body>
+</html>
+`;
+    await writeFile(path.join(stagingRoot, 'index.html'), content, 'utf8');
 }
 
 async function listOutputFiles(root,{signal}={}){
@@ -652,6 +685,7 @@ function releaseManifest(context,files,pwaArtifacts){
             displayName:context.config.displayName,
             version:context.config.version,
             entry:context.config.entry,
+            start:packageResourceUrl(appPackagePath(context, context.config.entry)),
             strategy:context.config.strategy,
             shared:[...context.config.shared],
             ...(pwaArtifacts?{pwa:{
@@ -695,6 +729,8 @@ async function replaceDirectory(stagingRoot,outputRoot){
 async function packageWithContext(context,options={}){
     const {signal,onEvent,browserPwa=true}=options;
     const pwaEnabled=browserPwa&&context.config.pwa?.enabled===true;
+    const appPath=`apps/${context.appId}`;
+    const entryPath=appPackagePath(context,context.config.entry);
     const inspected=await inspectContext(context,{signal});
     if(options.dryRun){
         return {
@@ -724,7 +760,14 @@ async function packageWithContext(context,options={}){
     let promoted=false;
     try{
         const records=await collectPackageRecords(context,{signal});
-        const copyBase=()=>copyRecords(records,stagingRoot,{signal,onEvent});
+        async function copyBase() {
+            await copyRecords(records,stagingRoot,{signal,onEvent});
+            if (!records.some(function selectedRootIndex(record) {
+                return record.destination === 'index.html';
+            })) {
+                await writePackageLauncher(context, stagingRoot);
+            }
+        }
         const adapter=await loadAdapter(context);
         if(adapter){
             await adapter.buildArcanePackage({
@@ -745,21 +788,22 @@ async function packageWithContext(context,options={}){
         const assetVersion=await readWorkspaceAssetVersion(context.workspaceRoot);
         const version=pwaEnabled?null:assetVersion;
         const inventory=new Set(files);
-        const offlineInventory=pwaEnabled?new Set(selectPwaFiles(files,context.config.pwa)):null;
+        const offlineInventory=pwaEnabled?new Set(selectPwaFiles(files,context.config.pwa,appPath)):null;
         const offlineReferences=new Set();
-        const entryUrl=new URL(context.config.entry,'http://arcane.invalid/');
+        const entryUrl=new URL(packageResourceUrl(entryPath),'http://arcane.invalid/');
         const pwaDocumentSources=new Map();
         if(pwaEnabled){
-            const documentPaths=new Set([context.config.entry]);
+            const documentPaths=new Set([entryPath]);
             for(const selected of context.config.include){
-                if(/\.html?$/iu.test(selected)&&inventory.has(selected))documentPaths.add(selected);
+                const selectedPath=appPackagePath(context,selected);
+                if(/\.html?$/iu.test(selected)&&inventory.has(selectedPath))documentPaths.add(selectedPath);
             }
             for(const document of inspected.browserDocuments){
                 const appDocument=context.config.include.some(function includesAppDocument(selected){
                     return sameOrDescendant(document.path,selected);
                 });
-                if(appDocument&&document.managedMaps.length>0&&inventory.has(document.path)){
-                    documentPaths.add(document.path);
+                if(appDocument&&document.managedMaps.length>0&&inventory.has(document.packagePath)){
+                    documentPaths.add(document.packagePath);
                 }
             }
             await Promise.all(
@@ -777,13 +821,13 @@ async function packageWithContext(context,options={}){
                 )
             );
         }
-        const entryDocument=pwaEnabled?pwaDocumentSources.get(context.config.entry).inspected
+        const entryDocument=pwaEnabled?pwaDocumentSources.get(entryPath).inspected
             :inspected.browserDocuments.find(function matchingEntryDocument(document){
                 return document.path===context.config.entry;
             });
         const documentUrl=entryDocument?.bases[0]?.href
             ?new URL(entryDocument.bases[0].href,entryUrl):entryUrl;
-        const pending=[{file:context.config.entry,documentUrl}];
+        const pending=[{file:entryPath,documentUrl}];
         for(const file of files){
             if(/^arcane\/(?:modules|entities|components|css|sdk|dependencies)\//u.test(file)
                 &&/\.(?:m?js|html?|css)$/iu.test(file))pending.push({file,documentUrl});
@@ -792,15 +836,15 @@ async function packageWithContext(context,options={}){
             }
         }
         for(const document of inspected.browserDocuments){
-            if(document.managedMaps.length>0&&!pwaDocumentSources.has(document.path)){
-                const url=new URL(document.path,entryUrl.origin);
-                pending.push({file:document.path,documentUrl:document.bases[0]?.href
+            if(document.managedMaps.length>0&&!pwaDocumentSources.has(document.packagePath)){
+                const url=new URL(packageResourceUrl(document.packagePath),entryUrl.origin);
+                pending.push({file:document.packagePath,documentUrl:document.bases[0]?.href
                     ?new URL(document.bases[0].href,url):url});
             }
         }
         for(const [file,document] of pwaDocumentSources){
-            if(file===context.config.entry)continue;
-            const url=new URL(file,entryUrl.origin);
+            if(file===entryPath)continue;
+            const url=new URL(packageResourceUrl(file),entryUrl.origin);
             pending.push({file,documentUrl:document.inspected.bases[0]?.href
                 ?new URL(document.inspected.bases[0].href,url):url});
         }
@@ -832,7 +876,7 @@ async function packageWithContext(context,options={}){
                 if(!pwaEnabled&&!traversable)continue;
                 if(kind==='import'&&!/^(?:\.{1,2}\/|\/)/u.test(url))continue;
                 try{
-                    const ownerUrl=new URL(relative,entryUrl.origin);
+                    const ownerUrl=new URL(packageResourceUrl(relative),entryUrl.origin);
                     const base=baseHref?new URL(baseHref,ownerUrl)
                         :baseKind==='document'||path.posix.basename(relative)==='arcane.importmap.json'
                             ?current.documentUrl:ownerUrl;
@@ -854,7 +898,7 @@ async function packageWithContext(context,options={}){
         if(files.some(file=>pathKey(file)===pathKey(RELEASE_MANIFEST_NAME))){
             fail(`Package content must not author ${RELEASE_MANIFEST_NAME}.`);
         }
-        if(!files.some(file=>pathKey(file)===pathKey(context.config.entry))){
+        if(!files.some(file=>pathKey(file)===pathKey(entryPath))){
             fail(`Package output is missing its entry file: ${context.config.entry}.`);
         }
         const pwaArtifacts=pwaEnabled?createPwaArtifacts({
@@ -862,8 +906,9 @@ async function packageWithContext(context,options={}){
                 id:context.appId,
                 displayName:context.config.displayName,
                 version:context.config.version,
-                entry:context.config.entry
+                entry:packageResourceUrl(entryPath)
             },
+            appPath,
             sdkVersion:assetVersion,
             pwa:context.config.pwa,
             files,
@@ -878,7 +923,7 @@ async function packageWithContext(context,options={}){
                 files.push(artifact.path);
             }
             for(const [documentPath,document] of pwaDocumentSources){
-                const documentUrl=new URL(documentPath,entryUrl.origin);
+                const documentUrl=new URL(packageResourceUrl(documentPath),entryUrl.origin);
                 const outputBase=document.inspected.bases[0]?.href
                     ?new URL(document.inspected.bases[0].href,documentUrl):documentUrl;
                 const outputDirectory=new URL('./',outputBase).pathname;

@@ -199,8 +199,26 @@ URLs and release schema:
 apps/<id>/arcane-app.json
 apps/<id>/arcane-package.json
 apps/<id>/index.html
+dist/<id>/index.html
+dist/<id>/apps/<id>/index.html
 dist/<id>/ARCANE_APP_RELEASE.json
 ```
+
+Packaging places each selected app file beneath `apps/<id>/` in the release
+and preserves every shared route destination. When no selected shared payload
+supplies a root `index.html`, the SDK generates one that opens the selected app
+entry. Authored document bases, app URLs, relative module imports, and shared
+runtime paths therefore resolve through the same layout in
+source development and packaged delivery. Packaging consumes the saved source
+and managed import maps; use `arcane import-map` to refresh those maps, or the
+ordinary `arcane dev` startup that performs that refresh.
+
+The release manifest keeps `app.entry` relative to the app directory and records
+the package launch URL in `app.start`, such as
+`./apps/hello-world/index.html`. Its complete `files` inventory includes the
+root `index.html` and the prefixed app files. Packaged browser serving opens
+`app.start`; a previously generated flat release without `app.start` retains
+its `app.entry` launch path.
 
 The authored schema-2 descriptor is canonical for new apps and projects an
 exact schema-1 `arcane-package.json` for current consumers. Existing Arcane

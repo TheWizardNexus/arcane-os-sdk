@@ -517,14 +517,18 @@ async function packagedRoutes(releaseRoot){
     let pwa = false;
     let startPath = '/index.html';
     try {
+        const release = JSON.parse(
+            await readFile(path.join(canonical, 'ARCANE_APP_RELEASE.json'), 'utf8')
+        );
+        const start = release.app.start ?? release.app.entry;
+        const startUrl = new URL(start, 'http://arcane.invalid/');
+        startPath = `${startUrl.pathname}${startUrl.search}${startUrl.hash}`;
+    } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+    }
+    try {
         const manifest = JSON.parse(await readFile(path.join(canonical, 'arcane-offline.json'), 'utf8'));
         pwa = manifest.schemaVersion === 1;
-        if (pwa) {
-            const release = JSON.parse(
-                await readFile(path.join(canonical, 'ARCANE_APP_RELEASE.json'), 'utf8')
-            );
-            startPath = `/${release.app.entry}`;
-        }
     } catch (error) {
         if (error.code !== 'ENOENT') throw error;
     }

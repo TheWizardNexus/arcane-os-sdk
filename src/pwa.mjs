@@ -72,17 +72,20 @@ function selectedPath(file, selection) {
     return file === selection || file.startsWith(prefix);
 }
 
-export function selectPwaFiles(files, pwa) {
+export function selectPwaFiles(files, pwa, appPath = '') {
     const config = normalizePwaConfig(pwa);
     const include = config?.offline.include ?? [];
     const exclude = config?.offline.exclude ?? [];
+    const appPrefix = appPath ? `${appPath}/` : '';
     return files.filter(
         function selectedOfflineFile(file) {
+            const relative = appPrefix && file.startsWith(appPrefix)
+                ? file.slice(appPrefix.length) : file;
             function includedPath(selection) {
-                return selectedPath(file, selection);
+                return selectedPath(relative, selection);
             }
             function excludedPath(selection) {
-                return selectedPath(file, selection);
+                return selectedPath(relative, selection);
             }
             return (include.length === 0 || include.some(includedPath))
                 && !exclude.some(excludedPath);
@@ -199,6 +202,7 @@ export function createPwaArtifacts(
         mode = 'release',
         runtimeBase = './arcane/sdk/',
         appBase,
+        appPath = '',
         navigationAliases,
         revision
     } = {}
@@ -209,20 +213,19 @@ export function createPwaArtifacts(
         throw new TypeError('PWA mode must be release or development.');
     }
     const entryUrl = new URL(app.entry, 'https://arcane.invalid/');
-    const applicationBase = appBase ?? (mode === 'development'
-        ? new URL('./', entryUrl).pathname : './');
-    const manifest = applicationManifest(
-        {
-            id: applicationBase,
-            name: app.displayName,
-            short_name: app.displayName,
-            start_url: app.entry,
-            scope: applicationBase,
-            display: 'standalone',
-            ...config.manifest
-        },
-        applicationBase
-    );
+    const applicationBase = appBase ?? (appPath ? `./${appPath}/`
+        : mode === 'development' ? new URL('./', entryUrl).pathname : './');
+    // Relocating app files must not change an existing installed app's default identity.
+    const installationBase = appBase ?? (mode === 'development' ? applicationBase : './');
+    const manifest = {
+        id: installationBase,
+        name: app.displayName,
+        short_name: app.displayName,
+        start_url: manifestUrl(app.entry, appPath ? basePath : applicationBase),
+        scope: installationBase,
+        display: 'standalone',
+        ...applicationManifest(config.manifest, applicationBase)
+    };
     const generatedAssets = [
         PWA_MANIFEST_NAME,
         PWA_OFFLINE_MANIFEST_NAME,
@@ -232,7 +235,7 @@ export function createPwaArtifacts(
             return resourceUrl(basePath, file);
         }
     );
-    const selectedFiles = selectPwaFiles(files, config);
+    const selectedFiles = selectPwaFiles(files, config, appPath);
     const selectedAssets = [
         ...selectedFiles.map(
             function packagedResource(file) {

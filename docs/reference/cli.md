@@ -195,8 +195,8 @@ Wrong or duplicate explicit app identity fails. The renderer then requires one
 path-correct base for every selected document. Included HTML files with neither
 the identity marker nor an active base are component fragments: they remain
 package files and are not rewritten with a document-level import map.
-Packaging and development use the same discovery owner, so directly navigable
-source pages and packaged pages receive the same complete managed import-map JSON.
+Packaging and development use the same discovery owner. Packaging consumes
+the saved managed import maps in directly navigable source pages.
 
 ```text
 arcane import-map [--workspace <directory>] [--app <id>]
@@ -254,19 +254,12 @@ together. A post-commit observer failure preserves delivery with
 `eventDelivery.status === 'degraded'` and `ARCANE_EVENT_DELIVERY_FAILED`; it
 does not roll back complete application content.
 
-An external package also publishes `/ARCANE_RUNTIME_PROJECTION.json`. The JSON
-is `{schemaVersion:1,kind:'arcane-app-runtime-projection',sdkVersion,
-pathPrefix:'arcane/',files:[{path}]}` and lists the complete packaged runtime.
-The development server exposes the same public route from its workspace
-projection. The private `/ARCANE_APP_RELEASE.json` record is not served to
-application code. Malformed projection data fails
-`ARCANE_RUNTIME_PROJECTION_INVALID`.
-
 `new` and `init` generate the map during scaffolding. `dev` refreshes all
-selected documents once before binding; non-dry-run `package` refreshes them
-once, then collects the complete release. Packaging does not run tests or
-checks automatically. Browser `build` and paired native packaging reuse the
-package flow. Explicit `test` and `check` operations read the existing map without regenerating it;
+selected documents once before binding. `package` consumes the saved source
+and maps; use `import-map` to refresh them explicitly before selecting output
+that needs updated maps. Packaging does not run tests or checks automatically.
+Browser `build` and paired native packaging reuse the package flow.
+Explicit `test` and `check` operations read the existing map without regenerating it;
 `verify`, `bundle`, and browser `run` do not regenerate it. There is no
 watcher, polling, scheduled refresh, download, or self-update behavior.
 
@@ -504,9 +497,12 @@ npm exec -- arcane check --app hello-world
 ### Overview
 
 Creates one complete browser release beneath `dist/<id>/`, preserving the prior
-output until the replacement is complete. It refreshes the selected document
-map once, then assembles `dist`. Packaging does not run tests or checks
-automatically.
+output until the replacement is complete. It consumes saved source and managed
+import maps, places app files beneath `apps/<id>/`, and retains the configured
+shared route destinations. When selected shared content supplies no root
+`index.html`, the SDK generates one that opens the selected app entry.
+Source document bases and resource URLs therefore retain their development
+layout. Packaging does not run tests or checks automatically.
 
 ```text
 arcane package [--app <id>] [--dry-run]
@@ -515,6 +511,9 @@ arcane package [--app <id>] [--dry-run]
 ### Result
 
 The result includes the release root, manifest, and complete selected inventory.
+`ARCANE_APP_RELEASE.json` keeps the authored app-relative `app.entry` and records
+the package launch URL in `app.start`, such as `./apps/hello-world/index.html`.
+The file inventory includes that app tree and the root `index.html`.
 `--dry-run` plans the package without refreshing source, running tests, or
 replacing output.
 
@@ -672,6 +671,8 @@ npm exec -- arcane build \
 
 For `--target browser`, starts the existing current `dist/<app>` release; it
 does not package, rebuild, test, check, or verify that release automatically.
+It opens the release manifest's `app.start` URL. Older flat releases without
+that field continue to open their `app.entry` path.
 The preview always uses HTTPS with the workspace certificate pair. Supply
 `--cert <file> --key <file>` together to use another pair; see
 [development HTTPS setup](#development-https-setup).
