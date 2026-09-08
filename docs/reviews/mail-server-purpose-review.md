@@ -1,10 +1,10 @@
-[Roshi's Codex PRIME] The gateway review and its portable credential follow-up apply the same three purpose gates. The gateway removals preserve complete delivery outcomes, configured CORS and recipient policy, and the optional subscription verifier. Mail credentials now belong in the user-selected `.env.json`, with one portable Node implementation for Windows, Linux, and macOS and a compatible Node host as the Android adaptation boundary. The original gateway inventory below uses baseline `f055e05`; the credential follow-up reviews the Windows storage implementation present at SDK `0.18.0`. Commit, package, publication, and actual platform execution outcomes belong to the delivery record rather than to this source-review report.
+[Roshi's Codex PRIME] The gateway review and its portable credential follow-up apply the same three purpose gates. The gateway removals preserve complete delivery outcomes, configured CORS and recipient policy, and the optional subscription verifier. Mail credentials now belong in the user-selected `.arcane.env.json`, with one portable Node implementation for Windows, Linux, and macOS and a compatible Node host as the Android adaptation boundary. The original gateway inventory below uses baseline `f055e05`; the credential follow-up reviews the Windows storage implementation present at SDK `0.18.0`. Commit, package, publication, and actual platform execution outcomes belong to the delivery record rather than to this source-review report.
 
 | Decision | Behavior | Why it matters | Source status at this review |
 | --- | --- | --- | --- |
 | Remove | Loopback-only admission, manual header reconstruction, address/origin normalization, local payload grammar, manual content-length scan, dead queue knobs | These restrict supported use, rewrite supplied values, or repeat work already owned elsewhere. | Removed from the inspected source; naming-only changes carry no runtime claim. |
 | Remove and replace | Local app-key hashes and X-Mail-Key authentication | The selected application plus bearer subscription contract needs an actual verifier, not a local shared-key comparison. | Removed. Optional `verifySubscription` implements the local integration contract; the remote endpoint adapter remains future work. Initial setup without that callback performs no caller authentication. |
-| Remove and replace | Windows-only credential process, native interop, helper timers, environment prerequisites, encoding and input/output limits | They prevent the required portable startup and perform work absent from the selected JSON storage path. | Replaced by direct `.env.json` access. Existing Windows credential records remain untouched. Default and named credential operations remain useful and are preserved. |
+| Remove and replace | Windows-only credential process, native interop, helper timers, environment prerequisites, encoding and input/output limits | They prevent the required portable startup and perform work absent from the selected JSON storage path. | Replaced by direct `.arcane.env.json` access. Existing Windows credential records remain untouched. Default and named credential operations remain useful and are preserved. |
 | Simplify | Exact CORS policy, one configuration resolution, one provider request construction/serialization, optional observation | Preserve the intended result while eliminating repeated parsing, copies, policy structures, and absent-observer work. | Present in inspected source. Explicit nonempty origin lists remain authoritative; otherwise the nominal-domain default applies. |
 | Keep | Configured subscription authentication, explicit recipient policy/fallback, stable idempotency, real cancellation/deadlines, complete provider outcomes, concurrent requests and owned shutdown | These have concrete callers and determine whether mail is sent, retried, reported honestly, or stopped correctly. | Retained. Only a verifier result of `true` permits authenticated delivery; failures and cancellation prevent the provider attempt. |
 
@@ -35,7 +35,7 @@ The latest user-selected boundaries govern this review:
 - Explicit recipient allowlists and error-recipient fallback remain. A configured nonempty allowlist covers resolved `to`, `cc`, and `bcc` recipients; allowing additional provider fields must not bypass the selected recipient policy. With no allowlist, the policy performs no recipient scan. Per-address trimming, lowercasing, and local email grammar do not remain.
 - Caller-selected deadlines, the cancellation adapter, complete provider outcomes, retry classification, stable idempotency, and independently constructed snapshots for emitted observations remain. Shared mutable provider snapshots have not been selected.
 - Remove manual response content-length scanning, duplicate configuration/CORS construction, unobserved event payload creation, unused `allowZero`, and unused CLI queue options.
-- All SDK mail operations require a functional Windows, Linux, and macOS path, with Android adaptation at the host boundary. Read provider configuration directly from an ignored `.env.json`; an operating-system limitation notice does not satisfy the portable requirement. Default profile `mail` uses `RESEND_API_KEY`; other exact names use `MAIL_PROFILES[profile].RESEND_API_KEY`. Missing configuration must identify the file and setting to fill in. Existing Windows records remain untouched, without an automatic read or migration.
+- All SDK mail operations require a functional Windows, Linux, and macOS path, with Android adaptation at the host boundary. Read provider configuration directly from an ignored `.arcane.env.json`; an operating-system limitation notice does not satisfy the portable requirement. Default profile `mail` uses `RESEND_API_KEY`; other exact names use `MAIL_PROFILES[profile].RESEND_API_KEY`. Missing configuration must identify the file and setting to fill in. Existing Windows records remain untouched, without an automatic read or migration.
 
 Source inspection during this report's handoff shows local app/email/sender/API-key format validators and loopback admission removed; origin values retained in one Set; complete provider JSON values or raw response text preserved; template-shaped provider requests no longer required to supply local text/HTML fields; and configuration passed once into `createConfiguredMailHandler`. Observer objects, pending Sets, callback closures, event payload reconstruction, and drain waits are absent when `onEvent` is omitted. An already-cancelled direct send stops before provider payload construction or serialization. Response writing no longer calculates content length. The fixed `/v1/mail` route accepts its query-bearing form, matching the portable endpoint parser. These are source observations, not executed behavior.
 
@@ -311,7 +311,7 @@ The coupled CLI/browser actions below are necessary to avoid leaving contradicto
 
 | Coupled path/action | Gates and decision | Required result and evidence boundary |
 | --- | --- | --- |
-| `src/mail.mjs` `serveMail` old hidden app-key input and local auth options | Y/Y/Y — Reconciled with the optional verifier contract. | Obsolete shared-app-key prompt/options are removed. Current `serveMailGateway` forwards `options.verifySubscription` to the server and keeps provider credential operations and the provider API key separate. The portable follow-up resolves that provider credential from `.env.json`. |
+| `src/mail.mjs` `serveMail` old hidden app-key input and local auth options | Y/Y/Y — Reconciled with the optional verifier contract. | Obsolete shared-app-key prompt/options are removed. Current `serveMailGateway` forwards `options.verifySubscription` to the server and keeps provider credential operations and the provider API key separate. The portable follow-up resolves that provider credential from `.arcane.env.json`. |
 | `src/mail.mjs` `recipientList` and origin list preparation | Y/Y/Y — Remove redundant rewriting, preserve configured policy values. | Gateway and CLI must not disagree about preserved recipients/origins. An exact allowlist is still an intentional policy. |
 | `src/mail.mjs` `withoutMailCredentials` | N/N/Y for recursive payload-key redaction — Remove. | It recursively traversed/copied complete results and deleted any content property named `apiKey` or `appKey`, including ordinary user payload fields. Keep actual transport credentials outside constructed public results at their owning boundary; do not rewrite the report based on property names. Source inspection shows this traversal removed. |
 | `src/mail.mjs` `completeSendFailure` | Y/Y/Y — Remove helper after preserving the complete result directly. | Failure output still contains the provider result, or a narrow wrapper for a non-object injected result. No recursive copying/redaction pass remains. |
@@ -378,7 +378,7 @@ Existing native credential records are neither read nor changed.
 | `setMailCredential`, `readMailCredential`, `getMailCredentialStatus`, `deleteMailCredential` | Y/Y/Y | Preserve all four operations and replace their implementation. Explicit set/delete update only the selected credential field while preserving other settings and profiles; read returns the selected key or null; status reports existence. File access uses portable Node APIs. |
 | `mailCredentialOptions`, `readMailProviderKey` | Y/Y/Y | Keep shared command configuration and consolidate the real send/serve duplicate key-read error path. Remove Windows runner, helper directory, and helper timeout forwarding. Missing configuration names the exact JSON setting and file before opening a listener or attempting delivery. |
 | CLI required profile flag and omitted invocation directory | Y/Y/Y | Make the profile optional with default `mail`, retaining explicit profiles. Forward the invocation directory through every mail operation, so the CLI reads the operator's selected file. Preserve hidden/stdin key entry and existing send/serve lifecycle. |
-| Repository and workspace-template `.gitignore` entry | Y/Y/N | Keep `.env.json` out of source control in this checkout and newly generated workspaces. The populated local file is outside the committed and published change. |
+| Repository and workspace-template `.gitignore` entry | Y/Y/N | Keep `.arcane.env.json` out of source control in this checkout and newly generated workspaces. The populated local file is outside the committed and published change. |
 
 The credential path performs one file read per selected operation and one write
 only for an explicit set or a deletion that finds a credential. Startup reads
@@ -402,7 +402,7 @@ subscription callback, sender selection, recipient configuration and cancellatio
 
 | Method or action | Gates | Decision, callers, and concrete purpose |
 | --- | --- | --- |
-| `readMailServerSettings` | Y/Y/N | Read the same `.env.json` once for server startup, select the existing provider profile and resolve the two shared PEM path settings relative to that file. This avoids a second configuration read and platform-specific credential or certificate processes. |
+| `readMailServerSettings` | Y/Y/N | Read the same `.arcane.env.json` once for server startup, select the existing provider profile and resolve the two shared PEM path settings relative to that file. This avoids a second configuration read and platform-specific credential or certificate processes. |
 | `readMailProviderKey` and `serveMailGateway` | Y/Y/N | Preserve the existing credential-injection interface and missing-provider error while consuming the already-read startup key. Require the selected TLS pair before binding; forward only the paths to the listener. Direct provider sending and key CRUD remain unchanged. |
 | `MAIL_TLS_CERT_PATH` and `MAIL_TLS_KEY_PATH` | Y/Y/N | Clear top-level names identify certificate and private-key file paths for one listener, independently of any provider profile or calling application. Missing settings and unusable JSON values name the field without printing its content. |
 | `startResendMailServer` TLS options | Y/Y/N | Add `certPath` and `keyPath` through the module's published PEM API. HTTPS-only mode creates one listener with HTTP/2 and HTTP/1.1 negotiation on the selected port. This internal source integration retains its existing HTTP behavior when neither path is supplied; it is not an npm package export. The public toolchain mail operation requires the JSON pair. |
@@ -436,3 +436,24 @@ defaults adds no runtime work or helper. TLS negotiation, the returned endpoint
 and the occupied-port message already use the selected port. Existing test
 source was updated for the omitted-port path; explicit-port cases were retained.
 No local tests, checks or server launch were performed for this increment.
+
+## Deployment configuration filename follow-up
+
+The user selected `.arcane.env.json` in the command's invocation directory,
+independently of a nested SDK directory. `mailCredentialLocation` remains the
+single filename owner for key operations, direct sending and server startup;
+`mailCredentialStatus` reports the same new name. The directory precedence and
+relative certificate-path resolution remain unchanged.
+
+The filename change passes Y/Y/N: its name identifies Arcane configuration,
+deployment ownership makes the location useful, and removing that configuration
+would lose the provider and TLS settings. Additional filename fallbacks, upward
+searches and automatic migrations fail N/N/Y and are omitted. This rename adds
+no read, timer, helper or per-request work. Existing deployments rename their
+file with its contents intact when adopting SDK 0.23.0. Repository and generated
+workspace ignores include the new name and retain the old entry for existing
+private files. Only the intended filename and status contract change; mail
+payloads, profiles, other settings and lifecycle remain unchanged.
+
+Existing credential and CLI test fixtures now use the selected name. Source
+and diff were reviewed; local tests, checks and server execution were not run.

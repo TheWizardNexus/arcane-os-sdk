@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.23.0
+
+- Rename the mail configuration file to `.arcane.env.json`. Upgrade existing
+  deployments by renaming `.env.json` in the directory where the mail command
+  runs, preserving its contents. Mail commands now read only the selected new
+  name and report `storage: '.arcane.env.json'`.
+- Keep configuration independent of the SDK installation directory, including
+  an SDK nested beneath the site root. Preserve provider profiles, relative TLS
+  paths, other JSON settings and HTTPS/HTTP2 port 4433. Update help, references,
+  the purpose-gate report and generated-workspace Git ignores.
+
 ## 0.22.1
 
 - Change the mail gateway's default HTTPS/HTTP2 port from 8025 to 4433 in

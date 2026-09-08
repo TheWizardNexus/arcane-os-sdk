@@ -54,7 +54,7 @@ test('mail key set reads a synthetic key only from explicit stdin and never repo
             return {
                 profile:options.profile,
                 provider:'resend',
-                storage:'.env.json',
+                storage:'.arcane.env.json',
                 exists:true
             };
         }
@@ -196,7 +196,7 @@ test('mail key status dispatches a sanitized profile operation',async function m
             return {
                 profile:options.profile,
                 provider:'resend',
-                storage:'.env.json',
+                storage:'.arcane.env.json',
                 exists:false
             };
         }
@@ -217,7 +217,7 @@ test('headless toolchain dispatches the mail operation without exposing credenti
             return {
                 profile:options.profile,
                 provider:'resend',
-                storage:'.env.json',
+                storage:'.arcane.env.json',
                 exists:true
             };
         }
@@ -226,7 +226,7 @@ test('headless toolchain dispatches the mail operation without exposing credenti
     assert.deepEqual(result,{
         profile:'arcane-dev',
         provider:'resend',
-        storage:'.env.json',
+        storage:'.arcane.env.json',
         exists:true
     });
 });
@@ -298,7 +298,7 @@ test('mail serve reports the missing JSON setting before opening its listener',a
     });
     assert.equal(exitCode,1);
     assert.equal(started,false);
-    assert.match(parseNdjson(stdout.read()).at(-1).data.error.message,/Missing RESEND_API_KEY in .*\.env\.json/u);
+    assert.match(parseNdjson(stdout.read()).at(-1).data.error.message,/Missing RESEND_API_KEY in .*\.arcane\.env\.json/u);
 });
 
 test('mail rejects a request timeout outside the Node timer range before execution',async function invalidMailTimeout(){
@@ -335,7 +335,7 @@ test('mail command controller keeps credential values inside the selected operat
             return {
                 profile:options.profile,
                 provider:'resend',
-                storage:'.env.json',
+                storage:'.arcane.env.json',
                 exists:true
             };
         }
@@ -429,7 +429,7 @@ test(
             ),
             function inspectMissingTlsSettings(error) {
                 assert.equal(error.code, 'ARCANE_PREREQUISITE_MISSING');
-                assert.match(error.message, /Missing MAIL_TLS_CERT_PATH, MAIL_TLS_KEY_PATH in .*\.env\.json/u);
+                assert.match(error.message, /Missing MAIL_TLS_CERT_PATH, MAIL_TLS_KEY_PATH in .*\.arcane\.env\.json/u);
                 assert.equal(error.message.includes(secret), false);
                 return true;
             }
@@ -443,7 +443,7 @@ test(
     async function injectedCredentialWithJsonTls(context) {
         const cwd = await temporaryDirectory(context);
         await writeFile(
-            path.join(cwd, '.env.json'),
+            path.join(cwd, '.arcane.env.json'),
             JSON.stringify(
                 {
                     RESEND_API_KEY: {unused: 'not-a-provider-key'},

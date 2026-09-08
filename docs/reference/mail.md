@@ -13,7 +13,7 @@ gateway and is never included in browser or WebAssembly state.
 | `MailTransport.mjs` | Browser, WebView, or compatible Fetch host | Sends one already-persisted request to the configured Arcane gateway with the stable report key as its idempotency key. |
 | `arcane mail send` | Node on the local machine | Reads one complete provider-neutral report from redirected stdin and performs one explicit Resend attempt with a caller-owned idempotency key. |
 | `arcane mail serve` | Node on the configured host | Owns caller verification, protects the provider credential, applies explicitly configured recipient and origin settings, and makes one server-side Resend request. |
-| `arcane mail key ...` | Node on Windows, Linux, or macOS | Stores, inspects, or deletes a Resend API key in the selected `.env.json`. |
+| `arcane mail key ...` | Node on Windows, Linux, or macOS | Stores, inspects, or deletes a Resend API key in the selected `.arcane.env.json`. |
 
 The browser never receives the Resend API key. The gateway never writes that
 key to source, argv, logs, events, fixtures, browser storage, or its public
@@ -56,7 +56,7 @@ browser import while preserving one shared CLI/toolchain implementation.
 Arcane Mail deliberately separates two credentials:
 
 - The **Resend API key** is provider authority. The Node process reads it from
-  `.env.json`. `arcane mail key set [profile]` can store it there through hidden
+  `.arcane.env.json`. `arcane mail key set [profile]` can store it there through hidden
   input; `mail send` and `mail serve` read the selected profile inside that process.
 - The **subscription key** is the application user's subscription credential.
   When present, the browser sends it as `Authorization: Bearer <subscriptionKey>`,
@@ -272,7 +272,7 @@ committed acceptance result.
 
 ## Operate the CLI and gateway
 
-Create `.env.json` in the directory from which the mail command runs, then fill
+Create `.arcane.env.json` in the directory from which the mail command runs, then fill
 in the provider key and the HTTPS certificate paths:
 
 ```json
@@ -283,7 +283,7 @@ in the provider key and the HTTPS certificate paths:
 }
 ```
 
-The SDK repository ignores `.env.json`. Keep the same entry in a consuming
+The SDK repository ignores `.arcane.env.json`. Keep the same entry in a consuming
 project's `.gitignore`. This is a JSON configuration file; the mail commands
 read it directly without copying its contents into `process.env`.
 
@@ -306,11 +306,32 @@ An absent named profile does not fall back to the default key. The profile
 selects Resend provider credentials; it is separate from the incoming
 application name and subscriber key.
 
-Programmatic operations resolve `.env.json` from `options.cwd`, then
+Programmatic operations resolve `.arcane.env.json` from `options.cwd`, then
 `options.workspaceRoot`, then `process.cwd()`, choosing the first supplied
 directory. The CLI uses its invocation directory. There is no upward directory
 search or dependency on a Windows installation directory or temporary-directory
 environment variable.
+
+Keep the configuration in the deployment directory even when the SDK is nested
+below it:
+
+```text
+my-site/
+├── .arcane.env.json
+└── arcane-os-sdk/
+    └── bin/arcane.mjs
+```
+
+Run from `my-site`, for example:
+
+```sh
+node ./arcane-os-sdk/bin/arcane.mjs mail serve --port 4433
+```
+
+The SDK directory does not choose the configuration location. When upgrading
+from SDK 0.22.1 or earlier, rename the existing `.env.json` to
+`.arcane.env.json` in the invocation directory, preserving its contents.
+The loader reads only `.arcane.env.json`.
 
 The existing key commands manage the same file:
 
@@ -324,7 +345,7 @@ arcane mail key delete
 non-interactive alternative and rejects a TTY. Each command accepts an optional
 profile argument, defaulting to `mail`. Set and delete preserve other JSON
 settings and profiles; status reports existence without returning the key.
-Results identify `storage: '.env.json'`. An already-absent deletion succeeds
+Results identify `storage: '.arcane.env.json'`. An already-absent deletion succeeds
 with `exists: false`.
 
 Existing Windows Credential Manager records remain untouched. The JSON path
@@ -381,7 +402,7 @@ domain, for example `https://mail.example.com:4433/v1/mail`.
 Set `MAIL_TLS_CERT_PATH` to the PEM certificate chain and `MAIL_TLS_KEY_PATH`
 to its PEM private-key file. These top-level settings belong to the listener
 and apply regardless of the selected provider profile. Relative paths resolve
-from the directory containing `.env.json`; absolute paths are also accepted.
+from the directory containing `.arcane.env.json`; absolute paths are also accepted.
 The certificate must cover the hostname callers use. One certificate may
 cover multiple names; the gateway does not require one certificate per calling
 application. Keep private-key files outside tracked source, such as in the

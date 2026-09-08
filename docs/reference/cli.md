@@ -32,7 +32,7 @@ and exits nonzero on failure. Machine output is defined by
 | `arcane update-check` | Performs one explicit, read-only npm dist-tag query for the installed SDK version. |
 | `arcane targets` | Lists target ids, declared status, formats, architectures, signing profiles, methods, and pairing reason. |
 | `arcane repo status\|pull\|push` | Runs one selected repository operation for the current app workspace. |
-| `arcane mail key set\|status\|delete` | Manages one server-only Resend API-key profile in `.env.json`. |
+| `arcane mail key set\|status\|delete` | Manages one server-only Resend API-key profile in `.arcane.env.json`. |
 | `arcane mail send` | Performs one explicit, idempotency-keyed Resend attempt from a complete JSON report on redirected stdin. |
 | `arcane mail serve` | Starts one Arcane-to-Resend gateway with a server-only provider profile, a selected listener, and optional CORS and recipient configuration. |
 
@@ -814,7 +814,7 @@ npm exec -- arcane repo status
 
 ### Resend credential profiles
 
-The mail commands read `.env.json` from the invocation directory on Windows,
+The mail commands read `.arcane.env.json` from the invocation directory on Windows,
 Linux, and macOS. The credential subcommands select one profile in that file:
 
 ```text
@@ -825,7 +825,7 @@ arcane mail key delete [profile]
 
 `key set` reads the Resend API key from a hidden terminal prompt. The
 `--secret-stdin` form is for deliberately redirected non-interactive input and
-rejects a TTY before reading. The key is written to `.env.json` and is never
+rejects a TTY before reading. The key is written to `.arcane.env.json` and is never
 accepted in argv or returned in status output. The optional profile defaults
 to `mail`, which selects top-level `RESEND_API_KEY`. Any other exact profile
 selects `MAIL_PROFILES[profile].RESEND_API_KEY`, with no default-key fallback.
@@ -838,10 +838,10 @@ The minimal file is:
 }
 ```
 
-Fill in the key before starting mail, and add `.env.json` to the project's
+Fill in the key before starting mail, and add `.arcane.env.json` to the project's
 `.gitignore`; the SDK repository already ignores it. Set and delete preserve
 the file's other settings and profiles. Status returns the selected profile,
-`provider:'resend'`, `storage:'.env.json'`, and `exists`. Delete returns
+`provider:'resend'`, `storage:'.arcane.env.json'`, and `exists`. Delete returns
 `exists:false` for both a removed and an already-absent credential.
 
 Programmatic `createToolchain().mail(...)` resolves the configuration directory
@@ -851,6 +851,12 @@ supplies a compatible Node runtime and an accessible configuration directory.
 Existing Windows Credential Manager records remain untouched; the JSON reader
 does not migrate or fall back to them. Mail reads JSON directly and does not
 populate or depend on process environment variables for this key.
+
+The SDK's installation directory does not affect this location. With an SDK
+under `my-site/arcane-os-sdk/`, run the command from `my-site/` and keep
+`my-site/.arcane.env.json` alongside that directory. Existing deployments using
+SDK 0.22.1 or earlier must rename `.env.json` to `.arcane.env.json` while
+preserving its contents; the loader reads only the new name.
 
 Missing files or missing/empty selected keys stop `send` and `serve` with the
 configuration path and exact JSON setting to fill in. Invalid JSON and file
@@ -887,7 +893,7 @@ Resend owns their accepted shape. The adapter removes the application-only
 `type` field and applies `--from` when supplied; otherwise the report or provider
 template supplies the sender. Direct CLI sending has
 no configured fallback recipients. The Resend credential comes only from the
-selected `.env.json` profile; omitting `--profile` selects `mail`. Neither the
+selected `.arcane.env.json` profile; omitting `--profile` selects `mail`. Neither the
 key nor report content is accepted through argv or process environment variables.
 
 The caller owns the nonempty `--report-key`, which is forwarded unchanged.
@@ -912,7 +918,7 @@ loss after the attempt begins is ambiguous because Resend may have accepted it.
 arcane mail serve [--profile <profile>] [--from <verified-sender>] [--app <label>] [--origin <exact-origin>] [--allow-to <addresses>] [--host 0.0.0.0] [--port 4433] [--request-timeout <ms>]
 ```
 
-The selected `.env.json` profile supplies only the server-side Resend API key;
+The selected `.arcane.env.json` profile supplies only the server-side Resend API key;
 omitting `--profile` selects `mail`.
 
 Add the listener's certificate configuration at the top level of the same file:
@@ -926,10 +932,10 @@ Add the listener's certificate configuration at the top level of the same file:
 ```
 
 Supply an existing PEM certificate chain and its private key. Paths resolve
-relative to `.env.json`, or may be absolute. They are shared across provider
+relative to `.arcane.env.json`, or may be absolute. They are shared across provider
 profiles. Missing TLS settings name the fields to fill in before a listener
 opens; the TLS owner reports PEM file errors. Keep private-key material outside
-tracked source. The SDK repository already ignores `.arcane/` and `.env.json`.
+tracked source. The SDK repository already ignores `.arcane/` and `.arcane.env.json`.
 
 The selected `node-http-server` module negotiates HTTP/2 with HTTP/1.1 fallback
 on the same HTTPS port, default `4433`, with no plain-HTTP listener. Callers use

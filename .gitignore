@@ -3,5 +3,6 @@ dist/
 .arcane/
 .sync/
 .env.json
+.arcane.env.json
 *.log
 *.tgz

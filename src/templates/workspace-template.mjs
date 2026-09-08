@@ -133,6 +133,7 @@ appropriate.
         'build/',
         '.arcane/',
         '.env.json',
+        '.arcane.env.json',
         '*.log',
         ''
     ].join('\n'));

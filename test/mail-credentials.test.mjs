@@ -15,12 +15,12 @@ import {temporaryDirectory} from './helpers.mjs';
 
 test('default JSON credential operations preserve unrelated settings and keep status secret-free',async function defaultCredential(context){
     const cwd=await temporaryDirectory(context);
-    const filePath=path.join(cwd,'.env.json');
+    const filePath=path.join(cwd,'.arcane.env.json');
     const preserved={note:'Keep this complete text. 🐉',nested:{active:true}};
     await writeFile(filePath,JSON.stringify(preserved));
     const secret='re_synthetic_default_only';
     const result=await setMailCredential({cwd,secret});
-    assert.deepEqual(result,{profile:'mail',provider:'resend',storage:'.env.json',exists:true});
+    assert.deepEqual(result,{profile:'mail',provider:'resend',storage:'.arcane.env.json',exists:true});
     assert.equal(JSON.stringify(result).includes(secret),false);
     assert.equal(await readMailCredential({cwd}),secret);
     assert.equal(await readMailCredential({workspaceRoot:cwd,profile:'mail'}),secret);
@@ -50,7 +50,7 @@ test('missing configuration stays absent through status and delete',async functi
     assert.equal(await readMailCredential({cwd}),null);
     assert.equal((await getMailCredentialStatus({cwd})).exists,false);
     assert.equal((await deleteMailCredential({cwd})).exists,false);
-    await assert.rejects(readFile(path.join(cwd,'.env.json')),{code:'ENOENT'});
+    await assert.rejects(readFile(path.join(cwd,'.arcane.env.json')),{code:'ENOENT'});
 });
 
 test('explicit invocation directory wins over the toolchain workspace',async function invocationDirectory(context){
@@ -60,7 +60,7 @@ test('explicit invocation directory wins over the toolchain workspace',async fun
     await setMailCredential({cwd:workspaceRoot,secret:'re_synthetic_workspace'});
     assert.equal(await readMailCredential({cwd,workspaceRoot}),'re_synthetic_invocation');
     assert.deepEqual(mailCredentialLocation({cwd,profile:'BOSS.prod'}),{
-        filePath:path.join(cwd,'.env.json'),
+        filePath:path.join(cwd,'.arcane.env.json'),
         profile:'BOSS.prod',
         setting:'MAIL_PROFILES["BOSS.prod"].RESEND_API_KEY'
     });
@@ -68,7 +68,7 @@ test('explicit invocation directory wins over the toolchain workspace',async fun
 
 test('malformed JSON errors identify the file without quoting credential content',async function malformedConfiguration(context){
     const cwd=await temporaryDirectory(context);
-    const filePath=path.join(cwd,'.env.json');
+    const filePath=path.join(cwd,'.arcane.env.json');
     const content='{"RESEND_API_KEY":"re_synthetic_private", broken}';
     await writeFile(filePath,content);
     await assert.rejects(readMailCredential({cwd}),function inspectParseFailure(error){
@@ -83,7 +83,7 @@ test('malformed JSON errors identify the file without quoting credential content
 
 test('empty keys are absent and unusable settings name the affected field',async function configurationValues(context){
     const cwd=await temporaryDirectory(context);
-    const filePath=path.join(cwd,'.env.json');
+    const filePath=path.join(cwd,'.arcane.env.json');
     await writeFile(filePath,JSON.stringify({RESEND_API_KEY:''}));
     assert.equal(await readMailCredential({cwd}),null);
     await writeFile(filePath,JSON.stringify({RESEND_API_KEY:{private:'re_synthetic_private'}}));
@@ -97,7 +97,7 @@ test('empty keys are absent and unusable settings name the affected field',async
 
 test('cancellation before credential writes preserves the existing file',async function cancelledWrite(context){
     const cwd=await temporaryDirectory(context);
-    const filePath=path.join(cwd,'.env.json');
+    const filePath=path.join(cwd,'.arcane.env.json');
     const content=JSON.stringify({RESEND_API_KEY:'re_synthetic_existing',note:'Preserve me.'});
     await writeFile(filePath,content);
     const controller=new AbortController();
@@ -121,7 +121,7 @@ test(
                 MAIL_TLS_KEY_PATH: keyPath
             }
         );
-        await writeFile(path.join(cwd, '.env.json'), content);
+        await writeFile(path.join(cwd, '.arcane.env.json'), content);
         const settings = await readMailServerSettings(
             {cwd, profile: 'BOSS'}
         );
@@ -133,7 +133,7 @@ test(
                 keyPath
             }
         );
-        assert.equal(await readFile(path.join(cwd, '.env.json'), 'utf8'), content);
+        assert.equal(await readFile(path.join(cwd, '.arcane.env.json'), 'utf8'), content);
         assert.deepEqual(
             await readMailServerSettings(
                 {cwd, profile: 'BOSS', readCredential: null}
@@ -148,7 +148,7 @@ test(
     async function invalidMailTlsSetting(context) {
         const cwd = await temporaryDirectory(context);
         await writeFile(
-            path.join(cwd, '.env.json'),
+            path.join(cwd, '.arcane.env.json'),
             JSON.stringify(
                 {RESEND_API_KEY: 're_synthetic_private', MAIL_TLS_CERT_PATH: {private: 'private-content'}}
             )

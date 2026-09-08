@@ -11,7 +11,7 @@ export function mailCredentialLocation(options={}){
         throw new ArcaneError(ERROR_CODES.usage,'Mail credential profile must be a nonempty string.');
     }
     return {
-        filePath:path.resolve(options.cwd??options.workspaceRoot??process.cwd(),'.env.json'),
+        filePath:path.resolve(options.cwd??options.workspaceRoot??process.cwd(),'.arcane.env.json'),
         profile,
         setting:profile==='mail'?'RESEND_API_KEY':`MAIL_PROFILES[${JSON.stringify(profile)}].RESEND_API_KEY`
     };
@@ -79,7 +79,7 @@ function configuredMailKey(settings,location){
 }
 
 function mailCredentialStatus(profile,exists){
-    return {profile,provider:'resend',storage:'.env.json',exists};
+    return {profile,provider:'resend',storage:'.arcane.env.json',exists};
 }
 
 export async function setMailCredential(options={}){
