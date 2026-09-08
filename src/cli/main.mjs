@@ -85,7 +85,7 @@ Usage:
   ${CLI_NAME} mail key status [profile]
   ${CLI_NAME} mail key delete [profile]
   ${CLI_NAME} mail send [--profile <profile>] [--from <address>] --report-key <id> --report-stdin [--request-timeout <ms>]
-  ${CLI_NAME} mail serve [--profile <profile>] [--from <address>] [--app <label>] [--origin <origin>] [--allow-to <addresses>] [--host 0.0.0.0] [--port 8025] [--request-timeout <ms>]
+  ${CLI_NAME} mail serve [--profile <profile>] [--from <address>] [--app <label>] [--origin <origin>] [--allow-to <addresses>] [--host 0.0.0.0] [--port 4433] [--request-timeout <ms>]
     HTTPS/HTTP2; .env.json supplies RESEND_API_KEY, MAIL_TLS_CERT_PATH, and MAIL_TLS_KEY_PATH.
 
 Development:
@@ -698,7 +698,7 @@ function operationOptions(command,parsed,cwd){
                 origin:values.origin,
                 allowTo:values['allow-to'],
                 host:values.host??'0.0.0.0',
-                port:readPort(values.port,8025),
+                port:readPort(values.port,4433),
                 requestTimeout:readMailRequestTimeout(values['request-timeout']),
             };
         }

@@ -364,10 +364,10 @@ deadline.
 Start the gateway:
 
 ```text
-npm exec -- arcane mail serve --profile mail --host 0.0.0.0 --port 8025
+npm exec -- arcane mail serve --profile mail --host 0.0.0.0 --port 4433
 ```
 
-The default listener is `0.0.0.0:8025`; `--host` and `--port` select its bind
+The default listener is `0.0.0.0:4433`; `--host` and `--port` select its bind
 address and port. The server can serve callers from multiple domains on the
 same machine. Route the page's `/v1/mail` to this listener, or configure an
 explicit shared endpoint in the caller.
@@ -376,7 +376,7 @@ explicit shared endpoint in the caller.
 `node-http-server` PEM API owns TLS and negotiates HTTP/2 or HTTP/1.1 on the
 same listener. It creates no additional plain-HTTP listener. The returned URL
 uses `https://`; `0.0.0.0` is the bind address, so callers use the deployed
-domain, for example `https://mail.example.com:8025/v1/mail`.
+domain, for example `https://mail.example.com:4433/v1/mail`.
 
 Set `MAIL_TLS_CERT_PATH` to the PEM certificate chain and `MAIL_TLS_KEY_PATH`
 to its PEM private-key file. These top-level settings belong to the listener

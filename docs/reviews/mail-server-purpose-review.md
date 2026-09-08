@@ -52,7 +52,7 @@ Configuration and foundational methods follow. Each baseline name is recorded so
 | `positiveInteger` | Resolves the retry delay; baseline exposes unused `allowZero`. | Y/Y/Y — Simplify. | The uncalled zero branch and its extra option/prose are removed. Current name: `readRetryDelayMs`, which resolves the actual retry-delay setting. |
 | `optionalTimeoutMs` | Reads body/provider deadlines only when supplied. | Y/Y/N — Keep. | Omitting a deadline produces no timer. Node timer-range handling prevents caller-selected delays from changing meaning. Current name remains `optionalTimeoutMs`. |
 | `normalizeRetryAfter` | Error and result constructors keep a usable retry delay. | Y/Y/N — Keep. | Retry scheduling consumes this value. It is control metadata, not a transformation of message content. Current name: `retryDelayOrZero`. |
-| `portNumber` | Startup resolves default or configured port, including ephemeral port zero. | Y/Y/Y — Remove wrapper; retain configuration value. | The HTTP owner handles actual port binding. Preserve default 8025 and explicit port zero; no extra port validator or domain policy is required. |
+| `portNumber` | Startup resolves default or configured port, including ephemeral port zero. | Y/Y/Y — Remove wrapper; retain configuration value. | The HTTP owner handles actual port binding. Use the selected default 4433 and preserve explicit port zero; no extra port validator or domain policy is required. |
 | `validateSignal` | Direct send and server options accept caller cancellation. | Y/Y/Y — Remove wrapper; retain original signal. | Native signal operations already own their contract. Cancellation controllers/listeners and the abortable adapter remain. |
 | `validateApiKey` | Provider configuration supplies the credential used by Resend Fetch. | Y/Y/Y — Remove local format validator. | CLI credential retrieval reports missing provider credentials; Fetch/provider own actual transport validity. Never echo the credential. |
 | `validateAppId` | Validates application identity using the old lowercase-slug grammar. | Y/Y/Y — Remove the grammar and closed-list/equality admission. | Per-request identity matters and remains an ordinary string. Any application may use the shared server. Read the supplied identity for subscription verification without rewriting it; no standalone wrapper is needed solely to restrict spelling. |
@@ -395,7 +395,7 @@ cancellation before writes, and CLI defaults. Local tests and checks were not ru
 ## HTTPS and HTTP/2 follow-up
 
 The user explicitly selected HTTPS with HTTP/2. The mail listener remains on
-its dedicated configured port, default 8025, with the published
+its dedicated configured port, now default 4433, with the published
 `node-http-server` module owning TLS, protocol negotiation and listener/session
 shutdown. This increment preserves the provider attempt, report content,
 subscription callback, sender selection, recipient configuration and cancellation.
@@ -423,3 +423,16 @@ JSON paths and missing TLS settings. Synthetic TLS selection is not evidence of
 an encrypted handshake. No local tests, checks, server launch, real TLS
 negotiation or provider send were performed for this follow-up review. Selected
 package and publication results belong to the delivery record.
+
+## Main mail port follow-up
+
+The user selected 4433 as the main mail-server port. Both the CLI's omitted-port
+setting and the server's programmatic default now select 4433. Explicit ports,
+including ephemeral port zero, continue through the existing configuration.
+
+The port setting passes Y/Y/N: the listener needs a bind port, deployments need
+an override, and removing either would lose required behavior. Changing the two
+defaults adds no runtime work or helper. TLS negotiation, the returned endpoint
+and the occupied-port message already use the selected port. Existing test
+source was updated for the omitted-port path; explicit-port cases were retained.
+No local tests, checks or server launch were performed for this increment.

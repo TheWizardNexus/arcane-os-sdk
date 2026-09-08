@@ -19,11 +19,11 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This checkout defines the `0.22.0` SDK contract. Applications pin one exact npm
+This checkout defines the `0.22.1` SDK contract. Applications pin one exact npm
 version and lockfile; registry state is deliberately not baked into application
 artifacts.
 
-The [mail gateway](docs/reference/mail.md) serves HTTPS with HTTP/2 on port 8025,
+The [mail gateway](docs/reference/mail.md) serves HTTPS with HTTP/2 on port 4433,
 using certificate paths from `.env.json`, and defaults browser mail to
 `/v1/mail` on the current domain. Multiple applications can share
 one server with explicit allowed origins. Subscription verification is disabled

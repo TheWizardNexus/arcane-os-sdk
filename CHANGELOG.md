@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.22.1
+
+- Change the mail gateway's default HTTPS/HTTP2 port from 8025 to 4433 in
+  the CLI and server configuration. Preserve explicit port overrides and the
+  existing occupied-port message; update current help, references and gate report.
+
 ## 0.22.0
 
 - Export `generateDocumentImportMaps()` from `arcane-os` for explicitly selected

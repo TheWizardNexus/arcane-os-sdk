@@ -155,7 +155,7 @@ test('mail serve defaults to all interfaces without reading an app key',async fu
             assert.equal(options.profile,'mail');
             assert.equal(options.cwd,path.resolve('synthetic-mail-workspace'));
             assert.equal(options.host,'0.0.0.0');
-            assert.equal(options.port,8025);
+            assert.equal(options.port,4433);
             assert.equal(options.appId,undefined);
             assert.equal(options.from,undefined);
             assert.equal(options.origin,undefined);
@@ -165,7 +165,7 @@ test('mail serve defaults to all interfaces without reading an app key',async fu
                 mode:'mail',
                 host:options.host,
                 port:options.port,
-                url:'https://0.0.0.0:8025/v1/mail',
+                url:'https://0.0.0.0:4433/v1/mail',
                 callerAuthentication:'none',
                 lifecycle:Promise.resolve(),
                 close:async function closeMailServer(){}

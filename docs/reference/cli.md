@@ -48,7 +48,7 @@ meaning and cardinality rules:
 | `--workspace` | directory | Commands that select an external or integrated workspace; defaults to `.`. |
 | `--app` | app id or label | Workspace/app operations except shared scope and `verify-bundle`; optional diagnostic label for `mail serve`. |
 | `--arcane-root` | directory | `doctor`, native `build`/`run`, `native-doctor`, `native-prepare` |
-| `--host` / `--port` | host / integer 0–65535 | Browser `dev`/`run` default to HTTPS at `127.0.0.1:8000`; `mail serve` defaults to HTTPS with HTTP/2 at `0.0.0.0:8025` and accepts an explicit bind host. |
+| `--host` / `--port` | host / integer 0–65535 | Browser `dev`/`run` default to HTTPS at `127.0.0.1:8000`; `mail serve` defaults to HTTPS with HTTP/2 at `0.0.0.0:4433` and accepts an explicit bind host. |
 | `--http-port` | integer 0–65535 | Browser `dev`/`run` HTTP redirect listener; defaults to `0`, which selects an available port. |
 | `--public` | flag | `dev`; binds to `0.0.0.0` unless `--host` explicitly selects another address. |
 | `--http` | flag | `dev` only; serves source and PWA routes on one HTTP listener selected by `--port`, without TLS. |
@@ -909,7 +909,7 @@ loss after the attempt begins is ambiguous because Resend may have accepted it.
 `mail serve` starts one owned HTTPS gateway with HTTP/2:
 
 ```text
-arcane mail serve [--profile <profile>] [--from <verified-sender>] [--app <label>] [--origin <exact-origin>] [--allow-to <addresses>] [--host 0.0.0.0] [--port 8025] [--request-timeout <ms>]
+arcane mail serve [--profile <profile>] [--from <verified-sender>] [--app <label>] [--origin <exact-origin>] [--allow-to <addresses>] [--host 0.0.0.0] [--port 4433] [--request-timeout <ms>]
 ```
 
 The selected `.env.json` profile supplies only the server-side Resend API key;
@@ -932,9 +932,9 @@ opens; the TLS owner reports PEM file errors. Keep private-key material outside
 tracked source. The SDK repository already ignores `.arcane/` and `.env.json`.
 
 The selected `node-http-server` module negotiates HTTP/2 with HTTP/1.1 fallback
-on the same HTTPS port, default `8025`, with no plain-HTTP listener. Callers use
+on the same HTTPS port, default `4433`, with no plain-HTTP listener. Callers use
 a hostname covered by the certificate, such as
-`https://mail.example.com:8025/v1/mail`; `0.0.0.0` identifies the bind address.
+`https://mail.example.com:4433/v1/mail`; `0.0.0.0` identifies the bind address.
 Restart the gateway after replacing renewed certificate files. Certificate
 issuance and renewal remain with the deployment's certificate owner.
 

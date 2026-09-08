@@ -113,7 +113,7 @@ function resolveMailServerConfiguration(options={}){
         host:options.host??'0.0.0.0',
         callerAuthentication:options.verifySubscription?'subscription':'none',
         onEvent:options.onEvent,
-        port:options.port??8025,
+        port:options.port??4433,
         providerTimeoutMs:optionalTimeoutMs(options.providerTimeoutMs,'providerTimeoutMs'),
         requestIdFactory:options.requestIdFactory??randomUUID,
         retryableDelayMs:readRetryDelayMs(options.retryableDelayMs),
