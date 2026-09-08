@@ -480,7 +480,7 @@ files. Their explicit precedence and credential compatibility rules are in the
 | `readMailConfiguration` | Y/Y/N | Keep the cohesive configuration at the SDK owner. Send/serve read each required file once, in parallel when both are needed. A send with an injected credential reader skips the unused secrets file; incoming HTTP requests use the resolved configuration without file reads. Other capability settings stay untouched. |
 | CLI's early default host, port, and send/serve profile values | Y/Y/Y | Remove premature default assignment. The same defaults remain after file configuration resolves, while explicit CLI values retain priority. Assigning defaults before reading JSON would conceal the deployment's chosen settings. |
 | `origins` string array and list replacement | Y/Y/N | Keep one exact list for multiple caller domains. Explicit options replace the file list, including empty arrays. Existing `origin`, `allowTo`, `errorTo`, and `requestTimeout` aliases remain compatible and win over their canonical programmatic names when both are supplied. No normalization or list-merging helper is needed. |
-| Root provider-key, named-profile, and TLS compatibility | Y/Y/N | Preserve live deployments using `RESEND_API_KEY`, `MAIL_PROFILES`, `MAIL_TLS_CERT_PATH`, and `MAIL_TLS_KEY_PATH`. Nested selected key presence takes priority even when null or empty. Named profiles never select a different account's default key. |
+| Root provider-key, named-profile, and TLS compatibility | Y/Y/N | Preserve supported inputs using `RESEND_API_KEY`, `MAIL_PROFILES`, `MAIL_TLS_CERT_PATH`, and `MAIL_TLS_KEY_PATH`. Nested selected key presence takes priority even when null or empty. Named profiles never select a different account's default key. Named-profile deployment use is unverified; the retained behavior is a compatibility contract. |
 | Key set/status/delete operations | Y/Y/N | Preserve credential management and secret-free status. New keys use the nested member; existing legacy keys are updated in place unless a nested key exists. Delete removes both selected representations to prevent an old credential reappearing, preserving other keys, settings, and profile containers. Key commands still default to `mail` independently of the serving profile. |
 | Send configuration | Y/Y/N | Use the same profile, sender, provider-timeout, and retry-guidance settings for direct sending. A send needs provider authority and its report, so listener certificates remain a serve-only prerequisite. Reports and idempotency keys remain per-operation inputs. |
 | Explicit runtime dependencies and callbacks | Y/Y/N | Preserve `readCredential`, provider injection, observation, cancellation, and subscription callbacks as programmatic inputs. A function or signal is not JSON configuration. The portable browser mail import retains its existing dependency boundary. |
@@ -507,3 +507,37 @@ adaptation. Local tests, checks, server launches, live mail sends, and platform
 execution were not performed by this documentation author. Selected package
 verification and publication outcomes belong to the release owner's delivery
 record.
+
+## Parameter examples and error-report path clarification
+
+The ordinary shared mail server needs one Resend key. Its current-domain
+behavior, origin list, and incoming application/subscription verification do
+not select among provider profiles. A named profile selects one stored key
+for an entire send or server invocation. Source inspection found named CLI and
+toolchain inputs plus synthetic tests; it did not establish a deployment that
+uses named mail profiles.
+
+| Method or action | Gates | Decision, callers, and concrete purpose |
+| --- | --- | --- |
+| Explicit default `profile: 'mail'` in setup examples | N/N/Y | Remove the redundant setting. Omission already selects the default key when no named configuration is supplied. CLI send/serve still honor an explicitly selected profile or `mail.profile`. |
+| Extra `another-provider-account` credential placeholder | N/N/Y | Remove it from ordinary setup. It adds an unused account choice to a one-key configuration. Existing optional named-profile behavior remains documented without presenting another account as a setup requirement. |
+| Named-profile CLI/toolchain capability and credential CRUD | Y/Y/N for compatibility | Retain the supported optional profile argument and exact named-key operations. Concrete application/deployment use is unverified. This is an account-selection contract, separate from removing redundant default arguments; its retention makes no claim that the nominal deployment needs it. |
+| Full CLI parameter explanation | Y/Y/N | Keep one canonical [Mail CLI parameters](../reference/mail.md#mail-cli-parameters) table. The CLI reference links to it and describes the current split configuration, selected values, defaults, aliases, and provider behavior without another competing table. |
+| Claim that mail errors can never produce an error-report loop | N/N/Y | Replace the absolute claim with the source-path qualification below. Ordinary server failures do not send another mail; a repeatedly failing browser event subscriber can produce new global error incidents during error-mail delivery. |
+
+The Node gateway reports ordinary request/provider failures through responses,
+observer results, or its console logger. Its error reporter does not call the
+mail sender. In the browser, `Errors` owns global `error` and
+`unhandledrejection` capture and sends error notifications through Mail. A
+failed notification remains pending with a warning rather than immediately
+creating another notification from that send failure.
+
+There is a separate conditional path: a subscriber that repeatedly throws
+while handling Mail events reaches the event authority's listener-failure
+reporter. In browsers with `reportError`, that failure can become a new global
+error incident. Sending that incident through Mail can invoke the same failing
+subscriber again. A loop therefore depends on that subscriber and the active
+global error handler; it is not an automatic server response to an ordinary
+mail failure. This is a static source-path finding, not an observed production
+incident or an executed reproduction. This documentation clarification changes
+no error, subscription, retry, or delivery behavior.

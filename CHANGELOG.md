@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.24.1
+
+- Add a mail CLI parameter table with command scope, purpose, and defaults.
+  Explain the difference between `--app`, `X-Mail-App`, `--report-stdin`, and
+  the nonsecret `--report-key` used for intentional same-message retries.
+- Remove redundant default-profile configuration and the alternate-account
+  placeholder from the main mail example. Align the CLI reference with the
+  shared configuration and credential files while preserving named-profile APIs.
+- Clarify when subscription headers are required, how ordinary delivery failures
+  retain their existing report, and the separate browser callback and verification
+  service paths that can create feedback. Runtime behavior is unchanged.
+
 ## 0.24.0
 
 - Read nonsecret mail settings from `arcane.config.json.mail` and provider keys

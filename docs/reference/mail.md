@@ -272,6 +272,40 @@ committed acceptance result.
 
 ## Operate the CLI and gateway
 
+### Mail CLI parameters
+
+`mail serve` starts the shared mail server. `mail send` makes one direct Resend
+request. `mail key set|status|delete` manages the provider credential.
+
+| Parameter | Command | What it does | When omitted |
+| --- | --- | --- | --- |
+| `--app <label>` | `mail serve` | Supplies a fallback application label for server events. An incoming `X-Mail-App` supplies the request's label. This option does not choose a Stripe account or limit which apps may send mail. | Uses `mail.appId` when configured; otherwise adds no fallback label. |
+| `--from <sender>` | `mail serve`, `mail send` | Overrides the sender, for example `"Dragon Dispatch <dispatch@example.com>"`. On the server, the override applies to every report. Resend must accept that sender. | Uses `mail.from` when configured, then the report's `from` or provider template default. |
+| `--report-stdin` | `mail send` | Reads one complete UTF-8 report JSON object from redirected standard input, including recipients, subject, body, and other provider fields. | Required; the command reports a usage error. |
+| `--report-key <id>` | `mail send` | Identifies one intended email and is forwarded unchanged as Resend's `Idempotency-Key`. Use a new value for a new email; reuse the value and unchanged report for an intentional retry. It is not a credential. | Required; the command reports a usage error. |
+| `--host <address>` | `mail serve` | Selects the listener bind address. `0.0.0.0` accepts connections through all IPv4 interfaces. | Uses `mail.host`, then `0.0.0.0`. |
+| `--port <number>` | `mail serve` | Selects the HTTPS listener port. Explicit `0` asks the operating system for an available port. | Uses `mail.port`, then `4433`. |
+| `--origin <origin>` | `mail serve` | Replaces the configured CORS origins with one exact browser origin, including scheme and any nondefault port. Use the JSON `origins` array for multiple origins; repeated flags keep only the last value. | Uses `mail.origins`; an absent or empty list uses the current request authority. Requests without an `Origin` header continue normally. |
+| `--allow-to <addresses>` | `mail serve` | Replaces the recipient allowlist with a comma-separated list. Applies to `to`, `cc`, and `bcc`, and supplies error-report fallback recipients unless `mail.errorRecipients` is configured separately. | Uses `mail.recipientAllowlist`; an absent or empty list leaves recipients unrestricted. |
+| `--request-timeout <ms>` | `mail serve`, `mail send` | Sets the deadline for one Resend request, in milliseconds. A timeout after sending begins leaves delivery uncertain; it does not schedule a retry. | Uses `mail.providerTimeoutMs`; absent or null adds no provider deadline. |
+| `--profile <name>` | `mail serve`, `mail send` | Selects an alternate saved Resend credential for this invocation. One listener uses that selected provider key for all callers. | Uses `mail.profile` if configured, otherwise the normal `mail.apiKey`. The single-key setup needs no profile setting. |
+| `[profile]` | `mail key set\|status\|delete` | Optional positional name of the credential to manage; it is not a flag. | Manages the normal `mail.apiKey`, independently of `mail.profile`. |
+| `--secret-stdin` | `mail key set` | Reads the Resend API key from deliberately redirected standard input instead of the hidden terminal prompt. | Prompts with hidden input. Machine-output mode requires redirected input. |
+| `--output human\|json\|ndjson` | All mail commands | Selects readable console output, one JSON result, or newline-delimited JSON events. | Uses `human`. |
+| `--help` | CLI | Displays CLI help instead of running the mail operation. | Runs the requested operation. |
+| `--version` | CLI | Displays the SDK version instead of running the mail operation. | Runs the requested operation. |
+
+There is no `--report` flag. `--report-stdin` supplies the message;
+`--report-key` identifies that same message across attempts. Browser `Mail.send()`
+generates and retains its report key automatically.
+
+Mail reads configuration from the directory in which the command runs;
+`--workspace` does not relocate these mail files. Mail HTTPS uses `mail.certPath`
+and `mail.keyPath` in JSON. The `--cert`, `--key`, `--https`, and `--http-port`
+flags belong to browser `dev`/`run`, and `--http` belongs to `dev`.
+
+### Mail configuration
+
 Keep app-supplied SDK settings under named capability members, starting with
 `mail`. Put the nonsecret mail settings in `arcane.config.json` in the directory
 from which the command runs:
@@ -285,7 +319,6 @@ from which the command runs:
       "https://dragons.example",
       "https://www.dragons.example"
     ],
-    "profile": "mail",
     "certPath": "certificates/fullchain.pem",
     "keyPath": "certificates/private-key.pem"
   }
@@ -333,24 +366,16 @@ injected providers, `fetchImpl`, `onEvent`, `requestIdFactory`,
 runtime inputs, not JSON settings. Reports and their idempotency keys remain
 inputs to each send operation.
 
-The default credential profile `mail` selects `.arcane.env.json.mail.apiKey`.
-Other profile names select exact entries in `.arcane.env.json.mail.profiles`:
+The single-key configuration above needs no `profile` or `profiles` member.
+Omitting the selection uses `.arcane.env.json.mail.apiKey`; multiple apps and
+domains can share that provider key.
 
-```json
-{
-  "mail": {
-    "apiKey": "",
-    "profiles": {
-      "another-provider-account": {
-        "apiKey": ""
-      }
-    }
-  }
-}
-```
-
-An absent named profile does not fall back to the default key. The profile
-selects Resend provider credentials; it is separate from the incoming
+For callers that already select an alternate credential, named-profile support
+remains available: `--profile <name>` or `mail.profile` selects
+`.arcane.env.json.mail.profiles[name].apiKey`. An absent named profile does not
+fall back to the default key. Selection happens once when send or serve starts;
+it does not map incoming apps or domains to different provider accounts.
+The profile selects Resend provider credentials, separately from the incoming
 application name and subscriber key. Existing top-level `RESEND_API_KEY` and
 `MAIL_PROFILES[profile].RESEND_API_KEY` remain supported. A nested selected
 `apiKey` takes precedence when the property exists, including null or an empty
@@ -449,8 +474,8 @@ arcane mail send --from "Arcane <verified@example.com>" --report-key <stable-id>
 The redirected UTF-8 JSON object is read completely. Its fields and values
 are retained; the Resend adapter removes the SDK's `type` routing field,
 uses `from` when configured (otherwise the report or provider template supplies
-the sender), and applies configured error-recipient fallback
-when applicable. Resend evaluates its own required provider fields. Message
+the sender). Direct sending supplies no fallback recipients. Resend evaluates
+its own required provider fields. Message
 content is not accepted in argv. Programmatic results and observer events
 preserve the complete report, provider request, provider response, and error detail while
 never exposing either credential.
@@ -579,6 +604,12 @@ key, and `signal` follows the request lifecycle. These control fields stay
 separate from the mail report and Resend payload. The verifier runs for each
 POST request before any provider attempt; results are not cached.
 
+`X-Mail-App` identifies the originating app so the verifier can select that
+app's subscription account, such as the appropriate Stripe account for `BOSS`
+or `TWiN`. It is separate from the gateway's optional `--app` event label.
+The missing-header and Bearer errors below apply only when `verifySubscription`
+is configured. Ordinary `mail serve` does not require either header.
+
 | Configured-verifier outcome | Gateway response |
 | --- | --- |
 | Missing or empty `X-Mail-App` | `400 mail_invalid_headers` |
@@ -601,6 +632,32 @@ discarding for each field. The SDK does not split a native header value again.
 CLI startup output says `Subscription verification: disabled` or
 `Subscription verification: configured`. Structured `server.ready` output
 includes the corresponding `callerAuthentication` value.
+
+## Error reports and retries
+
+An incoming report with `type: 'error'` is an email supplied by its caller.
+The gateway's `errorRecipients` setting only supplies fallback recipients for
+that report when its `to` array is empty. A gateway or provider failure returns
+an HTTP error and diagnostic events; it does not generate another error email.
+Gateway event-handler failures are written to the console. Each POST and each
+direct CLI send performs at most one provider attempt, with no automatic server retry.
+
+The browser outbox retains the same report and key after a retryable delivery
+failure. Each drain attempts each eligible record once; a later startup,
+connectivity event, or explicit drain can retry it. Browser `Errors` notification
+failure retains the same pending occurrence and logs a warning without scheduling
+itself again.
+
+A separate browser callback path can feed back into error reporting: a mail-event
+subscriber that repeatedly throws can reach global error capture, create another
+error report, and trigger another mail event. Subscriber failures cannot change
+an already committed mail result, though global capture can report them as new
+errors. This is a source-level possibility, not evidence of a deployed loop.
+
+For a verification service that sends its own emails, its host integration must
+also avoid the circular request path `mail -> verify subscription -> send mail ->
+verify subscription`. The SDK supplies a callback for verification; it does not
+choose that service's caller flow or enable it in ordinary CLI startup.
 
 ## Gateway request lifecycle
 

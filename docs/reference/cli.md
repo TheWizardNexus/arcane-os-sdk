@@ -812,10 +812,13 @@ npm exec -- arcane repo status
 
 ## `arcane mail`
 
-### Resend credential profiles
+### Configuration and provider credentials
 
-The mail commands read `.arcane.env.json` from the invocation directory on Windows,
-Linux, and macOS. The credential subcommands select one profile in that file:
+Mail reads nonsecret settings from `arcane.config.json.mail` and the Resend key
+from `.arcane.env.json.mail.apiKey` in the invocation directory on Windows,
+Linux, and macOS. See [Mail CLI parameters](mail.md#mail-cli-parameters) for the
+complete parameter, configuration-field, default, and precedence reference.
+The credential subcommands manage the provider key:
 
 ```text
 arcane mail key set [profile] [--secret-stdin]
@@ -826,26 +829,43 @@ arcane mail key delete [profile]
 `key set` reads the Resend API key from a hidden terminal prompt. The
 `--secret-stdin` form is for deliberately redirected non-interactive input and
 rejects a TTY before reading. The key is written to `.arcane.env.json` and is never
-accepted in argv or returned in status output. The optional profile defaults
-to `mail`, which selects top-level `RESEND_API_KEY`. Any other exact profile
-selects `MAIL_PROFILES[profile].RESEND_API_KEY`, with no default-key fallback.
+accepted in argv or returned in status output. The optional credential-command
+profile defaults to `mail`, independently of the send/serve configuration.
 
-The minimal file is:
+The minimal `.arcane.env.json` is:
 
 ```json
 {
-  "RESEND_API_KEY": ""
+  "mail": {
+    "apiKey": ""
+  }
 }
 ```
 
 Fill in the key before starting mail, and add `.arcane.env.json` to the project's
-`.gitignore`; the SDK repository already ignores it. Set and delete preserve
-the file's other settings and profiles. Status returns the selected profile,
+`.gitignore`; the SDK repository already ignores it. Keep nonsecret listener
+settings, including certificate file paths, in `arcane.config.json.mail`.
+
+Named profiles remain an optional CLI/toolchain compatibility feature for
+selecting another stored Resend key. An exact name selects
+`mail.profiles[name].apiKey`; the name is independent of incoming application
+names, domains, and subscription keys. One server process uses one selected
+Resend key for all its requests. An absent named key never falls back to the
+default account. Existing root `RESEND_API_KEY` and
+`MAIL_PROFILES[name].RESEND_API_KEY` remain fallbacks when the corresponding
+nested key property is absent. A nested property containing null or an empty
+string means the selected key is absent and takes precedence over a legacy key.
+
+Set and delete preserve the file's other settings and profile containers. New
+keys are written to the nested mail member. Existing legacy keys are updated
+in place unless the selected nested key property exists; delete removes both
+representations of only the selected key. Status returns the selected profile,
 `provider:'resend'`, `storage:'.arcane.env.json'`, and `exists`. Delete returns
 `exists:false` for both a removed and an already-absent credential.
 
-Programmatic `createToolchain().mail(...)` resolves the configuration directory
-from `cwd ?? workspaceRoot ?? process.cwd()`. This uses ordinary Node file
+Programmatic `createToolchain().mail(...)` resolves both files from the directory
+selected by `cwd ?? workspaceRoot ?? process.cwd()`, with no upward search.
+This uses ordinary Node file
 access rather than platform-specific credential processes. An Android host
 supplies a compatible Node runtime and an accessible configuration directory.
 Existing Windows Credential Manager records remain untouched; the JSON reader
@@ -854,11 +874,13 @@ populate or depend on process environment variables for this key.
 
 The SDK's installation directory does not affect this location. With an SDK
 under `my-site/arcane-os-sdk/`, run the command from `my-site/` and keep
-`my-site/.arcane.env.json` alongside that directory. Existing deployments using
+`my-site/arcane.config.json` and `my-site/.arcane.env.json` alongside that
+directory. Existing deployments using
 SDK 0.22.1 or earlier must rename `.env.json` to `.arcane.env.json` while
 preserving its contents; the loader reads only the new name.
 
-Missing files or missing/empty selected keys stop `send` and `serve` with the
+Each file is an optional configuration source. Missing or empty selected keys
+stop `send` and `serve` with the
 configuration path and exact JSON setting to fill in. Invalid JSON and file
 access failures remain observable without printing credential content.
 
@@ -890,11 +912,16 @@ shape:
 
 The CLI forwards the complete provider fields, including template requests.
 Resend owns their accepted shape. The adapter removes the application-only
-`type` field and applies `--from` when supplied; otherwise the report or provider
-template supplies the sender. Direct CLI sending has
-no configured fallback recipients. The Resend credential comes only from the
-selected `.arcane.env.json` profile; omitting `--profile` selects `mail`. Neither the
-key nor report content is accepted through argv or process environment variables.
+`type` field and applies the shared sender from `--from` or `mail.from` when
+supplied; otherwise the report or provider template supplies the sender. Direct
+CLI sending has no configured fallback recipients and requires no listener TLS
+paths. It consumes the configured provider timeout and retry guidance.
+
+The Resend credential comes from the selected `.arcane.env.json` entry.
+An explicit `--profile` overrides `arcane.config.json.mail.profile`; omitting
+both selects the default `mail.apiKey`, with the legacy fallback described
+above. Neither the key nor report content is accepted through argv or process
+environment variables.
 
 The caller owns the nonempty `--report-key`, which is forwarded unchanged.
 Reuse the same key only with the same
@@ -918,22 +945,28 @@ loss after the attempt begins is ambiguous because Resend may have accepted it.
 arcane mail serve [--profile <profile>] [--from <verified-sender>] [--app <label>] [--origin <exact-origin>] [--allow-to <addresses>] [--host 0.0.0.0] [--port 4433] [--request-timeout <ms>]
 ```
 
-The selected `.arcane.env.json` profile supplies only the server-side Resend API key;
-omitting `--profile` selects `mail`.
+The selected `.arcane.env.json` entry supplies only the server-side Resend API
+key. An explicit `--profile` overrides `arcane.config.json.mail.profile`;
+omitting both selects the default key.
 
-Add the listener's certificate configuration at the top level of the same file:
+Add the listener's certificate paths to `arcane.config.json`:
 
 ```json
 {
-  "RESEND_API_KEY": "",
-  "MAIL_TLS_CERT_PATH": ".arcane/mail/fullchain.pem",
-  "MAIL_TLS_KEY_PATH": ".arcane/mail/private-key.pem"
+  "mail": {
+    "certPath": ".arcane/mail/fullchain.pem",
+    "keyPath": ".arcane/mail/private-key.pem"
+  }
 }
 ```
 
 Supply an existing PEM certificate chain and its private key. Paths resolve
-relative to `.arcane.env.json`, or may be absolute. They are shared across provider
-profiles. Missing TLS settings name the fields to fill in before a listener
+relative to the selected configuration directory, or may be absolute. They
+belong to the listener regardless of the provider key selected. Legacy root
+`MAIL_TLS_CERT_PATH` and `MAIL_TLS_KEY_PATH` in `.arcane.env.json` remain
+fallbacks for omitted config paths. Explicit programmatic `certPath` and
+`keyPath` options override those files. Missing TLS settings name the fields
+to fill in before a listener
 opens; the TLS owner reports PEM file errors. Keep private-key material outside
 tracked source. The SDK repository already ignores `.arcane/` and `.arcane.env.json`.
 
@@ -949,7 +982,7 @@ server; the incoming request's `X-Mail-App` identifies the application for
 subscription verification. The HTTP authentication contract pairs that
 application with `Authorization: Bearer <subscription_key>`.
 
-Subscription verification is disabled for this initial service setup. The
+Subscription verification is disabled when no callback is configured. The
 programmatic `createToolchain().mail({action: 'serve', ...})` path accepts
 `verifySubscription({appName, subscriptionKey, signal})`; supplying that callback
 enables verification before each provider attempt. It must resolve to `true`
@@ -958,16 +991,27 @@ failure receives retryable 503; cancellation stops verification before sending.
 The callback connects the actual TWiN Stripe endpoint when its contract is
 ready. There is no guessed URL, response schema, or command-line endpoint flag.
 
-The listener defaults to `0.0.0.0`; `--host` selects another bind host. Browser
-mail defaults to `/v1/mail` on the current domain. `--origin` is optional and
-selects an explicit CORS allowlist when supplied. `--allow-to` optionally
-supplies a comma-separated recipient allowlist. CLI parsing preserves supplied
-address spelling and repeated entries. Programmatic `errorTo` selects fallback
-recipients for error reports; when omitted, the selected `allowTo` list supplies
-that fallback. `--request-timeout`
-adds a caller-selected provider-attempt timeout from 1 through 2147483647
-milliseconds, the Node timer range. When it is omitted, the SDK adds no
-provider timeout.
+The listener defaults to `0.0.0.0:4433`; `mail.host` and `mail.port` configure
+the listener, and explicit `--host` and `--port` override them. Browser mail
+defaults to `/v1/mail` on the current domain. `mail.origins` supplies an exact
+origin array; `--origin` replaces it with one origin. Repeated `--origin`
+options keep the last value. An absent or empty list selects the current
+request authority. Other Origins receive `403 mail_origin_not_allowed`;
+requests without an Origin continue normally. This CORS configuration does
+not filter client IPs or give loopback special treatment.
+
+`mail.recipientAllowlist` supplies the recipient list; `--allow-to` replaces it
+with a comma-separated list. CLI parsing preserves supplied address spelling
+and repeated entries. Programmatic `errorTo` or `mail.errorRecipients` selects
+fallback recipients for error reports. When neither is supplied, the effective
+recipient allowlist supplies that fallback; an explicit empty array supplies
+none. The [Mail CLI parameters](mail.md#mail-cli-parameters) reference also
+documents programmatic aliases and list-replacement precedence.
+
+`--request-timeout` overrides `mail.providerTimeoutMs` and accepts 1 through
+2147483647 milliseconds, the Node timer range. An absent effective timeout
+adds no provider deadline; programmatic/configured null also selects no
+deadline. `mail.bodyTimeoutMs` selects the optional request-body deadline.
 
 After binding, `server.ready` reports lifecycle fields such as
 protocol, optional app label, bind address, port, URL, and `callerAuthentication`
