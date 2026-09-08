@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import {Readable,Writable} from 'node:stream';
 import test from '../src/testing.mjs';
 import {runCli} from '../src/cli/main.mjs';
@@ -43,7 +44,7 @@ test('mail key set reads a synthetic key only from explicit stdin and never repo
             return {
                 profile:options.profile,
                 provider:'resend',
-                storage:'windows-credential-manager',
+                storage:'.env.json',
                 exists:true
             };
         }
@@ -133,14 +134,16 @@ test('mail serve defaults to all interfaces without reading an app key',async fu
 
     const exitCode=await runCli([
         'mail','serve',
-        '--profile','arcane-dev',
         '--output','ndjson'
     ],{
+        cwd:path.resolve('synthetic-mail-workspace'),
         stdin,
         stdout:stdout.stream,
         stderr:stderr.stream,
         execute:async function startMailWithoutInput(command,options){
             assert.equal(command,'mail');
+            assert.equal(options.profile,'mail');
+            assert.equal(options.cwd,path.resolve('synthetic-mail-workspace'));
             assert.equal(options.host,'0.0.0.0');
             assert.equal(options.port,8025);
             assert.equal(options.appId,undefined);
@@ -174,7 +177,7 @@ test('mail key status dispatches a sanitized profile operation',async function m
     const stderr=memoryStream();
     let invocation;
     const exitCode=await runCli([
-        'mail','key','status','arcane-dev','--output','ndjson'
+        'mail','key','status','--output','ndjson'
     ],{
         stdout:stdout.stream,
         stderr:stderr.stream,
@@ -183,7 +186,7 @@ test('mail key status dispatches a sanitized profile operation',async function m
             return {
                 profile:options.profile,
                 provider:'resend',
-                storage:'windows-credential-manager',
+                storage:'.env.json',
                 exists:false
             };
         }
@@ -192,7 +195,7 @@ test('mail key status dispatches a sanitized profile operation',async function m
     assert.equal(exitCode,0,stderr.read());
     assert.equal(invocation.command,'mail');
     assert.equal(invocation.options.action,'key-status');
-    assert.equal(invocation.options.profile,'arcane-dev');
+    assert.equal(invocation.options.profile,'mail');
     assert.equal(Object.hasOwn(invocation.options,'readSecret'),false);
 });
 
@@ -204,7 +207,7 @@ test('headless toolchain dispatches the mail operation without exposing credenti
             return {
                 profile:options.profile,
                 provider:'resend',
-                storage:'windows-credential-manager',
+                storage:'.env.json',
                 exists:true
             };
         }
@@ -213,7 +216,7 @@ test('headless toolchain dispatches the mail operation without exposing credenti
     assert.deepEqual(result,{
         profile:'arcane-dev',
         provider:'resend',
-        storage:'windows-credential-manager',
+        storage:'.env.json',
         exists:true
     });
 });
@@ -265,20 +268,26 @@ test('mail serve preserves an explicit host, CORS origin, and diagnostic app lab
     assert.equal(events.at(-1).data.result.target,'mail');
 });
 
-test('mail serve requires its provider credential profile before execution',async function invalidMailServe(){
+test('mail serve reports the missing JSON setting before opening its listener',async function missingMailKey(){
     const stdout=memoryStream();
-    let executed=false;
+    let started=false;
     const exitCode=await runCli([
         'mail','serve','--from','sender@example.com',
         '--app','mail-test','--output','ndjson'
     ],{
         stdout:stdout.stream,
         stderr:memoryStream().stream,
-        execute:async function unexpectedMailExecution(){executed=true;}
+        execute:async function executeMailWithMissingKey(_command,options){
+            return executeMailCommand({
+                ...options,
+                readCredential:async function missingCredential(){return null;},
+                startServer:async function unexpectedListener(){started=true;}
+            });
+        }
     });
     assert.equal(exitCode,1);
-    assert.equal(executed,false);
-    assert.match(parseNdjson(stdout.read()).at(-1).data.error.message,/--profile/u);
+    assert.equal(started,false);
+    assert.match(parseNdjson(stdout.read()).at(-1).data.error.message,/Missing RESEND_API_KEY in .*\.env\.json/u);
 });
 
 test('mail rejects a request timeout outside the Node timer range before execution',async function invalidMailTimeout(){
@@ -315,7 +324,7 @@ test('mail command controller keeps credential values inside the selected operat
             return {
                 profile:options.profile,
                 provider:'resend',
-                storage:'windows-credential-manager',
+                storage:'.env.json',
                 exists:true
             };
         }

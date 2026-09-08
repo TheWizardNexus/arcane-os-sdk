@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.19.0
+
+- Read mail credentials from `.env.json` in the invocation directory through
+  portable Node file APIs. Remove the Windows Credential Manager subprocess,
+  embedded PowerShell/C# helper, helper timeouts, and transport-only machinery.
+  Existing Windows credential records remain untouched; populate the JSON file
+  explicitly when adopting this configuration change.
+- Default mail commands to the top-level `RESEND_API_KEY`; `--profile mail`
+  selects that same key. Preserve named key set/status/delete operations through
+  exact `MAIL_PROFILES` entries, retaining unrelated JSON settings and naming
+  the missing setting and file before send or server startup.
+- Ignore `.env.json` in the SDK checkout and newly scaffolded workspaces. Update
+  the mail reference and purpose-gate report with the portable configuration
+  contract and the reasons for each retained or removed operation.
+
 ## 0.18.0
 
 - Adopt published `node-http-server` 10.0.0. PEM-backed development and

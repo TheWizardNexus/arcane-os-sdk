@@ -2,6 +2,14 @@
 
 ## Governing functional baseline
 
+Every SDK capability must work on Windows, Linux, and macOS within its declared
+runtime, with Android requiring only the necessary host adaptation. Keep shared
+configuration, credential handling, paths, startup, and lifecycle portable.
+The development machine does not define the supported platforms. A platform
+limitation in shared code requires correction at that owner; documentation alone
+does not fulfill this baseline. Preserve existing user data and useful public
+operations, and distinguish source review from execution on each actual platform.
+
 Never truncate, clip, elide, tail, shorten, or silently discard application,
 development, model, document, message, log, diagnostic, test, process, or tool
 content. Preserve the complete content through streaming or ordered continuation

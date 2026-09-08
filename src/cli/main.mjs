@@ -81,11 +81,11 @@ Usage:
   ${CLI_NAME} update-check
   ${CLI_NAME} targets
   ${CLI_NAME} repo status|pull|push
-  ${CLI_NAME} mail key set <profile> [--secret-stdin]
-  ${CLI_NAME} mail key status <profile>
-  ${CLI_NAME} mail key delete <profile>
-  ${CLI_NAME} mail send --profile <profile> [--from <address>] --report-key <id> --report-stdin [--request-timeout <ms>]
-  ${CLI_NAME} mail serve --profile <profile> [--from <address>] [--app <label>] [--origin <origin>] [--allow-to <addresses>] [--host 0.0.0.0] [--port 8025] [--request-timeout <ms>]
+  ${CLI_NAME} mail key set [profile] [--secret-stdin]
+  ${CLI_NAME} mail key status [profile]
+  ${CLI_NAME} mail key delete [profile]
+  ${CLI_NAME} mail send [--profile <profile>] [--from <address>] --report-key <id> --report-stdin [--request-timeout <ms>]
+  ${CLI_NAME} mail serve [--profile <profile>] [--from <address>] [--app <label>] [--origin <origin>] [--allow-to <addresses>] [--host 0.0.0.0] [--port 8025] [--request-timeout <ms>]
 
 Development:
   --public                      Bind dev to all IPv4 interfaces (0.0.0.0) and print network URLs.
@@ -657,9 +657,9 @@ function operationOptions(command,parsed,cwd){
         if(area==='key'){
             noExtraPositionals(command,positionals,3);
             const action=positionals[1];
-            const profile=positionals[2];
-            if(!['set','status','delete'].includes(action)||!profile){
-                usage('mail key requires set, status, or delete followed by one profile id.');
+            const profile=positionals[2]??'mail';
+            if(!['set','status','delete'].includes(action)){
+                usage('mail key requires set, status, or delete, with an optional profile id.');
             }
             if(values.profile!==undefined||values.from!==undefined||values.app!==undefined
                 ||values.origin!==undefined
@@ -675,6 +675,7 @@ function operationOptions(command,parsed,cwd){
             }
             return {
                 action:`key-${action}`,
+                cwd,
                 profile,
                 secretStdin:flags.has('secret-stdin'),
             };
@@ -687,10 +688,10 @@ function operationOptions(command,parsed,cwd){
             if(flags.has('report-stdin')||values['report-key']!==undefined){
                 usage('--report-stdin and --report-key are supported only by mail send.');
             }
-            if(!values.profile)usage('mail serve requires --profile <value>.');
             return {
                 action:'serve',
-                profile:values.profile,
+                cwd,
+                profile:values.profile??'mail',
                 from:values.from,
                 appId:values.app,
                 origin:values.origin,
@@ -710,25 +711,23 @@ function operationOptions(command,parsed,cwd){
                 ||values.port!==undefined){
                 usage('mail send does not accept gateway server options.');
             }
-            for(const [name,value]of Object.entries({
-                profile:values.profile,
-                'report-key':values['report-key'],
-            })){
-                if(!value)usage(`mail send requires --${name} <value>.`);
+            if(!values['report-key']){
+                usage('mail send requires --report-key <value>.');
             }
             if(!flags.has('report-stdin')){
                 usage('mail send requires --report-stdin.');
             }
             return {
                 action:'send',
-                profile:values.profile,
+                cwd,
+                profile:values.profile??'mail',
                 from:values.from,
                 reportKey:values['report-key'],
                 reportStdin:true,
                 requestTimeout:readMailRequestTimeout(values['request-timeout']),
             };
         }
-        usage('mail requires key set|status|delete <profile>, send, or serve.');
+        usage('mail requires key set|status|delete [profile], send, or serve.');
     }
     usage(`Unknown command. Run ${CLI_NAME} --help for usage.`);
 }

@@ -3,6 +3,7 @@ import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
 import {
     deleteMailCredential,
     getMailCredentialStatus,
+    mailCredentialLocation,
     readMailCredential,
     setMailCredential
 } from './mail-credentials.mjs';
@@ -54,13 +55,9 @@ function mailRecipientOptions(value,label){
 function mailCredentialOptions(options){
     return {
         profile:options.profile,
-        platform:options.platform,
-        systemRoot:options.systemRoot,
-        temporaryDirectory:options.temporaryDirectory,
-        spawnImpl:options.spawnImpl,
-        runner:options.credentialRunner,
-        signal:options.signal,
-        timeoutMs:options.credentialTimeoutMs
+        cwd:options.cwd,
+        workspaceRoot:options.workspaceRoot,
+        signal:options.signal
     };
 }
 
@@ -92,24 +89,11 @@ async function deleteMailCredentialProfile(options){
 
 async function sendMailFromReport(options){
     const readReport=resolveMailCommandDependency(options,'readReport',null);
-    const readCredential=resolveMailCommandDependency(options,'readCredential',readMailCredential);
     const send=resolveMailCommandDependency(options,'sendMail',sendResendMail);
     throwIfAborted(options.signal);
     const report=await readReport();
     throwIfAborted(options.signal);
-    let apiKey=await readCredential(mailCredentialOptions(options));
-    if(apiKey===null){
-        throw new ArcaneError(
-            ERROR_CODES.prerequisiteMissing,
-            `No Resend credential is configured for profile ${String(options.profile)}.`
-        );
-    }
-    if(!is.string(apiKey)||!apiKey){
-        throw new ArcaneError(
-            ERROR_CODES.operationFailed,
-            'The configured Resend credential could not be read.'
-        );
-    }
+    let apiKey=await readMailProviderKey(options);
     try{
         throwIfAborted(options.signal);
         const result=await send({
@@ -141,15 +125,15 @@ async function sendMailFromReport(options){
     }
 }
 
-async function serveMailGateway(options){
+async function readMailProviderKey(options){
     const readCredential=resolveMailCommandDependency(options,'readCredential',readMailCredential);
-    const startServer=resolveMailCommandDependency(options,'startServer',startResendMailServer);
-    throwIfAborted(options.signal);
-    let apiKey=await readCredential(mailCredentialOptions(options));
+    const credentialOptions=mailCredentialOptions(options);
+    const apiKey=await readCredential(credentialOptions);
     if(apiKey===null){
+        const location=mailCredentialLocation(credentialOptions);
         throw new ArcaneError(
             ERROR_CODES.prerequisiteMissing,
-            `No Resend credential is configured for profile ${String(options.profile)}.`
+            `Missing ${location.setting} in ${location.filePath}.`
         );
     }
     if(!is.string(apiKey)||!apiKey){
@@ -158,6 +142,13 @@ async function serveMailGateway(options){
             'The configured Resend credential could not be read.'
         );
     }
+    return apiKey;
+}
+
+async function serveMailGateway(options){
+    const startServer=resolveMailCommandDependency(options,'startServer',startResendMailServer);
+    throwIfAborted(options.signal);
+    let apiKey=await readMailProviderKey(options);
     try{
         throwIfAborted(options.signal);
         const recipientAllowlist=mailRecipientOptions(options.allowTo,'allowTo');

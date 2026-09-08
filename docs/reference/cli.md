@@ -32,7 +32,7 @@ and exits nonzero on failure. Machine output is defined by
 | `arcane update-check` | Performs one explicit, read-only npm dist-tag query for the installed SDK version. |
 | `arcane targets` | Lists target ids, declared status, formats, architectures, signing profiles, methods, and pairing reason. |
 | `arcane repo status\|pull\|push` | Runs one selected repository operation for the current app workspace. |
-| `arcane mail key set\|status\|delete` | Manages one server-only Resend API-key profile in Windows Credential Manager. |
+| `arcane mail key set\|status\|delete` | Manages one server-only Resend API-key profile in `.env.json`. |
 | `arcane mail send` | Performs one explicit, idempotency-keyed Resend attempt from a complete JSON report on redirected stdin. |
 | `arcane mail serve` | Starts one Arcane-to-Resend gateway with a server-only provider profile, a selected listener, and optional CORS and recipient configuration. |
 
@@ -813,22 +813,47 @@ npm exec -- arcane repo status
 
 ### Resend credential profiles
 
-The credential subcommands select one local profile:
+The mail commands read `.env.json` from the invocation directory on Windows,
+Linux, and macOS. The credential subcommands select one profile in that file:
 
 ```text
-arcane mail key set <profile> [--secret-stdin]
-arcane mail key status <profile>
-arcane mail key delete <profile>
+arcane mail key set [profile] [--secret-stdin]
+arcane mail key status [profile]
+arcane mail key delete [profile]
 ```
 
 `key set` reads the Resend API key from a hidden terminal prompt. The
 `--secret-stdin` form is for deliberately redirected non-interactive input and
-rejects a TTY before reading. The key is sent to the Windows Credential Manager
-helper over child-process stdin, never argv, and no plaintext fallback is
-created. Status reports only whether the profile exists. Delete returns the
-selected profile with `exists:false`; it intentionally does not distinguish a
-new deletion from an already-absent profile. Non-Windows hosts report the
-credential operation as unavailable.
+rejects a TTY before reading. The key is written to `.env.json` and is never
+accepted in argv or returned in status output. The optional profile defaults
+to `mail`, which selects top-level `RESEND_API_KEY`. Any other exact profile
+selects `MAIL_PROFILES[profile].RESEND_API_KEY`, with no default-key fallback.
+
+The minimal file is:
+
+```json
+{
+  "RESEND_API_KEY": ""
+}
+```
+
+Fill in the key before starting mail, and add `.env.json` to the project's
+`.gitignore`; the SDK repository already ignores it. Set and delete preserve
+the file's other settings and profiles. Status returns the selected profile,
+`provider:'resend'`, `storage:'.env.json'`, and `exists`. Delete returns
+`exists:false` for both a removed and an already-absent credential.
+
+Programmatic `createToolchain().mail(...)` resolves the configuration directory
+from `cwd ?? workspaceRoot ?? process.cwd()`. This uses ordinary Node file
+access rather than platform-specific credential processes. An Android host
+supplies a compatible Node runtime and an accessible configuration directory.
+Existing Windows Credential Manager records remain untouched; the JSON reader
+does not migrate or fall back to them. Mail reads JSON directly and does not
+populate or depend on process environment variables for this key.
+
+Missing files or missing/empty selected keys stop `send` and `serve` with the
+configuration path and exact JSON setting to fill in. Invalid JSON and file
+access failures remain observable without printing credential content.
 
 Machine output for `key set` requires `--secret-stdin`. Raw CLI arguments are
 not included in acceptance events, and usage errors do not echo unknown option
@@ -840,7 +865,7 @@ or positional values.
 server:
 
 ```text
-arcane mail send --profile <profile> [--from <verified-sender>] --report-key <id> --report-stdin [--request-timeout <ms>]
+arcane mail send [--profile <profile>] [--from <verified-sender>] --report-key <id> --report-stdin [--request-timeout <ms>]
 ```
 
 `--report-stdin` is mandatory and rejects a terminal before attaching input
@@ -861,8 +886,8 @@ Resend owns their accepted shape. The adapter removes the application-only
 `type` field and applies `--from` when supplied; otherwise the report or provider
 template supplies the sender. Direct CLI sending has
 no configured fallback recipients. The Resend credential comes only from the
-selected Windows Credential Manager profile; neither it nor report content is
-accepted through argv or environment variables.
+selected `.env.json` profile; omitting `--profile` selects `mail`. Neither the
+key nor report content is accepted through argv or process environment variables.
 
 The caller owns the nonempty `--report-key`, which is forwarded unchanged.
 Reuse the same key only with the same
@@ -883,10 +908,11 @@ loss after the attempt begins is ambiguous because Resend may have accepted it.
 `mail serve` starts one owned Node HTTP gateway:
 
 ```text
-arcane mail serve --profile <profile> [--from <verified-sender>] [--app <label>] [--origin <exact-origin>] [--allow-to <addresses>] [--host 0.0.0.0] [--port 8025] [--request-timeout <ms>]
+arcane mail serve [--profile <profile>] [--from <verified-sender>] [--app <label>] [--origin <exact-origin>] [--allow-to <addresses>] [--host 0.0.0.0] [--port 8025] [--request-timeout <ms>]
 ```
 
-The selected credential profile supplies only the server-side Resend API key.
+The selected `.env.json` profile supplies only the server-side Resend API key;
+omitting `--profile` selects `mail`.
 The CLI does not read a browser app key. Its optional `--app` value labels the
 server; the incoming request's `X-Mail-App` identifies the application for
 subscription verification. The HTTP authentication contract pairs that

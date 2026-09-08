@@ -13,12 +13,14 @@ gateway and is never included in browser or WebAssembly state.
 | `MailTransport.mjs` | Browser, WebView, or compatible Fetch host | Sends one already-persisted request to the configured Arcane gateway with the stable report key as its idempotency key. |
 | `arcane mail send` | Node on the local machine | Reads one complete provider-neutral report from redirected stdin and performs one explicit Resend attempt with a caller-owned idempotency key. |
 | `arcane mail serve` | Node on the configured host | Owns caller verification, protects the provider credential, applies explicitly configured recipient and origin settings, and makes one server-side Resend request. |
-| `arcane mail key ...` | Node on Windows | Stores, inspects, or deletes a Resend API key in Windows Credential Manager. |
+| `arcane mail key ...` | Node on Windows, Linux, or macOS | Stores, inspects, or deletes a Resend API key in the selected `.env.json`. |
 
 The browser never receives the Resend API key. The gateway never writes that
 key to source, argv, logs, events, fixtures, browser storage, or its public
-lifecycle result. Non-Windows hosts report credential operations as unavailable;
-there is no plaintext fallback.
+lifecycle result. The CLI and gateway use the same Node filesystem and network
+interfaces on Windows, Linux, and macOS. An Android host supplies a compatible
+Node runtime and an accessible configuration directory; the mail implementation
+contains no Windows credential process or platform-specific path convention.
 
 ## Public npm import
 
@@ -42,8 +44,8 @@ import Mail,{
   and `sendMailReport`.
 
 This entrypoint contains only the portable browser/WebView runtime, outbox, and
-transport contract. It does not import the Node HTTP gateway or Windows
-Credential Manager adapter. Programmatic developer tooling reaches those
+transport contract. It does not import the Node HTTP gateway or its filesystem
+credential adapter. Programmatic developer tooling reaches those
 host-owned operations through the existing `createToolchain().mail(...)`
 boundary; ordinary operators use `arcane mail send`, `arcane mail serve`, and
 `arcane mail key ...`. This keeps Node credential and server authority out of a
@@ -53,9 +55,9 @@ browser import while preserving one shared CLI/toolchain implementation.
 
 Arcane Mail deliberately separates two credentials:
 
-- The **Resend API key** is provider authority. `arcane mail key set <profile>`
-  stores it in Windows Credential Manager. `mail send --profile <profile>` and
-  `mail serve --profile <profile>` read it only inside the owning Node process.
+- The **Resend API key** is provider authority. The Node process reads it from
+  `.env.json`. `arcane mail key set [profile]` can store it there through hidden
+  input; `mail send` and `mail serve` read the selected profile inside that process.
 - The **subscription key** is the application user's subscription credential.
   When present, the browser sends it as `Authorization: Bearer <subscriptionKey>`,
   with the exact application name in `X-Mail-App`. The application name identifies the
@@ -270,21 +272,69 @@ committed acceptance result.
 
 ## Operate the CLI and gateway
 
-Store one Resend key under a local profile:
+Create `.env.json` in the directory from which the mail command runs, then fill
+in the provider key:
+
+```json
+{
+  "RESEND_API_KEY": ""
+}
+```
+
+The SDK repository ignores `.env.json`. Keep the same entry in a consuming
+project's `.gitignore`. This is a JSON configuration file; the mail commands
+read it directly without copying its contents into `process.env`.
+
+The default profile is `mail`, which selects top-level `RESEND_API_KEY`.
+The explicit `--profile mail` form selects the same setting. Other profile names
+select exact entries under `MAIL_PROFILES`:
+
+```json
+{
+  "RESEND_API_KEY": "",
+  "MAIL_PROFILES": {
+    "another-provider-account": {
+      "RESEND_API_KEY": ""
+    }
+  }
+}
+```
+
+An absent named profile does not fall back to the default key. The profile
+selects Resend provider credentials; it is separate from the incoming
+application name and subscriber key.
+
+Programmatic operations resolve `.env.json` from `options.cwd`, then
+`options.workspaceRoot`, then `process.cwd()`, choosing the first supplied
+directory. The CLI uses its invocation directory. There is no upward directory
+search or dependency on a Windows installation directory or temporary-directory
+environment variable.
+
+The existing key commands manage the same file:
 
 ```text
-arcane mail key set arcane-dev
-arcane mail key status arcane-dev
-arcane mail key delete arcane-dev
+arcane mail key set
+arcane mail key status
+arcane mail key delete
 ```
 
 `key set` prompts with hidden input. `--secret-stdin` is the explicit
-non-interactive alternative and rejects a TTY.
+non-interactive alternative and rejects a TTY. Each command accepts an optional
+profile argument, defaulting to `mail`. Set and delete preserve other JSON
+settings and profiles; status reports existence without returning the key.
+Results identify `storage: '.env.json'`. An already-absent deletion succeeds
+with `exists: false`.
+
+Existing Windows Credential Manager records remain untouched. The JSON path
+does not read, migrate, or delete those records; populate the selected JSON
+setting to use it. Missing files or missing/empty provider settings produce an
+actionable startup/send error naming the file and exact setting. Unreadable or
+invalid JSON is reported without including credential content in the error.
 
 Perform one provider attempt directly from the SDK CLI:
 
 ```text
-arcane mail send --profile arcane-dev --from "Arcane <verified@example.com>" --report-key <stable-id> --report-stdin
+arcane mail send --from "Arcane <verified@example.com>" --report-key <stable-id> --report-stdin
 ```
 
 The redirected UTF-8 JSON object is read completely. Its fields and values
@@ -312,7 +362,7 @@ deadline.
 Start the gateway:
 
 ```text
-arcane mail serve --profile arcane-dev --from "Arcane <verified@example.com>"
+npm exec -- arcane mail serve --profile mail --host 0.0.0.0 --port 8025
 ```
 
 The default listener is `0.0.0.0:8025`; `--host` and `--port` select its bind
