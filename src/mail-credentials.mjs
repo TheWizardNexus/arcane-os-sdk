@@ -111,6 +111,32 @@ export async function readMailCredential(options={}){
     return configuredMailKey(settings,location);
 }
 
+export async function readMailServerSettings(options = {}) {
+    const location = mailCredentialLocation(options);
+    const settings = await readMailSettings(location.filePath, options.signal);
+    const serverSettings = (options.readCredential ?? null) === null
+        ? {apiKey: configuredMailKey(settings, location)}
+        : {};
+    const tlsSettings = {
+        MAIL_TLS_CERT_PATH: 'certPath',
+        MAIL_TLS_KEY_PATH: 'keyPath'
+    };
+    for (const [setting, option] of Object.entries(tlsSettings)) {
+        const value = settings[setting];
+        if (value === undefined || value === null || value === '') {
+            continue;
+        }
+        if (!is.string(value)) {
+            throw new ArcaneError(
+                ERROR_CODES.usage,
+                `${setting} in ${location.filePath} must be a PEM file path string.`
+            );
+        }
+        serverSettings[option] = path.resolve(path.dirname(location.filePath), value);
+    }
+    return serverSettings;
+}
+
 export async function getMailCredentialStatus(options={}){
     const location=mailCredentialLocation(options);
     const settings=await readMailSettings(location.filePath,options.signal);

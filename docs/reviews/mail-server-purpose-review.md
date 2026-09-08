@@ -391,3 +391,35 @@ review does not claim execution on those platforms or an actual provider send.
 The updated test source covers disposable JSON storage, exact named selection,
 preservation of other settings, missing settings, credential-free error output,
 cancellation before writes, and CLI defaults. Local tests and checks were not run.
+
+## HTTPS and HTTP/2 follow-up
+
+The user explicitly selected HTTPS with HTTP/2. The mail listener remains on
+its dedicated configured port, default 8025, with the published
+`node-http-server` module owning TLS, protocol negotiation and listener/session
+shutdown. This increment preserves the provider attempt, report content,
+subscription callback, sender selection, recipient configuration and cancellation.
+
+| Method or action | Gates | Decision, callers, and concrete purpose |
+| --- | --- | --- |
+| `readMailServerSettings` | Y/Y/N | Read the same `.env.json` once for server startup, select the existing provider profile and resolve the two shared PEM path settings relative to that file. This avoids a second configuration read and platform-specific credential or certificate processes. |
+| `readMailProviderKey` and `serveMailGateway` | Y/Y/N | Preserve the existing credential-injection interface and missing-provider error while consuming the already-read startup key. Require the selected TLS pair before binding; forward only the paths to the listener. Direct provider sending and key CRUD remain unchanged. |
+| `MAIL_TLS_CERT_PATH` and `MAIL_TLS_KEY_PATH` | Y/Y/N | Clear top-level names identify certificate and private-key file paths for one listener, independently of any provider profile or calling application. Missing settings and unusable JSON values name the field without printing its content. |
+| `startResendMailServer` TLS options | Y/Y/N | Add `certPath` and `keyPath` through the module's published PEM API. HTTPS-only mode creates one listener with HTTP/2 and HTTP/1.1 negotiation on the selected port. This internal source integration retains its existing HTTP behavior when neither path is supplied; it is not an npm package export. The public toolchain mail operation requires the JSON pair. |
+| `listenForMailRequests` and returned URL | Y/Y/N | Observe the actual secure listener for bind errors and advertise HTTPS when selected. Preserve the friendly occupied-port failure, native cause, cancellation and owned shutdown. |
+| Native mail header access and current-domain comparison | Y/Y/Y | Remove the HTTP/1-only assumption that every request has `headersDistinct` and `Host`. HTTP/2 supplies native `headers` and `authority`; consume those directly without rebuilding or splitting headers. Node owns its HTTP/2 duplicate-field behavior. |
+| Certificate generation, platform trust changes, renewal watchers, duplicate PEM reads and a development-server import | N/N/Y | Add none. The operator supplies an existing certificate pair; the HTTP server module owns PEM loading. The development resolver has development-specific defaults and errors, so importing or extracting it adds no useful shared behavior for these two path resolutions. |
+
+Ordinary startup performs one JSON read, two path resolutions and one listener
+launch. Certificate file reads occur once at the module's transport owner.
+There are no new per-request file reads, provider requests, polling loops or
+certificate processes. These are source observations, not measured speedups.
+The JSON and Node TLS paths are portable across Windows, Linux and macOS;
+Android needs a compatible Node host and readable configuration/certificate files.
+
+Focused test source covers TLS option selection, the secure listener's occupied
+port, HTTP/2 header/authority handling, provider and subscription forwarding,
+JSON paths and missing TLS settings. Synthetic TLS selection is not evidence of
+an encrypted handshake. No local tests, checks, server launch, real TLS
+negotiation or provider send were performed for this follow-up review. Selected
+package and publication results belong to the delivery record.

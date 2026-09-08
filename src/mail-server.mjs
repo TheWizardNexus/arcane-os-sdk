@@ -134,20 +134,33 @@ function createRequestId(factory){
     return randomUUID();
 }
 
-function requireRequestHeader(request,headerName){
-    const headerValues=request.headersDistinct[headerName]??[];
-    if(headerValues.length!==1||!headerValues[0]){
-        throw new MailGatewayFault('mail_invalid_headers',{statusCode:400});
+function readRequestHeader(request, headerName) {
+    const distinctHeaders = request.headersDistinct;
+    if (distinctHeaders) {
+        const headerValues = distinctHeaders[headerName] ?? [];
+        return headerValues.length === 1 ? headerValues[0] : undefined;
     }
-    return headerValues[0];
+    // HTTP/2 owns header normalization and does not expose headersDistinct.
+    return request.headers[headerName];
+}
+
+function requireRequestHeader(request, headerName) {
+    const headerValue = readRequestHeader(request, headerName);
+    if (!headerValue) {
+        throw new MailGatewayFault(
+            'mail_invalid_headers',
+            {statusCode: 400}
+        );
+    }
+    return headerValue;
 }
 
 async function verifyMailSubscription(request,configuration,signal){
     const appName=requireRequestHeader(request,'x-mail-app');
-    const authorizationHeaders=request.headersDistinct.authorization??[];
-    const subscriptionKey=authorizationHeaders.length===1
-        ?/^Bearer (.+)$/iu.exec(authorizationHeaders[0])?.[1]
-        :undefined;
+    const authorization = readRequestHeader(request, 'authorization');
+    const subscriptionKey = authorization
+        ? /^Bearer (.+)$/iu.exec(authorization)?.[1]
+        : undefined;
     if(!subscriptionKey){
         throw new MailGatewayFault('mail_subscription_required',{statusCode:401});
     }
@@ -869,10 +882,11 @@ function createConfiguredMailHandler(configuration){
             }
             const requestOrigin=request.headers.origin;
             if(requestOrigin){
+                const requestAuthority = request.authority || request.headers.host;
                 const originAllowed=configuration.allowedOrigins.size>0
                     ?configuration.allowedOrigins.has(requestOrigin)
-                    :requestOrigin===`https://${request.headers.host}`
-                        ||requestOrigin===`http://${request.headers.host}`;
+                    :requestOrigin===`https://${requestAuthority}`
+                        ||requestOrigin===`http://${requestAuthority}`;
                 if(!originAllowed){
                     throw new MailGatewayFault('mail_origin_not_allowed',{statusCode:403});
                 }
@@ -1008,7 +1022,8 @@ function listenForMailRequests(mailServer){
             server.removeListener('error',onError);
             resolve(server);
         });
-        mailServer.server.once('error',onError);
+        const listener = mailServer.secureServer ?? mailServer.server;
+        listener.once('error', onError);
     });
 }
 
@@ -1017,11 +1032,24 @@ export async function startResendMailServer(options={}){
     if(configuration.signal?.aborted){
         throw configuration.signal.reason??new Error('Mail server start was cancelled.');
     }
-    const mailServer=new Server({
-        host:configuration.host,
-        port:configuration.port,
-        server:{timeout:0}
-    });
+    if ((options.certPath === undefined) !== (options.keyPath === undefined)) {
+        throw configurationError('Mail HTTPS requires both certPath and keyPath when either is supplied.');
+    }
+    const httpsSelected = options.certPath !== undefined;
+    const mailServer = new Server(
+        {
+            host: configuration.host,
+            port: configuration.port,
+            server: {timeout: 0},
+            https: httpsSelected ? {
+                certificate: options.certPath,
+                privateKey: options.keyPath,
+                port: configuration.port,
+                only: true,
+                http2: true
+            } : {}
+        }
+    );
     const requestHandler=createConfiguredMailHandler(configuration);
     mailServer.onRawRequest=function routeRawMailRequest(request,response){
         requestHandler.handle(request,response);
@@ -1050,7 +1078,7 @@ export async function startResendMailServer(options={}){
         throw configurationError('Mail server has no TCP listener address.');
     }
     const displayHost=address.address.includes(':')?`[${address.address}]`:address.address;
-    const origin=`http://${displayHost}:${String(address.port)}`;
+    const origin = `${httpsSelected ? 'https' : 'http'}://${displayHost}:${String(address.port)}`;
     let closePromise=null;
     let resolveLifecycle;
     let rejectLifecycle;

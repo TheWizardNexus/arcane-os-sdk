@@ -48,7 +48,7 @@ meaning and cardinality rules:
 | `--workspace` | directory | Commands that select an external or integrated workspace; defaults to `.`. |
 | `--app` | app id or label | Workspace/app operations except shared scope and `verify-bundle`; optional diagnostic label for `mail serve`. |
 | `--arcane-root` | directory | `doctor`, native `build`/`run`, `native-doctor`, `native-prepare` |
-| `--host` / `--port` | host / integer 0–65535 | Browser `dev`/`run` default to HTTPS at `127.0.0.1:8000`; `mail serve` defaults to HTTP at `0.0.0.0:8025` and accepts an explicit bind host. |
+| `--host` / `--port` | host / integer 0–65535 | Browser `dev`/`run` default to HTTPS at `127.0.0.1:8000`; `mail serve` defaults to HTTPS with HTTP/2 at `0.0.0.0:8025` and accepts an explicit bind host. |
 | `--http-port` | integer 0–65535 | Browser `dev`/`run` HTTP redirect listener; defaults to `0`, which selects an available port. |
 | `--public` | flag | `dev`; binds to `0.0.0.0` unless `--host` explicitly selects another address. |
 | `--http` | flag | `dev` only; serves source and PWA routes on one HTTP listener selected by `--port`, without TLS. |
@@ -906,7 +906,7 @@ loss after the attempt begins is ambiguous because Resend may have accepted it.
 
 ### Mail gateway
 
-`mail serve` starts one owned Node HTTP gateway:
+`mail serve` starts one owned HTTPS gateway with HTTP/2:
 
 ```text
 arcane mail serve [--profile <profile>] [--from <verified-sender>] [--app <label>] [--origin <exact-origin>] [--allow-to <addresses>] [--host 0.0.0.0] [--port 8025] [--request-timeout <ms>]
@@ -914,6 +914,30 @@ arcane mail serve [--profile <profile>] [--from <verified-sender>] [--app <label
 
 The selected `.env.json` profile supplies only the server-side Resend API key;
 omitting `--profile` selects `mail`.
+
+Add the listener's certificate configuration at the top level of the same file:
+
+```json
+{
+  "RESEND_API_KEY": "",
+  "MAIL_TLS_CERT_PATH": ".arcane/mail/fullchain.pem",
+  "MAIL_TLS_KEY_PATH": ".arcane/mail/private-key.pem"
+}
+```
+
+Supply an existing PEM certificate chain and its private key. Paths resolve
+relative to `.env.json`, or may be absolute. They are shared across provider
+profiles. Missing TLS settings name the fields to fill in before a listener
+opens; the TLS owner reports PEM file errors. Keep private-key material outside
+tracked source. The SDK repository already ignores `.arcane/` and `.env.json`.
+
+The selected `node-http-server` module negotiates HTTP/2 with HTTP/1.1 fallback
+on the same HTTPS port, default `8025`, with no plain-HTTP listener. Callers use
+a hostname covered by the certificate, such as
+`https://mail.example.com:8025/v1/mail`; `0.0.0.0` identifies the bind address.
+Restart the gateway after replacing renewed certificate files. Certificate
+issuance and renewal remain with the deployment's certificate owner.
+
 The CLI does not read a browser app key. Its optional `--app` value labels the
 server; the incoming request's `X-Mail-App` identifies the application for
 subscription verification. The HTTP authentication contract pairs that

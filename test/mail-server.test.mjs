@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import http2 from 'node:http2';
 import test from '../src/testing.mjs';
+import {temporaryDirectory, useSyntheticTls, writeSyntheticTlsFiles} from './helpers.mjs';
 import {
     createResendMailRequestHandler,
     RESEND_MAIL_PATH,
@@ -150,6 +152,49 @@ function deferred(){
     return {promise,reject,resolve};
 }
 
+function requestHttp2Mail(client, headers, body = '') {
+    return new Promise(
+        function collectHttp2MailResponse(resolve, reject) {
+            const request = client.request(headers);
+            const chunks = [];
+            let responseHeaders;
+            client.once('error', reject);
+            request.once('error', reject);
+            request.once(
+                'response',
+                function captureHttp2MailHeaders(receivedHeaders) {
+                    responseHeaders = receivedHeaders;
+                }
+            );
+            request.on(
+                'data',
+                function collectHttp2MailChunk(chunk) {
+                    chunks.push(chunk);
+                }
+            );
+            request.once(
+                'end',
+                function completeHttp2MailResponse() {
+                    client.removeListener('error', reject);
+                    try {
+                        const text = Buffer.concat(chunks).toString('utf8');
+                        resolve(
+                            {
+                                body: text ? JSON.parse(text) : null,
+                                headers: responseHeaders,
+                                statusCode: responseHeaders[':status']
+                            }
+                        );
+                    } catch (error) {
+                        reject(error);
+                    }
+                }
+            );
+            request.end(body);
+        }
+    );
+}
+
 async function settleSoon(promise,timeoutMs=1_000){
     let timer;
     const timeout=new Promise(function createSyntheticDeadline(resolve,reject){
@@ -191,6 +236,7 @@ test('mail gateway exposes an exact, credential-free lifecycle contract',async f
     assert.equal(instance.callerAuthentication,'subscription');
     assert.equal(instance.url,`${instance.origin}${RESEND_MAIL_PATH}`);
     assert.equal(instance.host,'127.0.0.1');
+    assert.equal(new URL(instance.origin).protocol, 'http:');
     assert.equal(instance.server.timeout,0);
     assert.equal(instance.closed,instance.lifecycle);
     for(const secretProperty of ['apiKey','subscriptionKey','from','recipientAllowlist','allowedOrigins']){
@@ -202,6 +248,196 @@ test('mail gateway exposes an exact, credential-free lifecycle contract',async f
     await firstClose;
     await instance.lifecycle;
 });
+
+test(
+    'mail HTTPS requires the complete selected PEM path pair before binding',
+    async function testMailTlsPathPair() {
+        for (const paths of [{certPath: 'synthetic-cert.pem'}, {keyPath: 'synthetic-key.pem'}]) {
+            await assert.rejects(
+                startResendMailServer(
+                    gatewayOptions(paths)
+                ),
+                function isMissingMailTlsPath(error) {
+                    return error?.code === 'ARCANE_MAIL_CONFIG_INVALID'
+                        && error.message.includes('both certPath and keyPath');
+                }
+            );
+        }
+    }
+);
+
+test(
+    'mail delegates HTTPS with HTTP1 fallback and surfaces the selected listener bind failure',
+    async function testMailTlsListenerSelection(t) {
+        const fixture = useSyntheticTls(t);
+        const directory = await temporaryDirectory(t);
+        const paths = await writeSyntheticTlsFiles(directory);
+        const instance = await startGateway(t, paths);
+        // The fixture covers TLS option delegation and listener ownership, not a handshake.
+        assert.equal(fixture.options.length, 1);
+        assert.equal(fixture.options[0].allowHTTP1, true);
+        assert.equal(fixture.options[0].cert.toString(), 'Synthetic certificate input; not a certificate.');
+        assert.equal(fixture.options[0].key.toString(), 'Synthetic key input; not a private key.');
+        assert.equal(instance.origin, `https://127.0.0.1:${instance.port}`);
+        assert.equal(instance.url, `${instance.origin}${RESEND_MAIL_PATH}`);
+        assert.equal(instance.server.listening, true);
+        assert.equal(Object.hasOwn(instance, 'certPath'), false);
+        assert.equal(Object.hasOwn(instance, 'keyPath'), false);
+
+        await assert.rejects(
+            startResendMailServer(
+                gatewayOptions(
+                    {...paths, port: instance.port}
+                )
+            ),
+            function isOccupiedMailTlsPort(error) {
+                return error?.code === 'EADDRINUSE'
+                    && error.cause?.code === 'EADDRINUSE'
+                    && error.message.includes(String(instance.port));
+            }
+        );
+        const accepted = await rawRequest(
+            instance,
+            {
+                body: JSON.stringify(validReport()),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Idempotency-Key': 'synthetic-tls-listener-report',
+                    'Origin': ALLOWED_ORIGIN,
+                    'X-Mail-App': APP_ID,
+                    'Authorization': `Bearer ${SUBSCRIPTION_KEY}`
+                }
+            }
+        );
+        assert.equal(accepted.statusCode, 202);
+        assert.equal(accepted.body.providerId, ACCEPTED_PROVIDER_ID);
+        await instance.close();
+        await instance.lifecycle;
+    }
+);
+
+test(
+    'native HTTP2 mail headers preserve authority CORS, subscription and complete provider content',
+    async function testHttp2MailRequestContract(t) {
+        const providerCalls = [];
+        const requestProtocols = [];
+        const handler = createResendMailRequestHandler(
+            gatewayOptions(
+                {
+                    allowedOrigins: [],
+                    fetchImpl: function captureHttp2ProviderRequest(url, options) {
+                        providerCalls.push(
+                            {url, options}
+                        );
+                        return defaultFetch();
+                    }
+                }
+            )
+        );
+        // Native cleartext HTTP/2 isolates the request contract from TLS negotiation.
+        const server = http2.createServer(
+            function dispatchNativeHttp2Mail(request, response) {
+                requestProtocols.push(
+                    {
+                        authority: request.authority,
+                        headersDistinct: request.headersDistinct,
+                        httpVersionMajor: request.httpVersionMajor
+                    }
+                );
+                handler.handle(request, response);
+            }
+        );
+        let client;
+        t.after(
+            async function closeNativeHttp2MailFixture() {
+                client?.destroy();
+                await handler.close();
+                await new Promise(
+                    function closeNativeMailServer(resolve, reject) {
+                        server.close(
+                            function nativeMailServerClosed(error) {
+                                if (error && error.code !== 'ERR_SERVER_NOT_RUNNING') {
+                                    reject(error);
+                                    return;
+                                }
+                                resolve();
+                            }
+                        );
+                    }
+                );
+            }
+        );
+        await new Promise(
+            function listenForNativeHttp2Mail(resolve, reject) {
+                server.once('error', reject);
+                server.listen(0, '127.0.0.1', resolve);
+            }
+        );
+        client = http2.connect(`http://127.0.0.1:${server.address().port}`);
+        const authority = 'mail.example.test:8025';
+        const origin = `https://${authority}`;
+        const headers = {
+            ':authority': authority,
+            ':method': 'POST',
+            ':path': RESEND_MAIL_PATH,
+            'authorization': `Bearer ${SUBSCRIPTION_KEY}`,
+            'content-type': 'application/json',
+            'idempotency-key': 'one exact, comma-containing report key',
+            'origin': origin,
+            'x-mail-app': APP_ID
+        };
+        const report = validReport(
+            {text: '  Exact HTTP/2 content.\nSecond line stays intact.  '}
+        );
+        const accepted = await requestHttp2Mail(
+            client,
+            headers,
+            JSON.stringify(report)
+        );
+        assert.equal(accepted.statusCode, 202);
+        assert.equal(accepted.headers['access-control-allow-origin'], origin);
+        assert.equal(accepted.body.providerId, ACCEPTED_PROVIDER_ID);
+        assert.deepEqual(
+            requestProtocols[0],
+            {authority, headersDistinct: undefined, httpVersionMajor: 2}
+        );
+        assert.equal(providerCalls.length, 1);
+        assert.equal(providerCalls[0].options.headers['Idempotency-Key'], headers['idempotency-key']);
+        assert.deepEqual(
+            JSON.parse(providerCalls[0].options.body),
+            {from: FROM, to: report.to, subject: report.subject, text: report.text}
+        );
+
+        const preflight = await requestHttp2Mail(
+            client,
+            {':authority': authority, ':method': 'OPTIONS', ':path': RESEND_MAIL_PATH, origin}
+        );
+        assert.equal(preflight.statusCode, 204);
+        assert.equal(preflight.headers['access-control-allow-origin'], origin);
+        const missingKey = await requestHttp2Mail(
+            client,
+            {...headers, 'idempotency-key': ''},
+            JSON.stringify(report)
+        );
+        assert.equal(missingKey.statusCode, 400);
+        assert.equal(missingKey.body.error.code, 'mail_invalid_headers');
+        const missingSubscription = await requestHttp2Mail(
+            client,
+            {...headers, authorization: ''},
+            JSON.stringify(report)
+        );
+        assert.equal(missingSubscription.statusCode, 401);
+        assert.equal(missingSubscription.body.error.code, 'mail_subscription_required');
+        const unrelatedOrigin = await requestHttp2Mail(
+            client,
+            {...headers, origin: ALLOWED_ORIGIN},
+            JSON.stringify(report)
+        );
+        assert.equal(unrelatedOrigin.statusCode, 403);
+        assert.equal(unrelatedOrigin.body.error.code, 'mail_origin_not_allowed');
+        assert.equal(providerCalls.length, 1);
+    }
+);
 
 test('mail gateway verifies the exact incoming application and bearer subscription key',async function testCallerAuthentication(t){
     let authenticatedProviderCalls=0;

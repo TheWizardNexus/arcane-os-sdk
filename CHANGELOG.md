@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.21.0
+
+- Serve mail over HTTPS with HTTP/2 through the published `node-http-server`
+  PEM API, with HTTP/1.1 fallback on the same selected port, default 8025.
+  Preserve the friendly occupied-port failure and owned listener lifecycle.
+- Read `MAIL_TLS_CERT_PATH` and `MAIL_TLS_KEY_PATH` with the provider profile
+  from `.env.json` in one startup read. Resolve relative PEM paths from that
+  file's directory and report missing TLS settings before binding. Keep file
+  and TLS handling portable across Windows, Linux and macOS.
+- Use native HTTP/2 headers and authority for the mail and CORS contracts,
+  preserving exact report content, subscription verification, provider
+  outcomes, existing credential injection and cancellation.
+- Extend the mail reference and purpose-gate report with TLS ownership and
+  configuration; add focused protocol and configuration test source.
+
 ## 0.20.0
 
 - Restore repository-shaped application packages: selected app files remain

@@ -86,6 +86,7 @@ Usage:
   ${CLI_NAME} mail key delete [profile]
   ${CLI_NAME} mail send [--profile <profile>] [--from <address>] --report-key <id> --report-stdin [--request-timeout <ms>]
   ${CLI_NAME} mail serve [--profile <profile>] [--from <address>] [--app <label>] [--origin <origin>] [--allow-to <addresses>] [--host 0.0.0.0] [--port 8025] [--request-timeout <ms>]
+    HTTPS/HTTP2; .env.json supplies RESEND_API_KEY, MAIL_TLS_CERT_PATH, and MAIL_TLS_KEY_PATH.
 
 Development:
   --public                      Bind dev to all IPv4 interfaces (0.0.0.0) and print network URLs.

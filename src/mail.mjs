@@ -5,6 +5,7 @@ import {
     getMailCredentialStatus,
     mailCredentialLocation,
     readMailCredential,
+    readMailServerSettings,
     setMailCredential
 } from './mail-credentials.mjs';
 import {sendResendMail,startResendMailServer} from './mail-server.mjs';
@@ -125,10 +126,11 @@ async function sendMailFromReport(options){
     }
 }
 
-async function readMailProviderKey(options){
-    const readCredential=resolveMailCommandDependency(options,'readCredential',readMailCredential);
+async function readMailProviderKey(options, serverSettings){
     const credentialOptions=mailCredentialOptions(options);
-    const apiKey=await readCredential(credentialOptions);
+    const apiKey = serverSettings !== undefined && (options.readCredential ?? null) === null
+        ? serverSettings.apiKey
+        : await resolveMailCommandDependency(options, 'readCredential', readMailCredential)(credentialOptions);
     if(apiKey===null){
         const location=mailCredentialLocation(credentialOptions);
         throw new ArcaneError(
@@ -147,10 +149,25 @@ async function readMailProviderKey(options){
 
 async function serveMailGateway(options){
     const startServer=resolveMailCommandDependency(options,'startServer',startResendMailServer);
+    const readServerSettings = resolveMailCommandDependency(options, 'readServerSettings', readMailServerSettings);
     throwIfAborted(options.signal);
-    let apiKey=await readMailProviderKey(options);
+    const serverSettings = await readServerSettings(
+        {...mailCredentialOptions(options), readCredential: options.readCredential}
+    );
+    throwIfAborted(options.signal);
+    let apiKey=await readMailProviderKey(options, serverSettings);
     try{
         throwIfAborted(options.signal);
+        const missingSettings = [];
+        if (!serverSettings.certPath) missingSettings.push('MAIL_TLS_CERT_PATH');
+        if (!serverSettings.keyPath) missingSettings.push('MAIL_TLS_KEY_PATH');
+        if (missingSettings.length) {
+            const location = mailCredentialLocation(options);
+            throw new ArcaneError(
+                ERROR_CODES.prerequisiteMissing,
+                `Missing ${missingSettings.join(', ')} in ${location.filePath}. Mail HTTPS requires a certificate and private key.`
+            );
+        }
         const recipientAllowlist=mailRecipientOptions(options.allowTo,'allowTo');
         const errorRecipients=options.errorTo===undefined
             ? recipientAllowlist
@@ -162,10 +179,12 @@ async function serveMailGateway(options){
                 ?[]
                 :is.array(options.origin)?[...options.origin]:[options.origin],
             bodyTimeoutMs:options.bodyTimeoutMs,
+            certPath:serverSettings.certPath,
             errorRecipients,
             fetchImpl:options.fetchImpl,
             from:options.from,
             host:options.host??'0.0.0.0',
+            keyPath:serverSettings.keyPath,
             onEvent:options.onEvent,
             port:options.port,
             providerTimeoutMs:options.requestTimeout,

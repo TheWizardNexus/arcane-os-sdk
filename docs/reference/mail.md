@@ -273,11 +273,13 @@ committed acceptance result.
 ## Operate the CLI and gateway
 
 Create `.env.json` in the directory from which the mail command runs, then fill
-in the provider key:
+in the provider key and the HTTPS certificate paths:
 
 ```json
 {
-  "RESEND_API_KEY": ""
+  "RESEND_API_KEY": "",
+  "MAIL_TLS_CERT_PATH": "",
+  "MAIL_TLS_KEY_PATH": ""
 }
 ```
 
@@ -370,6 +372,34 @@ address and port. The server can serve callers from multiple domains on the
 same machine. Route the page's `/v1/mail` to this listener, or configure an
 explicit shared endpoint in the caller.
 
+`mail serve` uses HTTPS with HTTP/2 on that selected port. The published
+`node-http-server` PEM API owns TLS and negotiates HTTP/2 or HTTP/1.1 on the
+same listener. It creates no additional plain-HTTP listener. The returned URL
+uses `https://`; `0.0.0.0` is the bind address, so callers use the deployed
+domain, for example `https://mail.example.com:8025/v1/mail`.
+
+Set `MAIL_TLS_CERT_PATH` to the PEM certificate chain and `MAIL_TLS_KEY_PATH`
+to its PEM private-key file. These top-level settings belong to the listener
+and apply regardless of the selected provider profile. Relative paths resolve
+from the directory containing `.env.json`; absolute paths are also accepted.
+The certificate must cover the hostname callers use. One certificate may
+cover multiple names; the gateway does not require one certificate per calling
+application. Keep private-key files outside tracked source, such as in the
+already-ignored `.arcane/` directory or an existing host certificate directory.
+
+Startup reads the JSON configuration once, reports missing TLS settings before
+binding, and lets the TLS owner report unreadable or unusable PEM files. It
+does not generate certificates, modify system trust, or add a renewal watcher.
+Restart the gateway after the configured certificate files are renewed.
+The same Node file and TLS APIs are used on Windows, Linux, and macOS; Android
+requires a compatible Node host and accessible configuration and certificate
+paths. These platform contracts are separate from actual platform execution.
+
+The public `createToolchain().mail({action: 'serve', ...options})` operation
+uses the same JSON certificate pair. Internally, `startResendMailServer` accepts
+`certPath` and `keyPath` and retains its existing HTTP behavior when neither
+is supplied. That internal function is not an npm package export.
+
 If the selected port is occupied, startup reports
 `Mail port <port> is already taken, possibly by another mail server.`
 The CLI exits with status 1. Programmatic callers receive the same message,
@@ -383,7 +413,8 @@ preserve each report's sender or its provider template's default.
 `--origin` selects an exact allowed caller origin; the
 programmatic `origin` option also accepts an array for multiple origins. With
 no origins configured, the gateway accepts an Origin matching its request
-Host using HTTP or HTTPS. Requests without Origin continue normally.
+authority (`:authority` for HTTP/2, `Host` for HTTP/1.1) using HTTP or HTTPS.
+Requests without Origin continue normally.
 Cross-origin preflight permits `Content-Type`, `Idempotency-Key`, `X-Mail-App`,
 and `Authorization`. This is origin configuration, not a loopback policy.
 
@@ -423,7 +454,7 @@ POST request before any provider attempt; results are not cached.
 
 | Configured-verifier outcome | Gateway response |
 | --- | --- |
-| Missing, empty, or repeated `X-Mail-App` | `400 mail_invalid_headers` |
+| Missing or empty `X-Mail-App` | `400 mail_invalid_headers` |
 | Missing or malformed Bearer credential | `401 mail_subscription_required` |
 | Callback returns anything except `true` | `401 mail_subscription_invalid` |
 | Callback throws | `503 mail_subscription_verification_failed`, retryable with the configured `retryableDelayMs` |
@@ -434,6 +465,11 @@ permits the existing mail-delivery path; it is not itself a mail-acceptance
 result. The SDK supplies no default verification URL or built-in Stripe
 endpoint adapter. Connecting the actual subscription endpoint is a separate
 hosting integration.
+
+The gateway uses Node's native header representations. HTTP/1.1 uses
+`headersDistinct`, retaining its repeated-field detection. HTTP/2 uses the
+compatibility request's `headers` object; Node owns duplicate joining or
+discarding for each field. The SDK does not split a native header value again.
 
 CLI startup output says `Subscription verification: disabled` or
 `Subscription verification: configured`. Structured `server.ready` output

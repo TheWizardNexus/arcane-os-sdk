@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import {writeFile} from 'node:fs/promises';
 import {Readable,Writable} from 'node:stream';
 import test from '../src/testing.mjs';
 import {runCli} from '../src/cli/main.mjs';
 import {executeMailCommand} from '../src/mail.mjs';
 import {executeOperation} from '../src/toolchain.mjs';
+import {temporaryDirectory} from './helpers.mjs';
 
 function memoryStream(){
     let value='';
@@ -21,6 +23,14 @@ function memoryStream(){
 
 function parseNdjson(value){
     return value.trim().split(/\r?\n/u).filter(Boolean).map(JSON.parse);
+}
+
+async function syntheticMailServerSettings() {
+    return {
+        apiKey: 're_synthetic',
+        certPath: path.resolve('synthetic-mail-certificate.pem'),
+        keyPath: path.resolve('synthetic-mail-private-key.pem')
+    };
 }
 
 test('mail key set reads a synthetic key only from explicit stdin and never reports it',async function mailKeySet(){
@@ -155,7 +165,7 @@ test('mail serve defaults to all interfaces without reading an app key',async fu
                 mode:'mail',
                 host:options.host,
                 port:options.port,
-                url:'http://0.0.0.0:8025/v1/mail',
+                url:'https://0.0.0.0:8025/v1/mail',
                 callerAuthentication:'none',
                 lifecycle:Promise.resolve(),
                 close:async function closeMailServer(){}
@@ -245,7 +255,7 @@ test('mail serve preserves an explicit host, CORS origin, and diagnostic app lab
                 appId:options.appId,
                 host:options.host,
                 port:8123,
-                url:'http://192.0.2.10:8123/v1/mail',
+                url:'https://192.0.2.10:8123/v1/mail',
                 lifecycle:Promise.resolve(),
                 close:async function closeMailServer(){}
             };
@@ -281,6 +291,7 @@ test('mail serve reports the missing JSON setting before opening its listener',a
             return executeMailCommand({
                 ...options,
                 readCredential:async function missingCredential(){return null;},
+                readServerSettings:syntheticMailServerSettings,
                 startServer:async function unexpectedListener(){started=true;}
             });
         }
@@ -350,6 +361,7 @@ test('mail command controller binds a provider profile and preserves explicit re
         requestTimeout:45_000,
         verifySubscription,
         readCredential:async function readSyntheticCredential(){return secret;},
+        readServerSettings:syntheticMailServerSettings,
         startServer:async function startSyntheticMailServer(options){
             observed=options;
             return {
@@ -358,7 +370,7 @@ test('mail command controller binds a provider profile and preserves explicit re
                 appId:options.appId,
                 host:options.host,
                 port:options.port,
-                url:'http://192.0.2.10:8025/v1/mail',
+                url:'https://192.0.2.10:8025/v1/mail',
                 lifecycle:Promise.resolve(),
                 close:async function closeSyntheticMailServer(){}
             };
@@ -371,6 +383,8 @@ test('mail command controller binds a provider profile and preserves explicit re
     assert.deepEqual(observed.errorRecipients,observed.recipientAllowlist);
     assert.equal(observed.providerTimeoutMs,45_000);
     assert.equal(observed.verifySubscription,verifySubscription);
+    assert.equal(observed.certPath,path.resolve('synthetic-mail-certificate.pem'));
+    assert.equal(observed.keyPath,path.resolve('synthetic-mail-private-key.pem'));
     assert.equal(JSON.stringify(result).includes(secret),false);
 });
 
@@ -383,6 +397,7 @@ test('mail command controller treats an explicit empty recipient list as unrestr
         allowTo:[],
         errorTo:[],
         readCredential:async function readSyntheticCredential(){return 're_synthetic';},
+        readServerSettings:syntheticMailServerSettings,
         startServer:async function startSyntheticMailServer(options){
             observed=options;
             return {target:'mail'};
@@ -393,6 +408,98 @@ test('mail command controller treats an explicit empty recipient list as unrestr
     assert.deepEqual(observed.allowedOrigins,[]);
     assert.equal(observed.host,'0.0.0.0');
 });
+
+test(
+    'mail serve reports both missing TLS settings without binding or exposing the provider key',
+    async function missingMailTlsSettings() {
+        const secret = 're_synthetic_private';
+        let started = false;
+        await assert.rejects(
+            executeMailCommand(
+                {
+                    action: 'serve',
+                    cwd: path.resolve('synthetic-mail-workspace'),
+                    readServerSettings: async function readSettingsWithoutCertificates() {
+                        return {apiKey: secret};
+                    },
+                    startServer: async function unexpectedListener() {
+                        started = true;
+                    }
+                }
+            ),
+            function inspectMissingTlsSettings(error) {
+                assert.equal(error.code, 'ARCANE_PREREQUISITE_MISSING');
+                assert.match(error.message, /Missing MAIL_TLS_CERT_PATH, MAIL_TLS_KEY_PATH in .*\.env\.json/u);
+                assert.equal(error.message.includes(secret), false);
+                return true;
+            }
+        );
+        assert.equal(started, false);
+    }
+);
+
+test(
+    'an injected mail credential remains the credential owner while JSON supplies TLS paths',
+    async function injectedCredentialWithJsonTls(context) {
+        const cwd = await temporaryDirectory(context);
+        await writeFile(
+            path.join(cwd, '.env.json'),
+            JSON.stringify(
+                {
+                    RESEND_API_KEY: {unused: 'not-a-provider-key'},
+                    MAIL_TLS_CERT_PATH: 'fullchain.pem',
+                    MAIL_TLS_KEY_PATH: 'private-key.pem'
+                }
+            )
+        );
+        let credentialReads = 0;
+        let started;
+        await executeMailCommand(
+            {
+                action: 'serve',
+                cwd,
+                readCredential: async function readInjectedMailCredential() {
+                    credentialReads += 1;
+                    return 're_synthetic_injected';
+                },
+                startServer: async function captureJsonConfiguredMail(options) {
+                    started = options;
+                    return {target: 'mail'};
+                }
+            }
+        );
+        assert.equal(credentialReads, 1);
+        assert.equal(started.apiKey, 're_synthetic_injected');
+        assert.equal(started.certPath, path.join(cwd, 'fullchain.pem'));
+        assert.equal(started.keyPath, path.join(cwd, 'private-key.pem'));
+    }
+);
+
+test(
+    'cancellation during mail settings stops the next credential operation',
+    async function cancelledMailSettings() {
+        const controller = new AbortController();
+        let credentialReads = 0;
+        await assert.rejects(
+            executeMailCommand(
+                {
+                    action: 'serve',
+                    signal: controller.signal,
+                    readServerSettings: async function cancelSettingsRead() {
+                        controller.abort();
+                        return syntheticMailServerSettings();
+                    },
+                    readCredential: async function unexpectedCredentialRead() {
+                        credentialReads += 1;
+                        return 're_synthetic';
+                    }
+                }
+            ),
+            {code: 'ARCANE_CANCELLED'}
+        );
+        assert.equal(credentialReads, 0);
+    }
+);
 
 test('mail send reads one complete report from stdin and returns complete acceptance detail',async function mailSend(){
     const report={

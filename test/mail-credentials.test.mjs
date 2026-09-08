@@ -7,6 +7,7 @@ import {
     getMailCredentialStatus,
     mailCredentialLocation,
     readMailCredential,
+    readMailServerSettings,
     setMailCredential
 } from '../src/mail-credentials.mjs';
 import test from '../src/testing.mjs';
@@ -106,3 +107,63 @@ test('cancellation before credential writes preserves the existing file',async f
     });
     assert.equal(await readFile(filePath,'utf8'),content);
 });
+
+test(
+    'mail server reads the selected provider and shared PEM paths from one configuration',
+    async function mailServerSettings(context) {
+        const cwd = await temporaryDirectory(context);
+        const keyPath = path.join(cwd, 'certificates', 'private-key.pem');
+        const content = JSON.stringify(
+            {
+                RESEND_API_KEY: 're_synthetic_default',
+                MAIL_PROFILES: {BOSS: {RESEND_API_KEY: 're_synthetic_boss'}},
+                MAIL_TLS_CERT_PATH: 'certificates/fullchain.pem',
+                MAIL_TLS_KEY_PATH: keyPath
+            }
+        );
+        await writeFile(path.join(cwd, '.env.json'), content);
+        const settings = await readMailServerSettings(
+            {cwd, profile: 'BOSS'}
+        );
+        assert.deepEqual(
+            settings,
+            {
+                apiKey: 're_synthetic_boss',
+                certPath: path.join(cwd, 'certificates', 'fullchain.pem'),
+                keyPath
+            }
+        );
+        assert.equal(await readFile(path.join(cwd, '.env.json'), 'utf8'), content);
+        assert.deepEqual(
+            await readMailServerSettings(
+                {cwd, profile: 'BOSS', readCredential: null}
+            ),
+            settings
+        );
+    }
+);
+
+test(
+    'mail TLS configuration errors name the setting without exposing its value',
+    async function invalidMailTlsSetting(context) {
+        const cwd = await temporaryDirectory(context);
+        await writeFile(
+            path.join(cwd, '.env.json'),
+            JSON.stringify(
+                {RESEND_API_KEY: 're_synthetic_private', MAIL_TLS_CERT_PATH: {private: 'private-content'}}
+            )
+        );
+        await assert.rejects(
+            readMailServerSettings(
+                {cwd}
+            ),
+            function inspectTlsSettingFailure(error) {
+                assert.equal(error.code, ERROR_CODES.usage);
+                assert.match(error.message, /MAIL_TLS_CERT_PATH/u);
+                assert.equal(error.message.includes('re_synthetic_private'), false);
+                assert.equal(error.message.includes('private-content'), false);
+                return true;
+            }
+        );
+    }
+);
