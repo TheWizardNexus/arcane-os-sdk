@@ -47,7 +47,7 @@ These protocols normalize orchestration and results. They do not normalize a
 Windows EXE, Linux DEB, Android APK, and portable directory into the same
 artifact kind.
 
-Managed browser imports have three supported control-plane entrypoints. The CLI
+App-scoped managed browser imports have three supported control-plane entrypoints. The CLI
 uses `arcane import-map`; Node callers use
 `executeOperation('import-map', options)` or
 `createToolchain(defaults).importMap(options)`. These are three routes to the
@@ -70,6 +70,9 @@ subpath owns shared speech-input cleanup and has the same
 managed browser key. There is
 no exported `importMapApplication()` function, `generateImportMap()` function, or
 `arcane-os/import-map` package subpath.
+Explicit host document lists use the separate root-exported
+[`generateDocumentImportMaps()`](sdk-api.md#generatedocumentimportmaps) API
+described below; they do not enter app discovery.
 
 The application dependency boundary is conditional. Only an application that
 actually consumes Arcane declares one exact published `arcane-os` version in
@@ -146,6 +149,27 @@ unsafe structure and grants no Core capability or provider authority.
 
 See [EventManager and time-travel review](event-manager.md) for the callable
 surface, DOM privacy defaults, playback modes, and recovery behavior.
+
+## Explicit host documents
+
+`generateDocumentImportMaps()` accepts one document root, an existing
+materialized runtime root, and explicit document-root-relative paths. It
+inventories the runtime and constructs the shared browser map once per call,
+then resolves each document's map against its first href-bearing base or its
+own URL. An absolute or root-relative base, or a relative base traversing above
+the document root, requires the caller's directory `deploymentUrl`; target-only
+bases leave URL resolution unchanged.
+
+The operation preserves authored content, resource URLs, custom import maps,
+and script order, updating only SDK-managed inline map blocks. It prepares all
+documents before sequential writes and reports `import-map.documents.started`,
+`import-map.write.progress`, and `import-map.documents.completed`. Cancellation
+can leave completed document writes in place. Successful writes remain
+successful when event delivery fails, with a degraded-delivery record in the
+return value. Runtime materialization, serving, and writer coordination remain
+with the caller. See the [API guide](sdk-api.md#generatedocumentimportmaps) for
+the complete inputs, results, errors, and example. The app-scoped discovery and
+map-artifact lifecycle below remains separate.
 
 ## Browser runtime delivery
 

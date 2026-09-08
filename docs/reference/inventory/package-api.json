@@ -6,7 +6,7 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 209,
+  "memberCount": 210,
   "members": [
     {
       "id": "root:APP_BUNDLE_DESCRIPTOR_NAME",
@@ -771,6 +771,22 @@
       "availability": "Node",
       "protocol": "Node ESM",
       "normalization": "ArcaneError and JSON-safe error normalization"
+    },
+    {
+      "id": "root:generateDocumentImportMaps",
+      "name": "generateDocumentImportMaps",
+      "displayName": "generateDocumentImportMaps()",
+      "kind": "function",
+      "signature": "async generateDocumentImportMaps({documentRoot, runtimeRoot, documents, version=SDK_VERSION, deploymentUrl, signal, onEvent}={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Runtime and app descriptors",
+      "summary": "Writes SDK-managed inline import maps for explicit host documents using an existing materialized runtime and each document's authored base.",
+      "availability": "Node on Windows, Linux, and macOS",
+      "protocol": "Explicit host documents",
+      "normalization": "Absolute filesystem result paths, document-relative browser maps, ordered write events, cancellation, and degraded event-delivery reporting"
     },
     {
       "id": "root:getSdkBrowserRuntimeRoot",

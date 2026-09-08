@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.22.0
+
+- Export `generateDocumentImportMaps()` from `arcane-os` for explicitly selected
+  host HTML documents and an existing materialized runtime. Generate each
+  document's SDK import URLs from its authored base without app discovery or
+  imposing an application layout.
+- Preserve complete authored HTML, resource URLs, custom import maps and script
+  loading order while updating only SDK-managed map blocks. Encode runtime
+  filenames and rebase both targets and URL compatibility keys.
+- Inventory the selected runtime once per batch, prepare every document before
+  writing, and expose ordered write events, cancellation and event-delivery
+  failures. Document the public API and add focused behavioral test source.
+- Preserve the platform's existing cancellation code in the import-map and
+  runtime-inventory paths, including ordinary `AbortController.abort()`.
+
 ## 0.21.0
 
 - Serve mail over HTTPS with HTTP/2 through the published `node-http-server`

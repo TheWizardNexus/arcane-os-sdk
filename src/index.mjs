@@ -135,6 +135,7 @@ export {
     readSdkBrowserRuntimeFile
 } from './sdk-browser-runtime.mjs';
 export {materializeWorkspaceRuntimeContent} from './workspace-runtime.mjs';
+export {generateDocumentImportMaps} from './import-map.mjs';
 export {
     discoverApps,
     inspectWorkspaceProfile,

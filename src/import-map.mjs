@@ -3,6 +3,7 @@ import {lstat,mkdir,readFile as readFileFromDisk,readdir,realpath,writeFile} fro
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {SDK_VERSION} from './constants.mjs';
+import {listRuntimeFiles} from './runtime.mjs';
 
 const is = new Is(false);
 
@@ -39,7 +40,7 @@ function fail(message,code='ARCANE_IMPORT_MAP_INVALID'){
 function throwIfAborted(signal){
     if(!signal?.aborted)return;
     const error=signal.reason instanceof Error?signal.reason:new Error('Operation cancelled.');
-    error.code=error.code||'ARCANE_CANCELLED';
+    if(error.code===undefined)error.code='ARCANE_CANCELLED';
     throw error;
 }
 
@@ -1296,9 +1297,16 @@ function validateInventory(files){
     return exact;
 }
 
-export async function buildImportMap({files,signal,version=SDK_VERSION}={}){
+function encodedUrlPath(relative) {
+    return relative.split('/').map(encodeURIComponent).join('/');
+}
+
+export async function buildImportMap({files,signal,version=SDK_VERSION,encodePaths=false}={}){
     throwIfAborted(signal);
     const inventory=validateInventory(files);
+    function runtimeTarget(relative) {
+        return `./arcane/${encodePaths ? encodedUrlPath(relative) : relative}`;
+    }
     const modules=[...inventory]
         .filter(relative=>relative.startsWith('modules/')
             &&!relative.slice('modules/'.length).includes('/')
@@ -1308,7 +1316,7 @@ export async function buildImportMap({files,signal,version=SDK_VERSION}={}){
     for(const relative of modules){
         throwIfAborted(signal);
         const name=path.posix.basename(relative).replace(JAVASCRIPT_EXTENSION,'');
-        registerSpecifier(namedRegistry,`arcane/${name}`,`./arcane/${relative}`);
+        registerSpecifier(namedRegistry,`arcane/${name}`,runtimeTarget(relative));
     }
     const entities=[...inventory].filter(relative=>relative.startsWith('entities/')
         &&!relative.slice('entities/'.length).includes('/')
@@ -1316,7 +1324,7 @@ export async function buildImportMap({files,signal,version=SDK_VERSION}={}){
     for(const relative of entities){
         throwIfAborted(signal);
         const name=path.posix.basename(relative).replace(JAVASCRIPT_EXTENSION,'');
-        registerSpecifier(namedRegistry,`arcane/entities/${name}`,`./arcane/${relative}`);
+        registerSpecifier(namedRegistry,`arcane/entities/${name}`,runtimeTarget(relative));
     }
     for(const [specifier,relative] of STATIC_RUNTIME_PACKAGE_IMPORTS){
         if(inventory.has(relative)){
@@ -1363,7 +1371,8 @@ export async function buildImportMap({files,signal,version=SDK_VERSION}={}){
     }
     for(const relative of [...inventory].sort(compareText)){
         if(JAVASCRIPT_EXTENSION.test(relative)){
-            registerSpecifier(namedRegistry,`./arcane/${relative}`,`./arcane/${relative}`);
+            const target=runtimeTarget(relative);
+            registerSpecifier(namedRegistry,target,target);
         }
     }
     const imports={};
@@ -2062,8 +2071,7 @@ function removeManagedBlocks(html,blocks){
     return result;
 }
 
-function firstModulePosition(html){
-    const structure=scanHtmlStructure(html);
+function firstModulePosition(html,structure=scanHtmlStructure(html)){
     let first=-1;
     for(const script of structure.scripts){
         const attributes=parseTagAttributes(script.open);
@@ -2432,6 +2440,312 @@ export async function readApplicationTestImportMapContext({
         imports:document.imports,
         signal
     });
+}
+
+function documentImportMapStructure(html) {
+    const structure = scanHtmlStructure(html);
+    const managed = [];
+    const executableTypes = new Set(
+        [
+            '', 'module', 'application/ecmascript', 'application/javascript',
+            'application/x-ecmascript', 'application/x-javascript',
+            'text/ecmascript', 'text/javascript', 'text/javascript1.0',
+            'text/javascript1.1', 'text/javascript1.2', 'text/javascript1.3',
+            'text/javascript1.4', 'text/javascript1.5', 'text/jscript',
+            'text/livescript', 'text/x-ecmascript', 'text/x-javascript'
+        ]
+    );
+    let firstLoad = firstModulePosition(html, structure);
+    let base = null;
+    for (const element of structure.bases) {
+        const attributes = parseTagAttributes(element.open);
+        if (!attributes.has('href')) continue;
+        base = {
+            ...element,
+            href:structuralAttribute(attributes, 'href', 'base')
+        };
+        break;
+    }
+    for (const script of structure.scripts) {
+        const attributes = parseTagAttributes(script.open);
+        const type = scriptType(attributes);
+        if (type === 'importmap' && attributes.has(MANAGED_IMPORT_MAP_ATTRIBUTE)) {
+            if (!script.closed) fail('Document contains an unterminated SDK import-map script.');
+            managed.push(script);
+        }
+        if (executableTypes.has(type) && (firstLoad < 0 || script.start < firstLoad)) {
+            firstLoad = script.start;
+        }
+    }
+    if (base && firstLoad >= 0 && base.end > firstLoad) {
+        fail('Document base must precede executable scripts and modulepreloads.');
+    }
+    return {
+        structure,
+        managed,
+        firstLoad,
+        base
+    };
+}
+
+function documentRelativeUrl(target, base) {
+    if (target.protocol !== base.protocol || target.host !== base.host) return target.href;
+    const directory = new URL('.', base);
+    const baseSegments = directory.pathname.split('/');
+    baseSegments.pop();
+    const targetSegments = target.pathname.split('/');
+    let shared = 0;
+    while (shared < baseSegments.length && shared < targetSegments.length - 1
+        && baseSegments[shared] === targetSegments[shared]) {
+        shared += 1;
+    }
+    // URL paths retain empty segments; filesystem relative() would collapse them.
+    const relative = [
+        ...new Array(baseSegments.length - shared).fill('..'),
+        ...targetSegments.slice(shared)
+    ].join('/');
+    const pathname = relative.startsWith('./') || relative.startsWith('../')
+        ? relative : `./${relative}`;
+    return `${pathname}${target.search}${target.hash}`;
+}
+
+function documentImports(imports, context, baseHref, relative) {
+    const documentUrl = new URL(encodedUrlPath(relative), context.deployment);
+    // Match URL parser normalization only for resolving the base; preserve authored HTML.
+    const baseAddress = (baseHref ?? '').replace(/[\t\r\n]/gu, '').replace(
+        /^[\u0000-\u0020]+|[\u0000-\u0020]+$/gu,
+        ''
+    );
+    if (!context.explicitDeployment && /^(?:[\\/]|[A-Za-z][A-Za-z0-9+.-]*:)/u.test(baseAddress)) {
+        throw new TypeError('An absolute or root-relative document base requires deploymentUrl.');
+    }
+    if (!context.explicitDeployment) {
+        let depth = relative.split('/').length - 1;
+        const basePath = baseAddress.split(/[?#]/u)[0].replaceAll('\\', '/');
+        for (const part of basePath.split('/')) {
+            const segment = part.replace(/%2e/giu, '.');
+            if (segment === '..') {
+                if (depth === 0) {
+                    throw new TypeError('A document base traversing above documentRoot requires deploymentUrl.');
+                }
+                depth -= 1;
+            } else if (segment !== '.') {
+                depth += 1;
+            }
+        }
+    }
+    const base = baseHref === undefined ? documentUrl : new URL(baseHref, documentUrl);
+    function rebaseUrl(value) {
+        if (value.startsWith('./arcane/')) {
+            return documentRelativeUrl(new URL(value.substring('./arcane/'.length), context.runtime), base);
+        }
+        if (value.startsWith('./node_modules/')) {
+            return documentRelativeUrl(new URL(value, context.deployment), base);
+        }
+        return value;
+    }
+    const rebased = {};
+    for (const [specifier, target] of Object.entries(imports)) {
+        rebased[rebaseUrl(specifier)] = rebaseUrl(target);
+    }
+    return rebased;
+}
+
+function renderDocumentImportMap(html, imports, state) {
+    const {structure, managed, firstLoad, base} = state;
+    const newline = html.includes('\r\n') ? '\r\n' : '\n';
+    const json = JSON.stringify({imports}, null, 2).replaceAll('<', '\\u003c');
+    const block = `<script type="importmap" ${MANAGED_IMPORT_MAP_ATTRIBUTE}>${newline}${json}${newline}</script>`;
+    const firstManaged = managed[0];
+    const replaceInPlace = firstManaged
+        && (!base || firstManaged.start >= base.end)
+        && (firstLoad < 0 || firstManaged.start < firstLoad);
+    const edits = managed.map(
+        function replaceSdkMap(script, index) {
+            return {
+                start:script.start,
+                end:script.end,
+                value:replaceInPlace && index === 0 ? block : ''
+            };
+        }
+    );
+    if (!replaceInPlace) {
+        const candidate = firstLoad >= 0 ? firstLoad
+            : structure.headClose >= 0 ? structure.headClose
+                : structure.bodyClose >= 0 ? structure.bodyClose : html.length;
+        const insertion = Math.max(candidate, base?.end ?? 0);
+        edits.push(
+            {
+                start:insertion,
+                end:insertion,
+                value:block
+            }
+        );
+    }
+    // Exact script ranges are SDK-owned; surrounding whitespace and author maps are not.
+    return applyReferenceEdits(html, edits);
+}
+
+/** Generate SDK maps for explicitly selected documents without imposing an app layout. */
+export async function generateDocumentImportMaps({
+    documentRoot,
+    runtimeRoot,
+    documents,
+    version = SDK_VERSION,
+    deploymentUrl,
+    signal,
+    onEvent
+} = {}) {
+    if (!is.string(documentRoot) || !documentRoot.trim()) {
+        throw new TypeError('generateDocumentImportMaps documentRoot must be a nonempty string.');
+    }
+    if (!is.array(documents) || documents.length === 0) {
+        throw new TypeError('generateDocumentImportMaps documents must be a nonempty array of relative paths.');
+    }
+    throwIfAborted(signal);
+    const root = path.resolve(documentRoot);
+    const runtime = path.resolve(runtimeRoot ?? path.join(root, 'arcane'));
+    const selected = [...new Set(documents.map(
+        function documentPath(value) {
+            return safeRelativePath(value, 'document path');
+        }
+    ))];
+    const deployment = deploymentUrl === undefined
+        ? pathToFileURL(`${root}${path.sep}`) : new URL(deploymentUrl);
+    if (!deployment.pathname.endsWith('/')) {
+        throw new TypeError('deploymentUrl must name a directory URL ending in /.');
+    }
+    const relativeRuntime = path.relative(root, runtime).split(path.sep).join('/');
+    if (path.isAbsolute(path.relative(root, runtime))) {
+        throw new TypeError('documentRoot and runtimeRoot must share a filesystem volume.');
+    }
+    const context = {
+        deployment,
+        runtime:new URL(relativeRuntime ? `${encodedUrlPath(relativeRuntime)}/` : './', deployment),
+        explicitDeployment:deploymentUrl !== undefined
+    };
+    const documentPaths = selected.map(
+        function resolveDocumentPath(relative) {
+            return path.join(root, ...relative.split('/'));
+        }
+    );
+    let eventError = await emit(
+        onEvent,
+        {
+            type:'import-map.documents.started',
+            documentRoot:root,
+            runtimeRoot:runtime,
+            documentPaths
+        }
+    );
+    const documentStates = new Array(selected.length);
+    const pending = selected.entries();
+    async function readDocuments() {
+        for (const [index, relative] of pending) {
+            throwIfAborted(signal);
+            const html = await readFileFromDisk(documentPaths[index], 'utf8');
+            throwIfAborted(signal);
+            documentStates[index] = {
+                path:relative,
+                filePath:documentPaths[index],
+                html,
+                state:documentImportMapStructure(html)
+            };
+        }
+    }
+    const readers = Array.from(
+        {length:Math.min(4, selected.length)},
+        readDocuments
+    );
+    const outcomes = await Promise.allSettled(
+        [
+            listRuntimeFiles(
+                {
+                    runtimeRoot:runtime,
+                    signal
+                }
+            ),
+            ...readers
+        ]
+    );
+    throwIfAborted(signal);
+    const errors = outcomes.filter(
+        function failedRead(outcome) {
+            return outcome.status === 'rejected';
+        }
+    ).map(
+        function readError(outcome) {
+            return outcome.reason;
+        }
+    );
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) throw new AggregateError(errors, 'Document import-map preparation failed.');
+    const built = await buildImportMap(
+        {
+            files:outcomes[0].value,
+            signal,
+            version,
+            encodePaths:true
+        }
+    );
+    const rendered = documentStates.map(
+        function renderSelectedDocument(document) {
+            throwIfAborted(signal);
+            const imports = documentImports(built.imports, context, document.state.base?.href, document.path);
+            return {
+                path:document.path,
+                filePath:document.filePath,
+                imports,
+                html:renderDocumentImportMap(document.html, imports, document.state)
+            };
+        }
+    );
+    const paths = [];
+    for (const document of rendered) {
+        throwIfAborted(signal);
+        await writeFile(document.filePath, document.html, 'utf8');
+        paths.push(document.filePath);
+        const deliveryError = await emit(
+            onEvent,
+            {
+                type:'import-map.write.progress',
+                paths:[...paths]
+            }
+        );
+        eventError ??= deliveryError;
+    }
+    const result = {
+        documentRoot:root,
+        runtimeRoot:runtime,
+        documentPaths,
+        documentCount:documentPaths.length,
+        documents:rendered.map(
+            function documentResult(document) {
+                return {
+                    path:document.path,
+                    filePath:document.filePath,
+                    imports:document.imports
+                };
+            }
+        ),
+        committed:true
+    };
+    const completedError = await emit(
+        onEvent,
+        {
+            type:'import-map.documents.completed',
+            ...result
+        }
+    );
+    eventError ??= completedError;
+    if (eventError) {
+        result.eventDelivery = {
+            status:'degraded',
+            errorCode:'ARCANE_EVENT_DELIVERY_FAILED',
+            message:String(eventError?.message ?? eventError)
+        };
+    }
+    return result;
 }
 
 async function generateImportMapUnlocked({

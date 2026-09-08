@@ -3,6 +3,7 @@ import {
     lstat,
     mkdir,
     readFile,
+    readdir,
     rm,
     symlink,
     writeFile
@@ -20,6 +21,26 @@ import {
 } from '../src/import-map.mjs';
 import {temporaryDirectory} from './helpers.mjs';
 import {SDK_VERSION} from '../src/constants.mjs';
+import {generateDocumentImportMaps} from '../src/index.mjs';
+
+function assertDocumentImportMap(html, prefix, suffix) {
+    const maps = [
+        ...html.matchAll(/<script\b(?=[^>]*\bdata-arcane-import-map(?:\s|>|=))[^>]*>([\s\S]*?)<\/script\s*>/gu)
+    ];
+    assert.equal(maps.length, 1);
+    assert.ok(
+        html.startsWith(prefix)
+    );
+    assert.ok(
+        html.endsWith(suffix)
+    );
+    const inserted = html.slice(prefix.length, html.length - suffix.length);
+    assert.match(
+        inserted.replace(maps[0][0], ''),
+        /^\s*$/u
+    );
+    return JSON.parse(maps[0][1]).imports;
+}
 
 async function writeWorkspaceFile(workspaceRoot,relative,source){
     const filePath=path.join(workspaceRoot,...relative.split('/'));
@@ -411,3 +432,425 @@ test('application tests read the existing managed browser map from the workspace
         `./arcane/modules/ThemeBootstrap.js?arcaneVersion=${SDK_VERSION}`
     );
 });
+
+test(
+    'public document map generation preserves host content and concurrent script loading without app metadata',
+    async function hostDocumentMaps(context) {
+        const documentRoot = await temporaryDirectory(context);
+        await writeRuntimeFixture(documentRoot);
+        const authoredMap = '<script type="importmap" data-product-map>{"imports":{"host":"../shared/host.js"}}</script>';
+        const documents = [
+            {
+                path: 'shell/index.html',
+                prefix: '<!doctype html>\r\n<html lang="en"><head>\r\n'
+                    + '<link rel="manifest" href="../shared/document.webmanifest?theme=night#start">\r\n'
+                    + authoredMap + '\r\n  ',
+                suffix: '<script src="../shared/boot.js?keep=one#ready" defer></script>\r\n'
+                    + '<script src="../shared/background.js" async></script>\r\n'
+                    + '<script type="module" src="./Shell.js?keep=two" async></script>\r\n'
+                    + '</head><body><main>  Keep every line, &amp; every trailing space.  </main></body></html>\r\n'
+            },
+            {
+                path: 'provisioner/index.html',
+                prefix: '<!doctype html>\n<html lang="en"><head>\n' + authoredMap + '\n    ',
+                suffix: '<link rel="modulepreload" href="../shared/ready.js?mode=quick">\n'
+                    + '<script type="module" src="./Provisioner.js" defer></script>\n'
+                    + '</head><body><main>Complete provisioner content.</main></body></html>\n'
+            }
+        ];
+        await Promise.all(
+            documents.map(
+                function writeHostDocument(document) {
+                    return writeWorkspaceFile(documentRoot, document.path, document.prefix + document.suffix);
+                }
+            )
+        );
+        const inventory = await readdir(
+            documentRoot,
+            {recursive: true}
+        );
+        const documentPaths = documents.map(
+            function hostDocumentPath(document) {
+                return document.path;
+            }
+        );
+        const options = {documentRoot, documents: documentPaths, version: '7.8.9'};
+        const result = await generateDocumentImportMaps(options);
+        assert.equal(result.documentRoot, documentRoot);
+        assert.equal(
+            result.runtimeRoot,
+            path.join(documentRoot, 'arcane')
+        );
+        assert.deepEqual(
+            result.documentPaths,
+            documentPaths.map(
+                function absoluteHostDocumentPath(relative) {
+                    return path.join(documentRoot, relative);
+                }
+            )
+        );
+        assert.equal(result.documentCount, 2);
+        assert.equal(result.committed, true);
+        const firstDocuments = new Map();
+        const mount = new URL('https://example.test/releases/deep/host/');
+        for (const document of documents) {
+            const filePath = path.join(documentRoot, document.path);
+            const html = await readFile(filePath, 'utf8');
+            const imports = assertDocumentImportMap(html, document.prefix, document.suffix);
+            firstDocuments.set(document.path, html);
+            const target = '../arcane/modules/ThemeBootstrap.js?arcaneVersion=7.8.9';
+            assert.equal(imports['arcane/ThemeBootstrap'], target);
+            assert.equal(imports['../arcane/modules/ThemeBootstrap.js'], target);
+            assert.equal(imports['../arcane/modules/ThemeBootstrap.js?arcaneVersion=7.8.9'], target);
+            assert.equal(
+                imports['../node_modules/strong-type/index.js'],
+                '../arcane/dependencies/strong-type/index.js?arcaneVersion=7.8.9'
+            );
+            const documentUrl = new URL(document.path, mount);
+            assert.equal(
+                new URL(imports['arcane/ThemeBootstrap'], documentUrl).href,
+                new URL('arcane/modules/ThemeBootstrap.js?arcaneVersion=7.8.9', mount).href
+            );
+            const reported = result.documents.find(
+                function matchingHostDocument(record) {
+                    return record.path === document.path;
+                }
+            );
+            assert.equal(reported.filePath, filePath);
+            assert.deepEqual(reported.imports, imports);
+        }
+        await generateDocumentImportMaps(options);
+        for (const document of documents) {
+            const html = await readFile(
+                path.join(documentRoot, document.path),
+                'utf8'
+            );
+            assert.equal(
+                html,
+                firstDocuments.get(document.path)
+            );
+        }
+        const finalInventory = await readdir(
+            documentRoot,
+            {recursive: true}
+        );
+        assert.deepEqual(
+            finalInventory.sort(),
+            inventory.sort()
+        );
+    }
+);
+
+test(
+    'document maps use the first href base and distinguish directory and file bases without changing authored maps',
+    async function authoredDocumentBases(context) {
+        const documentRoot = await temporaryDirectory(context);
+        await writeRuntimeFixture(documentRoot);
+        const staleMap = '<script data-arcane-import-map type="importmap">{"imports":{"stale":"./old.js"}}</script>';
+        const cases = [
+            {path: 'shell/pages/directory.html', base: '../assets/', expected: '../../arcane/modules/ThemeBootstrap.js'},
+            {path: 'shell/pages/file.html', base: '../assets', expected: '../arcane/modules/ThemeBootstrap.js'},
+            {path: 'shell/pages/repeated.html', base: './/', expected: '../../../arcane/modules/ThemeBootstrap.js'}
+        ];
+        const documents = [];
+        for (const selected of cases) {
+            const prefix = '<!doctype html><html lang="en"><head>\n'
+                + '<base target="_self">\n'
+                + `<base href="${selected.base}">\n`
+                + '<base href="../../../ignored/">\n'
+                + '<script type="importmap"> { "imports": { "authored": "./local.js?original=yes" } } </script>\n \t';
+            const suffix = '\t \n<link rel="manifest" href="./document.webmanifest">\n'
+                + '<script type="module" src="./App.js?original=yes" async></script>\n'
+                + '</head><body><main>Original host page.</main></body></html>\n';
+            await writeWorkspaceFile(documentRoot, selected.path, prefix + staleMap + suffix);
+            documents.push(
+                {...selected, prefix, suffix}
+            );
+        }
+        await generateDocumentImportMaps(
+            {
+                documentRoot,
+                documents: cases.map(
+                    function basedDocumentPath(selected) {
+                        return selected.path;
+                    }
+                ),
+                version: null
+            }
+        );
+        const mount = new URL('https://example.test/releases/deep/host/');
+        for (const document of documents) {
+            const html = await readFile(
+                path.join(documentRoot, document.path),
+                'utf8'
+            );
+            const imports = assertDocumentImportMap(html, document.prefix, document.suffix);
+            assert.equal(imports['arcane/ThemeBootstrap'], document.expected);
+            const documentUrl = new URL(document.path, mount);
+            const baseUrl = new URL(document.base, documentUrl);
+            assert.equal(
+                new URL(imports['arcane/ThemeBootstrap'], baseUrl).href,
+                new URL('arcane/modules/ThemeBootstrap.js', mount).href
+            );
+            assert.equal(
+                Object.hasOwn(imports, 'stale'),
+                false
+            );
+        }
+    }
+);
+
+test(
+    'document maps encode runtime filenames and custom runtime locations while preserving document filenames',
+    async function encodedDocumentMapPaths(context) {
+        const documentRoot = await temporaryDirectory(context);
+        const runtimeParent = path.join(documentRoot, 'payload#% library');
+        const runtimeRoot = path.join(runtimeParent, 'arcane');
+        await writeRuntimeFixture(runtimeParent);
+        await writeWorkspaceFile(runtimeRoot, 'modules/Panel#100% ready.js', 'export const ready = true;\n');
+        const documentPath = 'shell#% space/index#% page.html';
+        const prefix = '<!doctype html><html lang="en"><head><title>Encoded paths</title>\n';
+        const suffix = '<script type="module" src="./Host.js" async></script></head>'
+            + '<body><main>Keep shell#% space/index#% page.html.</main></body></html>\n';
+        const filePath = await writeWorkspaceFile(documentRoot, documentPath, prefix + suffix);
+        const documentPaths = [documentPath];
+        const result = await generateDocumentImportMaps(
+            {documentRoot, runtimeRoot, documents: documentPaths, version: '7.8.9'}
+        );
+        const html = await readFile(filePath, 'utf8');
+        const imports = assertDocumentImportMap(html, prefix, suffix);
+        const targetPath = '../payload%23%25%20library/arcane/modules/Panel%23100%25%20ready.js';
+        const target = `${targetPath}?arcaneVersion=7.8.9`;
+        assert.equal(imports['arcane/Panel#100% ready'], target);
+        assert.equal(imports[targetPath], target);
+        assert.equal(imports[target], target);
+        assert.equal(result.documents[0].path, documentPath);
+        assert.equal(result.documents[0].filePath, filePath);
+        const documentUrl = new URL('https://example.test/releases/deep/host/shell%23%25%20space/index%23%25%20page.html');
+        assert.equal(
+            new URL(imports['arcane/Panel#100% ready'], documentUrl).href,
+            'https://example.test/releases/deep/host/payload%23%25%20library/arcane/modules/Panel%23100%25%20ready.js?arcaneVersion=7.8.9'
+        );
+    }
+);
+
+test(
+    'a dot-prefixed runtime folder produces relative URL targets and compatibility keys',
+    async function dotPrefixedDocumentRuntime(context) {
+        const documentRoot = await temporaryDirectory(context);
+        const runtimeRoot = path.join(documentRoot, '.arcane');
+        await writeWorkspaceFile(runtimeRoot, 'modules/ThemeBootstrap.js', 'export default class ThemeBootstrap {}\n');
+        const prefix = '<!doctype html><html lang="en"><head>\n';
+        const suffix = '<script type="module" src="./Host.js" async></script>'
+            + '</head><body><main>Complete host content.</main></body></html>\n';
+        const filePath = await writeWorkspaceFile(documentRoot, 'index.html', prefix + suffix);
+        const documents = ['index.html'];
+        await generateDocumentImportMaps(
+            {documentRoot, runtimeRoot, documents, version: null}
+        );
+        const html = await readFile(filePath, 'utf8');
+        const imports = assertDocumentImportMap(html, prefix, suffix);
+        const target = './.arcane/modules/ThemeBootstrap.js';
+        assert.equal(imports['arcane/ThemeBootstrap'], target);
+        assert.equal(imports[target], target);
+        const documentUrl = new URL('https://example.test/releases/deep/host/index.html');
+        assert.equal(
+            new URL(imports['arcane/ThemeBootstrap'], documentUrl).href,
+            'https://example.test/releases/deep/host/.arcane/modules/ThemeBootstrap.js'
+        );
+    }
+);
+
+test(
+    'absolute document bases require the deployment URL before writing any selected document',
+    async function deployedDocumentBases(context) {
+        const documentRoot = await temporaryDirectory(context);
+        await writeRuntimeFixture(documentRoot);
+        const cases = [
+            {path: 'plain.html', base: ''},
+            {path: 'shell/root.html', base: '/other/assets/'},
+            {path: 'shell/absolute.html', base: 'https://cdn.example.test/layout/page.html'},
+            {path: 'shell/spaced-absolute.html', base: ' https://cdn.example.test/layout/page.html '}
+        ];
+        const documents = [];
+        for (const selected of cases) {
+            const prefix = '<!doctype html><html lang="en"><head>'
+                + (selected.base ? `<base href="${selected.base}">` : '') + '\n';
+            const suffix = '<script type="module" src="./Host.js" async></script>'
+                + '</head><body><main>Complete deployed page.</main></body></html>\n';
+            await writeWorkspaceFile(documentRoot, selected.path, prefix + suffix);
+            documents.push(
+                {...selected, prefix, suffix}
+            );
+        }
+        const options = {
+            documentRoot,
+            documents: cases.map(
+                function deployedDocumentPath(selected) {
+                    return selected.path;
+                }
+            ),
+            version: null
+        };
+        for (const selected of cases) {
+            if (!selected.base) continue;
+            const selectedDocuments = ['plain.html', selected.path];
+            await assert.rejects(
+                generateDocumentImportMaps(
+                    {...options, documents: selectedDocuments}
+                ),
+                /deploymentUrl/u
+            );
+        }
+        for (const document of documents) {
+            const html = await readFile(
+                path.join(documentRoot, document.path),
+                'utf8'
+            );
+            assert.equal(html, document.prefix + document.suffix);
+        }
+        const deploymentUrl = 'https://example.test/releases/deep/host/';
+        await generateDocumentImportMaps(
+            {...options, deploymentUrl}
+        );
+        for (const document of documents) {
+            const html = await readFile(
+                path.join(documentRoot, document.path),
+                'utf8'
+            );
+            const imports = assertDocumentImportMap(html, document.prefix, document.suffix);
+            const documentUrl = new URL(document.path, deploymentUrl);
+            const baseUrl = document.base ? new URL(document.base, documentUrl) : documentUrl;
+            assert.equal(
+                new URL(imports['arcane/ThemeBootstrap'], baseUrl).href,
+                new URL('arcane/modules/ThemeBootstrap.js', deploymentUrl).href
+            );
+        }
+    }
+);
+
+test(
+    'documents without executable loads receive the managed map after an authored base outside the head',
+    async function bodyBaseDocumentMap(context) {
+        const documentRoot = await temporaryDirectory(context);
+        await writeRuntimeFixture(documentRoot);
+        const prefix = '<html><head></head><body><base href="../">';
+        const suffix = '</body></html>';
+        const filePath = await writeWorkspaceFile(documentRoot, 'shell/index.html', prefix + suffix);
+        const documents = ['shell/index.html'];
+        await generateDocumentImportMaps(
+            {documentRoot, documents, version: null}
+        );
+        const html = await readFile(filePath, 'utf8');
+        const imports = assertDocumentImportMap(html, prefix, suffix);
+        const documentUrl = new URL('https://example.test/releases/deep/host/shell/index.html');
+        const baseUrl = new URL('../', documentUrl);
+        assert.equal(
+            new URL(imports['arcane/ThemeBootstrap'], baseUrl).href,
+            'https://example.test/releases/deep/host/arcane/modules/ThemeBootstrap.js'
+        );
+    }
+);
+
+test(
+    'relative bases that traverse above the document root require a deployment URL even when they return',
+    async function relativeBaseDeploymentCoordinates(context) {
+        const documentRoot = await temporaryDirectory(context);
+        await writeRuntimeFixture(documentRoot);
+        const rootName = path.basename(documentRoot);
+        const cases = [
+            {path: 'shell/index.html', base: '../'},
+            {path: 'shell/above.html', base: '../../'},
+            {path: 'shell/return.html', base: `../../${rootName}/`},
+            {path: 'shell/encoded-return.html', base: `%2e%2e/%2E%2E/${rootName}/`}
+        ];
+        const records = [];
+        for (const selected of cases) {
+            const prefix = `<html><head><base href="${selected.base}">`;
+            const suffix = '</head><body>Complete authored document.</body></html>\n';
+            const filePath = await writeWorkspaceFile(documentRoot, selected.path, prefix + suffix);
+            records.push(
+                {...selected, prefix, suffix, filePath}
+            );
+        }
+        for (const record of records) {
+            if (record.path === 'shell/index.html') continue;
+            const documents = ['shell/index.html', record.path];
+            await assert.rejects(
+                generateDocumentImportMaps(
+                    {documentRoot, documents, version: null}
+                ),
+                /deploymentUrl/u
+            );
+        }
+        for (const record of records) {
+            assert.equal(
+                await readFile(record.filePath, 'utf8'),
+                record.prefix + record.suffix
+            );
+        }
+        const ordinaryDocuments = ['shell/index.html'];
+        await generateDocumentImportMaps(
+            {documentRoot, documents: ordinaryDocuments, version: null}
+        );
+        const ordinary = records[0];
+        const ordinaryHtml = await readFile(ordinary.filePath, 'utf8');
+        const ordinaryImports = assertDocumentImportMap(ordinaryHtml, ordinary.prefix, ordinary.suffix);
+        assert.equal(ordinaryImports['arcane/ThemeBootstrap'], './arcane/modules/ThemeBootstrap.js');
+        const deploymentUrl = 'https://example.test/releases/deep/host/';
+        const documents = records.map(
+            function relativeBaseDocumentPath(record) {
+                return record.path;
+            }
+        );
+        await generateDocumentImportMaps(
+            {documentRoot, documents, version: null, deploymentUrl}
+        );
+        for (const record of records) {
+            const html = await readFile(record.filePath, 'utf8');
+            const imports = assertDocumentImportMap(html, record.prefix, record.suffix);
+            const documentUrl = new URL(record.path, deploymentUrl);
+            const baseUrl = new URL(record.base, documentUrl);
+            assert.equal(
+                new URL(imports['arcane/ThemeBootstrap'], baseUrl).href,
+                new URL('arcane/modules/ThemeBootstrap.js', deploymentUrl).href
+            );
+        }
+    }
+);
+
+test(
+    'pre-aborted document map generation preserves every selected document',
+    async function cancelledDocumentMaps(context) {
+        const documentRoot = await temporaryDirectory(context);
+        await writeRuntimeFixture(documentRoot);
+        const source = '<!doctype html><html lang="en"><head></head><body>Complete source.\n</body></html>\n';
+        const filePath = await writeWorkspaceFile(documentRoot, 'shell/index.html', source);
+        const controller = new AbortController();
+        const reason = new Error('Document-map request cancelled by its owner.');
+        controller.abort(reason);
+        const documents = ['shell/index.html'];
+        await assert.rejects(
+            generateDocumentImportMaps(
+                {documentRoot, documents, signal: controller.signal}
+            ),
+            function originalCancellation(error) {
+                return error === reason;
+            }
+        );
+        const ordinaryController = new AbortController();
+        ordinaryController.abort();
+        await assert.rejects(
+            generateDocumentImportMaps(
+                {documentRoot, documents, signal: ordinaryController.signal}
+            ),
+            function originalPlatformCancellation(error) {
+                return error === ordinaryController.signal.reason && error.name === 'AbortError';
+            }
+        );
+        assert.equal(
+            await readFile(filePath, 'utf8'),
+            source
+        );
+    }
+);

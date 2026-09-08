@@ -153,6 +153,7 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `executeNativeBuildPlan()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `executeOperation()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `fail()` | function | `arcane-os` | Errors | Node |
+| `generateDocumentImportMaps()` | function | `arcane-os` | Runtime and app descriptors | Node; explicit documents and an existing materialized runtime |
 | `getSdkBrowserRuntimeRoot()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `getSdkRoot()` | function | `arcane-os` | Runtime and app descriptors | Node |
 | `getTargetAdapter()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
@@ -1136,6 +1137,161 @@ import {APP_DESCRIPTOR_SCHEMA_VERSION} from 'arcane-os';
 
 console.log(APP_DESCRIPTOR_SCHEMA_VERSION);
 ```
+
+## generateDocumentImportMaps()
+
+### Overview
+
+Writes SDK-managed inline browser import maps into explicitly selected HTML
+documents. Hosts can keep their existing page layout and use an already
+materialized Arcane runtime without an app descriptor, app discovery, or an
+`apps/<id>/` directory. The existing app-scoped `arcane import-map` operation
+continues to own descriptor-selected application pages and its map artifact.
+
+### Signature and result
+
+```text
+async generateDocumentImportMaps({
+    documentRoot,
+    runtimeRoot = path.join(documentRoot, 'arcane'),
+    documents,
+    version = SDK_VERSION,
+    deploymentUrl,
+    signal,
+    onEvent
+} = {})
+```
+
+Import it from `arcane-os`.
+
+| Input | Contract |
+| --- | --- |
+| `documentRoot` | Required filesystem directory containing the selected documents. Returned root paths are absolute. |
+| `runtimeRoot` | Existing materialized runtime directory containing `modules/`, `entities/`, `sdk/`, and its other selected content. Defaults to `arcane/` under `documentRoot`. Pass an absolute path when selecting another directory; relative root arguments resolve from the current working directory. |
+| `documents` | Required nonempty array of document-root-relative file paths, such as `['shell/home.html', 'settings.html']`. Use forward slashes and normalized paths without a leading `./` or parent traversal. Duplicate paths are processed once, in first-selected order. |
+| `version` | Version used in generated import-map targets and URL compatibility keys. Defaults to the installed SDK's `SDK_VERSION`; `null` selects unversioned map URLs. Authored resource URLs outside the managed map stay unchanged. |
+| `deploymentUrl` | Optional absolute directory URL ending in `/` that corresponds to `documentRoot`, such as `https://example.com/control/`. Required when a selected document has an absolute or root-relative base URL, or a relative base that traverses above `documentRoot`. |
+| `signal` | Optional `AbortSignal`, observed during inventory, document preparation, and before each write. |
+| `onEvent` | Optional named callback receiving the ordered events below. An asynchronous callback is awaited before the operation continues. |
+
+The resolved result contains:
+
+```text
+{
+    documentRoot,
+    runtimeRoot,
+    documentPaths,
+    documentCount,
+    documents: [{path, filePath, imports}],
+    committed: true
+}
+```
+
+`documentPaths` and each `filePath` are absolute filesystem paths. Each `path`
+is relative to `documentRoot`; `imports` is the complete map rendered for that
+document. The operation inventories the runtime once, builds the shared map
+once, and reads the selected documents with up to four concurrent readers.
+It renders every document before writing any of them, then writes in selected
+order. `committed: true` means all selected writes completed; the batch is not
+an atomic filesystem transaction.
+
+### Document URLs and authored content
+
+The first `<base>` with an `href` determines each document's effective base.
+A target-only base, such as `<base target="_blank">`, does not change URL
+resolution. With no base, `shell/home.html` resolves the default runtime through
+`../arcane/`. With `<base href="../">`, the same page resolves it through
+`./arcane/`. Generated URLs include the selected version when one is supplied.
+
+The host serves the runtime at the same relative location as `runtimeRoot`
+has to `documentRoot`. `deploymentUrl` supplies that directory's public URL
+when an authored base needs an origin or deployment path to resolve correctly.
+For example, `https://example.com/control/` corresponds to `documentRoot`, so
+its default runtime is served at `https://example.com/control/arcane/`.
+Cross-origin bases produce absolute runtime map URLs. Without `deploymentUrl`,
+an absolute or root-relative base causes a `TypeError` before any document is
+written. A relative base that traverses above `documentRoot` also requires
+`deploymentUrl`, even if later path segments return into the physical directory:
+the filesystem's parent names do not establish public deployment paths.
+The two filesystem roots must share a volume.
+
+The generator replaces only SDK-marked `<script type="importmap"
+data-arcane-import-map>` ranges, consolidating multiple SDK blocks into one.
+It preserves complete authored HTML around those ranges, including whitespace,
+resource URLs, custom import maps, and the attributes and order of classic,
+module, `async`, and `defer` scripts. Custom maps remain separate and are not
+merged into the SDK map. The managed block follows the effective base and
+precedes executable scripts and module preloads. An authored base that follows
+one of those loads is reported as `ARCANE_IMPORT_MAP_INVALID` before writes.
+
+This operation writes only the selected HTML files. The caller owns runtime
+materialization, document selection, serving, and coordination with other
+document writers. It creates no map sidecar, copies no runtime content, and
+starts no build or browser.
+
+### Events, errors, and cancellation
+
+| Event | Fields |
+| --- | --- |
+| `import-map.documents.started` | `documentRoot`, `runtimeRoot`, and the complete `documentPaths` selection. |
+| `import-map.write.progress` | `paths`: all absolute document paths successfully written so far. |
+| `import-map.documents.completed` | The successful result fields, including `committed: true`. |
+
+If an event callback throws or rejects, generation continues. A successful
+return additionally reports `eventDelivery: {status: 'degraded', errorCode:
+'ARCANE_EVENT_DELIVERY_FAILED', message}` for the first callback failure.
+
+Invalid options can throw `TypeError`; document/map structure failures use
+`ARCANE_IMPORT_MAP_INVALID`, runtime inventory failures use
+`ARCANE_RUNTIME_INVALID`, and filesystem failures propagate. All started
+preparation reads settle before rejection; multiple failures are
+reported together in an `AggregateError`. Cancellation
+rejects with the signal's error reason when supplied, otherwise an operation
+cancellation error; an error lacking a code receives `ARCANE_CANCELLED`.
+Preparation failures occur before writes. Cancellation or a filesystem failure
+during writing can leave earlier completed files updated; the operation does
+not roll those files back. An in-flight filesystem write completes before the
+next cancellation boundary.
+
+### Availability and normalization
+
+**Node on Windows, Linux, and macOS.** Filesystem paths are resolved with the
+host path API; browser import URLs use forward slashes and URL encoding. Deep
+protocol: [Explicit host documents](protocols.md#explicit-host-documents).
+
+### Example
+
+A dragon observatory keeps its control page at `shell/home.html`, settings at
+`settings.html`, and its selected Arcane runtime at `arcane/`. Run this from
+that document root after materializing the runtime:
+
+```javascript
+import {generateDocumentImportMaps} from 'arcane-os';
+
+const controller = new AbortController();
+
+function reportImportMapEvent(event) {
+    console.log(event);
+}
+
+const result = await generateDocumentImportMaps(
+    {
+        documentRoot: process.cwd(),
+        documents: ['shell/home.html', 'settings.html'],
+        signal: controller.signal,
+        onEvent: reportImportMapEvent
+    }
+);
+
+for (const document of result.documents) {
+    console.log(document.path, document.imports['arcane/AI']);
+}
+```
+
+Change the explicit document list to update another host page. If either page
+uses `<base href="/control/">`, add
+`deploymentUrl: 'https://example.com/control/'` to the options. Both pages keep
+their authored layout and receive map URLs appropriate to their own base.
 
 ## getSdkBrowserRuntimeRoot()
 

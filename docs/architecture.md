@@ -74,6 +74,16 @@ migration; the current tree has no OS-to-SDK synchronization path.
 
 ## Workspace profiles
 
+Hosts with an existing HTML layout can call the root-exported
+[`generateDocumentImportMaps()`](reference/sdk-api.md#generatedocumentimportmaps)
+with a document root, explicit page paths, and an already materialized runtime.
+This SDK-owned operation builds the shared map once and renders each page's
+URLs from its authored base, preserving page content and script order. It
+updates only SDK-managed inline maps; the host owns document selection,
+runtime materialization, serving, and coordination with other writers. This
+path requires no application descriptor or `apps/<id>/` layout and leaves the
+app-scoped toolchain operation unchanged.
+
 An external workspace maps the exact runtime shipped by its locked `arcane-os`
 dependency. An Arcane OS checkout is an integrated SDK consumer, not the owner
 of portable runtime source. For live shared development, the explicit

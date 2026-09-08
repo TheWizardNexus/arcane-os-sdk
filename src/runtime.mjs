@@ -17,7 +17,7 @@ function fail(message,code='ARCANE_RUNTIME_INVALID'){
 function throwIfAborted(signal){
     if(!signal?.aborted)return;
     const error=signal.reason instanceof Error?signal.reason:new Error('Operation cancelled.');
-    error.code=error.code||'ARCANE_CANCELLED';
+    if(error.code===undefined)error.code='ARCANE_CANCELLED';
     throw error;
 }
 
