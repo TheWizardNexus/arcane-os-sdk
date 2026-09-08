@@ -45,6 +45,9 @@ settles it: an exact matching executed, declined, cancelled, or not-executed
   defers. This standing publication authority requires no repeated confirmation.
 - `dev` and `latest` are npm dist-tags selected from the strict package
   version. They are never Git branches and do not change the canonical checkout.
+- After every successful npm SDK publication, notify the existing tasks that
+  own active SDK-consuming applications, following the publication notice
+  procedure below. This applies to every release, including patches.
 - Continuous integration and npm publication may identify the selected `main`
   commit when a release is explicitly selected. That release-only identity is
   not an ordinary application, development, package, or runtime gate.
@@ -126,3 +129,34 @@ settles it: an exact matching executed, declined, cancelled, or not-executed
   as part of a selected distribution or release. Hosted source validation and
   documentation or Pages checks are release-publication evidence, not ordinary
   development checkpoints.
+
+## npm publication consumer notices
+
+Every new published `arcane-os` version requires a direct release notice to each
+active consuming application's existing owning task so that it can upgrade.
+Send the notices promptly after npm publication and version/channel confirmation,
+before reporting the release handoff complete. The user's standing instruction
+authorizes these task messages without another confirmation.
+
+Use current consumer declarations and task ownership to identify recipients;
+refresh the known consumer list at each publication instead of notifying only
+the application that requested the change. Respect explicit project stops,
+including Lifeline. Use existing tasks rather than creating new ones.
+
+Each notice must include the exact published package version and npm channel,
+the changes in that release and their relevance to the application, a release
+notes or changelog link, and any required compatibility or upgrade steps. Base
+the content on the actual published release. Distinguish publication and SDK
+verification evidence from any unverified application behavior. Tell the owner
+to advance its exact dependency pin, lockfile, and managed SDK projections
+through the normal public package workflow within its existing authority.
+
+Record the version, recipient tasks, notice content, and send outcome in the
+release task's durable handoff. Avoid duplicate notices for the same version
+and recipient; resume missing deliveries after a send failure. Report any
+unreachable owner plainly. A delivered notice is not proof of adoption.
+
+Consumer replies, upgrade completion, application tests, and application release
+readiness remain with their owners and do not gate SDK publication. The SDK
+publisher sends the notices without editing consumer repositories or waiting
+for their upgrades.
