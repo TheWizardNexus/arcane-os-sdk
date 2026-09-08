@@ -1,6 +1,7 @@
 import {execFile} from 'node:child_process';
 import {mkdir,mkdtemp,rm,writeFile} from 'node:fs/promises';
 import http from 'node:http';
+import http2 from 'node:http2';
 import https from 'node:https';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
@@ -10,20 +11,26 @@ export const repositoryRoot=path.resolve(path.dirname(fileURLToPath(import.meta.
 export const cliPath=path.join(repositoryRoot,'bin','arcane.mjs');
 
 // These fixtures exercise routing and native TLS option delegation, not a TLS
-// handshake or browser certificate trust. No certificate or private key is stored.
+// handshake, protocol negotiation or browser trust. No certificate or private key is stored.
 export function useSyntheticTls(context) {
     const createServer = https.createServer;
+    const createSecureServer = http2.createSecureServer;
     const options = [];
-    https.createServer = function createSyntheticTlsServer(tlsOptions, requestHandler) {
+    function createSyntheticTlsServer(tlsOptions, requestHandler) {
         options.push(tlsOptions);
-        return http.createServer(function syntheticTlsRequest(request, response) {
-            request.socket.encrypted = true;
-            return requestHandler(request, response);
-        });
-    };
+        return http.createServer(
+            function syntheticTlsRequest(request, response) {
+                request.socket.encrypted = true;
+                return requestHandler(request, response);
+            }
+        );
+    }
+    https.createServer = createSyntheticTlsServer;
+    http2.createSecureServer = createSyntheticTlsServer;
     context.after(
-        function restoreTlsConstructor() {
+        function restoreTlsConstructors() {
             https.createServer = createServer;
+            http2.createSecureServer = createSecureServer;
         }
     );
     return {options};

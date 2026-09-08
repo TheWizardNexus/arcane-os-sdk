@@ -320,6 +320,13 @@ address and port. The server can serve callers from multiple domains on the
 same machine. Route the page's `/v1/mail` to this listener, or configure an
 explicit shared endpoint in the caller.
 
+If the selected port is occupied, startup reports
+`Mail port <port> is already taken, possibly by another mail server.`
+The CLI exits with status 1. Programmatic callers receive the same message,
+with native `EADDRINUSE` metadata and the original error retained as `cause`.
+The existing listener remains running; this launch does not retry or select
+another port.
+
 `--app` is an optional server event label and does not restrict incoming
 application names. `--from` is an optional shared sender override; omit it to
 preserve each report's sender or its provider template's default.

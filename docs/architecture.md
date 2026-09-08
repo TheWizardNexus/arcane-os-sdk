@@ -134,8 +134,10 @@ expiration. The timestamp advances only after the whole resource check succeeds.
 Restarting is not a content synchronization step; inspect the
 selected source route and the last successful check when evaluating freshness.
 
-The shared dev server uses RIAEvangelist's `node-http-server` public interface
-for HTTPS and conditional responses on those selected routes. The SDK
+The shared dev server uses RIAEvangelist's published `node-http-server` 10.0.0
+public interface for HTTPS and conditional responses on those selected routes.
+PEM-backed HTTPS uses Node's `Http2SecureServer` with HTTP/1.1 compatibility;
+clients negotiate either protocol on the same HTTPS port. The SDK
 owns source selection and generated representations. By default, source development
 and every packaged browser preview serve content on HTTPS and redirect their
 paired HTTP listener with status 308 through the public request hook.

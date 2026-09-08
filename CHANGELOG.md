@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.18.0
+
+- Adopt published `node-http-server` 10.0.0. PEM-backed development and
+  packaged-preview HTTPS now negotiate HTTP/2 or HTTP/1.1 on the same port
+  through the existing module integration, with no new runtime dependency.
+- Document the returned `Http2SecureServer` for PEM-backed HTTPS. Preserve
+  raw `tls` options on native `https.Server`, explicit HTTP development, the
+  HTTP mail gateway, paired HTTP `308` redirects, source/PWA routes, complete
+  responses, conditional caching, and owned listener shutdown.
+- Adapt the shared synthetic TLS fixture to both native TLS constructors while
+  retaining option capture and cleanup. The fixture models routing and option
+  delegation; it does not establish a real TLS handshake or protocol negotiation.
+- Report an occupied mail listener port clearly while retaining native
+  `EADDRINUSE` details, the original cause, and the existing startup cleanup.
+
 ## 0.17.0
 
 - Add neutral `modal.configure({dismissible})` configuration, defaulting to

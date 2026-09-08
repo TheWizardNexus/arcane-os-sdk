@@ -1033,6 +1033,15 @@ export async function startResendMailServer(options={}){
         server=await listenForMailRequests(mailServer);
     }catch(error){
         await Promise.allSettled([mailServer.close(),requestHandler.close()]);
+        if (error?.code === 'EADDRINUSE') {
+            throw Object.assign(
+                new Error(
+                    `Mail port ${configuration.port} is already taken, possibly by another mail server.`,
+                    {cause:error}
+                ),
+                error
+            );
+        }
         throw error;
     }
     const address=server.address();

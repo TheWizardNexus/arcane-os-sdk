@@ -3464,14 +3464,15 @@ async function useselectApp(...arguments_) {
 
 Starts one owned browser development server with exact runtime/app route mappings and a caller-selected bind address.
 
-HTTP and HTTPS serving use the published `node-http-server` module. The SDK
+HTTP and HTTPS serving use published `node-http-server` 10.0.0. The SDK
 selects source routes and supplies generated representations; the module owns
 static-file conditional GET/HEAD handling and response delivery. The SDK
 retains modification dates for its generated representations. Unchanged
 resources can return `304` with no body while changed resources return their
-complete current representation. PEM-path listeners use module deployment;
-explicit raw `tls` options retain native HTTPS transport with the same module
-response and static-file operations.
+complete current representation. PEM-path listeners use module deployment and
+negotiate HTTP/2 or HTTP/1.1 on the same HTTPS port. Explicit raw `tls` options
+retain native HTTPS transport with the same module response and static-file
+operations.
 
 ### Signature, modes, and result
 
@@ -3518,8 +3519,12 @@ requirements remain browser-owned; see [explicit HTTP development](cli.md#explic
 The promise settles after all selected listeners are ready and resolves to
 `{server, protocol, mode, workspaceRoot, appId, host, port, origin, cleanUrl, url,
 networkUrls, httpPort, httpOrigin, httpUrl, close, closed, lifecycle}`. `server` is the raw Node
-server for application content; `protocol` is `'https:'` by default or `'http:'`
-with explicit HTTP source mode.
+server for application content: `Http2SecureServer` for PEM-backed HTTPS,
+`https.Server` for explicit raw `tls` options, or `http.Server` for explicit
+HTTP source mode. HTTP/2 uses Node's compatibility request/response APIs;
+callers accessing the raw server must account for its native type.
+`protocol` describes the URL scheme: `'https:'` for either negotiated HTTPS
+protocol or `'http:'` with explicit HTTP source mode.
 `url` and `cleanUrl` are the same application URL. Wildcard listeners use
 `localhost` in that local URL; `host` retains the actual bound address.
 `httpPort` is the actual HTTP listener port, `httpOrigin` is its HTTP origin,

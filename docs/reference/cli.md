@@ -345,6 +345,9 @@ Network URLs come from one interface snapshot at startup and do not establish
 remote reachability through the machine's firewall or network.
 
 HTTPS is the default for development and required for packaged browser previews.
+The published `node-http-server` 10.0.0 integration negotiates HTTP/2 or HTTP/1.1
+on the same HTTPS port using the configured PEM pair. Source routes, generated
+PWA resources, and conditional responses use the same serving pipeline.
 `--https` remains accepted but is no longer needed to select the transport.
 `--port` selects the HTTPS application port. A second HTTP listener returns
 `308` redirects to that HTTPS port, preserving the requested path and query.
