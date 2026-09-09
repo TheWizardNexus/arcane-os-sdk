@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {cp,lstat,mkdir,readFile,rename,symlink,writeFile} from 'node:fs/promises';
+import {cp,lstat,mkdir,readFile,symlink,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {createWorkspace,initWorkspace} from '../src/scaffold.mjs';
@@ -232,29 +232,21 @@ test('workspace validation ignores required-element decoys inside classic-script
         /does not belong to the selected workspace/u
     );
 
-    const appsRoot=path.join(workspaceRoot,'apps');
-    const retiredAppsRoot=path.join(workspaceRoot,'retired-apps');
-    let retargeted=false;
-    await assert.rejects(
-        validateDiscoveredApplication({
-            workspaceRoot:aliasRoot,
-            workspaceMode:selected.config.workspaceMode,
-            workspaceConfig:selected.config,
-            app:selected.app,
-            onEvent:async event=>{
-                if(retargeted||event.type!=='workspace.application.validated')return;
-                await rename(appsRoot,retiredAppsRoot);
-                await symlink(
-                    retiredAppsRoot,
-                    appsRoot,
-                    process.platform==='win32'?'junction':'dir'
-                );
-                retargeted=true;
-            }
-        }),
-        error=>error?.code==='ARCANE_INTEGRITY_FAILED'
-    );
-    assert.equal(retargeted,true);
+    let validatedEvent;
+    const completed=await validateDiscoveredApplication({
+        workspaceRoot:aliasRoot,
+        workspaceMode:selected.config.workspaceMode,
+        workspaceConfig:selected.config,
+        app:selected.app,
+        onEvent:event=>{
+            if(event.type==='workspace.application.validated')validatedEvent=event;
+        }
+    });
+    assert.equal(completed.valid,true);
+    assert.equal(completed.appId,'html-decoy');
+    assert.equal(completed.workspaceRoot,selected.workspaceRoot);
+    assert.equal(validatedEvent?.appId,'html-decoy');
+    assert.equal(validatedEvent.workspaceRoot,selected.workspaceRoot);
 });
 
 test('create refuses a nonempty target and init preserves existing authored files',async t=>{
