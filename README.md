@@ -19,7 +19,7 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This checkout defines the `0.29.0` SDK contract. Applications pin one exact npm
+This checkout defines the `0.29.1` SDK contract. Applications pin one exact npm
 version and lockfile; registry state is deliberately not baked into application
 artifacts.
 
@@ -604,9 +604,13 @@ prior file until the replacement is complete. Cancellation or failure before
 commit restores the prior output when that can be done without overwriting a
 concurrent change. A conflicting or uncertain path is preserved for inspection.
 
-The archive uses the documented USTAR+gzip structure and publishes its v1 JSON
-contract at `arcane-os/schemas/arcane-app-bundle.json`. When the user explicitly
-selects bundle verification, it rejects malformed archives, links, devices,
+The archive uses USTAR+gzip with per-file PAX path extensions for long or
+non-ASCII filenames and publishes its v1 JSON contract at
+`arcane-os/schemas/arcane-app-bundle.json`. Logical filenames and content remain
+complete; ordinary USTAR paths retain their existing representation, and bundle
+metadata keeps its existing SDK-version matching contract. Readers must support
+PAX path extensions to consume bundles that need them. When the
+user explicitly selects bundle verification, it rejects malformed archives, links, devices,
 unsafe or colliding paths, unsupported archive members, trailing data, and
 inconsistent descriptor or inventory structure. These checks reject corrupt
 selected artifacts; they do not impose byte-count, hash, provenance, or

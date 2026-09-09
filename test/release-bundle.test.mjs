@@ -3,7 +3,7 @@ import {mkdtemp, mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {gzipSync, gunzipSync} from 'node:zlib';
-import test from 'node:test';
+import test from '../src/testing.mjs';
 import {
     APP_BUNDLE_DESCRIPTOR_NAME,
     APP_BUNDLE_FORMAT,

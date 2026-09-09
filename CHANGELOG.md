@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.29.1
+
+- Preserve complete long and non-ASCII filenames in application release bundles
+  through standard per-file PAX path extensions. Public bundle creation and
+  verification retain logical payload paths and complete file content without
+  application-side renaming. Ordinary USTAR representation remains supported,
+  and the existing SDK-version metadata contract is unchanged. Bundles using
+  extended paths require the updated SDK reader or another PAX-capable reader.
+- Preserve application-authored resource URL queries, including `v`, encoded
+  and repeated fields, empty query segments, and fragments. Import-map refresh,
+  serving, packaging, and PWA delivery now change only SDK-owned `arcaneVersion`
+  fields through the existing shared transformer.
+
 ## 0.29.0
 
 - Add `legacyAppPaths: false` to `arcane-packager.json` for root applications
