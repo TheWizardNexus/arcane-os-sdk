@@ -38,8 +38,9 @@ comes from the selected application entry. The app owns names, icons, colors,
 display preference, routes and descriptions. Use real app icons; the SDK does
 not invent branding or claim that a browser has installed the app.
 
-Manifest URL fields are relative to the application directory. Source delivery
-and packaged delivery retain the app tree at `apps/<id>/`. For packaged output,
+Manifest URL fields are relative to the application directory. Each standalone
+app's root is its repository root. Explicit multi-app source and packaged
+delivery retain the selected app tree at `apps/<id>/`. For multi-app packaged output,
 the default `start_url` is `./apps/<id>/<entry>`, resolved from the generated
 root manifest. The default `id` and `scope` remain `./`, preserving the existing
 deployment-root installation identity. Authored relative URL fields, including
@@ -55,51 +56,30 @@ ordinary static host; it does not copy the installed runtime into `arcane/`.
 The source root defaults its installation ID to `/apps/<id>/` to preserve the
 previous source identity while its start URL and scope move to the root. An
 authored `manifest.id` remains authoritative. Packaged default identity remains
-`./`. Existing `/apps/<id>/` navigation aliases retain query strings and
-fragments and lead to the selected root document. No stored application data is
-rewritten by changing the layout.
+`./`. App identity and saved application data remain unchanged.
 
-Root PWA generation also retains `apps/<id>/arcane-sw.js` and
-`apps/<id>/arcane-offline.json`. These are ordinary generated files served at
-their original URLs, including on a static host. The same canonical worker and
-current inventory use root resource/navigation URLs, rebased for the previous
-scope when deployed beneath a directory. An existing worker's inventory refresh
-can learn the new navigation destinations; the browser can update the worker at
-its retained script URL through normal update and activation. No cache deletion,
-forced activation, user-data migration or application-owned server handler is
-introduced. Offline clients require a later successful connection to receive
-updated files; fixture coverage does not establish a particular installed app's
-actual browser lifecycle.
+### Root generated output
 
-### Root-only generated output
+For a standalone application, `appsRoot: "."` places the app at its repository
+root. Import-map refresh, `arcane dev`, package inspection/dry run and browser
+packaging use that layout directly:
 
-For a root application, add `"legacyAppPaths": false` to the workspace's
-`arcane-packager.json`, alongside `"appsRoot": "."`. The default is `true`.
-This selects root-only SDK-generated navigation and PWA output in import-map
-refresh, `arcane dev`, package inspection/dry run, and browser packaging:
-
-- The four root PWA files remain generated normally.
-- The SDK generates no `apps/<id>/` navigation pages, legacy worker or legacy
-  offline inventory, and adds no legacy navigation aliases or dev redirects.
+- The four root PWA files are generated normally when PWA is enabled.
+- The SDK generates no `apps/<id>/` navigation pages, nested worker or duplicate
+  offline inventory, and adds no redirects for that path family.
+- Runtime resources use the selected npm package paths; no repository-root
+  `arcane/` projection is generated.
 - The default source installation ID remains `/apps/<id>/`, the default
   packaged installation ID remains `./`, and an explicit `manifest.id` remains
-  authoritative. An ID is an installation identifier, not a request to generate
-  a directory. App identity and saved application data remain unchanged.
-- Existing files are left on disk. Explicitly selected authored old-path
-  resources remain in the normal source/package/offline inventory; this setting
-  is not a deletion or migration command.
+  authoritative. An ID identifies the installation; it does not generate a
+  directory or a redirect.
+- Authored resources follow their normal include/exclude selection. Generation
+  does not delete existing files, stored application data, or worker caches.
 
-Restart `arcane dev` after changing this workspace configuration. Omission or
-`true` retains the compatibility behavior described above. The option has no
-effect on apps whose configured `appsRoot` is `"apps"`.
-
-An installed app may still launch an old `/apps/<id>/` URL, and an existing
-worker registration may still update its old script/inventory URL. Disabling
-generation does not redirect those installed clients, unregister their worker,
-clear caches or guarantee their next update. Keep compatibility output enabled
-while old URLs still require SDK support, or supply the required resources
-through the application's own declared files and hosting policy. This SDK
-option alone makes no claim about any existing installation's adoption.
+Generated and offline app files are committed. GitHub Actions consume those
+committed files rather than generating them. Actual multi-app workspaces keep
+their explicit `appsRoot: "apps"` layout. This source/package contract does not
+establish any particular installed application's browser lifecycle.
 
 ### Offline resource selection
 

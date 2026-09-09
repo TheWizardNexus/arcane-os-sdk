@@ -13,10 +13,10 @@ import {
 import {workspaceTemplate} from '../src/templates/workspace-template.mjs';
 import {repositoryRoot,runNode,temporaryDirectory} from './helpers.mjs';
 
-test('root scaffold selects direct npm routes without a runtime copy or dependency execution',async t=>{
+test('default root scaffold selects direct npm routes without a runtime copy or dependency execution',async t=>{
     const parent=await temporaryDirectory(t);
     const targetPath=path.join(parent,'moon-library-files');
-    const result=await createWorkspace({targetPath,appId:'moon-library',appsRoot:'.'});
+    const result=await createWorkspace({targetPath,appId:'moon-library'});
     assert.equal(result.appsRoot,'.');
     assert.equal(result.workspaceRuntime,null);
     assert.deepEqual(result.importMap,{pending:true,reason:'sdk-install-required'});
@@ -47,18 +47,20 @@ test('root scaffold selects direct npm routes without a runtime copy or dependen
     await assert.rejects(initWorkspace({workspaceRoot:targetPath,appId:'different-app'}),/does not replace its identity/u);
 });
 
-test('workspace scaffold creates a private external app using the exact SDK version',async t=>{
+test('explicit multi-app scaffold creates a private external app using the exact SDK version',async t=>{
     const parent=await temporaryDirectory(t);
     const targetPath=path.join(parent,'signal-lab');
     const events=[];
     const receipt=await createWorkspace({
         targetPath,
         appId:'signal-lab',
+        appsRoot:'apps',
         displayName:'Signal Lab',
         onEvent:event=>events.push(event)
     });
 
     assert.equal(receipt.workspaceRoot,targetPath);
+    assert.equal(receipt.appsRoot,'apps');
     assert.equal(receipt.target,'browser');
     assert.equal(events.at(0).type,'scaffold.started');
     assert.equal(events.at(-1).type,'scaffold.completed');
@@ -159,6 +161,7 @@ test('workspace validation ignores required-element decoys inside classic-script
     await createWorkspace({
         targetPath:workspaceRoot,
         appId:'html-decoy',
+        appsRoot:'apps',
         displayName:'HTML Decoy'
     });
     const entryPath=path.join(workspaceRoot,'apps','html-decoy','index.html');
@@ -256,7 +259,7 @@ test('workspace validation ignores required-element decoys inside classic-script
     assert.equal(validatedEvent.workspaceRoot,selected.workspaceRoot);
 });
 
-test('create refuses a nonempty target and init preserves existing authored files',async t=>{
+test('create refuses a nonempty target and fresh init uses the repository root while preserving authored files',async t=>{
     const parent=await temporaryDirectory(t);
     const nonempty=path.join(parent,'nonempty');
     await mkdir(nonempty);
@@ -274,19 +277,28 @@ test('create refuses a nonempty target and init preserves existing authored file
     const receipt=await initWorkspace({workspaceRoot:initialized,appId:'preserved-app'});
     assert.equal(await readFile(path.join(initialized,'README.md'),'utf8'),'# Existing README\n');
     assert.ok(receipt.skippedFiles.includes('README.md'));
-    assert.ok(receipt.createdFiles.includes('apps/preserved-app/index.html'));
+    assert.equal(receipt.appsRoot,'.');
+    assert.ok(receipt.createdFiles.includes('index.html'));
+    const config=JSON.parse(await readFile(path.join(initialized,'arcane-packager.json'),'utf8'));
+    assert.equal(config.appsRoot,'.');
+    const selected=await resolveWorkspace({workspaceRoot:initialized});
+    assert.equal(selected.appRoot,initialized);
+    assert.equal(selected.appId,'preserved-app');
+    for(const absent of ['apps','arcane','arcane.lock.json','node_modules']){
+        await assert.rejects(lstat(path.join(initialized,absent)),error=>error.code==='ENOENT');
+    }
 });
 
 test('init replaces a noncanonical SDK lock with the canonical semantic document',async t=>{
     const workspaceRoot=await temporaryDirectory(t);
-    const generated=workspaceTemplate({appId:'forged-lock'});
+    const generated=workspaceTemplate({appId:'forged-lock',appsRoot:'apps'});
     const forged=JSON.parse(generated.files.get('arcane.lock.json'));
     forged.sdkBrowserRuntime.root='node_modules/another-sdk/browser-runtime';
     const lockPath=path.join(workspaceRoot,'arcane.lock.json');
     const original=`${JSON.stringify(forged,null,2)}\n`;
     await writeFile(lockPath,original);
 
-    const initialized=await initWorkspace({workspaceRoot,appId:'forged-lock'});
+    const initialized=await initWorkspace({workspaceRoot,appId:'forged-lock',appsRoot:'apps'});
     const reconciled=JSON.parse(await readFile(lockPath,'utf8'));
     assert.equal(initialized.workspaceMode,'external');
     assert.deepEqual(initialized.replacedFiles,['arcane.lock.json']);
@@ -300,8 +312,22 @@ test('init replaces a noncanonical SDK lock with the canonical semantic document
     assert.equal((await lstat(path.join(workspaceRoot,'arcane'))).isDirectory(),true);
 });
 
-test('workspace template lock contains only semantic SDK roots and protocols',()=>{
-    const generated=workspaceTemplate({appId:'lock-contract'});
+test('workspace template defaults to root files and retains the integrated app-only layout',()=>{
+    const root=workspaceTemplate({appId:'root-template'});
+    const config=JSON.parse(root.files.get('arcane-packager.json'));
+    assert.equal(config.appsRoot,'.');
+    assert.equal(root.files.has('index.html'),true);
+    assert.equal(root.files.has('arcane-app.json'),true);
+    assert.equal(root.files.has('arcane.lock.json'),false);
+    assert.equal([...root.files.keys()].some(relative=>/^(?:apps|arcane)\//u.test(relative)),false);
+
+    const integrated=workspaceTemplate({appId:'integrated-template',appOnly:true});
+    assert.equal(integrated.files.has('apps/integrated-template/index.html'),true);
+    assert.ok([...integrated.files.keys()].every(relative=>relative.startsWith('apps/integrated-template/')));
+});
+
+test('explicit multi-app template lock contains only semantic SDK roots and protocols',()=>{
+    const generated=workspaceTemplate({appId:'lock-contract',appsRoot:'apps'});
     const lock=JSON.parse(generated.files.get('arcane.lock.json'));
     assert.deepEqual(lock.runtime,{root:'node_modules/arcane-os/runtime'});
     assert.deepEqual(lock.sdkBrowserRuntime,{root:'node_modules/arcane-os/browser-runtime'});
@@ -317,7 +343,7 @@ test('every native scaffold includes a real raster icon and declares browser plu
             const appId=`scaffold-${target}`;
             const targetPath=path.join(parent,appId);
             const receipt=await createWorkspace({targetPath,appId,target});
-            const appRoot=path.join(targetPath,'apps',appId);
+            const appRoot=targetPath;
             const descriptor=JSON.parse(await readFile(path.join(appRoot,'arcane-app.json'),'utf8'));
             const packageManifest=JSON.parse(await readFile(path.join(appRoot,'arcane-package.json'),'utf8'));
             const icon=await readFile(path.join(appRoot,'img','icon.png'));
@@ -325,6 +351,10 @@ test('every native scaffold includes a real raster icon and declares browser plu
             const packageDocument=JSON.parse(await readFile(path.join(targetPath,'package.json'),'utf8'));
 
             assert.equal(receipt.target,target);
+            assert.equal(receipt.appsRoot,'.');
+            for(const absent of ['apps','arcane']){
+                await assert.rejects(lstat(path.join(targetPath,absent)),error=>error.code==='ENOENT');
+            }
             assert.deepEqual(descriptor.targets,['browser',target].sort());
             assert.equal(descriptor.requirements.minimumCoreVersion,'0.8.12');
             assert.equal(Object.hasOwn(descriptor,'permissions'),false);
@@ -364,7 +394,7 @@ test('init preflights package conflicts before creating any template files',asyn
         error=>error?.code==='ENOENT'
     );
     await assert.rejects(
-        readFile(path.join(workspaceRoot,'apps','conflict-app','index.html'),'utf8'),
+        readFile(path.join(workspaceRoot,'index.html'),'utf8'),
         error=>error?.code==='ENOENT'
     );
 });
@@ -405,7 +435,7 @@ test('init preserves a supported local SDK tarball declaration',async t=>{
         devDependencies:{'arcane-os':'file:../sdk-artifacts/arcane-os-0.1.0-dev.0.tgz'}
     },null,2)}\n`);
 
-    await initWorkspace({workspaceRoot,appId:'local-sdk-app'});
+    await initWorkspace({workspaceRoot,appId:'local-sdk-app',appsRoot:'apps'});
     const result=JSON.parse(await readFile(path.join(workspaceRoot,'package.json'),'utf8'));
     assert.equal(result.devDependencies['arcane-os'],'file:../sdk-artifacts/arcane-os-0.1.0-dev.0.tgz');
 });
@@ -419,7 +449,7 @@ test('init preserves one exact npm alias and derives its package routes and lock
         devDependencies:{'arcane-sdk':`npm:arcane-os@${SDK_VERSION}`}
     },null,2)}\n`);
 
-    await initWorkspace({workspaceRoot,appId:'alias-sdk-app'});
+    await initWorkspace({workspaceRoot,appId:'alias-sdk-app',appsRoot:'apps'});
 
     const packageDocument=JSON.parse(await readFile(path.join(workspaceRoot,'package.json'),'utf8'));
     assert.equal(packageDocument.devDependencies['arcane-sdk'],`npm:arcane-os@${SDK_VERSION}`);
@@ -526,6 +556,7 @@ test('init binds an existing external package route before defaulting a missing 
     const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-sdk-bound-alias-init-'});
     const generated=workspaceTemplate({
         appId:'bound-alias-sdk-app',
+        appsRoot:'apps',
         sdkDependencyName:'arcane-sdk',
         sdkDependencySpecifier:`npm:arcane-os@${SDK_VERSION}`,
         sdkPackageSource:'node_modules/arcane-sdk'
@@ -628,6 +659,7 @@ test('init adds only app-owned files to an integrated Arcane workspace',async t=
     });
 
     assert.equal(receipt.workspaceMode,'integrated');
+    assert.equal(receipt.appsRoot,'apps');
     assert.equal(receipt.packageUpdated,false);
     assert.equal(await readFile(path.join(workspaceRoot,'package.json'),'utf8'),packageSource);
     assert.ok(receipt.createdFiles.every(relative=>relative.startsWith('apps/integrated-app/')));

@@ -120,8 +120,9 @@ directory as a repository. Native target scaffolds also retain `browser` and
 include the required icon. The result reports the workspace, app, descriptor,
 target, and created paths.
 
-`--apps-root .` creates a standalone root application using its installed npm
-SDK directly. The default `--apps-root apps` preserves `apps/<id>`. Root setup
+Each standalone app's root is its repository root. The default `--apps-root .`
+uses the installed npm SDK directly. Explicit `--apps-root apps` selects a
+multi-app workspace with each app beneath `apps/<id>`. Root setup
 does not install dependencies or copy a runtime: run `npm install`, then
 `npm run import-map`. Until installation, its result reports the import map as
 pending with reason `sdk-install-required`.
@@ -152,7 +153,7 @@ idempotent only for files whose existing content satisfies the scaffold
 contract.
 
 `--apps-root .` selects root setup for a standalone workspace. Omission retains
-the configured layout, or `apps` for a new configuration. `init` never moves an
+the configured layout, or `.` for a new standalone configuration. `init` never moves an
 existing application or converts the integrated Arcane OS layout.
 
 ### Example
@@ -217,8 +218,9 @@ the workspace does not already identify exactly one. The command accepts no
 positional arguments and supports app scope only. `arcane-os import-map` is the
 identical executable alias.
 
-The generated artifact is
-`apps/<id>/modules/arcane.importmap.json`. Its exact JSON is also installed in
+The generated artifact is `modules/arcane.importmap.json` at a standalone
+app's repository root, or `apps/<id>/modules/arcane.importmap.json` for an
+explicit multi-app workspace. Its exact JSON is also installed in
 the configured entry and every other admitted browser document as `<script
 type="importmap" data-arcane-import-map>` before module loading. The complete
 runtime map derives its entries from the selected runtime and browser-runtime
@@ -228,15 +230,13 @@ portable runtime subpaths such as `arcane-os/preference-store` and
 modules. The result reports the complete map written to the selected
 application; no fixed entry count is a release contract.
 
-For `appsRoot: "."`, the artifact is `modules/arcane.importmap.json` at the
-application root. Set `"legacyAppPaths": false` in `arcane-packager.json` to
-omit SDK-generated `apps/<id>/` navigation/PWA compatibility files and aliases.
-The same workspace choice applies to `arcane dev` and `arcane package`; restart
-an already running dev server after changing it. The default remains `true`.
-Root PWA files, app/installation identity and selected authored files are
-preserved. Existing files are never deleted by this option. See
-[root-only generated output](pwa.md#root-only-generated-output) before changing
-the URLs needed by previously installed apps.
+For `appsRoot: "."`, managed imports use the installed package paths and enabled
+PWA files are written beside the root entry. The SDK generates no nested
+`apps/<id>/` redirects or duplicate PWA files and no repository-root `arcane/`
+projection. App and installation identity, saved data, and selected authored
+files remain unchanged. The same layout applies to `arcane dev` and
+`arcane package`. Generated and offline app files are committed; GitHub Actions
+consume those committed files. See [root generated output](pwa.md#root-generated-output).
 
 SDK `0.5.17` preserves the physical workspace route count and ordered include
 list. External and modern integrated routes require `components`, `css`,
@@ -531,8 +531,9 @@ npm exec -- arcane check --app hello-world
 
 Creates one complete browser release beneath `dist/<id>/`, preserving the prior
 output until the replacement is complete. It consumes saved source and managed
-import maps, places app files beneath `apps/<id>/`, and retains the configured
-shared route destinations. When selected shared content supplies no root
+import maps, keeps standalone app files at the output root, and retains the
+configured shared route destinations. Explicit multi-app workspaces retain
+their selected app beneath `apps/<id>/`. When selected shared content supplies no root
 `index.html`, the SDK generates one that opens the selected app entry.
 Source document bases and resource URLs therefore retain their development
 layout. Packaging does not run tests or checks automatically.
@@ -542,11 +543,10 @@ selected SDK content directly from `node_modules`. Only the portable output
 receives copies; no workspace `arcane/` projection is required. Its runtime URLs,
 managed import-map targets, and PWA inventory destinations match source serving.
 
-With `appsRoot: "."`, app files retain their root-relative layout. The optional
-root-config `legacyAppPaths: false` omits SDK-generated compatibility files
-beneath `apps/<id>/` from the planned and actual output. It does not omit
-explicitly selected authored resources at those paths or change the default
-packaged installation identity. Omission or `true` preserves existing behavior.
+With `appsRoot: "."`, the planned and actual output retain root-relative app
+files and direct npm package paths. The SDK adds no nested app redirects or
+duplicate PWA worker/inventory files. Explicitly selected authored resources
+and the default packaged installation identity remain unchanged.
 
 ```text
 arcane package [--app <id>] [--dry-run]
@@ -898,10 +898,10 @@ Resend key for all its requests. An absent named key never falls back to the
 default account. Existing root `RESEND_API_KEY` and
 `MAIL_PROFILES[name].RESEND_API_KEY` remain fallbacks when the corresponding
 nested key property is absent. A nested property containing null or an empty
-string means the selected key is absent and takes precedence over a legacy key.
+string means the selected key is absent and takes precedence over a root or profile key.
 
 Set and delete preserve the file's other settings and profile containers. New
-keys are written to the nested mail member. Existing legacy keys are updated
+keys are written to the nested mail member. Existing root or profile keys are updated
 in place unless the selected nested key property exists; delete removes both
 representations of only the selected key. Status returns the selected profile,
 `provider:'resend'`, `storage:'.arcane.env.json'`, and `exists`. Delete returns
@@ -963,7 +963,7 @@ paths. It consumes the configured provider timeout and retry guidance.
 
 The Resend credential comes from the selected `.arcane.env.json` entry.
 An explicit `--profile` overrides `arcane.config.json.mail.profile`; omitting
-both selects the default `mail.apiKey`, with the legacy fallback described
+both selects the default `mail.apiKey`, with the root-key fallback described
 above. Neither the key nor report content is accepted through argv or process
 environment variables.
 
@@ -1006,7 +1006,7 @@ Add the listener's certificate paths to `arcane.config.json`:
 
 Supply an existing PEM certificate chain and its private key. Paths resolve
 relative to the selected configuration directory, or may be absolute. They
-belong to the listener regardless of the provider key selected. Legacy root
+belong to the listener regardless of the provider key selected. Existing root
 `MAIL_TLS_CERT_PATH` and `MAIL_TLS_KEY_PATH` in `.arcane.env.json` remain
 fallbacks for omitted config paths. Explicit programmatic `certPath` and
 `keyPath` options override those files. Missing TLS settings name the fields

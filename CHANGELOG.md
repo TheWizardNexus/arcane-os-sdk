@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.31.0
+
+- Standalone applications use their repository root and installed npm package
+  paths. New standalone projects default to `appsRoot: "."`; initialization
+  preserves an existing configured layout, and explicit multi-app workspaces
+  retain their selected application directories.
+- Remove the retired `legacyAppPaths` setting and all SDK-generated nested app
+  redirects and duplicate PWA worker/inventory files. Consumers must remove the
+  obsolete setting when upgrading. Enabled PWA files remain at the app root;
+  public SDK files remain under `node_modules/arcane-os` or the installed alias.
+- Preserve selected authored files, complete URLs and queries, installation
+  identity, saved data and caches. Generation does not delete preexisting app
+  files; application owners preserve and relocate their content independently.
+- Generated and offline app files are committed for hosting workflows to
+  consume. Existing public Node TWiN and browser APIs remain available.
+
 ## 0.30.0
 
 - Add the public `arcane-os/ai/twin-cloud` subpath with stateless `fetchRequest`

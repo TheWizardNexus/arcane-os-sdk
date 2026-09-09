@@ -506,7 +506,7 @@ function operationOptions(command,parsed,cwd){
         return {
             targetPath:path.resolve(cwd,values.path??appId),
             appId,
-            appsRoot:values['apps-root']??'apps',
+            appsRoot:values['apps-root']??'.',
             displayName:values['display-name'],
             target:values.target??'browser',
             initializeGit:flags.has('git')

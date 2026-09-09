@@ -316,7 +316,7 @@ async function runGitInit(workspaceRoot,signal,onEvent){
 export async function createWorkspace({
     targetPath,
     appId,
-    appsRoot='apps',
+    appsRoot='.',
     displayName,
     target='browser',
     initializeGit=false,
@@ -400,7 +400,7 @@ export async function initWorkspace({
     },async workspaceOperationLease=>{
     const profile=await existingWorkspaceProfile(resolvedRoot);
     const workspaceMode=profile?.workspaceMode??'external';
-    const selectedAppsRoot=appsRoot??profile?.config.appsRoot??'apps';
+    const selectedAppsRoot=appsRoot??profile?.config.appsRoot??'.';
     if(!['apps','.'].includes(selectedAppsRoot))fail('appsRoot must be apps or .','ARCANE_USAGE');
     if(profile&&selectedAppsRoot!==profile.config.appsRoot){
         fail('appsRoot must match the existing workspace layout; init does not relocate an application.','ARCANE_USAGE');
@@ -439,6 +439,7 @@ export async function initWorkspace({
     const template=workspaceMode==='integrated'
         ?workspaceTemplate({
             appId,
+            appsRoot:selectedAppsRoot,
             displayName,
             appOnly:true,
             namedImports:true,

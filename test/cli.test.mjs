@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
+import {lstat,mkdir,readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {Writable} from 'node:stream';
 import test from '../src/testing.mjs';
 import {createNativeTargetRequest,runCli as runCliInProcess} from '../src/cli/main.mjs';
 import {SDK_VERSION} from '../src/constants.mjs';
 import {ArcaneError,ERROR_CODES} from '../src/errors.mjs';
-import {parseNdjson,repositoryRoot,runCli,runNode} from './helpers.mjs';
+import {parseNdjson,repositoryRoot,runCli,runNode,temporaryDirectory} from './helpers.mjs';
 
 function memoryStream(){
     let value='';
@@ -39,6 +39,55 @@ test('CLI help and version succeed through the shipped executable',async()=>{
     const version=await runCli(['--version']);
     assert.equal(version.code,0);
     assert.equal(version.stdout.trim(),SDK_VERSION);
+});
+
+test('CLI new and fresh init place each app at its repository root by default',async t=>{
+    const parent=await temporaryDirectory(t);
+    for(const command of ['new','init']){
+        const appId=`moon-library-${command}`;
+        const workspaceRoot=path.join(parent,appId);
+        if(command==='init')await mkdir(workspaceRoot);
+        const args=command==='new'
+            ?['new',appId,'--path',workspaceRoot]
+            :['init',appId,'--workspace',workspaceRoot];
+        const result=await runCli([...args,'--output','json'],{cwd:parent});
+        assert.equal(result.code,0,result.stderr);
+        assert.equal(JSON.parse(result.stdout).result.appsRoot,'.');
+        const config=JSON.parse(await readFile(path.join(workspaceRoot,'arcane-packager.json'),'utf8'));
+        const descriptor=JSON.parse(await readFile(path.join(workspaceRoot,'arcane-app.json'),'utf8'));
+        assert.equal(config.appsRoot,'.');
+        assert.equal(descriptor.id,appId);
+        assert.equal((await lstat(path.join(workspaceRoot,'index.html'))).isFile(),true);
+        for(const absent of ['apps','arcane','arcane.lock.json','node_modules']){
+            await assert.rejects(lstat(path.join(workspaceRoot,absent)),error=>error.code==='ENOENT');
+        }
+    }
+});
+
+test('CLI preserves explicit multi-app selection and leaves existing init layout resolution to its owner',async()=>{
+    for(const selection of [
+        {args:['new','moon-library'],appsRoot:'.'},
+        {args:['new','moon-library','--apps-root','apps'],appsRoot:'apps'},
+        {args:['init','moon-library'],appsRoot:undefined},
+        {args:['init','moon-library','--apps-root','apps'],appsRoot:'apps'}
+    ]){
+        const stdout=memoryStream();
+        const stderr=memoryStream();
+        const invocations=[];
+        const code=await runCliInProcess(selection.args,{
+            stdout:stdout.stream,
+            stderr:stderr.stream,
+            execute:async function captureScaffoldSelection(command,options){
+                invocations.push({command,options});
+                return {appId:options.appId,appsRoot:options.appsRoot};
+            }
+        });
+        assert.equal(code,0,stderr.read());
+        assert.equal(invocations.length,1);
+        assert.equal(invocations[0].command,selection.args[0]);
+        assert.equal(invocations[0].options.appId,'moon-library');
+        assert.equal(invocations[0].options.appsRoot,selection.appsRoot);
+    }
 });
 
 test('CLI maps the SDK runtime source only for explicit development',async()=>{

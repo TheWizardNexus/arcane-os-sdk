@@ -9,7 +9,7 @@ import {temporaryDirectory} from './helpers.mjs';
 async function selectionFixture(context,{invalidSibling=true}={}){
     const workspaceRoot=await temporaryDirectory(context);
     for(const appId of ['docs','unrelated']){
-        const {files}=workspaceTemplate({appId,appOnly:appId==='unrelated'});
+        const {files}=workspaceTemplate({appId,appsRoot:'apps',appOnly:appId==='unrelated'});
         for(const [relative,content] of files){
             const target=path.join(workspaceRoot,relative);
             await mkdir(path.dirname(target),{recursive:true});

@@ -157,16 +157,17 @@ the same browser URLs and saved managed import maps.
 
 Existing `physical-v1` configurations whose first source is `arcane` remain
 supported. The explicit materializer below still refreshes those projections,
-and the default multi-app scaffold retains its existing physical layout. The
+and an explicitly selected multi-app scaffold retains its physical layout. The
 earlier installed routes with virtual `/arcane` destinations also remain
 supported. Selecting `installed-v1`
 does not delete any preexisting workspace files. The separate host-document
 `generateDocumentImportMaps()` API continues to accept an already materialized
 runtime; its input contract is unchanged.
 
-### Optional standalone root application
+### Standalone root application
 
-`appsRoot: "."` selects one application whose `arcane-app.json`,
+Each standalone app's root is its repository root. `appsRoot: "."` selects
+that layout: `arcane-app.json`,
 `arcane-package.json`, entry, and app-owned files occupy the workspace root.
 The declared application ID remains unchanged. `appsRoot: "apps"` continues
 to discover `apps/<id>` and supports the existing integrated and multi-app
@@ -174,29 +175,19 @@ layouts. Entries and include/exclude paths remain relative to the application.
 
 Root HTML uses `<base href="./">`; nested navigable documents use their actual
 depth back to the workspace. Managed bare imports remain the public interface;
-their targets follow the selected npm routes. `arcane import-map` also writes
-root-app navigation pages for the previous `/apps/<id>/` links, preserving
-query strings and fragments. It preserves authored files at those destinations.
-For a direct-installed root PWA it generates the static PWA records at the root,
-so normal static hosting needs no SDK request handler or runtime copy.
+their targets follow the selected npm routes. `arcane import-map` generates
+enabled static PWA records at the app root, so normal static hosting needs no
+SDK request handler or runtime copy. Managed refresh, development serving,
+inspection, dry run and packaging add no nested `apps/<id>/` navigation pages,
+redirects, or duplicate PWA worker/inventory files. There is no output-retention
+switch for those retired records.
 
-To select root-only generated output, set `"legacyAppPaths": false` beside
-`"appsRoot": "."` in `arcane-packager.json`. This optional boolean defaults to
-`true`; it has no effect on the `appsRoot: "apps"` layout. The shared import-map
-refresh, source dev server, package inspection, dry run and package output then
-omit SDK-generated `apps/<id>/` navigation pages, navigation aliases, and the
-legacy PWA worker/offline inventory. Root PWA files and normal managed imports
-remain available. Edit the root configuration before starting `arcane dev`;
-restart an existing server after changing this workspace-level choice.
-
-This option does not change the application ID, stored data, the existing
-default installation ID or an authored `pwa.manifest.id`. It neither deletes
-existing files nor removes authored resources from the app's include/exclude
-selection. Explicitly included files under `apps/<id>/` still serve and package
-as authored resources. Previously installed launch URLs and worker update URLs
-need their old resources to remain available; retain the default compatibility
-output when those URLs still need SDK support. See the
-[root PWA compatibility boundary](pwa.md#root-only-generated-output).
+Application identity, stored data, the existing default installation ID and an
+authored `pwa.manifest.id` remain unchanged. Authored resources continue to
+follow the app's include/exclude selection; generation does not delete existing
+files. Published SDK internals stay package-owned under `node_modules`.
+Generated and offline app files are committed, and GitHub Actions consume
+those committed files. See [root generated output](pwa.md#root-generated-output).
 
 Direct-installed root maps expose `arcane-os/modules/<filename>` and
 `arcane-os/entities/<filename>` (including extensions), plus the existing

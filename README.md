@@ -16,31 +16,34 @@
 `arcane-os` is the application SDK and command-line toolchain for Arcane OS. It
 supports two explicit workspace profiles: an external app repository uses the
 version-locked SDK runtime, while an integrated Arcane checkout uses its live
-`arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
-event, cancellation, and browser run contracts.
+`arcane/` runtime. Both profiles share the theme, packaging, event, cancellation,
+and browser run contracts while retaining their selected application layout.
 
-This checkout defines the `0.30.0` SDK contract. Applications pin one exact npm
+This checkout defines the `0.31.0` SDK contract. Applications pin one exact npm
 version and lockfile; registry state is deliberately not baked into application
 artifacts.
 
-External browser apps can use the installed npm package directly, without a
+Standalone browser apps use their repository root and installed npm package directly, without a
 generated workspace `arcane/` directory or `arcane.lock.json`. Select the
 [four installed-package routes](docs/reference/protocols.md#installed-package-browser-routes)
 in `arcane-packager.json`: development, managed import maps, and PWA resources
 read the installed SDK at real `/node_modules/arcane-os/...` browser URLs when
 each destination equals its source. An alias uses its actual installed folder.
-Select `appsRoot: "."` for a standalone root app, or scaffold one with
-`arcane new my-app --apps-root .`. After npm installation, `arcane import-map`
-refreshes managed maps and the root app's static PWA/navigation files for ordinary
-static hosting. Portable app packages still contain their selected runtime.
+`arcane new my-app` defaults to `appsRoot: "."`. After npm installation,
+`arcane import-map` refreshes managed maps and the enabled root PWA files for
+ordinary static hosting. It generates no nested app redirects or duplicate PWA
+files. Remove the retired `legacyAppPaths` setting when upgrading. Commit generated
+and offline app files for hosting workflows to consume. Portable app packages
+still contain their selected runtime.
 Root/direct maps use `arcane-os/modules/<filename>` and
 `arcane-os/entities/<filename>` (including extensions) plus the focused lowercase
 exports, rather than `arcane/*` aliases. These paths resolve to the actual npm
 files, preserving relative component URLs. New root apps put the SDK in runtime
 `dependencies`; init preserves existing runtime/optional declarations and promotes
 a root app's SDK development declaration without changing its other packages.
-Existing `apps/<id>`, virtual `/arcane` routes, and materialized workspaces remain
-supported. Node services continue to
+Explicit multi-app `appsRoot: "apps"`, virtual runtime routes, and existing
+materialized workspaces remain supported; initialization preserves their selected
+layout. Node services continue to
 use the installed CLI or public imports such as `arcane-os/mail`.
 
 The [mail gateway](docs/reference/mail.md) serves HTTPS with HTTP/2 on port 4433
@@ -82,7 +85,7 @@ Create one browser application, install its pinned SDK, and start its source
 server:
 
 ```bash
-npx arcane-os@0.26.0 new hello-speech --path ./hello-speech --target browser
+npx arcane-os@0.31.0 new hello-speech --path ./hello-speech --target browser
 cd hello-speech
 npm install
 ```

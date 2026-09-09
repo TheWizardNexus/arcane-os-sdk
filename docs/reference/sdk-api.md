@@ -1057,14 +1057,13 @@ async function usevalidateAppConfig(...arguments_) {
 
 Validates one root packager mapping and its fixed shared-route boundaries.
 
-The schema-1 `arcane-packager.json` accepts the optional boolean
-`legacyAppPaths`, normalized to `true` when omitted. With `appsRoot: "."`,
-setting it to `false` omits generated legacy `apps/<id>/` navigation/PWA output
-across managed-map refresh, development serving, inspection and packaging.
-It leaves installation identity and authored file selection unchanged and has
-no effect with `appsRoot: "apps"`. See
-[standalone root applications](protocols.md#optional-standalone-root-application)
-for configuration, retained-file and existing-installation behavior.
+The schema-1 `arcane-packager.json` uses `appsRoot: "."` for standalone apps:
+each app's root is its repository root. Managed-map refresh, development
+serving, inspection and packaging use root app files and direct npm package
+paths without generated nested app redirects or duplicate PWA files.
+Installation identity and authored file selection remain unchanged.
+Explicit `appsRoot: "apps"` supports real multi-app workspaces. See
+[standalone root applications](protocols.md#standalone-root-application).
 
 ### Signature and result
 
@@ -3730,7 +3729,7 @@ actual HTTPS port while preserving the original request path and query. Both lis
 use the selected host.
 
 Source servers default to HTTPS, including localhost; packaged browser previews
-require HTTPS. The legacy `https` option is accepted but `https:false` and
+require HTTPS. The existing `https` option is accepted; `https:false` and
 `tls:false` alone do not disable HTTPS. HTTPS startup reads `.arcane/dev/server-cert.pem` and
 `.arcane/dev/server-key.pem` relative to `workspaceRoot` unless explicit
 `certPath` and `keyPath` are supplied together; relative paths resolve from the
@@ -4192,7 +4191,7 @@ The operation refreshes the selected authored descriptor's `arcane-package.json`
 projection and managed import maps under one development-refresh lock, then
 releases that lock before opening the selected source listener or listeners.
 It returns their application endpoints and shared shutdown
-lifecycle. Legacy package-only apps remain unchanged. The operation generates
+lifecycle. Package-only apps remain unchanged. The operation generates
 no packaged output; enabled PWA manifests
 are served directly from the selected source resources.
 

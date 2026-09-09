@@ -60,12 +60,12 @@ export function createWorkspaceLockDocument({
 
 export function workspaceTemplate({
     appId,
-    appsRoot='apps',
+    appOnly=false,
+    appsRoot=appOnly?'apps':'.',
     displayName,
     sdkDependencyName=SDK_NAME,
     sdkDependencySpecifier=SDK_VERSION,
     sdkPackageSource=`node_modules/${sdkDependencyName}`,
-    appOnly=false,
     namedImports=true,
     minimumCoreVersion='0.8.12',
     target='browser',
@@ -199,6 +199,7 @@ import map in every directly navigable descriptor-admitted \`.html\`/\`.htm\`
 document. HTML component fragments remain package files but do not receive a
 document-level base or managed import map.
 Development, package, and build refresh that shared inventory when the selected operation needs it.
+Commit generated import maps and enabled offline app files. Hosting workflows consume those committed files rather than generating them.
 Named \`${directRuntime?'arcane-os/modules/* and arcane-os/entities/*':'arcane/*'}\` imports resolve through the managed map to the selected SDK files. Packaging copies the complete selected application, runtime, and specifier
 map to \`dist/${appId}\` without running application tests. Run \`verify\` only when
 the user explicitly selects verification or a release artifact that requires it;
