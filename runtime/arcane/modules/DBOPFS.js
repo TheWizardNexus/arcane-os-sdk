@@ -16,20 +16,20 @@ const dbopfsReasons={
 export const DBOPFS_EVENT_TYPES={...dbopfsEventTypes};
 export const DBOPFS_REASONS={...dbopfsReasons};
 
-const DEFAULT_TABLE_DIRECTORIES={
-    users:'users',
-    scores:'scores',
-    chats:'chats',
-    notes:'notes',
-    documents:'documents',
-    songs:'songs',
-    images:'images',
-    journal_entries:'journal_entries',
-    streams_of_consciousness:'streams_of_consciousness',
-    reports:'reports',
-    errors:'errors',
+const TABLE_DIRECTORY_ALIASES={
     memories:'memory'
 };
+const DIRECTORY_TABLE_ALIASES={
+    memory:'memories'
+};
+
+function directoryNameForTable(tableName=''){
+    return TABLE_DIRECTORY_ALIASES[tableName]||tableName;
+}
+
+function tableNameForDirectory(directoryName=''){
+    return DIRECTORY_TABLE_ALIASES[directoryName]||directoryName;
+}
 
 function parseFileValue(fileName='',textContent=''){
     let value=textContent;
@@ -80,6 +80,11 @@ if(navigator.storage?.persist){
  */
 
 /**
+ * @typedef {Object<string,Promise<FileSystemDirectoryHandle>>} DBOPFSTableHandlePromises
+ * Pending table handle requests keyed by logical table name.
+ */
+
+/**
  * @typedef {Object<string,Promise>} DBOPFSWriteLocks
  * Promise based write locks to serialize writes to the same file.
  */
@@ -118,6 +123,9 @@ class DBOPFS {
 
     /** @type {DBOPFSTableHandles} */
     #tableHandles={}
+
+    /** @type {DBOPFSTableHandlePromises} */
+    #tableHandlePromises={}
 
     /** @type {DBOPFSTables} */
     #tables={}
@@ -297,7 +305,7 @@ class DBOPFS {
     }
 
     /**
-     * Initializes OPFS database and default tables.
+     * Initializes the application OPFS database scope.
      * Dispatches `dbopfs-ready` event when complete.
      *
      * @returns {Promise<void>}
@@ -313,7 +321,6 @@ class DBOPFS {
         this.#applicationId=scope.applicationId;
         this.#storagePath=scope.path;
         this.#db=scope.directory;
-        await this.#createDefaultTables();
 
         this.ready=true;
 
@@ -336,15 +343,6 @@ class DBOPFS {
             }
         );
         projectArcaneDOMEvent(window,occurrence);
-    }
-
-    async #createDefaultTables(){
-        for(const [alias,directoryName]of Object.entries(DEFAULT_TABLE_DIRECTORIES)){
-            this.#tableHandles[alias]=await this.#db.getDirectoryHandle(
-                directoryName,
-                {create:true}
-            );
-        }
     }
 
     /**
@@ -403,19 +401,49 @@ class DBOPFS {
             await this.readyPromise;
         }
 
-        if(!this.#tableHandles[tableName]){
-            const existingHandle=Object.values(this.#tableHandles).find(
-                handle=>handle.name===tableName
-            )
+        const directoryName=directoryNameForTable(tableName);
+        const registeredTableName=tableNameForDirectory(directoryName);
 
-            if(existingHandle){
-                return existingHandle
-            }
-
-            this.#tableHandles[tableName]=await this.#db.getDirectoryHandle(tableName,{create:true});
+        if(this.#tableHandles[registeredTableName]){
+            return this.#tableHandles[registeredTableName];
         }
 
-        return this.#tableHandles[tableName];
+        const existingHandle=Object.values(this.#tableHandles).find(
+            function matchingTableDirectory(handle){
+                return handle.name===directoryName;
+            }
+        );
+
+        if(existingHandle){
+            this.#tableHandles[registeredTableName]=existingHandle;
+            return existingHandle;
+        }
+
+        if(!this.#tableHandlePromises[registeredTableName]){
+            const handlePromise=this.#db.getDirectoryHandle(
+                directoryName,
+                {create:true}
+            ).then(
+                function registerRequestedTable(handle){
+                    this.#tableHandles[registeredTableName]=handle;
+                    return handle;
+                }.bind(this)
+            );
+            this.#tableHandlePromises[registeredTableName]=handlePromise;
+
+            function clearTableHandlePromise(){
+                if(this.#tableHandlePromises[registeredTableName]===handlePromise){
+                    delete this.#tableHandlePromises[registeredTableName];
+                }
+            }
+
+            handlePromise.then(
+                clearTableHandlePromise.bind(this),
+                clearTableHandlePromise.bind(this)
+            );
+        }
+
+        return this.#tableHandlePromises[registeredTableName];
     }
 
     /**
@@ -779,11 +807,16 @@ class DBOPFS {
      * @returns {Promise<boolean>}
      */
     async deleteTable(tableName){
+        const directoryName=directoryNameForTable(tableName);
+        const registeredTableName=tableNameForDirectory(directoryName);
+
         try{
-            await this.#db.removeEntry(tableName,{recursive:true})
+            await this.#db.removeEntry(directoryName,{recursive:true})
 
             delete this.#tables[tableName]
-            delete this.#tableHandles[tableName]
+            delete this.#tables[registeredTableName]
+            delete this.#tableHandles[registeredTableName]
+            delete this.#tableHandlePromises[registeredTableName]
         }catch(error){
             arcaneLogging.error(error)
         }
@@ -807,8 +840,8 @@ class DBOPFS {
 
         this.#tables={}
         this.#tableHandles={}
+        this.#tableHandlePromises={}
         this.#writeLocks={}
-        await this.#createDefaultTables()
 
         return this
     }
@@ -864,12 +897,15 @@ class DBOPFS {
                 continue
             }
 
+            const registeredTableName=tableNameForDirectory(name);
             const registered=Object.values(this.#tableHandles).some(
-                tableHandle=>tableHandle.name===name
-            )
+                function matchingDiscoveredDirectory(tableHandle){
+                    return tableHandle.name===name;
+                }
+            );
 
             if(!registered){
-                this.#tableHandles[name]=handle
+                this.#tableHandles[registeredTableName]=handle
             }
 
             tableNames.push(name)

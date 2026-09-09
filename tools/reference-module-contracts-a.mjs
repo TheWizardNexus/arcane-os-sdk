@@ -506,8 +506,8 @@ console.log(window.dbls.get('settings'),window.dbls.count());`
     {
         name:'DBOPFS.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Browser import installs window.dbopfs, asynchronously opens or creates the app OPFS scope and default tables, emits dbopfs-ready, and CRUD and backup methods read, write, delete, download, or restore files.',
-        paramsResults:'After readyPromise, DBOPFS supports table and file set, get, batch, filter, count, and delete APIs plus PNG-compressed backup and restore. Storage is rooted at apps/<authoritative-app-id>, and worker fallback handles synchronous OPFS access.',
+        lifecycleSideEffects:'Browser import installs window.dbopfs, asynchronously opens or creates only the app OPFS scope, and emits dbopfs-ready. No table directory is created until a caller requests it; clearAllStorage leaves the emptied app scope without recreating product directories. CRUD and backup methods read, write, delete, download, or restore files.',
+        paramsResults:'After readyPromise, getTableHandle(tableName) lazily opens or creates one requested table and coalesces concurrent requests for the same physical directory. The logical memories table retains its physical memory directory. Existing directories remain discoverable, and DBOPFS supports table and file set, get, batch, filter, count, and delete APIs plus PNG-compressed backup and restore. Storage is rooted at apps/<authoritative-app-id>, and worker fallback handles synchronous OPFS access.',
         events:['dbopfs-ready'],
         errors:['APP_DATA_SCOPE_INVALID','APP_DATA_SCOPE_MISMATCH','APP_DATA_SCOPE_REQUIRED','APP_DATA_STORAGE_UNAVAILABLE','DOM, OPFS, worker, serialization, compression, and backup validation failures'],
         capabilitiesCore:'Normalized app-scoped browser and native-WebView persistence; Arcane.app.current supplies authoritative identity when native, but Core is not a database service.',

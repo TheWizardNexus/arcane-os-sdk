@@ -6500,3 +6500,188 @@ test(
         }
     }
 );
+
+test(
+    'DBOPFS creates only requested tables and preserves the memories directory alias',
+    async function testDBOPFSLazyTableDirectories(){
+        function missingEntry(name){
+            const error=new Error(`Missing entry: ${name}`);
+            error.name='NotFoundError';
+            return error;
+        }
+
+        function createDirectory(name,initialDirectories=[]){
+            const entries=new Map();
+            const directoryRequests=[];
+            const createdDirectories=[];
+
+            for(const directory of initialDirectories){
+                entries.set(directory.name,directory);
+            }
+
+            return {
+                kind:'directory',
+                name,
+                createdDirectories,
+                directoryRequests,
+                async getDirectoryHandle(directoryName,{create=false}={}){
+                    directoryRequests.push(directoryName);
+
+                    if(entries.has(directoryName)){
+                        return entries.get(directoryName);
+                    }
+                    if(!create){
+                        throw missingEntry(directoryName);
+                    }
+
+                    const directory=createDirectory(directoryName);
+                    entries.set(directoryName,directory);
+                    createdDirectories.push(directoryName);
+                    return directory;
+                },
+                async removeEntry(entryName){
+                    if(!entries.delete(entryName)){
+                        throw missingEntry(entryName);
+                    }
+                },
+                async *entries(){
+                    for(const entry of entries){
+                        yield entry;
+                    }
+                },
+                entryNames(){
+                    return [...entries.keys()];
+                }
+            };
+        }
+
+        function restoreGlobalProperty(name,descriptor){
+            if(descriptor){
+                Object.defineProperty(globalThis,name,descriptor);
+                return;
+            }
+            delete globalThis[name];
+        }
+
+        const memoryDirectory=createDirectory('memory');
+        const existingProductDirectory=createDirectory('existing-product');
+        const applicationDirectory=createDirectory(
+            'dbopfs-lazy-table-test',
+            [memoryDirectory,existingProductDirectory]
+        );
+        const applicationsDirectory=createDirectory(
+            'apps',
+            [applicationDirectory]
+        );
+        const rootDirectory=createDirectory('root',[applicationsDirectory]);
+        const documentObject={
+            documentElement:{dataset:{}},
+            querySelector(selector){
+                if(selector!=='meta[name="arcane-app-id"]'){
+                    return null;
+                }
+                return {
+                    getAttribute(attribute){
+                        return attribute==='content'
+                            ?'dbopfs-lazy-table-test'
+                            :null;
+                    }
+                };
+            }
+        };
+        const windowTarget=new EventTarget();
+        windowTarget.document=documentObject;
+        const descriptors={
+            document:Object.getOwnPropertyDescriptor(globalThis,'document'),
+            navigator:Object.getOwnPropertyDescriptor(globalThis,'navigator'),
+            window:Object.getOwnPropertyDescriptor(globalThis,'window')
+        };
+
+        Object.defineProperty(globalThis,'document',{
+            configurable:true,
+            value:documentObject,
+            writable:true
+        });
+        Object.defineProperty(globalThis,'navigator',{
+            configurable:true,
+            value:{
+                storage:{
+                    async getDirectory(){
+                        return rootDirectory;
+                    },
+                    async persist(){
+                        return true;
+                    }
+                }
+            },
+            writable:true
+        });
+        Object.defineProperty(globalThis,'window',{
+            configurable:true,
+            value:windowTarget,
+            writable:true
+        });
+
+        try{
+            await import('../runtime/arcane/modules/DBOPFS.js?lazy-table-directories');
+            const dbopfs=windowTarget.dbopfs;
+            await dbopfs.readyPromise;
+
+            assert.deepEqual(applicationDirectory.createdDirectories,[]);
+            assert.deepEqual(await dbopfs.getTableNames(),[]);
+
+            const [logicalMemory,physicalMemory]=await Promise.all([
+                dbopfs.getTableHandle('memories'),
+                dbopfs.getTableHandle('memory')
+            ]);
+            assert.equal(logicalMemory,memoryDirectory);
+            assert.equal(physicalMemory,memoryDirectory);
+            assert.equal(
+                applicationDirectory.directoryRequests.filter(
+                    function requestedMemory(name){
+                        return name==='memory';
+                    }
+                ).length,
+                1
+            );
+            assert.deepEqual(await dbopfs.getTableNames(),['memories']);
+            assert.deepEqual(
+                await dbopfs.getTableNames(true),
+                ['memory','existing-product']
+            );
+            assert.deepEqual(
+                await dbopfs.getTableNames(),
+                ['memories','existing-product']
+            );
+
+            const [firstDocuments,secondDocuments]=await Promise.all([
+                dbopfs.getTableHandle('documents'),
+                dbopfs.getTableHandle('documents')
+            ]);
+            assert.equal(firstDocuments,secondDocuments);
+            assert.deepEqual(applicationDirectory.createdDirectories,['documents']);
+
+            const createCountBeforeClear=applicationDirectory.createdDirectories.length;
+            await dbopfs.clearAllStorage();
+            assert.equal(
+                applicationDirectory.createdDirectories.length,
+                createCountBeforeClear
+            );
+            assert.deepEqual(applicationDirectory.entryNames(),[]);
+            assert.deepEqual(await dbopfs.getTableNames(),[]);
+
+            const restoredMemory=await dbopfs.getTableHandle('memories');
+            assert.equal(restoredMemory.name,'memory');
+            assert.deepEqual(
+                applicationDirectory.createdDirectories,
+                ['documents','memory']
+            );
+            await dbopfs.deleteTable('memories');
+            assert.deepEqual(applicationDirectory.entryNames(),[]);
+        }finally{
+            restoreGlobalProperty('window',descriptors.window);
+            restoreGlobalProperty('navigator',descriptors.navigator);
+            restoreGlobalProperty('document',descriptors.document);
+        }
+    }
+);
