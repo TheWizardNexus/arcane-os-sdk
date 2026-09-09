@@ -1,9 +1,11 @@
 # Arcane runtime entity modules
 
-The synchronized runtime ships 14 entity modules with 29 public ESM bindings.
+The synchronized runtime ships 14 entity modules with 30 public ESM bindings.
 This page explains each module's capability and host assumptions. The exact
 constructor/function/value contracts are canonical in the
-[Arcane shared entity inventory](core/arcane-entities.md).
+[Arcane shared entity inventory](core/arcane-entities.md), with later SDK
+additions documented below and in the current
+[runtime entity inventory](inventory/runtime-entities.json).
 
 Entity creation and serialization are usually cross-host. Methods that touch
 DOM, DBOPFS, local storage, AI, or object URLs require the corresponding browser
@@ -25,7 +27,7 @@ or native-WebView dependency.
 | `Preference.js` | `default`, `preferenceSchema` | Boolean, number, select, and text preference definitions. | Cross-host; normalized. |
 | `TerminalSession.js` | `default`, `terminalShells` | Frozen terminal session identity, shell, and state. | Cross-host; normalized. |
 | `Theme.js` | five exports | Semantic theme tokens, conversion, serialization, and DOM application. | Values cross-host; apply/clear need DOM; normalized/mixed. |
-| `User.js` | `default` | User preferences/profile state with DBLS/DBOPFS lifecycle. | Browser/native WebView; storage behavior mixed. |
+| `User.js` | `default`, `profileUpdateFromSearchParams` | User preferences/profile state and pure URL-query profile mapping. | Browser/native WebView module; mapping itself has no side effects. |
 | `Weather.js` | four classes | Frozen location, observation, day, and snapshot weather entities. | Cross-host; normalized. |
 
 ## ApiModelRecord.js
@@ -272,12 +274,41 @@ Owns persisted user preference/profile fields, explicit-preference updates,
 fresh reads, saves, and JSON projection. It installs `window.user` after its
 DBLS/DBOPFS lifecycle and emits `user-entity-loaded`.
 
+### profileUpdateFromSearchParams(searchParams)
+
+Named export from `arcane-os/entities/User.js`. Pass an existing
+`URLSearchParams`; the helper returns a new ordinary profile-update record.
+
+| Query parameter | Profile field |
+| --- | --- |
+| `subscription`, otherwise `subscription_key` | `subscription_key` |
+| `TWiN` (exact case) | `license_key` |
+| `name` | `username` |
+| `email` | `email` |
+| `phone` | `phone` |
+
+Presence selects `subscription` over the fallback, even when its first value
+is empty. Missing or empty selected values are omitted. Repeated parameters
+use their first value, following `URLSearchParams.get()`. Normal URL decoding
+occurs once when the caller creates the parameters; the helper preserves the
+decoded strings, including spaces, Unicode, literal plus signs, and leading
+zeros, without trimming, further decoding, or numeric conversion. Whitespace
+is a supplied nonempty value. Unknown keys, including `zipcode`, are ignored;
+no extra name fields are inferred.
+
+The helper does not mutate the parameters, read or change the current URL,
+hydrate, render, or save. Importing `User.js` still has its existing browser
+singleton lifecycle. Applications own URL capture/removal, manual-draft
+protection, readiness, and their awaited `user.updateExplicit(update)` call.
+
 ### Example
 
 ```javascript
-import UserEntity from '/arcane/entities/User.js';
+import {profileUpdateFromSearchParams} from 'arcane-os/entities/User.js';
 
-console.log(typeof UserEntity.prototype.toJSON);
+const params = new URLSearchParams('name=Captain+Moonboots&phone=00123');
+const update = profileUpdateFromSearchParams(params);
+// {username: 'Captain Moonboots', phone: '00123'}
 ```
 
 ## Weather.js

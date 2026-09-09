@@ -62,6 +62,66 @@ import {assessScamRisk} from '../runtime/arcane/modules/ScamRiskPolicy.js';
 
 const repositoryRoot=new URL('../',import.meta.url);
 
+test('User query profile mapping preserves decoded values without side effects',async function userQueryProfileMapping(){
+    const source=await readFile(
+        new URL('runtime/arcane/entities/User.js',repositoryRoot),
+        'utf8'
+    );
+    const declaration=source.match(
+        /^export function profileUpdateFromSearchParams\(searchParams\)\{[\s\S]*?^\}/mu
+    );
+    assert.ok(declaration,'User.js must expose the named pure query mapper.');
+    // Evaluate the actual pure function without starting the browser singleton.
+    const profileUpdateFromSearchParams=Function(
+        `${declaration[0].replace(/^export /u,'')}\nreturn profileUpdateFromSearchParams;`
+    )();
+
+    const params=new URLSearchParams(
+        'subscription=0007&subscription_key=ignored&TWiN=demo%2Blicense'
+        +'&name=%20Zo%C3%AB+%E9%BE%8D%20&email=reader%2Bdemo%40example.invalid'
+        +'&phone=001234&zipcode=00999&first_name=ignored&last_name=ignored'
+    );
+    const original=params.toString();
+    assert.deepEqual(profileUpdateFromSearchParams(params),{
+        subscription_key:'0007',
+        license_key:'demo+license',
+        username:' Zoë 龍 ',
+        email:'reader+demo@example.invalid',
+        phone:'001234'
+    });
+    assert.equal(params.toString(),original);
+    assert.deepEqual(
+        profileUpdateFromSearchParams(new URLSearchParams('subscription_key=fallback')),
+        {subscription_key:'fallback'}
+    );
+    assert.deepEqual(
+        profileUpdateFromSearchParams(new URLSearchParams(
+            'subscription=&subscription=second&subscription_key=fallback'
+            +'&TWiN=&name=&email=&phone='
+        )),
+        {}
+    );
+    assert.deepEqual(profileUpdateFromSearchParams(new URLSearchParams()),{});
+    assert.deepEqual(
+        profileUpdateFromSearchParams(new URLSearchParams(
+            'subscription=first&subscription=second&TWiN=%252B&TWiN=ignored'
+            +'&name=+&email=first&email=second&phone=000&phone=123'
+        )),
+        {subscription_key:'first',license_key:'%2B',username:' ',email:'first',phone:'000'}
+    );
+    assert.deepEqual(
+        profileUpdateFromSearchParams(new URLSearchParams(
+            'twin=ignored&TWIN=ignored&license_key=ignored&username=ignored'
+            +'&Name=ignored&Email=ignored&Phone=ignored&zipcode=00999'
+        )),
+        {}
+    );
+    assert.deepEqual(
+        profileUpdateFromSearchParams(new URLSearchParams('subscription_key=&subscription_key=second')),
+        {}
+    );
+});
+
 test('chat record predicates preserve complete model-authored openings',()=>{
     assert.equal(hasUserEntry([{role:'assistant',content:'Welcome.'}]),false);
     assert.equal(hasConversationEntry([{role:'assistant',content:'Welcome.'}]),true);

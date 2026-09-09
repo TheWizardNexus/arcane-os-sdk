@@ -25,6 +25,34 @@ import {
  */
 import DBOPFS from '../modules/DBOPFS.js';
 
+/**
+ * Maps supplied URL query values to an explicit profile update without saving.
+ * URLSearchParams owns decoding; preserve its first value exactly as returned.
+ * A present subscription, even empty, takes precedence over subscription_key.
+ *
+ * @param {URLSearchParams} searchParams
+ * @returns {Object<string,string>}
+ */
+export function profileUpdateFromSearchParams(searchParams){
+    const update={
+        subscription_key:searchParams.get(
+            searchParams.has('subscription')?'subscription':'subscription_key'
+        ),
+        license_key:searchParams.get('TWiN'),
+        username:searchParams.get('name'),
+        email:searchParams.get('email'),
+        phone:searchParams.get('phone')
+    };
+
+    for(const key of Object.keys(update)){
+        if(update[key]===null||update[key]===''){
+            delete update[key];
+        }
+    }
+
+    return update;
+}
+
 function createDefaultDashboard(){
     return { charts:{} };
 }

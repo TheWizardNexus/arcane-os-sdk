@@ -612,7 +612,7 @@ test('the synchronized runtime catalogs match files, bindings, and component scr
 
     await t.test('all entity modules and exact exports are cataloged',()=>{
         assert.equal(entityInventory.moduleCount,14);
-        assert.equal(entityInventory.exportCount,29);
+        assert.equal(entityInventory.exportCount,30);
         const liveByFile=new Map(live.entities.map(module=>[module.file,module.exports]));
         assert.deepEqual(
             sorted(live.entities.map(module=>module.file)),
