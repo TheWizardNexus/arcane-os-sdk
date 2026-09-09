@@ -3,7 +3,7 @@
 The npm package exposes a Node.js ESM control plane, the portable
 `arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`,
 `arcane-os/preference-store`, `arcane-os/speech-playback`,
-`arcane-os/speech-text`, `arcane-os/ai/tool-text-stream`, and `arcane-os/browser-device` entrypoints, and the browser-only
+`arcane-os/speech-text`, `arcane-os/ai/tool-text-stream`, `arcane-os/ai/twin-cloud`, and `arcane-os/browser-device` entrypoints, and the browser-only
 `arcane-os/pwa`, `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints.
 The `arcane-os/modules/<filename>` and `arcane-os/entities/<filename>` paths
 resolve directly to the existing runtime files, with their actual extension.
@@ -66,6 +66,7 @@ runtime layouts.
 | `arcane-os/pwa` | Nonblocking PWA registration, worker updates, native installation state and a dismissible installation component. |
 | `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, complete DBOPFS model storage, streaming, cancellation, and structural tool-call results. |
 | `arcane-os/ai/tool-text-stream` | Shared selected tool-argument text observer for provider integration. |
+| `arcane-os/ai/twin-cloud` | Complete TWiN Cloud requests from Node or a browser with an explicit key/model and shared retry/cancellation behavior. |
 | `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS provider mechanisms, ordinary upstream assets, materialized/native routing, Workers, and cancellation. |
 | `arcane-os/mail` | Portable Mail runtime, durable outbox, complete transport responses, and provider-neutral acceptance contracts. |
 
@@ -121,6 +122,13 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 
 | Member | Kind | Import | Group | Availability |
 | --- | --- | --- | --- | --- |
+| `fetchRequest()` | function | `arcane-os/ai/twin-cloud` | TWiN Cloud requests | Node and Browser; remote HTTPS provider |
+| `fetchHTTPResponse()` | function | `arcane-os/ai/twin-cloud` | Shared AI transport integration | Node and Browser |
+| `fetchJSONResponse()` | function | `arcane-os/ai/twin-cloud` | Shared AI transport integration | Node and Browser |
+| `structuredOutputFormat()` | function | `arcane-os/ai/twin-cloud` | Shared AI transport integration | Node and Browser |
+| `openAIResponseFormat()` | function | `arcane-os/ai/twin-cloud` | Shared AI transport integration | Node and Browser |
+| `isAIRequestAbort()` | function | `arcane-os/ai/twin-cloud` | Shared AI transport integration | Node and Browser |
+| `normalizeAIRequestAbort()` | function | `arcane-os/ai/twin-cloud` | Shared AI transport integration | Node and Browser |
 | `APP_BUNDLE_DESCRIPTOR_NAME` | constant | `arcane-os` | Packaging and release bundles | Node |
 | `APP_BUNDLE_EXTENSION` | constant | `arcane-os` | Packaging and release bundles | Node |
 | `APP_BUNDLE_FORMAT` | constant | `arcane-os` | Packaging and release bundles | Node |
@@ -7634,6 +7642,265 @@ subscription, write, or logging, and does not cache the preference.
 import {readArcaneDeveloperMode} from 'arcane-os/logging';
 
 const developerMode=readArcaneDeveloperMode();
+```
+
+## fetchRequest()
+
+### Overview
+
+Makes one complete TWiN Cloud request with explicit caller-owned credentials
+and model selection. This named function is independent of the browser
+`AI` instance method with the same name.
+
+### Signature and result
+
+```text
+async fetchRequest(options={})
+```
+
+Import the named function from `arcane-os/ai/twin-cloud`. Supply `twinKey`,
+`model`, and complete `messages`. The function requires the explicit model;
+it reads no browser preference or default-model selection. Optional
+`structuredOutput:true` or `'json'` sends `response_format:{type:'json_object'}`.
+A supplied JSON Schema sends `response_format:{type:'json_schema',
+json_schema:{name:'structured_response',strict:true,schema:...}}`. Omission
+leaves structured output off. Optional `tools`, `toolChoice`,
+`parallelToolCalls`, and `reasoningEffort` map to their existing TWiN wire
+fields. Tool fields are sent when `tools` is nonempty; a nonempty
+`reasoningEffort` is forwarded without selecting a default. No default output
+cap, tool execution, or provider-response envelope validation is added.
+
+The return value is the entire parsed provider JSON, not only one choice or
+message. Optional callbacks are `onRequest(request,id,metadata)` before
+dispatch and `onResponse(response,id,false)` before successful return;
+`id` defaults to `Date.now()` and may be supplied by the caller. Request metadata
+is `{operation:'fetch',transport:'http',destination:'https://inference.do-ai.run/v1/chat/completions'}`.
+Both callbacks are awaited, and callback
+failures propagate. Credentials are supplied to transport rather than added to
+the message or response callback payload.
+
+### Availability and normalization
+
+**Node and Browser; Cloud transport.** Uses standard Fetch and cancellation,
+without DOM, browser profiles, user singletons, or storage initialization.
+Import starts no request. HTTP `429` whose message contains `overload`
+(case-insensitive) waits
+`3000` milliseconds and retries the complete request; other HTTP failures
+throw their complete parsed JSON or text bodies. A missing key throws
+`AI_PROVIDER_NOT_CONFIGURED`; a missing model throws `TypeError`. `signal`
+cancellation during transport, body reading, retry waiting,
+or callback settlement prevents successful return and uses
+`ARCANE_AI_REQUEST_ABORTED`. No request history, DBOPFS write, or recurring
+model context is retained. The caller owns persistence and key configuration.
+See [TWiN Cloud](ai/twin-cloud.md) for a complete Node JSON-schema example and
+the unchanged browser AI interface.
+
+### Example
+
+```javascript
+import serverConfig from './server-config.json' with {type: 'json'};
+import {fetchRequest} from 'arcane-os/ai/twin-cloud';
+
+const response = await fetchRequest({
+    twinKey: serverConfig.twinKey,
+    model: 'openai-gpt-oss-20b',
+    messages: [{role: 'user', content: 'Describe a moon-powered toaster.'}]
+});
+
+console.log(response);
+```
+
+`server-config.json` is an application-owned, ignored configuration file;
+never commit its key or print it in diagnostics. The SDK does not read it.
+
+## fetchHTTPResponse()
+
+### Overview
+
+Shared low-level HTTP owner used by browser AI and the focused TWiN API.
+Ordinary TWiN callers use `fetchRequest()` instead.
+
+### Signature and result
+
+```text
+async fetchHTTPResponse(url,options)
+```
+
+Returns the successful Fetch `Response` without consuming its body. Both URL
+and Fetch options are caller-supplied; this helper adds no key, model, or
+request envelope. Non-success responses are read completely as JSON when the
+content type contains `application/json`, otherwise as text. Only status 429
+with an overload message repeats after 3000 ms; other error bodies are thrown.
+
+### Availability and normalization
+
+**Node and Browser.** Exported from `arcane-os/ai/twin-cloud` for shared SDK
+integration. `options.signal` cancels Fetch and the overload wait and is checked
+after response/error-body reads. Cancellation uses
+`ARCANE_AI_REQUEST_ABORTED`. Overload warnings use the existing shared logger.
+
+### Example
+
+```javascript
+import {fetchHTTPResponse} from 'arcane-os/ai/twin-cloud';
+
+// The integration supplies its selected endpoint and complete Fetch options.
+const response = await fetchHTTPResponse(endpoint, requestOptions);
+```
+
+## fetchJSONResponse()
+
+### Overview
+
+Shared complete JSON-body reader built on `fetchHTTPResponse()`.
+
+### Signature and result
+
+```text
+async fetchJSONResponse(url,options)
+```
+
+Returns the full parsed JSON value. A successful response whose content type
+does not contain `application/json` throws `TypeError`; JSON parser failures
+propagate. The helper does not select choices or validate a provider envelope.
+
+### Availability and normalization
+
+**Node and Browser.** Exported from `arcane-os/ai/twin-cloud` for shared SDK
+integration; it retains the HTTP owner's retry/cancellation behavior and checks
+cancellation again after parsing. Ordinary callers use `fetchRequest()`.
+
+### Example
+
+```javascript
+import {fetchJSONResponse} from 'arcane-os/ai/twin-cloud';
+
+// The integration supplies its selected endpoint and complete Fetch options.
+const completion = await fetchJSONResponse(endpoint, requestOptions);
+```
+
+## structuredOutputFormat()
+
+### Overview
+
+Normalizes the existing AI structured-output option without rewriting a schema.
+
+### Signature and result
+
+```text
+structuredOutputFormat(value=false)
+```
+
+False, null, and undefined return null. True and `'json'` return `'json'`.
+A plain object with `Object.prototype` or a null prototype is returned
+unchanged. Other values throw `AI_STRUCTURED_OUTPUT_INVALID`.
+
+### Availability and normalization
+
+**Node and Browser.** Synchronous helper exported from
+`arcane-os/ai/twin-cloud`; performs no network or storage operation.
+
+### Example
+
+```javascript
+import {structuredOutputFormat} from 'arcane-os/ai/twin-cloud';
+
+const format = structuredOutputFormat({
+    type: 'object',
+    properties: {text: {type: 'string'}}
+});
+```
+
+## openAIResponseFormat()
+
+### Overview
+
+Maps a normalized structured-output choice to chat-completion wire fields.
+
+### Signature and result
+
+```text
+openAIResponseFormat(format)
+```
+
+`'json'` becomes `{type:'json_object'}`; a supplied schema becomes
+`{type:'json_schema',json_schema:{name:'structured_response',strict:true,schema:format}}`.
+A disabled format returns null. Use `structuredOutputFormat()` first to
+normalize the public option; this mapper does not validate schema contents.
+
+### Availability and normalization
+
+**Node and Browser.** Synchronous helper exported from
+`arcane-os/ai/twin-cloud`, shared with browser AI and performing no I/O.
+
+### Example
+
+```javascript
+import {structuredOutputFormat, openAIResponseFormat} from 'arcane-os/ai/twin-cloud';
+
+const responseFormat = openAIResponseFormat(structuredOutputFormat(true));
+// {type: 'json_object'}
+```
+
+## isAIRequestAbort()
+
+### Overview
+
+Recognizes the existing AI request cancellation forms.
+
+### Signature and result
+
+```text
+isAIRequestAbort(error,signal)
+```
+
+Returns a boolean: true when the signal is aborted, the error name is
+`AbortError`, or its code is `ARCANE_REQUEST_ABORTED`,
+`ARCANE_AI_REQUEST_ABORTED`, or `AI_REQUEST_ABORTED`.
+
+### Availability and normalization
+
+**Node and Browser.** Synchronous helper exported from
+`arcane-os/ai/twin-cloud`; it neither changes nor aborts the supplied operation.
+
+### Example
+
+```javascript
+import {isAIRequestAbort} from 'arcane-os/ai/twin-cloud';
+
+const controller = new AbortController();
+controller.abort();
+const cancelled = isAIRequestAbort(undefined, controller.signal);
+```
+
+## normalizeAIRequestAbort()
+
+### Overview
+
+Keeps cancellation under the shared AI error code while preserving its cause.
+
+### Signature and result
+
+```text
+normalizeAIRequestAbort(error)
+```
+
+An existing `ARCANE_AI_REQUEST_ABORTED` error is returned unchanged. Otherwise
+the result is an Error named `AbortError`, with code
+`ARCANE_AI_REQUEST_ABORTED`, message `The AI request was cancelled.`, and the
+supplied value as its cause. The helper returns the error; it does not throw it.
+
+### Availability and normalization
+
+**Node and Browser.** Synchronous helper exported from
+`arcane-os/ai/twin-cloud`; creates no request, storage, or user state.
+
+### Example
+
+```javascript
+import {normalizeAIRequestAbort} from 'arcane-os/ai/twin-cloud';
+
+const cancelled = normalizeAIRequestAbort(new DOMException('Cancelled', 'AbortError'));
 ```
 
 ## Data export subpaths

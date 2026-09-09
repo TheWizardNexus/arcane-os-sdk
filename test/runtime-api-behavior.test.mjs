@@ -2495,15 +2495,23 @@ test(
                     }
                 }
             };
+            const responseSchema = {
+                type:'object',
+                properties:{html:{type:'string'}, text:{type:'string'}},
+                required:['html', 'text'],
+                additionalProperties:false
+            };
             const publicCloud=await ai.fetchRequest({
                 messages:[{role:'user',content:'Public cloud'}],
                 reasoningEffort:'low',
+                structuredOutput:responseSchema,
                 tools:[tool]
             });
             assert.equal(publicCloud.choices[0].message.content,'cloud response');
             const streamedCloud=await ai.streamRequest({
                 messages:[{role:'user',content:'Streamed cloud'}],
                 reasoningEffort:'high',
+                structuredOutput:responseSchema,
                 tools:[tool]
             });
             assert.equal(streamedCloud,'cloud stream');
@@ -2538,6 +2546,22 @@ test(
                 'high'
             );
             assert.deepEqual(JSON.parse(requests[2].options.body).tools,[tool]);
+            const expectedFormat = {
+                type:'json_schema',
+                json_schema:{
+                    name:'structured_response',
+                    strict:true,
+                    schema:responseSchema
+                }
+            };
+            assert.deepEqual(
+                JSON.parse(requests[1].options.body).response_format,
+                expectedFormat
+            );
+            assert.deepEqual(
+                JSON.parse(requests[2].options.body).response_format,
+                expectedFormat
+            );
 
             await runtime.unload('llm');
             await ai.transitionAI(

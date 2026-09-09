@@ -26,6 +26,10 @@ const runtimePackageImports=new Map([
         path.join(repositoryRoot,'browser-runtime','ai','tool-text-stream.mjs')
     ],
     [
+        'arcane-os/ai/twin-cloud',
+        path.join(repositoryRoot,'browser-runtime','ai','twin-cloud.mjs')
+    ],
+    [
         'arcane-os/ai/browser-speech',
         path.join(repositoryRoot,'browser-runtime','ai','browser-speech.mjs')
     ]

@@ -156,6 +156,7 @@ test('complete runtime inventory produces a mutable named import map without rea
             'sdk/dom-event-instrumentation.mjs',
             'sdk/ai/browser-wasm.mjs',
             'sdk/ai/browser-speech.mjs',
+            'sdk/ai/twin-cloud.mjs',
             'sdk/dependencies/event-pubsub/index.js'
         ],
         readFile:async()=>{
@@ -170,6 +171,7 @@ test('complete runtime inventory produces a mutable named import map without rea
         './node_modules/strong-type/index.js':'./arcane/dependencies/strong-type/index.js',
         'arcane-os/ai/browser-speech':'./arcane/sdk/ai/browser-speech.mjs',
         'arcane-os/ai/browser-wasm':'./arcane/sdk/ai/browser-wasm.mjs',
+        'arcane-os/ai/twin-cloud':'./arcane/sdk/ai/twin-cloud.mjs',
         'arcane-os/dom-event-instrumentation':'./arcane/sdk/dom-event-instrumentation.mjs',
         'arcane-os/event-manager':'./arcane/sdk/event-manager.mjs',
         'arcane-os/entities/Preference.js':'./arcane/entities/Preference.js',

@@ -78,6 +78,7 @@ version; WebKitGTK availability must not be generalized to macOS.
 | Read host identity, capabilities, storage, preferences, appearance, or platform state | `globalThis.Arcane` | **Cross-host** where the method is implemented and admitted | Promise behavior and `Arcane.Error` are normalized. Result fields are normalized unless the method explicitly documents a platform-dependent snapshot. |
 | Use local AI without coupling app code to Ollama HTTP | `Arcane.localAI`, `Arcane.ai`, or `/arcane/modules/Ollama.js` | Primarily **Native**; Android exposes a narrower admitted inference projection | Admission, errors, and managed-operation events are normalized. Direct Ollama response envelopes remain **Provider-native**. |
 | Use TWiN Cloud from the renderer profile | `/arcane/modules/AI.js` | **Cloud** from an allowed browser/native renderer | High-level chat behavior is normalized by the module. The TWiN access key authenticates remote LLM chat; raw provider diagnostics remain provider-specific. No automatic cloud fallback is inferred from local failure. |
+| Send one TWiN Cloud request with an explicit key and model | `fetchRequest` from `arcane-os/ai/twin-cloud` | **Node** and **Browser**, using standard Fetch and a remote HTTPS provider | Keeps complete messages and returns the full parsed provider JSON. Shared structured-output mapping, overload-only HTTP 429 retry after 3000 ms, and cancellation match browser TWiN transport. No browser profile, AI/user singleton, DBOPFS, or retained request history is created. |
 | Use speech through one application helper | `/arcane/modules/AI.js` and `Arcane.speech` | **Browser** or **Native** | The helper keeps audio on device: Whisper owns STT and Kokoro owns TTS. It automatically cleans only the outbound speech-input copy and normalizes application-facing audio/text behavior while browser and native request/response plumbing differs below that boundary. |
 | Inspect or manage raw Ollama models | `Arcane.ollama` or `/arcane/modules/Ollama.js` | **Native** desktop Core for management; narrower Android inference only | Wrapper method names, errors, streaming correlation, and admission are Arcane-controlled. Direct Ollama success envelopes are intentionally provider-native. |
 | Use native terminal, installation, user, provisioning, or machine controls | matching `Arcane.*` namespace | **Native** and app/capability restricted | Calls and errors use the common bridge contract. Platform results can be host-specific and are marked in the method guide. |
@@ -239,6 +240,14 @@ envelope. `ollama.readiness()` returns a frozen `{ready, version, errorCode}`
 snapshot.
 
 ### Provider-native within an Arcane boundary
+
+[`arcane-os/ai/twin-cloud`](ai/twin-cloud.md) accepts an explicit `twinKey` and
+`model`, with the same named `fetchRequest` import in Node and managed browsers.
+It preserves complete provider response JSON while mapping the supplied
+structured-output, tool, and reasoning options to the TWiN wire contract.
+The SDK adds no output cap or persisted context. Cancellation applies during
+request, body read, overload retry wait, and callback settlement. The existing
+profile-backed browser `AI.js` entry and its lifecycle remain separate.
 
 Direct `Arcane.ollama.chat()`, `generate()`, `show()`, `embed()`, and lifecycle
 methods return complete Ollama-compatible envelopes. Arcane still owns error

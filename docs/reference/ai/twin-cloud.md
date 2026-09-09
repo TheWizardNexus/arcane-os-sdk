@@ -1,8 +1,125 @@
 # TWiN Cloud: one request
 
-TWiN Cloud is the high-level `AI.js` default remote LLM service, named `TWIN`.
-Speech stays on device and does not use the TWiN access key. This guide uses the
-same managed browser imports as the [browser speech quick start](browser-speech.md).
+Use `fetchRequest` from `arcane-os/ai/twin-cloud` for a complete TWiN Cloud
+request in Node or a browser with an explicit key and model. It imports no
+browser profile, DOM, user singleton, or storage, and starts no work on import.
+The existing browser `AI.js` interface remains available for applications that
+already use its provider selection, lifecycle, and speech. TWiN Cloud is that
+interface's default remote LLM service, named `TWIN`; speech stays on device
+and does not use the TWiN access key.
+
+## Node: explicit key, model, and structured result
+
+Install the published `arcane-os` package in the Node project. Keep the key in
+the application's existing server configuration, outside source control and
+diagnostics. In this example, `server-config.json` is that caller-owned local
+configuration file with a `twinKey` property; add its exact path to `.gitignore`
+before creating it. The SDK does not discover or write this file.
+
+```javascript
+import serverConfig from './server-config.json' with {type: 'json'};
+import {fetchRequest} from 'arcane-os/ai/twin-cloud';
+
+const response = await fetchRequest({
+    twinKey: serverConfig.twinKey,
+    model: 'openai-gpt-oss-20b',
+    messages: [{
+        role: 'user',
+        content: 'Explain why the moon-powered toaster keeps burning breakfast. Return HTML and plain text.'
+    }],
+    structuredOutput: {
+        type: 'object',
+        properties: {
+            html: {type: 'string'},
+            text: {type: 'string'}
+        },
+        required: ['html', 'text'],
+        additionalProperties: false
+    }
+});
+
+console.log(response);
+```
+
+`model` is required and remains exactly the supplied identifier. This function
+does not select the browser profile's default model. The example's prompt and
+`html`/`text` schema are caller-owned data, not SDK business logic. Changing
+those fields changes the requested result without changing the SDK.
+
+The resolved value is the complete parsed provider JSON, including every
+choice and provider field. The SDK does not extract only the first message,
+parse its content into a second object, or replace the response with an
+application-specific record. The supplied schema becomes
+`response_format: {type:'json_schema', json_schema:{name:'structured_response',
+strict:true, schema:...}}`. `structuredOutput:true` or `'json'` instead selects
+`response_format:{type:'json_object'}`; omission leaves structured output off.
+
+## Shared request behavior
+
+The focused API accepts complete `messages`, optional `tools`, `toolChoice`,
+`parallelToolCalls`, and `reasoningEffort` in addition to the explicit
+`twinKey` and `model`. Tool options use the existing chat-completion wire fields
+`tools`, `tool_choice`, and `parallel_tool_calls` when `tools` is nonempty.
+A supplied nonempty `reasoningEffort` uses the provider's `reasoning_effort`
+field; omission preserves its default. No output limit is added by this API.
+The function neither executes tools nor adds provider-response envelope
+validation.
+
+Optional `id`, `onRequest(request,id,metadata)`, and
+`onResponse(response,id,false)` follow the complete-response `AI.fetchRequest`
+callback shape. The request callback runs before dispatch; the response
+callback receives the complete parsed result before it is returned. Omitted
+`id` uses `Date.now()`; request metadata is
+`{operation:'fetch',transport:'http',destination:'https://inference.do-ai.run/v1/chat/completions'}`.
+The key is
+transport authentication, not part of either callback's message payload. Keep
+credentials out of application logging as well.
+
+Only HTTP `429` with a message containing `overload` (case-insensitive) repeats automatically,
+after `3000` milliseconds. Another overload repeats the same complete request;
+other HTTP failures do not become an automatic retry loop. Pass a fresh
+`AbortController`'s `signal` and call `abort()` to cancel. Cancellation during
+the request, response-body read, retry wait, or callback settlement prevents
+successful result delivery and rejects with `ARCANE_AI_REQUEST_ABORTED`.
+Other HTTP failures throw the complete parsed JSON error body or text body.
+A missing key uses `AI_PROVIDER_NOT_CONFIGURED`, a missing explicit model
+throws `TypeError`, and an unsupported `structuredOutput` input uses
+`AI_STRUCTURED_OUTPUT_INVALID`.
+
+The SDK retains no request or response history between calls and uses no
+DBOPFS, chat entity, or memory extraction. Each call's `messages` are its
+complete caller-supplied context. The caller decides whether and how to keep
+the result; this stateless transport adds no saved conversation or migration.
+
+Browser applications can use this same focused import through their generated
+managed import map. Browser Fetch and CORS behavior still apply. Importing it
+does not instantiate `AI`, read saved preferences, configure speech, or change
+the existing `arcane-os/ai` browser entry.
+
+### Shared low-level integration helpers
+
+The same module also exports the helpers used by browser `AI.js`. Ordinary
+callers use `fetchRequest`; these exports let SDK transport integration share
+the existing implementation rather than maintain another retry or body reader.
+
+| Export | Contract |
+| --- | --- |
+| `fetchHTTPResponse(url,options)` | Uses the caller's Fetch options, overload retry and cancellation; returns a successful `Response` with its body unconsumed. |
+| `fetchJSONResponse(url,options)` | Uses that HTTP owner, requires `application/json`, and returns the complete parsed body without selecting choices. |
+| `structuredOutputFormat(value=false)` | Maps false/null/undefined to null, true/`'json'` to `'json'`, and preserves a supplied plain JSON Schema object. Other inputs use `AI_STRUCTURED_OUTPUT_INVALID`. |
+| `openAIResponseFormat(format)` | Maps the normalized value to `json_object`, strict `json_schema` named `structured_response`, or null. |
+| `isAIRequestAbort(error,signal)` | Recognizes an aborted signal, `AbortError`, or the existing Arcane AI/request cancellation codes. |
+| `normalizeAIRequestAbort(error)` | Preserves an existing `ARCANE_AI_REQUEST_ABORTED` error or creates that `AbortError` with the original value as its cause. |
+
+These helpers start no work on import. HTTP helpers require explicit URL and
+options; they do not add a key, model, browser state, or retained conversation.
+Overload warnings use the shared console logger and preserve the complete
+provider error.
+
+## Existing browser AI interface
+
+The following browser example uses the same managed imports as the
+[browser speech quick start](browser-speech.md).
 
 ## Install and import
 

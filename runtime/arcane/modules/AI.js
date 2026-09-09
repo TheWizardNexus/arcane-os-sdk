@@ -16,6 +16,14 @@ import {
 } from './AIProviderRuntime.js';
 import {normalizeOllamaModelIdentifier} from './OllamaModelIdentifier.js';
 import {arcaneLogging} from 'arcane-os/logging';
+import {
+    fetchHTTPResponse,
+    fetchJSONResponse,
+    isAIRequestAbort,
+    normalizeAIRequestAbort,
+    structuredOutputFormat as normalizeStructuredOutput,
+    openAIResponseFormat
+} from 'arcane-os/ai/twin-cloud';
 import {MarkdownSpeech,stripSpeechFormatting} from 'arcane-os/speech-text';
 import {prepareSpeech} from './PreparedSpeech.js';
 import {createToolTextObserver} from 'arcane-os/ai/tool-text-stream';
@@ -119,24 +127,6 @@ function aiInitializationError(code,reason,message){
     error.code=code;
     error.reason=reason;
     return error;
-}
-
-function isAIRequestAbort(error,signal){
-    return signal?.aborted
-        ||error?.name==='AbortError'
-        ||error?.code==='ARCANE_REQUEST_ABORTED'
-        ||error?.code==='ARCANE_AI_REQUEST_ABORTED'
-        ||error?.code==='AI_REQUEST_ABORTED';
-}
-
-function normalizeAIRequestAbort(error){
-    if(error?.code==='ARCANE_AI_REQUEST_ABORTED'){
-        return error;
-    }
-    const normalized=new Error('The AI request was cancelled.',{cause:error});
-    normalized.name='AbortError';
-    normalized.code='ARCANE_AI_REQUEST_ABORTED';
-    return normalized;
 }
 
 function normalizeAIReasoningEffort(value){
@@ -3776,69 +3766,6 @@ class AI {
         return true;
     }
 
-    async #fetchHTTPResponse(url,options){
-        const {signal}=options;
-        const retryDelayMs=3000;
-        try{
-            while(true){
-                if(signal?.aborted){
-                    throw normalizeAIRequestAbort(signal.reason);
-                }
-                const response=await fetch(url,options);
-                if(signal?.aborted){
-                    throw normalizeAIRequestAbort(signal.reason);
-                }
-                if(response.ok){
-                    return response;
-                }
-
-                const contentType=response.headers.get('content-type')||'';
-                const error=contentType.includes('application/json')
-                    ?await response.json()
-                    :await response.text();
-                if(signal?.aborted){
-                    throw normalizeAIRequestAbort(signal.reason);
-                }
-                const message=is.string(error)
-                    ?error
-                    :error?.error?.message??error?.message;
-                if(
-                    response.status!==429
-                    ||!is.string(message)
-                    ||!message.toLowerCase().includes('overload')
-                ){
-                    throw error;
-                }
-
-                arcaneLogging.warn(
-                    `${message}\nRetrying in ${retryDelayMs / 1000} seconds`,
-                    error
-                );
-                await new Promise(function waitForOverloadRetry(resolve,reject){
-                    function finishRetryDelay(){
-                        signal?.removeEventListener('abort',cancelRetryDelay);
-                        resolve();
-                    }
-                    function cancelRetryDelay(){
-                        clearTimeout(timer);
-                        signal.removeEventListener('abort',cancelRetryDelay);
-                        reject(normalizeAIRequestAbort(signal.reason));
-                    }
-                    const timer=setTimeout(finishRetryDelay,retryDelayMs);
-                    signal?.addEventListener('abort',cancelRetryDelay,{once:true});
-                    if(signal?.aborted){
-                        cancelRetryDelay();
-                    }
-                });
-            }
-        }catch(error){
-            if(isAIRequestAbort(error,signal)){
-                throw normalizeAIRequestAbort(error);
-            }
-            throw error;
-        }
-    }
-
     #nativeOllama(){
         const client=globalThis.Arcane?.ollama;
 
@@ -4169,48 +4096,6 @@ class AI {
             {role:'system',content:instruction},
             ...sanitizedMessages
         ];
-    }
-
-    #structuredOutputFormat(value=false){
-        if(value===false||value===null||value===undefined){
-            return null;
-        }
-        if(value===true||value==='json'){
-            return 'json';
-        }
-        if(
-            is.object(value)
-            &&!is.array(value)
-            &&(
-                Object.getPrototypeOf(value)===Object.prototype
-                ||Object.getPrototypeOf(value)===null
-            )
-        ){
-            return value;
-        }
-
-        const error=new TypeError(
-            'AI structured output must be enabled with true, json, or a JSON Schema object.'
-        );
-        error.code='AI_STRUCTURED_OUTPUT_INVALID';
-        throw error;
-    }
-
-    #openAIResponseFormat(structuredOutputFormat){
-        if(structuredOutputFormat==='json'){
-            return {type:'json_object'};
-        }
-        if(structuredOutputFormat){
-            return {
-                type:'json_schema',
-                json_schema:{
-                    name:'structured_response',
-                    strict:true,
-                    schema:structuredOutputFormat
-                }
-            };
-        }
-        return null;
     }
 
     async #reportRequest(requestHandler,request,id,metadata){
@@ -4762,7 +4647,7 @@ class AI {
             if(signal?.aborted){
                 throw normalizeAIRequestAbort();
             }
-            const structuredOutputFormat=this.#structuredOutputFormat(
+            const structuredOutputFormat=normalizeStructuredOutput(
                 structuredOutput
             );
 
@@ -4776,7 +4661,7 @@ class AI {
         }
 
         if(structuredOutputFormat){
-            request.response_format=this.#openAIResponseFormat(
+            request.response_format=openAIResponseFormat(
                 structuredOutputFormat
             );
         }
@@ -4970,7 +4855,7 @@ class AI {
             destination:this.url
         });
         const body = JSON.stringify(request);
-        const response=await this.#fetchHTTPResponse(
+        const response=await fetchHTTPResponse(
             this.url,
             {
                 method:'POST',
@@ -5622,7 +5507,7 @@ class AI {
         if(signal?.aborted){
             throw normalizeAIRequestAbort();
         }
-        const structuredOutputFormat=this.#structuredOutputFormat(structuredOutput);
+        const structuredOutputFormat=normalizeStructuredOutput(structuredOutput);
 
         const normalizedReasoningEffort=normalizeAIReasoningEffort(
             reasoningEffort===undefined?this.reasoningEffort:reasoningEffort
@@ -5634,7 +5519,7 @@ class AI {
         }
 
         if(structuredOutputFormat){
-            request.response_format=this.#openAIResponseFormat(
+            request.response_format=openAIResponseFormat(
                 structuredOutputFormat
             );
         }
@@ -5718,7 +5603,7 @@ class AI {
             destination:this.url
         });
         const body = JSON.stringify(request);
-        const response=await this.#fetchHTTPResponse(
+        const responseJSON=await fetchJSONResponse(
             this.url,
             {
                 method:'POST',
@@ -5729,36 +5614,11 @@ class AI {
             }
         );
 
-        const contentType=response.headers.get('content-type')||'';
-
-        if(!contentType.includes('application/json')){
-            throw new TypeError(
-                `AI request returned ${contentType||'an unknown content type'} instead of JSON.`
-            );
-        }
-
-        let responseJSON;
-        try{
-            responseJSON=await response.json();
-        }catch(error){
-            if(isAIRequestAbort(error,signal)){
-                throw normalizeAIRequestAbort(error);
-            }
-            throw error;
-        }
         if(signal?.aborted){
             throw normalizeAIRequestAbort();
         }
-
-        if(!response.id){
-            response.id=id;
-        }
-
-        //console.log(responseJSON);
-        //async
         normalizeAICompletionToolCalls(responseJSON);
         await responseHandler(responseJSON,id,false);
-        //sync
         return responseJSON;
     }
 

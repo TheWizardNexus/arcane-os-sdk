@@ -6,7 +6,7 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 210,
+  "memberCount": 217,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
@@ -3395,6 +3395,104 @@
       "availability": "Node and browser",
       "protocol": "Shared user.developer preference",
       "normalization": "Returns null until target.user.ready is true, then whether target.user.developer is exactly true; returns false if preference access throws"
+    },
+    {
+      "id": "twin-cloud:fetchRequest",
+      "name": "fetchRequest",
+      "displayName": "fetchRequest()",
+      "kind": "function",
+      "signature": "async fetchRequest(options={})",
+      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "primaryImport": "arcane-os/ai/twin-cloud",
+      "group": "TWiN Cloud requests",
+      "summary": "Sends one complete TWiN Cloud request with an explicit caller-owned key and model.",
+      "availability": "Node and Browser; remote HTTPS provider",
+      "protocol": "TWiN Cloud complete-response chat",
+      "normalization": "Preserves complete messages and parsed provider JSON; maps explicit structured-output, tool, and reasoning options; shares overload-only HTTP 429 retry after 3000 ms and cancellation; retains no browser profile, storage, or request history"
+    },
+    {
+      "id": "twin-cloud:fetchHTTPResponse",
+      "name": "fetchHTTPResponse",
+      "displayName": "fetchHTTPResponse()",
+      "kind": "function",
+      "signature": "async fetchHTTPResponse(url,options)",
+      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "primaryImport": "arcane-os/ai/twin-cloud",
+      "group": "Shared AI transport integration",
+      "summary": "Returns a successful unconsumed Fetch Response through the shared AI HTTP owner.",
+      "availability": "Node and Browser",
+      "protocol": "Shared AI HTTP transport",
+      "normalization": "Preserves caller Fetch options and complete error bodies; repeats only overload HTTP 429 after 3000 ms; signal cancellation uses ARCANE_AI_REQUEST_ABORTED"
+    },
+    {
+      "id": "twin-cloud:fetchJSONResponse",
+      "name": "fetchJSONResponse",
+      "displayName": "fetchJSONResponse()",
+      "kind": "function",
+      "signature": "async fetchJSONResponse(url,options)",
+      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "primaryImport": "arcane-os/ai/twin-cloud",
+      "group": "Shared AI transport integration",
+      "summary": "Reads the complete successful provider JSON through the shared HTTP owner.",
+      "availability": "Node and Browser",
+      "protocol": "Shared AI HTTP transport",
+      "normalization": "Requires application/json, retains every parsed field without envelope validation, and checks cancellation before delivery"
+    },
+    {
+      "id": "twin-cloud:structuredOutputFormat",
+      "name": "structuredOutputFormat",
+      "displayName": "structuredOutputFormat()",
+      "kind": "function",
+      "signature": "structuredOutputFormat(value=false)",
+      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "primaryImport": "arcane-os/ai/twin-cloud",
+      "group": "Shared AI transport integration",
+      "summary": "Normalizes the existing structured-output option while preserving a supplied schema.",
+      "availability": "Node and Browser",
+      "protocol": "Shared AI structured-output options",
+      "normalization": "False/null/undefined return null, true/json return json, a plain schema object is returned unchanged, and other inputs use AI_STRUCTURED_OUTPUT_INVALID"
+    },
+    {
+      "id": "twin-cloud:openAIResponseFormat",
+      "name": "openAIResponseFormat",
+      "displayName": "openAIResponseFormat()",
+      "kind": "function",
+      "signature": "openAIResponseFormat(format)",
+      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "primaryImport": "arcane-os/ai/twin-cloud",
+      "group": "Shared AI transport integration",
+      "summary": "Maps normalized structured-output settings to chat-completion response_format.",
+      "availability": "Node and Browser",
+      "protocol": "Shared AI structured-output options",
+      "normalization": "Returns json_object, strict json_schema named structured_response with the original schema, or null; does not validate schema contents"
+    },
+    {
+      "id": "twin-cloud:isAIRequestAbort",
+      "name": "isAIRequestAbort",
+      "displayName": "isAIRequestAbort()",
+      "kind": "function",
+      "signature": "isAIRequestAbort(error,signal)",
+      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "primaryImport": "arcane-os/ai/twin-cloud",
+      "group": "Shared AI transport integration",
+      "summary": "Recognizes an aborted signal or an existing AI request cancellation error.",
+      "availability": "Node and Browser",
+      "protocol": "Shared AI cancellation",
+      "normalization": "Returns a boolean for AbortError or ARCANE_REQUEST_ABORTED, ARCANE_AI_REQUEST_ABORTED, and AI_REQUEST_ABORTED; changes no operation"
+    },
+    {
+      "id": "twin-cloud:normalizeAIRequestAbort",
+      "name": "normalizeAIRequestAbort",
+      "displayName": "normalizeAIRequestAbort()",
+      "kind": "function",
+      "signature": "normalizeAIRequestAbort(error)",
+      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "primaryImport": "arcane-os/ai/twin-cloud",
+      "group": "Shared AI transport integration",
+      "summary": "Returns the common AI AbortError while preserving the original cause.",
+      "availability": "Node and Browser",
+      "protocol": "Shared AI cancellation",
+      "normalization": "Preserves an existing ARCANE_AI_REQUEST_ABORTED value or returns an AbortError with that code and the supplied cause"
     }
   ]
 }

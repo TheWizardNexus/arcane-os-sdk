@@ -88,6 +88,10 @@ test('the selected npm tarball installs and exposes the public SDK',{
     assert.equal(installedPackage.exports['./mail'],'./src/mail-api.mjs');
     assert.equal(installedPackage.exports['./testing'],'./src/testing.mjs');
     assert.equal(
+        installedPackage.exports['./ai/twin-cloud'],
+        './browser-runtime/ai/twin-cloud.mjs'
+    );
+    assert.equal(
         installedPackage.exports['./preference-store'],
         './runtime/arcane/modules/PreferenceStore.js'
     );
@@ -211,6 +215,37 @@ import {MarkdownSpeech,stripSpeechFormatting} from 'arcane-os/speech-text';
 
 test('installed public SDK entrypoints and runtime materialization are functional',async()=>{
     assert.equal(SDK_VERSION,${JSON.stringify(verified.version)});
+    const browserGlobals = new Map();
+    const previousFetch = globalThis.fetch;
+    try {
+        for (const name of ['window', 'document', 'localStorage', 'sessionStorage', 'indexedDB']) {
+            browserGlobals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+            Object.defineProperty(
+                globalThis,
+                name,
+                {
+                    configurable: true,
+                    get: function unavailableBrowserOwner() {
+                        throw new Error('Node TWiN import accessed browser state: ' + name);
+                    }
+                }
+            );
+        }
+        globalThis.fetch = function unexpectedImportNetwork() {
+            throw new Error('Node TWiN import must not make a network request.');
+        };
+        const twinCloud = await import('arcane-os/ai/twin-cloud');
+        assert.equal(typeof twinCloud.fetchRequest, 'function');
+    } finally {
+        globalThis.fetch = previousFetch;
+        for (const [name, descriptor] of browserGlobals) {
+            if (descriptor) {
+                Object.defineProperty(globalThis, name, descriptor);
+            } else {
+                Reflect.deleteProperty(globalThis, name);
+            }
+        }
+    }
     for(const relative of [
         'modules/ToolCallRouter.js','entities/Chat.js','entities/User.js',
         'modules/TimeGuard.js','modules/WaitForComponent.js'
