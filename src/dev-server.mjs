@@ -6,7 +6,7 @@ import https from 'node:https';
 import os from 'node:os';
 import path from 'node:path';
 import {resolveWorkspace} from './workspace.mjs';
-import {appRelativeRoot} from './app-layout.mjs';
+import {appRelativeRoot,rootAppLegacyPath} from './app-layout.mjs';
 import {readInstalledSdkLayout} from './sdk-runtime-layout.mjs';
 import {APP_DESCRIPTOR_NAME, projectPackageManifest} from './app-descriptor.mjs';
 import {APP_CONFIG_NAME, validateAppConfig} from './packager/core.mjs';
@@ -1047,10 +1047,11 @@ async function startOwnedDevServer({
     const pwaResourceUrls = new Set();
     function developmentPwaArtifacts(selectedRoutes, assets = [], version = assetVersion) {
         const rootApp = selectedRoutes.config.appsRoot === '.';
+        const legacyAppPath = rootAppLegacyPath(selectedRoutes.config, selectedRoutes.appId);
         const appBase = applicationSourcePath(selectedRoutes.config,selectedRoutes.appId);
         const navigationAliases = {'/': selectedRoutes.startPath};
-        if (rootApp) {
-            const legacyBase = `/apps/${selectedRoutes.appId}`;
+        if (legacyAppPath) {
+            const legacyBase = `/${legacyAppPath}`;
             navigationAliases[legacyBase] = selectedRoutes.startPath;
             navigationAliases[`${legacyBase}/`] = selectedRoutes.startPath;
             for (const asset of [selectedRoutes.startPath,...assets]) {
@@ -1082,9 +1083,9 @@ async function startOwnedDevServer({
                 basePath: '/',
                 appBase,
                 ...(rootApp ? {
-                    installationId:`/apps/${routeSet.appId}/`,
-                    legacyAppPath:`apps/${routeSet.appId}`
+                    installationId:`/apps/${routeSet.appId}/`
                 } : {}),
+                legacyAppPath,
                 runtimeBase: selectedRoutes.browserRuntimeBase
                     ?? selectedRoutes.installed?.browserRuntimeBase ?? '/arcane/sdk/',
                 mode: 'development'
@@ -1176,7 +1177,7 @@ async function startOwnedDevServer({
             const target=parseRequestTarget(request.url);
             if(!target){deny(response,400,'Invalid request path.');return;}
             const {segments}=target;
-            const legacyAppRequest = mode === 'source' && routeSet.config.appsRoot === '.'
+            const legacyAppRequest = mode === 'source' && rootAppLegacyPath(routeSet.config, routeSet.appId)
                 && segments[0] === 'apps' && segments[1] === routeSet.appId;
             const legacyPwaRequest = legacyAppRequest && segments.length === 3
                 && ['arcane-sw.js', 'arcane-offline.json'].includes(segments[2]);

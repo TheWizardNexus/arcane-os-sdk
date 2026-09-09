@@ -12,7 +12,7 @@ import {
 import {loadArcaneIntegratedProvider} from './integrated-provider-loader.mjs';
 import {startDevServer} from './dev-server.mjs';
 import {applyPwaEntryReferences,generateImportMap,readApplicationTestImportMapContext} from './import-map.mjs';
-import {rootAppNavigation} from './app-layout.mjs';
+import {rootAppLegacyPath,rootAppNavigation} from './app-layout.mjs';
 import {createPwaArtifacts} from './pwa.mjs';
 import {readInstalledSdkLayout} from './sdk-runtime-layout.mjs';
 import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
@@ -327,7 +327,16 @@ async function refreshPreparedImportMap(prepared,{signal,onEvent,workspaceOperat
 async function refreshRootApplicationFiles(prepared,inspected,importMap,{signal,onEvent}){
     const {workspaceRoot,appId}=prepared;
     const manifest=prepared.validation.app.manifest;
-    const navigation=rootAppNavigation(appId,manifest.entry,inspected.browserDocuments.map(document=>document.path));
+    const legacyAppPath = rootAppLegacyPath(prepared.validation.config, appId);
+    const navigation = legacyAppPath ? rootAppNavigation(
+        appId,
+        manifest.entry,
+        inspected.browserDocuments.map(
+            function rootBrowserDocumentPath(document) {
+                return document.path;
+            }
+        )
+    ) : [];
     // These aliases belong to the SDK only after generation; retained app files stay authored.
     for(const redirect of navigation){
         throwIfAborted(signal);
@@ -343,9 +352,17 @@ async function refreshRootApplicationFiles(prepared,inspected,importMap,{signal,
     const entry=`/${manifest.entry.split('/').map(encodeURIComponent).join('/')}`;
     const navigationAliases={
         '/':entry,
-        [`/apps/${appId}`]:entry,
-        [`/apps/${appId}/`]:entry,
-        ...Object.fromEntries(navigation.map(redirect=>[`/${redirect.path}`,redirect.target]))
+        ...(legacyAppPath ? {
+            [`/${legacyAppPath}`]:entry,
+            [`/${legacyAppPath}/`]:entry,
+            ...Object.fromEntries(
+                navigation.map(
+                    function rootNavigationAlias(redirect) {
+                        return [`/${redirect.path}`,redirect.target];
+                    }
+                )
+            )
+        } : {})
     };
     // The source host serves the installed files in place. There is no runtime projection.
     const files=[...new Set([
@@ -361,7 +378,7 @@ async function refreshRootApplicationFiles(prepared,inspected,importMap,{signal,
         basePath:'/',
         appBase:'/',
         installationId:`/apps/${appId}/`,
-        legacyAppPath:`apps/${appId}`,
+        legacyAppPath,
         runtimeBase:installed.browserRuntimeBase,
         mode:'development',
         navigationAliases

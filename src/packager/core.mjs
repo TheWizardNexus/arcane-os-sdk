@@ -12,7 +12,7 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {appRelativeRoot,resolveAppRoot,rootAppNavigation} from '../app-layout.mjs';
+import {appRelativeRoot,resolveAppRoot,rootAppLegacyPath,rootAppNavigation} from '../app-layout.mjs';
 import {readInstalledSdkLayout} from '../sdk-runtime-layout.mjs';
 import {withWorkspaceOperationLock} from '../workspace-operation-lock.mjs';
 import {
@@ -275,10 +275,13 @@ function validateSharedRoute(route,label){
 }
 
 export function validateRootConfig(value,configPath=ROOT_CONFIG_NAME){
-    assertOnlyKeys(value,new Set(['schemaVersion','appsRoot','distRoot','sharedPayloads']),ROOT_CONFIG_NAME);
+    assertOnlyKeys(value,new Set(['schemaVersion','appsRoot','distRoot','sharedPayloads','legacyAppPaths']),ROOT_CONFIG_NAME);
     if(value.schemaVersion!==1)fail(`${ROOT_CONFIG_NAME}.schemaVersion must be 1.`);
     if(!['apps','.'].includes(value.appsRoot)||value.distRoot!=='dist'){
         fail(`${ROOT_CONFIG_NAME} must bind appsRoot to "apps" or "." and distRoot to "dist".`);
+    }
+    if (value.legacyAppPaths !== undefined && !is.boolean(value.legacyAppPaths)) {
+        fail(`${ROOT_CONFIG_NAME}.legacyAppPaths must be a boolean.`);
     }
     if(!isPlainObject(value.sharedPayloads)){
         fail(`${ROOT_CONFIG_NAME}.sharedPayloads must be an object.`);
@@ -293,7 +296,10 @@ export function validateRootConfig(value,configPath=ROOT_CONFIG_NAME){
             validateSharedRoute(route,`sharedPayloads.${id}[${index}]`)
         );
     }
-    return {schemaVersion:1,appsRoot:value.appsRoot,distRoot:'dist',sharedPayloads,configPath};
+    return {
+        schemaVersion:1,appsRoot:value.appsRoot,distRoot:'dist',sharedPayloads,configPath,
+        legacyAppPaths:value.legacyAppPaths ?? true
+    };
 }
 
 function normalizeOptionalRecord(value,label){
@@ -575,7 +581,7 @@ async function optionalDescriptor(context){
 async function inspectContext(context,{signal}={}){
     const records=await collectPackageRecords(context,{signal});
     const documents=await browserDocuments(records,context.config.entry);
-    const navigation=context.rootConfig.appsRoot==='.'?rootAppNavigation(
+    const navigation=rootAppLegacyPath(context.rootConfig,context.appId)?rootAppNavigation(
         context.appId,context.config.entry,documents.map(document=>document.path)
     ):[];
     for(const redirect of navigation){
@@ -757,11 +763,11 @@ async function replaceDirectory(stagingRoot,outputRoot){
 async function packageWithContext(context,options={}){
     const {signal,onEvent,browserPwa=true}=options;
     const pwaEnabled=browserPwa&&context.config.pwa?.enabled===true;
-    const legacyAppPath=context.rootConfig.appsRoot==='.'?`apps/${context.appId}`:undefined;
+    const legacyAppPath=rootAppLegacyPath(context.rootConfig,context.appId);
     const appPath=appRelativeRoot(context.rootConfig,context.appId);
     const entryPath=appPackagePath(context,context.config.entry);
     const inspected=await inspectContext(context,{signal});
-    const navigation=context.rootConfig.appsRoot==='.'?rootAppNavigation(
+    const navigation=legacyAppPath?rootAppNavigation(
         context.appId,context.config.entry,inspected.browserDocuments.map(document=>document.path)
     ):[];
     if(options.dryRun){

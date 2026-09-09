@@ -13,7 +13,8 @@ import {
 } from './helpers.mjs';
 
 async function sourceFixture(context, {
-    enabled = true, authored = false, http = false, rootApp = false, directPackage = null
+    enabled = true, authored = false, http = false, rootApp = false, directPackage = null,
+    legacyAppPaths
 } = {}) {
     if (!http) useSyntheticTls(context);
     const workspaceRoot = await temporaryDirectory(context, {prefix: 'arcane-dev-pwa-'});
@@ -21,6 +22,7 @@ async function sourceFixture(context, {
     const rootConfig = {
         schemaVersion: 1,
         appsRoot: rootApp ? '.' : 'apps',
+        ...(legacyAppPaths === undefined ? {} : {legacyAppPaths}),
         distRoot: 'dist',
         sharedPayloads: {
             'browser-runtime': [
@@ -223,6 +225,110 @@ test('root source PWA retains identity and follows direct installed alias routes
     const changedLegacyOffline = await (await globalThis.fetch(`${instance.origin}/apps/fixture/arcane-offline.json`)).json();
     assert.equal(changedLegacyOffline.navigationAliases['/apps/fixture/index.html'], '/secondary.html');
     await assert.rejects(lstat(path.join(workspaceRoot, 'dist')), {code: 'ENOENT'});
+});
+
+for (const enabled of [true, false]) {
+    test(`root-only source serving retains authored resources with PWA ${enabled ? 'enabled' : 'disabled'}`,
+        async function rootOnlySourceRoutes(context) {
+            const {workspaceRoot, instance} = await sourceFixture(context, {
+                rootApp: true, directPackage: 'node_modules/arcane-os', http: true,
+                legacyAppPaths: false, enabled
+            });
+            const query = '?view=complete%20content&tag=first&tag=second';
+            const root = await globalThis.fetch(`${instance.origin}/${query}`, {redirect: 'manual'});
+            assert.equal(root.status, 302);
+            assert.equal(root.headers.get('location'), `/index.html${query}`);
+            const entry = await globalThis.fetch(instance.url);
+            assert.equal(entry.status, 200);
+            assert.ok((await entry.text()).includes('First source content'));
+            for (const legacy of [
+                '/apps/fixture', '/apps/fixture/', '/apps/fixture/index.html',
+                '/apps/fixture/secondary.html', '/apps/fixture/arcane-sw.js',
+                '/apps/fixture/arcane-offline.json'
+            ]) {
+                const response = await globalThis.fetch(`${instance.origin}${legacy}${query}`, {redirect: 'manual'});
+                assert.equal(response.status, 404, legacy);
+                assert.equal(response.headers.get('location'), null, legacy);
+                await response.text();
+            }
+            for (const [resource, content] of [
+                ['service-worker.js', 'self.addEventListener("fetch", function appFetch() {});'],
+                ['manifest.json', '{"name":"Authored root resource"}']
+            ]) {
+                const response = await globalThis.fetch(`${instance.origin}/apps/fixture/${resource}`, {redirect: 'manual'});
+                assert.equal(response.status, 200, resource);
+                assert.equal(response.headers.get('location'), null, resource);
+                assert.equal(await response.text(), content, resource);
+            }
+            if (enabled) {
+                const manifest = await (await globalThis.fetch(`${instance.origin}/arcane.webmanifest`)).json();
+                assert.equal(manifest.id, '/apps/fixture/');
+                assert.equal(manifest.scope, '/');
+                assert.equal(manifest.start_url, '/index.html');
+                const offline = await (await globalThis.fetch(`${instance.origin}/arcane-offline.json`)).json();
+                assert.equal(offline.appId, 'fixture');
+                assert.deepEqual(offline.navigationAliases, {'/': '/index.html'});
+                assert.ok(offline.assets.includes('/node_modules/arcane-os/browser-runtime/pwa.mjs'));
+                assert.equal(offline.assets.includes('/apps/fixture/arcane-sw.js'), false);
+                assert.equal(offline.assets.includes('/apps/fixture/arcane-offline.json'), false);
+                assert.ok(offline.assets.includes('/apps/fixture/service-worker.js'));
+                const worker = await globalThis.fetch(`${instance.origin}/arcane-sw.js`);
+                assert.equal(worker.status, 200);
+                assert.ok((await worker.text()).includes('installPwaWorker'));
+            } else {
+                assert.equal((await globalThis.fetch(`${instance.origin}/arcane.webmanifest`)).status, 404);
+            }
+
+            const authored = new Map([
+                ['apps/fixture/index.html', '<!doctype html><p>  Complete authored old-path page.  </p>\n'],
+                ['apps/fixture/arcane-sw.js', 'self.addEventListener("fetch", function retainedFetch() {});\n'],
+                ['apps/fixture/arcane-offline.json', '{"note":"  Complete authored old-path inventory.  "}\n']
+            ]);
+            for (const [relative, content] of authored) {
+                await writeFile(path.join(workspaceRoot, relative), content);
+            }
+            const ignored = path.join(workspaceRoot, 'apps/fixture/unselected.txt');
+            await writeFile(ignored, '  Retained unselected source.  ');
+            const packagePath = path.join(workspaceRoot, 'arcane-package.json');
+            const app = JSON.parse(await readFile(packagePath, 'utf8'));
+            app.include.push(...authored.keys());
+            await writeFile(packagePath, JSON.stringify(app));
+            for (const [relative, content] of authored) {
+                const response = await globalThis.fetch(`${instance.origin}/${relative}`, {redirect: 'manual'});
+                assert.equal(response.status, 200, relative);
+                assert.equal(response.headers.get('location'), null, relative);
+                const servedContent = await response.text();
+                if (enabled && relative === 'apps/fixture/index.html') {
+                    assert.ok(servedContent.startsWith(content));
+                    assert.ok(servedContent.includes('<link rel="manifest" href="/arcane.webmanifest">'));
+                    assert.ok(servedContent.includes('async data-arcane-pwa src="/arcane-pwa.mjs"'));
+                } else assert.equal(servedContent, content, relative);
+                assert.equal(await readFile(path.join(workspaceRoot, relative), 'utf8'), content);
+            }
+            assert.equal((await globalThis.fetch(`${instance.origin}/apps/fixture/unselected.txt`)).status, 404);
+            assert.equal(await readFile(ignored, 'utf8'), '  Retained unselected source.  ');
+            if (enabled) {
+                const offline = await (await globalThis.fetch(`${instance.origin}/arcane-offline.json`)).json();
+                assert.deepEqual(offline.navigationAliases, {'/': '/index.html'});
+                for (const relative of authored.keys()) assert.ok(offline.assets.includes(`/${relative}`), relative);
+            }
+            await assert.rejects(lstat(path.join(workspaceRoot, 'dist')), {code: 'ENOENT'});
+        }
+    );
+}
+
+test('legacy output opt-out leaves nested source routes unchanged', async function nestedSourceLegacyOption(context) {
+    const {instance} = await sourceFixture(context, {http: true, legacyAppPaths: false});
+    assert.equal(instance.url, `${instance.origin}/apps/fixture/index.html`);
+    const root = await globalThis.fetch(`${instance.origin}/`, {redirect: 'manual'});
+    assert.equal(root.headers.get('location'), '/apps/fixture/index.html');
+    const entry = await globalThis.fetch(instance.url);
+    assert.equal(entry.status, 200);
+    assert.ok((await entry.text()).includes('First source content'));
+    const manifest = await (await globalThis.fetch(`${instance.origin}/arcane.webmanifest`)).json();
+    assert.equal(manifest.id, '/apps/fixture/');
+    assert.equal(manifest.scope, '/apps/fixture/');
+    assert.equal(manifest.start_url, '/apps/fixture/index.html');
 });
 
 test(

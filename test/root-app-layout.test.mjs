@@ -4,7 +4,7 @@ import path from 'node:path';
 import {runInNewContext} from 'node:vm';
 import test from '../src/testing.mjs';
 import {rootAppNavigation} from '../src/app-layout.mjs';
-import {packageApp} from '../src/packager/core.mjs';
+import {inspectApp,packageApp,validateRootConfig} from '../src/packager/core.mjs';
 import {installedSdkRoutes} from '../src/sdk-runtime-layout.mjs';
 import {createToolchain} from '../src/toolchain.mjs';
 import {temporaryDirectory} from './helpers.mjs';
@@ -19,7 +19,7 @@ async function writeJson(root,relative,value){
     await writeText(root,relative,`${JSON.stringify(value,null,2)}\n`);
 }
 
-async function rootFixture(context,dependencyName,{manifestId}={}){
+async function rootFixture(context,dependencyName,{manifestId,legacyAppPaths}={}){
     const workspaceRoot=await temporaryDirectory(context,{prefix:'arcane-root-layout-'});
     const appId='root-app';
     const packageSource=`node_modules/${dependencyName}`;
@@ -50,6 +50,7 @@ async function rootFixture(context,dependencyName,{manifestId}={}){
         }),
         writeJson(workspaceRoot,'arcane-packager.json',{
             schemaVersion:1,appsRoot:'.',distRoot:'dist',
+            ...(legacyAppPaths===undefined?{}:{legacyAppPaths}),
             sharedPayloads:{'browser-runtime':installedSdkRoutes(packageSource,{direct:true})}
         }),
         writeJson(workspaceRoot,'arcane-package.json',manifest),
@@ -80,6 +81,8 @@ async function rootFixture(context,dependencyName,{manifestId}={}){
     await Promise.all([...resources].map(async function writeInstalledFile([relative,content]){
         await writeText(packageRoot,relative,content);
     }));
+    const rootConfig=JSON.parse(await readFile(path.join(workspaceRoot,'arcane-packager.json'),'utf8'));
+    assert.equal(validateRootConfig(rootConfig).legacyAppPaths,legacyAppPaths??true);
     return {workspaceRoot,appId,packageSource,packageRoot,sdkVersion,manifest,fragment,module,resources};
 }
 
@@ -99,7 +102,9 @@ function redirectedLocation(content,source){
 for(const dependencyName of ['arcane-os','arcane-sdk']){
     test(`root ${dependencyName} import-map emits direct static PWA files and portable navigation`,async function rootStaticPwa(context){
         const manifestId=dependencyName==='arcane-sdk'?'/retained-installation/':undefined;
-        const fixture=await rootFixture(context,dependencyName,{manifestId});
+        const fixture=await rootFixture(context,dependencyName,{
+            manifestId,...(dependencyName==='arcane-sdk'?{legacyAppPaths:true}:{})
+        });
         const {workspaceRoot,appId,packageSource}=fixture;
         const toolchain=createToolchain({workspaceRoot,appId});
         const themeUrl=`./${packageSource}/runtime/arcane/modules/ThemeBootstrap.js`;
@@ -226,6 +231,111 @@ for(const dependencyName of ['arcane-os','arcane-sdk']){
         assert.equal(packaged.files.includes(`${packageSource}/package.json`),false);
     });
 }
+
+for(const dependencyName of ['arcane-os','arcane-sdk']){
+    test(`root ${dependencyName} can omit legacy output without changing its identity`,async function rootOnlyOutput(context){
+        const manifestId=dependencyName==='arcane-sdk'?'/retained-installation/':undefined;
+        const fixture=await rootFixture(context,dependencyName,{manifestId,legacyAppPaths:false});
+        const {workspaceRoot,appId,packageSource}=fixture;
+        const toolchain=createToolchain({workspaceRoot,appId});
+        await toolchain.importMap({});
+        await assert.rejects(stat(path.join(workspaceRoot,'apps')),{code:'ENOENT'});
+        const manifest=JSON.parse(await readFile(path.join(workspaceRoot,'arcane.webmanifest'),'utf8'));
+        assert.equal(manifest.id,manifestId??'/apps/root-app/');
+        assert.equal(manifest.scope,'/');
+        assert.equal(manifest.start_url,'/pages/review.html');
+        const offline=JSON.parse(await readFile(path.join(workspaceRoot,'arcane-offline.json'),'utf8'));
+        assert.equal(offline.appId,appId);
+        assert.deepEqual(offline.navigationAliases,{'/':'/pages/review.html'});
+        assert.equal(offline.assets.some(function legacyAsset(asset){return asset.startsWith('/apps/');}),false);
+        assert.ok(offline.assets.includes(`/${packageSource}/browser-runtime/pwa.mjs`));
+        for(const relative of ['arcane-pwa.mjs','arcane-sw.js','arcane-offline.json','arcane.webmanifest']){
+            assert.equal((await stat(path.join(workspaceRoot,relative))).isFile(),true,relative);
+        }
+        const sentinelPath='apps/root-app/retained-note.txt';
+        const sentinel='  Unselected authored content stays in place.\nSecond line.  ';
+        await writeText(workspaceRoot,sentinelPath,sentinel);
+        await toolchain.importMap({});
+        assert.equal(await readFile(path.join(workspaceRoot,sentinelPath),'utf8'),sentinel);
+        const inspected=await inspectApp({workspaceRoot,appId});
+        const dryRun=await packageApp({workspaceRoot,appId,dryRun:true});
+        for(const inventory of [inspected.files,dryRun.files]){
+            assert.equal(inventory.some(function legacyFile(file){return file.startsWith('apps/');}),false);
+        }
+        await assert.rejects(stat(path.join(workspaceRoot,'dist')),{code:'ENOENT'});
+        const packaged=await packageApp({workspaceRoot,appId});
+        assert.deepEqual(packaged.files,dryRun.files);
+        assert.equal(packaged.files.some(function legacyFile(file){return file.startsWith('apps/');}),false);
+        await assert.rejects(stat(path.join(packaged.outputRoot,'apps')),{code:'ENOENT'});
+        const packagedManifest=JSON.parse(await readFile(path.join(packaged.outputRoot,'arcane.webmanifest'),'utf8'));
+        assert.equal(packagedManifest.id,manifestId??'./');
+        assert.equal(packagedManifest.scope,'./');
+        assert.equal(packaged.manifest.app.id,appId);
+        assert.equal(packaged.manifest.app.start,'./pages/review.html');
+        const packagedOffline=JSON.parse(await readFile(path.join(packaged.outputRoot,'arcane-offline.json'),'utf8'));
+        assert.deepEqual(packagedOffline.navigationAliases,{'./':'./pages/review.html'});
+        assert.equal(packagedOffline.assets.some(function legacyAsset(asset){return asset.startsWith('./apps/');}),false);
+        for(const document of ['index.html','pages/review.html','pages/other.htm']){
+            const content=await readFile(path.join(workspaceRoot,document),'utf8');
+            assert.ok(content.includes(`<meta name="arcane-app-id" content="${appId}">`));
+            assert.ok(content.includes('<main>  The turnips retain every word.  </main>'));
+        }
+        assert.equal(await readFile(path.join(workspaceRoot,'content/fragment.html'),'utf8'),fixture.fragment);
+        assert.equal(await readFile(path.join(workspaceRoot,sentinelPath),'utf8'),sentinel);
+    });
+}
+
+test('root-only output preserves explicitly selected authored legacy resources',async function authoredRootOnlyOutput(context){
+    const fixture=await rootFixture(context,'arcane-os',{legacyAppPaths:false});
+    const {workspaceRoot,appId}=fixture;
+    const authored=new Map([
+        ['apps/root-app/index.html','<!doctype html><p>  The original old-path page remains authored.  </p>\n'],
+        ['apps/root-app/arcane-sw.js','self.addEventListener("fetch", function authoredFetch() {});\n'],
+        ['apps/root-app/arcane-offline.json','{"note":"  Authored inventory, not generated output.  "}\n']
+    ]);
+    for(const [relative,content] of authored)await writeText(workspaceRoot,relative,content);
+    await writeJson(workspaceRoot,'arcane-package.json',{
+        ...fixture.manifest,include:[...fixture.manifest.include,...authored.keys()]
+    });
+    await createToolchain({workspaceRoot,appId}).importMap({});
+    const inspected=await inspectApp({workspaceRoot,appId});
+    const dryRun=await packageApp({workspaceRoot,appId,dryRun:true});
+    const packaged=await packageApp({workspaceRoot,appId});
+    assert.deepEqual(packaged.files,dryRun.files);
+    for(const [relative,content] of authored){
+        assert.ok(inspected.files.includes(relative),relative);
+        assert.ok(packaged.files.includes(relative),relative);
+        assert.equal(await readFile(path.join(workspaceRoot,relative),'utf8'),content);
+        const packagedContent=await readFile(path.join(packaged.outputRoot,relative),'utf8');
+        if(relative==='apps/root-app/index.html'){
+            assert.ok(packagedContent.startsWith(content));
+            assert.ok(packagedContent.includes('<link rel="manifest" href="../../arcane.webmanifest">'));
+            assert.ok(packagedContent.includes('async data-arcane-pwa src="../../arcane-pwa.mjs"'));
+        }else assert.equal(packagedContent,content);
+    }
+    const offline=JSON.parse(await readFile(path.join(workspaceRoot,'arcane-offline.json'),'utf8'));
+    assert.deepEqual(offline.navigationAliases,{'/':'/pages/review.html'});
+    for(const relative of authored.keys())assert.ok(offline.assets.includes(`/${relative}`),relative);
+});
+
+test('root-only output also omits navigation when PWA is disabled',async function nonPwaRootOnlyOutput(context){
+    const fixture=await rootFixture(context,'arcane-os',{legacyAppPaths:false});
+    const {workspaceRoot,appId}=fixture;
+    await writeJson(workspaceRoot,'arcane-package.json',{
+        ...fixture.manifest,pwa:{enabled:false}
+    });
+    await createToolchain({workspaceRoot,appId}).importMap({});
+    await assert.rejects(stat(path.join(workspaceRoot,'apps')),{code:'ENOENT'});
+    await assert.rejects(stat(path.join(workspaceRoot,'arcane.webmanifest')),{code:'ENOENT'});
+    const inspected=await inspectApp({workspaceRoot,appId});
+    const dryRun=await packageApp({workspaceRoot,appId,dryRun:true});
+    const packaged=await packageApp({workspaceRoot,appId});
+    assert.deepEqual(dryRun.files,inspected.files);
+    assert.deepEqual(packaged.files,inspected.files);
+    assert.equal(packaged.files.some(function legacyFile(file){return file.startsWith('apps/');}),false);
+    assert.equal(packaged.manifest.app.start,'./pages/review.html');
+    await assert.rejects(stat(path.join(packaged.outputRoot,'apps')),{code:'ENOENT'});
+});
 
 test('nested direct-installed apps retain established aliases alongside package paths',async function nestedDirectAliases(context){
     const fixture=await rootFixture(context,'arcane-os');

@@ -71,6 +71,38 @@ introduced. Offline clients require a later successful connection to receive
 updated files; fixture coverage does not establish a particular installed app's
 actual browser lifecycle.
 
+### Root-only generated output
+
+For a root application, add `"legacyAppPaths": false` to the workspace's
+`arcane-packager.json`, alongside `"appsRoot": "."`. The default is `true`.
+This selects root-only SDK-generated navigation and PWA output in import-map
+refresh, `arcane dev`, package inspection/dry run, and browser packaging:
+
+- The four root PWA files remain generated normally.
+- The SDK generates no `apps/<id>/` navigation pages, legacy worker or legacy
+  offline inventory, and adds no legacy navigation aliases or dev redirects.
+- The default source installation ID remains `/apps/<id>/`, the default
+  packaged installation ID remains `./`, and an explicit `manifest.id` remains
+  authoritative. An ID is an installation identifier, not a request to generate
+  a directory. App identity and saved application data remain unchanged.
+- Existing files are left on disk. Explicitly selected authored old-path
+  resources remain in the normal source/package/offline inventory; this setting
+  is not a deletion or migration command.
+
+Restart `arcane dev` after changing this workspace configuration. Omission or
+`true` retains the compatibility behavior described above. The option has no
+effect on apps whose configured `appsRoot` is `"apps"`.
+
+An installed app may still launch an old `/apps/<id>/` URL, and an existing
+worker registration may still update its old script/inventory URL. Disabling
+generation does not redirect those installed clients, unregister their worker,
+clear caches or guarantee their next update. Keep compatibility output enabled
+while old URLs still require SDK support, or supply the required resources
+through the application's own declared files and hosting policy. This SDK
+option alone makes no claim about any existing installation's adoption.
+
+### Offline resource selection
+
 `offline.include` and `offline.exclude` select literal paths or directory
 prefixes from the selected emitted inventory. An omitted or empty include list
 selects that inventory; exclusions subtract from it. App files use app-relative

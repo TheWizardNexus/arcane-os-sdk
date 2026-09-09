@@ -5,6 +5,12 @@ export function appRelativeRoot(config, appId) {
     return config.appsRoot === '.' ? '' : `apps/${appId}`;
 }
 
+// Generated compatibility URLs are separate from installation and storage identity.
+export function rootAppLegacyPath(config, appId) {
+    return config.appsRoot === '.' && config.legacyAppPaths !== false
+        ? `apps/${appId}` : undefined;
+}
+
 export function resolveAppRoot(workspaceRoot, config, appId) {
     return path.resolve(workspaceRoot, appRelativeRoot(config, appId));
 }

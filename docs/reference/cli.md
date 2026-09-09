@@ -228,6 +228,16 @@ portable runtime subpaths such as `arcane-os/preference-store` and
 modules. The result reports the complete map written to the selected
 application; no fixed entry count is a release contract.
 
+For `appsRoot: "."`, the artifact is `modules/arcane.importmap.json` at the
+application root. Set `"legacyAppPaths": false` in `arcane-packager.json` to
+omit SDK-generated `apps/<id>/` navigation/PWA compatibility files and aliases.
+The same workspace choice applies to `arcane dev` and `arcane package`; restart
+an already running dev server after changing it. The default remains `true`.
+Root PWA files, app/installation identity and selected authored files are
+preserved. Existing files are never deleted by this option. See
+[root-only generated output](pwa.md#root-only-generated-output) before changing
+the URLs needed by previously installed apps.
+
 SDK `0.5.17` preserves the physical workspace route count and ordered include
 list. External and modern integrated routes require `components`, `css`,
 `dependencies`, `entities`, `img`, `modules`, and `sdk`; a physical workspace
@@ -531,6 +541,12 @@ For `installed-v1`, the same four configured source routes supply the complete
 selected SDK content directly from `node_modules`. Only the portable output
 receives copies; no workspace `arcane/` projection is required. Its runtime URLs,
 managed import-map targets, and PWA inventory destinations match source serving.
+
+With `appsRoot: "."`, app files retain their root-relative layout. The optional
+root-config `legacyAppPaths: false` omits SDK-generated compatibility files
+beneath `apps/<id>/` from the planned and actual output. It does not omit
+explicitly selected authored resources at those paths or change the default
+packaged installation identity. Omission or `true` preserves existing behavior.
 
 ```text
 arcane package [--app <id>] [--dry-run]

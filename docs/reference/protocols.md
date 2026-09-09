@@ -180,6 +180,24 @@ query strings and fragments. It preserves authored files at those destinations.
 For a direct-installed root PWA it generates the static PWA records at the root,
 so normal static hosting needs no SDK request handler or runtime copy.
 
+To select root-only generated output, set `"legacyAppPaths": false` beside
+`"appsRoot": "."` in `arcane-packager.json`. This optional boolean defaults to
+`true`; it has no effect on the `appsRoot: "apps"` layout. The shared import-map
+refresh, source dev server, package inspection, dry run and package output then
+omit SDK-generated `apps/<id>/` navigation pages, navigation aliases, and the
+legacy PWA worker/offline inventory. Root PWA files and normal managed imports
+remain available. Edit the root configuration before starting `arcane dev`;
+restart an existing server after changing this workspace-level choice.
+
+This option does not change the application ID, stored data, the existing
+default installation ID or an authored `pwa.manifest.id`. It neither deletes
+existing files nor removes authored resources from the app's include/exclude
+selection. Explicitly included files under `apps/<id>/` still serve and package
+as authored resources. Previously installed launch URLs and worker update URLs
+need their old resources to remain available; retain the default compatibility
+output when those URLs still need SDK support. See the
+[root PWA compatibility boundary](pwa.md#root-only-generated-output).
+
 Direct-installed root maps expose `arcane-os/modules/<filename>` and
 `arcane-os/entities/<filename>` (including extensions), plus the existing
 focused lowercase package exports. They omit the old `arcane/*` and

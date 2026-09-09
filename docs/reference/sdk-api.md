@@ -1041,6 +1041,15 @@ async function usevalidateAppConfig(...arguments_) {
 
 Validates one root packager mapping and its fixed shared-route boundaries.
 
+The schema-1 `arcane-packager.json` accepts the optional boolean
+`legacyAppPaths`, normalized to `true` when omitted. With `appsRoot: "."`,
+setting it to `false` omits generated legacy `apps/<id>/` navigation/PWA output
+across managed-map refresh, development serving, inspection and packaging.
+It leaves installation identity and authored file selection unchanged and has
+no effect with `appsRoot: "apps"`. See
+[standalone root applications](protocols.md#optional-standalone-root-application)
+for configuration, retained-file and existing-installation behavior.
+
 ### Signature and result
 
 ```text
