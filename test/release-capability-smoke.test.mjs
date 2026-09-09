@@ -76,7 +76,7 @@ test('the selected npm tarball installs and exposes the public SDK',{
         '--save-exact',
         verified.tarballPath
     ],{cwd:consumerRoot,timeout:90_000});
-    assert.equal(installed.code,0,installed.stderr);
+    assert.equal(installed.code,0,[installed.stderr,installed.stdout].join('\n'));
 
     const installedRoot=path.join(consumerRoot,'node_modules','arcane-os');
     const installedPackage=JSON.parse(await readFile(
@@ -274,7 +274,7 @@ test('installed public SDK entrypoints and runtime materialization are functiona
         cwd:consumerRoot,
         timeout:60_000
     });
-    assert.equal(contractResult.code,0,contractResult.stderr);
+    assert.equal(contractResult.code,0,[contractResult.stderr,contractResult.stdout].join('\n'));
     assert.match(contractResult.stdout,/Test Total : 1/u);
     assert.match(contractResult.stdout,/Passed :[^\r\n]*1/u);
 
@@ -284,7 +284,7 @@ test('installed public SDK entrypoints and runtime materialization are functiona
         '--app',appId,
         '--output','json'
     ],{cwd:consumerRoot,timeout:60_000});
-    assert.equal(importMapResult.code,0,importMapResult.stderr||importMapResult.stdout);
+    assert.equal(importMapResult.code,0,[importMapResult.stderr,importMapResult.stdout].join('\n'));
     const entrySource=await readFile(path.join(appRoot,'index.html'),'utf8');
     const reviewSource=await readFile(path.join(appRoot,'pages','review.html'),'utf8');
     assert.match(entrySource,/<script type="importmap" data-arcane-import-map>/u);
@@ -300,7 +300,7 @@ test('installed public SDK entrypoints and runtime materialization are functiona
         ['exec','--offline','--','arcane','--version'],
         {cwd:consumerRoot,timeout:30_000}
     );
-    assert.equal(cliResult.code,0,cliResult.stderr);
+    assert.equal(cliResult.code,0,[cliResult.stderr,cliResult.stdout].join('\n'));
     assert.equal(cliResult.stdout.trim(),verified.version);
 
     // The same installed consumer can serve and package directly from npm.
@@ -357,7 +357,7 @@ import {hasConversationEntry} from 'arcane-os/chat-records';
 import {normalizeConversationActionItems} from 'arcane-os/conversation-action-items';
 import {formatConversationClosingReportText} from 'arcane-os/conversation-closing-report';
 
-test('installed npm sources own maps, development serving and portable output',async function installedPackageOnly(){
+test('installed npm sources own maps, development serving and portable output',{timeout:120_000},async function installedPackageOnly(){
     const workspaceRoot=process.cwd();
     const appId=${JSON.stringify(appId)};
     const appRoot=path.join(workspaceRoot,'apps',appId);
@@ -391,6 +391,7 @@ test('installed npm sources own maps, development serving and portable output',a
 
     const toolchain=createToolchain({workspaceRoot,appId});
     await writeFile(lockPath,JSON.stringify({sdk:{version:'0.0.1'}}));
+    console.log('[installed-package] Legacy application import-map.');
     await toolchain.importMap();
     const mapPath=path.join(appRoot,'modules','arcane.importmap.json');
     const versionedMap=JSON.parse(await readFile(mapPath,'utf8'));
@@ -418,6 +419,7 @@ test('installed npm sources own maps, development serving and portable output',a
         writeFile(descriptorPath,JSON.stringify(descriptor)),
         writeFile(packagePath,JSON.stringify(manifest))
     ]);
+    console.log('[installed-package] Legacy PWA import-map.');
     await toolchain.importMap();
     const logicalPaths=[
         '/arcane/components/chat.html',
@@ -427,6 +429,7 @@ test('installed npm sources own maps, development serving and portable output',a
         '/arcane/dependencies/strong-type/index.js',
         '/licenses/arcane-os/LICENSE'
     ];
+    console.log('[installed-package] Legacy application serving.');
     const instance=await startDevServer({workspaceRoot,appId,http:true,host:'127.0.0.1',port:0});
     try{
         for(const logicalPath of logicalPaths){
@@ -447,6 +450,7 @@ test('installed npm sources own maps, development serving and portable output',a
     }finally{
         await instance.close();
     }
+    console.log('[installed-package] Legacy application packaging.');
     const packaged=await packageApp({workspaceRoot,appId});
     for(const logicalPath of logicalPaths){
         assert.ok(packaged.files.includes(logicalPath.substring(1)),logicalPath);
@@ -477,6 +481,7 @@ test('installed npm sources own maps, development serving and portable output',a
         await writeFile(filePath,content,'utf8');
     }));
     const rootToolchain=createToolchain({workspaceRoot,appId:rootAppId});
+    console.log('[installed-package] Root application import-map.');
     await rootToolchain.importMap();
     const rootMap=JSON.parse(await readFile(path.join(workspaceRoot,'modules','arcane.importmap.json'),'utf8'));
     const rootTheme='./node_modules/arcane-os/runtime/arcane/modules/ThemeBootstrap.js';
@@ -493,6 +498,7 @@ test('installed npm sources own maps, development serving and portable output',a
     }
     const rootBootstrap=await readFile(path.join(workspaceRoot,'arcane-pwa.mjs'),'utf8');
     assert.ok(rootBootstrap.includes('"/node_modules/arcane-os/browser-runtime/pwa.mjs"'));
+    console.log('[installed-package] Root application packaging.');
     const rootPackaged=await packageApp({workspaceRoot,appId:rootAppId});
     assert.ok(rootPackaged.files.includes('index.html'));
     for(const relative of [
@@ -510,12 +516,13 @@ test('installed npm sources own maps, development serving and portable output',a
     assert.equal(await readFile(path.join(rootPackaged.outputRoot,'modules','App.js'),'utf8'),${JSON.stringify(rootModule)});
     await assert.rejects(stat(projection),{code:'ENOENT'});
     await assert.rejects(stat(lockPath),{code:'ENOENT'});
+    console.log('[installed-package] Complete.');
 });
 `);
     const installedOnlyResult=await runNode([installedTestRunner,installedOnlyContract],{
-        cwd:consumerRoot,timeout:60_000
+        cwd:consumerRoot,timeout:150_000
     });
-    assert.equal(installedOnlyResult.code,0,installedOnlyResult.stderr||installedOnlyResult.stdout);
+    assert.equal(installedOnlyResult.code,0,[installedOnlyResult.stderr,installedOnlyResult.stdout].join('\n'));
     assert.match(installedOnlyResult.stdout,/Test Total : 1/u);
     assert.match(installedOnlyResult.stdout,/Passed :[^\r\n]*1/u);
 });

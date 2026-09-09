@@ -35,17 +35,22 @@ test('Check packs and exercises only the selected npm package',async()=>{
 
 test('publication uses the selected tarball and verifies npm version visibility',async()=>{
     const workflow=await read('.github/workflows/publish-dev.yml');
+    const selectedCheck=await read('tools/verify-selected-check-run.mjs');
     assert.match(
         workflow,
         /publish:[\s\S]*if: github\.repository == 'TheWizardNexus\/arcane-os-sdk' && github\.ref == 'refs\/heads\/main'/u
     );
     assert.match(workflow,/publish:[\s\S]*environment:\s*\n\s*name: npm/u);
-    assert.match(workflow,/node tools\/build-npm-release\.mjs --output/u);
+    assert.match(workflow,/verify-selected-check-run\.mjs --run-id/u);
+    assert.match(workflow,/artifact-ids: \$\{\{ inputs\.artifact_id \}\}/u);
+    assert.doesNotMatch(workflow,/build-npm-release\.mjs|npm pack\b/u);
+    assert.match(selectedCheck,/artifact\.workflow_run\?\.head_sha!==run\.head_sha/u);
+    assert.doesNotMatch(selectedCheck,/requiredEnvironment\('GITHUB_SHA'\)/u);
     assert.match(workflow,/npm-registry-publication\.mjs preflight --tarball/u);
     assert.match(workflow,/steps\.publication\.outputs\['needs-publish'\] == 'true'/u);
     assert.match(
         workflow,
-        /npm publish "\$\{\{ steps\.pack\.outputs\.tarball \}\}" --ignore-scripts --access public --tag "\$\{\{ steps\.publication\.outputs\.channel \}\}"/u
+        /npm publish "\$\{\{ steps\.selected\.outputs\.tarball \}\}" --ignore-scripts --access public --tag "\$\{\{ steps\.publication\.outputs\.channel \}\}"/u
     );
     assert.match(
         workflow,

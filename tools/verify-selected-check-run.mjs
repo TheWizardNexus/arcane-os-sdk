@@ -63,7 +63,6 @@ async function main(){
     const options=parseArguments(process.argv.slice(2));
     const apiUrl=requiredEnvironment('GITHUB_API_URL').replace(/\/$/u,'');
     const repository=requiredEnvironment('GITHUB_REPOSITORY');
-    const expectedHead=requiredEnvironment('GITHUB_SHA');
     const token=requiredEnvironment('GITHUB_TOKEN');
     const run=await requestJson(
         apiUrl,
@@ -84,8 +83,8 @@ async function main(){
     if(run.head_branch!=='main'){
         fail(`Check run ${options.runId} did not run on main.`);
     }
-    if(run.head_sha!==expectedHead){
-        fail(`Check run ${options.runId} selected ${run.head_sha}, but publication selected ${expectedHead}.`);
+    if(!is.string(run.head_sha)||run.head_sha===''){
+        fail(`Check run ${options.runId} has no selected source revision.`);
     }
     if(run.status!=='completed'||run.conclusion!=='success'){
         fail(`Check run ${options.runId} must be completed successfully; received ${run.status}/${run.conclusion}.`);
@@ -109,12 +108,12 @@ async function main(){
     if(artifact.expired===true)fail(`Artifact ${options.artifactId} has expired.`);
     if(String(artifact.workflow_run?.id??'')!==options.runId
         ||artifact.workflow_run?.head_branch!=='main'
-        ||artifact.workflow_run?.head_sha!==expectedHead){
+        ||artifact.workflow_run?.head_sha!==run.head_sha){
         fail(`Artifact ${options.artifactId} is not bound to the selected main revision.`);
     }
 
     process.stdout.write(
-        `Check run ${options.runId} succeeded at ${expectedHead} with artifact ${options.artifactId} for arcane-os ${options.version}.\n`
+        `Check run ${options.runId} succeeded at ${run.head_sha} with artifact ${options.artifactId} for arcane-os ${options.version}.\n`
     );
 }
 
