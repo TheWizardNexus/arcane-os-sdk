@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.27.1
+
+- Preserve the previous `apps/<id>/arcane-sw.js` and `arcane-offline.json`
+  endpoints when generating a root-layout PWA. Both use the canonical worker
+  and current root inventory, including navigation aliases and installed npm
+  resource paths; portable output also retains deployment-relative URLs.
+- Serve those previous worker and inventory endpoints directly during SDK
+  development instead of redirecting worker-script requests. Retain ordinary
+  browser update/activation, caches, application identity and saved data.
+- Keep root layout optional and existing multi-app and Node server behavior
+  unchanged. Installed-application execution remains consumer-owned.
+
 ## 0.27.0
 
 - Add optional standalone `appsRoot: "."` discovery and `new`/`init --apps-root .`.

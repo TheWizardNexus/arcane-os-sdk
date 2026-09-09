@@ -59,6 +59,18 @@ authored `manifest.id` remains authoritative. Packaged default identity remains
 fragments and lead to the selected root document. No stored application data is
 rewritten by changing the layout.
 
+Root PWA generation also retains `apps/<id>/arcane-sw.js` and
+`apps/<id>/arcane-offline.json`. These are ordinary generated files served at
+their original URLs, including on a static host. The same canonical worker and
+current inventory use root resource/navigation URLs, rebased for the previous
+scope when deployed beneath a directory. An existing worker's inventory refresh
+can learn the new navigation destinations; the browser can update the worker at
+its retained script URL through normal update and activation. No cache deletion,
+forced activation, user-data migration or application-owned server handler is
+introduced. Offline clients require a later successful connection to receive
+updated files; fixture coverage does not establish a particular installed app's
+actual browser lifecycle.
+
 `offline.include` and `offline.exclude` select literal paths or directory
 prefixes from the selected emitted inventory. An omitted or empty include list
 selects that inventory; exclusions subtract from it. App files use app-relative

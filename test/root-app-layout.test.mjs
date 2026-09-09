@@ -136,6 +136,17 @@ for(const dependencyName of ['arcane-os','arcane-sdk']){
         assert.ok(offline.assets.includes('/modules/arcane.importmap.json'));
         assert.ok(offline.assets.includes('/content/fragment.html'));
         assert.equal(offline.assets.includes(`/${packageSource}/package.json`),false);
+        const legacyAppPath=`apps/${appId}`;
+        const legacyOffline=JSON.parse(await readFile(path.join(workspaceRoot,legacyAppPath,'arcane-offline.json'),'utf8'));
+        assert.equal(legacyOffline.appId,appId);
+        assert.equal(legacyOffline.appVersion,offline.appVersion);
+        assert.equal(legacyOffline.revision,offline.revision);
+        assert.deepEqual(legacyOffline.navigationAliases,offline.navigationAliases);
+        for(const asset of offline.assets)assert.ok(legacyOffline.assets.includes(asset),asset);
+        assert.ok(legacyOffline.assets.includes('./arcane-offline.json'));
+        const legacyWorker=await readFile(path.join(workspaceRoot,legacyAppPath,'arcane-sw.js'),'utf8');
+        assert.ok(legacyWorker.includes(`"/${packageSource}/browser-runtime/pwa.mjs"`));
+        assert.ok(legacyWorker.includes('self.addEventListener(\'fetch\', onFetch)'));
         const bootstrap=await readFile(path.join(workspaceRoot,'arcane-pwa.mjs'),'utf8');
         assert.ok(bootstrap.includes(`"/${packageSource}/browser-runtime/pwa.mjs"`));
         const navigation=rootAppNavigation(appId,fixture.manifest.entry,['pages/review.html','index.html','pages/other.htm']);
@@ -168,6 +179,29 @@ for(const dependencyName of ['arcane-os','arcane-sdk']){
         }
         const packagedOffline=JSON.parse(await readFile(path.join(packaged.outputRoot,'arcane-offline.json'),'utf8'));
         assert.equal(packagedOffline.navigationAliases['./apps/root-app/'],'./pages/review.html');
+        const packagedLegacyOffline=JSON.parse(await readFile(path.join(packaged.outputRoot,legacyAppPath,'arcane-offline.json'),'utf8'));
+        assert.equal(packagedLegacyOffline.appId,appId);
+        assert.equal(packagedLegacyOffline.appVersion,packagedOffline.appVersion);
+        assert.equal(packagedLegacyOffline.revision,packagedOffline.revision);
+        assert.ok(packaged.files.includes(`${legacyAppPath}/arcane-sw.js`));
+        assert.ok(packaged.files.includes(`${legacyAppPath}/arcane-offline.json`));
+        assert.ok(packagedLegacyOffline.assets.includes(`../../${packageSource}/browser-runtime/pwa.mjs`));
+        assert.ok(packagedLegacyOffline.assets.includes('./arcane-offline.json'));
+        const packageBase='https://example.test/releases/root/';
+        const legacyScope=new URL(`${legacyAppPath}/`,packageBase);
+        const legacyAssets=new Set(packagedLegacyOffline.assets.map(asset=>new URL(asset,legacyScope).href));
+        for(const asset of packagedOffline.assets){
+            assert.ok(legacyAssets.has(new URL(asset,packageBase).href),asset);
+        }
+        const legacyAliases=new Map(Object.entries(packagedLegacyOffline.navigationAliases).map(([from,to])=>[
+            new URL(from,legacyScope).href,new URL(to,legacyScope).href
+        ]));
+        for(const [from,to] of Object.entries(packagedOffline.navigationAliases)){
+            assert.equal(legacyAliases.get(new URL(from,packageBase).href),new URL(to,packageBase).href,from);
+        }
+        const packagedLegacyWorker=await readFile(path.join(packaged.outputRoot,legacyAppPath,'arcane-sw.js'),'utf8');
+        assert.ok(packagedLegacyWorker.includes(`"../../${packageSource}/browser-runtime/pwa.mjs"`));
+        assert.ok(packagedLegacyWorker.includes('self.addEventListener(\'fetch\', onFetch)'));
         for(const redirect of navigation){
             const content=await readFile(path.join(packaged.outputRoot,redirect.path),'utf8');
             assert.equal(redirectedLocation(content,`https://example.test/releases/root/${redirect.path}?view=all#last-turn`),

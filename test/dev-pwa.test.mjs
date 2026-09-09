@@ -170,6 +170,16 @@ test('root source PWA retains identity and follows direct installed alias routes
     assert.ok(offline.assets.includes(`/${packageSource}/runtime/arcane/modules/child.js`));
     assert.ok(offline.assets.includes('/modules/leaf.js?mode=worker'));
     assert.equal(offline.assets.includes('/documents/excluded.txt'), false);
+    const legacyWorker = await globalThis.fetch(`${instance.origin}/apps/fixture/arcane-sw.js`, {redirect: 'manual'});
+    assert.equal(legacyWorker.status, 200);
+    assert.match(legacyWorker.headers.get('content-type'), /javascript/u);
+    assert.ok((await legacyWorker.text()).includes('installPwaWorker'));
+    const legacyInventoryResponse = await globalThis.fetch(`${instance.origin}/apps/fixture/arcane-offline.json`, {redirect: 'manual'});
+    assert.equal(legacyInventoryResponse.status, 200);
+    const legacyInventory = await legacyInventoryResponse.json();
+    assert.equal(legacyInventory.navigationAliases['/apps/fixture/secondary.html'], '/secondary.html');
+    assert.ok(legacyInventory.assets.includes(`/${packageSource}/runtime/arcane/modules/child.js`));
+    assert.ok(legacyInventory.assets.includes('./arcane-offline.json'));
     const runtime = await globalThis.fetch(`${instance.origin}/${packageSource}/runtime/arcane/modules/State.js`);
     assert.equal(await runtime.text(), "export {child} from './child.js';");
     const document = await globalThis.fetch(`${instance.origin}/documents/payload.html`);
@@ -190,6 +200,8 @@ test('root source PWA retains identity and follows direct installed alias routes
     assert.equal(legacyEntry.headers.get('location'), `/secondary.html${query}`);
     const changedOffline = await (await globalThis.fetch(`${instance.origin}/arcane-offline.json`)).json();
     assert.equal(changedOffline.navigationAliases['/apps/fixture/index.html'], '/secondary.html');
+    const changedLegacyOffline = await (await globalThis.fetch(`${instance.origin}/apps/fixture/arcane-offline.json`)).json();
+    assert.equal(changedLegacyOffline.navigationAliases['/apps/fixture/index.html'], '/secondary.html');
     await assert.rejects(lstat(path.join(workspaceRoot, 'dist')), {code: 'ENOENT'});
 });
 

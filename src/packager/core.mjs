@@ -757,6 +757,7 @@ async function replaceDirectory(stagingRoot,outputRoot){
 async function packageWithContext(context,options={}){
     const {signal,onEvent,browserPwa=true}=options;
     const pwaEnabled=browserPwa&&context.config.pwa?.enabled===true;
+    const legacyAppPath=context.rootConfig.appsRoot==='.'?`apps/${context.appId}`:undefined;
     const appPath=appRelativeRoot(context.rootConfig,context.appId);
     const entryPath=appPackagePath(context,context.config.entry);
     const inspected=await inspectContext(context,{signal});
@@ -775,7 +776,11 @@ async function packageWithContext(context,options={}){
                     PWA_MANIFEST_NAME,
                     PWA_OFFLINE_MANIFEST_NAME,
                     PWA_WORKER_NAME,
-                    PWA_BOOTSTRAP_NAME
+                    PWA_BOOTSTRAP_NAME,
+                    ...(legacyAppPath?[
+                        `${legacyAppPath}/${PWA_WORKER_NAME}`,
+                        `${legacyAppPath}/${PWA_OFFLINE_MANIFEST_NAME}`
+                    ]:[])
                 ]:[])
             ].sort(compareText)
         };
@@ -962,6 +967,7 @@ async function packageWithContext(context,options={}){
                 entry:packageResourceUrl(entryPath)
             },
             appPath,
+            ...(legacyAppPath?{legacyAppPath}:{}),
             ...(installed?.direct?{runtimeBase:`.${installed.browserRuntimeBase}`} : {}),
             ...(navigationAliases?{navigationAliases}:{}),
             sdkVersion:assetVersion,
@@ -974,7 +980,9 @@ async function packageWithContext(context,options={}){
                 if(inventory.has(artifact.path)){
                     fail(`Package content overlaps generated PWA file: ${artifact.path}.`);
                 }
-                await writeFile(path.join(stagingRoot,artifact.path),artifact.content,'utf8');
+                const artifactPath=path.join(stagingRoot,...artifact.path.split('/'));
+                await mkdir(path.dirname(artifactPath),{recursive:true});
+                await writeFile(artifactPath,artifact.content,'utf8');
                 files.push(artifact.path);
             }
             for(const [documentPath,document] of pwaDocumentSources){

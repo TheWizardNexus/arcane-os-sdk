@@ -361,6 +361,7 @@ async function refreshRootApplicationFiles(prepared,inspected,importMap,{signal,
         basePath:'/',
         appBase:'/',
         installationId:`/apps/${appId}/`,
+        legacyAppPath:`apps/${appId}`,
         runtimeBase:installed.browserRuntimeBase,
         mode:'development',
         navigationAliases

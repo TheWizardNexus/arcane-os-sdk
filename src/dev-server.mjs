@@ -1081,7 +1081,10 @@ async function startOwnedDevServer({
                 navigationAliases,
                 basePath: '/',
                 appBase,
-                ...(rootApp ? {installationId:`/apps/${routeSet.appId}/`} : {}),
+                ...(rootApp ? {
+                    installationId:`/apps/${routeSet.appId}/`,
+                    legacyAppPath:`apps/${routeSet.appId}`
+                } : {}),
                 runtimeBase: selectedRoutes.browserRuntimeBase
                     ?? selectedRoutes.installed?.browserRuntimeBase ?? '/arcane/sdk/',
                 mode: 'development'
@@ -1109,8 +1112,8 @@ async function startOwnedDevServer({
             pwaStates.set(selectedRoutes, state);
             if (selectedRoutes === currentSourceRoutes) currentPwaState = state;
         }
-        if (targetPath === '/arcane-sw.js'
-            || targetPath === '/arcane-offline.json') {
+        if (targetPath.endsWith('/arcane-sw.js')
+            || targetPath.endsWith('/arcane-offline.json')) {
             if (!state.inventoryTask) {
                 // Timestamp selection before traversal, so an older snapshot
                 // finishing later cannot acquire a newer HTTP modification date.
@@ -1173,10 +1176,13 @@ async function startOwnedDevServer({
             const target=parseRequestTarget(request.url);
             if(!target){deny(response,400,'Invalid request path.');return;}
             const {segments}=target;
-            const generatedPwaPath = ['/arcane.webmanifest', '/arcane-offline.json', '/arcane-sw.js', '/arcane-pwa.mjs']
-                .includes(target.path);
             const legacyAppRequest = mode === 'source' && routeSet.config.appsRoot === '.'
                 && segments[0] === 'apps' && segments[1] === routeSet.appId;
+            const legacyPwaRequest = legacyAppRequest && segments.length === 3
+                && ['arcane-sw.js', 'arcane-offline.json'].includes(segments[2]);
+            const generatedPwaPath = legacyPwaRequest
+                || ['/arcane.webmanifest', '/arcane-offline.json', '/arcane-sw.js', '/arcane-pwa.mjs']
+                    .includes(target.path);
             const requestedMapping = currentSourceRoutes.mappings.find(function currentRequestMapping(route) {
                 return route.prefix.every(function currentRequestSegment(segment,index) {
                     return segments[index] === segment;
@@ -1186,7 +1192,7 @@ async function startOwnedDevServer({
             const selectedRoutes = mode === 'source' && (appRequest || segments.length === 0 || generatedPwaPath)
                 ? await refreshSourceRoutes() : currentSourceRoutes;
             const pwaEnabled = mode === 'source' ? selectedRoutes.app?.pwa?.enabled === true : routeSet.pwa;
-            if (legacyAppRequest) {
+            if (legacyAppRequest && !(pwaEnabled && legacyPwaRequest)) {
                 const legacyPath = target.pathname.slice(`/apps/${routeSet.appId}`.length);
                 const location = !legacyPath || legacyPath === '/' || legacyPath === '/index.html'
                     ? selectedRoutes.startPath : legacyPath;

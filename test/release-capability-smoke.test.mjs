@@ -493,11 +493,39 @@ test('installed npm sources own maps, development serving and portable output',{
     assert.equal(rootWebManifest.id,'/apps/'+rootAppId+'/');
     assert.equal(rootWebManifest.start_url,'/index.html');
     assert.equal(rootWebManifest.scope,'/');
-    for(const generated of ['arcane-pwa.mjs','arcane-sw.js','arcane-offline.json']){
+    const rootLegacyAppPath='apps/'+rootAppId;
+    for(const generated of [
+        'arcane-pwa.mjs','arcane-sw.js','arcane-offline.json',
+        rootLegacyAppPath+'/arcane-sw.js',rootLegacyAppPath+'/arcane-offline.json'
+    ]){
         assert.equal((await stat(path.join(workspaceRoot,generated))).isFile(),true,generated);
     }
     const rootBootstrap=await readFile(path.join(workspaceRoot,'arcane-pwa.mjs'),'utf8');
     assert.ok(rootBootstrap.includes('"/node_modules/arcane-os/browser-runtime/pwa.mjs"'));
+    const rootOffline=JSON.parse(await readFile(path.join(workspaceRoot,'arcane-offline.json'),'utf8'));
+    const rootLegacyOffline=JSON.parse(await readFile(
+        path.join(workspaceRoot,rootLegacyAppPath,'arcane-offline.json'),'utf8'));
+    assert.equal(rootLegacyOffline.appId,rootAppId);
+    assert.equal(rootLegacyOffline.sdkVersion,version);
+    assert.equal(rootLegacyOffline.revision,rootOffline.revision);
+    const sourceBase='https://example.test/';
+    const sourceLegacyScope=new URL(rootLegacyAppPath+'/',sourceBase);
+    const sourceLegacyAssets=new Set(rootLegacyOffline.assets.map(asset=>new URL(asset,sourceLegacyScope).href));
+    for(const asset of rootOffline.assets){
+        assert.ok(sourceLegacyAssets.has(new URL(asset,sourceBase).href),asset);
+    }
+    assert.ok(sourceLegacyAssets.has(new URL('arcane-offline.json',sourceLegacyScope).href));
+    assert.ok(sourceLegacyAssets.has(new URL(rootTheme,sourceBase).href));
+    const sourceLegacyAliases=new Map(Object.entries(rootLegacyOffline.navigationAliases).map(([from,to])=>[
+        new URL(from,sourceLegacyScope).href,new URL(to,sourceLegacyScope).href
+    ]));
+    for(const [from,to] of Object.entries(rootOffline.navigationAliases)){
+        assert.equal(sourceLegacyAliases.get(new URL(from,sourceBase).href),new URL(to,sourceBase).href,from);
+    }
+    assert.equal(sourceLegacyAliases.get(new URL('index.html',sourceLegacyScope).href),
+        new URL('index.html',sourceBase).href);
+    const rootLegacyWorker=await readFile(path.join(workspaceRoot,rootLegacyAppPath,'arcane-sw.js'),'utf8');
+    assert.ok(rootLegacyWorker.includes('"/node_modules/arcane-os/browser-runtime/pwa.mjs"'));
     console.log('[installed-package] Root application packaging.');
     const rootPackaged=await packageApp({workspaceRoot,appId:rootAppId});
     assert.ok(rootPackaged.files.includes('index.html'));
@@ -513,6 +541,37 @@ test('installed npm sources own maps, development serving and portable output',{
     const rootPackagedManifest=JSON.parse(await readFile(path.join(rootPackaged.outputRoot,'arcane.webmanifest'),'utf8'));
     assert.equal(rootPackagedManifest.id,'./');
     assert.equal(rootPackagedManifest.scope,'./');
+    for(const endpoint of ['arcane-sw.js','arcane-offline.json']){
+        const relative=rootLegacyAppPath+'/'+endpoint;
+        assert.ok(rootPackaged.files.includes(relative),relative);
+        assert.equal((await stat(path.join(rootPackaged.outputRoot,relative))).isFile(),true,relative);
+    }
+    const packagedRootOffline=JSON.parse(await readFile(
+        path.join(rootPackaged.outputRoot,'arcane-offline.json'),'utf8'));
+    const packagedRootLegacyOffline=JSON.parse(await readFile(
+        path.join(rootPackaged.outputRoot,rootLegacyAppPath,'arcane-offline.json'),'utf8'));
+    assert.equal(packagedRootLegacyOffline.appId,rootAppId);
+    assert.equal(packagedRootLegacyOffline.sdkVersion,version);
+    assert.equal(packagedRootLegacyOffline.revision,packagedRootOffline.revision);
+    const packageBase='https://example.test/releases/root-application/';
+    const packagedLegacyScope=new URL(rootLegacyAppPath+'/',packageBase);
+    const packagedLegacyAssets=new Set(packagedRootLegacyOffline.assets.map(asset=>new URL(asset,packagedLegacyScope).href));
+    for(const asset of packagedRootOffline.assets){
+        assert.ok(packagedLegacyAssets.has(new URL(asset,packageBase).href),asset);
+    }
+    assert.ok(packagedLegacyAssets.has(new URL('arcane-offline.json',packagedLegacyScope).href));
+    assert.ok(packagedLegacyAssets.has(new URL(rootTheme,packageBase).href));
+    const packagedLegacyAliases=new Map(Object.entries(packagedRootLegacyOffline.navigationAliases).map(([from,to])=>[
+        new URL(from,packagedLegacyScope).href,new URL(to,packagedLegacyScope).href
+    ]));
+    for(const [from,to] of Object.entries(packagedRootOffline.navigationAliases)){
+        assert.equal(packagedLegacyAliases.get(new URL(from,packageBase).href),new URL(to,packageBase).href,from);
+    }
+    assert.equal(packagedLegacyAliases.get(new URL('index.html',packagedLegacyScope).href),
+        new URL('index.html',packageBase).href);
+    const packagedRootLegacyWorker=await readFile(
+        path.join(rootPackaged.outputRoot,rootLegacyAppPath,'arcane-sw.js'),'utf8');
+    assert.ok(packagedRootLegacyWorker.includes('"../../node_modules/arcane-os/browser-runtime/pwa.mjs"'));
     assert.equal(await readFile(path.join(rootPackaged.outputRoot,'modules','App.js'),'utf8'),${JSON.stringify(rootModule)});
     await assert.rejects(stat(projection),{code:'ENOENT'});
     await assert.rejects(stat(lockPath),{code:'ENOENT'});

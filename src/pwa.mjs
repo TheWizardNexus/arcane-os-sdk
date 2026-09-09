@@ -1,5 +1,6 @@
 import Is from 'strong-type';
 import {randomUUID} from 'node:crypto';
+import path from 'node:path';
 import {createPwaWorkerScript} from './pwa-worker.mjs';
 import {versionAssetUrl} from './import-map.mjs';
 
@@ -203,6 +204,7 @@ export function createPwaArtifacts(
         runtimeBase = './arcane/sdk/',
         appBase,
         installationId,
+        legacyAppPath,
         appPath = '',
         navigationAliases,
         revision
@@ -305,18 +307,60 @@ controller.ready.catch(
     const entryAssets = {manifest: PWA_MANIFEST_NAME, bootstrap: PWA_BOOTSTRAP_NAME};
     const manifestHref = resourceUrl(basePath, entryAssets.manifest);
     const bootstrapHref = resourceUrl(basePath, entryAssets.bootstrap);
+    const generatedFiles = [
+        {path: PWA_MANIFEST_NAME, content: json(manifest)},
+        {path: PWA_OFFLINE_MANIFEST_NAME, content: json(offlineManifest)},
+        {
+            path: PWA_WORKER_NAME,
+            content: createPwaWorkerScript(offlineManifest, `${runtimeBase}pwa.mjs`)
+        },
+        {path: PWA_BOOTSTRAP_NAME, content: bootstrap}
+    ];
+    if (legacyAppPath) {
+        const directory = legacyAppPath.endsWith('/') ? legacyAppPath : `${legacyAppPath}/`;
+        const priorDirectory = new URL(resourceUrl('./', directory), 'https://arcane.invalid/').pathname;
+        // Existing registrations continue updating their own script and inventory URLs.
+        function priorScopeUrl(value) {
+            if (value.startsWith('/') || /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(value)) return value;
+            const resolved = new URL(value, 'https://arcane.invalid/');
+            let relative = path.posix.relative(priorDirectory, resolved.pathname);
+            if (!relative) {
+                relative = resolved.pathname.endsWith('/')
+                    ? './'
+                    : `../${path.posix.basename(resolved.pathname)}`;
+            }
+            else {
+                if (!relative.startsWith('.')) relative = `./${relative}`;
+                if (resolved.pathname.endsWith('/') && !relative.endsWith('/')) relative += '/';
+            }
+            return `${relative}${resolved.search}${resolved.hash}`;
+        }
+        const legacyOfflineManifest = {
+            ...offlineManifest,
+            assets: [...new Set([
+                ...offlineManifest.assets.map(priorScopeUrl),
+                `./${PWA_OFFLINE_MANIFEST_NAME}`
+            ])],
+            navigationAliases: Object.fromEntries(
+                Object.entries(offlineManifest.navigationAliases).map(
+                    function priorScopeNavigation([alias, target]) {
+                        return [priorScopeUrl(alias), priorScopeUrl(target)];
+                    }
+                )
+            )
+        };
+        generatedFiles.push(
+            {
+                path: `${directory}${PWA_WORKER_NAME}`,
+                content: createPwaWorkerScript(legacyOfflineManifest, priorScopeUrl(`${runtimeBase}pwa.mjs`))
+            },
+            {path: `${directory}${PWA_OFFLINE_MANIFEST_NAME}`, content: json(legacyOfflineManifest)}
+        );
+    }
     return {
         manifest,
         offlineManifest,
-        files: [
-            {path: PWA_MANIFEST_NAME, content: json(manifest)},
-            {path: PWA_OFFLINE_MANIFEST_NAME, content: json(offlineManifest)},
-            {
-                path: PWA_WORKER_NAME,
-                content: createPwaWorkerScript(offlineManifest, `${runtimeBase}pwa.mjs`)
-            },
-            {path: PWA_BOOTSTRAP_NAME, content: bootstrap}
-        ],
+        files: generatedFiles,
         entryAssets,
         entryMarkup: `<link rel="manifest" href="${htmlAttribute(manifestHref)}">\n`
             + `<script type="module" async data-arcane-pwa src="${htmlAttribute(bootstrapHref)}"></script>\n`

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {createContext, Script} from 'node:vm';
 import test from '../src/testing.mjs';
 import {createPwaWorkerScript} from '../src/pwa-worker.mjs';
+import {createPwaArtifacts} from '../src/pwa.mjs';
 
 const scope = 'https://example.test/app/';
 
@@ -70,7 +71,10 @@ function cacheStore() {
     };
 }
 
-function workerFixture({manifest = workerManifest(), storage = cacheStore(), fetchResource, now = Date.now, clientUrl} = {}) {
+function workerFixture({
+    manifest = workerManifest(), storage = cacheStore(), fetchResource, now = Date.now,
+    clientUrl, workerScope = scope, script
+} = {}) {
     const handlers = new Map();
     const requests = [];
     const messages = [];
@@ -101,12 +105,12 @@ function workerFixture({manifest = workerManifest(), storage = cacheStore(), fet
                     return fetchResource(request);
                 }
                 return new Response(
-                    request.url === `${scope}arcane-offline.json` ? JSON.stringify(manifest) : `original:${request.url}`,
+                    request.url === `${workerScope}arcane-offline.json` ? JSON.stringify(manifest) : `original:${request.url}`,
                     {headers: {'last-modified': 'Mon, 07 Sep 2026 00:00:00 GMT'}}
                 );
             },
             self: {
-                registration: {scope},
+                registration: {scope: workerScope},
                 addEventListener(type, handler) {
                     handlers.set(type, handler);
                 },
@@ -120,7 +124,7 @@ function workerFixture({manifest = workerManifest(), storage = cacheStore(), fet
                     async matchAll() {
                         return [
                             {
-                                url: `${scope}index.html`,
+                                url: `${workerScope}index.html`,
                                 postMessage(message) {
                                     messages.push(message);
                                 }
@@ -138,7 +142,7 @@ function workerFixture({manifest = workerManifest(), storage = cacheStore(), fet
         }
     );
     new Script(
-        createPwaWorkerScript(manifest, clientUrl)
+        script ?? createPwaWorkerScript(manifest, clientUrl)
     ).runInContext(context);
     return {
         requests,
@@ -536,6 +540,106 @@ test(
         assert.equal(fixture.request(`${scope}app.mjs${query}`).response, undefined);
     }
 );
+
+test('prior-scope cached navigation follows root aliases after its own inventory refresh', async function priorScopeInventoryRefresh() {
+    const appId = 'retained-root-app';
+    const oldScope = `https://example.test/apps/${appId}/`;
+    const artifacts = createPwaArtifacts({
+        app: {id: appId, displayName: 'Retained root application', version: '1.0.0', entry: '/index.html'},
+        sdkVersion: '0.27.1', pwa: {enabled: true}, mode: 'development',
+        basePath: '/', appBase: '/', installationId: `/apps/${appId}/`,
+        legacyAppPath: `apps/${appId}`, runtimeBase: '/node_modules/arcane-os/browser-runtime/',
+        assets: ['/index.html', '/modules/App.js', '/node_modules/arcane-os/browser-runtime/pwa.mjs'],
+        navigationAliases: {
+            [`/apps/${appId}/`]: '/index.html',
+            [`/apps/${appId}/index.html`]: '/index.html'
+        }
+    });
+    const legacyFile = artifacts.files.find(function priorInventory(file) {
+        return file.path === `apps/${appId}/arcane-offline.json`;
+    });
+    const legacy = JSON.parse(legacyFile.content);
+    assert.ok(legacy.assets.includes('/node_modules/arcane-os/browser-runtime/pwa.mjs'));
+    assert.ok(legacy.assets.includes('./arcane-offline.json'));
+    const oldManifest = workerManifest({
+        appId, sdkVersion: '0.26.0', mode: 'development',
+        assets: ['index.html', 'arcane-offline.json'], navigationAliases: {'./': 'index.html'}
+    });
+    const storage = cacheStore();
+    const savedData = await storage.open('application-saved-data');
+    await savedData.put('conversation', new Response('Complete saved conversation.'));
+    let now = 1000000;
+    let deployed = false;
+    const fixture = workerFixture({
+        manifest: oldManifest, storage, workerScope: oldScope, now() { return now; },
+        fetchResource(request) {
+            const content = request.url === `${oldScope}arcane-offline.json`
+                ? JSON.stringify(deployed ? legacy : oldManifest)
+                : request.url === 'https://example.test/arcane-offline.json'
+                    ? JSON.stringify(artifacts.offlineManifest)
+                    : `Complete content:${request.url}`;
+            return new Response(content, {headers: {'last-modified': 'Mon, 07 Sep 2026 00:00:00 GMT'}});
+        }
+    });
+    await fixture.lifecycle('install');
+    const cachedPage = await fixture.request(`${oldScope}index.html`, {mode: 'navigate'}).response;
+    assert.equal(await cachedPage.text(), `Complete content:${oldScope}index.html`);
+    deployed = true;
+    now += 120001;
+    const refreshed = await fixture.refresh();
+    assert.equal(refreshed.error, null);
+    assert.ok(fixture.requests.some(function fetchedOldInventory(request) {
+        return request.url === `${oldScope}arcane-offline.json`;
+    }));
+    const navigation = await fixture.request(`${oldScope}index.html`, {mode: 'navigate'}).response;
+    assert.equal(navigation.status, 302);
+    assert.equal(navigation.headers.get('location'), 'https://example.test/index.html');
+    const retainedCache = storage.stores.get(`arcane-pwa|${JSON.stringify([appId, oldScope])}|resources`);
+    assert.equal(await retainedCache.get(`${oldScope}index.html`).clone().text(), `Complete content:${oldScope}index.html`);
+    assert.equal(await (await savedData.match('conversation')).text(), 'Complete saved conversation.');
+});
+
+test('generated prior-scope worker uses portable root resources and retains navigation query and target fragment', async function portablePriorScopeWorker() {
+    const appId = 'portable-root-app';
+    const packageRoot = 'https://example.test/releases/current/';
+    const oldScope = `${packageRoot}apps/${appId}/`;
+    const artifacts = createPwaArtifacts({
+        app: {id: appId, displayName: 'Portable root application', version: '1.0.0', entry: './index.html'},
+        sdkVersion: '0.27.1', pwa: {enabled: true},
+        legacyAppPath: `apps/${appId}`, runtimeBase: './node_modules/arcane-sdk/browser-runtime/',
+        files: ['index.html', 'modules/App.js', 'node_modules/arcane-sdk/browser-runtime/pwa.mjs'],
+        navigationAliases: {
+            [`./apps/${appId}/`]: './index.html',
+            [`./apps/${appId}/index.html`]: './index.html#last-turn'
+        }
+    });
+    const byPath = new Map(artifacts.files.map(function artifactPath(file) { return [file.path, file.content]; }));
+    const legacy = JSON.parse(byPath.get(`apps/${appId}/arcane-offline.json`));
+    assert.ok(legacy.assets.includes('../../index.html'));
+    assert.ok(legacy.assets.includes('../../node_modules/arcane-sdk/browser-runtime/pwa.mjs'));
+    assert.equal(legacy.navigationAliases['./index.html'], '../../index.html#last-turn');
+    const script = byPath.get(`apps/${appId}/arcane-sw.js`);
+    assert.ok(script.includes('"../../node_modules/arcane-sdk/browser-runtime/pwa.mjs"'));
+    const fixture = workerFixture({
+        manifest: legacy, script, workerScope: oldScope,
+        fetchResource(request) {
+            const relative = new URL(request.url).pathname.slice(new URL(packageRoot).pathname.length);
+            return new Response(byPath.get(relative) ?? `Complete content:${request.url}`);
+        }
+    });
+    await fixture.lifecycle('install');
+    await fixture.lifecycle('activate');
+    const query = '?view=complete%20content&tag=first&tag=second';
+    const navigation = await fixture.request(`${oldScope}index.html${query}#position`, {mode: 'navigate'}).response;
+    assert.equal(navigation.status, 302);
+    assert.equal(navigation.headers.get('location'), `${packageRoot}index.html${query}#last-turn`);
+    assert.ok(fixture.requests.some(function fetchedRootModule(request) {
+        return request.url === `${packageRoot}node_modules/arcane-sdk/browser-runtime/pwa.mjs`;
+    }));
+    assert.equal(fixture.requests.some(function incorrectlyNestedRoot(request) {
+        return request.url.startsWith(`${oldScope}node_modules/`);
+    }), false);
+});
 
 for (const [mode, interval] of [['development', 120000], ['release', 900000]]) {
     test(
