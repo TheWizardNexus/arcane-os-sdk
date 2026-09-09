@@ -286,6 +286,25 @@ class DBOPFS {
         return `${tableName}:${fileName}`
     }
 
+    /**
+     * Invalidates every known cache key for one logical/physical table pair.
+     * @private
+     * @param {string} tableName
+     * @param {string} directoryName
+     * @param {string} registeredTableName
+     */
+    #forgetTable(tableName,directoryName,registeredTableName){
+        for(const name of new Set([
+            tableName,
+            directoryName,
+            registeredTableName
+        ])){
+            delete this.#tables[name]
+            delete this.#tableHandles[name]
+            delete this.#tableHandlePromises[name]
+        }
+    }
+
     /** @type {boolean} */
     ready=false;
 
@@ -823,6 +842,64 @@ class DBOPFS {
         }
 
         return true
+    }
+
+    /**
+     * Removes one existing table only when its physical directory is empty.
+     * The native non-recursive OPFS operation owns the emptiness decision, so
+     * this method never creates, scans, clears, or recursively removes a table.
+     *
+     * @param {string} tableName
+     * @returns {Promise<{
+     *   status:'removed'|'absent'|'not-empty',
+     *   removed:boolean,
+     *   tableName:string,
+     *   directoryName:string
+     * }>}
+     */
+    async removeEmptyTable(tableName){
+        if(!this.ready){
+            await this.readyPromise;
+        }
+
+        const directoryName=directoryNameForTable(tableName);
+        const registeredTableName=tableNameForDirectory(directoryName);
+
+        try{
+            await this.#db.removeEntry(directoryName)
+        }catch(error){
+            if(error.name==='InvalidModificationError'){
+                return {
+                    status:'not-empty',
+                    removed:false,
+                    tableName:registeredTableName,
+                    directoryName
+                }
+            }
+
+            if(error.name!=='NotFoundError'){
+                arcaneLogging.error(error)
+                throw error
+            }
+
+            this.#forgetTable(tableName,directoryName,registeredTableName)
+
+            return {
+                status:'absent',
+                removed:false,
+                tableName:registeredTableName,
+                directoryName
+            }
+        }
+
+        this.#forgetTable(tableName,directoryName,registeredTableName)
+
+        return {
+            status:'removed',
+            removed:true,
+            tableName:registeredTableName,
+            directoryName
+        }
     }
 
     /**

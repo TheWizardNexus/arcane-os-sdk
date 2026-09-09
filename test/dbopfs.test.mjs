@@ -14,6 +14,12 @@ test(
             return error;
         }
 
+        function nonEmptyEntry(name){
+            const error=new Error(`Directory is not empty: ${name}`);
+            error.name='InvalidModificationError';
+            return error;
+        }
+
         function createDirectory(name,initialDirectories=[]){
             const entries=new Map();
             const directoryRequests=[];
@@ -43,10 +49,21 @@ test(
                     createdDirectories.push(directoryName);
                     return directory;
                 },
-                async removeEntry(entryName){
-                    if(!entries.delete(entryName)){
+                async removeEntry(entryName,{recursive=false}={}){
+                    const entry=entries.get(entryName);
+
+                    if(!entry){
                         throw missingEntry(entryName);
                     }
+                    if(
+                        entry.kind==='directory'
+                        &&entry.entryNames().length>0
+                        &&!recursive
+                    ){
+                        throw nonEmptyEntry(entryName);
+                    }
+
+                    entries.delete(entryName);
                 },
                 async *entries(){
                     for(const entry of entries){
@@ -69,9 +86,19 @@ test(
 
         const memoryDirectory=createDirectory('memory');
         const existingProductDirectory=createDirectory('existing-product');
+        const emptyRetiredDirectory=createDirectory('empty-retired');
+        const populatedDirectory=createDirectory(
+            'populated-product',
+            [{kind:'file',name:'saved.json'}]
+        );
         const applicationDirectory=createDirectory(
             'dbopfs-lazy-table-test',
-            [memoryDirectory,existingProductDirectory]
+            [
+                memoryDirectory,
+                existingProductDirectory,
+                emptyRetiredDirectory,
+                populatedDirectory
+            ]
         );
         const applicationsDirectory=createDirectory(
             'apps',
@@ -151,11 +178,65 @@ test(
             assert.deepEqual(await dbopfs.getTableNames(),['memories']);
             assert.deepEqual(
                 await dbopfs.getTableNames(true),
-                ['memory','existing-product']
+                [
+                    'memory',
+                    'existing-product',
+                    'empty-retired',
+                    'populated-product'
+                ]
             );
             assert.deepEqual(
                 await dbopfs.getTableNames(),
-                ['memories','existing-product']
+                [
+                    'memories',
+                    'existing-product',
+                    'empty-retired',
+                    'populated-product'
+                ]
+            );
+
+            assert.deepEqual(
+                await dbopfs.removeEmptyTable('empty-retired'),
+                {
+                    status:'removed',
+                    removed:true,
+                    tableName:'empty-retired',
+                    directoryName:'empty-retired'
+                }
+            );
+            assert.equal(
+                applicationDirectory.entryNames().includes('empty-retired'),
+                false
+            );
+            assert.equal(
+                (await dbopfs.getTableNames()).includes('empty-retired'),
+                false
+            );
+            assert.deepEqual(
+                await dbopfs.removeEmptyTable('missing-retired'),
+                {
+                    status:'absent',
+                    removed:false,
+                    tableName:'missing-retired',
+                    directoryName:'missing-retired'
+                }
+            );
+            assert.equal(
+                applicationDirectory.createdDirectories.includes('missing-retired'),
+                false
+            );
+            assert.deepEqual(
+                await dbopfs.removeEmptyTable('populated-product'),
+                {
+                    status:'not-empty',
+                    removed:false,
+                    tableName:'populated-product',
+                    directoryName:'populated-product'
+                }
+            );
+            assert.equal(
+                applicationDirectory.entryNames().includes('populated-product'),
+                true
             );
 
             const [firstDocuments,secondDocuments]=await Promise.all([
@@ -186,6 +267,20 @@ test(
             dbopfs.tables.memories={
                 'cached.json':{content:'logical-name cache'}
             };
+            assert.deepEqual(
+                await dbopfs.removeEmptyTable('memory'),
+                {
+                    status:'removed',
+                    removed:true,
+                    tableName:'memories',
+                    directoryName:'memory'
+                }
+            );
+            assert.deepEqual(applicationDirectory.entryNames(),[]);
+            assert.equal(Object.hasOwn(dbopfs.tables,'memory'),false);
+            assert.equal(Object.hasOwn(dbopfs.tables,'memories'),false);
+
+            await dbopfs.getTableHandle('memories');
             await dbopfs.deleteTable('memories');
             assert.deepEqual(applicationDirectory.entryNames(),[]);
             assert.equal(Object.hasOwn(dbopfs.tables,'memory'),false);

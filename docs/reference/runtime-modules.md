@@ -1783,7 +1783,7 @@ Provides app-scoped OPFS tables, worker I/O, backup/restore, compression, and CR
 
 ### Public surface
 
-default `DBOPFS`; installs `window.dbopfs`, emits `dbopfs-ready`; table/file/backup APIs.
+default `DBOPFS`; installs `window.dbopfs`, emits `dbopfs-ready`; table/file/backup APIs. `removeEmptyTable(tableName)` removes one explicitly selected existing table directory only when OPFS confirms that it is empty. It never creates, scans, clears, or recursively removes the target. It resolves a mutable record with `status` set to `removed`, `absent`, or `not-empty`, the matching `removed` boolean, and the logical `tableName` plus physical `directoryName`; unexpected platform errors reject.
 
 Exact exports: `DBOPFS_EVENT_TYPES`, `DBOPFS_REASONS`, `default`.
 
@@ -1793,7 +1793,10 @@ Exact exports: `DBOPFS_EVENT_TYPES`, `DBOPFS_REASONS`, `default`.
 are normalized. Each readable JSONL row becomes its parsed value; a nonblank
 unreadable row remains in its original string form so the owning application
 can display, diagnose, or recover it without silent data loss. DOM and storage
-errors remain observable. Transport: OPFS, DBOPFSWorker, Compression Streams.
+errors remain observable. The logical `memories` table continues to map to the
+physical `memory` directory, and successful or already-absent empty-table
+removal invalidates both alias and cached-handle state. Transport: OPFS,
+DBOPFSWorker, Compression Streams.
 [Deep protocol details](protocols.md).
 
 ### Example
