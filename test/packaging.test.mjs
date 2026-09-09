@@ -8,6 +8,8 @@ import {
     discoverApps,
     inspectApp,
     packageApp,
+    validateAppConfig,
+    validateRootConfig,
     verifyApp
 } from '../src/packager/core.mjs';
 
@@ -140,6 +142,86 @@ test('packager materializes every selected app and shared file with complete con
     const verified=await verifyApp({workspaceRoot:selected.workspaceRoot,appId:'complete-app'});
     assert.equal(verified.verified,true);
     assert.deepEqual(verified.files,inspected.files);
+});
+
+test('shared directory roots preserve descendant routes, exclusions and complete content',async function sharedDirectoryRoots(t){
+    const selected=await workspaceFixture(t);
+    const configPath=path.join(selected.workspaceRoot,'arcane-packager.json');
+    const config=JSON.parse(await readFile(configPath,'utf8'));
+    const browserSource='node_modules/arcane-os/browser-runtime';
+    const dependencySource='node_modules/arcane-os/runtime/strong-type';
+    const rootSource='node_modules/arcane-os/package-notes';
+    const browserRoot=path.join(selected.workspaceRoot,browserSource);
+    const dependencyRoot=path.join(selected.workspaceRoot,dependencySource);
+    const notesRoot=path.join(selected.workspaceRoot,rootSource);
+    await Promise.all([
+        mkdir(path.join(browserRoot,'ai','excluded'),{recursive:true}),
+        mkdir(path.join(dependencyRoot,'types'),{recursive:true}),
+        mkdir(notesRoot,{recursive:true})
+    ]);
+    const runtime='export const runtime = "  complete browser runtime  ";\n';
+    const nested='export const provider = "all provider content";\n';
+    const dependency='export const predicate = value => value;\n';
+    const note='  Complete package note\nwith a trailing space \n';
+    await Promise.all([
+        writeFile(path.join(browserRoot,'entry.mjs'),runtime),
+        writeFile(path.join(browserRoot,'ai','provider.mjs'),nested),
+        writeFile(path.join(browserRoot,'ai','excluded','private.txt'),'explicitly excluded'),
+        writeFile(path.join(browserRoot,'omit.txt'),'explicitly excluded'),
+        writeFile(path.join(dependencyRoot,'types','predicate.js'),dependency),
+        writeFile(path.join(notesRoot,'package-note.txt'),note)
+    ]);
+    config.sharedPayloads.runtime.push(
+        {source:browserSource,destination:'arcane/sdk',include:['.'],exclude:['ai/excluded','omit.txt']},
+        {source:dependencySource,destination:'arcane/dependencies/strong-type',include:['.'],exclude:[]},
+        {source:rootSource,destination:'.',include:['.'],exclude:[]}
+    );
+    await writeJson(configPath,config);
+
+    const inspected=await inspectApp({workspaceRoot:selected.workspaceRoot,appId:'complete-app'});
+    assert.deepEqual(inspected.files,[
+        'apps/complete-app/content/document.txt',
+        'apps/complete-app/index.html',
+        'arcane/dependencies/strong-type/types/predicate.js',
+        'arcane/modules/complete.js',
+        'arcane/sdk/ai/provider.mjs',
+        'arcane/sdk/entry.mjs',
+        'index.html',
+        'package-note.txt'
+    ]);
+    assert.equal(inspected.files.some(function containsRootMarker(file){return file.startsWith('./')||file.includes('/./');}),false);
+    const packaged=await packageApp({workspaceRoot:selected.workspaceRoot,appId:'complete-app'});
+    assert.deepEqual(packaged.files,inspected.files);
+    for(const [relative,content] of [
+        ['apps/complete-app/content/document.txt',selected.document],
+        ['arcane/modules/complete.js',selected.module],
+        ['arcane/sdk/entry.mjs',runtime],
+        ['arcane/sdk/ai/provider.mjs',nested],
+        ['arcane/dependencies/strong-type/types/predicate.js',dependency],
+        ['package-note.txt',note]
+    ]){
+        assert.equal(await readFile(path.join(packaged.outputRoot,relative),'utf8'),content);
+    }
+    assert.equal(await readFile(path.join(browserRoot,'entry.mjs'),'utf8'),runtime);
+
+    const rootConfig=validateRootConfig(config);
+    const appConfig=JSON.parse(await readFile(path.join(selected.appRoot,'arcane-package.json'),'utf8'));
+    assert.throws(function appRootSelectionRemainsUnsupported(){
+        validateAppConfig({...appConfig,include:['.']},'complete-app',rootConfig);
+    },/Unsafe .*include/u);
+    assert.throws(function overlappingSharedRootSelection(){
+        validateRootConfig({...config,sharedPayloads:{runtime:[{
+            source:browserSource,destination:'arcane/sdk',include:['.','ai'],exclude:[]
+        }]}});
+    },/overlapping paths/u);
+    config.sharedPayloads.runtime.push({
+        source:browserSource,destination:'arcane/sdk',include:['entry.mjs'],exclude:[]
+    });
+    await writeJson(configPath,config);
+    await assert.rejects(
+        inspectApp({workspaceRoot:selected.workspaceRoot,appId:'complete-app'}),
+        /Package destination collision: arcane\/sdk\/entry\.mjs/u
+    );
 });
 
 test(

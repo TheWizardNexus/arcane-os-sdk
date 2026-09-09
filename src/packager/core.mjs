@@ -136,12 +136,13 @@ function isGlobLike(value){
     return /[*?\[\]{}]/u.test(value);
 }
 
-function validatePathList(value,label,{required=false}={}){
+function validatePathList(value,label,{required=false,allowRoot=false}={}){
     if(!is.array(value)||(required&&value.length===0)){
         fail(`${label} must be ${required?'a non-empty':'an'} array of literal relative paths.`);
     }
     const normalized=value.map((entry,index)=>{
-        const item=normalizeRelativePath(entry,`${label}[${index}]`);
+        const item=allowRoot?normalizeRelativeRoot(entry,`${label}[${index}]`)
+            :normalizeRelativePath(entry,`${label}[${index}]`);
         if(isGlobLike(item))fail(`${label}[${index}] must be literal; directories include descendants.`);
         return item;
     });
@@ -151,7 +152,8 @@ function validatePathList(value,label,{required=false}={}){
     if(required){
         for(let left=0;left<normalized.length;left+=1){
             for(let right=left+1;right<normalized.length;right+=1){
-                if(sameOrDescendant(normalized[left],normalized[right])
+                if(normalized[left]==='.'||normalized[right]==='.'
+                    ||sameOrDescendant(normalized[left],normalized[right])
                     ||sameOrDescendant(normalized[right],normalized[left])){
                     fail(`${label} has overlapping paths: ${normalized[left]} and ${normalized[right]}`);
                 }
@@ -256,7 +258,7 @@ function validateSharedRoute(route,label){
     assertOnlyKeys(route,new Set(['source','destination','include','exclude']),label);
     const source=normalizeRelativeRoot(route.source,`${label}.source`);
     const destination=normalizeRelativeRoot(route.destination,`${label}.destination`);
-    const include=validatePathList(route.include,`${label}.include`,{required:true});
+    const include=validatePathList(route.include,`${label}.include`,{required:true,allowRoot:true});
     const exclude=validatePathList(route.exclude??[],`${label}.exclude`);
     if(source==='.'||source==='apps'||source.startsWith('apps/')
         ||source==='dist'||source.startsWith('dist/')||source==='node_modules'
@@ -421,7 +423,7 @@ async function loadContext(requestedWorkspaceRoot,appId){
 }
 
 function destinationJoin(root,relative){
-    return root==='.'?relative:`${root}/${relative}`;
+    return relative==='.'?root:root==='.'?relative:`${root}/${relative}`;
 }
 
 function appPackagePath(context, relative) {
@@ -442,12 +444,13 @@ async function collectSelectedPath({
     records,
     destinations,
     signal,
-    label
+    label,
+    allowRoot=false
 }){
     throwIfAborted(signal);
     if(isExcluded(selected,excludes))return;
     if(reject(selected))fail(`${label} selects a reserved private or generated path: ${selected}.`);
-    const absolute=resolveInside(sourceRoot,selected,label);
+    const absolute=resolveInside(sourceRoot,selected,label,{allowRoot});
     let info;
     try{info=await lstat(absolute);}
     catch(error){
@@ -455,15 +458,16 @@ async function collectSelectedPath({
         throw error;
     }
     if(info.isSymbolicLink())fail(`${label} contains a symbolic link or junction: ${selected}.`);
+    if(selected==='.'&&!info.isDirectory())fail(`${label} root selection must be a directory.`);
     if(info.isDirectory()){
         const entries=await readdir(absolute,{withFileTypes:true});
         entries.sort((left,right)=>compareText(left.name,right.name));
         for(const entry of entries){
-            const child=`${selected}/${entry.name}`;
+            const child=destinationJoin(selected,entry.name);
             await collectSelectedPath({
                 sourceRoot,
                 selected:child,
-                destination:`${destination}/${entry.name}`,
+                destination:destinationJoin(destination,entry.name),
                 excludes,
                 reject,
                 records,
@@ -515,7 +519,8 @@ async function collectPackageRecords(context,{signal}={}){
                     records,
                     destinations,
                     signal,
-                    label:`sharedPayloads.${sharedId}`
+                    label:`sharedPayloads.${sharedId}`,
+                    allowRoot:true
                 });
             }
         }
