@@ -846,8 +846,9 @@ class DBOPFS {
 
     /**
      * Removes one existing table only when its physical directory is empty.
-     * The native non-recursive OPFS operation owns the emptiness decision, so
-     * this method never creates, scans, clears, or recursively removes a table.
+     * The target is resolved as an existing directory without creating or
+     * scanning it. Native non-recursive OPFS removal owns the emptiness
+     * decision, so this method never clears or recursively removes a table.
      *
      * @param {string} tableName
      * @returns {Promise<{
@@ -866,6 +867,7 @@ class DBOPFS {
         const registeredTableName=tableNameForDirectory(directoryName);
 
         try{
+            await this.#db.getDirectoryHandle(directoryName,{create:false})
             await this.#db.removeEntry(directoryName)
         }catch(error){
             if(error.name==='InvalidModificationError'){

@@ -553,7 +553,7 @@
       "summary": "Provides app-scoped OPFS tables, explicit non-recursive empty-table removal, worker I/O, backup/restore, compression, and CRUD/batch APIs.",
       "availability": "Browser / native WebView",
       "protocol": "OPFS, DBOPFSWorker, Compression Streams, and per-realm globalThis.arcaneEvents authority",
-      "normalization": "App scope and recognized file parsing are normalized; nonblank unreadable JSONL rows remain complete raw strings, empty-table removal reports removed, absent, or not-empty without creating or recursively clearing a directory, aliases and cached handles are invalidated only when the directory is gone, and unexpected DOM/storage errors are preserved.",
+      "normalization": "App scope and recognized file parsing are normalized; nonblank unreadable JSONL rows remain complete raw strings, empty-table removal reports removed, absent, or not-empty after a create:false directory lookup and without scanning or recursively clearing a directory, same-named files are preserved, aliases and cached handles are invalidated only when the directory is gone, and unexpected DOM/storage errors are preserved.",
       "surface": "default `DBOPFS`; installs `window.dbopfs`, emits `dbopfs-ready`; table/file/backup APIs including removeEmptyTable(tableName)."
     },
     {

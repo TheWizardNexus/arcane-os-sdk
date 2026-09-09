@@ -1783,7 +1783,7 @@ Provides app-scoped OPFS tables, worker I/O, backup/restore, compression, and CR
 
 ### Public surface
 
-default `DBOPFS`; installs `window.dbopfs`, emits `dbopfs-ready`; table/file/backup APIs. `removeEmptyTable(tableName)` removes one explicitly selected existing table directory only when OPFS confirms that it is empty. It never creates, scans, clears, or recursively removes the target. It resolves a mutable record with `status` set to `removed`, `absent`, or `not-empty`, the matching `removed` boolean, and the logical `tableName` plus physical `directoryName`; unexpected platform errors reject.
+default `DBOPFS`; installs `window.dbopfs`, emits `dbopfs-ready`; table/file/backup APIs. `removeEmptyTable(tableName)` resolves one explicitly selected existing directory without creating or scanning it, then removes it only when OPFS confirms that it is empty. It never creates, clears, or recursively removes the target. It resolves a mutable record with `status` set to `removed`, `absent`, or `not-empty`, the matching `removed` boolean, and the logical `tableName` plus physical `directoryName`; a same-named file and unexpected platform errors reject without removal.
 
 Exact exports: `DBOPFS_EVENT_TYPES`, `DBOPFS_REASONS`, `default`.
 

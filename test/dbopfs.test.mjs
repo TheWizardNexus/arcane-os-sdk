@@ -20,6 +20,12 @@ test(
             return error;
         }
 
+        function mismatchedEntry(name){
+            const error=new Error(`Entry is not a directory: ${name}`);
+            error.name='TypeMismatchError';
+            return error;
+        }
+
         function createDirectory(name,initialDirectories=[]){
             const entries=new Map();
             const directoryRequests=[];
@@ -38,7 +44,13 @@ test(
                     directoryRequests.push(directoryName);
 
                     if(entries.has(directoryName)){
-                        return entries.get(directoryName);
+                        const entry=entries.get(directoryName);
+
+                        if(entry.kind!=='directory'){
+                            throw mismatchedEntry(directoryName);
+                        }
+
+                        return entry;
                     }
                     if(!create){
                         throw missingEntry(directoryName);
@@ -91,13 +103,15 @@ test(
             'populated-product',
             [{kind:'file',name:'saved.json'}]
         );
+        const sameNamedFile={kind:'file',name:'not-a-table'};
         const applicationDirectory=createDirectory(
             'dbopfs-lazy-table-test',
             [
                 memoryDirectory,
                 existingProductDirectory,
                 emptyRetiredDirectory,
-                populatedDirectory
+                populatedDirectory,
+                sameNamedFile
             ]
         );
         const applicationsDirectory=createDirectory(
@@ -224,6 +238,14 @@ test(
             assert.equal(
                 applicationDirectory.createdDirectories.includes('missing-retired'),
                 false
+            );
+            await assert.rejects(
+                dbopfs.removeEmptyTable('not-a-table'),
+                {name:'TypeMismatchError'}
+            );
+            assert.equal(
+                applicationDirectory.entryNames().includes('not-a-table'),
+                true
             );
             assert.deepEqual(
                 await dbopfs.removeEmptyTable('populated-product'),
