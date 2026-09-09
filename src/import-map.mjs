@@ -1390,6 +1390,9 @@ export async function buildImportMap({files,signal,version=SDK_VERSION,encodePat
     for(const relative of [...inventory].sort(compareText)){
         if(JAVASCRIPT_EXTENSION.test(relative)){
             const target=runtimeTarget(relative);
+            if(relative.startsWith('modules/')||relative.startsWith('entities/')){
+                registerSpecifier(namedRegistry,`arcane-os/${relative}`,target);
+            }
             registerSpecifier(namedRegistry,target,target);
         }
     }
@@ -1453,7 +1456,7 @@ async function physicalRuntime(workspaceRoot,signal){
     return {files};
 }
 
-async function managedImportMapBuild(resolvedWorkspace,signal,pwaEnabled=false){
+async function managedImportMapBuild(resolvedWorkspace,resolvedApp,signal,pwaEnabled=false){
     const installed=await readInstalledSdkLayout(resolvedWorkspace);
     const [runtime,version]=await Promise.all([
         installed?installedRuntimeFiles(resolvedWorkspace,installed,signal):physicalRuntime(resolvedWorkspace,signal),
@@ -1462,13 +1465,15 @@ async function managedImportMapBuild(resolvedWorkspace,signal,pwaEnabled=false){
     const built=await buildImportMap({files:runtime.files,signal,version});
     if(installed?.direct){
         const imports={};
+        const rootApplication=samePath(resolvedWorkspace,resolvedApp);
         function installedBrowserUrl(value){
             return value.startsWith('./')
                 ?`./${installedRuntimeTarget(value.slice(2),installed,{browser:true})}`:value;
         }
         for(const [specifier,target] of Object.entries(built.imports)){
+            if(rootApplication&&specifier.startsWith('arcane/'))continue;
             const selected=installedBrowserUrl(target);
-            imports[specifier]=selected;
+            if(!rootApplication)imports[specifier]=selected;
             // Relative module imports and bare names must resolve to the same instance.
             imports[installedBrowserUrl(specifier)]=selected;
         }
@@ -2846,7 +2851,7 @@ async function generateImportMapUnlocked({
     }catch(error){
         if(error?.code!=='ENOENT')throw error;
     }
-    const {built,json,version}=await managedImportMapBuild(resolvedWorkspace,signal,pwaEnabled);
+    const {built,json,version}=await managedImportMapBuild(resolvedWorkspace,resolvedApp,signal,pwaEnabled);
     const renderedDocuments=documentStates.map(item=>({
         ...item,
         content:rewriteAssetReferences(renderManagedHtml(item.html,json,item.baseHref),{

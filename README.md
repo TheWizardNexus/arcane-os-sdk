@@ -19,7 +19,7 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This checkout defines the `0.27.1` SDK contract. Applications pin one exact npm
+This checkout defines the `0.28.0` SDK contract. Applications pin one exact npm
 version and lockfile; registry state is deliberately not baked into application
 artifacts.
 
@@ -33,6 +33,12 @@ Select `appsRoot: "."` for a standalone root app, or scaffold one with
 `arcane new my-app --apps-root .`. After npm installation, `arcane import-map`
 refreshes managed maps and the root app's static PWA/navigation files for ordinary
 static hosting. Portable app packages still contain their selected runtime.
+Root/direct maps use `arcane-os/modules/<filename>` and
+`arcane-os/entities/<filename>` (including extensions) plus the focused lowercase
+exports, rather than `arcane/*` aliases. These paths resolve to the actual npm
+files, preserving relative component URLs. New root apps put the SDK in runtime
+`dependencies`; init preserves existing runtime/optional declarations and promotes
+a root app's SDK development declaration without changing its other packages.
 Existing `apps/<id>`, virtual `/arcane` routes, and materialized workspaces remain
 supported. Node services continue to
 use the installed CLI or public imports such as `arcane-os/mail`.

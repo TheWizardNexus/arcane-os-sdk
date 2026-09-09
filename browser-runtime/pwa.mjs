@@ -156,7 +156,7 @@ export function registerPwa({workerUrl = './arcane-sw.js', scope} = {}) {
 
     async function loadCheckStorage() {
         if (!globalThis.dbopfs) {
-            await import('arcane/DBOPFS');
+            await import('arcane-os/modules/DBOPFS.js');
         }
         const storage = globalThis.dbopfs;
         if (!storage) {

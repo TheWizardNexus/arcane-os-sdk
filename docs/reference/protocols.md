@@ -146,7 +146,7 @@ all four source and destination paths. Package selection and SDK
 version come from the installed dependency, not a generated runtime lock.
 
 `arcane import-map`, `arcane dev`, packaging, and generated PWA inventories use
-the same actual npm destinations. For example, `arcane/HTMLImport` resolves to
+the same actual npm destinations. For example, `arcane-os/modules/HTMLImport.js` resolves to
 `./node_modules/arcane-os/runtime/arcane/modules/HTMLImport.js`, and
 `arcane-os/event-manager` resolves to
 `./node_modules/arcane-os/browser-runtime/event-manager.mjs`. A normal static
@@ -179,6 +179,20 @@ root-app navigation pages for the previous `/apps/<id>/` links, preserving
 query strings and fragments. It preserves authored files at those destinations.
 For a direct-installed root PWA it generates the static PWA records at the root,
 so normal static hosting needs no SDK request handler or runtime copy.
+
+Direct-installed root maps expose `arcane-os/modules/<filename>` and
+`arcane-os/entities/<filename>` (including extensions), plus the existing
+focused lowercase package exports. They omit the old `arcane/*` and
+`./arcane/*` keys. Real installed `runtime/arcane/` directories are unchanged.
+Physical, nested and virtual layouts retain their established aliases and also
+support the package-namespaced module/entity keys. Relative module and component
+URLs still resolve from the actual selected file, not a reexport wrapper.
+
+New root apps declare the SDK in `dependencies` because serving their npm
+resources requires the installed package at runtime. Root `init` promotes an
+existing SDK development declaration while preserving other dependencies.
+Existing runtime or optional declarations retain their classification across
+layouts; the default nested scaffold continues to use its development dependency.
 
 ## Installed SDK runtime materialization
 

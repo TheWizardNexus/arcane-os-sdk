@@ -5,11 +5,16 @@ The npm package exposes a Node.js ESM control plane, the portable
 `arcane-os/preference-store`, `arcane-os/speech-playback`,
 `arcane-os/speech-text`, `arcane-os/ai/tool-text-stream`, and `arcane-os/browser-device` entrypoints, and the browser-only
 `arcane-os/pwa`, `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints.
+The `arcane-os/modules/<filename>` and `arcane-os/entities/<filename>` paths
+resolve directly to the existing runtime files, with their actual extension.
+They are public Node package exports and managed browser keys, without a wrapper.
+For example, `import.meta.resolve('arcane-os/modules/WaitForComponent.js')`
+retains the module directory needed to resolve `../components/modal.html`.
 Lowercase runtime subpaths also expose existing module namespaces through both
 Node package exports and managed browser imports, as listed below. Established
 browser names such as `arcane/AIProviderRuntime`, `arcane/AIRuntimeState`, and
-`arcane/ThemeBootstrap` remain managed-map names rather than Node package
-entrypoints. Applications call `globalThis.Arcane` for capability-gated host
+`arcane/ThemeBootstrap` remain compatibility names in physical/nested maps;
+direct-installed root maps use the package namespace instead. Applications call `globalThis.Arcane` for capability-gated host
 behavior.
 
 This page is the canonical inventory for every JavaScript name reachable through `package.json#exports`. The same binding can appear at the root and a focused subpath; those entrypoints are listed together. The root workspace `discoverApps` and the low-level packager `discoverApps` are intentionally separate records because they are different functions.
@@ -36,6 +41,8 @@ runtime layouts.
 | `arcane-os/packager` | Low-level browser app packager. |
 | `arcane-os/release-bundle` | Deterministic external release bundles. |
 | `arcane-os/event-manager` | Central synchronous events, complete time-travel history, playback, and optional DOM instrumentation. |
+| `arcane-os/modules/<filename>` | Direct existing runtime module, including its `.js` or `.mjs` extension. |
+| `arcane-os/entities/<filename>` | Direct existing runtime entity, including its extension. |
 | `arcane-os/logging` | Shared console diagnostics controlled by the existing `user.developer` preference. |
 | `arcane-os/preference-store` | Portable preference records and injected storage adapters. |
 | `arcane-os/ai` | Existing `AI.js` provider-neutral inference and speech namespace. |

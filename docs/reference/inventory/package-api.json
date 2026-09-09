@@ -7,6 +7,10 @@
     "moduleSystem": "ESM"
   },
   "memberCount": 210,
+  "runtimeSubpathPatterns": {
+    "arcane-os/modules/*": "./runtime/arcane/modules/*",
+    "arcane-os/entities/*": "./runtime/arcane/entities/*"
+  },
   "members": [
     {
       "id": "root:APP_BUNDLE_DESCRIPTOR_NAME",

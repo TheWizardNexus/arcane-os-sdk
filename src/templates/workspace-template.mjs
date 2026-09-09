@@ -159,7 +159,7 @@ appropriate.
 
 - Use plain JavaScript, HTML, and CSS; do not introduce TypeScript or TSX.
 - Keep reusable portable mechanisms in the Arcane SDK and app-specific behavior under \`${appPrefix||'./'}\`.
-- Keep \`${runtimePrefix}/css/theme.css\` before app styles and import \`arcane/ThemeBootstrap\` before app code runs.
+- Keep \`${runtimePrefix}/css/theme.css\` before app styles and import \`${directRuntime?'arcane-os/modules/ThemeBootstrap.js':'arcane/ThemeBootstrap'}\` before app code runs.
 - Use \`rgb(...)\` or \`rgba(...)\` for new CSS colors.
 - Build one named app and one explicit target at a time. Native targets may be unavailable until their adapters are installed.
 - Preserve complete application, model, document, message, log, diagnostic, process, and tool content. Do not truncate, clip, tail, elide, or silently discard it.
@@ -199,7 +199,7 @@ import map in every directly navigable descriptor-admitted \`.html\`/\`.htm\`
 document. HTML component fragments remain package files but do not receive a
 document-level base or managed import map.
 Development, package, and build refresh that shared inventory when the selected operation needs it.
-Named \`arcane/*\` imports resolve through the managed map to the selected SDK files. Packaging copies the complete selected application, runtime, and specifier
+Named \`${directRuntime?'arcane-os/modules/* and arcane-os/entities/*':'arcane/*'}\` imports resolve through the managed map to the selected SDK files. Packaging copies the complete selected application, runtime, and specifier
 map to \`dist/${appId}\` without running application tests. Run \`verify\` only when
 the user explicitly selects verification or a release artifact that requires it;
 \`bundle\` creates the distributable archive and \`run\` launches the selected
@@ -369,9 +369,11 @@ ${bootstrapMarkup}</head>
         files.set(`${appPrefix}modules/arcane.importmap.json`,json({imports:{}}));
     }
     const themeSpecifier=namedImports
-        ?'arcane/ThemeBootstrap':`${appsRoot==='.'?'../':'../../../'}${runtimePrefix.slice(2)}/modules/ThemeBootstrap.js`;
+        ?directRuntime?'arcane-os/modules/ThemeBootstrap.js':'arcane/ThemeBootstrap'
+        :`${appsRoot==='.'?'../':'../../../'}${runtimePrefix.slice(2)}/modules/ThemeBootstrap.js`;
     const appDataSpecifier=namedImports
-        ?'arcane/AppDataScope':`${appsRoot==='.'?'../':'../../../'}${runtimePrefix.slice(2)}/modules/AppDataScope.js`;
+        ?directRuntime?'arcane-os/app-data-scope':'arcane/AppDataScope'
+        :`${appsRoot==='.'?'../':'../../../'}${runtimePrefix.slice(2)}/modules/AppDataScope.js`;
     const strongTypeSpecifier=namedImports
         ?'strong-type':directRuntime?`../${sdkPackageSource}/runtime/strong-type/index.js`:'../../../arcane/dependencies/strong-type/index.js';
     files.set(`${appPrefix}modules/App.js`,`import Is from '${strongTypeSpecifier}';

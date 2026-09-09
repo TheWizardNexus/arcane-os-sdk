@@ -211,6 +211,18 @@ import {MarkdownSpeech,stripSpeechFormatting} from 'arcane-os/speech-text';
 
 test('installed public SDK entrypoints and runtime materialization are functional',async()=>{
     assert.equal(SDK_VERSION,${JSON.stringify(verified.version)});
+    for(const relative of [
+        'modules/ToolCallRouter.js','entities/Chat.js','entities/User.js',
+        'modules/TimeGuard.js','modules/WaitForComponent.js'
+    ]){
+        const resolved=import.meta.resolve('arcane-os/'+relative);
+        assert.ok(resolved.endsWith('/node_modules/arcane-os/runtime/arcane/'+relative));
+        await readFile(new URL(resolved),'utf8');
+    }
+    const waiter=import.meta.resolve('arcane-os/modules/WaitForComponent.js');
+    const modal=await readFile(new URL('../components/modal.html',waiter),'utf8');
+    assert.ok(modal.includes('modal'));
+    assert.equal(import.meta.resolve('arcane-os/ai'),import.meta.resolve('arcane-os/modules/AI.js'));
     assert.equal(typeof createEventManager,'function');
     assert.ok(Array.isArray(listTargets()));
     assert.equal(typeof mail.Mail,'function');

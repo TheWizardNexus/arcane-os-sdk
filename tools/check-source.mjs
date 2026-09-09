@@ -128,6 +128,8 @@ function assertPackageMetadata(packageDocument){
         './toolchain',
         './events',
         './event-manager',
+        './modules/*',
+        './entities/*',
         './mail',
         './targets',
         './native',

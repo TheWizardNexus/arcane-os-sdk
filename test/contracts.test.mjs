@@ -45,6 +45,20 @@ test('path and semantic-version contracts retain package-format validation',()=>
     });
 });
 
+test('runtime package namespaces resolve to their actual module and entity files',()=>{
+    for(const relative of [
+        'modules/ToolCallRouter.js','entities/Chat.js','entities/User.js',
+        'modules/TimeGuard.js','modules/WaitForComponent.js'
+    ]){
+        assert.equal(import.meta.resolve(`arcane-os/${relative}`),
+            new URL(`../runtime/arcane/${relative}`,import.meta.url).href);
+    }
+    assert.equal(import.meta.resolve('arcane-os/ai'),import.meta.resolve('arcane-os/modules/AI.js'));
+    const waiter=import.meta.resolve('arcane-os/modules/WaitForComponent.js');
+    assert.equal(new URL('../components/modal.html',waiter).href,
+        new URL('../runtime/arcane/components/modal.html',import.meta.url).href);
+});
+
 test('ordinary app configuration omits security without authoring an empty record',()=>{
     const root=validateRootConfig({
         schemaVersion:1,

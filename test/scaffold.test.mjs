@@ -30,6 +30,10 @@ test('root scaffold selects direct npm routes without a runtime copy or dependen
     assert.ok(html.includes('<base href="./">'));
     assert.ok(html.includes('./node_modules/arcane-os/runtime/arcane/css/theme.css'));
     assert.ok(html.includes('./modules/App.js'));
+    const appSource=await readFile(path.join(targetPath,'modules/App.js'),'utf8');
+    assert.ok(appSource.includes("from 'arcane-os/modules/ThemeBootstrap.js'"));
+    assert.ok(appSource.includes("from 'arcane-os/app-data-scope'"));
+    assert.doesNotMatch(appSource,/['"]arcane\//u);
     const selected=await resolveWorkspace({workspaceRoot:targetPath});
     assert.equal(selected.appId,'moon-library');
     assert.equal(selected.appRoot,targetPath);

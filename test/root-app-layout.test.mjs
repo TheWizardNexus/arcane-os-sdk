@@ -42,7 +42,7 @@ async function rootFixture(context,dependencyName,{manifestId}={}){
             +'<script type="module" src="./modules/App.js"></script></body></html>\n';
     }
     const fragment='<section>  Complete retained fragment\nwith trailing space \n</section>\n';
-    const module="import 'arcane/ThemeBootstrap';\nexport const verdict = '  Keep the complete testimony.  ';\n";
+    const module="import 'arcane-os/modules/ThemeBootstrap.js';\nexport const verdict = '  Keep the complete testimony.  ';\n";
     await Promise.all([
         writeJson(workspaceRoot,'package.json',{
             name:'root-app-consumer',private:true,type:'module',
@@ -108,15 +108,25 @@ for(const dependencyName of ['arcane-os','arcane-sdk']){
         });
         const versioned=await toolchain.importMap({});
         const versionedTheme=`${themeUrl}?arcaneVersion=${fixture.sdkVersion}`;
-        for(const specifier of ['arcane/ThemeBootstrap',themeUrl,versionedTheme]){
+        for(const specifier of ['arcane-os/modules/ThemeBootstrap.js',themeUrl,versionedTheme]){
             assert.equal(versioned.importMap.imports[specifier],versionedTheme,specifier);
         }
+        assert.equal(Object.keys(versioned.importMap.imports).some(function obsoleteRootSpecifier(specifier){
+            return specifier.startsWith('arcane/')||specifier.startsWith('./arcane/');
+        }),false);
+        assert.equal(versioned.importMap.imports['arcane-os/entities/Record.js'],
+            `./${packageSource}/runtime/arcane/entities/Record.js?arcaneVersion=${fixture.sdkVersion}`);
         await writeJson(workspaceRoot,'arcane-package.json',fixture.manifest);
         const result=await toolchain.importMap({});
         assert.equal(result.importMap.committed,true);
-        for(const specifier of ['arcane/ThemeBootstrap',themeUrl]){
+        for(const specifier of ['arcane-os/modules/ThemeBootstrap.js',themeUrl]){
             assert.equal(result.importMap.imports[specifier],themeUrl,specifier);
         }
+        assert.equal(Object.keys(result.importMap.imports).some(function obsoleteRootSpecifier(specifier){
+            return specifier.startsWith('arcane/')||specifier.startsWith('./arcane/');
+        }),false);
+        assert.equal(result.importMap.imports['arcane-os/entities/Record.js'],
+            `./${packageSource}/runtime/arcane/entities/Record.js`);
         assert.equal(result.importMap.imports['arcane-os/event-manager'],
             `./${packageSource}/browser-runtime/event-manager.mjs`);
         assert.equal(result.importMap.imports['strong-type'],
@@ -168,6 +178,11 @@ for(const dependencyName of ['arcane-os','arcane-sdk']){
         await assert.rejects(stat(path.join(workspaceRoot,'arcane')),{code:'ENOENT'});
         await assert.rejects(stat(path.join(workspaceRoot,'arcane.lock.json')),{code:'ENOENT'});
         const packaged=await packageApp({workspaceRoot,appId});
+        const packagedMap=JSON.parse(await readFile(path.join(packaged.outputRoot,'modules/arcane.importmap.json'),'utf8'));
+        assert.equal(packagedMap.imports['arcane-os/modules/ThemeBootstrap.js'],themeUrl);
+        assert.equal(Object.keys(packagedMap.imports).some(function obsoletePackagedSpecifier(specifier){
+            return specifier.startsWith('arcane/')||specifier.startsWith('./arcane/');
+        }),false);
         const packagedManifest=JSON.parse(await readFile(path.join(packaged.outputRoot,'arcane.webmanifest'),'utf8'));
         assert.equal(packagedManifest.id,manifestId??'./');
         assert.equal(packagedManifest.scope,'./');
@@ -211,6 +226,36 @@ for(const dependencyName of ['arcane-os','arcane-sdk']){
         assert.equal(packaged.files.includes(`${packageSource}/package.json`),false);
     });
 }
+
+test('nested direct-installed apps retain established aliases alongside package paths',async function nestedDirectAliases(context){
+    const fixture=await rootFixture(context,'arcane-os');
+    const {workspaceRoot,packageSource,sdkVersion}=fixture;
+    const appId='nested-app';
+    const config=JSON.parse(await readFile(path.join(workspaceRoot,'arcane-packager.json'),'utf8'));
+    const html=(await readFile(path.join(workspaceRoot,'index.html'),'utf8'))
+        .replace('content="root-app"',`content="${appId}"`)
+        .replace('<base href="./">','<base href="../../">')
+        .replace('href="./app.css"',`href="./apps/${appId}/app.css"`)
+        .replace('src="./modules/App.js"',`src="./apps/${appId}/modules/App.js"`);
+    await Promise.all([
+        writeJson(workspaceRoot,'arcane-packager.json',{...config,appsRoot:'apps'}),
+        writeJson(workspaceRoot,`apps/${appId}/arcane-package.json`,{
+            ...fixture.manifest,id:appId,entry:'index.html',include:['index.html','app.css','modules'],pwa:{enabled:false}
+        }),
+        writeText(workspaceRoot,`apps/${appId}/index.html`,html),
+        writeText(workspaceRoot,`apps/${appId}/app.css`,'main { white-space: pre-wrap; }\n'),
+        writeText(workspaceRoot,`apps/${appId}/modules/App.js`,"import 'arcane/ThemeBootstrap';\n")
+    ]);
+    const result=await createToolchain({workspaceRoot,appId}).importMap({});
+    const themeUrl=`./${packageSource}/runtime/arcane/modules/ThemeBootstrap.js`;
+    const versionedTheme=`${themeUrl}?arcaneVersion=${sdkVersion}`;
+    for(const specifier of [
+        'arcane/ThemeBootstrap','./arcane/modules/ThemeBootstrap.js',
+        'arcane-os/modules/ThemeBootstrap.js',themeUrl,versionedTheme
+    ]){
+        assert.equal(result.importMap.imports[specifier],versionedTheme,specifier);
+    }
+});
 
 test('root navigation generation preserves an existing authored old app path',async function retainedRootNavigation(context){
     const fixture=await rootFixture(context,'arcane-os');

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.28.0
+
+- Expose existing runtime modules and entities directly through
+  `arcane-os/modules/<filename>` and `arcane-os/entities/<filename>`, including
+  extensions. Package exports and managed maps point to the actual files, so
+  relative imports, component resources and `import.meta.resolve` keep their
+  established directory and lifecycle. Existing lowercase exports remain.
+- Root apps using direct npm routes generate package-namespaced maps without
+  the old `arcane/*` or `./arcane/*` keys. Update authored root-app bare imports
+  before regenerating the managed map. Installed `runtime/arcane/` directories
+  remain unchanged; physical, virtual and nested layouts retain compatibility.
+- Use the package namespace for generated root app code and shared PWA imports,
+  preserving parallel startup and the existing storage and installation owners.
+- New root apps declare the SDK as a runtime dependency. Init promotes their
+  SDK development declaration and preserves existing runtime or optional
+  classification in every layout, including aliases. Existing nested scaffold
+  defaults remain unchanged. No server, listener or application policy changes.
+
 ## 0.27.1
 
 - Preserve the previous `apps/<id>/arcane-sw.js` and `arcane-offline.json`

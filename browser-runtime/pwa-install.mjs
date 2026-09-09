@@ -89,7 +89,7 @@ export function getPwaInstall() {
 
     async function loadInstallStorage() {
         if (!globalThis.dbopfs) {
-            await import('arcane/DBOPFS');
+            await import('arcane-os/modules/DBOPFS.js');
         }
         const storage = globalThis.dbopfs;
         if (!storage) {
@@ -273,8 +273,8 @@ export function mountPwaInstallPrompt({appName = ''} = {}) {
         if (!globalThis.document) return null;
         // Both modules may start independently; saved theme loading is not a barrier.
         await Promise.all([
-            import('arcane/HTMLImport'),
-            import('arcane/ThemeBootstrap')
+            import('arcane-os/modules/HTMLImport.js'),
+            import('arcane-os/modules/ThemeBootstrap.js')
         ]);
         if (owner.state.status === 'disposed') return null;
         if (!document.body) {
@@ -295,7 +295,7 @@ export function mountPwaInstallPrompt({appName = ''} = {}) {
         host.hidden = true;
         host.dataset.appName = String(appName);
         host.dataset.arcanePwaInstall = '';
-        host.setAttribute('href', new URL('../components/pwa-install.html', import.meta.resolve('arcane/HTMLImport')).href);
+        host.setAttribute('href', new URL('../components/pwa-install.html', import.meta.resolve('arcane-os/modules/HTMLImport.js')).href);
         return new Promise(function waitForInstallComponent(resolve, reject) {
             const observer = new MutationObserver(function observeRemovedInstallComponent() {
                 if (!host.isConnected) cancelMount();

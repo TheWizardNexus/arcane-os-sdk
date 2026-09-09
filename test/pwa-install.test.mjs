@@ -554,15 +554,15 @@ test('Removing a loading component or disposing its owner settles mounting and p
             imported.push(specifier);
             return Promise.resolve({});
         }, function resolveManagedModule(specifier) {
-            assert.equal(specifier, 'arcane/HTMLImport');
+            assert.equal(specifier, 'arcane-os/modules/HTMLImport.js');
             return 'https://example.test/node_modules/arcane-sdk/runtime/arcane/modules/HTMLImport.js';
         });
         try {
             let attached = new Promise(function firstAttachment(resolve) { appended = resolve; });
             const mounting = module.mountPwaInstallPrompt();
             const host = await attached;
-            assert.ok(imported.includes('arcane/HTMLImport'));
-            assert.ok(imported.includes('arcane/ThemeBootstrap'));
+            assert.ok(imported.includes('arcane-os/modules/HTMLImport.js'));
+            assert.ok(imported.includes('arcane-os/modules/ThemeBootstrap.js'));
             assert.equal(host.href, 'https://example.test/node_modules/arcane-sdk/runtime/arcane/components/pwa-install.html');
             host.remove();
             observedRemoval();

@@ -1,6 +1,6 @@
 {
   "name": "arcane-os",
-  "version": "0.27.1",
+  "version": "0.28.0",
   "description": "Arcane OS JavaScript SDK, project-local CLI, browser runtime, and repository-portable application packager.",
   "type": "module",
   "main": "./src/index.mjs",
@@ -13,6 +13,8 @@
     "./toolchain": "./src/toolchain.mjs",
     "./events": "./src/events.mjs",
     "./event-manager": "./src/event-manager.mjs",
+    "./modules/*": "./runtime/arcane/modules/*",
+    "./entities/*": "./runtime/arcane/entities/*",
     "./logging": "./browser-runtime/logging.mjs",
     "./browser-device": "./browser-runtime/browser-device.mjs",
     "./pwa": "./browser-runtime/pwa.mjs",
