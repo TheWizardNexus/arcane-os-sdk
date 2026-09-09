@@ -6,7 +6,7 @@ import https from 'node:https';
 import os from 'node:os';
 import path from 'node:path';
 import {resolveWorkspace} from './workspace.mjs';
-import {appRelativeRoot,rootAppLegacyPath} from './app-layout.mjs';
+import {appRelativeRoot} from './app-layout.mjs';
 import {readInstalledSdkLayout} from './sdk-runtime-layout.mjs';
 import {APP_DESCRIPTOR_NAME, projectPackageManifest} from './app-descriptor.mjs';
 import {APP_CONFIG_NAME, validateAppConfig} from './packager/core.mjs';
@@ -1047,26 +1047,8 @@ async function startOwnedDevServer({
     const pwaResourceUrls = new Set();
     function developmentPwaArtifacts(selectedRoutes, assets = [], version = assetVersion) {
         const rootApp = selectedRoutes.config.appsRoot === '.';
-        const legacyAppPath = rootAppLegacyPath(selectedRoutes.config, selectedRoutes.appId);
         const appBase = applicationSourcePath(selectedRoutes.config,selectedRoutes.appId);
         const navigationAliases = {'/': selectedRoutes.startPath};
-        if (legacyAppPath) {
-            const legacyBase = `/${legacyAppPath}`;
-            navigationAliases[legacyBase] = selectedRoutes.startPath;
-            navigationAliases[`${legacyBase}/`] = selectedRoutes.startPath;
-            for (const asset of [selectedRoutes.startPath,...assets]) {
-                const pathname = new URL(asset,'http://arcane.invalid').pathname;
-                if (!/\.html?$/iu.test(pathname)) continue;
-                const segments = decodeURIComponent(pathname).split('/').filter(Boolean);
-                const mapping = selectedRoutes.mappings.find(function matchingNavigationRoute(route) {
-                    return route.prefix.every(function matchingNavigationSegment(segment,index) {
-                        return segments[index] === segment;
-                    });
-                });
-                if (mapping?.kind === 'app') navigationAliases[`${legacyBase}${pathname}`] = pathname;
-            }
-            navigationAliases[`${legacyBase}/index.html`] = selectedRoutes.startPath;
-        }
         return createPwaArtifacts(
             {
                 app: {
@@ -1085,7 +1067,6 @@ async function startOwnedDevServer({
                 ...(rootApp ? {
                     installationId:`/apps/${routeSet.appId}/`
                 } : {}),
-                legacyAppPath,
                 runtimeBase: selectedRoutes.browserRuntimeBase
                     ?? selectedRoutes.installed?.browserRuntimeBase ?? '/arcane/sdk/',
                 mode: 'development'
@@ -1177,34 +1158,17 @@ async function startOwnedDevServer({
             const target=parseRequestTarget(request.url);
             if(!target){deny(response,400,'Invalid request path.');return;}
             const {segments}=target;
-            const legacyAppRequest = mode === 'source' && rootAppLegacyPath(routeSet.config, routeSet.appId)
-                && segments[0] === 'apps' && segments[1] === routeSet.appId;
-            const legacyPwaRequest = legacyAppRequest && segments.length === 3
-                && ['arcane-sw.js', 'arcane-offline.json'].includes(segments[2]);
-            const generatedPwaPath = legacyPwaRequest
-                || ['/arcane.webmanifest', '/arcane-offline.json', '/arcane-sw.js', '/arcane-pwa.mjs']
-                    .includes(target.path);
+            const generatedPwaPath = ['/arcane.webmanifest', '/arcane-offline.json', '/arcane-sw.js', '/arcane-pwa.mjs']
+                .includes(target.path);
             const requestedMapping = currentSourceRoutes.mappings.find(function currentRequestMapping(route) {
                 return route.prefix.every(function currentRequestSegment(segment,index) {
                     return segments[index] === segment;
                 });
             });
-            const appRequest = requestedMapping?.kind === 'app' || legacyAppRequest;
+            const appRequest = requestedMapping?.kind === 'app';
             const selectedRoutes = mode === 'source' && (appRequest || segments.length === 0 || generatedPwaPath)
                 ? await refreshSourceRoutes() : currentSourceRoutes;
             const pwaEnabled = mode === 'source' ? selectedRoutes.app?.pwa?.enabled === true : routeSet.pwa;
-            const authoredLegacyResource = legacyAppRequest
-                && sourcePathAllowed(segments, selectedRoutes.app);
-            if (legacyAppRequest
-                && !(pwaEnabled && legacyPwaRequest)
-                && !authoredLegacyResource) {
-                const legacyPath = target.pathname.slice(`/apps/${routeSet.appId}`.length);
-                const location = !legacyPath || legacyPath === '/' || legacyPath === '/index.html'
-                    ? selectedRoutes.startPath : legacyPath;
-                response.writeHead(302,{location:`${location}${target.search}`});
-                response.end();
-                return;
-            }
             if (mode === 'source' && pwaEnabled
                 && generatedPwaPath) {
                 const generated = await sourcePwaArtifact(target.path, selectedRoutes);

@@ -512,16 +512,16 @@ test(
 );
 
 test(
-    'relocated navigation aliases retain complete query fields without merging resource cache entries',
-    async function preserveRelocatedNavigationQuery() {
+    'authored navigation aliases retain complete query fields without merging resource cache entries',
+    async function preserveAuthoredNavigationQuery() {
         const fixture = workerFixture(
             {
                 manifest: workerManifest(
                     {
                         navigationAliases: {
                             './': 'index.html',
-                            './apps/example-app/': 'index.html',
-                            './apps/example-app/index.html': 'index.html'
+                            './reading-room/': 'index.html',
+                            './reading-room/index.html': 'index.html'
                         }
                     }
                 )
@@ -530,7 +530,7 @@ test(
         await fixture.lifecycle('install');
         const query = '?view=complete%20content&tag=first&tag=second';
         const navigation = fixture.request(
-            `${scope}apps/example-app/index.html${query}`,
+            `${scope}reading-room/index.html${query}`,
             {mode: 'navigate'}
         );
         const response = await navigation.response;
@@ -541,26 +541,28 @@ test(
     }
 );
 
-test('prior-scope cached navigation follows root aliases after its own inventory refresh', async function priorScopeInventoryRefresh() {
+test('root worker inventory refresh preserves installed identity and saved caches', async function rootInventoryRefresh() {
     const appId = 'retained-root-app';
-    const oldScope = `https://example.test/apps/${appId}/`;
+    const rootScope = 'https://example.test/';
     const artifacts = createPwaArtifacts({
-        app: {id: appId, displayName: 'Retained root application', version: '1.0.0', entry: '/index.html'},
+        app: {id: appId, displayName: 'Retained root application', version: '1.0.0', entry: '/secondary.html'},
         sdkVersion: '0.27.1', pwa: {enabled: true}, mode: 'development',
         basePath: '/', appBase: '/', installationId: `/apps/${appId}/`,
-        legacyAppPath: `apps/${appId}`, runtimeBase: '/node_modules/arcane-os/browser-runtime/',
-        assets: ['/index.html', '/modules/App.js', '/node_modules/arcane-os/browser-runtime/pwa.mjs'],
-        navigationAliases: {
-            [`/apps/${appId}/`]: '/index.html',
-            [`/apps/${appId}/index.html`]: '/index.html'
-        }
+        runtimeBase: '/node_modules/arcane-os/browser-runtime/',
+        assets: ['/secondary.html', '/modules/App.js', '/node_modules/arcane-os/browser-runtime/pwa.mjs'],
+        navigationAliases: {'/': '/secondary.html'}
     });
-    const legacyFile = artifacts.files.find(function priorInventory(file) {
-        return file.path === `apps/${appId}/arcane-offline.json`;
+    assert.equal(artifacts.manifest.id, `/apps/${appId}/`);
+    assert.equal(artifacts.manifest.scope, '/');
+    assert.deepEqual(artifacts.files.map(function generatedPath(file) { return file.path; }), [
+        'arcane.webmanifest', 'arcane-offline.json', 'arcane-sw.js', 'arcane-pwa.mjs'
+    ]);
+    const inventoryFile = artifacts.files.find(function rootInventory(file) {
+        return file.path === 'arcane-offline.json';
     });
-    const legacy = JSON.parse(legacyFile.content);
-    assert.ok(legacy.assets.includes('/node_modules/arcane-os/browser-runtime/pwa.mjs'));
-    assert.ok(legacy.assets.includes('./arcane-offline.json'));
+    const inventory = JSON.parse(inventoryFile.content);
+    assert.ok(inventory.assets.includes('/node_modules/arcane-os/browser-runtime/pwa.mjs'));
+    assert.ok(inventory.assets.includes('/arcane-offline.json'));
     const oldManifest = workerManifest({
         appId, sdkVersion: '0.26.0', mode: 'development',
         assets: ['index.html', 'arcane-offline.json'], navigationAliases: {'./': 'index.html'}
@@ -571,57 +573,54 @@ test('prior-scope cached navigation follows root aliases after its own inventory
     let now = 1000000;
     let deployed = false;
     const fixture = workerFixture({
-        manifest: oldManifest, storage, workerScope: oldScope, now() { return now; },
+        manifest: oldManifest, storage, workerScope: rootScope, now() { return now; },
         fetchResource(request) {
-            const content = request.url === `${oldScope}arcane-offline.json`
-                ? JSON.stringify(deployed ? legacy : oldManifest)
-                : request.url === 'https://example.test/arcane-offline.json'
-                    ? JSON.stringify(artifacts.offlineManifest)
-                    : `Complete content:${request.url}`;
+            const content = request.url === `${rootScope}arcane-offline.json`
+                ? JSON.stringify(deployed ? inventory : oldManifest)
+                : `Complete content:${request.url}`;
             return new Response(content, {headers: {'last-modified': 'Mon, 07 Sep 2026 00:00:00 GMT'}});
         }
     });
     await fixture.lifecycle('install');
-    const cachedPage = await fixture.request(`${oldScope}index.html`, {mode: 'navigate'}).response;
-    assert.equal(await cachedPage.text(), `Complete content:${oldScope}index.html`);
+    const cachedPage = await fixture.request(`${rootScope}index.html`, {mode: 'navigate'}).response;
+    assert.equal(await cachedPage.text(), `Complete content:${rootScope}index.html`);
     deployed = true;
     now += 120001;
     const refreshed = await fixture.refresh();
     assert.equal(refreshed.error, null);
-    assert.ok(fixture.requests.some(function fetchedOldInventory(request) {
-        return request.url === `${oldScope}arcane-offline.json`;
+    assert.ok(fixture.requests.some(function fetchedRootInventory(request) {
+        return request.url === `${rootScope}arcane-offline.json`;
     }));
-    const navigation = await fixture.request(`${oldScope}index.html`, {mode: 'navigate'}).response;
+    const navigation = await fixture.request(rootScope, {mode: 'navigate'}).response;
     assert.equal(navigation.status, 302);
-    assert.equal(navigation.headers.get('location'), 'https://example.test/index.html');
-    const retainedCache = storage.stores.get(`arcane-pwa|${JSON.stringify([appId, oldScope])}|resources`);
-    assert.equal(await retainedCache.get(`${oldScope}index.html`).clone().text(), `Complete content:${oldScope}index.html`);
+    assert.equal(navigation.headers.get('location'), `${rootScope}secondary.html`);
+    const retainedCache = storage.stores.get(`arcane-pwa|${JSON.stringify([appId, rootScope])}|resources`);
+    assert.equal(await retainedCache.get(`${rootScope}index.html`).clone().text(), `Complete content:${rootScope}index.html`);
     assert.equal(await (await savedData.match('conversation')).text(), 'Complete saved conversation.');
 });
 
-test('generated prior-scope worker uses portable root resources and retains navigation query and target fragment', async function portablePriorScopeWorker() {
+test('generated root worker uses portable npm resources and retains navigation query and target fragment', async function portableRootWorker() {
     const appId = 'portable-root-app';
     const packageRoot = 'https://example.test/releases/current/';
-    const oldScope = `${packageRoot}apps/${appId}/`;
     const artifacts = createPwaArtifacts({
         app: {id: appId, displayName: 'Portable root application', version: '1.0.0', entry: './index.html'},
         sdkVersion: '0.27.1', pwa: {enabled: true},
-        legacyAppPath: `apps/${appId}`, runtimeBase: './node_modules/arcane-sdk/browser-runtime/',
+        runtimeBase: './node_modules/arcane-sdk/browser-runtime/',
         files: ['index.html', 'modules/App.js', 'node_modules/arcane-sdk/browser-runtime/pwa.mjs'],
         navigationAliases: {
-            [`./apps/${appId}/`]: './index.html',
-            [`./apps/${appId}/index.html`]: './index.html#last-turn'
+            './': './index.html#last-turn'
         }
     });
     const byPath = new Map(artifacts.files.map(function artifactPath(file) { return [file.path, file.content]; }));
-    const legacy = JSON.parse(byPath.get(`apps/${appId}/arcane-offline.json`));
-    assert.ok(legacy.assets.includes('../../index.html'));
-    assert.ok(legacy.assets.includes('../../node_modules/arcane-sdk/browser-runtime/pwa.mjs'));
-    assert.equal(legacy.navigationAliases['./index.html'], '../../index.html#last-turn');
-    const script = byPath.get(`apps/${appId}/arcane-sw.js`);
-    assert.ok(script.includes('"../../node_modules/arcane-sdk/browser-runtime/pwa.mjs"'));
+    assert.deepEqual([...byPath.keys()], ['arcane.webmanifest', 'arcane-offline.json', 'arcane-sw.js', 'arcane-pwa.mjs']);
+    const inventory = JSON.parse(byPath.get('arcane-offline.json'));
+    assert.ok(inventory.assets.includes('./index.html'));
+    assert.ok(inventory.assets.includes('./node_modules/arcane-sdk/browser-runtime/pwa.mjs'));
+    assert.equal(inventory.navigationAliases['./'], './index.html#last-turn');
+    const script = byPath.get('arcane-sw.js');
+    assert.ok(script.includes('"./node_modules/arcane-sdk/browser-runtime/pwa.mjs"'));
     const fixture = workerFixture({
-        manifest: legacy, script, workerScope: oldScope,
+        manifest: inventory, script, workerScope: packageRoot,
         fetchResource(request) {
             const relative = new URL(request.url).pathname.slice(new URL(packageRoot).pathname.length);
             return new Response(byPath.get(relative) ?? `Complete content:${request.url}`);
@@ -630,15 +629,12 @@ test('generated prior-scope worker uses portable root resources and retains navi
     await fixture.lifecycle('install');
     await fixture.lifecycle('activate');
     const query = '?view=complete%20content&tag=first&tag=second';
-    const navigation = await fixture.request(`${oldScope}index.html${query}#position`, {mode: 'navigate'}).response;
+    const navigation = await fixture.request(`${packageRoot}${query}#position`, {mode: 'navigate'}).response;
     assert.equal(navigation.status, 302);
     assert.equal(navigation.headers.get('location'), `${packageRoot}index.html${query}#last-turn`);
     assert.ok(fixture.requests.some(function fetchedRootModule(request) {
         return request.url === `${packageRoot}node_modules/arcane-sdk/browser-runtime/pwa.mjs`;
     }));
-    assert.equal(fixture.requests.some(function incorrectlyNestedRoot(request) {
-        return request.url.startsWith(`${oldScope}node_modules/`);
-    }), false);
 });
 
 for (const [mode, interval] of [['development', 120000], ['release', 900000]]) {
@@ -740,10 +736,10 @@ test(
     async function olderCacheNewWorker() {
         const storage = cacheStore();
         const oldManifest = workerManifest({mode: 'development', assets: ['old.html', 'arcane-offline.json'], navigationAliases: {'./': 'old.html'}});
-        const legacyName = `arcane-pwa|${JSON.stringify([oldManifest.appId, scope])}|previous-output`;
-        const legacy = await storage.open(legacyName);
-        await legacy.put(`${scope}old.html`, new Response('retained old page'));
-        await legacy.put(`${scope}arcane-offline.json`, new Response(JSON.stringify(oldManifest)));
+        const previousCacheName = `arcane-pwa|${JSON.stringify([oldManifest.appId, scope])}|previous-output`;
+        const previousCache = await storage.open(previousCacheName);
+        await previousCache.put(`${scope}old.html`, new Response('retained old page'));
+        await previousCache.put(`${scope}arcane-offline.json`, new Response(JSON.stringify(oldManifest)));
         const current = workerManifest({mode: 'release', revision: 'new-output', sdkVersion: '0.11.1', assets: ['new.html', 'old.html', 'arcane-offline.json'], navigationAliases: {'./': 'new.html'}});
         let now = 1000000;
         let offline = false;
@@ -760,7 +756,7 @@ test(
         });
         await fixture.lifecycle('install');
         await fixture.lifecycle('activate');
-        assert.equal(storage.stores.has(legacyName), true);
+        assert.equal(storage.stores.has(previousCacheName), true);
         assert.deepEqual(fixture.requests.map(function requestedUrl(request) { return request.url; }), [`${scope}new.html`]);
         const navigation = await fixture.request(scope, {mode: 'navigate'}).response;
         assert.equal(navigation.headers.get('location'), `${scope}new.html`);
@@ -896,11 +892,11 @@ test(
         const clientUrl = '../shared/sdk/pwa.mjs';
         const assets = ['app.mjs', 'arcane-pwa.mjs', clientUrl, 'arcane-offline.json'];
         const previousManifest = workerManifest({assets});
-        const legacyName = `arcane-pwa|${JSON.stringify([previousManifest.appId, scope])}|old-worker`;
-        const legacy = await storage.open(legacyName);
+        const previousCacheName = `arcane-pwa|${JSON.stringify([previousManifest.appId, scope])}|old-worker`;
+        const previousCache = await storage.open(previousCacheName);
         for (const asset of assets) {
             const url = new URL(asset, scope).href;
-            await legacy.put(url, new Response(
+            await previousCache.put(url, new Response(
                 asset === 'arcane-offline.json' ? JSON.stringify(previousManifest) : `retained:${url}`,
                 {headers: {'last-modified': 'Mon, 07 Sep 2026 00:00:00 GMT'}}
             ));
@@ -913,7 +909,7 @@ test(
         assert.ok(fixture.requests.every(function protocolTransfer(request) { return request.cache === 'no-store' && request.headers.get('if-modified-since') === null; }));
         assert.equal(await (await fixture.request(`${scope}app.mjs`).response).text(), `retained:${scope}app.mjs`);
         assert.equal(await (await fixture.request(new URL(clientUrl, scope).href).response).text(), `original:${new URL(clientUrl, scope).href}`);
-        assert.equal(storage.stores.has(legacyName), true);
+        assert.equal(storage.stores.has(previousCacheName), true);
         const next = workerFixture({storage, manifest, clientUrl});
         await next.lifecycle('install');
         assert.equal(next.requests.length, 0);

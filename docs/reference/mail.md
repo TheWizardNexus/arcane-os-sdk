@@ -381,7 +381,7 @@ application name and subscriber key. Existing top-level `RESEND_API_KEY` and
 `MAIL_PROFILES[profile].RESEND_API_KEY` remain supported. A nested selected
 `apiKey` takes precedence when the property exists, including null or an empty
 string, which means the selected key is absent. Only an absent nested key
-property permits fallback to the corresponding legacy key.
+property permits fallback to the corresponding root or profile key.
 
 Programmatic operations resolve both files from `options.cwd`, then
 `options.workspaceRoot`, then `process.cwd()`, choosing the first supplied
@@ -397,7 +397,7 @@ Configuration precedence is explicit:
    An explicit null retains the option's existing meaning; it does not select
    the file value again.
 2. `arcane.config.json.mail` supplies nonsecret settings absent from those options.
-3. Legacy `.arcane.env.json` root `MAIL_TLS_CERT_PATH` and `MAIL_TLS_KEY_PATH`
+3. `.arcane.env.json` root `MAIL_TLS_CERT_PATH` and `MAIL_TLS_KEY_PATH`
    supply certificate paths absent from the selected options and config member.
 4. Remaining settings use the defaults above.
 
@@ -452,7 +452,7 @@ non-interactive alternative and rejects a TTY. Each command accepts an optional
 profile argument, defaulting to `mail` independently of `arcane.config.json.mail.profile`.
 Set and delete preserve other JSON settings and profiles; status reports
 existence without returning the key. A new credential is written to the nested
-mail member. An existing legacy credential is updated at its existing location
+mail member. An existing root or profile credential is updated at its existing location
 unless the selected nested key property exists, in which case set updates that
 nested property. Delete removes both representations of only the selected key,
 so an older key cannot reappear through fallback. Other settings and profile
@@ -500,7 +500,7 @@ guidance from the same configuration. It does not require gateway TLS paths.
 Send and serve read each required JSON file once, concurrently when both are
 needed, before consuming their settings. An injected `readCredential` remains
 the credential owner and reads once. With that injection, send reads only
-`arcane.config.json`; serve also reads `.arcane.env.json` for legacy TLS paths
+`arcane.config.json`; serve also reads `.arcane.env.json` for root TLS paths
 without interpreting its unused file credential.
 
 Start the gateway:
@@ -522,7 +522,7 @@ domain, for example `https://mail.example.com:4433/v1/mail`.
 
 Set `arcane.config.json.mail.certPath` to the PEM certificate chain and
 `mail.keyPath` to its PEM private-key file. These settings belong to the listener
-and apply regardless of the selected provider profile. The legacy root
+and apply regardless of the selected provider profile. The root
 `MAIL_TLS_CERT_PATH` and `MAIL_TLS_KEY_PATH` fields in `.arcane.env.json` remain
 fallbacks. Relative certificate paths resolve from the selected configuration
 directory, including explicit programmatic path options; absolute paths are also accepted.

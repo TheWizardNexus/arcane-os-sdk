@@ -81,9 +81,9 @@ function mailCredentialEntry(settings, location) {
             : `mail.profiles[${JSON.stringify(location.profile)}].apiKey`
     };
     if (nestedSettings && Object.hasOwn(nestedSettings, 'apiKey')) return nestedEntry;
-    const legacySettings = mailProfileSettings(settings, location);
-    if (legacySettings && Object.hasOwn(legacySettings, 'RESEND_API_KEY')) {
-        return {profileSettings: legacySettings, key: 'RESEND_API_KEY', setting: location.setting};
+    const profileSettings = mailProfileSettings(settings, location);
+    if (profileSettings && Object.hasOwn(profileSettings, 'RESEND_API_KEY')) {
+        return {profileSettings, key: 'RESEND_API_KEY', setting: location.setting};
     }
     return nestedEntry;
 }

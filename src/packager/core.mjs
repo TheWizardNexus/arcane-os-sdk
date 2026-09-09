@@ -12,7 +12,7 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {appRelativeRoot,resolveAppRoot,rootAppLegacyPath,rootAppNavigation} from '../app-layout.mjs';
+import {appRelativeRoot,resolveAppRoot} from '../app-layout.mjs';
 import {readInstalledSdkLayout} from '../sdk-runtime-layout.mjs';
 import {withWorkspaceOperationLock} from '../workspace-operation-lock.mjs';
 import {
@@ -275,13 +275,10 @@ function validateSharedRoute(route,label){
 }
 
 export function validateRootConfig(value,configPath=ROOT_CONFIG_NAME){
-    assertOnlyKeys(value,new Set(['schemaVersion','appsRoot','distRoot','sharedPayloads','legacyAppPaths']),ROOT_CONFIG_NAME);
+    assertOnlyKeys(value,new Set(['schemaVersion','appsRoot','distRoot','sharedPayloads']),ROOT_CONFIG_NAME);
     if(value.schemaVersion!==1)fail(`${ROOT_CONFIG_NAME}.schemaVersion must be 1.`);
     if(!['apps','.'].includes(value.appsRoot)||value.distRoot!=='dist'){
         fail(`${ROOT_CONFIG_NAME} must bind appsRoot to "apps" or "." and distRoot to "dist".`);
-    }
-    if (value.legacyAppPaths !== undefined && !is.boolean(value.legacyAppPaths)) {
-        fail(`${ROOT_CONFIG_NAME}.legacyAppPaths must be a boolean.`);
     }
     if(!isPlainObject(value.sharedPayloads)){
         fail(`${ROOT_CONFIG_NAME}.sharedPayloads must be an object.`);
@@ -297,8 +294,7 @@ export function validateRootConfig(value,configPath=ROOT_CONFIG_NAME){
         );
     }
     return {
-        schemaVersion:1,appsRoot:value.appsRoot,distRoot:'dist',sharedPayloads,configPath,
-        legacyAppPaths:value.legacyAppPaths ?? true
+        schemaVersion:1,appsRoot:value.appsRoot,distRoot:'dist',sharedPayloads,configPath
     };
 }
 
@@ -581,15 +577,6 @@ async function optionalDescriptor(context){
 async function inspectContext(context,{signal}={}){
     const records=await collectPackageRecords(context,{signal});
     const documents=await browserDocuments(records,context.config.entry);
-    const navigation=rootAppLegacyPath(context.rootConfig,context.appId)?rootAppNavigation(
-        context.appId,context.config.entry,documents.map(document=>document.path)
-    ):[];
-    for(const redirect of navigation){
-        const selected=records.find(record=>pathKey(record.destination)===pathKey(redirect.path));
-        if(selected&&!(await readFile(selected.source,'utf8')).includes('<!-- Arcane root application navigation -->')){
-            fail(`Root application navigation would replace selected content: ${redirect.path}.`);
-        }
-    }
     return {
         appId:context.appId,
         displayName:context.config.displayName,
@@ -607,7 +594,7 @@ async function inspectContext(context,{signal}={}){
         ...(context.config.adapter===undefined?{}:{adapter:context.config.adapter}),
         descriptor:await optionalDescriptor(context),
         browserDocuments:documents,
-        files:[...new Set(['index.html',...records.map(record=>record.destination),...navigation.map(redirect=>redirect.path)])].sort(compareText),
+        files:[...new Set(['index.html',...records.map(record=>record.destination)])].sort(compareText),
         output:path.relative(context.workspaceRoot,context.outputRoot).split(path.sep).join('/')
     };
 }
@@ -763,13 +750,9 @@ async function replaceDirectory(stagingRoot,outputRoot){
 async function packageWithContext(context,options={}){
     const {signal,onEvent,browserPwa=true}=options;
     const pwaEnabled=browserPwa&&context.config.pwa?.enabled===true;
-    const legacyAppPath=rootAppLegacyPath(context.rootConfig,context.appId);
     const appPath=appRelativeRoot(context.rootConfig,context.appId);
     const entryPath=appPackagePath(context,context.config.entry);
     const inspected=await inspectContext(context,{signal});
-    const navigation=legacyAppPath?rootAppNavigation(
-        context.appId,context.config.entry,inspected.browserDocuments.map(document=>document.path)
-    ):[];
     if(options.dryRun){
         return {
             appId:context.appId,
@@ -782,11 +765,7 @@ async function packageWithContext(context,options={}){
                     PWA_MANIFEST_NAME,
                     PWA_OFFLINE_MANIFEST_NAME,
                     PWA_WORKER_NAME,
-                    PWA_BOOTSTRAP_NAME,
-                    ...(legacyAppPath?[
-                        `${legacyAppPath}/${PWA_WORKER_NAME}`,
-                        `${legacyAppPath}/${PWA_OFFLINE_MANIFEST_NAME}`
-                    ]:[])
+                    PWA_BOOTSTRAP_NAME
                 ]:[])
             ].sort(compareText)
         };
@@ -823,18 +802,6 @@ async function packageWithContext(context,options={}){
             });
         }else{
             await copyBase();
-        }
-        for(const redirect of navigation){
-            throwIfAborted(signal);
-            const filePath=path.join(stagingRoot,...redirect.path.split('/'));
-            try{
-                const current=await readFile(filePath,'utf8');
-                if(!current.includes('<!-- Arcane root application navigation -->')){
-                    fail(`Root application navigation would replace package content: ${redirect.path}.`);
-                }
-            }catch(error){if(error.code!=='ENOENT')throw error;}
-            await mkdir(path.dirname(filePath),{recursive:true});
-            await writeFile(filePath,redirect.content,'utf8');
         }
         const files=await listOutputFiles(stagingRoot,{signal});
         // Traverse actual browser resources after the adapter finishes. Files
@@ -957,14 +924,6 @@ async function packageWithContext(context,options={}){
             fail(`Package output is missing its entry file: ${context.config.entry}.`);
         }
         const installed=pwaEnabled?await readInstalledSdkLayout(context.workspaceRoot,context.rootConfig):null;
-        const navigationAliases=navigation.length?{
-            './':packageResourceUrl(entryPath),
-            [`./apps/${context.appId}`]:packageResourceUrl(entryPath),
-            [`./apps/${context.appId}/`]:packageResourceUrl(entryPath),
-            ...Object.fromEntries(navigation.map(redirect=>[
-                packageResourceUrl(redirect.path),packageResourceUrl(redirect.target.slice(1))
-            ]))
-        }:undefined;
         const pwaArtifacts=pwaEnabled?createPwaArtifacts({
             app:{
                 id:context.appId,
@@ -973,9 +932,7 @@ async function packageWithContext(context,options={}){
                 entry:packageResourceUrl(entryPath)
             },
             appPath,
-            ...(legacyAppPath?{legacyAppPath}:{}),
             ...(installed?.direct?{runtimeBase:`.${installed.browserRuntimeBase}`} : {}),
-            ...(navigationAliases?{navigationAliases}:{}),
             sdkVersion:assetVersion,
             pwa:context.config.pwa,
             files,

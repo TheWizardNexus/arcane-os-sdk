@@ -499,8 +499,13 @@ for (const liveSource of [false, true]) {
             context.after(function closeRootSourceServer() { return instance.close(); });
             assert.equal(instance.url, `${instance.origin}/index.html`);
             const query = '?request=full%20content&tag=one&tag=two';
-            const redirect = await globalThis.fetch(`${instance.origin}/apps/${appId}/index.html${query}`, {redirect: 'manual'});
+            const redirect = await globalThis.fetch(`${instance.origin}/${query}`, {redirect: 'manual'});
+            assert.equal(redirect.status, 302);
             assert.equal(redirect.headers.get('location'), `/index.html${query}`);
+            const absent = await globalThis.fetch(`${instance.origin}/apps/${appId}/index.html${query}`, {redirect: 'manual'});
+            assert.equal(absent.status, 404);
+            assert.equal(absent.headers.get('location'), null);
+            await absent.text();
             const app = await globalThis.fetch(`${instance.origin}/modules/root.js`);
             assert.equal(await app.text(), 'export const rootApplication = true;');
             const importMap = JSON.parse(await readFile(

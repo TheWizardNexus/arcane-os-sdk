@@ -12,7 +12,6 @@ import {
 import {loadArcaneIntegratedProvider} from './integrated-provider-loader.mjs';
 import {startDevServer} from './dev-server.mjs';
 import {applyPwaEntryReferences,generateImportMap,readApplicationTestImportMapContext} from './import-map.mjs';
-import {rootAppLegacyPath,rootAppNavigation} from './app-layout.mjs';
 import {createPwaArtifacts} from './pwa.mjs';
 import {readInstalledSdkLayout} from './sdk-runtime-layout.mjs';
 import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
@@ -327,48 +326,15 @@ async function refreshPreparedImportMap(prepared,{signal,onEvent,workspaceOperat
 async function refreshRootApplicationFiles(prepared,inspected,importMap,{signal,onEvent}){
     const {workspaceRoot,appId}=prepared;
     const manifest=prepared.validation.app.manifest;
-    const legacyAppPath = rootAppLegacyPath(prepared.validation.config, appId);
-    const navigation = legacyAppPath ? rootAppNavigation(
-        appId,
-        manifest.entry,
-        inspected.browserDocuments.map(
-            function rootBrowserDocumentPath(document) {
-                return document.path;
-            }
-        )
-    ) : [];
-    // These aliases belong to the SDK only after generation; retained app files stay authored.
-    for(const redirect of navigation){
-        throwIfAborted(signal);
-        try{
-            const current=await readFile(path.join(workspaceRoot,...redirect.path.split('/')),'utf8');
-            if(!current.includes('<!-- Arcane root application navigation -->')){
-                throw new ArcaneError(ERROR_CODES.workspaceInvalid,
-                    `Root application navigation would replace authored content: ${redirect.path}.`);
-            }
-        }catch(error){if(error.code!=='ENOENT')throw error;}
-    }
     const installed=await readInstalledSdkLayout(workspaceRoot,prepared.validation.config);
     const entry=`/${manifest.entry.split('/').map(encodeURIComponent).join('/')}`;
     const navigationAliases={
-        '/':entry,
-        ...(legacyAppPath ? {
-            [`/${legacyAppPath}`]:entry,
-            [`/${legacyAppPath}/`]:entry,
-            ...Object.fromEntries(
-                navigation.map(
-                    function rootNavigationAlias(redirect) {
-                        return [`/${redirect.path}`,redirect.target];
-                    }
-                )
-            )
-        } : {})
+        '/':entry
     };
     // The source host serves the installed files in place. There is no runtime projection.
     const files=[...new Set([
         ...inspected.files.filter(file=>file!=='index.html'||manifest.include.includes('index.html')),
-        importMap.artifactRelativePath,
-        ...navigation.map(redirect=>redirect.path)
+        importMap.artifactRelativePath
     ])];
     const pwa=installed?.direct&&manifest.pwa?.enabled?createPwaArtifacts({
         app:{id:appId,displayName:manifest.displayName,version:manifest.version,entry},
@@ -378,12 +344,11 @@ async function refreshRootApplicationFiles(prepared,inspected,importMap,{signal,
         basePath:'/',
         appBase:'/',
         installationId:`/apps/${appId}/`,
-        legacyAppPath,
         runtimeBase:installed.browserRuntimeBase,
         mode:'development',
         navigationAliases
     }):null;
-    for(const file of [...navigation,...(pwa?.files??[])]){
+    for(const file of pwa?.files??[]){
         throwIfAborted(signal);
         const filePath=path.join(workspaceRoot,...file.path.split('/'));
         await mkdir(path.dirname(filePath),{recursive:true});
@@ -402,7 +367,7 @@ async function refreshRootApplicationFiles(prepared,inspected,importMap,{signal,
     }
     await emit(onEvent,{
         type:'import-map.root-files.completed',appId,
-        navigation:navigation.map(redirect=>redirect.path),
+        navigation:[],
         pwa:pwa?.files.map(file=>file.path)??[]
     });
 }

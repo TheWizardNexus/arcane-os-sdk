@@ -170,16 +170,16 @@ test(
 );
 
 test(
-    'nested mail keys take precedence while exact legacy profiles remain readable',
-    async function nestedAndLegacyMailKeys(context) {
+    'nested mail keys take precedence while exact existing profiles remain readable',
+    async function nestedAndProfileMailKeys(context) {
         const cwd = await temporaryDirectory(context);
         const filePath = path.join(cwd, '.arcane.env.json');
         const profile = 'BOSS dragons.example / production';
         const settings = {
-            RESEND_API_KEY: 're_synthetic_legacy_default',
+            RESEND_API_KEY: 're_synthetic_root_default',
             MAIL_PROFILES: {
-                [profile]: {RESEND_API_KEY: 're_synthetic_legacy_named'},
-                TWiN: {RESEND_API_KEY: 're_synthetic_legacy_twin'}
+                [profile]: {RESEND_API_KEY: 're_synthetic_profile_named'},
+                TWiN: {RESEND_API_KEY: 're_synthetic_profile_twin'}
             },
             mail: {
                 apiKey: 're_synthetic_nested_default',
@@ -205,7 +205,7 @@ test(
             await readMailCredential(
                 {cwd, profile: 'TWiN'}
             ),
-            're_synthetic_legacy_twin'
+            're_synthetic_profile_twin'
         );
         assert.equal(
             await readMailCredential(
@@ -241,10 +241,10 @@ test(
         const filePath = path.join(cwd, '.arcane.env.json');
         const settings = {
             note: 'Keep the dragon parade invitation exactly as written. 🐉',
-            RESEND_API_KEY: 're_synthetic_legacy_default',
+            RESEND_API_KEY: 're_synthetic_root_default',
             MAIL_PROFILES: {
-                BOSS: {RESEND_API_KEY: 're_synthetic_legacy_boss', label: 'Keep BOSS.'},
-                TWiN: {RESEND_API_KEY: 're_synthetic_legacy_twin'}
+                BOSS: {RESEND_API_KEY: 're_synthetic_profile_boss', label: 'Keep BOSS.'},
+                TWiN: {RESEND_API_KEY: 're_synthetic_profile_twin'}
             },
             mail: {
                 label: 'Keep mail.',
@@ -325,7 +325,7 @@ test(
             }
         };
         const secrets = {
-            RESEND_API_KEY: 're_synthetic_legacy',
+            RESEND_API_KEY: 're_synthetic_root',
             MAIL_TLS_CERT_PATH: 'old/fullchain.pem',
             MAIL_TLS_KEY_PATH: 'old/private-key.pem',
             mail: {

@@ -74,11 +74,11 @@ export function getBrowserDeviceSettings(navigatorObject = globalThis.navigator)
 
 // Only an explicit browser adapter type or fallback flag establishes its class.
 // Vendor names and powerPreference (including Chromium's echoed request) do not.
-export function describeBrowserGpu(info, legacyFallbackAdapter) {
+export function describeBrowserGpu(info, fallbackAdapter) {
     const adapterType = is.string(info?.type) ? info.type : null;
     const isFallbackAdapter = is.boolean(info?.isFallbackAdapter)
         ? info.isFallbackAdapter
-        : is.boolean(legacyFallbackAdapter) ? legacyFallbackAdapter : null;
+        : is.boolean(fallbackAdapter) ? fallbackAdapter : null;
     let performanceStatus = 'unknown';
     if (isFallbackAdapter === true || adapterType === 'CPU') performanceStatus = 'fallback';
     else if (adapterType === 'discrete GPU') performanceStatus = 'discrete';
