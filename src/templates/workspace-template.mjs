@@ -1,4 +1,5 @@
 import Is from 'strong-type';
+import {installedSdkRoutes} from '../sdk-runtime-layout.mjs';
 import {
     ARCANE_PROTOCOL,
     CLI_EVENT_PROTOCOL,
@@ -59,6 +60,7 @@ export function createWorkspaceLockDocument({
 
 export function workspaceTemplate({
     appId,
+    appsRoot='apps',
     displayName,
     sdkDependencyName=SDK_NAME,
     sdkDependencySpecifier=SDK_VERSION,
@@ -86,6 +88,12 @@ export function workspaceTemplate({
     if(!supportedTargets.includes(target)){
         throw new Error(`Unsupported scaffold target: ${String(target)}.`);
     }
+    if(!['apps','.'].includes(appsRoot))throw new Error('appsRoot must be apps or .');
+    if(appOnly&&appsRoot==='.')throw new Error('Root scaffolding selects a standalone workspace.');
+    const appPrefix=appsRoot==='.'?'':`apps/${appId}/`;
+    const directRuntime=appsRoot==='.'&&!appOnly;
+    const runtimePrefix=directRuntime?`./${sdkPackageSource}/runtime/arcane`:'./arcane';
+    const baseHref=appsRoot==='.'?'./':'../../';
     const native=target!=='browser';
     const buildTarget=native?target:'browser';
     const runTarget=native&&target!=='portable'?target:'browser';
@@ -125,7 +133,7 @@ appropriate.
     </script>
 `:'';
     const bootstrapMarkup=namedImports?'':
-        '    <script type="module" src="./arcane/modules/ThemeBootstrap.js?v=1"></script>\n';
+        `    <script type="module" src="${runtimePrefix}/modules/ThemeBootstrap.js?v=1"></script>\n`;
     const files=new Map();
     files.set('.gitignore',[
         'node_modules/',
@@ -150,8 +158,8 @@ appropriate.
     files.set('AGENTS.md',`# ${name} development instructions
 
 - Use plain JavaScript, HTML, and CSS; do not introduce TypeScript or TSX.
-- Keep reusable portable mechanisms in the Arcane SDK and app-specific behavior under \`apps/${appId}/\`.
-- Keep \`arcane/css/theme.css\` before app styles and import \`arcane/ThemeBootstrap\` before app code runs.
+- Keep reusable portable mechanisms in the Arcane SDK and app-specific behavior under \`${appPrefix||'./'}\`.
+- Keep \`${runtimePrefix}/css/theme.css\` before app styles and import \`arcane/ThemeBootstrap\` before app code runs.
 - Use \`rgb(...)\` or \`rgba(...)\` for new CSS colors.
 - Build one named app and one explicit target at a time. Native targets may be unavailable until their adapters are installed.
 - Preserve complete application, model, document, message, log, diagnostic, process, and tool content. Do not truncate, clip, tail, elide, or silently discard it.
@@ -167,10 +175,11 @@ This repository contains the portable Arcane application \`${appId}\`. It includ
 
 \`\`\`sh
 npm install
+npm run import-map
 npm run dev
 \`\`\`
 
-Open the loopback URL printed by the development server. The source server exposes this app and its physical \`arcane/\` runtime; it does not expose an Ollama HTTP endpoint.
+Open the loopback URL printed by the development server. ${directRuntime?'This root app reads SDK files directly from its installed npm package; an ordinary static host uses the same resource paths.':'This app uses the existing physical arcane/ runtime layout.'} The SDK server does not expose an Ollama HTTP endpoint.
 
 Commit the generated \`package-lock.json\` after dependency installation. CI intentionally uses \`npm ci\` and therefore requires that lock. Before the SDK is published, install a locally packed \`${SDK_NAME}\` \`.tgz\` with \`npm install --save-dev --save-exact <path-to-tarball>\`; keep that tarball at the lock file's relative path for repeatable local \`npm ci\` runs.
 
@@ -185,13 +194,12 @@ npm run run
 \`\`\`
 
 The explicit \`import-map\` command refreshes
-\`apps/${appId}/modules/arcane.importmap.json\` and the managed inline browser
+\`${appPrefix}modules/arcane.importmap.json\` and the managed inline browser
 import map in every directly navigable descriptor-admitted \`.html\`/\`.htm\`
 document. HTML component fragments remain package files but do not receive a
 document-level base or managed import map.
 Development, package, and build refresh that shared inventory when the selected operation needs it.
-Named \`arcane/*\` imports resolve against the physical workspace \`arcane/\`
-tree. Packaging copies the complete selected application, runtime, and specifier
+Named \`arcane/*\` imports resolve through the managed map to the selected SDK files. Packaging copies the complete selected application, runtime, and specifier
 map to \`dist/${appId}\` without running application tests. Run \`verify\` only when
 the user explicitly selects verification or a release artifact that requires it;
 \`bundle\` creates the distributable archive and \`run\` launches the selected
@@ -201,7 +209,7 @@ Native targets are provider-supplied and must be scaffolded and selected
 explicitly; this browser workflow does not imply a standalone native executable.
 ${nativeGuide}
 
-Every browser release also carries Arcane OS licensing material under \`licenses/arcane-os/\`. Review those terms before distribution.
+Every browser release also carries Arcane OS licensing material under \`${directRuntime?sdkPackageSource:'licenses/arcane-os'}\`. Review those terms before distribution.
 `);
     files.set('package.json',json({
         name:packageName,
@@ -230,10 +238,10 @@ Every browser release also carries Arcane OS licensing material under \`licenses
     }));
     files.set('arcane-packager.json',json({
         schemaVersion:1,
-        appsRoot:'apps',
+        appsRoot,
         distRoot:'dist',
         sharedPayloads:{
-            'browser-runtime':[
+            'browser-runtime':directRuntime?installedSdkRoutes(sdkPackageSource,{direct:true}):[
                 {
                     source:'arcane',
                     destination:'arcane',
@@ -249,11 +257,11 @@ Every browser release also carries Arcane OS licensing material under \`licenses
             ]
         }
     }));
-    files.set('arcane.lock.json',json(createWorkspaceLockDocument({
+    if(!directRuntime)files.set('arcane.lock.json',json(createWorkspaceLockDocument({
         dependencyName:sdkDependencyName,
         packageSource:sdkPackageSource
     })));
-    files.set(`apps/${appId}/arcane-app.json`,json({
+    files.set(`${appPrefix}arcane-app.json`,json({
         schemaVersion:2,
         id:appId,
         displayName:name,
@@ -283,7 +291,7 @@ Every browser release also carries Arcane OS licensing material under \`licenses
         },
         targets:native?['browser',target].sort():['browser']
     }));
-    files.set(`apps/${appId}/arcane-package.json`,json({
+    files.set(`${appPrefix}arcane-package.json`,json({
         schemaVersion:1,
         id:appId,
         displayName:name,
@@ -294,7 +302,7 @@ Every browser release also carries Arcane OS licensing material under \`licenses
         exclude:[],
         shared:['browser-runtime']
     }));
-    files.set(`apps/${appId}/manifest.json`,json({
+    files.set(`${appPrefix}manifest.json`,json({
         name,
         short_name:titleCase(appId),
         start_url:'./index.html',
@@ -303,19 +311,19 @@ Every browser release also carries Arcane OS licensing material under \`licenses
         theme_color:'rgb(23, 34, 56)',
         icons:[]
     }));
-    files.set(`apps/${appId}/index.html`,`<!doctype html>
+    files.set(`${appPrefix}index.html`,`<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="arcane-app-id" content="${html(appId)}">
-    <base href="../../">
+    <base href="${baseHref}">
 ${importMapMarkup}    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="rgb(23, 34, 56)">
     <title>${html(name)}</title>
-    <link rel="manifest" href="./apps/${html(appId)}/manifest.json">
-    <link rel="stylesheet" href="./arcane/css/theme.css?v=1">
-    <link rel="stylesheet" href="./arcane/css/primitives.css?v=1">
-    <link rel="stylesheet" href="./apps/${html(appId)}/${html(appId)}.css?v=1">
+    <link rel="manifest" href="./${html(appPrefix)}manifest.json">
+    <link rel="stylesheet" href="${runtimePrefix}/css/theme.css?v=1">
+    <link rel="stylesheet" href="${runtimePrefix}/css/primitives.css?v=1">
+    <link rel="stylesheet" href="./${html(appPrefix)}${html(appId)}.css?v=1">
 ${bootstrapMarkup}</head>
 <body>
     <main class="app-shell">
@@ -332,11 +340,11 @@ ${bootstrapMarkup}</head>
             </div>
         </section>
     </main>
-    <script type="module" src="./apps/${html(appId)}/modules/App.js?v=1"></script>
+    <script type="module" src="./${html(appPrefix)}modules/App.js?v=1"></script>
 </body>
 </html>
 `);
-    files.set(`apps/${appId}/${appId}.css`,`body {
+    files.set(`${appPrefix}${appId}.css`,`body {
     margin: 0;
     min-height: 100vh;
     background: var(--background, rgb(13, 18, 32));
@@ -358,15 +366,15 @@ ${bootstrapMarkup}</head>
 }
 `);
     if(namedImports){
-        files.set(`apps/${appId}/modules/arcane.importmap.json`,json({imports:{}}));
+        files.set(`${appPrefix}modules/arcane.importmap.json`,json({imports:{}}));
     }
     const themeSpecifier=namedImports
-        ?'arcane/ThemeBootstrap':'../../../arcane/modules/ThemeBootstrap.js';
+        ?'arcane/ThemeBootstrap':`${appsRoot==='.'?'../':'../../../'}${runtimePrefix.slice(2)}/modules/ThemeBootstrap.js`;
     const appDataSpecifier=namedImports
-        ?'arcane/AppDataScope':'../../../arcane/modules/AppDataScope.js';
+        ?'arcane/AppDataScope':`${appsRoot==='.'?'../':'../../../'}${runtimePrefix.slice(2)}/modules/AppDataScope.js`;
     const strongTypeSpecifier=namedImports
-        ?'strong-type':'../../../arcane/dependencies/strong-type/index.js';
-    files.set(`apps/${appId}/modules/App.js`,`import Is from '${strongTypeSpecifier}';
+        ?'strong-type':directRuntime?`../${sdkPackageSource}/runtime/strong-type/index.js`:'../../../arcane/dependencies/strong-type/index.js';
+    files.set(`${appPrefix}modules/App.js`,`import Is from '${strongTypeSpecifier}';
 import arcaneThemeReady from '${themeSpecifier}';
 import {
     resolveApplicationId,
@@ -407,9 +415,9 @@ action?.addEventListener('click',()=>{
 });
 `);
     if(native){
-        files.set(`apps/${appId}/img/icon.png`,Buffer.from(appIcon));
+        files.set(`${appPrefix}img/icon.png`,Buffer.from(appIcon));
     }
-    files.set(`apps/${appId}/test/app.test.mjs`,`import assert from 'node:assert/strict';
+    files.set(`${appPrefix}test/app.test.mjs`,`import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import test from '${SDK_NAME}/testing';
 
@@ -420,13 +428,13 @@ test('application shell uses the shared Arcane theme in order',async()=>{
         readFile(new URL('index.html',appRoot),'utf8'),
         readFile(new URL('modules/App.js',appRoot),'utf8')
     ]);
-    const theme=source.indexOf('./arcane/css/theme.css');
-    const primitives=source.indexOf('./arcane/css/primitives.css');
-    const appStyle=source.indexOf('./apps/${appId}/${appId}.css');
-    const importMap=source.indexOf('${namedImports?'data-arcane-import-map':'./arcane/modules/ThemeBootstrap.js'}');
-    const appModule=source.indexOf('./apps/${appId}/modules/App.js');
+    const theme=source.indexOf('${runtimePrefix}/css/theme.css');
+    const primitives=source.indexOf('${runtimePrefix}/css/primitives.css');
+    const appStyle=source.indexOf('./${appPrefix}${appId}.css');
+    const importMap=source.indexOf('${namedImports?'data-arcane-import-map':`${runtimePrefix}/modules/ThemeBootstrap.js`}');
+    const appModule=source.indexOf('./${appPrefix}modules/App.js');
 
-    assert.match(source,/<base href="\\.\\.\\/\\.\\.\\/">/);
+    assert.ok(source.includes('<base href="${baseHref}">'));
     assert.match(source,/<meta name="arcane-app-id" content="${appId}">/);
     assert.ok(theme>=0&&primitives>theme&&appStyle>primitives);
     assert.ok(importMap>=0&&appModule>importMap);
@@ -445,7 +453,7 @@ test('application package identity matches its directory',async()=>{
     if(appOnly){
         return {
             name,
-            files:new Map([...files].filter(([relative])=>relative.startsWith(`apps/${appId}/`)))
+            files:new Map([...files].filter(([relative])=>relative.startsWith(`${appPrefix}`)))
         };
     }
     return {name,files};

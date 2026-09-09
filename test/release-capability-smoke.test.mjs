@@ -328,9 +328,27 @@ test('installed public SDK entrypoints and runtime materialization are functiona
             }
         ]}
     }));
+    const rootAppId='release-smoke-root';
+    const rootModule="import 'arcane/ThemeBootstrap';\nexport const testimony = '  Keep the complete root application content.  ';\n";
+    const rootFiles=[
+        ['arcane-package.json',json({
+            schemaVersion:1,id:rootAppId,displayName:'Root Application Release Smoke',version:'0.1.0',
+            entry:'index.html',strategy:'static',include:['app.css','index.html','modules'],
+            exclude:[],shared:['browser-runtime'],pwa:{enabled:true}
+        })],
+        ['index.html','<!doctype html><html lang="en"><head>'
+            +`<meta name="arcane-app-id" content="${rootAppId}"><base href="./">`
+            +'<link rel="stylesheet" href="./node_modules/arcane-os/runtime/arcane/css/theme.css">'
+            +'<link rel="stylesheet" href="./node_modules/arcane-os/runtime/arcane/css/primitives.css">'
+            +'<link rel="stylesheet" href="./app.css">'
+            +'</head><body><main>  Complete root application content.  </main>'
+            +'<script type="module" src="./modules/App.js"></script></body></html>\n'],
+        ['app.css','main { display: block; white-space: pre-wrap; }\n'],
+        ['modules/App.js',rootModule]
+    ];
     const installedOnlyContract=path.join(testRoot,'installed-package-only.test.mjs');
     await writeFile(installedOnlyContract,`import assert from 'node:assert/strict';
-import {readFile,rm,stat,writeFile} from 'node:fs/promises';
+import {mkdir,readFile,rm,stat,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {createToolchain,packageApp,resolveWorkspace,startDevServer,validateWorkspace} from 'arcane-os';
 import test from 'arcane-os/testing';
@@ -440,6 +458,56 @@ test('installed npm sources own maps, development serving and portable output',a
     const offline=JSON.parse(await readFile(path.join(packaged.outputRoot,'arcane-offline.json'),'utf8'));
     assert.equal(offline.sdkVersion,version);
     for(const logicalPath of logicalPaths){assert.ok(offline.assets.includes('.'+logicalPath),logicalPath);}
+    await assert.rejects(stat(projection),{code:'ENOENT'});
+    await assert.rejects(stat(lockPath),{code:'ENOENT'});
+
+    // Reuse this installed tarball for a distinct standalone root application.
+    const rootAppId=${JSON.stringify(rootAppId)};
+    const rootConfigPath=path.join(workspaceRoot,'arcane-packager.json');
+    const rootConfig=JSON.parse(await readFile(rootConfigPath,'utf8'));
+    rootConfig.appsRoot='.';
+    rootConfig.sharedPayloads['browser-runtime']=rootConfig.sharedPayloads['browser-runtime'].map(
+        function directInstalledDestination(route){return {...route,destination:route.source};}
+    );
+    await writeFile(rootConfigPath,JSON.stringify(rootConfig),'utf8');
+    const rootFiles=${JSON.stringify(rootFiles)};
+    await Promise.all(rootFiles.map(async function writeRootFile([relative,content]){
+        const filePath=path.join(workspaceRoot,...relative.split('/'));
+        await mkdir(path.dirname(filePath),{recursive:true});
+        await writeFile(filePath,content,'utf8');
+    }));
+    const rootToolchain=createToolchain({workspaceRoot,appId:rootAppId});
+    await rootToolchain.importMap();
+    const rootMap=JSON.parse(await readFile(path.join(workspaceRoot,'modules','arcane.importmap.json'),'utf8'));
+    const rootTheme='./node_modules/arcane-os/runtime/arcane/modules/ThemeBootstrap.js';
+    assert.equal(rootMap.imports['arcane/ThemeBootstrap'],rootTheme);
+    assert.equal(rootMap.imports[rootTheme],rootTheme);
+    assert.equal(rootMap.imports['arcane-os/event-manager'],'./node_modules/arcane-os/browser-runtime/event-manager.mjs');
+    assert.equal(rootMap.imports['strong-type'],'./node_modules/arcane-os/runtime/strong-type/index.js');
+    const rootWebManifest=JSON.parse(await readFile(path.join(workspaceRoot,'arcane.webmanifest'),'utf8'));
+    assert.equal(rootWebManifest.id,'/apps/'+rootAppId+'/');
+    assert.equal(rootWebManifest.start_url,'/index.html');
+    assert.equal(rootWebManifest.scope,'/');
+    for(const generated of ['arcane-pwa.mjs','arcane-sw.js','arcane-offline.json']){
+        assert.equal((await stat(path.join(workspaceRoot,generated))).isFile(),true,generated);
+    }
+    const rootBootstrap=await readFile(path.join(workspaceRoot,'arcane-pwa.mjs'),'utf8');
+    assert.ok(rootBootstrap.includes('"/node_modules/arcane-os/browser-runtime/pwa.mjs"'));
+    const rootPackaged=await packageApp({workspaceRoot,appId:rootAppId});
+    assert.ok(rootPackaged.files.includes('index.html'));
+    for(const relative of [
+        'runtime/arcane/modules/ThemeBootstrap.js','browser-runtime/event-manager.mjs',
+        'runtime/strong-type/index.js','LICENSE'
+    ]){
+        const selected='node_modules/arcane-os/'+relative;
+        assert.ok(rootPackaged.files.includes(selected),selected);
+        assert.equal(await readFile(path.join(rootPackaged.outputRoot,selected),'utf8'),
+            await readFile(path.join(installedRoot,relative),'utf8'),selected);
+    }
+    const rootPackagedManifest=JSON.parse(await readFile(path.join(rootPackaged.outputRoot,'arcane.webmanifest'),'utf8'));
+    assert.equal(rootPackagedManifest.id,'./');
+    assert.equal(rootPackagedManifest.scope,'./');
+    assert.equal(await readFile(path.join(rootPackaged.outputRoot,'modules','App.js'),'utf8'),${JSON.stringify(rootModule)});
     await assert.rejects(stat(projection),{code:'ENOENT'});
     await assert.rejects(stat(lockPath),{code:'ENOENT'});
 });

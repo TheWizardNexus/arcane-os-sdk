@@ -507,6 +507,36 @@ test(
     }
 );
 
+test(
+    'relocated navigation aliases retain complete query fields without merging resource cache entries',
+    async function preserveRelocatedNavigationQuery() {
+        const fixture = workerFixture(
+            {
+                manifest: workerManifest(
+                    {
+                        navigationAliases: {
+                            './': 'index.html',
+                            './apps/example-app/': 'index.html',
+                            './apps/example-app/index.html': 'index.html'
+                        }
+                    }
+                )
+            }
+        );
+        await fixture.lifecycle('install');
+        const query = '?view=complete%20content&tag=first&tag=second';
+        const navigation = fixture.request(
+            `${scope}apps/example-app/index.html${query}`,
+            {mode: 'navigate'}
+        );
+        const response = await navigation.response;
+        assert.equal(response.status, 302);
+        assert.equal(response.headers.get('location'), `${scope}index.html${query}`);
+        assert.equal(fixture.requests.length, 2);
+        assert.equal(fixture.request(`${scope}app.mjs${query}`).response, undefined);
+    }
+);
+
 for (const [mode, interval] of [['development', 120000], ['release', 900000]]) {
     test(
         `PWA ${mode} page checks retain 304 bodies and wait until strictly after the app check interval`,

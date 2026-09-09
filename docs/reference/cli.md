@@ -109,7 +109,7 @@ Creates one repository-shaped external application workspace and the selected
 app. It never creates more than one app or silently installs a global SDK.
 
 ```text
-arcane new <id> [--path <directory>] [--display-name <name>] [--target <target>] [--git]
+arcane new <id> [--path <directory>] [--apps-root apps|.] [--display-name <name>] [--target <target>] [--git]
 ```
 
 ### Options and result
@@ -119,6 +119,12 @@ arcane new <id> [--path <directory>] [--display-name <name>] [--target <target>]
 directory as a repository. Native target scaffolds also retain `browser` and
 include the required icon. The result reports the workspace, app, descriptor,
 target, and created paths.
+
+`--apps-root .` creates a standalone root application using its installed npm
+SDK directly. The default `--apps-root apps` preserves `apps/<id>`. Root setup
+does not install dependencies or copy a runtime: run `npm install`, then
+`npm run import-map`. Until installation, its result reports the import map as
+pending with reason `sdk-install-required`.
 
 ### Example
 
@@ -135,7 +141,7 @@ initialization writes only the selected `apps/<id>/` boundary and does not add
 an SDK dependency to the Arcane OS repository.
 
 ```text
-arcane init [id] [--workspace <directory>] [--app <id>] [--display-name <name>] [--target <target>]
+arcane init [id] [--workspace <directory>] [--app <id>] [--apps-root apps|.] [--display-name <name>] [--target <target>]
 ```
 
 ### Errors and safety
@@ -144,6 +150,10 @@ Existing conflicting files, invalid ids, an ambiguous app selection, or an
 incompatible workspace fail rather than being overwritten. Initialization is
 idempotent only for files whose existing content satisfies the scaffold
 contract.
+
+`--apps-root .` selects root setup for a standalone workspace. Omission retains
+the configured layout, or `apps` for a new configuration. `init` never moves an
+existing application or converts the integrated Arcane OS layout.
 
 ### Example
 
@@ -318,13 +328,14 @@ workspace/runtime routes. It defaults to HTTPS on localhost; `--public` enables 
 from other devices on the network, using HTTPS by default.
 
 For an external workspace, the server exposes the selected SDK routes alongside
-the application. `installed-v1` serves directly from the installed package
-under `/arcane`, `/arcane/sdk`, and `/arcane/dependencies/strong-type`, without
-creating a workspace runtime directory. Existing `physical-v1` workspaces serve
+the application. Direct `installed-v1` routes serve the real
+`/node_modules/<dependency>/...` URLs without creating a workspace runtime
+directory. Earlier virtual `/arcane` installed routes remain supported.
+Existing `physical-v1` workspaces serve
 their projected `arcane/` root. Integrated workspaces retain their configured
 physical routes.
-The explicit live-source SDK mapping remains unchanged and does not replace the
-installed projection.
+An explicit live-source SDK mapping follows the selected browser destinations
+while reading canonical SDK source; it never replaces installed files.
 
 ```text
 arcane dev [--app <id>] [--public] [--http | --https] [--cert <file> --key <file>] [--host <address>] [--port 8000] [--http-port 0]

@@ -1,4 +1,5 @@
 import Is from 'strong-type';
+import {resolveAppRoot} from './app-layout.mjs';
 import {isDeepStrictEqual} from 'node:util';
 import {readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
@@ -427,7 +428,8 @@ async function readJsonFile(filePath,label,{optional=false}={}){
 
 export async function refreshAppPackageProjection({workspaceRoot, appId, signal, onEvent}) {
     throwIfAborted(signal);
-    const appRoot = path.join(workspaceRoot, 'apps', appId);
+    const rootConfig=await readJsonFile(path.join(workspaceRoot,'arcane-packager.json'),'arcane-packager.json');
+    const appRoot = resolveAppRoot(workspaceRoot,rootConfig,appId);
     const descriptorPath = path.join(appRoot, APP_DESCRIPTOR_NAME);
     const authored = await readJsonFile(
         descriptorPath,

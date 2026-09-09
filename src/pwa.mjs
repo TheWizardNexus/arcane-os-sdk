@@ -202,6 +202,7 @@ export function createPwaArtifacts(
         mode = 'release',
         runtimeBase = './arcane/sdk/',
         appBase,
+        installationId,
         appPath = '',
         navigationAliases,
         revision
@@ -218,7 +219,7 @@ export function createPwaArtifacts(
     // Relocating app files must not change an existing installed app's default identity.
     const installationBase = appBase ?? (mode === 'development' ? applicationBase : './');
     const manifest = {
-        id: installationBase,
+        id: installationId ?? installationBase,
         name: app.displayName,
         short_name: app.displayName,
         start_url: manifestUrl(app.entry, appPath ? basePath : applicationBase),

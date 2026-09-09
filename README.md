@@ -19,7 +19,7 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This checkout defines the `0.26.0` SDK contract. Applications pin one exact npm
+This checkout defines the `0.27.0` SDK contract. Applications pin one exact npm
 version and lockfile; registry state is deliberately not baked into application
 artifacts.
 
@@ -27,9 +27,14 @@ External browser apps can use the installed npm package directly, without a
 generated workspace `arcane/` directory or `arcane.lock.json`. Select the
 [four installed-package routes](docs/reference/protocols.md#installed-package-browser-routes)
 in `arcane-packager.json`: development, managed import maps, and PWA resources
-read the installed SDK while keeping `/arcane/...` browser URLs. Portable app
-packages still contain their selected runtime. Existing materialized workspaces
-and the scaffold's current layout remain supported. Node services continue to
+read the installed SDK at real `/node_modules/arcane-os/...` browser URLs when
+each destination equals its source. An alias uses its actual installed folder.
+Select `appsRoot: "."` for a standalone root app, or scaffold one with
+`arcane new my-app --apps-root .`. After npm installation, `arcane import-map`
+refreshes managed maps and the root app's static PWA/navigation files for ordinary
+static hosting. Portable app packages still contain their selected runtime.
+Existing `apps/<id>`, virtual `/arcane` routes, and materialized workspaces remain
+supported. Node services continue to
 use the installed CLI or public imports such as `arcane-os/mail`.
 
 The [mail gateway](docs/reference/mail.md) serves HTTPS with HTTP/2 on port 4433

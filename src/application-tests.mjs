@@ -124,7 +124,9 @@ async function selectedTestFiles({workspaceRoot,workspaceMode,appRoot,signal}){
     if(workspaceMode==='external'){
         await collectOptionalTests(path.join(workspaceRoot,'test'),workspaceRoot,files,signal);
     }
-    if(appRoot)await collectOptionalTests(path.join(appRoot,'test'),appRoot,files,signal);
+    if(appRoot&&(workspaceMode!=='external'||!samePath(workspaceRoot,appRoot))){
+        await collectOptionalTests(path.join(appRoot,'test'),appRoot,files,signal);
+    }
     return [...files].sort();
 }
 

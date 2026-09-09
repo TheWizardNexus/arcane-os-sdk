@@ -87,10 +87,11 @@ app-scoped toolchain operation unchanged.
 An external workspace can select `installed-v1` routes directly from its
 `node_modules/arcane-os` installation, without a workspace `arcane/` tree or
 `arcane.lock.json`. The SDK reads the installed package version and maps its
-runtime, browser runtime, runtime dependency, and licenses to the established
-browser destinations. Existing `physical-v1` workspaces and the explicit
-materializer remain supported; scaffolding retains its existing physical
-layout. See [installed-package routes](reference/protocols.md#installed-package-browser-routes)
+runtime, browser runtime, runtime dependency, and licenses to the configured
+browser destinations. Direct destinations are the real npm paths. Existing
+`physical-v1` workspaces, virtual installed routes, and the explicit materializer
+remain supported. Root scaffolding selects direct npm routes; the existing
+multi-app scaffold retains its physical layout. See [installed-package routes](reference/protocols.md#installed-package-browser-routes)
 for the configuration and npm-alias form.
 
 An Arcane OS checkout is an integrated SDK consumer, not the owner
@@ -245,13 +246,23 @@ apps synthesize that descriptor from their schema-1 package plus the current
 native registry during migration.
 
 An external app can use four `installed-v1` shared routes in
-`arcane-packager.json`: the installed SDK's `runtime/arcane` maps to `/arcane`,
-`browser-runtime` to `/arcane/sdk`, `runtime/strong-type` to
-`/arcane/dependencies/strong-type`, and its three license files to
-`/licenses/arcane-os`. Source serving and import-map generation read those
+`arcane-packager.json`. With each destination equal to its source, browser URLs
+point directly into `/node_modules/arcane-os/runtime/arcane`,
+`/node_modules/arcane-os/browser-runtime`, and
+`/node_modules/arcane-os/runtime/strong-type`; the three package license files
+remain in `/node_modules/arcane-os`. An alias uses its actual installed folder.
+Source serving and import-map generation read those
 installed files without creating a workspace runtime copy. Distribution copies
 the selected routes completely inside the portable artifact, preserving the
 same URLs. Existing physical `arcane/` routes retain their behavior.
+
+`appsRoot: "."` places one standalone application at the workspace root while
+retaining its declared ID and app-relative entries. The existing `apps` option
+keeps multi-app and integrated layouts. Root static hosting consumes the same
+npm URLs, managed maps, generated PWA files, and compatibility navigation pages
+as SDK development. TWiN's ordinary static host needs no additional server;
+separate Node API hosts such as Stripe keep their existing server and SDK mail
+imports. Application location does not change their listeners or configuration.
 
 Release schema 1 and builder identity `arcane-app-packager-v1` remain unchanged
 because current Arcane native consumers treat them as public contracts. Native

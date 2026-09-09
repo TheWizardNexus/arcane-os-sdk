@@ -14,6 +14,7 @@ const VALUE_OPTIONS=new Set([
     'display-name',
     'workspace',
     'app',
+    'apps-root',
     'sdk-runtime-source',
     'arcane-root',
     'host',
@@ -60,8 +61,8 @@ const MAX_NODE_TIMER_DELAY_MS=2_147_483_647;
 export const HELP_TEXT=`Arcane OS application SDK ${SDK_VERSION}
 
 Usage:
-  ${CLI_NAME} new <id> [--path <directory>] [--display-name <name>] [--target <target>] [--git]
-  ${CLI_NAME} init [id] [--workspace <directory>] [--display-name <name>] [--target <target>]
+  ${CLI_NAME} new <id> [--path <directory>] [--apps-root apps|.] [--display-name <name>] [--target <target>] [--git]
+  ${CLI_NAME} init [id] [--workspace <directory>] [--apps-root apps|.] [--display-name <name>] [--target <target>]
   ${CLI_NAME} upgrade [--workspace <directory>] [--app <id>]
   ${CLI_NAME} doctor [--workspace <directory>] [--arcane-root <directory>]
   ${CLI_NAME} import-map [--workspace <directory>] [--app <id>]
@@ -421,15 +422,6 @@ function readScope(value){
     return scope;
 }
 
-function inferredAppId(workspaceRoot){
-    const id=path.basename(workspaceRoot)
-        .normalize('NFKD')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/gu,'-')
-        .replace(/^-+|-+$/gu,'');
-    return id||'arcane-app';
-}
-
 function noExtraPositionals(command,positionals,expected=0){
     if(positionals.length>expected){
         usage(`Unexpected argument for ${command}.`);
@@ -503,6 +495,9 @@ function operationOptions(command,parsed,cwd){
     if(command!=='mail'&&flags.has('report-stdin')){
         usage('--report-stdin is supported only by mail send.');
     }
+    if(values['apps-root']!==undefined&&!['new','init'].includes(command)){
+        usage('--apps-root is supported only by new and init.');
+    }
 
     if(command==='new'){
         const appId=positionals[0];
@@ -511,6 +506,7 @@ function operationOptions(command,parsed,cwd){
         return {
             targetPath:path.resolve(cwd,values.path??appId),
             appId,
+            appsRoot:values['apps-root']??'apps',
             displayName:values['display-name'],
             target:values.target??'browser',
             initializeGit:flags.has('git')
@@ -520,7 +516,8 @@ function operationOptions(command,parsed,cwd){
         noExtraPositionals(command,positionals,1);
         return {
             workspaceRoot,
-            appId:positionals[0]??values.app??inferredAppId(workspaceRoot),
+            appId:positionals[0]??values.app,
+            appsRoot:values['apps-root'],
             displayName:values['display-name'],
             target:values.target??'browser'
         };

@@ -8,6 +8,7 @@ import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
 import {SDK_NAME,SDK_VERSION,workspaceTemplate} from './templates/workspace-template.mjs';
 import {inspectWorkspaceProfile,resolveSdkPackageDeclaration} from './workspace.mjs';
 import {parseSemver} from './packager/core.mjs';
+import {resolveAppRoot} from './app-layout.mjs';
 
 const is = new Is(false);
 
@@ -310,6 +311,7 @@ async function runGitInit(workspaceRoot,signal,onEvent){
 export async function createWorkspace({
     targetPath,
     appId,
+    appsRoot='apps',
     displayName,
     target='browser',
     initializeGit=false,
@@ -318,6 +320,7 @@ export async function createWorkspace({
 }){
     validateInputs(appId,displayName);
     validateScaffoldTarget(target);
+    if(!['apps','.'].includes(appsRoot))fail('appsRoot must be apps or .','ARCANE_USAGE');
     if(!is.string(targetPath)||!targetPath.trim())fail('targetPath is required.','ARCANE_USAGE');
     if(!is.boolean(initializeGit))fail('initializeGit must be a boolean.','ARCANE_USAGE');
     throwIfAborted(signal);
@@ -332,20 +335,21 @@ export async function createWorkspace({
     },async workspaceOperationLease=>{
     const template=workspaceTemplate({
         appId,
+        appsRoot,
         displayName,
         target,
         appIcon:await scaffoldIcon(target)
     });
     const writtenFiles=await writeMissingFiles(workspaceRoot,template.files,{signal,onEvent});
-    const workspaceRuntime=await materializeWorkspaceRuntimeContent({
+    const workspaceRuntime=appsRoot==='.'?null:await materializeWorkspaceRuntimeContent({
         workspaceRoot,
         signal,
         onEvent
     });
-    const importMap=await generateImportMap({
+    const importMap=appsRoot==='.'?{pending:true,reason:'sdk-install-required'}:await generateImportMap({
         workspaceRoot,
         appId,
-        appRoot:path.join(workspaceRoot,'apps',appId),
+        appRoot:resolveAppRoot(workspaceRoot,{appsRoot},appId),
         workspaceOperationLease,
         signal,
         onEvent
@@ -354,6 +358,7 @@ export async function createWorkspace({
     const result={
         workspaceRoot,
         appId,
+        appsRoot,
         displayName:template.name,
         target,
         ...writtenFiles,
@@ -370,12 +375,13 @@ export async function createWorkspace({
 export async function initWorkspace({
     workspaceRoot=process.cwd(),
     appId,
+    appsRoot,
     displayName,
     target='browser',
     signal,
     onEvent
 }){
-    validateInputs(appId,displayName);
+    if(appId!==undefined)validateInputs(appId,displayName);
     validateScaffoldTarget(target);
     throwIfAborted(signal);
     const resolvedRoot=path.resolve(workspaceRoot);
@@ -389,6 +395,28 @@ export async function initWorkspace({
     },async workspaceOperationLease=>{
     const profile=await existingWorkspaceProfile(resolvedRoot);
     const workspaceMode=profile?.workspaceMode??'external';
+    const selectedAppsRoot=appsRoot??profile?.config.appsRoot??'apps';
+    if(!['apps','.'].includes(selectedAppsRoot))fail('appsRoot must be apps or .','ARCANE_USAGE');
+    if(profile&&selectedAppsRoot!==profile.config.appsRoot){
+        fail('appsRoot must match the existing workspace layout; init does not relocate an application.','ARCANE_USAGE');
+    }
+    if(workspaceMode==='integrated'&&selectedAppsRoot==='.'){
+        fail('The integrated workspace keeps applications under apps; root scaffolding selects a standalone workspace.','ARCANE_USAGE');
+    }
+    if(selectedAppsRoot==='.'){
+        let existingId;
+        try{existingId=JSON.parse(await readFile(path.join(resolvedRoot,'arcane-package.json'),'utf8')).id;}
+        catch(error){if(error?.code!=='ENOENT')throw error;}
+        if(existingId!==undefined){
+            if(appId!==undefined&&appId!==existingId){
+                fail(`The root application id is ${existingId}; init does not replace its identity.`,'ARCANE_USAGE');
+            }
+            appId=existingId;
+        }
+    }
+    appId??=path.basename(resolvedRoot).normalize('NFKD').toLowerCase()
+        .replace(/[^a-z0-9]+/gu,'-').replace(/^-+|-+$/gu,'')||'arcane-app';
+    validateInputs(appId,displayName);
     const existingPackage=workspaceMode==='external'
         ?await readExistingPackage(resolvedRoot)
         :null;
@@ -415,6 +443,7 @@ export async function initWorkspace({
         })
         :workspaceTemplate({
             appId,
+            appsRoot:selectedAppsRoot,
             displayName,
             sdkDependencyName:sdkDeclaration.dependencyName,
             sdkDependencySpecifier:sdkDeclaration.specifier,
@@ -451,17 +480,23 @@ export async function initWorkspace({
         await emit(onEvent,{type:'scaffold.file.replaced',path:'arcane.lock.json'});
     }
     const packageUpdated=await applyPackageMerge(resolvedRoot,packagePlan,{signal,onEvent});
-    const workspaceRuntime=workspaceMode==='external'
+    const directRuntime=workspaceMode==='external'&&selectedAppsRoot==='.';
+    const workspaceRuntime=workspaceMode==='external'&&!directRuntime
         ?await materializeWorkspaceRuntimeContent({
             workspaceRoot:resolvedRoot,
             signal,
             onEvent
         })
         :null;
-    const importMap=await generateImportMap({
+    let sdkInstalled=true;
+    if(directRuntime){
+        try{await lstat(path.join(resolvedRoot,sdkDeclaration.packageSource,'package.json'));}
+        catch(error){if(error?.code==='ENOENT')sdkInstalled=false;else throw error;}
+    }
+    const importMap=!sdkInstalled?{pending:true,reason:'sdk-install-required'}:await generateImportMap({
         workspaceRoot:resolvedRoot,
         appId,
-        appRoot:path.join(resolvedRoot,'apps',appId),
+        appRoot:resolveAppRoot(resolvedRoot,{appsRoot:selectedAppsRoot},appId),
         workspaceOperationLease,
         signal,
         onEvent
@@ -470,6 +505,7 @@ export async function initWorkspace({
         workspaceRoot:resolvedRoot,
         workspaceMode,
         appId,
+        appsRoot:selectedAppsRoot,
         displayName:template.name,
         target,
         ...writtenFiles,

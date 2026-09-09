@@ -394,11 +394,25 @@ function installPwaWorker(manifest, clientUrl) {
         );
     }
 
+    function navigationRedirect(url) {
+        const exact = navigationAliases.get(url);
+        if (exact) return {location: exact, resource: cacheUrl(exact)};
+        const source = new URL(url);
+        const query = source.search;
+        if (!query) return null;
+        source.search = '';
+        const selected = navigationAliases.get(source.href);
+        if (!selected) return null;
+        const destination = new URL(selected);
+        destination.search = destination.search ? `${destination.search}&${query.slice(1)}` : query;
+        return {location: destination.href, resource: cacheUrl(selected)};
+    }
+
     async function requestedResource(request, url) {
         await restored;
-        const redirect = request.mode === 'navigate' ? navigationAliases.get(url) : null;
-        if (redirect && cacheUrl(redirect) !== url && ownedUrls.has(cacheUrl(redirect))) {
-            return {response: Response.redirect(redirect, 302), done: Promise.resolve(null)};
+        const redirect = request.mode === 'navigate' ? navigationRedirect(url) : null;
+        if (redirect && cacheUrl(redirect.location) !== url && ownedUrls.has(redirect.resource)) {
+            return {response: Response.redirect(redirect.location, 302), done: Promise.resolve(null)};
         }
         if (!ownedUrls.has(url)) {
             return {response: await fetch(request), done: Promise.resolve(null)};
@@ -422,7 +436,7 @@ function installPwaWorker(manifest, clientUrl) {
             return;
         }
         if (manifestRestored && !ownedUrls.has(url)
-            && !(request.mode === 'navigate' && navigationAliases.has(url))) {
+            && !(request.mode === 'navigate' && navigationRedirect(url))) {
             return;
         }
         const resource = requestedResource(request, url);

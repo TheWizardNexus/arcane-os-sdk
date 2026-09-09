@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.27.0
+
+- Add optional standalone `appsRoot: "."` discovery and `new`/`init --apps-root .`.
+  Preserve declared app IDs, existing multi-app/integrated layouts, nested pages,
+  and the selected native/portable package interface.
+- Serve and package direct installed SDK URLs under `/node_modules/<dependency>/`.
+  Managed bare and relative imports select the same module instances, including
+  npm aliases; dynamic component resources resolve from their own installed URL.
+- Generate root static PWA files and prior `/apps/<id>/` navigation pages through
+  the existing `arcane import-map` operation. Preserve authored installation IDs,
+  source/package defaults, query strings, fragments, and complete app content.
+  Ordinary static hosts need no additional SDK server or copied runtime.
+- Keep existing physical and virtual browser routes, Node mail APIs, listener
+  configuration, and server-consumer entrypoints unchanged.
+
 ## 0.26.0
 
 - Add explicit installed-package browser runtime routes. Source development,

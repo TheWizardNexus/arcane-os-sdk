@@ -13,6 +13,33 @@ import {
 import {workspaceTemplate} from '../src/templates/workspace-template.mjs';
 import {repositoryRoot,runNode,temporaryDirectory} from './helpers.mjs';
 
+test('root scaffold selects direct npm routes without a runtime copy or dependency execution',async t=>{
+    const parent=await temporaryDirectory(t);
+    const targetPath=path.join(parent,'moon-library-files');
+    const result=await createWorkspace({targetPath,appId:'moon-library',appsRoot:'.'});
+    assert.equal(result.appsRoot,'.');
+    assert.equal(result.workspaceRuntime,null);
+    assert.deepEqual(result.importMap,{pending:true,reason:'sdk-install-required'});
+    const config=JSON.parse(await readFile(path.join(targetPath,'arcane-packager.json'),'utf8'));
+    assert.equal(config.appsRoot,'.');
+    assert.ok(config.sharedPayloads['browser-runtime'].every(route=>route.source===route.destination));
+    const html=await readFile(path.join(targetPath,'index.html'),'utf8');
+    assert.ok(html.includes('<base href="./">'));
+    assert.ok(html.includes('./node_modules/arcane-os/runtime/arcane/css/theme.css'));
+    assert.ok(html.includes('./modules/App.js'));
+    const selected=await resolveWorkspace({workspaceRoot:targetPath});
+    assert.equal(selected.appId,'moon-library');
+    assert.equal(selected.appRoot,targetPath);
+    for(const absent of ['apps','arcane','arcane.lock.json','node_modules']){
+        await assert.rejects(lstat(path.join(targetPath,absent)),error=>error.code==='ENOENT');
+    }
+    const repeated=await initWorkspace({workspaceRoot:targetPath});
+    assert.equal(repeated.appsRoot,'.');
+    assert.equal(repeated.appId,'moon-library');
+    assert.deepEqual(repeated.importMap,{pending:true,reason:'sdk-install-required'});
+    await assert.rejects(initWorkspace({workspaceRoot:targetPath,appId:'different-app'}),/does not replace its identity/u);
+});
+
 test('workspace scaffold creates a private external app using the exact SDK version',async t=>{
     const parent=await temporaryDirectory(t);
     const targetPath=path.join(parent,'signal-lab');
@@ -84,7 +111,7 @@ test('workspace scaffold creates a private external app using the exact SDK vers
     assert.ok(theme>=0&&primitives>theme&&appStyle>primitives);
     assert.ok(managedImportMap>0&&managedImportMap<appModule);
     assert.ok(appModule>appStyle);
-    assert.doesNotMatch(html,/ThemeBootstrap[.]js[?]/u);
+    assert.doesNotMatch(html,/<script\b[^>]*\bsrc=["'][^"']*ThemeBootstrap[.]js[?]/u);
     const appSource=await readFile(path.join(appRoot,'modules','App.js'),'utf8');
     assert.match(appSource,/from 'arcane\/ThemeBootstrap'/u);
     assert.match(appSource,/from 'arcane\/AppDataScope'/u);
@@ -95,7 +122,7 @@ test('workspace scaffold creates a private external app using the exact SDK vers
     assert.deepEqual(Object.keys(importMap),['imports']);
     assert.equal(
         importMap.imports['./node_modules/strong-type/index.js'],
-        './arcane/dependencies/strong-type/index.js'
+        `./arcane/dependencies/strong-type/index.js?arcaneVersion=${SDK_VERSION}`
     );
     assert.equal(
         await readFile(path.join(targetPath,'arcane','dependencies','strong-type','index.js'),'utf8'),
@@ -202,7 +229,7 @@ test('workspace validation ignores required-element decoys inside classic-script
             workspaceConfig:selected.config,
             app:{...selected.app,appRoot:linkedAppRoot}
         }),
-        /must be a real directory/u
+        /does not belong to the selected workspace/u
     );
 
     const appsRoot=path.join(workspaceRoot,'apps');
@@ -420,7 +447,7 @@ test('init rejects an npm alias that does not target the exact SDK version',asyn
 
     await assert.rejects(
         initWorkspace({workspaceRoot,appId:'inexact-sdk-app'}),
-        /exact npm alias/u
+        /Invalid scaffold SDK installation authority/u
     );
     await assert.rejects(
         lstat(path.join(workspaceRoot,'arcane-packager.json')),
@@ -442,7 +469,7 @@ test('init rejects a versionless npm alias even beside an exact canonical SDK de
 
     await assert.rejects(
         initWorkspace({workspaceRoot,appId:'versionless-alias-sdk-app'}),
-        /exact npm alias/u
+        /exactly one Arcane SDK installation/u
     );
     await assert.rejects(
         lstat(path.join(workspaceRoot,'arcane-packager.json')),
@@ -461,7 +488,7 @@ test('init rejects an npm alias declared under the canonical SDK dependency key'
 
     await assert.rejects(
         initWorkspace({workspaceRoot,appId:'canonical-alias-sdk-app'}),
-        /distinct dependency key/u
+        /Invalid scaffold SDK installation authority/u
     );
     await assert.rejects(
         lstat(path.join(workspaceRoot,'arcane-packager.json')),
@@ -582,7 +609,7 @@ test('init adds only app-owned files to an integrated Arcane workspace',async t=
         path.join(workspaceRoot,'apps','integrated-app','arcane-app.json'),
         'utf8'
     ));
-    assert.equal(descriptor.requirements.minimumCoreVersion,'0.8.11');
+    assert.equal(Object.hasOwn(descriptor.requirements,'minimumCoreVersion'),false);
     await assert.rejects(
         readFile(path.join(workspaceRoot,'arcane.lock.json'),'utf8'),
         error=>error?.code==='ENOENT'

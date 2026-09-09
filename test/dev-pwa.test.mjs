@@ -6,18 +6,21 @@ import test from '../src/testing.mjs';
 import {startDevServer} from '../src/dev-server.mjs';
 import {createWorkspace} from '../src/scaffold.mjs';
 import {developApplication} from '../src/toolchain.mjs';
+import {installedSdkRoutes} from '../src/sdk-runtime-layout.mjs';
 import {ARCANE_PROTOCOL, SDK_VERSION} from '../src/constants.mjs';
 import {
     fetchSyntheticTls as fetch,temporaryDirectory,useSyntheticTls,writeSyntheticTlsFiles
 } from './helpers.mjs';
 
-async function sourceFixture(context, {enabled = true, authored = false, http = false} = {}) {
+async function sourceFixture(context, {
+    enabled = true, authored = false, http = false, rootApp = false, directPackage = null
+} = {}) {
     if (!http) useSyntheticTls(context);
     const workspaceRoot = await temporaryDirectory(context, {prefix: 'arcane-dev-pwa-'});
     if (!http) await writeSyntheticTlsFiles(workspaceRoot);
     const rootConfig = {
         schemaVersion: 1,
-        appsRoot: 'apps',
+        appsRoot: rootApp ? '.' : 'apps',
         distRoot: 'dist',
         sharedPayloads: {
             'browser-runtime': [
@@ -33,6 +36,12 @@ async function sourceFixture(context, {enabled = true, authored = false, http = 
             ]
         }
     };
+    if (directPackage) rootConfig.sharedPayloads['browser-runtime'] = installedSdkRoutes(
+        directPackage, {direct: true}
+    );
+    const appPrefix = rootApp ? '' : 'apps/fixture/';
+    const runtimePath = directPackage ? `${directPackage}/runtime/arcane` : 'arcane';
+    const browserRuntimePath = directPackage ? `${directPackage}/browser-runtime` : 'arcane/sdk';
     const app = {
         schemaVersion: 1,
         id: 'fixture',
@@ -52,43 +61,53 @@ async function sourceFixture(context, {enabled = true, authored = false, http = 
         };
     }
     if (authored) app.include.sort();
-    const entry = '<!doctype html><html lang="en"><head><base href="../../">'
-        + '<script type="importmap" data-arcane-import-map>{"imports":{"arcane/State":"./arcane/modules/State.js?v=1&arcaneVersion=old"}}</script>'
-        + '<link rel="stylesheet" href="./apps/fixture/styles.css?v=4">'
-        + '<script type="module" src="./apps/fixture/modules/entry.js?v=4"></script>'
+    const entry = `<!doctype html><html lang="en"><head><base href="${rootApp ? './' : '../../'}">`
+        + `<script type="importmap" data-arcane-import-map>{"imports":{"arcane/State":"./${runtimePath}/modules/State.js?v=1&arcaneVersion=old"}}</script>`
+        + `<link rel="stylesheet" href="./${appPrefix}styles.css?v=4">`
+        + `<script type="module" src="./${appPrefix}modules/entry.js?v=4"></script>`
         + '<script type="application/json">{"payload":"./data.js?v=4"}</script>'
         + '</head><body><p>First source content</p></body></html>';
-    const secondary = '<!doctype html><html lang="en"><head><base href="../../">'
-        + '<script type="module" src="./apps/fixture/modules/secondary.js?v=4"></script>'
+    const secondary = `<!doctype html><html lang="en"><head><base href="${rootApp ? './' : '../../'}">`
+        + `<script type="module" src="./${appPrefix}modules/secondary.js?v=4"></script>`
         + '</head><body>Unvisited application page</body></html>';
     const documentHtml = '<script src="./payload.js?v=4"></script><p>Complete document content.</p>';
     const documentJavaScript = "import './raw.js?v=4'; const documentText = 'Complete supplied source.';";
     const files = new Map([
-        ['package.json', JSON.stringify({name: 'dev-pwa-fixture', private: true, type: 'module', devDependencies: {'arcane-os': SDK_VERSION}})],
+        ['package.json', JSON.stringify({name: 'dev-pwa-fixture', private: true, type: 'module', devDependencies: {
+            [directPackage ? directPackage.slice('node_modules/'.length) : 'arcane-os']:
+                directPackage ? `npm:arcane-os@${SDK_VERSION}` : SDK_VERSION
+        }})],
         ['arcane-packager.json', JSON.stringify(rootConfig)],
         ['arcane.lock.json', JSON.stringify({sdk: {name: 'arcane-os', version: '9.8.7'}})],
-        ['apps/fixture/arcane-package.json', JSON.stringify(app)],
-        ['apps/fixture/index.html', entry],
-        ['apps/fixture/secondary.html', secondary],
-        ['apps/fixture/modules/entry.js', "import './entry-child.js?v=4'; export const state = 'first';"],
-        ['apps/fixture/modules/entry-child.js', 'export const first = true;'],
-        ['apps/fixture/modules/secondary.js', "import './deep.js?mode=a%20b&arcaneVersion=old&v=4';"],
-        ['apps/fixture/modules/deep.js', "export {leaf} from './leaf.js?mode=a+b&arcaneVersion=old#active'; new Worker(new URL('./worker.js?mode=a%20b&v=4', import.meta.url), {type:'module'});"],
-        ['apps/fixture/modules/leaf.js', 'export const leaf = true;'],
-        ['apps/fixture/modules/worker.js', "import './leaf.js?mode=worker&v=4';"],
-        ['apps/fixture/modules/arcane.importmap.json', '{"imports":{"leaf":"./apps/fixture/modules/leaf.js?mode=map&v=4"}}'],
-        ['apps/fixture/styles.css', '.fixture{background:url("./icon.svg?theme=a%20b&v=4")}'],
-        ['apps/fixture/icon.svg', '<svg xmlns="http://www.w3.org/2000/svg"></svg>'],
-        ['apps/fixture/documents/payload.html', documentHtml],
-        ['apps/fixture/documents/payload.js', documentJavaScript],
-        ['apps/fixture/documents/raw.js', 'export const document = true;'],
-        ['apps/fixture/documents/excluded.txt', 'Not selected for offline storage.'],
-        ['arcane/modules/State.js', "export {child} from './child.js?v=4';"],
-        ['arcane/modules/child.js', 'export const child = true;'],
-        ['arcane/sdk/pwa.mjs', 'export const servingFixture = true;']
+        [`${appPrefix}arcane-package.json`, JSON.stringify(app)],
+        [`${appPrefix}index.html`, entry],
+        [`${appPrefix}secondary.html`, secondary],
+        [`${appPrefix}modules/entry.js`, "import './entry-child.js?v=4'; export const state = 'first';"],
+        [`${appPrefix}modules/entry-child.js`, 'export const first = true;'],
+        [`${appPrefix}modules/secondary.js`, "import './deep.js?mode=a%20b&arcaneVersion=old&v=4';"],
+        [`${appPrefix}modules/deep.js`, "export {leaf} from './leaf.js?mode=a+b&arcaneVersion=old#active'; new Worker(new URL('./worker.js?mode=a%20b&v=4', import.meta.url), {type:'module'});"],
+        [`${appPrefix}modules/leaf.js`, 'export const leaf = true;'],
+        [`${appPrefix}modules/worker.js`, "import './leaf.js?mode=worker&v=4';"],
+        [`${appPrefix}modules/arcane.importmap.json`, `{"imports":{"leaf":"./${appPrefix}modules/leaf.js?mode=map&v=4"}}`],
+        [`${appPrefix}styles.css`, '.fixture{background:url("./icon.svg?theme=a%20b&v=4")}'],
+        [`${appPrefix}icon.svg`, '<svg xmlns="http://www.w3.org/2000/svg"></svg>'],
+        [`${appPrefix}documents/payload.html`, documentHtml],
+        [`${appPrefix}documents/payload.js`, documentJavaScript],
+        [`${appPrefix}documents/raw.js`, 'export const document = true;'],
+        [`${appPrefix}documents/excluded.txt`, 'Not selected for offline storage.'],
+        [`${runtimePath}/modules/State.js`, "export {child} from './child.js?v=4';"],
+        [`${runtimePath}/modules/child.js`, 'export const child = true;'],
+        [`${browserRuntimePath}/pwa.mjs`, 'export const servingFixture = true;']
     ]);
+    if (directPackage) {
+        files.set(`${directPackage}/package.json`, JSON.stringify({name: 'arcane-os', version: SDK_VERSION}));
+        files.set(`${directPackage}/runtime/strong-type/index.js`, 'export default function StrongType() {}');
+        for (const license of ['LICENSE', 'COMMERCIAL-LICENSE.md', 'NOTICE']) {
+            files.set(`${directPackage}/${license}`, 'Synthetic fixture notice.');
+        }
+    }
     if (authored) {
-        files.set('apps/fixture/arcane-app.json', JSON.stringify({
+        files.set(`${appPrefix}arcane-app.json`, JSON.stringify({
             schemaVersion: 2,
             id: app.id,
             displayName: app.displayName,
@@ -119,6 +138,60 @@ async function sourceFixture(context, {enabled = true, authored = false, http = 
     });
     return {workspaceRoot, instance, entry, documentHtml, documentJavaScript};
 }
+
+test('root source PWA retains identity and follows direct installed alias routes', async function rootSourcePwa(context) {
+    const packageSource = 'node_modules/arcane-sdk';
+    const {workspaceRoot, instance, documentHtml} = await sourceFixture(context, {
+        rootApp: true, directPackage: packageSource, authored: true, http: true
+    });
+    assert.equal(instance.url, `${instance.origin}/index.html`);
+    const query = '?view=complete%20content&tag=first&tag=second';
+    for (const legacy of ['/', '/apps/fixture', '/apps/fixture/', '/apps/fixture/index.html']) {
+        const response = await globalThis.fetch(`${instance.origin}${legacy}${query}`, {redirect: 'manual'});
+        assert.equal(response.status, 302, legacy);
+        assert.equal(response.headers.get('location'), `/index.html${query}`, legacy);
+    }
+    const nested = await globalThis.fetch(`${instance.origin}/apps/fixture/secondary.html${query}`, {redirect: 'manual'});
+    assert.equal(nested.headers.get('location'), `/secondary.html${query}`);
+    const html = await (await globalThis.fetch(instance.url)).text();
+    assert.ok(html.includes('<base href="./">'));
+    assert.ok(html.includes('src="./modules/entry.js"'));
+    assert.ok(html.includes('<link rel="manifest" href="/arcane.webmanifest">'));
+    const manifest = await (await globalThis.fetch(`${instance.origin}/arcane.webmanifest`)).json();
+    assert.equal(manifest.id, '/apps/fixture/');
+    assert.equal(manifest.scope, '/');
+    assert.equal(manifest.start_url, '/index.html');
+    assert.equal(manifest.icons[0].src, '/icon.svg');
+    const bootstrap = await (await globalThis.fetch(`${instance.origin}/arcane-pwa.mjs`)).text();
+    assert.ok(bootstrap.includes(`from "/${packageSource}/browser-runtime/pwa.mjs";`));
+    const offline = await (await globalThis.fetch(`${instance.origin}/arcane-offline.json`)).json();
+    assert.equal(offline.sdkVersion, SDK_VERSION);
+    assert.equal(offline.navigationAliases['/apps/fixture/secondary.html'], '/secondary.html');
+    assert.ok(offline.assets.includes(`/${packageSource}/runtime/arcane/modules/child.js`));
+    assert.ok(offline.assets.includes('/modules/leaf.js?mode=worker'));
+    assert.equal(offline.assets.includes('/documents/excluded.txt'), false);
+    const runtime = await globalThis.fetch(`${instance.origin}/${packageSource}/runtime/arcane/modules/State.js`);
+    assert.equal(await runtime.text(), "export {child} from './child.js';");
+    const document = await globalThis.fetch(`${instance.origin}/documents/payload.html`);
+    assert.equal(await document.text(), documentHtml);
+
+    const descriptorPath = path.join(workspaceRoot, 'arcane-app.json');
+    const descriptor = JSON.parse(await readFile(descriptorPath, 'utf8'));
+    descriptor.package.entry = 'secondary.html';
+    descriptor.package.pwa.manifest.id = '/authored-installation/';
+    await writeFile(descriptorPath, JSON.stringify(descriptor), 'utf8');
+    const changed = await (await globalThis.fetch(`${instance.origin}/arcane.webmanifest`)).json();
+    assert.equal(changed.id, '/authored-installation/');
+    assert.equal(changed.start_url, '/secondary.html');
+    assert.equal(changed.scope, '/');
+    const root = await globalThis.fetch(`${instance.origin}/${query}`, {redirect: 'manual'});
+    assert.equal(root.headers.get('location'), `/secondary.html${query}`);
+    const legacyEntry = await globalThis.fetch(`${instance.origin}/apps/fixture/index.html${query}`, {redirect: 'manual'});
+    assert.equal(legacyEntry.headers.get('location'), `/secondary.html${query}`);
+    const changedOffline = await (await globalThis.fetch(`${instance.origin}/arcane-offline.json`)).json();
+    assert.equal(changedOffline.navigationAliases['/apps/fixture/index.html'], '/secondary.html');
+    await assert.rejects(lstat(path.join(workspaceRoot, 'dist')), {code: 'ENOENT'});
+});
 
 test(
     'explicit HTTP development serves the same generated PWA and conditional offline routes',
@@ -156,7 +229,7 @@ test(
         assert.equal(manifest.scope, '/apps/fixture/');
         assert.equal(manifest.short_name, 'Fixture');
         assert.equal(manifest.icons[0].src, '/apps/fixture/icon.svg');
-        assert.ok(generated.get('/arcane-pwa.mjs').includes('import {registerPwa} from "/arcane/sdk/pwa.mjs";'));
+        assert.ok(generated.get('/arcane-pwa.mjs').includes('import {registerPwa, mountPwaInstallPrompt} from "/arcane/sdk/pwa.mjs";'));
         assert.ok(generated.get('/arcane-sw.js').includes('/apps/fixture/modules/leaf.js?mode=worker'));
         const offline = JSON.parse(generated.get('/arcane-offline.json'));
         assert.equal(offline.mode, 'development');
@@ -190,7 +263,7 @@ test('PWA source routes serve clean entries and current saved content without re
     assert.equal(manifest.icons[0].src, '/apps/fixture/icon.svg');
     const bootstrap = await fetch(`${instance.origin}/arcane-pwa.mjs`);
     assert.equal(bootstrap.status, 200);
-    assert.ok((await bootstrap.text()).includes('import {registerPwa} from "/arcane/sdk/pwa.mjs";'));
+    assert.ok((await bootstrap.text()).includes('import {registerPwa, mountPwaInstallPrompt} from "/arcane/sdk/pwa.mjs";'));
 
     await writeFile(path.join(workspaceRoot, 'apps/fixture/index.html'), entry.replace('First source content', 'Updated source content'), 'utf8');
     await writeFile(path.join(workspaceRoot, 'arcane/modules/State.js'), "export {child} from './child.js?mode=updated&v=5';", 'utf8');

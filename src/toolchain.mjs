@@ -1,6 +1,6 @@
 import Is from 'strong-type';
 import path from 'node:path';
-import {readdir,lstat,realpath} from 'node:fs/promises';
+import {readdir,lstat,realpath,mkdir,readFile,writeFile} from 'node:fs/promises';
 import {createWorkspace,initWorkspace} from './scaffold.mjs';
 import {
     discoverApps as discoverWorkspaceApps,
@@ -11,7 +11,10 @@ import {
 } from './workspace.mjs';
 import {loadArcaneIntegratedProvider} from './integrated-provider-loader.mjs';
 import {startDevServer} from './dev-server.mjs';
-import {generateImportMap,readApplicationTestImportMapContext} from './import-map.mjs';
+import {applyPwaEntryReferences,generateImportMap,readApplicationTestImportMapContext} from './import-map.mjs';
+import {rootAppNavigation} from './app-layout.mjs';
+import {createPwaArtifacts} from './pwa.mjs';
+import {readInstalledSdkLayout} from './sdk-runtime-layout.mjs';
 import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
 import {refreshAppPackageProjection} from './app-descriptor.mjs';
 import {
@@ -303,7 +306,7 @@ async function refreshPreparedImportMap(prepared,{signal,onEvent,workspaceOperat
             'The selected application package descriptor changed before import-map refresh.'
         );
     }
-    return generateImportMap({
+    const importMap=await generateImportMap({
         workspaceRoot:prepared.workspaceRoot,
         appId:prepared.appId,
         appRoot:prepared.appRoot,
@@ -314,6 +317,75 @@ async function refreshPreparedImportMap(prepared,{signal,onEvent,workspaceOperat
         workspaceOperationLease,
         signal,
         onEvent
+    });
+    if(prepared.validation.config.appsRoot==='.'){
+        await refreshRootApplicationFiles(prepared,inspected,importMap,{signal,onEvent});
+    }
+    return importMap;
+}
+
+async function refreshRootApplicationFiles(prepared,inspected,importMap,{signal,onEvent}){
+    const {workspaceRoot,appId}=prepared;
+    const manifest=prepared.validation.app.manifest;
+    const navigation=rootAppNavigation(appId,manifest.entry,inspected.browserDocuments.map(document=>document.path));
+    // These aliases belong to the SDK only after generation; retained app files stay authored.
+    for(const redirect of navigation){
+        throwIfAborted(signal);
+        try{
+            const current=await readFile(path.join(workspaceRoot,...redirect.path.split('/')),'utf8');
+            if(!current.includes('<!-- Arcane root application navigation -->')){
+                throw new ArcaneError(ERROR_CODES.workspaceInvalid,
+                    `Root application navigation would replace authored content: ${redirect.path}.`);
+            }
+        }catch(error){if(error.code!=='ENOENT')throw error;}
+    }
+    const installed=await readInstalledSdkLayout(workspaceRoot,prepared.validation.config);
+    const entry=`/${manifest.entry.split('/').map(encodeURIComponent).join('/')}`;
+    const navigationAliases={
+        '/':entry,
+        [`/apps/${appId}`]:entry,
+        [`/apps/${appId}/`]:entry,
+        ...Object.fromEntries(navigation.map(redirect=>[`/${redirect.path}`,redirect.target]))
+    };
+    // The source host serves the installed files in place. There is no runtime projection.
+    const files=[...new Set([
+        ...inspected.files.filter(file=>file!=='index.html'||manifest.include.includes('index.html')),
+        importMap.artifactRelativePath,
+        ...navigation.map(redirect=>redirect.path)
+    ])];
+    const pwa=installed?.direct&&manifest.pwa?.enabled?createPwaArtifacts({
+        app:{id:appId,displayName:manifest.displayName,version:manifest.version,entry},
+        sdkVersion:installed.version,
+        pwa:manifest.pwa,
+        files,
+        basePath:'/',
+        appBase:'/',
+        installationId:`/apps/${appId}/`,
+        runtimeBase:installed.browserRuntimeBase,
+        mode:'development',
+        navigationAliases
+    }):null;
+    for(const file of [...navigation,...(pwa?.files??[])]){
+        throwIfAborted(signal);
+        const filePath=path.join(workspaceRoot,...file.path.split('/'));
+        await mkdir(path.dirname(filePath),{recursive:true});
+        await writeFile(filePath,file.content,'utf8');
+    }
+    if(pwa){
+        for(const document of inspected.browserDocuments){
+            throwIfAborted(signal);
+            const filePath=path.join(prepared.appRoot,...document.path.split('/'));
+            const content=await readFile(filePath,'utf8');
+            await writeFile(filePath,applyPwaEntryReferences(content,{
+                manifestUrl:`/${pwa.entryAssets.manifest}`,
+                bootstrapUrl:`/${pwa.entryAssets.bootstrap}`
+            }),'utf8');
+        }
+    }
+    await emit(onEvent,{
+        type:'import-map.root-files.completed',appId,
+        navigation:navigation.map(redirect=>redirect.path),
+        pwa:pwa?.files.map(file=>file.path)??[]
     });
 }
 

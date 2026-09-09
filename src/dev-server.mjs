@@ -6,6 +6,7 @@ import https from 'node:https';
 import os from 'node:os';
 import path from 'node:path';
 import {resolveWorkspace} from './workspace.mjs';
+import {appRelativeRoot} from './app-layout.mjs';
 import {readInstalledSdkLayout} from './sdk-runtime-layout.mjs';
 import {APP_DESCRIPTOR_NAME, projectPackageManifest} from './app-descriptor.mjs';
 import {APP_CONFIG_NAME, validateAppConfig} from './packager/core.mjs';
@@ -97,7 +98,7 @@ function parseRequestTarget(rawUrl){
     let parsed;
     try{parsed=new URL(raw,'http://127.0.0.1');}
     catch{return null;}
-    return {segments,path:decoded,searchParams:parsed.searchParams};
+    return {segments,path:decoded,pathname:parsed.pathname,search:parsed.search,searchParams:parsed.searchParams};
 }
 
 function resolveInside(root,segments){
@@ -450,7 +451,8 @@ async function sourceRoutes(workspaceRoot,appId,{
 }){
     const resolved=await resolveWorkspace({workspaceRoot,appId});
     const appMapping={
-        prefix:['apps',resolved.appId],
+        kind:'app',
+        prefix:appRelativeRoot(resolved.config,resolved.appId).split('/').filter(Boolean),
         root:resolved.appRoot,
         include:resolved.app.manifest.include,
         allow:relative=>sourcePathAllowed(relative,resolved.app.manifest)
@@ -462,15 +464,24 @@ async function sourceRoutes(workspaceRoot,appId,{
             resolved.appId,
             {signal,onEvent}
         );
+        const installedRoutes=resolved.config.browserRuntimeLayout==='installed-v1'
+            ?resolved.config.sharedPayloads['browser-runtime']:null;
+        const sourceMappings=installedRoutes?sdkSource.mappings.map(
+            function selectLiveSourceDestination(mapping,index){
+                const route=installedRoutes[[0,2,1][index]];
+                return {...mapping,prefix:route.destination.split('/')};
+            }
+        ):sdkSource.mappings;
         return {
             workspaceRoot:resolved.workspaceRoot,
             workspaceMode:resolved.config.workspaceMode,
             config:resolved.config,
             appId:resolved.appId,
             app:resolved.app.manifest,
-            startPath:`/apps/${resolved.appId}/${resolved.app.manifest.entry}`,
+            startPath:applicationSourcePath(resolved.config,resolved.appId,resolved.app.manifest.entry),
             runtime:sdkSource.runtime,
-            mappings:[appMapping,...sdkSource.mappings]
+            ...(installedRoutes?{browserRuntimeBase:`/${installedRoutes[1].destination}/`}:{}),
+            mappings:[appMapping,...sourceMappings]
         };
     }
     if(resolved.config.workspaceMode==='integrated'
@@ -485,7 +496,7 @@ async function sourceRoutes(workspaceRoot,appId,{
             ...(installed?{installed}:{}),
             appId:resolved.appId,
             app:resolved.app.manifest,
-            startPath:`/apps/${resolved.appId}/${resolved.app.manifest.entry}`,
+            startPath:applicationSourcePath(resolved.config,resolved.appId,resolved.app.manifest.entry),
             mappings:[
                 appMapping,
                 ...resolved.config.sharedPayloads['browser-runtime'].map(route=>({
@@ -504,7 +515,7 @@ async function sourceRoutes(workspaceRoot,appId,{
         config:resolved.config,
         appId:resolved.appId,
         app:resolved.app.manifest,
-        startPath:`/apps/${resolved.appId}/${resolved.app.manifest.entry}`,
+        startPath:applicationSourcePath(resolved.config,resolved.appId,resolved.app.manifest.entry),
         mappings:[
             appMapping,
             {
@@ -515,6 +526,11 @@ async function sourceRoutes(workspaceRoot,appId,{
             }
         ]
     };
+}
+
+function applicationSourcePath(config,appId,relative='') {
+    const root=appRelativeRoot(config,appId);
+    return `/${root?`${root}/`:''}${relative}`;
 }
 
 async function packagedRoutes(releaseRoot){
@@ -578,8 +594,7 @@ async function sourcePwaAssets(routeSet, mappings, signal, resourceUrls, resourc
             } else if (info.isFile()) {
                 const segments = [...mapping.prefix, ...relative];
                 const url = `/${segments.map(encodeURIComponent).join('/')}`;
-                const appResource = mapping.prefix[0] === 'apps'
-                    && mapping.prefix[1] === routeSet.appId;
+                const appResource = mapping.kind === 'app';
                 const logical = (appResource ? relative : segments).join('/');
                 records.set(logical, url);
                 resources.set(url, {mapping, relative});
@@ -597,7 +612,7 @@ async function sourcePwaAssets(routeSet, mappings, signal, resourceUrls, resourc
     for (const selected of routeSet.app.include) {
         if (!/\.html?$/iu.test(selected)) continue;
         const url = new URL(
-            `/apps/${routeSet.appId}/${selected.split('/').map(encodeURIComponent).join('/')}`,
+            applicationSourcePath(routeSet.config,routeSet.appId,selected.split('/').map(encodeURIComponent).join('/')),
             origin
         );
         pending.push({url, documentUrl: url});
@@ -636,8 +651,8 @@ async function sourcePwaAssets(routeSet, mappings, signal, resourceUrls, resourc
         const documentUrl = authoredBase ? new URL(authoredBase, current.url) : current.documentUrl;
         if (!runtimeRootsAdded && pathname === entryUrl.pathname) {
             runtimeRootsAdded = true;
-            for (const url of resources.keys()) {
-                if (/^\/arcane\/.*\.(?:m?js|html?|css)$/iu.test(url)
+            for (const [url, resource] of resources) {
+                if ((resource.mapping.kind !== 'app' && /\.(?:m?js|html?|css)$/iu.test(url))
                     || path.posix.basename(url) === 'arcane.importmap.json') {
                     pending.push({url: new URL(url, origin), documentUrl});
                 }
@@ -966,7 +981,7 @@ async function startOwnedDevServer({
     let sourceManifestTask;
     const appMapping = mappings.find(
         function selectedApplicationMapping(mapping) {
-            return mapping.prefix[0] === 'apps' && mapping.prefix[1] === routeSet.appId;
+            return mapping.kind === 'app';
         }
     );
     async function refreshSourceRoutes() {
@@ -1017,7 +1032,7 @@ async function startOwnedDevServer({
         currentSourceRoutes = {
             ...routeSet,
             app: manifest,
-            startPath: `/apps/${routeSet.appId}/${manifest.entry}`,
+            startPath: applicationSourcePath(routeSet.config,routeSet.appId,manifest.entry),
             mappings: mappings.map(
                 function currentSourceMapping(mapping) {
                     return mapping === appMapping ? currentAppMapping : mapping;
@@ -1031,6 +1046,26 @@ async function startOwnedDevServer({
     let currentPwaState;
     const pwaResourceUrls = new Set();
     function developmentPwaArtifacts(selectedRoutes, assets = [], version = assetVersion) {
+        const rootApp = selectedRoutes.config.appsRoot === '.';
+        const appBase = applicationSourcePath(selectedRoutes.config,selectedRoutes.appId);
+        const navigationAliases = {'/': selectedRoutes.startPath};
+        if (rootApp) {
+            const legacyBase = `/apps/${selectedRoutes.appId}`;
+            navigationAliases[legacyBase] = selectedRoutes.startPath;
+            navigationAliases[`${legacyBase}/`] = selectedRoutes.startPath;
+            for (const asset of [selectedRoutes.startPath,...assets]) {
+                const pathname = new URL(asset,'http://arcane.invalid').pathname;
+                if (!/\.html?$/iu.test(pathname)) continue;
+                const segments = decodeURIComponent(pathname).split('/').filter(Boolean);
+                const mapping = selectedRoutes.mappings.find(function matchingNavigationRoute(route) {
+                    return route.prefix.every(function matchingNavigationSegment(segment,index) {
+                        return segments[index] === segment;
+                    });
+                });
+                if (mapping?.kind === 'app') navigationAliases[`${legacyBase}${pathname}`] = pathname;
+            }
+            navigationAliases[`${legacyBase}/index.html`] = selectedRoutes.startPath;
+        }
         return createPwaArtifacts(
             {
                 app: {
@@ -1043,10 +1078,12 @@ async function startOwnedDevServer({
                 pwa: selectedRoutes.app.pwa,
                 files: [],
                 assets,
-                navigationAliases: {'/': selectedRoutes.startPath},
+                navigationAliases,
                 basePath: '/',
-                appBase: `/apps/${routeSet.appId}/`,
-                runtimeBase: '/arcane/sdk/',
+                appBase,
+                ...(rootApp ? {installationId:`/apps/${routeSet.appId}/`} : {}),
+                runtimeBase: selectedRoutes.browserRuntimeBase
+                    ?? selectedRoutes.installed?.browserRuntimeBase ?? '/arcane/sdk/',
                 mode: 'development'
             }
         );
@@ -1138,10 +1175,25 @@ async function startOwnedDevServer({
             const {segments}=target;
             const generatedPwaPath = ['/arcane.webmanifest', '/arcane-offline.json', '/arcane-sw.js', '/arcane-pwa.mjs']
                 .includes(target.path);
-            const appRequest = segments[0] === 'apps' && segments[1] === routeSet.appId;
+            const legacyAppRequest = mode === 'source' && routeSet.config.appsRoot === '.'
+                && segments[0] === 'apps' && segments[1] === routeSet.appId;
+            const requestedMapping = currentSourceRoutes.mappings.find(function currentRequestMapping(route) {
+                return route.prefix.every(function currentRequestSegment(segment,index) {
+                    return segments[index] === segment;
+                });
+            });
+            const appRequest = requestedMapping?.kind === 'app' || legacyAppRequest;
             const selectedRoutes = mode === 'source' && (appRequest || segments.length === 0 || generatedPwaPath)
                 ? await refreshSourceRoutes() : currentSourceRoutes;
             const pwaEnabled = mode === 'source' ? selectedRoutes.app?.pwa?.enabled === true : routeSet.pwa;
+            if (legacyAppRequest) {
+                const legacyPath = target.pathname.slice(`/apps/${routeSet.appId}`.length);
+                const location = !legacyPath || legacyPath === '/' || legacyPath === '/index.html'
+                    ? selectedRoutes.startPath : legacyPath;
+                response.writeHead(302,{location:`${location}${target.search}`});
+                response.end();
+                return;
+            }
             if (mode === 'source' && pwaEnabled
                 && generatedPwaPath) {
                 const generated = await sourcePwaArtifact(target.path, selectedRoutes);
@@ -1163,7 +1215,7 @@ async function startOwnedDevServer({
                 return;
             }
             if(segments.length===0){
-                response.writeHead(302,{location:selectedRoutes.startPath});
+                response.writeHead(302,{location:`${selectedRoutes.startPath}${target.search}`});
                 response.end();
                 return;
             }
@@ -1195,7 +1247,7 @@ async function startOwnedDevServer({
                 const extension=path.extname(opened.candidate).toLowerCase();
                 const html=extension==='.html'||extension==='.htm';
                 const selectedPwaDocument = mode === 'source' && pwaEnabled && html
-                    && mapping.prefix[0] === 'apps' && mapping.prefix[1] === routeSet.appId
+                    && mapping.kind === 'app'
                     && selectedRoutes.app.include.includes(relative.join('/'));
                 const selectedDocument = target.path === selectedRoutes.startPath || selectedPwaDocument;
                 const managedDocument = !selectedDocument && html && await isManagedDocument(opened);
@@ -1204,7 +1256,7 @@ async function startOwnedDevServer({
                 // A live server can span an SDK upgrade. Refresh the small
                 // version record on navigation, not on each resource request.
                 if(entryDocument||managedMap)rememberAssetVersion(await selectedAssetVersion());
-                const runtimeResource=segments[0]==='arcane';
+                const runtimeResource=mapping.kind!=='app';
                 const browserResource=['script','style','worker','sharedworker','serviceworker']
                     .includes(request.headers['sec-fetch-dest']);
                 const rewrite=runtimeResource||entryDocument||browserResource||managedMap

@@ -536,25 +536,34 @@ test('Removing a loading component or disposing its owner settles mounting and p
         document.createElement = function createImportHost() {
             element = new EventTarget();
             element.dataset = {};
-            element.setAttribute = function setHostAttribute() {};
+            element.setAttribute = function setHostAttribute(name, value) { element[name] = value; };
             element.remove = function removeHost() { element.isConnected = false; };
             return element;
         };
         document.body = {append(host) { host.isConnected = true; appended(host); }};
         const source = await readFile(new URL('../browser-runtime/pwa-install.mjs', import.meta.url), 'utf8');
-        const execute = new Function('Is', 'createArcaneEventSource', 'loadModule', source
+        const execute = new Function('Is', 'createArcaneEventSource', 'loadModule', 'resolveModule', source
             .replace(/^import .+;\r?$/gmu, '')
             .replace(/^export /gmu, '')
             .replaceAll('import.meta.url', "'https://example.test/arcane/sdk/pwa-install.mjs'")
+            .replaceAll('import.meta.resolve', 'resolveModule')
             .replaceAll('import(', 'loadModule(')
             + '\nreturn {getPwaInstall, mountPwaInstallPrompt};');
-        const module = execute(Is, createArcaneEventSource, function loadManagedModule() {
+        const imported = [];
+        const module = execute(Is, createArcaneEventSource, function loadManagedModule(specifier) {
+            imported.push(specifier);
             return Promise.resolve({});
+        }, function resolveManagedModule(specifier) {
+            assert.equal(specifier, 'arcane/HTMLImport');
+            return 'https://example.test/node_modules/arcane-sdk/runtime/arcane/modules/HTMLImport.js';
         });
         try {
             let attached = new Promise(function firstAttachment(resolve) { appended = resolve; });
             const mounting = module.mountPwaInstallPrompt();
             const host = await attached;
+            assert.ok(imported.includes('arcane/HTMLImport'));
+            assert.ok(imported.includes('arcane/ThemeBootstrap'));
+            assert.equal(host.href, 'https://example.test/node_modules/arcane-sdk/runtime/arcane/components/pwa-install.html');
             host.remove();
             observedRemoval();
             await assert.rejects(mounting, {name: 'AbortError'});

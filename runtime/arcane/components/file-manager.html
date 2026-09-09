@@ -352,6 +352,7 @@
     //importing Document at the end of the file to avoid blocking;
 
     const host=this;
+    const componentHref=new URL(host.getAttribute('href'),document.baseURI);
     const {default:waitForComponent}=await import('../modules/WaitForComponent.js');
     const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
     const events=createArcaneEventSource(host,{source:'arcane.component.file-manager',eventTypes:['file-manager-action','file-manager-select','file-manager-open','file-manager-ready']});
@@ -830,8 +831,8 @@
         icon.className='tree-entry-icon';
         icon.alt='';
         icon.src=entry.kind==='directory'
-            ?new URL('./arcane/img/folder.svg',document.baseURI).href
-            :new URL('./arcane/img/doc.svg',document.baseURI).href;
+            ?new URL('../img/folder.svg',componentHref).href
+            :new URL('../img/doc.svg',componentHref).href;
         name.className='tree-entry-name';
         name.innerText=entry.name;
         count.className='tree-file-count';
@@ -1409,7 +1410,7 @@
         deleteButton.innerText='Delete File';
         deleteIcon.alt='';
         deleteIcon.className='action-icon';
-        deleteIcon.src=new URL('./arcane/img/trash.svg',document.baseURI).href;
+        deleteIcon.src=new URL('../img/trash.svg',componentHref).href;
         deleteButton.prepend(deleteIcon);
         deleteButton.addEventListener(
             'click',
@@ -1615,7 +1616,7 @@
 
         fileIcon.alt='';
         fileIcon.className='icon file-icon';
-        fileIcon.src=new URL('./arcane/img/doc.svg',document.baseURI).href;
+        fileIcon.src=new URL('../img/doc.svg',componentHref).href;
         fileDetails.className='file-details';
         fileLabel.className='file-name';
         fileLabel.innerText=fileName;
@@ -1638,7 +1639,7 @@
 
         deleteIcon.alt='';
         deleteIcon.className='action-icon';
-        deleteIcon.src=new URL('./arcane/img/trash.svg',document.baseURI).href;
+        deleteIcon.src=new URL('../img/trash.svg',componentHref).href;
 
         openButton.addEventListener(
             'click',
@@ -1938,7 +1939,7 @@
             directory.dataset.directory=tableName;
             folder.className='file folder';
             folderIcon.className='icon';
-            folderIcon.src=new URL('./arcane/img/folder.svg',document.baseURI).href;
+            folderIcon.src=new URL('../img/folder.svg',componentHref).href;
             folderName.innerText=tableName;
             fileCount.className='file-count';
             fileCount.innerText=`${files.length} ${files.length===1?'file':'files'}`;

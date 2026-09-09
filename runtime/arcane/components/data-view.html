@@ -20,6 +20,7 @@
     const {arcaneLogging}=await import('arcane-os/logging');
 
     const host=this;
+    const componentHref=new URL(host.getAttribute('href'),document.baseURI);
     const openButton=host.shadowRoot.querySelector('#openData');
     const dataModal=host.shadowRoot.querySelector('#dataModal');
     const {default:waitForComponent}=await import('../modules/WaitForComponent.js');
@@ -89,7 +90,7 @@
             fileManager.dataset.layout=host.dataset.layout||'files';
             fileManager.setAttribute(
                 'href',
-                './arcane/components/file-manager.html?v=18'
+                new URL('./file-manager.html?v=18',componentHref).href
             );
 
             content.append(heading,fileManager);

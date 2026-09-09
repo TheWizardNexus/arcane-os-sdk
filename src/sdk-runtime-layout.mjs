@@ -4,9 +4,9 @@ import path from 'node:path';
 
 const is=new Is(false);
 
-// The browser URLs stay the same; only the source of their files changes.
-export function installedSdkRoutes(packageSource,{security=false}={}){
-    return [
+// Direct routes use the installed npm paths in both the browser and selected output.
+export function installedSdkRoutes(packageSource,{security=false,direct=false}={}){
+    const routes=[
         {
             source:`${packageSource}/runtime/arcane`,destination:'arcane',
             include:['components','css','entities','img','modules',...(security?['security']:[])],exclude:[]
@@ -24,6 +24,7 @@ export function installedSdkRoutes(packageSource,{security=false}={}){
             include:['LICENSE','COMMERCIAL-LICENSE.md','NOTICE'],exclude:[]
         }
     ];
+    return direct?routes.map(route=>({...route,destination:route.source})):routes;
 }
 
 export function installedSdkPackageSource(config){
@@ -31,7 +32,10 @@ export function installedSdkPackageSource(config){
     if(!is.array(routes)||routes.length!==4)return null;
     const source=routes[3]?.source;
     if(!is.string(source)||!/^node_modules\/(?:@[a-z0-9._-]+\/)?[a-z0-9][a-z0-9._-]*$/u.test(source))return null;
-    const expected=installedSdkRoutes(source,{security:routes[0]?.include?.at(-1)==='security'});
+    const expected=installedSdkRoutes(source,{
+        security:routes[0]?.include?.at(-1)==='security',
+        direct:routes[0]?.destination===routes[0]?.source
+    });
     return routes.every(function matchesInstalledRoute(route,index){
         const wanted=expected[index];
         return route?.source===wanted.source&&route?.destination===wanted.destination
@@ -56,7 +60,13 @@ export async function readInstalledSdkLayout(workspaceRoot,config){
         error.code='ARCANE_WORKSPACE_INVALID';
         throw error;
     }
-    return {packageSource,packageRoot,versionPath,version:manifest.version,routes:config.sharedPayloads['browser-runtime']};
+    const routes=config.sharedPayloads['browser-runtime'];
+    return {
+        packageSource,packageRoot,versionPath,version:manifest.version,routes,
+        direct:routes[0].destination===routes[0].source,
+        runtimeBase:`/${routes[0].destination}/`,
+        browserRuntimeBase:`/${routes[1].destination}/`
+    };
 }
 
 export async function installedRuntimeFiles(workspaceRoot,layout,signal){
@@ -71,9 +81,9 @@ export async function installedRuntimeFiles(workspaceRoot,layout,signal){
             else if(entry.isFile())files.push(relative);
         }
     }
-    for(const route of layout.routes){
-        if(route.destination!=='arcane'&&!route.destination.startsWith('arcane/'))continue;
-        const prefix=route.destination==='arcane'?'':route.destination.slice('arcane/'.length);
+    for(const [index,route] of layout.routes.entries()){
+        if(index===3)continue;
+        const prefix=['','sdk','dependencies/strong-type'][index];
         for(const selected of route.include){
             const suffix=selected==='.'?'':selected;
             await visit(
@@ -85,15 +95,18 @@ export async function installedRuntimeFiles(workspaceRoot,layout,signal){
     return {files:files.sort()};
 }
 
-export function installedRuntimeTarget(relative,layout){
-    for(const route of [...layout.routes].sort(function longestDestinationFirst(left,right){
-        return right.destination.length-left.destination.length;
+export function installedRuntimeTarget(relative,layout,{browser=false}={}){
+    const logicalRoots=['arcane','arcane/sdk','arcane/dependencies/strong-type','licenses/arcane-os'];
+    const routes=layout.routes.map((route,index)=>({...route,logical:logicalRoots[index]}));
+    for(const route of routes.sort(function longestDestinationFirst(left,right){
+        return right.logical.length-left.logical.length;
     })){
-        if(!relative.startsWith(`${route.destination}/`))continue;
-        const suffix=relative.slice(route.destination.length+1);
+        if(!relative.startsWith(`${route.logical}/`))continue;
+        const suffix=relative.slice(route.logical.length+1);
         if(route.include.some(function includesRuntimeTarget(selected){
-            return selected==='.'||suffix===selected||suffix.startsWith(`${selected}/`);
-        }))return `${route.source}/${suffix}`;
+            const pathname=suffix.split(/[?#]/u)[0];
+            return selected==='.'||pathname===selected||pathname.startsWith(`${selected}/`);
+        }))return `${browser?route.destination:route.source}/${suffix}`;
     }
     return relative;
 }

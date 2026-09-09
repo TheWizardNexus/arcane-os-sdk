@@ -273,8 +273,8 @@ export function mountPwaInstallPrompt({appName = ''} = {}) {
         if (!globalThis.document) return null;
         // Both modules may start independently; saved theme loading is not a barrier.
         await Promise.all([
-            import(new URL('../modules/HTMLImport.js', import.meta.url).href),
-            import(new URL('../modules/ThemeBootstrap.js', import.meta.url).href)
+            import('arcane/HTMLImport'),
+            import('arcane/ThemeBootstrap')
         ]);
         if (owner.state.status === 'disposed') return null;
         if (!document.body) {
@@ -295,7 +295,7 @@ export function mountPwaInstallPrompt({appName = ''} = {}) {
         host.hidden = true;
         host.dataset.appName = String(appName);
         host.dataset.arcanePwaInstall = '';
-        host.setAttribute('href', new URL('../components/pwa-install.html', import.meta.url).href);
+        host.setAttribute('href', new URL('../components/pwa-install.html', import.meta.resolve('arcane/HTMLImport')).href);
         return new Promise(function waitForInstallComponent(resolve, reject) {
             const observer = new MutationObserver(function observeRemovedInstallComponent() {
                 if (!host.isConnected) cancelMount();

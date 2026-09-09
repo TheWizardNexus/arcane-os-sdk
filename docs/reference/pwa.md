@@ -47,6 +47,18 @@ explicit `id` and `scope` values, resolve against `./apps/<id>/`; an icon such
 as `img/library.png` therefore remains beneath the app directory. Absolute URL
 fields retain their authored destination.
 
+For `appsRoot: "."`, application URLs stay at the deployment root. Direct npm
+routes keep runtime URLs under `/node_modules/<dependency>/...`. The public
+`arcane import-map` operation generates static PWA files beside the root entry
+and adds their links to the selected navigable documents. This works with an
+ordinary static host; it does not copy the installed runtime into `arcane/`.
+The source root defaults its installation ID to `/apps/<id>/` to preserve the
+previous source identity while its start URL and scope move to the root. An
+authored `manifest.id` remains authoritative. Packaged default identity remains
+`./`. Existing `/apps/<id>/` navigation aliases retain query strings and
+fragments and lead to the selected root document. No stored application data is
+rewritten by changing the layout.
+
 `offline.include` and `offline.exclude` select literal paths or directory
 prefixes from the selected emitted inventory. An omitted or empty include list
 selects that inventory; exclusions subtract from it. App files use app-relative

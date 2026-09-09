@@ -1,4 +1,5 @@
 import Is from 'strong-type';
+import {appRelativeRoot, resolveAppRoot, appBaseHref} from './app-layout.mjs';
 import {readFile,readdir,realpath,stat} from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -228,6 +229,25 @@ async function discoverAppsInRoot(root,config,appId){
     if(appId!==undefined&&(!is.string(appId)||!APP_ID_PATTERN.test(appId))){
         fail(`Invalid app id: ${String(appId)}.`,'ARCANE_USAGE');
     }
+    async function readApp(appRoot,id,manifest){
+        const configPath=path.join(appRoot,APP_CONFIG_NAME);
+        manifest??=await readJson(configPath,`${appRelativeRoot(config,id) || '.'}/${APP_CONFIG_NAME}`);
+        const validatedManifest=validatePackagerAppConfig(manifest,id,config,configPath);
+        if(!validatedManifest.shared.includes('browser-runtime')){
+            fail(`${configPath} must include the browser-runtime shared payload.`);
+        }
+        const descriptor=await loadAppDescriptor({workspaceRoot:root,appRoot,appId:id,packageManifest:manifest});
+        return completeValue({
+            appId:id,appRoot,manifest:validatedManifest,
+            descriptor:descriptor.descriptor,descriptorSource:descriptor.source,
+            descriptorPath:descriptor.descriptorPath
+        });
+    }
+    if(config.appsRoot==='.'){
+        const manifest=await readJson(path.join(root,APP_CONFIG_NAME),APP_CONFIG_NAME);
+        if(appId!==undefined&&appId!==manifest.id)return [];
+        return [await readApp(root,manifest.id,manifest)];
+    }
     const appsRoot=path.join(root,'apps');
     await assertRealDirectory(appsRoot,'Workspace apps root');
     const entries=await readdir(appsRoot,{withFileTypes:true});
@@ -240,26 +260,7 @@ async function discoverAppsInRoot(root,config,appId){
         if(!entry.isDirectory())continue;
         const appRoot=path.join(appsRoot,entry.name);
         try{
-            const configPath=path.join(appRoot,APP_CONFIG_NAME);
-            const manifest=await readJson(configPath,`apps/${entry.name}/${APP_CONFIG_NAME}`);
-            const validatedManifest=validatePackagerAppConfig(manifest,entry.name,config,configPath);
-            if(!validatedManifest.shared.includes('browser-runtime')){
-                fail(`apps/${entry.name}/${APP_CONFIG_NAME} must include the browser-runtime shared payload.`);
-            }
-            const descriptor=await loadAppDescriptor({
-                workspaceRoot:root,
-                appRoot,
-                appId:entry.name,
-                packageManifest:manifest
-            });
-            apps.push(completeValue({
-                appId:entry.name,
-                appRoot,
-                manifest:validatedManifest,
-                descriptor:descriptor.descriptor,
-                descriptorSource:descriptor.source,
-                descriptorPath:descriptor.descriptorPath
-            }));
+            apps.push(await readApp(appRoot,entry.name));
         }catch(error){
             if(!String(error?.message).includes('does not exist'))throw error;
         }
@@ -294,7 +295,7 @@ export async function selectApp(workspaceRoot=process.cwd(),appId){
         if(!selected)fail(`Unknown app "${appId}".`);
         return selected;
     }
-    if(apps.length===0)fail('No Arcane applications were found under apps/.');
+    if(apps.length===0)fail('No Arcane applications were found at the configured appsRoot.');
     if(apps.length>1){
         fail(`This workspace contains multiple apps; select one explicitly: ${apps.map(app=>app.appId).join(', ')}.`,'ARCANE_USAGE');
     }
@@ -313,7 +314,7 @@ export async function resolveWorkspace({workspaceRoot=process.cwd(),appId}={}){
     }else if(apps.length===1){
         [app]=apps;
     }else if(apps.length===0){
-        fail('No Arcane applications were found under apps/.');
+        fail('No Arcane applications were found at the configured appsRoot.');
     }else{
         fail(`This workspace contains multiple apps; select one explicitly: ${apps.map(item=>item.appId).join(', ')}.`,'ARCANE_USAGE');
     }
@@ -363,39 +364,43 @@ export async function resolveInstalledSdkInstallation(workspaceRoot,declaration)
 
 function assertHtmlContract(source,appId,{
     entry='index.html',
+    appPath=`apps/${appId}`,
+    baseHref='../../',
+    runtimePath='arcane',
     strictStyles=true,
     allowMissingManagedImportMap=false
 }={}){
-    const entryLabel=`apps/${appId}/${entry}`;
+    const entryLabel=[appPath,entry].filter(Boolean).join('/');
     const htmlContract=inspectImportMapHtml(source);
     const appIdMetadata=htmlContract.metas.filter(meta=>meta.name==='arcane-app-id');
     if(appIdMetadata.length!==1||appIdMetadata[0].content!==appId){
         fail(`${entryLabel} must declare exactly one active matching arcane-app-id metadata element.`);
     }
-    if(htmlContract.bases.length!==1||htmlContract.bases[0].href!=='../../'){
-        fail(`${entryLabel} must declare exactly one active <base href="../../">.`);
+    if(htmlContract.bases.length!==1||htmlContract.bases[0].href!==baseHref){
+        fail(`${entryLabel} must declare exactly one active <base href="${baseHref}">.`);
     }
-    const resourcePath=value=>value.split(/[?#]/u,1)[0];
+    const resourcePath=value=>value.split(/[?#]/u,1)[0].replace(/^\.\//u,'/');
     const styles=htmlContract.links.filter(link=>link.rel
         .split(/[\t\n\f\r ]+/u).includes('stylesheet'));
     const positionOfStyle=expected=>styles.find(link=>resourcePath(link.href)===expected)?.start??-1;
-    const theme=positionOfStyle('./arcane/css/theme.css');
-    const primitives=positionOfStyle('./arcane/css/primitives.css');
-    const escapedAppId=appId.replace(/[.*+?^${}()|[\]\\]/gu,'\\$&');
+    const theme=positionOfStyle(`/${runtimePath}/css/theme.css`);
+    const primitives=positionOfStyle(`/${runtimePath}/css/primitives.css`);
+    const appPrefix=appPath?`${appPath}/`:'';
+    const escapedAppPrefix=appPrefix.replace(/[.*+?^${}()|[\]\\]/gu,'\\$&');
     const appStyle=styles.find(link=>new RegExp(
-        `^(?:\\./|/)apps/${escapedAppId}/[^/]+\\.css$`,
+        `^(?:\\./|/)${escapedAppPrefix}[^/]+\\.css$`,
         'u'
     ).test(resourcePath(link.href)))?.start??-1;
     const modules=htmlContract.scripts.filter(script=>script.type==='module'&&script.src);
     const bootstrap=modules.find(script=>resourcePath(script.src)
-        ==='./arcane/modules/ThemeBootstrap.js')?.start??-1;
+        ===`/${runtimePath}/modules/ThemeBootstrap.js`)?.start??-1;
     if(htmlContract.managedMaps.length>1){
         fail(`${entryLabel} must contain at most one active managed Arcane import map.`);
     }
     const managedImportMap=htmlContract.managedMaps[0]?.start??-1;
     const firstModule=htmlContract.firstModulePosition;
     const appModule=modules.find(script=>new RegExp(
-        `^(?:\\./|/)apps/${escapedAppId}/.+\\.(?:js|mjs)$`,
+        `^(?:\\./|/)${escapedAppPrefix}(?!arcane/|node_modules/).+\\.(?:js|mjs)$`,
         'u'
     ).test(resourcePath(script.src)))?.start??-1;
     if(theme<0){
@@ -444,12 +449,6 @@ export async function validateDiscoveredApplication({
         fail('A discovered Arcane application is required for focused validation.');
     }
     const canonicalWorkspaceRoot=await realpath(workspaceRoot);
-    await assertRealDirectory(path.join(canonicalWorkspaceRoot,'apps'),'Workspace apps root');
-    const expectedAppRoot=path.join(canonicalWorkspaceRoot,'apps',app.appId);
-    if(!sameDirectoryPath(app.appRoot,expectedAppRoot)){
-        fail(`Discovered app ${app.appId} does not belong to the selected workspace.`);
-    }
-    const canonicalAppRoot=await realpath(app.appRoot);
     let config=workspaceConfig;
     if(!config){
         const profile=await inspectWorkspaceProfile(canonicalWorkspaceRoot);
@@ -461,6 +460,12 @@ export async function validateDiscoveredApplication({
     if(!isObject(config?.sharedPayloads)){
         fail('The selected Arcane workspace configuration is unavailable for focused validation.');
     }
+    const expectedAppRoot=resolveAppRoot(canonicalWorkspaceRoot,config,app.appId);
+    await assertRealDirectory(expectedAppRoot,'Selected application root');
+    if(!sameDirectoryPath(app.appRoot,expectedAppRoot)){
+        fail(`Discovered app ${app.appId} does not belong to the selected workspace.`);
+    }
+    const canonicalAppRoot=await realpath(app.appRoot);
     const configPath=path.join(canonicalAppRoot,APP_CONFIG_NAME);
     const rawManifest=await readJson(
         configPath,
@@ -492,6 +497,9 @@ export async function validateDiscoveredApplication({
     }
     assertHtmlContract(await readFile(entryPath,'utf8'),app.appId,{
         entry:manifest.entry,
+        appPath:appRelativeRoot(config,app.appId),
+        baseHref:appBaseHref(canonicalWorkspaceRoot,canonicalAppRoot,manifest.entry),
+        runtimePath:config.sharedPayloads['browser-runtime'][0].destination,
         strictStyles:workspaceMode==='external',
         allowMissingManagedImportMap
     });

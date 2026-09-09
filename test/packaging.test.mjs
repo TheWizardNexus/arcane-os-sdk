@@ -17,17 +17,17 @@ async function writeJson(filePath,value){
     await writeFile(filePath,`${JSON.stringify(value,null,2)}\n`,'utf8');
 }
 
-async function workspaceFixture(t,{security}={}){
+async function workspaceFixture(t,{security,appsRoot='apps'}={}){
     const workspaceRoot=await mkdtemp(path.join(os.tmpdir(),'arcane-packager-content-'));
     t.after(()=>rm(workspaceRoot,{recursive:true,force:true}));
-    const appRoot=path.join(workspaceRoot,'apps','complete-app');
+    const appRoot=appsRoot==='.'?workspaceRoot:path.join(workspaceRoot,'apps','complete-app');
     await Promise.all([
         mkdir(path.join(appRoot,'content'),{recursive:true}),
         mkdir(path.join(workspaceRoot,'runtime','modules'),{recursive:true})
     ]);
     await writeJson(path.join(workspaceRoot,'arcane-packager.json'),{
         schemaVersion:1,
-        appsRoot:'apps',
+        appsRoot,
         distRoot:'dist',
         sharedPayloads:{
             runtime:[{
@@ -87,14 +87,14 @@ test('selected static package carries one release through entry, modules, Worker
         +'<script type="module" src="./apps/complete-app/content/App.js"></script>');
     const packaged=await packageApp({workspaceRoot:selected.workspaceRoot,appId:'complete-app'});
     const entry=await readFile(path.join(packaged.outputRoot,'apps/complete-app/index.html'),'utf8');
-    assert.ok(entry.includes(`entry.js?v=6&amp;arcaneVersion=${version}`));
+    assert.ok(entry.includes(`entry.js?arcaneVersion=${version}`),entry);
     assert.ok(entry.includes(`theme.css?theme=day&amp;arcaneVersion=${version}#palette`));
     assert.ok(entry.includes('<p>./arcane/modules/entry.js?v=6</p>'));
     const module=await readFile(path.join(packaged.outputRoot,'arcane/modules/entry.js'),'utf8');
-    assert.ok(module.includes(`child.js?v=2&arcaneVersion=${version}`));
+    assert.ok(module.includes(`child.js?arcaneVersion=${version}`),module);
     assert.ok(module.includes(`worker.js?arcaneVersion=${version}`));
     const worker=await readFile(path.join(packaged.outputRoot,'arcane/modules/worker.js'),'utf8');
-    assert.ok(worker.includes(`child.js?v=2&arcaneVersion=${version}`));
+    assert.ok(worker.includes(`child.js?arcaneVersion=${version}`),worker);
     const style=await readFile(path.join(packaged.outputRoot,'arcane/modules/theme.css'),'utf8');
     assert.ok(style.includes(`icon.svg?color=blue&arcaneVersion=${version}#mark`));
     assert.equal(await readFile(path.join(packaged.outputRoot,'apps/complete-app/content/document.html'),'utf8'),corpus);
@@ -142,6 +142,110 @@ test('packager materializes every selected app and shared file with complete con
     const verified=await verifyApp({workspaceRoot:selected.workspaceRoot,appId:'complete-app'});
     assert.equal(verified.verified,true);
     assert.deepEqual(verified.files,inspected.files);
+});
+
+test('standalone root discovery selects the declared id and packages complete content without an apps prefix',async function standaloneRootPackage(t){
+    const selected=await workspaceFixture(t,{appsRoot:'.'});
+    const nestedAppRoot=path.join(selected.workspaceRoot,'apps','unrelated-app');
+    await mkdir(nestedAppRoot,{recursive:true});
+    await writeJson(path.join(nestedAppRoot,'arcane-package.json'),{id:'unrelated-app'});
+    assert.deepEqual(await discoverApps({workspaceRoot:selected.workspaceRoot}),['complete-app']);
+    await assert.rejects(
+        inspectApp({workspaceRoot:selected.workspaceRoot,appId:'unrelated-app'}),
+        /id must be a valid application id matching the selected application/u
+    );
+    const inspected=await inspectApp({workspaceRoot:selected.workspaceRoot,appId:'complete-app'});
+    assert.deepEqual(inspected.files,[
+        'apps/complete-app/index.html','arcane/modules/complete.js','content/document.txt','index.html'
+    ]);
+    assert.equal(inspected.output,'dist/complete-app');
+    assert.deepEqual(inspected.browserDocuments.map(function appDocument(document){
+        return {path:document.path,packagePath:document.packagePath};
+    }),[{path:'index.html',packagePath:'index.html'}]);
+    const packaged=await packageApp({workspaceRoot:selected.workspaceRoot,appId:'complete-app'});
+    assert.equal(packaged.manifest.app.start,'./index.html');
+    assert.deepEqual(packaged.files,inspected.files);
+    assert.equal(await readFile(path.join(packaged.outputRoot,'index.html'),'utf8'),selected.html);
+    assert.equal(await readFile(path.join(packaged.outputRoot,'content/document.txt'),'utf8'),selected.document);
+    assert.equal(await readFile(path.join(packaged.outputRoot,'arcane/modules/complete.js'),'utf8'),selected.module);
+    assert.equal(await readFile(path.join(selected.appRoot,'index.html'),'utf8'),selected.html);
+    const verified=await verifyApp({workspaceRoot:selected.workspaceRoot,appId:'complete-app'});
+    assert.equal(verified.verified,true);
+    assert.deepEqual(verified.files,inspected.files);
+});
+
+test('standalone nested pages retain their bases and shared HTML stays outside app document discovery',async function standaloneNestedDocuments(t){
+    const selected=await workspaceFixture(t,{appsRoot:'.'});
+    const configPath=path.join(selected.appRoot,'arcane-package.json');
+    const config=JSON.parse(await readFile(configPath,'utf8'));
+    config.entry='pages/review.html';
+    config.include=['pages','modules','content'];
+    await writeJson(configPath,config);
+    await Promise.all([
+        mkdir(path.join(selected.appRoot,'pages')),
+        mkdir(path.join(selected.appRoot,'modules'))
+    ]);
+    const page='<!doctype html><base href="../">'
+        +'<script type="module" src="./modules/App.js"></script>'
+        +'<script type="module" src="./arcane/modules/complete.js"></script>'
+        +'<p>  Complete nested page content  </p>\n';
+    const fragment='<p>  Complete fragment without a document base  </p>\n';
+    const sharedPage='<!doctype html><base href="./"><p>Shared content is not an app page.</p>\n';
+    const appModule="import '../arcane/modules/complete.js';\n";
+    await Promise.all([
+        writeFile(path.join(selected.appRoot,'pages/review.html'),page),
+        writeFile(path.join(selected.appRoot,'pages/other.htm'),page),
+        writeFile(path.join(selected.appRoot,'content/fragment.html'),fragment),
+        writeFile(path.join(selected.appRoot,'modules/App.js'),appModule),
+        writeFile(path.join(selected.workspaceRoot,'runtime/modules/shared.html'),sharedPage)
+    ]);
+    const inspected=await inspectApp({workspaceRoot:selected.workspaceRoot,appId:'complete-app'});
+    assert.deepEqual(inspected.browserDocuments.map(function documentPath(document){
+        return {path:document.path,packagePath:document.packagePath};
+    }),[
+        {path:'pages/review.html',packagePath:'pages/review.html'},
+        {path:'pages/other.htm',packagePath:'pages/other.htm'}
+    ]);
+    const packaged=await packageApp({workspaceRoot:selected.workspaceRoot,appId:'complete-app'});
+    assert.equal(packaged.manifest.app.start,'./pages/review.html');
+    const launcher=await readFile(path.join(packaged.outputRoot,'index.html'),'utf8');
+    assert.ok(launcher.includes('url=./pages/review.html'));
+    const mount=new URL('https://example.test/releases/standalone/');
+    for(const relative of ['pages/review.html','pages/other.htm']){
+        const content=await readFile(path.join(packaged.outputRoot,relative),'utf8');
+        assert.ok(content.includes('<p>  Complete nested page content  </p>\n'));
+        assert.equal(await readFile(path.join(selected.appRoot,relative),'utf8'),page);
+        const base=new URL(content.match(/<base href="([^"]+)">/u)[1],new URL(relative,mount));
+        assert.equal(base.href,mount.href);
+        for(const match of content.matchAll(/src="([^"]+)"/gu)){
+            const resource=new URL(match[1],base);
+            assert.ok(packaged.files.includes(resource.pathname.slice(mount.pathname.length)));
+        }
+    }
+    assert.equal(await readFile(path.join(selected.appRoot,'modules/App.js'),'utf8'),appModule);
+    const packagedModule=await readFile(path.join(packaged.outputRoot,'modules/App.js'),'utf8');
+    assert.equal(new URL(packagedModule.match(/import '([^']+)'/u)[1],new URL('modules/App.js',mount)).pathname,
+        new URL('arcane/modules/complete.js',mount).pathname);
+    assert.equal(await readFile(path.join(packaged.outputRoot,'content/fragment.html'),'utf8'),fragment);
+    assert.equal(await readFile(path.join(packaged.outputRoot,'arcane/modules/shared.html'),'utf8'),sharedPage);
+    assert.equal(await readFile(path.join(selected.appRoot,'index.html'),'utf8'),selected.html);
+});
+
+test('standalone app and shared routes report a real destination collision without replacing either source',async function standaloneDestinationCollision(t){
+    const selected=await workspaceFixture(t,{appsRoot:'.'});
+    const configPath=path.join(selected.appRoot,'arcane-package.json');
+    const config=JSON.parse(await readFile(configPath,'utf8'));
+    config.include.push('arcane');
+    await writeJson(configPath,config);
+    await mkdir(path.join(selected.appRoot,'arcane/modules'),{recursive:true});
+    const authored='export const authored = "complete app-owned content";\n';
+    await writeFile(path.join(selected.appRoot,'arcane/modules/complete.js'),authored);
+    await assert.rejects(
+        packageApp({workspaceRoot:selected.workspaceRoot,appId:'complete-app'}),
+        /Package destination collision: arcane\/modules\/complete\.js/u
+    );
+    assert.equal(await readFile(path.join(selected.appRoot,'arcane/modules/complete.js'),'utf8'),authored);
+    assert.equal(await readFile(path.join(selected.workspaceRoot,'runtime/modules/complete.js'),'utf8'),selected.module);
 });
 
 test('shared directory roots preserve descendant routes, exclusions and complete content',async function sharedDirectoryRoots(t){

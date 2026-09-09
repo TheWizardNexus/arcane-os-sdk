@@ -107,31 +107,31 @@ needed:
 ```json
 {
   "schemaVersion": 1,
-  "appsRoot": "apps",
+  "appsRoot": ".",
   "distRoot": "dist",
   "sharedPayloads": {
     "browser-runtime": [
       {
         "source": "node_modules/arcane-os/runtime/arcane",
-        "destination": "arcane",
+        "destination": "node_modules/arcane-os/runtime/arcane",
         "include": ["components", "css", "entities", "img", "modules"],
         "exclude": []
       },
       {
         "source": "node_modules/arcane-os/browser-runtime",
-        "destination": "arcane/sdk",
+        "destination": "node_modules/arcane-os/browser-runtime",
         "include": ["."],
         "exclude": []
       },
       {
         "source": "node_modules/arcane-os/runtime/strong-type",
-        "destination": "arcane/dependencies/strong-type",
+        "destination": "node_modules/arcane-os/runtime/strong-type",
         "include": ["."],
         "exclude": []
       },
       {
         "source": "node_modules/arcane-os",
-        "destination": "licenses/arcane-os",
+        "destination": "node_modules/arcane-os",
         "include": ["LICENSE", "COMMERCIAL-LICENSE.md", "NOTICE"],
         "exclude": []
       }
@@ -142,21 +142,43 @@ needed:
 
 The first include list also accepts a final `security` entry. An npm alias such
 as `arcane-sdk` substitutes `node_modules/arcane-sdk` for the package prefix in
-all four source paths. Destinations remain unchanged. Package selection and SDK
+all four source and destination paths. Package selection and SDK
 version come from the installed dependency, not a generated runtime lock.
 
 `arcane import-map`, `arcane dev`, packaging, and generated PWA inventories use
-the same logical destinations. Source serving and map generation read installed
+the same actual npm destinations. For example, `arcane/HTMLImport` resolves to
+`./node_modules/arcane-os/runtime/arcane/modules/HTMLImport.js`, and
+`arcane-os/event-manager` resolves to
+`./node_modules/arcane-os/browser-runtime/event-manager.mjs`. A normal static
+server can serve those files directly. Source serving and map generation read installed
 files without materializing them into the workspace. A selected portable
 package copies its complete selected resources inside the artifact, preserving
 the same browser URLs and saved managed import maps.
 
 Existing `physical-v1` configurations whose first source is `arcane` remain
 supported. The explicit materializer below still refreshes those projections,
-and scaffolding retains its existing physical layout. Selecting `installed-v1`
+and the default multi-app scaffold retains its existing physical layout. The
+earlier installed routes with virtual `/arcane` destinations also remain
+supported. Selecting `installed-v1`
 does not delete any preexisting workspace files. The separate host-document
 `generateDocumentImportMaps()` API continues to accept an already materialized
 runtime; its input contract is unchanged.
+
+### Optional standalone root application
+
+`appsRoot: "."` selects one application whose `arcane-app.json`,
+`arcane-package.json`, entry, and app-owned files occupy the workspace root.
+The declared application ID remains unchanged. `appsRoot: "apps"` continues
+to discover `apps/<id>` and supports the existing integrated and multi-app
+layouts. Entries and include/exclude paths remain relative to the application.
+
+Root HTML uses `<base href="./">`; nested navigable documents use their actual
+depth back to the workspace. Managed bare imports remain the public interface;
+their targets follow the selected npm routes. `arcane import-map` also writes
+root-app navigation pages for the previous `/apps/<id>/` links, preserving
+query strings and fragments. It preserves authored files at those destinations.
+For a direct-installed root PWA it generates the static PWA records at the root,
+so normal static hosting needs no SDK request handler or runtime copy.
 
 ## Installed SDK runtime materialization
 

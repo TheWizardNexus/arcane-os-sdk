@@ -12,6 +12,8 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {appRelativeRoot,resolveAppRoot,rootAppNavigation} from '../app-layout.mjs';
+import {readInstalledSdkLayout} from '../sdk-runtime-layout.mjs';
 import {withWorkspaceOperationLock} from '../workspace-operation-lock.mjs';
 import {
     applyPwaEntryReferences,
@@ -275,8 +277,8 @@ function validateSharedRoute(route,label){
 export function validateRootConfig(value,configPath=ROOT_CONFIG_NAME){
     assertOnlyKeys(value,new Set(['schemaVersion','appsRoot','distRoot','sharedPayloads']),ROOT_CONFIG_NAME);
     if(value.schemaVersion!==1)fail(`${ROOT_CONFIG_NAME}.schemaVersion must be 1.`);
-    if(value.appsRoot!=='apps'||value.distRoot!=='dist'){
-        fail(`${ROOT_CONFIG_NAME} must bind appsRoot to "apps" and distRoot to "dist".`);
+    if(!['apps','.'].includes(value.appsRoot)||value.distRoot!=='dist'){
+        fail(`${ROOT_CONFIG_NAME} must bind appsRoot to "apps" or "." and distRoot to "dist".`);
     }
     if(!isPlainObject(value.sharedPayloads)){
         fail(`${ROOT_CONFIG_NAME}.sharedPayloads must be an object.`);
@@ -291,7 +293,7 @@ export function validateRootConfig(value,configPath=ROOT_CONFIG_NAME){
             validateSharedRoute(route,`sharedPayloads.${id}[${index}]`)
         );
     }
-    return {schemaVersion:1,appsRoot:'apps',distRoot:'dist',sharedPayloads,configPath};
+    return {schemaVersion:1,appsRoot:value.appsRoot,distRoot:'dist',sharedPayloads,configPath};
 }
 
 function normalizeOptionalRecord(value,label){
@@ -300,14 +302,14 @@ function normalizeOptionalRecord(value,label){
     return copyJson(value);
 }
 
-export function validateAppConfig(value,appId,rootConfig,configPath=`apps/${appId}/${APP_CONFIG_NAME}`){
+export function validateAppConfig(value,appId,rootConfig,configPath=path.posix.join(appRelativeRoot(rootConfig,appId),APP_CONFIG_NAME)){
     assertOnlyKeys(value,new Set([
         'schemaVersion','id','displayName','version','entry','strategy','security',
         'localAIModelPolicy','include','exclude','shared','adapter','pwa'
     ]),`${appId}/${APP_CONFIG_NAME}`);
     if(value.schemaVersion!==1)fail(`${appId}/${APP_CONFIG_NAME}.schemaVersion must be 1.`);
-    if(value.id!==appId||!APP_ID_PATTERN.test(value.id)){
-        fail(`${appId}/${APP_CONFIG_NAME}.id must exactly match its apps directory.`);
+    if(!is.string(value.id)||value.id!==appId||!APP_ID_PATTERN.test(value.id)){
+        fail(`${APP_CONFIG_NAME}.id must be a valid application id matching the selected application: ${String(appId)}.`);
     }
     const displayName=assertPresentationText(value.displayName,`${appId}/${APP_CONFIG_NAME}.displayName`);
     parseSemver(value.version);
@@ -406,8 +408,8 @@ async function loadContext(requestedWorkspaceRoot,appId){
     const rootConfig=validateRootConfig(await readJson(rootConfigPath,ROOT_CONFIG_NAME),rootConfigPath);
     if(!is.string(appId)||!APP_ID_PATTERN.test(appId))fail(`Unsafe app id: ${String(appId)}`);
     const appsRoot=await realDirectory(path.join(workspaceRoot,rootConfig.appsRoot),'Apps root');
-    const appRoot=resolveInside(appsRoot,appId,'app id');
-    await assertContainedRealPath(appsRoot,appRoot,`apps/${appId}`);
+    const appRoot=resolveAppRoot(workspaceRoot,rootConfig,appId);
+    await assertContainedRealPath(appsRoot,appRoot,appId);
     const configPath=path.join(appRoot,APP_CONFIG_NAME);
     const config=validateAppConfig(await readJson(configPath,`${appId}/${APP_CONFIG_NAME}`),appId,rootConfig,configPath);
     return {
@@ -427,7 +429,8 @@ function destinationJoin(root,relative){
 }
 
 function appPackagePath(context, relative) {
-    return `apps/${context.appId}/${relative}`;
+    const root=appRelativeRoot(context.rootConfig,context.appId);
+    return root?`${root}/${relative}`:relative;
 }
 
 function packageResourceUrl(relative) {
@@ -502,8 +505,12 @@ async function collectPackageRecords(context,{signal}={}){
             records,
             destinations,
             signal,
-            label:`apps/${context.appId}`
+            label:context.appId
         });
+    }
+    // App ownership comes from its selected files, including in a root layout.
+    for(const record of records){
+        record.appRelativePath=path.relative(context.appRoot,record.source).split(path.sep).join('/');
     }
     for(const sharedId of context.config.shared){
         for(const route of context.rootConfig.sharedPayloads[sharedId]){
@@ -532,19 +539,19 @@ async function collectPackageRecords(context,{signal}={}){
     return records;
 }
 
-async function browserDocuments(records,entry,appPrefix){
+async function browserDocuments(records,entry){
     let entryDocument=null;
     const documents=[];
     for(const record of records){
+        if(record.appRelativePath===undefined)continue;
         const extension=path.posix.extname(record.destination).toLocaleLowerCase('en-US');
         if(extension!=='.html'&&extension!=='.htm')continue;
-        const documentPath=record.destination.startsWith(appPrefix)
-            ?record.destination.slice(appPrefix.length):record.destination;
+        const documentPath=record.appRelativePath;
         const inspected=inspectImportMapHtml(await readFile(record.source,'utf8'),{
             documentPath
         });
         const document={path:documentPath,packagePath:record.destination,...copyJson(inspected)};
-        if(record.destination===`${appPrefix}${entry}`){
+        if(documentPath===entry){
             entryDocument=document;
         }else if(inspected.bases.length>0){
             documents.push(document);
@@ -567,6 +574,16 @@ async function optionalDescriptor(context){
 
 async function inspectContext(context,{signal}={}){
     const records=await collectPackageRecords(context,{signal});
+    const documents=await browserDocuments(records,context.config.entry);
+    const navigation=context.rootConfig.appsRoot==='.'?rootAppNavigation(
+        context.appId,context.config.entry,documents.map(document=>document.path)
+    ):[];
+    for(const redirect of navigation){
+        const selected=records.find(record=>pathKey(record.destination)===pathKey(redirect.path));
+        if(selected&&!(await readFile(selected.source,'utf8')).includes('<!-- Arcane root application navigation -->')){
+            fail(`Root application navigation would replace selected content: ${redirect.path}.`);
+        }
+    }
     return {
         appId:context.appId,
         displayName:context.config.displayName,
@@ -583,8 +600,8 @@ async function inspectContext(context,{signal}={}){
         }),
         ...(context.config.adapter===undefined?{}:{adapter:context.config.adapter}),
         descriptor:await optionalDescriptor(context),
-        browserDocuments:await browserDocuments(records,context.config.entry,appPackagePath(context,'')),
-        files:[...new Set(['index.html',...records.map(record=>record.destination)])].sort(compareText),
+        browserDocuments:documents,
+        files:[...new Set(['index.html',...records.map(record=>record.destination),...navigation.map(redirect=>redirect.path)])].sort(compareText),
         output:path.relative(context.workspaceRoot,context.outputRoot).split(path.sep).join('/')
     };
 }
@@ -595,6 +612,12 @@ export async function discoverApps({workspaceRoot:requestedWorkspaceRoot}={}){
         await readJson(path.join(workspaceRoot,ROOT_CONFIG_NAME),ROOT_CONFIG_NAME),
         path.join(workspaceRoot,ROOT_CONFIG_NAME)
     );
+    if(rootConfig.appsRoot==='.'){
+        const configPath=path.join(workspaceRoot,APP_CONFIG_NAME);
+        const value=await readJson(configPath,APP_CONFIG_NAME);
+        const config=validateAppConfig(value,value?.id,rootConfig,configPath);
+        return [config.id];
+    }
     const appsRoot=await realDirectory(path.join(workspaceRoot,rootConfig.appsRoot),'Apps root');
     const entries=await readdir(appsRoot,{withFileTypes:true});
     const apps=[];
@@ -734,9 +757,12 @@ async function replaceDirectory(stagingRoot,outputRoot){
 async function packageWithContext(context,options={}){
     const {signal,onEvent,browserPwa=true}=options;
     const pwaEnabled=browserPwa&&context.config.pwa?.enabled===true;
-    const appPath=`apps/${context.appId}`;
+    const appPath=appRelativeRoot(context.rootConfig,context.appId);
     const entryPath=appPackagePath(context,context.config.entry);
     const inspected=await inspectContext(context,{signal});
+    const navigation=context.rootConfig.appsRoot==='.'?rootAppNavigation(
+        context.appId,context.config.entry,inspected.browserDocuments.map(document=>document.path)
+    ):[];
     if(options.dryRun){
         return {
             appId:context.appId,
@@ -787,6 +813,18 @@ async function packageWithContext(context,options={}){
         }else{
             await copyBase();
         }
+        for(const redirect of navigation){
+            throwIfAborted(signal);
+            const filePath=path.join(stagingRoot,...redirect.path.split('/'));
+            try{
+                const current=await readFile(filePath,'utf8');
+                if(!current.includes('<!-- Arcane root application navigation -->')){
+                    fail(`Root application navigation would replace package content: ${redirect.path}.`);
+                }
+            }catch(error){if(error.code!=='ENOENT')throw error;}
+            await mkdir(path.dirname(filePath),{recursive:true});
+            await writeFile(filePath,redirect.content,'utf8');
+        }
         const files=await listOutputFiles(stagingRoot,{signal});
         // Traverse actual browser resources after the adapter finishes. Files
         // included only as application documents retain their original content.
@@ -807,7 +845,7 @@ async function packageWithContext(context,options={}){
                 const appDocument=context.config.include.some(function includesAppDocument(selected){
                     return sameOrDescendant(document.path,selected);
                 });
-                if(appDocument&&document.managedMaps.length>0&&inventory.has(document.packagePath)){
+                if(appDocument&&(appPath===''||document.managedMaps.length>0)&&inventory.has(document.packagePath)){
                     documentPaths.add(document.packagePath);
                 }
             }
@@ -833,8 +871,9 @@ async function packageWithContext(context,options={}){
         const documentUrl=entryDocument?.bases[0]?.href
             ?new URL(entryDocument.bases[0].href,entryUrl):entryUrl;
         const pending=[{file:entryPath,documentUrl}];
+        const sharedFiles=new Set(records.filter(record=>record.appRelativePath===undefined).map(record=>record.destination));
         for(const file of files){
-            if(/^arcane\/(?:modules|entities|components|css|sdk|dependencies)\//u.test(file)
+            if((sharedFiles.has(file)||/^arcane\/(?:modules|entities|components|css|sdk|dependencies)\//u.test(file))
                 &&/\.(?:m?js|html?|css)$/iu.test(file))pending.push({file,documentUrl});
             if(pwaEnabled&&path.posix.basename(file)==='arcane.importmap.json'){
                 pending.push({file,documentUrl});
@@ -906,6 +945,15 @@ async function packageWithContext(context,options={}){
         if(!files.some(file=>pathKey(file)===pathKey(entryPath))){
             fail(`Package output is missing its entry file: ${context.config.entry}.`);
         }
+        const installed=pwaEnabled?await readInstalledSdkLayout(context.workspaceRoot,context.rootConfig):null;
+        const navigationAliases=navigation.length?{
+            './':packageResourceUrl(entryPath),
+            [`./apps/${context.appId}`]:packageResourceUrl(entryPath),
+            [`./apps/${context.appId}/`]:packageResourceUrl(entryPath),
+            ...Object.fromEntries(navigation.map(redirect=>[
+                packageResourceUrl(redirect.path),packageResourceUrl(redirect.target.slice(1))
+            ]))
+        }:undefined;
         const pwaArtifacts=pwaEnabled?createPwaArtifacts({
             app:{
                 id:context.appId,
@@ -914,6 +962,8 @@ async function packageWithContext(context,options={}){
                 entry:packageResourceUrl(entryPath)
             },
             appPath,
+            ...(installed?.direct?{runtimeBase:`.${installed.browserRuntimeBase}`} : {}),
+            ...(navigationAliases?{navigationAliases}:{}),
             sdkVersion:assetVersion,
             pwa:context.config.pwa,
             files,

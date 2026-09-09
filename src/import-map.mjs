@@ -1,4 +1,5 @@
 import Is from 'strong-type';
+import {appBaseHref,resolveAppRoot} from './app-layout.mjs';
 import {lstat,mkdir,readFile as readFileFromDisk,readdir,realpath,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -1459,6 +1460,20 @@ async function managedImportMapBuild(resolvedWorkspace,signal,pwaEnabled=false){
         pwaEnabled?null:installed?.version??readWorkspaceAssetVersion(resolvedWorkspace)
     ]);
     const built=await buildImportMap({files:runtime.files,signal,version});
+    if(installed?.direct){
+        const imports={};
+        function installedBrowserUrl(value){
+            return value.startsWith('./')
+                ?`./${installedRuntimeTarget(value.slice(2),installed,{browser:true})}`:value;
+        }
+        for(const [specifier,target] of Object.entries(built.imports)){
+            const selected=installedBrowserUrl(target);
+            imports[specifier]=selected;
+            // Relative module imports and bare names must resolve to the same instance.
+            imports[installedBrowserUrl(specifier)]=selected;
+        }
+        built.imports=imports;
+    }
     const json=`${JSON.stringify({imports:built.imports},null,2).replaceAll('<','\\u003c')}\n`;
     return {built,json,version};
 }
@@ -2178,12 +2193,6 @@ export function inspectImportMapHtml(html){
     };
 }
 
-function documentBaseHref(relative){
-    const directory=path.posix.dirname(relative);
-    const depth=directory==='.'?0:directory.split('/').length;
-    return '../'.repeat(depth+2);
-}
-
 function renderManagedHtml(html,json,baseHref='../../'){
     const structure=scanHtmlStructure(html);
     const activeBases=structure.bases.map(base=>({
@@ -2340,11 +2349,18 @@ async function writeGeneratedFiles({root,files,signal,onEvent}){
     return eventError;
 }
 
-function resolvedAppRoot(workspaceRoot,appId,appRoot){
+async function resolvedAppRoot(workspaceRoot,appId,appRoot){
     if(!is.string(appId)||appId.trim()===''){
         throw new TypeError('Import-map app id must be a nonempty string.');
     }
-    const resolved=path.resolve(appRoot??path.join(workspaceRoot,'apps',appId));
+    let selected=appRoot;
+    if(selected===undefined){
+        let config={appsRoot:'apps'};
+        try{config=JSON.parse(await readFileFromDisk(path.join(workspaceRoot,'arcane-packager.json'),'utf8'));}
+        catch(error){if(error?.code!=='ENOENT')throw error;}
+        selected=resolveAppRoot(workspaceRoot,config,appId);
+    }
+    const resolved=path.resolve(selected);
     if(!pathInside(workspaceRoot,resolved))fail('Import-map application root must stay inside the workspace.');
     return resolved;
 }
@@ -2789,7 +2805,7 @@ async function generateImportMapUnlocked({
     }
     throwIfAborted(signal);
     const resolvedWorkspace=path.resolve(workspaceRoot);
-    const resolvedApp=resolvedAppRoot(resolvedWorkspace,appId,appRoot);
+    const resolvedApp=await resolvedAppRoot(resolvedWorkspace,appId,appRoot);
     await physicalDirectory(resolvedWorkspace,resolvedApp);
     const safeEntry=safeRelativePath(entry,'application entry');
     const safeDocuments=normalizedDocumentPaths(safeEntry,documents);
@@ -2819,7 +2835,7 @@ async function generateImportMapUnlocked({
         const html=await readPhysicalTextFile(resolvedApp,documentPath,label);
         throwIfAborted(signal);
         // Reject malformed application structure before traversing the runtime inventory.
-        const baseHref=documentBaseHref(safeDocuments[index]);
+        const baseHref=appBaseHref(resolvedWorkspace,resolvedApp,safeDocuments[index]);
         renderManagedHtml(html,'{"imports":{}}\n',baseHref);
         documentStates.push({filePath:documentPath,html,label,baseHref});
     }

@@ -10,6 +10,7 @@ import test from '../src/testing.mjs';
 import {createWorkspace as scaffoldWorkspace} from '../src/scaffold.mjs';
 import {startDevServer} from '../src/dev-server.mjs';
 import {materializeInstalledSdkRuntime} from '../src/installed-sdk-runtime.mjs';
+import {installedSdkRoutes} from '../src/sdk-runtime-layout.mjs';
 import {projectPackageManifest} from '../src/app-descriptor.mjs';
 import {SDK_NAME,SDK_VERSION} from '../src/constants.mjs';
 import {
@@ -467,6 +468,51 @@ test('direct source serving is independent of the installed package dependency n
     assert.equal(theme.status,200);
     assert.match(theme.headers.get('content-type'),/^text\/css/u);
 });
+
+for (const liveSource of [false, true]) {
+    test(`root application routes preserve direct npm aliases${liveSource ? ' with live SDK source' : ''}`,
+        async function rootInstalledSourceRoutes(context) {
+            const parent = await temporaryDirectory(context, {prefix: 'arcane-root-source-'});
+            const workspaceRoot = path.join(parent, 'workspace');
+            const appId = 'root-served-app';
+            await scaffoldWorkspace({targetPath: workspaceRoot, appId, appsRoot: '.'});
+            const packageSource = 'node_modules/arcane-sdk';
+            const packagePath = path.join(workspaceRoot, 'package.json');
+            const packageDocument = JSON.parse(await readFile(packagePath, 'utf8'));
+            delete packageDocument.devDependencies[SDK_NAME];
+            packageDocument.devDependencies['arcane-sdk'] = `npm:${SDK_NAME}@${SDK_VERSION}`;
+            await writeFile(packagePath, JSON.stringify(packageDocument), 'utf8');
+            const configPath = path.join(workspaceRoot, 'arcane-packager.json');
+            const config = JSON.parse(await readFile(configPath, 'utf8'));
+            config.sharedPayloads['browser-runtime'] = installedSdkRoutes(packageSource, {direct: true});
+            await writeFile(configPath, JSON.stringify(config), 'utf8');
+            const installedRoot = await createSdkRuntimeSource(workspaceRoot, {directory: packageSource});
+            await writeFile(path.join(installedRoot, 'runtime/arcane/modules/AI.js'), 'export const installedRuntime = true;');
+            await writeFile(path.join(workspaceRoot, 'modules/root.js'), 'export const rootApplication = true;');
+            const sdkRuntimeSourceRoot = liveSource ? await createSdkRuntimeSource(parent) : undefined;
+            const instance = await startDevServer({
+                workspaceRoot, appId, sdkRuntimeSourceRoot, port: 0, http: true
+            });
+            context.after(function closeRootSourceServer() { return instance.close(); });
+            assert.equal(instance.url, `${instance.origin}/index.html`);
+            const query = '?request=full%20content&tag=one&tag=two';
+            const redirect = await globalThis.fetch(`${instance.origin}/apps/${appId}/index.html${query}`, {redirect: 'manual'});
+            assert.equal(redirect.headers.get('location'), `/index.html${query}`);
+            const app = await globalThis.fetch(`${instance.origin}/modules/root.js`);
+            assert.equal(await app.text(), 'export const rootApplication = true;');
+            const runtime = await globalThis.fetch(`${instance.origin}/${packageSource}/runtime/arcane/modules/AI.js`);
+            assert.equal(runtime.status, 200);
+            assert.equal(await runtime.text(), liveSource ? 'export const liveSource=true;\n' : 'export const installedRuntime = true;');
+            for (const relative of ['browser-runtime/event-manager.mjs', 'runtime/strong-type/index.js']) {
+                const shared = await globalThis.fetch(`${instance.origin}/${packageSource}/${relative}`);
+                assert.equal(shared.status, 200, relative);
+                await shared.text();
+            }
+            const oldVirtual = await globalThis.fetch(`${instance.origin}/arcane/sdk/event-manager.mjs`);
+            assert.equal(oldVirtual.status, 404);
+        }
+    );
+}
 
 test('explicit SDK runtime source mount is live, narrow, and observable',async t=>{
     useSyntheticTls(t);
