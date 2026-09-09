@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.28.1
+
+- DBOPFS initialization opens the application's existing storage scope without
+  creating product-specific table directories. Applications create the tables
+  they need through the existing `getTableHandle(name)` API after readiness.
+- Create tables on demand and coalesce concurrent requests for the same physical
+  table. Logical `memories` and physical `memory` retain one shared handle and
+  deletion path. Existing directory discovery, complete reads and exports, CRUD,
+  worker fallback, events, application identity and saved data remain supported.
+- Explicit `clearAllStorage()` leaves the cleared application scope empty rather
+  than recreating default folders. This update performs no saved-data migration
+  or automatic removal of existing folders. The 0.28.0 npm resource paths remain
+  unchanged.
+
 ## 0.28.0
 
 - Expose existing runtime modules and entities directly through
