@@ -20,6 +20,9 @@ test('root scaffold selects direct npm routes without a runtime copy or dependen
     assert.equal(result.appsRoot,'.');
     assert.equal(result.workspaceRuntime,null);
     assert.deepEqual(result.importMap,{pending:true,reason:'sdk-install-required'});
+    const packageDocument=JSON.parse(await readFile(path.join(targetPath,'package.json'),'utf8'));
+    assert.equal(packageDocument.dependencies['arcane-os'],SDK_VERSION);
+    assert.equal(packageDocument.devDependencies,undefined);
     const config=JSON.parse(await readFile(path.join(targetPath,'arcane-packager.json'),'utf8'));
     assert.equal(config.appsRoot,'.');
     assert.ok(config.sharedPayloads['browser-runtime'].every(route=>route.source===route.destination));
@@ -361,6 +364,33 @@ test('init preflights package conflicts before creating any template files',asyn
         error=>error?.code==='ENOENT'
     );
 });
+
+for(const appsRoot of ['.','apps']){
+    for(const dependencyGroup of ['dependencies','devDependencies','optionalDependencies']){
+        for(const dependencyName of ['arcane-os','arcane-sdk']){
+            test(`init ${appsRoot} retains ${dependencyName} runtime classification from ${dependencyGroup}`,async t=>{
+                const workspaceRoot=await temporaryDirectory(t);
+                const specifier=dependencyName==='arcane-os'?SDK_VERSION:`npm:arcane-os@${SDK_VERSION}`;
+                await writeFile(path.join(workspaceRoot,'package.json'),`${JSON.stringify({
+                    name:'classified-app',private:true,type:'module',
+                    [dependencyGroup]:{[dependencyName]:specifier},
+                    scripts:{start:'node server.mjs'}
+                },null,2)}\n`);
+                await initWorkspace({workspaceRoot,appId:'classified-app',appsRoot});
+                const document=JSON.parse(await readFile(path.join(workspaceRoot,'package.json'),'utf8'));
+                const selectedGroup=appsRoot==='.'&&dependencyGroup==='devDependencies'
+                    ?'dependencies':dependencyGroup;
+                assert.equal(document[selectedGroup][dependencyName],specifier);
+                assert.equal(document.scripts.start,'node server.mjs');
+                for(const group of ['dependencies','devDependencies','optionalDependencies']){
+                    if(group!==selectedGroup)assert.equal(document[group]?.[dependencyName],undefined);
+                }
+                await initWorkspace({workspaceRoot,appId:'classified-app',appsRoot});
+                assert.deepEqual(JSON.parse(await readFile(path.join(workspaceRoot,'package.json'),'utf8')),document);
+            });
+        }
+    }
+}
 
 test('init preserves a supported local SDK tarball declaration',async t=>{
     const workspaceRoot=await temporaryDirectory(t);

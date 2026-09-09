@@ -117,7 +117,7 @@ export function resolveSdkPackageDeclaration(rootPackage,{
 }={}){
     if(!isObject(rootPackage))fail('package.json must contain a JSON object.');
     const candidates=[];
-    for(const groupName of ['devDependencies','dependencies']){
+    for(const groupName of ['devDependencies','dependencies','optionalDependencies']){
         const group=rootPackage[groupName];
         if(group===undefined)continue;
         if(!isObject(group))fail(`package.json ${groupName} must be a JSON object.`);

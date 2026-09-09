@@ -192,21 +192,26 @@ async function prepareExistingPackage(workspaceRoot,files,existingPackage,sdkDec
     if(conflicts.length){
         fail(`Existing package.json conflicts with Arcane setup; no values were overwritten. Resolve: ${conflicts.join('; ')}.`);
     }
+    const dependencyGroup=sdkDeclaration.dependencyGroup==='optionalDependencies'
+        ?'optionalDependencies'
+        :generated.dependencies||sdkDeclaration.dependencyGroup==='dependencies'
+            ?'dependencies':'devDependencies';
     const merged={
         ...existing,
         private:true,
         type:'module',
         scripts:{...generated.scripts,...(existing.scripts||{})},
-        devDependencies:{
-            ...(existing.devDependencies||{}),
+        [dependencyGroup]:{
+            ...(existing[dependencyGroup]||{}),
             [sdkDeclaration.dependencyName]:sdkDeclaration.specifier
         },
         engines:{...generated.engines,...(existing.engines||{})}
     };
-    if(existing.dependencies?.[sdkDeclaration.dependencyName]!==undefined){
-        merged.dependencies={...existing.dependencies};
-        delete merged.dependencies[sdkDeclaration.dependencyName];
-        if(Object.keys(merged.dependencies).length===0)delete merged.dependencies;
+    if(dependencyGroup!=='devDependencies'
+        &&existing.devDependencies?.[sdkDeclaration.dependencyName]!==undefined){
+        merged.devDependencies={...existing.devDependencies};
+        delete merged.devDependencies[sdkDeclaration.dependencyName];
+        if(Object.keys(merged.devDependencies).length===0)delete merged.devDependencies;
     }
     if(JSON.stringify(existing)===JSON.stringify(merged)){
         return {exists:true,updated:false};

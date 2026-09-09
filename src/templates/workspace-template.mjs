@@ -181,7 +181,7 @@ npm run dev
 
 Open the loopback URL printed by the development server. ${directRuntime?'This root app reads SDK files directly from its installed npm package; an ordinary static host uses the same resource paths.':'This app uses the existing physical arcane/ runtime layout.'} The SDK server does not expose an Ollama HTTP endpoint.
 
-Commit the generated \`package-lock.json\` after dependency installation. CI intentionally uses \`npm ci\` and therefore requires that lock. Before the SDK is published, install a locally packed \`${SDK_NAME}\` \`.tgz\` with \`npm install --save-dev --save-exact <path-to-tarball>\`; keep that tarball at the lock file's relative path for repeatable local \`npm ci\` runs.
+Commit the generated \`package-lock.json\` after dependency installation. CI intentionally uses \`npm ci\` and therefore requires that lock. ${directRuntime?'The SDK is a runtime dependency: keep it installed when serving this app directly from node_modules. ':''}Before the SDK is published, install a locally packed \`${SDK_NAME}\` \`.tgz\` with \`npm install ${directRuntime?'--save-prod':'--save-dev'} --save-exact <path-to-tarball>\`; keep that tarball at the lock file's relative path for repeatable local \`npm ci\` runs.
 
 ## Optional browser release commands
 
@@ -231,7 +231,7 @@ Every browser release also carries Arcane OS licensing material under \`${direct
                 'run:browser':'arcane run --target browser'
             }:{})
         },
-        devDependencies:{
+        [directRuntime?'dependencies':'devDependencies']:{
             [sdkDependencyName]:sdkDependencySpecifier
         },
         engines:{node:'>=22.23.2'}
