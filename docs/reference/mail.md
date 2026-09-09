@@ -712,6 +712,22 @@ browser and gateway preserve complete request and response content without
 body-size gates. With no event observer, the gateway does not construct event
 payloads or parse a second provider-request representation for observation.
 
+Requests whose path does not match `/v1/mail` receive `303 See Other` with an
+empty body and `Location: https://<current-hostname>/404.html`. The destination
+uses the request's HTTP/2 authority or HTTP/1.1 Host hostname, omits the API port,
+and replaces the requested path and query. For example:
+
+| Unmatched request URL | Redirect destination |
+| --- | --- |
+| `https://mail.thewizardnexus.com:4433/` | `https://mail.thewizardnexus.com/404.html` |
+| `https://mail.precrisis.ai:4433/missing?example=1` | `https://mail.precrisis.ai/404.html` |
+
+The HTTPS website on the current hostname owns that page. The mail listener
+only returns the redirect. Requests to `/v1/mail`, including its query-bearing
+form, retain the existing CORS policy, OPTIONS preflight, method handling, and
+structured API errors. For example, `GET /v1/mail` still receives `405`.
+Subscription verification and its automatic same-IP exception remain unchanged.
+
 The gateway returns `202` only after Resend returns a nonempty string provider id.
 Transport loss, an explicit caller-selected timeout, an invalid success body,
 or an unreadable provider response returns an explicit uncertain result and never claims

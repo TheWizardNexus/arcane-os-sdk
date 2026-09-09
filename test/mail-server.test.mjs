@@ -531,6 +531,13 @@ test(
         );
         assert.equal(preflight.statusCode, 204);
         assert.equal(preflight.headers['access-control-allow-origin'], origin);
+        const missingRoute = await requestHttp2Mail(
+            client,
+            {':authority': authority, ':method': 'GET', ':path': '/?source=missing-route'}
+        );
+        assert.equal(missingRoute.statusCode, 303);
+        assert.equal(missingRoute.headers.location, 'https://mail.example.test/404.html');
+        assert.equal(missingRoute.body, null);
         const missingKey = await requestHttp2Mail(
             client,
             {...headers, 'idempotency-key': ''},
@@ -989,9 +996,13 @@ test('mail gateway preserves explicit origin and recipient decisions and rejects
         assert.equal(result.body.error.retryable,false);
         assert.equal(result.body.error.uncertain,false);
     }
-    const missingRoute=await requestMail(instance,{path:'/not-mail'});
-    assert.equal(missingRoute.response.status,404);
-    assert.equal(missingRoute.body.error.code,'mail_route_not_found');
+    const missingRoute = await requestMail(
+        instance,
+        {headers: {Host: 'mail.example.test:4433'}, path: '/not-mail?source=missing-route'}
+    );
+    assert.equal(missingRoute.response.status, 303);
+    assert.equal(missingRoute.response.headers.get('location'), 'https://mail.example.test/404.html');
+    assert.equal(missingRoute.text, '');
 
     const getRequest=await requestMail(instance,{method:'GET'});
     assert.equal(getRequest.response.status,405);

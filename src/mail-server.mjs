@@ -877,8 +877,21 @@ function createConfiguredMailHandler(configuration){
         });
 
         try{
-            if(request.url!==RESEND_MAIL_PATH&&!request.url?.startsWith(`${RESEND_MAIL_PATH}?`)){
-                throw new MailGatewayFault('mail_route_not_found',{statusCode:404});
+            if (request.url !== RESEND_MAIL_PATH && !request.url?.startsWith(`${RESEND_MAIL_PATH}?`)) {
+                const requestAuthority = request.authority || request.headers.host || '';
+                const hostname = new URL(`https://${requestAuthority}`).hostname;
+                response.writeHead(
+                    303,
+                    {
+                        'content-type': 'text/plain; charset=utf-8',
+                        'location': `https://${hostname}/404.html`
+                    }
+                );
+                response.end();
+                if (!request.readableEnded && !request.destroyed) {
+                    request.resume();
+                }
+                return;
             }
             const requestOrigin=request.headers.origin;
             if(requestOrigin){

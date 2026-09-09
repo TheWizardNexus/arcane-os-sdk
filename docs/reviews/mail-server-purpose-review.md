@@ -4,6 +4,9 @@ The [same-IP subscription exception follow-up](#same-ip-subscription-exception-f
 records the later user-selected change to when the optional verifier runs. The
 earlier inventories retain their stated historical scope; current verification
 skips requests whose actual connection source and destination IPs are equal.
+The [unmatched-route redirect follow-up](#unmatched-route-redirect-follow-up)
+records the later change from a missing-route JSON error to the hostname's
+HTTPS 404 page.
 
 | Decision | Behavior | Why it matters | Source status at this review |
 | --- | --- | --- | --- |
@@ -601,3 +604,28 @@ This follow-up records the selected behavior and source review. No local test,
 check, build, server launch, live mail send, or platform execution was performed
 by this documentation author. Release and runtime evidence remain with the
 corresponding operation's owner.
+
+## Unmatched-route redirect follow-up
+
+The user selected the Stripe server's redirect behavior for unmatched mail
+routes. The existing SDK `handleMailRequest` route decision owns this behavior:
+an unmatched path returns `303 See Other` with an empty body and a Location of
+`https://<current-hostname>/404.html`. The request authority supplies the hostname;
+the destination omits the API port and replaces the original path and query.
+The website on that hostname owns the page content.
+
+| Method or action | Gate 1: Do we care? | Gate 2: Why is it worth the work? | Gate 3: Can we remove it without losing the required result? | Decision and concrete effect |
+| --- | --- | --- | --- | --- |
+| Unmatched-path JSON `404` response | No. The selected result is navigation to the hostname's 404 page. | Keeping it would preserve the superseded response instead of the requested navigation. | Yes, when replaced with the redirect at the existing route decision. | Replace only this response with `303` and an empty body. |
+| Current-hostname HTTPS redirect without the API port | Yes. It sends visitors to the requested website page. | One request-authority parse supplies the hostname for every deployment without another setting or domain table. | No. Removing it loses the explicitly selected destination. | Keep the decision inline in the existing native request handler; add no server, dependency, proxy, or file-serving path. |
+| Matched `/v1/mail` CORS, OPTIONS, method errors, subscription verification, same-IP exception, and delivery results | Yes. Existing applications depend on these mail contracts. | An unmatched navigation does not change how an actual API request is handled or reported. | No. Redirecting actual API failures would hide the caller's delivery outcome. | Preserve `/v1/mail` and its query-bearing form, including OPTIONS preflight, `405` for unsupported methods, and structured API errors. |
+
+An unmatched request ends at its existing route branch without entering
+subscription verification, report parsing, or provider delivery. There is one
+redirect response per unmatched request, with no new asynchronous wait, DNS
+lookup, configuration read, timer, or retained state. This is a source-level
+operation description; no timing improvement or deployed result is claimed.
+
+This follow-up is based on source review. This documentation author ran no local
+tests, checks, builds, server launches, or production requests. Delivery and
+selected-package verification remain with their respective owners.
