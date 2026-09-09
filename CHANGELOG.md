@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.28.2
+
+- Redirect unmatched Mail server routes with `303 See Other` to
+  `https://<current hostname>/404.html`, using the request's HTTP/1 Host or
+  HTTP/2 authority and omitting the API listener port. The redirect has an empty
+  body and uses the existing HTTP server response interface.
+- Preserve `/v1/mail` requests with query strings, CORS and OPTIONS behavior,
+  method and API errors, subscription handling, and the complete Mail provider
+  and cancellation lifecycle. Client APIs, npm resource paths, dependencies,
+  and listener configuration are unchanged.
+
 ## 0.28.1
 
 - DBOPFS initialization opens the application's existing storage scope without

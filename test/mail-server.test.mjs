@@ -230,7 +230,7 @@ function requestHandlerMail(handler, {
 function requestHttp2Mail(client, headers, body = '') {
     return new Promise(
         function collectHttp2MailResponse(resolve, reject) {
-            const request = client.request(headers);
+            const request = client.request(headers, {endStream: false});
             const chunks = [];
             let responseHeaders;
             client.once('error', reject);
@@ -996,12 +996,12 @@ test('mail gateway preserves explicit origin and recipient decisions and rejects
         assert.equal(result.body.error.retryable,false);
         assert.equal(result.body.error.uncertain,false);
     }
-    const missingRoute = await requestMail(
+    const missingRoute = await rawRequest(
         instance,
         {headers: {Host: 'mail.example.test:4433'}, path: '/not-mail?source=missing-route'}
     );
-    assert.equal(missingRoute.response.status, 303);
-    assert.equal(missingRoute.response.headers.get('location'), 'https://mail.example.test/404.html');
+    assert.equal(missingRoute.statusCode, 303);
+    assert.equal(missingRoute.headers.location, 'https://mail.example.test/404.html');
     assert.equal(missingRoute.text, '');
 
     const getRequest=await requestMail(instance,{method:'GET'});
