@@ -814,6 +814,7 @@ class DBOPFS {
             await this.#db.removeEntry(directoryName,{recursive:true})
 
             delete this.#tables[tableName]
+            delete this.#tables[directoryName]
             delete this.#tables[registeredTableName]
             delete this.#tableHandles[registeredTableName]
             delete this.#tableHandlePromises[registeredTableName]

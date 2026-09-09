@@ -1905,7 +1905,7 @@
         let tableNames=dirs;
 
         if(!tableNames?.length){
-            tableNames=await dbopfs.getTableNames(Boolean(layout));
+            tableNames=await dbopfs.getTableNames(true);
         }
         if(destroyed||sequence!==gridLoadSequence){
             return [];

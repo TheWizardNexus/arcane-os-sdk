@@ -6676,8 +6676,32 @@ test(
                 applicationDirectory.createdDirectories,
                 ['documents','memory']
             );
+            dbopfs.tables.memory={
+                'cached.json':{content:'physical-name cache'}
+            };
+            dbopfs.tables.memories={
+                'cached.json':{content:'logical-name cache'}
+            };
             await dbopfs.deleteTable('memories');
             assert.deepEqual(applicationDirectory.entryNames(),[]);
+            assert.equal(Object.hasOwn(dbopfs.tables,'memory'),false);
+            assert.equal(Object.hasOwn(dbopfs.tables,'memories'),false);
+
+            const fileManagerSource=await readFile(
+                new URL(
+                    'runtime/arcane/components/file-manager.html',
+                    repositoryRoot
+                ),
+                'utf8'
+            );
+            assert.match(
+                fileManagerSource,
+                /tableNames=await dbopfs\.getTableNames\(true\);/u
+            );
+            assert.doesNotMatch(
+                fileManagerSource,
+                /dbopfs\.getTableNames\(Boolean\(layout\)\)/u
+            );
         }finally{
             restoreGlobalProperty('window',descriptors.window);
             restoreGlobalProperty('navigator',descriptors.navigator);
