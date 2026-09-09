@@ -1470,12 +1470,19 @@ async function managedImportMapBuild(resolvedWorkspace,resolvedApp,signal,pwaEna
             return value.startsWith('./')
                 ?`./${installedRuntimeTarget(value.slice(2),installed,{browser:true})}`:value;
         }
+        function installedPhysicalCompatibilityUrl(value){
+            if(!value.startsWith('./arcane/sdk/')
+                &&!value.startsWith('./arcane/dependencies/strong-type/'))return null;
+            return `./${installed.routes[0].destination}/${value.slice('./arcane/'.length)}`;
+        }
         for(const [specifier,target] of Object.entries(built.imports)){
             if(rootApplication&&specifier.startsWith('arcane/'))continue;
             const selected=installedBrowserUrl(target);
             if(!rootApplication)imports[specifier]=selected;
             // Relative module imports and bare names must resolve to the same instance.
             imports[installedBrowserUrl(specifier)]=selected;
+            const physicalCompatibilityUrl=installedPhysicalCompatibilityUrl(specifier);
+            if(physicalCompatibilityUrl)imports[physicalCompatibilityUrl]=selected;
         }
         built.imports=imports;
     }

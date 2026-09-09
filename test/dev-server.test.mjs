@@ -500,6 +500,16 @@ for (const liveSource of [false, true]) {
             assert.equal(redirect.headers.get('location'), `/index.html${query}`);
             const app = await globalThis.fetch(`${instance.origin}/modules/root.js`);
             assert.equal(await app.text(), 'export const rootApplication = true;');
+            const importMap = JSON.parse(await readFile(
+                path.join(workspaceRoot, 'modules', 'arcane.importmap.json'),
+                'utf8'
+            ));
+            const browserSettings = `./${packageSource}/browser-runtime/ai/browser-device-settings.mjs`;
+            assert.equal(
+                importMap.imports[`./${packageSource}/runtime/arcane/sdk/ai/browser-device-settings.mjs`],
+                browserSettings
+            );
+            assert.equal(importMap.imports[browserSettings], browserSettings);
             const runtime = await globalThis.fetch(`${instance.origin}/${packageSource}/runtime/arcane/modules/AI.js`);
             assert.equal(runtime.status, 200);
             assert.equal(await runtime.text(), liveSource ? 'export const liveSource=true;\n' : 'export const installedRuntime = true;');
