@@ -258,6 +258,8 @@ test('generated URL keys share the package-selected module targets',async functi
         './arcane/modules/State.js?arcaneVersion=2.3.4':'./arcane/modules/State.js?arcaneVersion=2.3.4',
         './arcane/modules/nested/helper.mjs':'./arcane/modules/nested/helper.mjs?arcaneVersion=2.3.4',
         './arcane/modules/nested/helper.mjs?arcaneVersion=2.3.4':'./arcane/modules/nested/helper.mjs?arcaneVersion=2.3.4',
+        'arcane-os/modules/State.js':'./arcane/modules/State.js?arcaneVersion=2.3.4',
+        'arcane-os/modules/nested/helper.mjs':'./arcane/modules/nested/helper.mjs?arcaneVersion=2.3.4',
         'arcane/State':'./arcane/modules/State.js?arcaneVersion=2.3.4'
     });
 });
@@ -469,7 +471,7 @@ test('PWA entry references retain inactive content, other attributes and script 
     assert.ok(emptySource.includes('<link rel="manifest" href="/apps/fixture/manifest.webmanifest"/>'));
     assert.ok(emptySource.includes('<script data-arcane-pwa src="/apps/fixture/pwa.mjs?mode=a&amp;flag=b" type="module" async></script>'));
     const slashValue=applyPwaEntryReferences('<link rel="manifest" href="old"><script data-arcane-pwa src="old.mjs" data-name=kept/></script>',options);
-    assert.ok(slashValue.includes('data-name=kept/ async>'));
+    assert.ok(slashValue.includes('data-name=kept/ type="module" async>'));
 });
 
 test('PWA import-map generation uses clean URLs without changing shared runtime source',async function pwaWorkspaceProjection(t){
