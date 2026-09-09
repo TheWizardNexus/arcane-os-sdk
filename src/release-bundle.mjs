@@ -93,7 +93,7 @@ function splitUstarPath(archivePath){
             return {name,prefix};
         }
     }
-    fail(`Archive path cannot be represented by ustar: ${normalized}.`);
+    return null;
 }
 
 function writeTextField(header,offset,length,value,label){
@@ -112,8 +112,10 @@ function writeOctalField(header,offset,length,value,label,{trailingSpace=false}=
     header.write(rendered,offset,length,'ascii');
 }
 
-export function createCanonicalUstarHeader(archivePath,size){
-    const {name,prefix}=splitUstarPath(archivePath);
+function createTarHeader(archivePath,size,type){
+    const fields=splitUstarPath(archivePath);
+    if(!fields)fail(`Archive path cannot be represented by ustar: ${archivePath}.`);
+    const {name,prefix}=fields;
     const header=Buffer.alloc(TAR_BLOCK_SIZE);
     writeTextField(header,0,100,name,'ustar name');
     writeOctalField(header,100,8,ARCHIVE_MODE,'ustar mode');
@@ -122,7 +124,7 @@ export function createCanonicalUstarHeader(archivePath,size){
     writeOctalField(header,124,12,size,'ustar size');
     writeOctalField(header,136,12,0,'ustar mtime');
     header.fill(0x20,148,156);
-    header[156]=0x30;
+    header[156]=type;
     header.write('ustar\0',257,6,'ascii');
     header.write('00',263,2,'ascii');
     writeTextField(header,265,32,'root','ustar owner');
@@ -134,11 +136,43 @@ export function createCanonicalUstarHeader(archivePath,size){
     return header;
 }
 
-function tarEntry(archivePath,content){
-    const header=createCanonicalUstarHeader(archivePath,content.length);
+export function createCanonicalUstarHeader(archivePath,size){
+    return createTarHeader(archivePath,size,0x30);
+}
+
+function tarRecord(archivePath,content,type=0x30){
+    const header=createTarHeader(archivePath,content.length,type);
     const remainder=content.length%TAR_BLOCK_SIZE;
     const padding=remainder===0?Buffer.alloc(0):Buffer.alloc(TAR_BLOCK_SIZE-remainder);
     return Buffer.concat([header,content,padding]);
+}
+
+function paxPathRecord(archivePath) {
+    const value = Buffer.from(` path=${archivePath}\n`, 'utf8');
+    // POSIX PAX framing includes the decimal prefix itself in the record length.
+    let length = value.length + 1;
+    while(String(length).length + value.length !== length) {
+        length = String(length).length + value.length;
+    }
+    const prefix = Buffer.from(String(length), 'ascii');
+    return Buffer.concat(
+        [prefix, value]
+    );
+}
+
+function tarEntry(archivePath, content) {
+    const fields = splitUstarPath(archivePath);
+    if(fields && !/[^\u0000-\u007f]/u.test(archivePath)) {
+        return tarRecord(archivePath, content);
+    }
+    // The following regular header is only a placeholder; PAX owns the complete path.
+    const extendedPath = paxPathRecord(archivePath);
+    return Buffer.concat(
+        [
+            tarRecord('PaxHeaders/entry', extendedPath, 0x78),
+            tarRecord('PaxPayload/entry', content)
+        ]
+    );
 }
 
 async function realDirectory(location,label){
@@ -308,9 +342,53 @@ function readOctalField(header,offset,length,label){
     return value;
 }
 
+function readPaxPath(content) {
+    let offset = 0;
+    let archivePath;
+    while(offset < content.length) {
+        const separator = content.indexOf(0x20, offset);
+        if(separator < 0) {
+            fail('Bundle contains malformed PAX record framing.');
+        }
+        const lengthText = content.subarray(offset, separator).toString('latin1');
+        if(!/^[1-9][0-9]*$/u.test(lengthText)) {
+            fail('Bundle contains malformed PAX record framing.');
+        }
+        const length = Number(lengthText);
+        const end = offset + length;
+        if(!is.safeInteger(length) || end > content.length || end <= separator + 1
+            || content[end - 1] !== 0x0a) {
+            fail('Bundle contains an incomplete or malformed PAX record.');
+        }
+        const assignment = content.indexOf(0x3d, separator + 1);
+        if(assignment <= separator + 1 || assignment >= end - 1) {
+            fail('Bundle contains a malformed PAX assignment.');
+        }
+        const keyword = content.subarray(separator + 1, assignment).toString('utf8');
+        if(keyword !== 'path') {
+            fail(`Bundle contains an unsupported PAX field: ${keyword}.`);
+        }
+        try {
+            const decoder = new TextDecoder(
+                'utf-8',
+                {fatal: true, ignoreBOM: true}
+            );
+            archivePath = decoder.decode(content.subarray(assignment + 1, end - 1));
+        } catch (error) {
+            fail(`Bundle PAX path is not valid UTF-8: ${error.message}.`);
+        }
+        offset = end;
+    }
+    if(archivePath === undefined) {
+        fail('Bundle PAX header is missing its path.');
+    }
+    return archivePath;
+}
+
 function readTarEntries(archive){
     const entries=new Map();
     let offset=0;
+    let pendingPath;
     while(offset+TAR_BLOCK_SIZE<=archive.length){
         const header=archive.subarray(offset,offset+TAR_BLOCK_SIZE);
         if(header.every(value=>value===0))break;
@@ -321,21 +399,31 @@ function readTarEntries(archive){
         let actualChecksum=0;
         for(const value of checksumHeader)actualChecksum+=value;
         if(actualChecksum!==expectedChecksum)fail('Bundle contains a malformed ustar header.');
-        if(header[156]!==0&&header[156]!==0x30)fail('Bundle contains a non-file archive entry.');
+        const type=header[156];
+        if(type!==0&&type!==0x30&&type!==0x78)fail('Bundle contains a non-file archive entry.');
         const name=readStringField(header,0,100);
         const prefix=readStringField(header,345,155);
-        const archivePath=validateAppBundlePath(prefix?`${prefix}/${name}`:name,'archive path');
-        if(entries.has(pathKey(archivePath)))fail(`Bundle contains a duplicate path: ${archivePath}.`);
+        const headerPath=prefix?`${prefix}/${name}`:name;
         const size=readOctalField(header,124,12,'ustar size');
         const contentStart=offset+TAR_BLOCK_SIZE;
         const contentEnd=contentStart+size;
-        if(contentEnd>archive.length)fail(`Bundle entry is incomplete: ${archivePath}.`);
+        if(contentEnd>archive.length)fail(`Bundle entry is incomplete: ${pendingPath??headerPath}.`);
+        const content=archive.subarray(contentStart,contentEnd);
+        offset=contentStart+Math.ceil(size/TAR_BLOCK_SIZE)*TAR_BLOCK_SIZE;
+        if(type===0x78){
+            if(pendingPath!==undefined)fail('Bundle PAX path is missing its following file.');
+            pendingPath=readPaxPath(content);
+            continue;
+        }
+        const archivePath=validateAppBundlePath(pendingPath??headerPath,'archive path');
+        pendingPath=undefined;
+        if(entries.has(pathKey(archivePath)))fail(`Bundle contains a duplicate path: ${archivePath}.`);
         entries.set(pathKey(archivePath),{
             path:archivePath,
-            content:Buffer.from(archive.subarray(contentStart,contentEnd))
+            content:Buffer.from(content)
         });
-        offset=contentStart+Math.ceil(size/TAR_BLOCK_SIZE)*TAR_BLOCK_SIZE;
     }
+    if(pendingPath!==undefined)fail('Bundle PAX path is missing its following file.');
     return entries;
 }
 

@@ -464,14 +464,14 @@
       "name": "createAppReleaseBundle",
       "displayName": "createAppReleaseBundle()",
       "kind": "function",
-      "signature": "async createAppReleaseBundle({ receipt, releaseRoot, outputPath, overwrite=false, signal, onEvent }={})",
+      "signature": "async createAppReleaseBundle({releaseRoot, appDescriptor, outputPath, overwrite=false, signal, onEvent}={})",
       "entrypoints": [
         "arcane-os",
         "arcane-os/release-bundle"
       ],
       "primaryImport": "arcane-os",
       "group": "Packaging and release bundles",
-      "summary": "Writes one deterministic USTAR+gzip external application bundle from the selected authored release state.",
+      "summary": "Writes one deterministic USTAR+gzip external application bundle, using per-file POSIX PAX path extensions for complete long or non-ASCII filenames.",
       "availability": "Node",
       "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Normalized SDK validation with complete canonical archive and release content"
@@ -2164,7 +2164,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Packaging and release bundles",
-      "summary": "Parses and authenticates one deterministic app bundle without extraction.",
+      "summary": "Parses one deterministic app bundle without extraction, supporting ordinary USTAR entries and complete per-file POSIX PAX paths within the existing same-SDK-version contract.",
       "availability": "Node",
       "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Normalized SDK validation with complete canonical archive and release content"

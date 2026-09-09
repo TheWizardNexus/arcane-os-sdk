@@ -629,12 +629,17 @@ async function previewNextPrerelease(workspaceRoot) {
 
 ### Overview
 
-Writes one deterministic USTAR+gzip external application bundle from the selected authored release state.
+Writes one deterministic USTAR+gzip external application bundle from the selected
+authored release state. Long or non-ASCII filenames use per-file POSIX PAX `path`
+extensions, preserving their complete UTF-8 spelling and file content. Ordinary
+USTAR entries remain unchanged. Metadata framing is excluded from the manifest's
+logical file inventory. Existing portable-path rules, schema 1, and the
+`ustar+gzip` format identifier remain unchanged.
 
 ### Signature and result
 
 ```text
-async createAppReleaseBundle({ receipt, releaseRoot, outputPath, overwrite=false, signal, onEvent }={})
+async createAppReleaseBundle({releaseRoot, appDescriptor, outputPath, overwrite=false, signal, onEvent}={})
 ```
 
 Import it from `arcane-os` or `arcane-os/release-bundle`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
@@ -658,6 +663,9 @@ async function usecreateAppReleaseBundle(...arguments_) {
 ### Overview
 
 Builds the exact 512-byte canonical USTAR header for one validated bundle entry.
+This low-level helper remains a single regular-file header with the USTAR field
+limits. Use `createAppReleaseBundle()` to encode complete long or Unicode paths;
+the bundle writer supplies PAX framing where needed.
 
 ### Signature and result
 
@@ -1104,7 +1112,14 @@ async function useverifyApp(...arguments_) {
 
 ### Overview
 
-Parses and authenticates one deterministic app bundle without extraction.
+Parses one deterministic app bundle without extraction and checks its structural
+manifest and complete logical file inventory. It supports ordinary USTAR entries
+and per-file POSIX PAX `path` extensions. The complete extended path is used by
+`files` and `readFile()`; the metadata and regular-header placeholder are not
+payload files. Malformed or orphaned PAX records produce `ARCANE_BUNDLE_INVALID`.
+Other PAX attributes and archive member types remain unsupported. The existing
+same-SDK-version condition remains unchanged. An older reader without PAX support
+must be updated before importing a bundle that requires these path extensions.
 
 ### Signature and result
 

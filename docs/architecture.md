@@ -273,16 +273,31 @@ External repository delivery adds a distinct schema-1
 `arcane-app-release-bundle` envelope. Bundle creation uses an authored schema-2
 `arcane-app.json`; a synthesized package or registry projection remains valid for integrated
 packaging but is not used for an external bundle. The
-archive contains exactly `ARCANE_APP_BUNDLE.json`, canonical `arcane-app.json`,
+logical file inventory contains exactly `ARCANE_APP_BUNDLE.json`, canonical `arcane-app.json`,
 `payload/ARCANE_APP_RELEASE.json`, and the release inventory beneath `payload/`
 in that order. The envelope adds no repository-only source or build tooling
 beyond that selected release inventory. Individual apps remain responsible for
 their authored source policy.
 
-The bundle contract uses the documented USTAR+gzip structure. Explicit bundle
-verification parses the selected archive without extraction and rejects
-genuinely malformed structures, unsafe or colliding paths, unsupported members,
-trailing data, and incompatible bundle generations. These corrupt-artifact
+The bundle contract retains schema 1 and the `ustar+gzip` format identifier.
+Ordinary representable ASCII paths use the existing USTAR headers. Long paths
+and non-ASCII names use a [POSIX PAX](https://docs.oracle.com/cd/E86824_01/html/E54763/pax-1.html)
+per-file `x` header containing the complete
+UTF-8 `path`, immediately before that file's regular header and content. This
+transport framing is not a payload member and never appears in the logical
+inventory or `readFile()` results. Path spelling and file content remain unchanged;
+the existing portable-path rules still apply. The public
+`createCanonicalUstarHeader()` helper remains a single USTAR header and retains
+its format-local field limits; complete bundles use `createAppReleaseBundle()`.
+
+The bundle reader consumes these `path` extensions for the following file only,
+as well as ordinary USTAR entries. Other PAX attributes and archive member
+types remain outside this bundle profile. Older SDK readers without PAX support
+cannot read bundles that require these extensions; update the consuming SDK
+before importing one. The existing same-SDK-version bundle condition is unchanged.
+Explicit bundle verification parses the selected archive without extraction and
+rejects genuinely malformed structures, unsafe or colliding paths, unsupported
+members, and incompatible bundle generations. These corrupt-artifact
 checks do not create byte-count, content-hash, provenance, or admission gates
 for ordinary development, packaging, serving, or running.
 

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/TheWizardNexus/arcane-os-sdk/schemas/arcane-app-bundle.schema.json",
   "title": "Arcane external application release bundle",
-  "description": "Structural manifest for one complete USTAR+gzip application bundle.",
+  "description": "Structural manifest for one complete USTAR+gzip application bundle, with per-file POSIX PAX path extensions for long or non-ASCII filenames. PAX framing is excluded from the logical file inventory.",
   "type": "object",
   "required": [
     "schemaVersion",
