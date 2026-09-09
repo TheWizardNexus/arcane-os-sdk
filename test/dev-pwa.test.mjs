@@ -53,6 +53,10 @@ async function sourceFixture(context, {
         exclude: [],
         shared: ['browser-runtime']
     };
+    if (rootApp) app.include.push(
+        'apps/fixture/service-worker.js',
+        'apps/fixture/manifest.json'
+    );
     if (enabled) {
         app.pwa = {
             enabled: true,
@@ -99,6 +103,10 @@ async function sourceFixture(context, {
         [`${runtimePath}/modules/child.js`, 'export const child = true;'],
         [`${browserRuntimePath}/pwa.mjs`, 'export const servingFixture = true;']
     ]);
+    if (rootApp) {
+        files.set('apps/fixture/service-worker.js', 'self.addEventListener("fetch", function appFetch() {});');
+        files.set('apps/fixture/manifest.json', '{"name":"Authored root resource"}');
+    }
     if (directPackage) {
         files.set(`${directPackage}/package.json`, JSON.stringify({name: 'arcane-os', version: SDK_VERSION}));
         files.set(`${directPackage}/runtime/strong-type/index.js`, 'export default function StrongType() {}');
@@ -153,6 +161,18 @@ test('root source PWA retains identity and follows direct installed alias routes
     }
     const nested = await globalThis.fetch(`${instance.origin}/apps/fixture/secondary.html${query}`, {redirect: 'manual'});
     assert.equal(nested.headers.get('location'), `/secondary.html${query}`);
+    for (const [resource, expected] of [
+        ['service-worker.js', 'self.addEventListener("fetch", function appFetch() {});'],
+        ['manifest.json', '{"name":"Authored root resource"}']
+    ]) {
+        const response = await globalThis.fetch(
+            `${instance.origin}/apps/fixture/${resource}`,
+            {redirect: 'manual'}
+        );
+        assert.equal(response.status, 200, resource);
+        assert.equal(response.headers.get('location'), null, resource);
+        assert.equal(await response.text(), expected, resource);
+    }
     const html = await (await globalThis.fetch(instance.url)).text();
     assert.ok(html.includes('<base href="./">'));
     assert.ok(html.includes('src="./modules/entry.js"'));

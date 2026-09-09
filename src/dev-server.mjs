@@ -1192,7 +1192,11 @@ async function startOwnedDevServer({
             const selectedRoutes = mode === 'source' && (appRequest || segments.length === 0 || generatedPwaPath)
                 ? await refreshSourceRoutes() : currentSourceRoutes;
             const pwaEnabled = mode === 'source' ? selectedRoutes.app?.pwa?.enabled === true : routeSet.pwa;
-            if (legacyAppRequest && !(pwaEnabled && legacyPwaRequest)) {
+            const authoredLegacyResource = legacyAppRequest
+                && sourcePathAllowed(segments, selectedRoutes.app);
+            if (legacyAppRequest
+                && !(pwaEnabled && legacyPwaRequest)
+                && !authoredLegacyResource) {
                 const legacyPath = target.pathname.slice(`/apps/${routeSet.appId}`.length);
                 const location = !legacyPath || legacyPath === '/' || legacyPath === '/index.html'
                     ? selectedRoutes.startPath : legacyPath;
