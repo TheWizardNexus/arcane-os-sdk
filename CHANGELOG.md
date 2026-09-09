@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.29.0
+
+- Add `legacyAppPaths: false` to `arcane-packager.json` for root applications
+  using `appsRoot: "."`. Import-map refresh, source development, and packaging
+  omit SDK-generated `apps/<id>` navigation aliases and legacy PWA worker and
+  inventory files. Omission or `true` preserves the existing behavior.
+- Preserve application storage identity, explicit PWA manifest identity, direct
+  installed npm resource URLs, and selected authored files. The SDK does not
+  delete existing historical files. Applications choosing root-only output own
+  removal of those files and the resulting loss of old bookmark, launch, and
+  service-worker update URLs that depended on them.
+
 ## 0.28.4
 
 - Preserve installed component-relative browser-runtime and strong-type import
