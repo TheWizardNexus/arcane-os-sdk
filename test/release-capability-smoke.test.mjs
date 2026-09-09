@@ -341,7 +341,7 @@ test('installed public SDK entrypoints and runtime materialization are functiona
         ]}
     }));
     const rootAppId='release-smoke-root';
-    const rootModule="import 'arcane/ThemeBootstrap';\nexport const testimony = '  Keep the complete root application content.  ';\n";
+    const rootModule="import 'arcane-os/modules/ThemeBootstrap.js';\nexport const testimony = '  Keep the complete root application content.  ';\n";
     const rootFiles=[
         ['arcane-package.json',json({
             schemaVersion:1,id:rootAppId,displayName:'Root Application Release Smoke',version:'0.1.0',
@@ -497,7 +497,10 @@ test('installed npm sources own maps, development serving and portable output',{
     await rootToolchain.importMap();
     const rootMap=JSON.parse(await readFile(path.join(workspaceRoot,'modules','arcane.importmap.json'),'utf8'));
     const rootTheme='./node_modules/arcane-os/runtime/arcane/modules/ThemeBootstrap.js';
-    assert.equal(rootMap.imports['arcane/ThemeBootstrap'],rootTheme);
+    assert.equal(rootMap.imports['arcane-os/modules/ThemeBootstrap.js'],rootTheme);
+    assert.equal(Object.keys(rootMap.imports).some(function obsoleteRootAlias(specifier){
+        return specifier.startsWith('arcane/')||specifier.startsWith('./arcane/');
+    }),false);
     assert.equal(rootMap.imports[rootTheme],rootTheme);
     assert.equal(rootMap.imports['arcane-os/event-manager'],'./node_modules/arcane-os/browser-runtime/event-manager.mjs');
     assert.equal(rootMap.imports['strong-type'],'./node_modules/arcane-os/runtime/strong-type/index.js');
