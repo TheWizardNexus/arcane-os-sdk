@@ -9,6 +9,7 @@ import {setTimeout as waitForHttpDateChange} from 'node:timers/promises';
 import test from '../src/testing.mjs';
 import {createWorkspace as scaffoldWorkspace} from '../src/scaffold.mjs';
 import {startDevServer} from '../src/dev-server.mjs';
+import {generateImportMap} from '../src/import-map.mjs';
 import {materializeInstalledSdkRuntime} from '../src/installed-sdk-runtime.mjs';
 import {installedSdkRoutes} from '../src/sdk-runtime-layout.mjs';
 import {projectPackageManifest} from '../src/app-descriptor.mjs';
@@ -134,6 +135,7 @@ async function createSdkRuntimeSource(parent,{
         ['runtime/strong-type/index.js','export default function strongType(){}\n'],
         ['runtime/strong-type/package.json','{"name":"strong-type","version":"2.0.0"}\n'],
         ['browser-runtime/event-manager.mjs','export const liveBrowserRuntime=true;\n'],
+        ['browser-runtime/ai/browser-device-settings.mjs','export const browserDeviceSettings=true;\n'],
         ['browser-runtime/ai/ARCANE_AI_BROWSER_WASM_COMPONENTS.json','{"schemaVersion":1}\n'],
         ['browser-runtime/ARCANE_SDK_BROWSER_RELEASE.json','{"private":true}\n'],
         ['browser-runtime/.git/config','private vcs content\n'],
@@ -479,8 +481,8 @@ for (const liveSource of [false, true]) {
             const packageSource = 'node_modules/arcane-sdk';
             const packagePath = path.join(workspaceRoot, 'package.json');
             const packageDocument = JSON.parse(await readFile(packagePath, 'utf8'));
-            delete packageDocument.devDependencies[SDK_NAME];
-            packageDocument.devDependencies['arcane-sdk'] = `npm:${SDK_NAME}@${SDK_VERSION}`;
+            delete packageDocument.dependencies[SDK_NAME];
+            packageDocument.dependencies['arcane-sdk'] = `npm:${SDK_NAME}@${SDK_VERSION}`;
             await writeFile(packagePath, JSON.stringify(packageDocument), 'utf8');
             const configPath = path.join(workspaceRoot, 'arcane-packager.json');
             const config = JSON.parse(await readFile(configPath, 'utf8'));
@@ -490,6 +492,7 @@ for (const liveSource of [false, true]) {
             await writeFile(path.join(installedRoot, 'runtime/arcane/modules/AI.js'), 'export const installedRuntime = true;');
             await writeFile(path.join(workspaceRoot, 'modules/root.js'), 'export const rootApplication = true;');
             const sdkRuntimeSourceRoot = liveSource ? await createSdkRuntimeSource(parent) : undefined;
+            await generateImportMap({workspaceRoot, appId, appRoot: workspaceRoot});
             const instance = await startDevServer({
                 workspaceRoot, appId, sdkRuntimeSourceRoot, port: 0, http: true
             });
@@ -505,11 +508,16 @@ for (const liveSource of [false, true]) {
                 'utf8'
             ));
             const browserSettings = `./${packageSource}/browser-runtime/ai/browser-device-settings.mjs`;
+            const versionedBrowserSettings = `${browserSettings}?arcaneVersion=${SDK_VERSION}`;
             assert.equal(
                 importMap.imports[`./${packageSource}/runtime/arcane/sdk/ai/browser-device-settings.mjs`],
-                browserSettings
+                versionedBrowserSettings
             );
-            assert.equal(importMap.imports[browserSettings], browserSettings);
+            assert.equal(importMap.imports[browserSettings], versionedBrowserSettings);
+            assert.equal(
+                importMap.imports[`./${packageSource}/runtime/arcane/dependencies/strong-type/index.js`],
+                `./${packageSource}/runtime/strong-type/index.js?arcaneVersion=${SDK_VERSION}`
+            );
             const runtime = await globalThis.fetch(`${instance.origin}/${packageSource}/runtime/arcane/modules/AI.js`);
             assert.equal(runtime.status, 200);
             assert.equal(await runtime.text(), liveSource ? 'export const liveSource=true;\n' : 'export const installedRuntime = true;');

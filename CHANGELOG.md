@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.28.4
+
+- Preserve installed component-relative browser-runtime and strong-type import
+  aliases in direct npm maps, including npm-alias workspaces. These aliases
+  resolve to the same installed modules as the direct paths, restoring browser
+  device-settings loading without copies or a second module instance.
+- Serve explicitly included historical authored resources at their retained
+  paths in root-app development. Unselected navigation aliases and generated
+  PWA endpoints retain their existing behavior. Applications refresh managed
+  maps through the public SDK command after updating the dependency; no
+  authored SDK edits, saved-data migration, or dependency changes are required.
+
 ## 0.28.3
 
 - Add explicit `DBOPFS.removeEmptyTable(tableName)` for removing an existing
