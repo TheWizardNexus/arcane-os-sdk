@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.32.0
+
+- Export `profileUpdateFromSearchParams(searchParams)` from
+  `arcane-os/entities/User.js` for purchase-link profile updates. It maps
+  `subscription` (otherwise `subscription_key`), exact `TWiN`, `name`, `email`,
+  and `phone` to the existing User profile fields and omits empty or missing
+  selected values. A present `subscription` takes precedence even when empty.
+- Preserve normal `URLSearchParams` decoding, first repeated values, Unicode,
+  spaces, literal plus signs and leading zeros without further conversion.
+  Ignore `zipcode` and unrelated keys. The helper neither mutates the URL nor
+  saves; apps retain hydration, draft protection and `updateExplicit` ownership.
+- Keep the standalone root/direct npm path behavior released in `0.31.0` and
+  all existing User setters, persistence and browser singleton lifecycle.
+
 ## 0.31.0
 
 - Standalone applications use their repository root and installed npm package
