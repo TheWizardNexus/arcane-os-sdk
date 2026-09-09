@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.30.0
+
+- Add the public `arcane-os/ai/twin-cloud` subpath with stateless `fetchRequest`
+  for Node and browser callers. Supply the TWiN key, model, messages, optional
+  structured-output schema and cancellation signal explicitly. The result is
+  the complete parsed provider completion, with no browser startup, saved
+  conversation, hidden model default or output cap.
+- Share the existing TWiN HTTP, structured JSON, overload retry and cancellation
+  implementation with the browser AI owner while preserving its public methods
+  and lifecycle. Only overload responses with HTTP 429 use the existing
+  three-second retry; other failures retain their complete provider response.
+
 ## 0.29.1
 
 - Preserve complete long and non-ASCII filenames in application release bundles
