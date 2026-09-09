@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.28.3
+
+- Add explicit `DBOPFS.removeEmptyTable(tableName)` for removing an existing
+  empty table directory through native non-recursive OPFS removal. It reports
+  `removed`, `absent`, or `not-empty` and preserves nonempty tables and file
+  targets without creating, scanning, or clearing them.
+- Invalidate the logical/physical table alias and cached handles after removal
+  or confirmed absence. Existing recursive `deleteTable()` and
+  `clearAllStorage()` behavior remains unchanged. This release performs no
+  automatic cleanup or saved-data migration; npm paths and dependencies remain
+  unchanged.
+
 ## 0.28.2
 
 - Redirect unmatched Mail server routes with `303 See Other` to
