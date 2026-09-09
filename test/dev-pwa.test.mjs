@@ -177,7 +177,7 @@ test('root source PWA retains identity and follows direct installed alias routes
     }
     const html = await (await globalThis.fetch(instance.url)).text();
     assert.ok(html.includes('<base href="./">'));
-    assert.ok(html.includes('src="./modules/entry.js"'));
+    assert.ok(html.includes('src="./modules/entry.js?v=4"'));
     assert.ok(html.includes('<link rel="manifest" href="/arcane.webmanifest">'));
     const manifest = await (await globalThis.fetch(`${instance.origin}/arcane.webmanifest`)).json();
     assert.equal(manifest.id, '/apps/fixture/');
@@ -190,7 +190,8 @@ test('root source PWA retains identity and follows direct installed alias routes
     assert.equal(offline.sdkVersion, SDK_VERSION);
     assert.equal(offline.navigationAliases['/apps/fixture/secondary.html'], '/secondary.html');
     assert.ok(offline.assets.includes(`/${packageSource}/runtime/arcane/modules/child.js`));
-    assert.ok(offline.assets.includes('/modules/leaf.js?mode=worker'));
+    assert.ok(offline.assets.includes(`/${packageSource}/runtime/arcane/modules/child.js?v=4`));
+    assert.ok(offline.assets.includes('/modules/leaf.js?mode=worker&v=4'));
     assert.equal(offline.assets.includes('/documents/excluded.txt'), false);
     const legacyWorker = await globalThis.fetch(`${instance.origin}/apps/fixture/arcane-sw.js`, {redirect: 'manual'});
     assert.equal(legacyWorker.status, 200);
@@ -201,9 +202,10 @@ test('root source PWA retains identity and follows direct installed alias routes
     const legacyInventory = await legacyInventoryResponse.json();
     assert.equal(legacyInventory.navigationAliases['/apps/fixture/secondary.html'], '/secondary.html');
     assert.ok(legacyInventory.assets.includes(`/${packageSource}/runtime/arcane/modules/child.js`));
+    assert.ok(legacyInventory.assets.includes(`/${packageSource}/runtime/arcane/modules/child.js?v=4`));
     assert.ok(legacyInventory.assets.includes('./arcane-offline.json'));
     const runtime = await globalThis.fetch(`${instance.origin}/${packageSource}/runtime/arcane/modules/State.js`);
-    assert.equal(await runtime.text(), "export {child} from './child.js';");
+    assert.equal(await runtime.text(), "export {child} from './child.js?v=4';");
     const document = await globalThis.fetch(`${instance.origin}/documents/payload.html`);
     assert.equal(await document.text(), documentHtml);
 
@@ -368,13 +370,14 @@ test(
         assert.equal(manifest.short_name, 'Fixture');
         assert.equal(manifest.icons[0].src, '/apps/fixture/icon.svg');
         assert.ok(generated.get('/arcane-pwa.mjs').includes('import {registerPwa, mountPwaInstallPrompt} from "/arcane/sdk/pwa.mjs";'));
-        assert.ok(generated.get('/arcane-sw.js').includes('/apps/fixture/modules/leaf.js?mode=worker'));
+        assert.ok(generated.get('/arcane-sw.js').includes('/apps/fixture/modules/leaf.js?mode=worker&v=4'));
         const offline = JSON.parse(generated.get('/arcane-offline.json'));
         assert.equal(offline.mode, 'development');
         assert.equal(offline.appVersion, '1.2.3');
         assert.equal(offline.sdkVersion, '9.8.7');
         assert.ok(offline.assets.includes('/apps/fixture/documents/payload.html'));
         assert.ok(offline.assets.includes('/arcane/modules/child.js'));
+        assert.ok(offline.assets.includes('/arcane/modules/child.js?v=4'));
         assert.equal(offline.assets.includes('/apps/fixture/documents/excluded.txt'), false);
         const document = await globalThis.fetch(`${instance.origin}/apps/fixture/documents/payload.html`);
         assert.equal(await document.text(), documentHtml);
@@ -388,7 +391,7 @@ test('PWA source routes serve clean entries and current saved content without re
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('cache-control'), 'no-cache');
     const html = await response.text();
-    assert.ok(html.includes('src="./apps/fixture/modules/entry.js"'));
+    assert.ok(html.includes('src="./apps/fixture/modules/entry.js?v=4"'));
     assert.ok(html.includes('<script type="module" async data-arcane-pwa src="/arcane-pwa.mjs"></script>'));
     assert.ok(html.includes('<link rel="manifest" href="/arcane.webmanifest">'));
     assert.ok(html.includes('{"payload":"./data.js?v=4"}'));
@@ -408,10 +411,10 @@ test('PWA source routes serve clean entries and current saved content without re
     await writeFile(path.join(workspaceRoot, 'arcane.lock.json'), JSON.stringify({sdk: {name: 'arcane-os', version: '9.8.8'}}), 'utf8');
     assert.ok((await (await fetch(`${instance.origin}/apps/fixture/index.html`)).text()).includes('Updated source content'));
     const runtime = await fetch(`${instance.origin}/arcane/modules/State.js`);
-    assert.equal(await runtime.text(), "export {child} from './child.js?mode=updated';");
+    assert.equal(await runtime.text(), "export {child} from './child.js?mode=updated&v=5';");
     const offline = await (await fetch(`${instance.origin}/arcane-offline.json`)).json();
     assert.equal(offline.sdkVersion, '9.8.8');
-    assert.ok(offline.assets.includes('/arcane/modules/child.js?mode=updated'));
+    assert.ok(offline.assets.includes('/arcane/modules/child.js?mode=updated&v=5'));
     assert.equal(await readFile(path.join(workspaceRoot, 'arcane/modules/State.js'), 'utf8'),
         "export {child} from './child.js?mode=updated&v=5';");
 });
@@ -421,30 +424,29 @@ test('source offline inventory closes unvisited page references before worker ca
     const worker = await fetch(`${instance.origin}/arcane-sw.js`);
     assert.equal(worker.status, 200);
     const script = await worker.text();
-    assert.ok(script.includes('/apps/fixture/modules/deep.js?mode=a%20b'));
+    assert.ok(script.includes('/apps/fixture/modules/deep.js?mode=a%20b&v=4'));
     const offline = await (await fetch(`${instance.origin}/arcane-offline.json`)).json();
     assert.equal(offline.mode, 'development');
     for (const resource of [
         '/apps/fixture/secondary.html',
-        '/apps/fixture/modules/deep.js?mode=a%20b',
+        '/apps/fixture/modules/deep.js?mode=a%20b&v=4',
         '/apps/fixture/modules/leaf.js?mode=a+b',
-        '/apps/fixture/modules/leaf.js?mode=worker',
-        '/apps/fixture/modules/leaf.js?mode=map',
-        '/apps/fixture/modules/worker.js?mode=a%20b',
-        '/apps/fixture/icon.svg?theme=a%20b',
+        '/apps/fixture/modules/leaf.js?mode=worker&v=4',
+        '/apps/fixture/modules/leaf.js?mode=map&v=4',
+        '/apps/fixture/modules/worker.js?mode=a%20b&v=4',
+        '/apps/fixture/icon.svg?theme=a%20b&v=4',
         '/apps/fixture/documents/payload.html'
     ]) assert.ok(offline.assets.includes(resource), resource);
     assert.equal(offline.assets.includes('/apps/fixture/documents/excluded.txt'), false);
     assert.equal(offline.assets.includes('/apps/fixture/documents/raw.js?v=4'), false);
     for (const resource of offline.assets) {
         const url = new URL(resource, instance.origin);
-        assert.equal(url.searchParams.has('v'), false, resource);
         assert.equal(url.searchParams.has('arcaneVersion'), false, resource);
         assert.equal(url.hash, '', resource);
     }
     // A service-worker install fetch has no script destination and may fetch this first.
-    const deep = await fetch(`${instance.origin}/apps/fixture/modules/deep.js?mode=a%20b`);
-    assert.equal(await deep.text(), "export {leaf} from './leaf.js?mode=a+b#active'; new Worker(new URL('./worker.js?mode=a%20b', import.meta.url), {type:'module'});");
+    const deep = await fetch(`${instance.origin}/apps/fixture/modules/deep.js?mode=a%20b&v=4`);
+    assert.equal(await deep.text(), "export {leaf} from './leaf.js?mode=a+b#active'; new Worker(new URL('./worker.js?mode=a%20b&v=4', import.meta.url), {type:'module'});");
     const secondary = await fetch(`${instance.origin}/apps/fixture/secondary.html`);
     assert.ok((await secondary.text()).includes('async data-arcane-pwa'));
     assert.equal(await (await fetch(`${instance.origin}/apps/fixture/documents/payload.html`)).text(), documentHtml);
@@ -455,14 +457,14 @@ test('ordinary source serving keeps versioned URLs and does not add PWA routes',
     const {instance, documentHtml} = await sourceFixture(context, {enabled: false});
     const response = await fetch(`${instance.origin}/apps/fixture/index.html`);
     const html = await response.text();
-    assert.ok(html.includes('src="./apps/fixture/modules/entry.js?arcaneVersion=9.8.7"'));
+    assert.ok(html.includes('src="./apps/fixture/modules/entry.js?v=4&amp;arcaneVersion=9.8.7"'));
     assert.equal(html.includes('data-arcane-pwa'), false);
     for (const route of ['/arcane.webmanifest', '/arcane-offline.json', '/arcane-sw.js', '/arcane-pwa.mjs']) {
         assert.equal((await fetch(`${instance.origin}${route}`)).status, 404, route);
     }
     const runtime = await fetch(`${instance.origin}/arcane/modules/State.js`);
     assert.equal(runtime.headers.get('cache-control'), null);
-    assert.equal(await runtime.text(), "export {child} from './child.js?arcaneVersion=9.8.7';");
+    assert.equal(await runtime.text(), "export {child} from './child.js?v=4&arcaneVersion=9.8.7';");
     assert.equal(await (await fetch(`${instance.origin}/apps/fixture/documents/payload.html`)).text(), documentHtml);
 });
 

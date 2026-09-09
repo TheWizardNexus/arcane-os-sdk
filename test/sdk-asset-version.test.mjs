@@ -17,34 +17,38 @@ import {temporaryDirectory} from './helpers.mjs';
 
 test('asset URLs preserve raw parameters, fragments and relative spelling',function completeAssetUrls(){
     assert.equal(versionAssetUrl('./module.js?v=4&mode=a%20b#entry','2.3.4'),
-        './module.js?mode=a%20b&arcaneVersion=2.3.4#entry');
+        './module.js?v=4&mode=a%20b&arcaneVersion=2.3.4#entry');
     assert.equal(versionAssetUrl('../module.js?flag&arcaneVersion=old&&mode=a+b#entry','2.3.4'),
         '../module.js?flag&arcaneVersion=2.3.4&&mode=a+b#entry');
     assert.equal(versionAssetUrl('/module.js?%61rcaneVersion=old&flag=','2.3.4'),
         '/module.js?%61rcaneVersion=2.3.4&flag=');
     assert.equal(versionAssetUrl('module.js?flag&','2.3.4'),
-        'module.js?flag&arcaneVersion=2.3.4');
+        'module.js?flag&&arcaneVersion=2.3.4');
     for(const reference of ['https://example.test/a.js','//example.test/a.js','data:text/javascript,0','blob:example','#symbol','?mode=1']){
         assert.equal(versionAssetUrl(reference,'2.3.4'),reference);
     }
     assert.equal(versionAssetUrl('./entry.js'),`./entry.js?arcaneVersion=${SDK_VERSION}`);
 });
 
-test('local resource URLs use one Arcane version while retaining unrelated query fields',function soleAssetVersion(){
+test('local resource URLs change only the SDK version field',function soleAssetVersion(){
     const cases=[
-        ['./module.js?v=4','./module.js?arcaneVersion=2.3.4'],
-        ['./module.js?v=4&','./module.js?arcaneVersion=2.3.4'],
-        ['./module.js?arcaneVersion=&v=4','./module.js?arcaneVersion=2.3.4'],
-        ['./module.js?v=4&mode=a%20b#part','./module.js?mode=a%20b&arcaneVersion=2.3.4#part'],
-        ['./module.js?mode=a+b&v=4&flag','./module.js?mode=a+b&flag&arcaneVersion=2.3.4'],
-        ['./module.js?mode=a+b&v=4#part','./module.js?mode=a+b&arcaneVersion=2.3.4#part'],
-        ['./module.js?v&v=4&%76=5','./module.js?arcaneVersion=2.3.4'],
+        ['./module.js?v=4','./module.js?v=4&arcaneVersion=2.3.4'],
+        ['./module.js?v=4&','./module.js?v=4&&arcaneVersion=2.3.4'],
+        ['./module.js?arcaneVersion=&v=4','./module.js?arcaneVersion=2.3.4&v=4'],
+        ['./module.js?v=4&mode=a%20b#part','./module.js?v=4&mode=a%20b&arcaneVersion=2.3.4#part'],
+        ['./module.js?mode=a+b&v=4&flag','./module.js?mode=a+b&v=4&flag&arcaneVersion=2.3.4'],
+        ['./module.js?mode=a+b&v=4#part','./module.js?mode=a+b&v=4&arcaneVersion=2.3.4#part'],
+        ['./module.js?v&v=4&%76=5','./module.js?v&v=4&%76=5&arcaneVersion=2.3.4'],
+        ['./styles.css?v=20260909-sitemap','./styles.css?v=20260909-sitemap&arcaneVersion=2.3.4'],
+        ['./module.js?','./module.js?&arcaneVersion=2.3.4'],
+        ['./module.js?&&#part','./module.js?&&&arcaneVersion=2.3.4#part'],
+        ['./module.js?%76=a%20b&v=a+b&v=&=value&&#part','./module.js?%76=a%20b&v=a+b&v=&=value&&&arcaneVersion=2.3.4#part'],
         ['./module.js?v=4&arcaneVersion=old&mode=a%20b&v=5&arcaneVersion=older#part',
-            './module.js?arcaneVersion=2.3.4&mode=a%20b#part'],
+            './module.js?v=4&arcaneVersion=2.3.4&mode=a%20b&v=5#part'],
         ['./module.js?mode=a+b&%61rcaneVersion=old&v=4&arcaneVersion=older&flag=',
-            './module.js?mode=a+b&%61rcaneVersion=2.3.4&flag='],
+            './module.js?mode=a+b&%61rcaneVersion=2.3.4&v=4&flag='],
         ['./module.js?arcaneVersion&v=&%61rcaneVersion=older&value=v%3D4',
-            './module.js?arcaneVersion=2.3.4&value=v%3D4']
+            './module.js?arcaneVersion=2.3.4&v=&value=v%3D4']
     ];
     for(const [source,expected] of cases){
         const actual=versionAssetUrl(source,'2.3.4');
@@ -88,7 +92,7 @@ test('module resources change at literal syntax without rewriting text, data or 
         "await import(selected);"
     ].join('\n');
     const transformed=rewriteAssetReferences(source,{filePath:'entry.mjs',version:'2.3.4'});
-    assert.ok(transformed.includes("'./main.js?arcaneVersion=2.3.4#module'"));
+    assert.ok(transformed.includes("'./main.js?v=4&arcaneVersion=2.3.4#module'"));
     for(const name of ['../helper.mjs','./dynamic.js','./worker.mjs','./stt-worker.mjs','./tts-worker.mjs','./classic.js','./shared.js','./first.js','./second.js','./theme.css']){
         assert.ok(transformed.includes(`'${name}?arcaneVersion=2.3.4'`),name);
     }
@@ -101,7 +105,7 @@ test('module resources change at literal syntax without rewriting text, data or 
 
 test('escaped JavaScript URL spellings survive version replacement',function escapedReferenceSyntax(){
     const source=String.raw`import './module.js?v=4\u0026arcaneVersion=old\u0026mode=a%20b#part';`;
-    const expected=String.raw`import './module.js?arcaneVersion=2.3.4\u0026mode=a%20b#part';`;
+    const expected=String.raw`import './module.js?v=4\u0026arcaneVersion=2.3.4\u0026mode=a%20b#part';`;
     assert.equal(rewriteAssetReferences(source,{filePath:'entry.js',version:'2.3.4'}),expected);
 });
 
@@ -109,7 +113,7 @@ test('duplicate version removal preserves surviving JavaScript query escapes and
     const source=String.raw`import './module.js?mode=a\x26v=4\u0026%61rcaneVersion=old\x26arcaneVersion=older\u0026flag#part';
 const data="./module.js?v=4\u0026arcaneVersion=old";
 import 'https://example.test/module.js?v=4\u0026arcaneVersion=old';`;
-    const expected=String.raw`import './module.js?mode=a\u0026%61rcaneVersion=2.3.4\u0026flag#part';
+    const expected=String.raw`import './module.js?mode=a\x26v=4\u0026%61rcaneVersion=2.3.4\u0026flag#part';
 const data="./module.js?v=4\u0026arcaneVersion=old";
 import 'https://example.test/module.js?v=4\u0026arcaneVersion=old';`;
     assert.equal(rewriteAssetReferences(source,{filePath:'entry.js',version:'2.3.4'}),expected);
@@ -136,10 +140,10 @@ test('HTML changes active resources while retaining templates, payload scripts a
         onReference:function recordReference(reference){references.push(reference);}
     });
     for(const line of source.split('\n').slice(1,4))assert.ok(transformed.includes(line));
-    assert.ok(transformed.includes('./entry.js?mode=a&amp;arcaneVersion=2.3.4#entry'));
-    assert.ok(transformed.includes('./theme.css?mode=a%20b&amp;arcaneVersion=2.3.4'));
-    assert.ok(transformed.includes('./component.html?arcaneVersion=2.3.4'));
-    assert.ok(transformed.includes('url(&quot;./image.png?mode=a&amp;arcaneVersion=2.3.4&quot;)'));
+    assert.ok(transformed.includes('./entry.js?mode=a&amp;arcaneVersion=2.3.4&amp;v=4#entry'));
+    assert.ok(transformed.includes('./theme.css?v=4&amp;mode=a%20b&amp;arcaneVersion=2.3.4'));
+    assert.ok(transformed.includes('./component.html?v=13&amp;arcaneVersion=2.3.4'));
+    assert.ok(transformed.includes('url(&quot;./image.png?mode=a&amp;v=4&amp;arcaneVersion=2.3.4&quot;)'));
     assert.ok(transformed.includes('<a href="./document.html">document</a>'));
     assert.ok(transformed.includes('await import("./inline.js?arcaneVersion=2.3.4")'));
     assert.ok(references.some(function hasOriginalScript(item){
@@ -158,7 +162,7 @@ test('duplicate version removal preserves HTML query entities and inactive conte
         '<script type="module" src="https://example.test/module.js?v=4&amp;arcaneVersion=old"></script>'
     ].join('\n');
     const expected=[
-        '<script type="module" src="./module.js?%61rcaneVersion=2.3.4&amp;mode=a%20b&#38;flag#part"></script>',
+        '<script type="module" src="./module.js?v=4&#38;%61rcaneVersion=2.3.4&amp;mode=a%20b&#38;flag#part"></script>',
         '<a href="./document.html?v=4&amp;arcaneVersion=old">document</a>',
         '<script type="application/json">{"url":"./payload.js?v=4&arcaneVersion=old"}</script>',
         '<script type="module" src="https://example.test/module.js?v=4&amp;arcaneVersion=old"></script>'
@@ -182,7 +186,7 @@ test('CSS preserves comments and text while versioning imported sheets and resou
         '.icon {mask:url(#symbol);background:url(data:image/svg+xml,example);}'
     ].join('\n');
     const transformed=rewriteAssetReferences(source,{filePath:'theme.css',version:'2.3.4'});
-    assert.ok(transformed.includes('@import "./layout.css?arcaneVersion=2.3.4"'));
+    assert.ok(transformed.includes('@import "./layout.css?v=2&arcaneVersion=2.3.4"'));
     assert.ok(transformed.includes('url(./palette.css?arcaneVersion=2.3.4)'));
     assert.ok(transformed.includes('url("./card.png?mode=a&arcaneVersion=2.3.4#part")'));
     assert.ok(transformed.includes('/* url(./comment.png) */'));
@@ -371,18 +375,26 @@ test('workspace version drives generated document and map while test paths retai
     await writeFile(path.join(appRoot,'index.html'),'<base href="../../"><script type="module" src="./apps/fixture/entry.js?v=4"></script>','utf8');
     const generated=await generateImportMap({workspaceRoot:workspace,appId:'fixture'});
     assert.equal(generated.imports['arcane/State'],'./arcane/modules/State.js?arcaneVersion=2.3.4');
-    assert.ok((await readFile(path.join(appRoot,'index.html'),'utf8')).includes('./apps/fixture/entry.js?arcaneVersion=2.3.4'));
+    assert.ok((await readFile(path.join(appRoot,'index.html'),'utf8')).includes('./apps/fixture/entry.js?v=4&amp;arcaneVersion=2.3.4'));
     const target='./arcane/modules/State.js?v=4&arcaneVersion=2.3.4#part';
     const context=await createApplicationTestImportMapContext({applicationRoot:workspace,imports:{fixture:target}});
     assert.equal(context.imports.fixture,target);
 });
 
-test('explicit null removes resource versions and preserves remaining query spelling',function cleanAssetUrls(){
+test('explicit null removes only SDK versions and preserves authored query spelling',function cleanAssetUrls(){
     const cases=[
-        ['./module.js?v=4&arcaneVersion=old#part','./module.js#part'],
-        ['./module.js?arcaneVersion=&v&%76=5&&','./module.js'],
-        ['./module.js?v=4&mode=a%20b&%61rcaneVersion=old&flag=#part','./module.js?mode=a%20b&flag=#part'],
-        ['./module.js?mode=a+b&&v=4&','./module.js?mode=a+b&&'],
+        ['./module.js?v=4&arcaneVersion=old#part','./module.js?v=4#part'],
+        ['./module.js?arcaneVersion=&v&%76=5&&','./module.js?v&%76=5&&'],
+        ['./module.js?v=4&mode=a%20b&%61rcaneVersion=old&flag=#part','./module.js?v=4&mode=a%20b&flag=#part'],
+        ['./module.js?mode=a+b&&v=4&','./module.js?mode=a+b&&v=4&'],
+        ['./styles.css?v=20260909-sitemap','./styles.css?v=20260909-sitemap'],
+        ['./module.js?','./module.js?'],
+        ['./module.js?&&#part','./module.js?&&#part'],
+        ['./module.js?%76=a%20b&v=a+b&v=&=value&&#part','./module.js?%76=a%20b&v=a+b&v=&=value&&#part'],
+        ['./module.js?arcaneVersion=old','./module.js'],
+        ['./module.js?arcaneVersion=old&%61rcaneVersion=older#part','./module.js#part'],
+        ['./module.js?arcaneVersion=old&','./module.js?'],
+        ['./module.js?&arcaneVersion=old&&%61rcaneVersion=older&','./module.js?&&'],
         ['./module.js?value=v%3D4&flag','./module.js?value=v%3D4&flag'],
         ['./module.js','./module.js'],
         ['https://example.test/module.js?v=4','https://example.test/module.js?v=4']
@@ -396,28 +408,29 @@ test('explicit null removes resource versions and preserves remaining query spel
 
 test('clean resources preserve JavaScript escapes, HTML entities, and unrelated payloads',function cleanResourceSourceSpelling(){
     const source=String.raw`import '.\u002fmodule.js?v=4\u0026mode=a%20b\x26arcaneVersion=old#part'; const payload='./module.js?v=4&arcaneVersion=old';`;
-    const expected=String.raw`import '.\u002fmodule.js?mode=a%20b#part'; const payload='./module.js?v=4&arcaneVersion=old';`;
+    const expected=String.raw`import '.\u002fmodule.js?v=4\u0026mode=a%20b#part'; const payload='./module.js?v=4&arcaneVersion=old';`;
     assert.equal(rewriteAssetReferences(source,{filePath:'entry.js',version:null}),expected);
     const html='<script type="module" src="./module.js?v=4&#38;mode=a%20b&amp;arcaneVersion=old&#x26;flag#part"></script><a href="./document.html?v=4">keep</a><script type="application/json">{"url":"./data.js?v=4"}</script>';
-    const clean='<script type="module" src="./module.js?mode=a%20b&#x26;flag#part"></script><a href="./document.html?v=4">keep</a><script type="application/json">{"url":"./data.js?v=4"}</script>';
+    const clean='<script type="module" src="./module.js?v=4&#38;mode=a%20b&#x26;flag#part"></script><a href="./document.html?v=4">keep</a><script type="application/json">{"url":"./data.js?v=4"}</script>';
     assert.equal(rewriteAssetReferences(html,{filePath:'index.html',version:null}),clean);
     const remote='<base href="https://example.test/"><script src="./script.js?v=4"></script><style>@import "./theme.css?v=4";</style>';
     assert.equal(rewriteAssetReferences(remote,{filePath:'index.html',version:null}),remote);
     assert.equal(rewriteAssetReferences('.card{background:url(./image.png?v=4&mode=a+b)}',{filePath:'theme.css',version:null}),
-        '.card{background:url(./image.png?mode=a+b)}');
+        '.card{background:url(./image.png?v=4&mode=a+b)}');
 });
 
-test('clean import maps converge URL keys without rewriting other JSON payloads',function cleanImportMapIdentity(){
+test('clean import maps retain authored URL identities without rewriting other JSON payloads',function cleanImportMapIdentity(){
     const source=String.raw`{ "imports": { ".\u002fentry.js?v=4": "./obsolete.js?arcaneVersion=old", "./entry.js": "./selected.js?v=4", "./helper.js?mode=a%20b&arcaneVersion=old": "./helper.js?mode=a+b&v=4", "pkg/": "./pkg/", "bare": "./bare.js?arcaneVersion=old" }, "scopes": { "./entry.js?arcaneVersion=old": { "entry": "./obsolete-scoped.js?v=4" }, "./entry.js": { "./helper.js?v=4": "./scoped.js?v=4" } }, "data": { "url": "./payload.js?v=4&arcaneVersion=old" } }`;
     const clean=rewriteAssetReferences(source,{filePath:'modules/arcane.importmap.json',version:null});
     const map=JSON.parse(clean);
     assert.deepEqual(map.imports,{
-        './entry.js':'./selected.js',
-        './helper.js?mode=a%20b':'./helper.js?mode=a+b',
+        './entry.js?v=4':'./obsolete.js',
+        './entry.js':'./selected.js?v=4',
+        './helper.js?mode=a%20b':'./helper.js?mode=a+b&v=4',
         'pkg/':'./pkg/',
         bare:'./bare.js'
     });
-    assert.deepEqual(map.scopes,{'./entry.js':{'./helper.js':'./scoped.js'}});
+    assert.deepEqual(map.scopes,{'./entry.js':{'./helper.js?v=4':'./scoped.js?v=4'}});
     assert.ok(clean.includes('"data": { "url": "./payload.js?v=4&arcaneVersion=old" }'));
     assert.equal(rewriteAssetReferences(clean,{filePath:'modules/arcane.importmap.json',version:null}),clean);
     assert.equal(rewriteAssetReferences(source,{filePath:'document.json',version:null}),source);
@@ -469,11 +482,13 @@ test('PWA import-map generation uses clean URLs without changing shared runtime 
     const appRoot=path.join(workspace,'apps','fixture');
     await mkdir(appRoot,{recursive:true});
     await writeFile(path.join(appRoot,'arcane-package.json'),JSON.stringify({pwa:{enabled:true}}),'utf8');
-    await writeFile(path.join(appRoot,'index.html'),'<base href="../../"><script type="module" src="./apps/fixture/entry.js?v=4&arcaneVersion=old"></script>','utf8');
+    await writeFile(path.join(appRoot,'index.html'),'<base href="../../"><link rel="stylesheet" href="./styles.css?v=20260909-sitemap"><script type="module" src="./apps/fixture/entry.js?v=4&arcaneVersion=old"></script>','utf8');
     const generated=await generateImportMap({workspaceRoot:workspace,appId:'fixture'});
     assert.equal(generated.imports['arcane/State'],'./arcane/modules/State.js');
     assert.equal(generated.imports['./arcane/modules/State.js?arcaneVersion=2.3.4'],undefined);
-    assert.ok((await readFile(path.join(appRoot,'index.html'),'utf8')).includes('src="./apps/fixture/entry.js"'));
+    const generatedHtml=await readFile(path.join(appRoot,'index.html'),'utf8');
+    assert.ok(generatedHtml.includes('src="./apps/fixture/entry.js?v=4"'));
+    assert.ok(generatedHtml.includes('href="./styles.css?v=20260909-sitemap"'));
     assert.equal(await readFile(path.join(runtimeRoot,'State.js'),'utf8'),runtimeSource);
     const built=await buildImportMap({files:['sdk/pwa.mjs'],version:null});
     assert.equal(built.imports['arcane-os/pwa'],'./arcane/sdk/pwa.mjs');

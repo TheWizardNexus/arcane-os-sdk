@@ -3,7 +3,7 @@
 Applications that enable [PWA delivery](pwa.md) use clean local resource URLs.
 Their generated offline manifest and service worker own the selected application
 and SDK release information. In that mode, the delivery transformer removes
-both `v` and `arcaneVersion`, preserving other query fields and fragments.
+only the SDK-owned `arcaneVersion` field, preserving authored query fields and fragments.
 The behavior below continues to apply when PWA delivery is disabled and to native
 packages. Workspace runtime materialization remains usable by either target;
 the selected browser delivery applies its PWA URL policy.
@@ -15,11 +15,12 @@ SDK package metadata, not a timestamp, content measurement, or application
 constant.
 
 For example, an existing `./arcane/modules/HTMLImport.js?v=6#module` reference
-becomes `./arcane/modules/HTMLImport.js?arcaneVersion=${version}#module`.
-`arcaneVersion` is the sole resource version field: transformation removes `v`,
-updates the first existing `arcaneVersion`, and removes duplicate version fields.
-Regenerating for another SDK release replaces that version value. Unrelated
-query fields, their spelling, and fragments remain intact.
+becomes `./arcane/modules/HTMLImport.js?v=6&arcaneVersion=${version}#module`.
+`arcaneVersion` is the SDK's resource version field: transformation updates its
+first existing value and removes duplicate `arcaneVersion` fields, or appends it
+when absent. Regenerating for another SDK release replaces only that SDK value.
+Authored fields, including `v`, encoded keys and values, repeated or empty query
+segments, their source spelling, and fragments remain intact.
 
 ## Public tooling
 

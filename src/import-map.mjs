@@ -847,7 +847,7 @@ function assetUrlVersionEdits(value,version){
         let decodedKey=key;
         try{decodedKey=decodeURIComponent(key.replaceAll('+',' '));}
         catch{decodedKey=key;}
-        const remove=decodedKey==='v'||(decodedKey==='arcaneVersion'&&(clean||versionFound));
+        const remove=decodedKey==='arcaneVersion'&&(clean||versionFound);
         parameters.push({start:offset,end:offset+parameter.length,remove});
         if(decodedKey==='arcaneVersion'&&!versionFound&&!clean){
             versionFound=true;
@@ -859,10 +859,10 @@ function assetUrlVersionEdits(value,version){
         }
         offset+=parameter.length+1;
     }
-    if(clean&&!parameters.some(function hasRemainingField(parameter){
-        return !parameter.remove&&parameter.end>parameter.start;
+    if(clean&&parameters.every(function removesSdkField(parameter){
+        return parameter.remove;
     }))return [{start:queryStart,end:address.length,value:''}];
-    // Remove adjacent obsolete fields together, including only their separator.
+    // Remove adjacent SDK version fields together, including only their separator.
     // Other field spelling and source-level escapes remain untouched.
     for(let index=0;index<parameters.length;index+=1){
         if(!parameters[index].remove)continue;
@@ -874,13 +874,10 @@ function assetUrlVersionEdits(value,version){
             value:''
         });
     }
-    const lastRetained=parameters.findLast(function retainedParameter(parameter){
-        return !parameter.remove;
-    });
     if(!clean&&!versionFound)edits.push({
         start:address.length,
         end:address.length,
-        value:`${lastRetained&&lastRetained.end>lastRetained.start?'&':''}arcaneVersion=${versionValue}`
+        value:`&arcaneVersion=${versionValue}`
     });
     return edits;
 }

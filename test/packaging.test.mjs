@@ -87,14 +87,14 @@ test('selected static package carries one release through entry, modules, Worker
         +'<script type="module" src="./apps/complete-app/content/App.js"></script>');
     const packaged=await packageApp({workspaceRoot:selected.workspaceRoot,appId:'complete-app'});
     const entry=await readFile(path.join(packaged.outputRoot,'apps/complete-app/index.html'),'utf8');
-    assert.ok(entry.includes(`entry.js?arcaneVersion=${version}`),entry);
+    assert.ok(entry.includes(`entry.js?v=6&amp;arcaneVersion=${version}`),entry);
     assert.ok(entry.includes(`theme.css?theme=day&amp;arcaneVersion=${version}#palette`));
     assert.ok(entry.includes('<p>./arcane/modules/entry.js?v=6</p>'));
     const module=await readFile(path.join(packaged.outputRoot,'arcane/modules/entry.js'),'utf8');
-    assert.ok(module.includes(`child.js?arcaneVersion=${version}`),module);
+    assert.ok(module.includes(`child.js?v=2&arcaneVersion=${version}`),module);
     assert.ok(module.includes(`worker.js?arcaneVersion=${version}`));
     const worker=await readFile(path.join(packaged.outputRoot,'arcane/modules/worker.js'),'utf8');
-    assert.ok(worker.includes(`child.js?arcaneVersion=${version}`),worker);
+    assert.ok(worker.includes(`child.js?v=2&arcaneVersion=${version}`),worker);
     const style=await readFile(path.join(packaged.outputRoot,'arcane/modules/theme.css'),'utf8');
     assert.ok(style.includes(`icon.svg?color=blue&arcaneVersion=${version}#mark`));
     assert.equal(await readFile(path.join(packaged.outputRoot,'apps/complete-app/content/document.html'),'utf8'),corpus);

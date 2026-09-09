@@ -150,9 +150,10 @@ The same bootstrap starts one initially hidden `pwa-install.html` component with
 the generated manifest's app name. Component loading and worker registration
 proceed independently.
 
-The selected PWA browser delivery removes `v` and `arcaneVersion` from actual
-local resource references, including the managed import map. Other query fields,
-fragments, source spelling and unrelated payloads are preserved. The offline
+The selected PWA browser delivery removes only SDK-owned `arcaneVersion` fields
+from actual local resource references, including the managed import map. Authored
+fields such as `v`, encoded and repeated fields, empty query segments, fragments,
+source spelling and unrelated payloads are preserved. The offline
 manifest now carries release information. Non-PWA and native delivery retain
 the [existing asset version contract](asset-versioning.md).
 

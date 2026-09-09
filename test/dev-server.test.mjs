@@ -209,7 +209,7 @@ test(
             assert.equal(response.headers.get('x-content-type-options'), null);
             const body = await response.text();
             if (resource === resources[0]) assert.equal(body, firstDocument);
-            if (resource === resources[1]) assert.ok(body.includes('child.js?arcaneVersion=9.8.7'));
+            if (resource === resources[1]) assert.ok(body.includes('child.js?v=4&arcaneVersion=9.8.7'));
             modified.set(resource, lastModified);
             const unchanged = await request(
                 instance.origin,
@@ -259,7 +259,7 @@ test(
                 body,
                 resource === resources[0]
                     ? updatedDocument
-                    : "import './child.js?arcaneVersion=9.8.8'; export const state = 'updated';"
+                    : "import './child.js?v=4&arcaneVersion=9.8.8'; export const state = 'updated';"
             );
         }
         assert.equal(await readFile(documentPath, 'utf8'), updatedDocument);
@@ -290,11 +290,11 @@ test('source server versions local references from selected SDK metadata and rev
     assert.equal(module.status,200);
     assert.equal(module.headers.get('cache-control'),null);
     const source=await module.text();
-    assert.ok(source.includes('child.js?arcaneVersion=9.8.7'));
+    assert.ok(source.includes('child.js?v=2&arcaneVersion=9.8.7'));
     assert.ok(source.includes('worker.js?arcaneVersion=9.8.7'));
     const worker=await request(instance.origin,'/arcane/modules/worker.js?arcaneVersion=9.8.7');
     assert.equal(worker.status,200);
-    assert.ok((await worker.text()).includes('child.js?arcaneVersion=9.8.7'));
+    assert.ok((await worker.text()).includes('child.js?v=2&arcaneVersion=9.8.7'));
     assert.equal(await readFile(path.join(sourceRoot,'runtime/arcane/modules/worker.js'),'utf8'),
         "import './child.js?v=2';\n");
     const document=await request(instance.origin,'/apps/served-app/modules/document.html');
@@ -311,7 +311,7 @@ test('source server versions local references from selected SDK metadata and rev
     const refreshedEntry=await request(instance.origin,'/apps/served-app/index.html');
     assert.ok((await refreshedEntry.text()).includes('arcaneVersion=9.8.8'));
     const refreshedWorker=await request(instance.origin,'/arcane/modules/worker.js?arcaneVersion=9.8.8');
-    assert.ok((await refreshedWorker.text()).includes('child.js?arcaneVersion=9.8.8'));
+    assert.ok((await refreshedWorker.text()).includes('child.js?v=2&arcaneVersion=9.8.8'));
 });
 
 test('source server exposes the selected app and installed SDK browser routes',async t=>{

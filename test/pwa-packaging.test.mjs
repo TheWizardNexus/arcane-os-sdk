@@ -270,13 +270,16 @@ test(
         assert.equal(source.manifest.start_url, '/apps/pwa-app/index.html?conversation=one#start');
         assert.equal(source.manifest.scope, '/apps/pwa-app/');
         assert.equal(source.manifest.id, '/apps/pwa-app/');
-        assert.equal(source.manifest.icons[0].src, '/apps/pwa-app/img/icon.png?color=blue#mark');
+        assert.equal(source.manifest.icons[0].src, '/apps/pwa-app/img/icon.png?v=8&color=blue#mark');
         assert.equal(source.manifest.icons[1].src, metadata.icons[1].src);
         assert.equal(source.manifest.screenshots[0].src, '/apps/pwa-app/img/screen.png?view=wide');
         assert.equal(source.manifest.shortcuts[0].url, '/apps/pwa-app/pages/settings.html?theme=day#appearance');
         assert.equal(source.manifest.shortcuts[0].icons[0].src, '/apps/pwa-app/img/icon.png?color=blue#mark');
         assert.ok(
             source.offlineManifest.assets.includes('/apps/pwa-app/img/icon.png?color=blue#mark')
+        );
+        assert.ok(
+            source.offlineManifest.assets.includes('/apps/pwa-app/img/icon.png?v=8&color=blue#mark')
         );
         assert.equal(source.offlineManifest.revision, 'development');
         assert.equal(
@@ -298,7 +301,7 @@ test(
         };
         const release = createPwaArtifacts(releaseOptions);
         assert.equal(release.manifest.start_url, './index.html?conversation=one#start');
-        assert.equal(release.manifest.icons[0].src, './img/icon.png?color=blue#mark');
+        assert.equal(release.manifest.icons[0].src, './img/icon.png?v=8&color=blue#mark');
         assert.equal(release.offlineManifest.revision, 'selected-release-one');
         assert.equal(release.offlineManifest.sdkVersion, '9.8.7');
         assert.deepEqual(metadata, original);
@@ -312,7 +315,7 @@ test(
         assert.equal(nestedRelease.manifest.start_url, './apps/pwa-app/index.html?conversation=one#start');
         assert.equal(nestedRelease.manifest.scope, './apps/pwa-app/');
         assert.equal(nestedRelease.manifest.id, './apps/pwa-app/');
-        assert.equal(nestedRelease.manifest.icons[0].src, './apps/pwa-app/img/icon.png?color=blue#mark');
+        assert.equal(nestedRelease.manifest.icons[0].src, './apps/pwa-app/img/icon.png?v=8&color=blue#mark');
         assert.equal(nestedRelease.manifest.shortcuts[0].url, './apps/pwa-app/pages/settings.html?theme=day#appearance');
         assert.deepEqual(metadata, original);
     }
@@ -350,7 +353,8 @@ test(
                 'utf8'
             );
             assert.match(html, /<script\b(?=[^>]*\bdata-arcane-pwa)(?=[^>]*\basync)[^>]*>/u);
-            assert.doesNotMatch(html, /<script\b[^>]*\bsrc="[^"\s]*[?&](?:v|arcaneVersion)=/u);
+            assert.doesNotMatch(html, /<script\b[^>]*\bsrc="[^"\s]*[?&](?:amp;)?arcaneVersion=/u);
+            assert.match(html, /<script\b[^>]*\bsrc="[^"\s]*\?v=old&amp;language=fr#graph"/u);
             assert.ok(
                 html.includes(`src="${bootstrapUrl}"`),
                 file
@@ -377,13 +381,13 @@ test(
         assert.equal(offline.appVersion, '1.2.3');
         assert.equal(offline.sdkVersion, '9.8.7');
         assert.ok(
-            offline.assets.includes('./apps/pwa-app/modules/app.js?language=fr')
+            offline.assets.includes('./apps/pwa-app/modules/app.js?v=old&language=fr')
         );
         assert.ok(
-            offline.assets.includes('./arcane/modules/Shared.js?mode=full')
+            offline.assets.includes('./arcane/modules/Shared.js?v=old&mode=full')
         );
         assert.ok(
-            offline.assets.includes('./arcane/modules/MapOnly.js?flavor=map-only')
+            offline.assets.includes('./arcane/modules/MapOnly.js?v=old&flavor=map-only')
         );
         assert.equal(
             offline.assets.includes('./arcane-sw.js'),
@@ -399,7 +403,7 @@ test(
                 'utf8'
             )
         );
-        assert.equal(importMap.imports['arcane/Shared'], './arcane/modules/Shared.js?mode=full');
+        assert.equal(importMap.imports['arcane/Shared'], './arcane/modules/Shared.js?v=old&mode=full');
         assert.equal(
             await readFile(
                 path.join(packaged.outputRoot, 'apps/pwa-app/content/document.html'),
