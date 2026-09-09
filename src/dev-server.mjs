@@ -6,6 +6,7 @@ import https from 'node:https';
 import os from 'node:os';
 import path from 'node:path';
 import {resolveWorkspace} from './workspace.mjs';
+import {readInstalledSdkLayout} from './sdk-runtime-layout.mjs';
 import {APP_DESCRIPTOR_NAME, projectPackageManifest} from './app-descriptor.mjs';
 import {APP_CONFIG_NAME, validateAppConfig} from './packager/core.mjs';
 import {createEventQueue} from './event-queue.mjs';
@@ -436,6 +437,7 @@ function sharedPathAllowed(relative,route){
     });
     if(excluded)return false;
     return route.include.some(item=>{
+        if(item==='.')return true;
         const candidate=inventoryKey(item);
         return comparable===candidate||comparable.startsWith(`${candidate}/`);
     });
@@ -471,11 +473,16 @@ async function sourceRoutes(workspaceRoot,appId,{
             mappings:[appMapping,...sdkSource.mappings]
         };
     }
-    if(resolved.config.workspaceMode==='integrated'){
+    if(resolved.config.workspaceMode==='integrated'
+        ||resolved.config.browserRuntimeLayout==='installed-v1'){
+        const installed=resolved.config.browserRuntimeLayout==='installed-v1'
+            ?await readInstalledSdkLayout(resolved.workspaceRoot,resolved.config)
+            :null;
         return {
             workspaceRoot:resolved.workspaceRoot,
-            workspaceMode:'integrated',
+            workspaceMode:resolved.config.workspaceMode,
             config:resolved.config,
+            ...(installed?{installed}:{}),
             appId:resolved.appId,
             app:resolved.app.manifest,
             startPath:`/apps/${resolved.appId}/${resolved.app.manifest.entry}`,
@@ -579,7 +586,7 @@ async function sourcePwaAssets(routeSet, mappings, signal, resourceUrls, resourc
             }
         }
         for (const selected of mapping.include ?? ['']) {
-            await visitSourceResource(selected ? selected.split('/') : []);
+            await visitSourceResource(selected && selected!=='.' ? selected.split('/') : []);
         }
     }
     const origin = 'http://arcane.invalid';
@@ -866,7 +873,7 @@ async function startOwnedDevServer({
     const mappings=deterministicMappings(routeSet.mappings);
     const versionPath = mode === 'source'
         ? sdkRuntimeSourceRoot === undefined
-            ? path.join(routeSet.workspaceRoot, 'arcane.lock.json')
+            ? routeSet.installed?.versionPath ?? path.join(routeSet.workspaceRoot, 'arcane.lock.json')
             : path.join(routeSet.runtime.sourceRoot, 'package.json')
         : undefined;
     const [generatorInputs, initialAssetVersion, versionInput] = await Promise.all(
@@ -897,6 +904,9 @@ async function startOwnedDevServer({
     );
     async function selectedAssetVersion(){
         if(mode!=='source')return undefined;
+        if(routeSet.installed)return JSON.parse(await readFile(
+            routeSet.installed.versionPath,'utf8'
+        )).version;
         return sdkRuntimeSourceRoot===undefined
             ?readWorkspaceAssetVersion(routeSet.workspaceRoot)
             :JSON.parse(await readFile(

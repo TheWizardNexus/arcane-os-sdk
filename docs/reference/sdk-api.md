@@ -5,11 +5,12 @@ The npm package exposes a Node.js ESM control plane, the portable
 `arcane-os/preference-store`, `arcane-os/speech-playback`,
 `arcane-os/speech-text`, `arcane-os/ai/tool-text-stream`, and `arcane-os/browser-device` entrypoints, and the browser-only
 `arcane-os/pwa`, `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints.
-Those package subpaths are distinct from application-facing projection modules
-in the managed browser map, such as `arcane/AIProviderRuntime`,
-`arcane/AIRuntimeState`, and `arcane/ThemeBootstrap`. Applications use those
-mapped runtime modules and call `globalThis.Arcane` for capability-gated host
-behavior; they are not additional `package.json#exports` entrypoints.
+Lowercase runtime subpaths also expose existing module namespaces through both
+Node package exports and managed browser imports, as listed below. Established
+browser names such as `arcane/AIProviderRuntime`, `arcane/AIRuntimeState`, and
+`arcane/ThemeBootstrap` remain managed-map names rather than Node package
+entrypoints. Applications call `globalThis.Arcane` for capability-gated host
+behavior.
 
 This page is the canonical inventory for every JavaScript name reachable through `package.json#exports`. The same binding can appear at the root and a focused subpath; those entrypoints are listed together. The root workspace `discoverApps` and the low-level packager `discoverApps` are intentionally separate records because they are different functions.
 
@@ -19,7 +20,8 @@ This table is the Node `package.json#exports` map: it defines package
 entrypoints for SDK/tooling code. It is distinct from the generated browser
 import map that resolves application-facing `arcane/*` modules and the focused
 EventManager entry. See [browser runtime delivery](protocols.md#browser-runtime-delivery)
-for the installed-inventory-derived physical-runtime contract in SDK `0.5.18`.
+for the shared browser destinations used by installed-package and physical
+runtime layouts.
 
 | Specifier | Purpose |
 | --- | --- |
@@ -36,6 +38,21 @@ for the installed-inventory-derived physical-runtime contract in SDK `0.5.18`.
 | `arcane-os/event-manager` | Central synchronous events, complete time-travel history, playback, and optional DOM instrumentation. |
 | `arcane-os/logging` | Shared console diagnostics controlled by the existing `user.developer` preference. |
 | `arcane-os/preference-store` | Portable preference records and injected storage adapters. |
+| `arcane-os/ai` | Existing `AI.js` provider-neutral inference and speech namespace. |
+| `arcane-os/ai-preference-tuple` | Existing `AIPreferenceTuple.js` module namespace. |
+| `arcane-os/ai-preference-runtime` | Existing `AIPreferenceRuntime.js` module namespace. |
+| `arcane-os/ai-provider-runtime` | Existing `AIProviderRuntime.js` provider selection and lifecycle namespace. |
+| `arcane-os/ai-runtime-state` | Existing `AIRuntimeState.js` state and event namespace. |
+| `arcane-os/model-definition` | Existing `ModelDefinition.js` module namespace. |
+| `arcane-os/conversation-timebox` | Existing `ConversationTimebox.js` module namespace. |
+| `arcane-os/conversation-action-items` | Existing `ConversationActionItems.js` module namespace. |
+| `arcane-os/conversation-closing-report` | Existing `ConversationClosingReport.js` module namespace. |
+| `arcane-os/chat-records` | Existing `ChatRecords.js` module namespace. |
+| `arcane-os/app-data-scope` | Existing `AppDataScope.js` application storage scope namespace. |
+| `arcane-os/core-local-model-catalog` | Existing `CoreLocalModelCatalog.js` local model catalog namespace. |
+| `arcane-os/dbopfs-document-library` | Existing `DBOPFSDocumentLibrary.js` document storage namespace. |
+| `arcane-os/local-ai-readiness` | Existing `LocalAIReadiness.js` local AI readiness namespace. |
+| `arcane-os/ollama-model-identifier` | Existing `OllamaModelIdentifier.js` model identifier namespace. |
 | `arcane-os/speech-playback` | Portable speech preparation, playback state, and injected media adapters. |
 | `arcane-os/speech-text` | Speech-input formatting cleanup for complete text and streamed chunks. |
 | `arcane-os/browser-device` | Synchronous mobile or desktop identity hints for application-owned settings. |
@@ -44,6 +61,18 @@ for the installed-inventory-derived physical-runtime contract in SDK `0.5.18`.
 | `arcane-os/ai/tool-text-stream` | Shared selected tool-argument text observer for provider integration. |
 | `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS provider mechanisms, ordinary upstream assets, materialized/native routing, Workers, and cancellation. |
 | `arcane-os/mail` | Portable Mail runtime, durable outbox, complete transport responses, and provider-neutral acceptance contracts. |
+
+These lowercase runtime-module entrypoints expose their existing exports; they
+do not duplicate the module implementations or change their platform and
+lifecycle requirements. Node resolves them inside the installed package, while
+the managed browser map resolves the same names to the selected runtime URLs.
+Node package resolution does not make browser-only operations available in
+Node: a module still needs its documented browser globals, storage, media,
+Worker, or host capabilities when its initialization or operation uses them.
+Use `arcane-os/mail` for the existing Mail aggregation rather than importing a
+private runtime file. Its package facade and managed browser entry both expose
+the canonical `MailApi.mjs` aggregation and the same Mail, outbox, and transport
+bindings.
 
 Eight JSON schemas and `package.json` are data-only export subpaths. In Node ESM, import JSON with `with {type: 'json'}`, or resolve and read it explicitly.
 
@@ -1495,6 +1524,11 @@ Materializes the complete installed SDK runtime and browser-runtime content.
 After full runtime replacement, it writes or replaces semantic
 `arcane.lock.json` from the actual installed dependency name, package name,
 package version, alias source, and projected roots.
+
+This operation remains available for physical workspace projections. External
+applications using [installed-package routes](protocols.md#installed-package-browser-routes)
+read directly from their installed dependency and do not need to call it or
+create `arcane.lock.json` before serving, refreshing app import maps, or packaging.
 
 ### Signature and result
 
@@ -3643,6 +3677,10 @@ certPath, keyPath, tls, signal, onEvent}` and serves one validated
 workspace application plus its complete SDK or integrated runtime. Packaged mode uses
 `{mode:'packaged', releaseRoot, workspaceRoot, host, port, httpPort, certPath, keyPath, tls,
 signal, onEvent}` and serves the complete selected release files.
+External source mode accepts both the installed-package route layout and the
+existing physical runtime layout. Installed-package mode serves the configured
+SDK resources directly from `node_modules` at their logical browser URLs;
+it does not create a workspace `arcane/` directory or require `arcane.lock.json`.
 `host` defaults to `127.0.0.1` and accepts an
 explicit network address or hostname. Use `0.0.0.0` for all IPv4 interfaces or
 `::` for the platform's IPv6 wildcard listeners. `port` selects the HTTPS
@@ -3866,8 +3904,10 @@ async validateWorkspace({
 
 Import it from `arcane-os`. It resolves to a validation result with
 `valid`, `workspaceMode`, `workspaceRoot`, `appId`, `appRoot`, the selected
-configuration/application, lock data, and completed checks. For an external
-workspace it additionally returns the exact installed package authority:
+configuration/application, lock data where the layout uses it, and completed
+checks. External `installed-v1` selection reads package metadata directly and
+does not require a workspace `arcane.lock.json` or runtime projection. For an
+external workspace the result additionally includes the installed package:
 
 ```javascript
 {
@@ -3876,17 +3916,17 @@ workspace it additionally returns the exact installed package authority:
     packageSource,
     canonicalPackageRoot,
     packageName: 'arcane-os',
-    packageVersion: '0.5.18',
+    packageVersion,
     runtimeRoot,
     browserRuntimeRoot
   }
 }
 ```
 
-The dependency can be named `arcane-os` or be one exact npm alias for
-`npm:arcane-os@0.5.18`. The selected installation must still be one direct,
-physical, non-link package directory whose manifest identifies exactly as
-`arcane-os@0.5.18`; duplicate canonical/alias declarations reject.
+The dependency can be named `arcane-os` or use an npm alias for the selected
+`arcane-os` version. The configured package source must match that declaration;
+`packageVersion` reports the installed package's version. Duplicate
+canonical/alias declarations reject.
 `allowMissingManagedImportMap` is an internal packaging/development seam. An
 ordinary caller should leave it `false`.
 

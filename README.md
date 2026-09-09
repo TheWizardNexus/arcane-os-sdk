@@ -19,9 +19,18 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles preserve the same app URLs, theme, packaging,
 event, cancellation, and browser run contracts.
 
-This checkout defines the `0.25.0` SDK contract. Applications pin one exact npm
+This checkout defines the `0.26.0` SDK contract. Applications pin one exact npm
 version and lockfile; registry state is deliberately not baked into application
 artifacts.
+
+External browser apps can use the installed npm package directly, without a
+generated workspace `arcane/` directory or `arcane.lock.json`. Select the
+[four installed-package routes](docs/reference/protocols.md#installed-package-browser-routes)
+in `arcane-packager.json`: development, managed import maps, and PWA resources
+read the installed SDK while keeping `/arcane/...` browser URLs. Portable app
+packages still contain their selected runtime. Existing materialized workspaces
+and the scaffold's current layout remain supported. Node services continue to
+use the installed CLI or public imports such as `arcane-os/mail`.
 
 The [mail gateway](docs/reference/mail.md) serves HTTPS with HTTP/2 on port 4433
 by default. Configure its host, port, origin list, certificate paths, and other
@@ -62,7 +71,7 @@ Create one browser application, install its pinned SDK, and start its source
 server:
 
 ```bash
-npx arcane-os@0.12.0 new hello-speech --path ./hello-speech --target browser
+npx arcane-os@0.26.0 new hello-speech --path ./hello-speech --target browser
 cd hello-speech
 npm install
 ```

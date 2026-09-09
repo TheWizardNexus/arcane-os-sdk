@@ -61,13 +61,19 @@ explicit identity fails, and the selected page then must pass exact path-relativ
 base validation.
 Included HTML with neither signal is a component fragment and remains a
 complete package file.
-`arcane-os/preference-store` and `arcane-os/speech-playback` are the two
-portable subpaths that resolve directly to canonical runtime-module namespaces
-from both Node package exports and managed browser keys;
+Public lowercase runtime subpaths resolve directly to canonical runtime-module
+namespaces from both Node package exports and managed browser keys. These
+include `arcane-os/preference-store`, `arcane-os/speech-playback`,
+`arcane-os/ai-preference-tuple`, `arcane-os/ai-preference-runtime`,
+`arcane-os/ai-provider-runtime`, `arcane-os/ai-runtime-state`,
+`arcane-os/model-definition`, `arcane-os/conversation-timebox`,
+`arcane-os/conversation-action-items`, `arcane-os/conversation-closing-report`,
+and `arcane-os/chat-records`.
 `arcane/PreferenceStore` and `arcane/SpeechPlayback` remain their established
 browser import-map names. The additional portable `arcane-os/speech-text`
 subpath owns shared speech-input cleanup and has the same
-managed browser key. There is
+managed browser key. `arcane-os/mail` remains the existing Mail aggregation.
+There is
 no exported `importMapApplication()` function, `generateImportMap()` function, or
 `arcane-os/import-map` package subpath.
 Explicit host document lists use the separate root-exported
@@ -89,6 +95,68 @@ or `dist`. Distribution instead uses the app's installed package and
 materializes the complete required SDK runtime,
 browser-runtime, and managed-import-map closure inside that app's own artifact.
 No application polls for SDK changes.
+
+## Installed-package browser routes
+
+An external application can serve and package its installed SDK directly,
+without creating a top-level `arcane/` directory or requiring
+`arcane.lock.json`. Select `installed-v1` through these four ordered routes in
+the existing schema-1 `arcane-packager.json`; no additional layout field is
+needed:
+
+```json
+{
+  "schemaVersion": 1,
+  "appsRoot": "apps",
+  "distRoot": "dist",
+  "sharedPayloads": {
+    "browser-runtime": [
+      {
+        "source": "node_modules/arcane-os/runtime/arcane",
+        "destination": "arcane",
+        "include": ["components", "css", "entities", "img", "modules"],
+        "exclude": []
+      },
+      {
+        "source": "node_modules/arcane-os/browser-runtime",
+        "destination": "arcane/sdk",
+        "include": ["."],
+        "exclude": []
+      },
+      {
+        "source": "node_modules/arcane-os/runtime/strong-type",
+        "destination": "arcane/dependencies/strong-type",
+        "include": ["."],
+        "exclude": []
+      },
+      {
+        "source": "node_modules/arcane-os",
+        "destination": "licenses/arcane-os",
+        "include": ["LICENSE", "COMMERCIAL-LICENSE.md", "NOTICE"],
+        "exclude": []
+      }
+    ]
+  }
+}
+```
+
+The first include list also accepts a final `security` entry. An npm alias such
+as `arcane-sdk` substitutes `node_modules/arcane-sdk` for the package prefix in
+all four source paths. Destinations remain unchanged. Package selection and SDK
+version come from the installed dependency, not a generated runtime lock.
+
+`arcane import-map`, `arcane dev`, packaging, and generated PWA inventories use
+the same logical destinations. Source serving and map generation read installed
+files without materializing them into the workspace. A selected portable
+package copies its complete selected resources inside the artifact, preserving
+the same browser URLs and saved managed import maps.
+
+Existing `physical-v1` configurations whose first source is `arcane` remain
+supported. The explicit materializer below still refreshes those projections,
+and scaffolding retains its existing physical layout. Selecting `installed-v1`
+does not delete any preexisting workspace files. The separate host-document
+`generateDocumentImportMaps()` API continues to accept an already materialized
+runtime; its input contract is unchanged.
 
 ## Installed SDK runtime materialization
 

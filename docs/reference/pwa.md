@@ -108,6 +108,15 @@ app's `arcane-app.json`. Startup refreshes that app's generated
 maps and starting the server. No packaging or `dist` output is required.
 Package-only applications retain their existing descriptor workflow.
 
+With the external [`installed-v1` routes](protocols.md#installed-package-browser-routes),
+the server inventories the selected SDK directly in `node_modules`. Runtime
+resources retain their public `arcane/`, `arcane/sdk/`, and
+`arcane/dependencies/strong-type/` URLs, so offline selections use those logical
+paths rather than package filesystem paths. No workspace `arcane/` tree or
+`arcane.lock.json` is needed. Packaging uses the same route selection and copies
+the selected resources into the portable output; existing physical projections
+remain supported.
+
 Add a file or directory to `package.include` to make it part of the app's
 resources. A new file inside an already included directory needs no separate
 entry. `package.include` is an application resource selection, not a file list

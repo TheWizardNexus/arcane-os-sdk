@@ -184,7 +184,7 @@ npm exec -- arcane doctor --workspace . --arcane-root "../Arcane OS"
 
 ### Overview
 
-Refreshes one selected application's physical browser runtime map, generates
+Refreshes one selected application's browser runtime map, generates
 its standard browser import map, discovers every directly navigable
 `.html`/`.htm` document admitted by the selected descriptor's existing
 include/exclude rules, and commits the map artifact plus those managed documents
@@ -211,10 +211,10 @@ The generated artifact is
 `apps/<id>/modules/arcane.importmap.json`. Its exact JSON is also installed in
 the configured entry and every other admitted browser document as `<script
 type="importmap" data-arcane-import-map>` before module loading. The complete
-physical-v1 runtime derives its entries from the installed runtime and
-browser-runtime inventories. It intentionally has no package-root mapping;
+runtime map derives its entries from the selected runtime and browser-runtime
+inventories. It intentionally has no package-root mapping;
 portable runtime subpaths such as `arcane-os/preference-store` and
-`arcane-os/speech-playback` instead map directly to their canonical projected
+`arcane-os/speech-playback` instead map directly to their canonical runtime
 modules. The result reports the complete map written to the selected
 application; no fixed entry count is a release contract.
 
@@ -223,6 +223,15 @@ list. External and modern integrated routes require `components`, `css`,
 `dependencies`, `entities`, `img`, `modules`, and `sdk`; a physical workspace
 may omit only an optional trailing `security` include. The external license
 route remains separate and second.
+
+External applications can instead select the four ordered
+[`installed-v1` routes](protocols.md#installed-package-browser-routes) in
+`arcane-packager.json`. This reads directly from the installed SDK package and
+requires neither a workspace `arcane/` directory nor `arcane.lock.json`.
+The generated browser destinations remain `arcane/`, `arcane/sdk/`, and
+`arcane/dependencies/strong-type/`; an npm alias changes package source paths,
+not those browser URLs. The SDK version comes from that installed package.
+Existing physical workspaces and scaffold output remain supported unchanged.
 
 ### Result and safety
 
@@ -308,9 +317,12 @@ Starts one development server for one selected app and maps the exact
 workspace/runtime routes. It defaults to HTTPS on localhost; `--public` enables access
 from other devices on the network, using HTTPS by default.
 
-For an external workspace, the server exposes the selected projected
-`arcane/` root, including `arcane/sdk` and `arcane/dependencies`, alongside the
-application. Integrated workspaces retain their configured physical routes.
+For an external workspace, the server exposes the selected SDK routes alongside
+the application. `installed-v1` serves directly from the installed package
+under `/arcane`, `/arcane/sdk`, and `/arcane/dependencies/strong-type`, without
+creating a workspace runtime directory. Existing `physical-v1` workspaces serve
+their projected `arcane/` root. Integrated workspaces retain their configured
+physical routes.
 The explicit live-source SDK mapping remains unchanged and does not replace the
 installed projection.
 
@@ -503,6 +515,11 @@ shared route destinations. When selected shared content supplies no root
 `index.html`, the SDK generates one that opens the selected app entry.
 Source document bases and resource URLs therefore retain their development
 layout. Packaging does not run tests or checks automatically.
+
+For `installed-v1`, the same four configured source routes supply the complete
+selected SDK content directly from `node_modules`. Only the portable output
+receives copies; no workspace `arcane/` projection is required. Its runtime URLs,
+managed import-map targets, and PWA inventory destinations match source serving.
 
 ```text
 arcane package [--app <id>] [--dry-run]

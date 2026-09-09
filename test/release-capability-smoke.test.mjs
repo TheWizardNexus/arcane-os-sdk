@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {mkdir,readFile,writeFile} from 'node:fs/promises';
+import {mkdir,readFile,rm,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
 import test from '../src/testing.mjs';
@@ -302,4 +302,152 @@ test('installed public SDK entrypoints and runtime materialization are functiona
     );
     assert.equal(cliResult.code,0,cliResult.stderr);
     assert.equal(cliResult.stdout.trim(),verified.version);
+
+    // The same installed consumer can serve and package directly from npm.
+    // Remove only this fixture's earlier materialized runtime and stale lock.
+    await rm(path.join(consumerRoot,'arcane'),{recursive:true});
+    await rm(path.join(consumerRoot,'arcane.lock.json'));
+    await writeConsumerFile(consumerRoot,'arcane-packager.json',json({
+        schemaVersion:1,appsRoot:'apps',distRoot:'dist',
+        sharedPayloads:{'browser-runtime':[
+            {
+                source:'node_modules/arcane-os/runtime/arcane',destination:'arcane',
+                include:['components','css','entities','img','modules'],exclude:[]
+            },
+            {
+                source:'node_modules/arcane-os/browser-runtime',destination:'arcane/sdk',
+                include:['.'],exclude:[]
+            },
+            {
+                source:'node_modules/arcane-os/runtime/strong-type',
+                destination:'arcane/dependencies/strong-type',include:['.'],exclude:[]
+            },
+            {
+                source:'node_modules/arcane-os',destination:'licenses/arcane-os',
+                include:['LICENSE','COMMERCIAL-LICENSE.md','NOTICE'],exclude:[]
+            }
+        ]}
+    }));
+    const installedOnlyContract=path.join(testRoot,'installed-package-only.test.mjs');
+    await writeFile(installedOnlyContract,`import assert from 'node:assert/strict';
+import {readFile,rm,stat,writeFile} from 'node:fs/promises';
+import path from 'node:path';
+import {createToolchain,packageApp,resolveWorkspace,startDevServer,validateWorkspace} from 'arcane-os';
+import test from 'arcane-os/testing';
+import {parseModelDefinition} from 'arcane-os/model-definition';
+import {hasConversationEntry} from 'arcane-os/chat-records';
+import {normalizeConversationActionItems} from 'arcane-os/conversation-action-items';
+import {formatConversationClosingReportText} from 'arcane-os/conversation-closing-report';
+
+test('installed npm sources own maps, development serving and portable output',async function installedPackageOnly(){
+    const workspaceRoot=process.cwd();
+    const appId=${JSON.stringify(appId)};
+    const appRoot=path.join(workspaceRoot,'apps',appId);
+    const installedRoot=path.join(workspaceRoot,'node_modules','arcane-os');
+    const projection=path.join(workspaceRoot,'arcane');
+    const lockPath=path.join(workspaceRoot,'arcane.lock.json');
+    const version=${JSON.stringify(verified.version)};
+    await assert.rejects(stat(projection),{code:'ENOENT'});
+    await assert.rejects(stat(lockPath),{code:'ENOENT'});
+    const resolved=await resolveWorkspace({workspaceRoot,appId});
+    assert.equal(resolved.config.browserRuntimeLayout,'installed-v1');
+    assert.equal(resolved.config.sdkPackageSource,'node_modules/arcane-os');
+    assert.equal((await validateWorkspace({workspaceRoot,appId})).valid,true);
+    for(const name of [
+        'ai','ai-preference-tuple','ai-preference-runtime','ai-provider-runtime',
+        'ai-runtime-state','model-definition','conversation-timebox',
+        'conversation-action-items','conversation-closing-report','chat-records',
+        'app-data-scope','core-local-model-catalog','dbopfs-document-library',
+        'local-ai-readiness','ollama-model-identifier'
+    ]){
+        const resolvedModule=new URL(import.meta.resolve('arcane-os/'+name));
+        assert.equal(resolvedModule.protocol,'file:');
+        assert.ok(resolvedModule.pathname.includes('/runtime/arcane/modules/'),name);
+    }
+    // Pure shared modules execute in Node; browser-only AI is resolved above.
+    const definition=parseModelDefinition(${JSON.stringify('FROM installed-fixture\n\nSYSTEM """\nComplete installed prompt.\n"""\n')});
+    assert.equal(definition.system,'Complete installed prompt.');
+    assert.equal(hasConversationEntry([{role:'user',content:'Complete conversation.'}]),true);
+    assert.deepEqual(normalizeConversationActionItems([]),[]);
+    assert.equal(typeof formatConversationClosingReportText,'function');
+
+    const toolchain=createToolchain({workspaceRoot,appId});
+    await writeFile(lockPath,JSON.stringify({sdk:{version:'0.0.1'}}));
+    await toolchain.importMap();
+    const mapPath=path.join(appRoot,'modules','arcane.importmap.json');
+    const versionedMap=JSON.parse(await readFile(mapPath,'utf8'));
+    assert.equal(versionedMap.imports['arcane/ThemeBootstrap'],
+        './arcane/modules/ThemeBootstrap.js?arcaneVersion='+version);
+    assert.equal(versionedMap.imports['arcane-os/model-definition'],
+        './arcane/modules/ModelDefinition.js?arcaneVersion='+version);
+    assert.equal(versionedMap.imports['arcane-os/mail'],
+        './arcane/modules/MailApi.mjs?arcaneVersion='+version);
+    assert.deepEqual(JSON.parse(await readFile(lockPath,'utf8')),{sdk:{version:'0.0.1'}});
+    await rm(lockPath);
+    assert.equal(await readFile(path.join(appRoot,'components','status.html'),'utf8'),${JSON.stringify(fragmentSource)});
+    for(const filename of ['index.html','pages/review.html']){
+        const page=await readFile(path.join(appRoot,filename),'utf8');
+        assert.ok(page.includes('data-arcane-import-map'));
+    }
+
+    const descriptorPath=path.join(appRoot,'arcane-app.json');
+    const packagePath=path.join(appRoot,'arcane-package.json');
+    const descriptor=JSON.parse(await readFile(descriptorPath,'utf8'));
+    const manifest=JSON.parse(await readFile(packagePath,'utf8'));
+    descriptor.package.pwa={enabled:true};
+    manifest.pwa={enabled:true};
+    await Promise.all([
+        writeFile(descriptorPath,JSON.stringify(descriptor)),
+        writeFile(packagePath,JSON.stringify(manifest))
+    ]);
+    await toolchain.importMap();
+    const logicalPaths=[
+        '/arcane/components/chat.html',
+        '/arcane/modules/ThemeBootstrap.js',
+        '/arcane/sdk/event-manager.mjs',
+        '/arcane/sdk/ai/browser-speech.mjs',
+        '/arcane/dependencies/strong-type/index.js',
+        '/licenses/arcane-os/LICENSE'
+    ];
+    const instance=await startDevServer({workspaceRoot,appId,http:true,host:'127.0.0.1',port:0});
+    try{
+        for(const logicalPath of logicalPaths){
+            const response=await fetch(new URL(logicalPath,instance.origin));
+            assert.equal(response.status,200,logicalPath);
+            const content=await response.text();
+            assert.notEqual(content,'',logicalPath);
+            if(logicalPath==='/licenses/arcane-os/LICENSE'){
+                assert.equal(content,await readFile(path.join(installedRoot,'LICENSE'),'utf8'));
+            }
+        }
+        const response=await fetch(new URL('/arcane-offline.json',instance.origin));
+        assert.equal(response.status,200);
+        const offline=await response.json();
+        assert.equal(offline.sdkVersion,version);
+        for(const logicalPath of logicalPaths){assert.ok(offline.assets.includes(logicalPath),logicalPath);}
+        assert.equal(offline.assets.some(function packageUrl(url){return url.includes('node_modules/');}),false);
+    }finally{
+        await instance.close();
+    }
+    const packaged=await packageApp({workspaceRoot,appId});
+    for(const logicalPath of logicalPaths){
+        assert.ok(packaged.files.includes(logicalPath.substring(1)),logicalPath);
+    }
+    assert.equal(packaged.files.some(function packagePath(file){
+        return file.startsWith('node_modules/')||file.includes('/./');
+    }),false);
+    assert.equal(await readFile(path.join(packaged.outputRoot,'apps',appId,'components','status.html'),'utf8'),${JSON.stringify(fragmentSource)});
+    const offline=JSON.parse(await readFile(path.join(packaged.outputRoot,'arcane-offline.json'),'utf8'));
+    assert.equal(offline.sdkVersion,version);
+    for(const logicalPath of logicalPaths){assert.ok(offline.assets.includes('.'+logicalPath),logicalPath);}
+    await assert.rejects(stat(projection),{code:'ENOENT'});
+    await assert.rejects(stat(lockPath),{code:'ENOENT'});
+});
+`);
+    const installedOnlyResult=await runNode([installedTestRunner,installedOnlyContract],{
+        cwd:consumerRoot,timeout:60_000
+    });
+    assert.equal(installedOnlyResult.code,0,installedOnlyResult.stderr||installedOnlyResult.stdout);
+    assert.match(installedOnlyResult.stdout,/Test Total : 1/u);
+    assert.match(installedOnlyResult.stdout,/Passed :[^\r\n]*1/u);
 });

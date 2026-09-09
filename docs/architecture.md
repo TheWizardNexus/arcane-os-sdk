@@ -84,13 +84,22 @@ runtime materialization, serving, and coordination with other writers. This
 path requires no application descriptor or `apps/<id>/` layout and leaves the
 app-scoped toolchain operation unchanged.
 
-An external workspace maps the exact runtime shipped by its locked `arcane-os`
-dependency. An Arcane OS checkout is an integrated SDK consumer, not the owner
+An external workspace can select `installed-v1` routes directly from its
+`node_modules/arcane-os` installation, without a workspace `arcane/` tree or
+`arcane.lock.json`. The SDK reads the installed package version and maps its
+runtime, browser runtime, runtime dependency, and licenses to the established
+browser destinations. Existing `physical-v1` workspaces and the explicit
+materializer remain supported; scaffolding retains its existing physical
+layout. See [installed-package routes](reference/protocols.md#installed-package-browser-routes)
+for the configuration and npm-alias form.
+
+An Arcane OS checkout is an integrated SDK consumer, not the owner
 of portable runtime source. For live shared development, the explicit
 development-only SDK source mount maps the canonical SDK runtime and dependency
-paths into that consumer. Without the mount, the workspace uses its locked SDK
-projection. The development server and packager consume the same route
-destinations in both cases, so app imports do not change. Integrated
+paths into that consumer. Without the mount, integrated workspaces retain their
+physical projection; external workspaces select either layout above. The development server,
+import-map generator, packager, and PWA inventory consume the same route
+destinations, so app imports do not change. Integrated
 initialization creates only app-owned files and never rewrites Arcane OS or SDK
 root configuration.
 
@@ -235,13 +244,14 @@ exact schema-1 `arcane-package.json` for current consumers. Existing Arcane
 apps synthesize that descriptor from their schema-1 package plus the current
 native registry during migration.
 
-An external app's `arcane-packager.json` has three exact shared routes. They map
-the installed SDK runtime to `/arcane`, its vendored strong-type dependency to
-`/node_modules/strong-type`, and the SDK's `LICENSE`,
-`COMMERCIAL-LICENSE.md`, and `NOTICE` to `/licenses/arcane-os`. Development does
-not copy SDK runtime source into the app repository. Distribution materializes
-those selected SDK routes completely inside the portable artifact, so the
-finished app has no Arcane OS runtime dependency.
+An external app can use four `installed-v1` shared routes in
+`arcane-packager.json`: the installed SDK's `runtime/arcane` maps to `/arcane`,
+`browser-runtime` to `/arcane/sdk`, `runtime/strong-type` to
+`/arcane/dependencies/strong-type`, and its three license files to
+`/licenses/arcane-os`. Source serving and import-map generation read those
+installed files without creating a workspace runtime copy. Distribution copies
+the selected routes completely inside the portable artifact, preserving the
+same URLs. Existing physical `arcane/` routes retain their behavior.
 
 Release schema 1 and builder identity `arcane-app-packager-v1` remain unchanged
 because current Arcane native consumers treat them as public contracts. Native

@@ -4,6 +4,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {SDK_VERSION} from './constants.mjs';
 import {listRuntimeFiles} from './runtime.mjs';
+import {readInstalledSdkLayout,installedRuntimeFiles,installedRuntimeTarget} from './sdk-runtime-layout.mjs';
 
 const is = new Is(false);
 
@@ -19,7 +20,23 @@ const SDK_BROWSER_AI_ENTRY='sdk/ai/browser-wasm.mjs';
 const SDK_BROWSER_SPEECH_ENTRY='sdk/ai/browser-speech.mjs';
 const STATIC_RUNTIME_PACKAGE_IMPORTS=new Map([
     ['arcane-os/preference-store','modules/PreferenceStore.js'],
-    ['arcane-os/speech-playback','modules/SpeechPlayback.js']
+    ['arcane-os/speech-playback','modules/SpeechPlayback.js'],
+    ['arcane-os/ai','modules/AI.js'],
+    ['arcane-os/ai-preference-tuple','modules/AIPreferenceTuple.js'],
+    ['arcane-os/ai-preference-runtime','modules/AIPreferenceRuntime.js'],
+    ['arcane-os/ai-provider-runtime','modules/AIProviderRuntime.js'],
+    ['arcane-os/ai-runtime-state','modules/AIRuntimeState.js'],
+    ['arcane-os/model-definition','modules/ModelDefinition.js'],
+    ['arcane-os/conversation-timebox','modules/ConversationTimebox.js'],
+    ['arcane-os/conversation-action-items','modules/ConversationActionItems.js'],
+    ['arcane-os/conversation-closing-report','modules/ConversationClosingReport.js'],
+    ['arcane-os/chat-records','modules/ChatRecords.js'],
+    ['arcane-os/app-data-scope','modules/AppDataScope.js'],
+    ['arcane-os/core-local-model-catalog','modules/CoreLocalModelCatalog.js'],
+    ['arcane-os/dbopfs-document-library','modules/DBOPFSDocumentLibrary.js'],
+    ['arcane-os/local-ai-readiness','modules/LocalAIReadiness.js'],
+    ['arcane-os/ollama-model-identifier','modules/OllamaModelIdentifier.js'],
+    ['arcane-os/mail','modules/MailApi.mjs']
 ]);
 const SDK_BROWSER_SELF_IMPORTS=new Map([
     ['arcane-os/event-manager',SDK_BROWSER_ENTRY],
@@ -1436,9 +1453,10 @@ async function physicalRuntime(workspaceRoot,signal){
 }
 
 async function managedImportMapBuild(resolvedWorkspace,signal,pwaEnabled=false){
+    const installed=await readInstalledSdkLayout(resolvedWorkspace);
     const [runtime,version]=await Promise.all([
-        physicalRuntime(resolvedWorkspace,signal),
-        pwaEnabled?null:readWorkspaceAssetVersion(resolvedWorkspace)
+        installed?installedRuntimeFiles(resolvedWorkspace,installed,signal):physicalRuntime(resolvedWorkspace,signal),
+        pwaEnabled?null:installed?.version??readWorkspaceAssetVersion(resolvedWorkspace)
     ]);
     const built=await buildImportMap({files:runtime.files,signal,version});
     const json=`${JSON.stringify({imports:built.imports},null,2).replaceAll('<','\\u003c')}\n`;
@@ -1446,6 +1464,8 @@ async function managedImportMapBuild(resolvedWorkspace,signal,pwaEnabled=false){
 }
 
 export async function readWorkspaceAssetVersion(workspaceRoot){
+    const installed=await readInstalledSdkLayout(workspaceRoot);
+    if(installed)return installed.version;
     let source;
     try{source=await readFileFromDisk(path.join(workspaceRoot,'arcane.lock.json'),'utf8');}
     catch(error){
@@ -2434,10 +2454,17 @@ export async function readApplicationTestImportMapContext({
         ||is.array(document.imports)){
         fail('Application test import-map artifact must contain an imports object.');
     }
+    const installed=await readInstalledSdkLayout(resolvedWorkspaceRoot);
+    const imports=installed?Object.fromEntries(Object.entries(document.imports).map(
+        function installedApplicationTestTarget([specifier,target]){
+            return [specifier,is.string(target)&&target.startsWith('./')
+                ?`./${installedRuntimeTarget(target.slice(2),installed)}`:target];
+        }
+    )):document.imports;
     return createApplicationTestImportMapContext({
         applicationRoot:resolvedWorkspaceRoot,
         boundary:'source',
-        imports:document.imports,
+        imports,
         signal
     });
 }

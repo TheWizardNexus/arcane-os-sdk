@@ -9,6 +9,7 @@ import {
 import {loadAppDescriptor} from './app-descriptor.mjs';
 import {SDK_NAME as EXPECTED_SDK_NAME} from './constants.mjs';
 import {inspectImportMapHtml} from './import-map.mjs';
+import {installedSdkPackageSource} from './sdk-runtime-layout.mjs';
 
 const is = new Is(false);
 
@@ -159,6 +160,13 @@ function classifyRootConfig(config){
     const validated=validatePackagerRootConfig(config,ROOT_CONFIG_NAME);
     const routes=validated.sharedPayloads['browser-runtime'];
     if(!is.array(routes))fail(`${ROOT_CONFIG_NAME} must define browser-runtime routes.`);
+    const installedPackageSource=installedSdkPackageSource(validated);
+    if(installedPackageSource!==null){
+        return {
+            ...validated,workspaceMode:'external',browserRuntimeLayout:'installed-v1',
+            sdkPackageSource:installedPackageSource
+        };
+    }
     const externalPackageSource=routes.length===2
         &&dependencyNameForSdkPackageSource(routes[1]?.source)!==null
         ?routes[1].source

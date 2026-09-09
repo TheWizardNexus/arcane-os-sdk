@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.26.0
+
+- Add explicit installed-package browser runtime routes. Source development,
+  managed import maps, application test-map resolution, and PWA resource
+  selection can use the npm dependency directly without a generated workspace
+  runtime or lock. Keep existing browser URLs, aliases, and materialized layouts.
+- Let a shared package route select its complete source directory with
+  `include: ["."]`. Portable app output includes the selected runtime,
+  dependencies, assets, and notices without requiring the SDK at deployment.
+- Expose lowercase public module subpaths for shared AI preferences, provider
+  state, model definitions, conversation helpers, application data, document
+  libraries, and local AI readiness. Browser maps and Node package resolution
+  select the same canonical implementations; browser runtime requirements remain.
+- Share the existing portable Mail aggregation with browser import maps while
+  preserving the `arcane-os/mail` API and Node mail CLI used by server consumers.
+
 ## 0.25.0
 
 - Automatically skip configured mail subscription verification when the actual
