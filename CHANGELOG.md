@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.33.0
+
+- Add the default and named `AIModelSelectionController` export at
+  `arcane-os/modules/AIModelSelectionController.js`. It coordinates existing
+  LLM, STT and TTS provider/model select elements with app-owned defaults,
+  catalogs and optional explicit asynchronous inventory discovery.
+- Preserve unknown saved values and newer drafts during asynchronous
+  hydration and discovery, including paired LLM provider/model choices and
+  per-provider model memory. Expose current selection, operation state,
+  original errors and deterministic disposal without late control mutations.
+- Keep the existing six-slot preference tuple order and spelling unchanged.
+  The controller neither saves User preferences nor activates or downloads
+  providers, models or voices; application policy and persistence stay local.
+
 ## 0.32.0
 
 - Export `profileUpdateFromSearchParams(searchParams)` from
