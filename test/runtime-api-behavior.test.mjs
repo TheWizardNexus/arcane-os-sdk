@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
 import test from '../src/testing.mjs';
+import AIModelSelectionController, {
+    AIModelSelectionController as NamedAIModelSelectionController
+} from 'arcane-os/modules/AIModelSelectionController.js';
 import {arcaneEvents} from '../src/event-manager.mjs';
 import {
     getCoreLocalModelCatalog,
@@ -61,6 +64,387 @@ import RecordReviewStore from '../runtime/arcane/modules/RecordReviewStore.js';
 import {assessScamRisk} from '../runtime/arcane/modules/ScamRiskPolicy.js';
 
 const repositoryRoot=new URL('../',import.meta.url);
+
+const modelSelectionSlots = [
+    'llmProvider', 'sttProvider', 'ttsProvider', 'llmModel', 'ttsModel', 'sttModel'
+];
+
+function modelSelectionOption() {
+    return {
+        tagName: 'OPTION',
+        value: '',
+        textContent: '',
+        get label() {
+            return this.textContent;
+        },
+        selected: false,
+        disabled: false,
+        dataset: {}
+    };
+}
+
+class ModelSelectionTestSelect extends EventTarget {
+    constructor(value) {
+        super();
+        this.options = [];
+        this.ownerDocument = {createElement: modelSelectionOption};
+        const option = modelSelectionOption();
+        option.value = value;
+        option.textContent = value;
+        this.append(option);
+    }
+
+    get value() {
+        const selected = this.options.find(
+            function selectedOption(option) {
+                return option.selected;
+            }
+        );
+        return selected?.value ?? '';
+    }
+
+    set value(value) {
+        let selected = false;
+        for (const option of this.options) {
+            option.selected = !selected && option.value === value;
+            selected ||= option.selected;
+        }
+    }
+
+    append(...options) {
+        this.options.push(...options);
+        if (!this.options.some(
+            function isSelectedOption(option) {
+                return option.selected;
+            }
+        ) && this.options[0]) {
+            this.options[0].selected = true;
+        }
+    }
+
+    replaceChildren(...options) {
+        this.options = [];
+        this.append(...options);
+    }
+}
+
+function pendingModelSelection() {
+    let resolve;
+    let reject;
+    const promise = new Promise(
+        function modelSelectionCompletion(resolveCompletion, rejectCompletion) {
+            resolve = resolveCompletion;
+            reject = rejectCompletion;
+        }
+    );
+    return {promise, resolve, reject};
+}
+
+function modelSelectionFixture(overrides = {}) {
+    const defaults = ['TWIN', 'LOCAL_SPEACH', 'LOCAL_SPEACH', 'cloud/default', 'voice/default', 'text/default'];
+    const selects = {};
+    for (const [index, slot] of modelSelectionSlots.entries()) {
+        selects[slot] = new ModelSelectionTestSelect(defaults[index]);
+    }
+    const catalogs = {
+        llmProvider: ['TWIN', 'OLLAMA', 'EMPTY'],
+        sttProvider: ['LOCAL_SPEACH', 'other-transcription'],
+        ttsProvider: ['LOCAL_SPEACH', 'other-voice'],
+        llmModel: [
+            {value: 'cloud/default', label: 'App cloud default', provider: 'TWIN'},
+            {value: 'cloud/draft', label: 'App cloud draft', provider: 'TWIN'},
+            {value: 'native/unavailable', label: 'App unavailable choice', provider: 'OLLAMA', disabled: true},
+            {value: 'native/first', label: 'App native first', provider: 'OLLAMA'},
+            {value: 'native/second', label: 'App native second', provider: 'OLLAMA'}
+        ],
+        ttsModel: ['voice/default', 'voice/draft'],
+        sttModel: ['text/default', 'text/draft']
+    };
+    const controller = new AIModelSelectionController(
+        {selects, defaults, catalogs, ...overrides}
+    );
+    return {controller, selects, defaults};
+}
+
+function draftModelSelection(select, value, eventType = 'change') {
+    select.value = value;
+    assert.equal(select.value, value, 'The authored choice must exist in the select.');
+    select.dispatchEvent(new Event(eventType));
+}
+
+test(
+    'public model selection owns six named selects without starting inventory or rewriting unknown values',
+    async function completeModelSelectionValues() {
+        assert.equal(AIModelSelectionController, NamedAIModelSelectionController);
+        let inventoryCalls = 0;
+        const {controller, selects, defaults} = modelSelectionFixture(
+            {
+                inventory: function explicitInventory() {
+                    inventoryCalls += 1;
+                    return {};
+                }
+            }
+        );
+        assert.equal(inventoryCalls, 0);
+        assert.deepEqual(controller.getSelection(), defaults);
+        const saved = [
+            ' unknown provider ', 'LOCAL_SPEACH', ' unknown voice route ',
+            ' unknown model\ncomplete ', ' voice 龍 ', ' text model '
+        ];
+        await controller.hydrate(saved);
+        assert.deepEqual(controller.getSelection(), saved);
+        for (const [index, slot] of modelSelectionSlots.entries()) {
+            assert.equal(selects[slot].value, saved[index]);
+        }
+        const copied = controller.getSelection();
+        copied[0] = 'outside mutation';
+        assert.deepEqual(controller.getSelection(), saved);
+        assert.equal(Object.isFrozen(copied), false);
+        assert.equal(inventoryCalls, 0);
+        await controller.discover();
+        assert.equal(inventoryCalls, 1);
+        assert.deepEqual(controller.getSelection(), saved);
+        assert.equal(controller.dispose(), true);
+    }
+);
+
+test(
+    'model selection uses existing control values when defaults and optional inventory are absent',
+    async function existingModelSelectionDefaults() {
+        const {controller, defaults} = modelSelectionFixture(
+            {defaults: undefined}
+        );
+        const discovered = await controller.discover();
+        assert.deepEqual(discovered, defaults);
+        assert.equal(controller.state.discovering, false);
+        assert.equal(controller.state.discoveryError, null);
+        controller.dispose();
+    }
+);
+
+test(
+    'model selection hydration merges actual saved slots without replacing newer paired LLM drafts',
+    async function modelSelectionHydrationDrafts() {
+        const {controller, selects} = modelSelectionFixture();
+        const hydration = pendingModelSelection();
+        const hydrating = controller.hydrate(hydration.promise);
+        assert.equal(controller.state.hydrating, true);
+        draftModelSelection(selects.llmModel, 'cloud/draft', 'input');
+        draftModelSelection(selects.sttProvider, 'other-transcription');
+        hydration.resolve(
+            ['OLLAMA', 'saved-stt', 'saved-tts', 'native/saved', 'saved-voice', 'saved-text']
+        );
+        await hydrating;
+        assert.deepEqual(
+            controller.getSelection(),
+            ['TWIN', 'other-transcription', 'saved-tts', 'cloud/draft', 'saved-voice', 'saved-text']
+        );
+        assert.equal(controller.state.hydrating, false);
+        assert.equal(controller.state.hydrationError, null);
+        const providerHydration = pendingModelSelection();
+        const pendingProvider = controller.hydrate(providerHydration.promise);
+        draftModelSelection(selects.llmProvider, 'OLLAMA');
+        providerHydration.resolve(
+            ['TWIN', 'other-saved-stt', 'other-saved-tts', 'cloud/saved', 'other-saved-voice', 'other-saved-text']
+        );
+        await pendingProvider;
+        assert.deepEqual(
+            controller.getSelection(),
+            ['OLLAMA', 'other-saved-stt', 'other-saved-tts', 'native/first', 'other-saved-voice', 'other-saved-text']
+        );
+        controller.dispose();
+    }
+);
+
+test(
+    'model selection latest hydration wins without stale completion changing selection',
+    async function latestModelSelectionHydration() {
+        const {controller} = modelSelectionFixture();
+        const earlier = pendingModelSelection();
+        const later = pendingModelSelection();
+        const earlierHydration = controller.hydrate(earlier.promise);
+        const laterHydration = controller.hydrate(later.promise);
+        const selected = ['OLLAMA', 'new-stt', 'new-tts', 'native/new', 'new-voice', 'new-text'];
+        later.resolve(selected);
+        await laterHydration;
+        assert.equal(controller.state.hydrating, false);
+        earlier.resolve(
+            ['TWIN', 'old-stt', 'old-tts', 'cloud/old', 'old-voice', 'old-text']
+        );
+        await earlierHydration;
+        assert.deepEqual(controller.getSelection(), selected);
+        controller.dispose();
+    }
+);
+
+test(
+    'model selection remembers app-owned LLM pairs and never carries a model to an unrelated provider',
+    function pairedModelSelectionDrafts() {
+        const {controller, selects} = modelSelectionFixture();
+        draftModelSelection(selects.llmModel, 'cloud/draft');
+        draftModelSelection(selects.llmProvider, 'OLLAMA');
+        assert.equal(selects.llmModel.value, 'native/first');
+        draftModelSelection(selects.llmModel, 'native/second');
+        draftModelSelection(selects.llmProvider, 'TWIN');
+        assert.equal(selects.llmModel.value, 'cloud/draft');
+        draftModelSelection(selects.llmProvider, 'OLLAMA');
+        assert.equal(selects.llmModel.value, 'native/second');
+        draftModelSelection(selects.llmProvider, 'EMPTY');
+        assert.equal(selects.llmModel.value, '');
+        assert.equal(controller.getSelection()[3], '');
+        controller.dispose();
+    }
+);
+
+test(
+    'model selection discovery preserves current drafts and merges Core inventory without stale replacement',
+    async function modelSelectionDiscoveryDrafts() {
+        const requests = [];
+        const {controller, selects} = modelSelectionFixture(
+            {
+                inventory: function discoverAppInventory(request) {
+                    const completion = pendingModelSelection();
+                    requests.push(
+                        {...request, ...completion}
+                    );
+                    return completion.promise;
+                }
+            }
+        );
+        const first = controller.discover();
+        const second = controller.discover();
+        assert.equal(requests.length, 2);
+        assert.equal(requests[0].signal.aborted, true);
+        assert.equal(requests[1].signal.aborted, false);
+        assert.equal(controller.state.discovering, true);
+        draftModelSelection(selects.llmModel, 'cloud/draft');
+        assert.equal(requests[1].selection[3], 'cloud/default');
+        requests[1].resolve(
+            {
+                llmModel: [
+                    {preferenceValue: 'native/discovered', providerValue: 'OLLAMA', label: 'Complete native label'}
+                ],
+                sttModel: ['text/discovered']
+            }
+        );
+        await second;
+        assert.equal(controller.state.discovering, false);
+        assert.equal(controller.state.discoveryError, null);
+        assert.equal(controller.getSelection()[3], 'cloud/draft');
+        requests[0].resolve(
+            {sttModel: ['stale/text']}
+        );
+        await first;
+        assert.equal(selects.sttModel.options.some(
+            function staleInventoryOption(option) {
+                return option.value === 'stale/text';
+            }
+        ), false);
+        assert.equal(selects.sttModel.options.some(
+            function authoredInventoryOption(option) {
+                return option.value === 'text/default';
+            }
+        ), true);
+        assert.equal(selects.sttModel.options.some(
+            function discoveredInventoryOption(option) {
+                return option.value === 'text/discovered';
+            }
+        ), true);
+        draftModelSelection(selects.llmProvider, 'OLLAMA');
+        const discovered = selects.llmModel.options.find(
+            function discoveredCoreModel(option) {
+                return option.value === 'native/discovered';
+            }
+        );
+        assert.ok(discovered);
+        assert.equal(discovered.textContent, 'Complete native label');
+        controller.dispose();
+    }
+);
+
+test(
+    'model selection exposes original hydration and discovery errors and supports a later explicit retry',
+    async function completeModelSelectionErrors() {
+        const error = new Error('Complete selection failure\n' + 'detail '.repeat(180));
+        const hydration = pendingModelSelection();
+        let rejectInventory = true;
+        const {controller, defaults} = modelSelectionFixture(
+            {
+                inventory: function retryableInventory() {
+                    if (rejectInventory) throw error;
+                    return {};
+                }
+            }
+        );
+        const hydrating = controller.hydrate(hydration.promise);
+        hydration.reject(error);
+        await assert.rejects(
+            hydrating,
+            function originalHydrationError(received) {
+                return received === error;
+            }
+        );
+        assert.equal(controller.state.hydrationError, error);
+        assert.equal(controller.state.hydrating, false);
+        await assert.rejects(
+            controller.discover(),
+            function originalDiscoveryError(received) {
+                return received === error;
+            }
+        );
+        assert.equal(controller.state.discoveryError, error);
+        assert.equal(controller.state.discovering, false);
+        assert.deepEqual(controller.getSelection(), defaults);
+        rejectInventory = false;
+        await controller.discover();
+        await controller.hydrate(defaults);
+        assert.equal(controller.state.discoveryError, null);
+        assert.equal(controller.state.hydrationError, null);
+        controller.dispose();
+    }
+);
+
+test(
+    'model selection disposal aborts inventory and leaves late hydration and discoveries outside the selects',
+    async function disposedModelSelection() {
+        const hydration = pendingModelSelection();
+        const inventory = pendingModelSelection();
+        let signal;
+        const {controller, selects, defaults} = modelSelectionFixture(
+            {
+                inventory: function heldInventory(request) {
+                    signal = request.signal;
+                    return inventory.promise;
+                }
+            }
+        );
+        const hydrating = controller.hydrate(hydration.promise);
+        const discovering = controller.discover();
+        assert.equal(controller.dispose(), true);
+        assert.equal(controller.dispose(), false);
+        assert.equal(controller.state.disposed, true);
+        assert.equal(controller.state.hydrating, false);
+        assert.equal(controller.state.discovering, false);
+        assert.equal(signal.aborted, true);
+        hydration.resolve(
+            ['late-provider', 'late-stt', 'late-tts', 'late-model', 'late-voice', 'late-text']
+        );
+        inventory.resolve(
+            {sttModel: ['late-discovery']}
+        );
+        await Promise.all(
+            [hydrating, discovering]
+        );
+        for (const [index, slot] of modelSelectionSlots.entries()) {
+            assert.equal(selects[slot].value, defaults[index]);
+        }
+        draftModelSelection(selects.llmProvider, 'OLLAMA');
+        assert.equal(selects.llmModel.value, defaults[3], 'Disposed provider listeners must not rebuild the model select.');
+        assert.deepEqual(controller.getSelection(), defaults);
+        await assert.rejects(controller.hydrate(defaults));
+        await assert.rejects(controller.discover());
+    }
+);
 
 test('User query profile mapping preserves decoded values without side effects',async function userQueryProfileMapping(){
     const source=await readFile(

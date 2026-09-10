@@ -1,14 +1,14 @@
 import Is from 'strong-type';
 const is=new Is(false);
 
-export const AI_PREFERENCE_SLOT_KEYS=Object.freeze([
+export const AI_PREFERENCE_SLOT_KEYS=[
     'llmProvider',
     'sttProvider',
     'ttsProvider',
     'llmModel',
     'ttsModel',
     'sttModel'
-]);
+];
 
 function preferenceToken(value){
     return is.string(value)

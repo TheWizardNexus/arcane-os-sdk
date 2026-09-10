@@ -146,6 +146,7 @@ test('complete runtime inventory produces a mutable named import map without rea
     let readAttempted=false;
     const result=await buildImportMap({
         files:[
+            'modules/AIModelSelectionController.js',
             'modules/ThemeBootstrap.js',
             'modules/PreferenceStore.js',
             'modules/SpeechPlayback.js',
@@ -175,12 +176,14 @@ test('complete runtime inventory produces a mutable named import map without rea
         'arcane-os/dom-event-instrumentation':'./arcane/sdk/dom-event-instrumentation.mjs',
         'arcane-os/event-manager':'./arcane/sdk/event-manager.mjs',
         'arcane-os/entities/Preference.js':'./arcane/entities/Preference.js',
+        'arcane-os/modules/AIModelSelectionController.js':'./arcane/modules/AIModelSelectionController.js',
         'arcane-os/modules/PersistentAIChatSession.js':'./arcane/modules/PersistentAIChatSession.js',
         'arcane-os/modules/PreferenceStore.js':'./arcane/modules/PreferenceStore.js',
         'arcane-os/modules/SpeechPlayback.js':'./arcane/modules/SpeechPlayback.js',
         'arcane-os/modules/ThemeBootstrap.js':'./arcane/modules/ThemeBootstrap.js',
         'arcane-os/preference-store':'./arcane/modules/PreferenceStore.js',
         'arcane-os/speech-playback':'./arcane/modules/SpeechPlayback.js',
+        'arcane/AIModelSelectionController':'./arcane/modules/AIModelSelectionController.js',
         'arcane/PersistentAIChatSession':'./arcane/modules/PersistentAIChatSession.js',
         'arcane/PreferenceStore':'./arcane/modules/PreferenceStore.js',
         'arcane/SpeechPlayback':'./arcane/modules/SpeechPlayback.js',

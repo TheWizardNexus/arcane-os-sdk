@@ -48,8 +48,9 @@ own asynchronous work, cancellation, and backpressure.
 | Module | Kind | Capability | Availability | Normalization |
 | --- | --- | --- | --- | --- |
 | [`AI.js`](#aijs) | esm | Provider-selectable chat, speech-to-text, text-to-speech, tool calling, structured output, streaming, bounded synthesis, and ordered audio-clock playback. | Browser + native bridge + cloud | High-level chat/speech behavior and active TTS operation failures are normalized; provider diagnostics remain mixed. |
+| [`AIModelSelectionController.js`](#aimodelselectioncontrollerjs) | esm | Binds six supplied provider/model selects with draft-safe hydration, explicit catalog discovery, and paired LLM selection. | Browser / native WebView | Mutable exact values and complete errors; storage and activation remain app-owned. |
 | [`AIPreferenceRuntime.js`](#aipreferenceruntimejs) | esm | Applies and reads non-persistent per-user AI preference overrides. | Cross-host | Normalized six-slot preference state. |
-| [`AIPreferenceTuple.js`](#aipreferencetuplejs) | esm | Normalizes and compares the six provider/model preference slots. | Cross-host | Fully normalized frozen tuple. |
+| [`AIPreferenceTuple.js`](#aipreferencetuplejs) | esm | Normalizes and compares the six provider/model preference slots. | Cross-host | Mutable slot order and normalized tuple. |
 | [`AIProviderRuntime.js`](#aiproviderruntimejs) | esm | Owns provider-neutral selection, lifecycle, routing, startup, requests, streaming, cancellation, and independent LLM/STT/TTS state. | Cross-host runtime; provider-specific availability | Normalized required provider members plus route/status contracts, with explicit local-only selection and no implicit fallback. |
 | [`AIResponseURLPolicy.js`](#airesponseurlpolicyjs) | esm | Extracts and audits links from AI Markdown, rendered HTML, CSS, srcset, bare URLs, and email text. | Cross-host | Mutable audit with exact link comparison after renderer-level decoding. |
 | [`AIRuntimeState.js`](#airuntimestatejs) | esm | Publishes sticky mutable role snapshots, lifecycle intents, and startup-settlement barriers. | Cross-host state contract | Closed monotonic state records; events report state but grant no authority. |
@@ -683,6 +684,123 @@ async function sayHello(applicationRuntime) {
 
 For on-device TTS, use the [browser speech quick start](ai/browser-speech.md).
 
+## AIModelSelectionController.js
+
+### Overview
+
+Use existing native selects to edit provider/model preferences while saved
+preferences or an optional model inventory arrive asynchronously. The controller
+owns only selection and option rendering. Applications retain their labels,
+catalogs, defaults, saved preferences, model readiness, and explicit activation.
+Importing or constructing it never loads a model, starts discovery, or writes
+User preferences or storage.
+
+### Public surface
+
+Exact exports: `AIModelSelectionController`, `default` (the same class).
+
+`new AIModelSelectionController({selects, defaults, catalogs, inventory})` accepts
+six existing selects by the following names. Tuples use this exact order:
+
+| Index | Select key | Selection |
+| --- | --- | --- |
+| 0 | `llmProvider` | LLM provider |
+| 1 | `sttProvider` | Speech-to-text provider |
+| 2 | `ttsProvider` | Text-to-speech provider |
+| 3 | `llmModel` | LLM model |
+| 4 | `ttsModel` | Text-to-speech model |
+| 5 | `sttModel` | Speech-to-text model |
+
+`defaults` is an optional tuple; omitted slots use the selects' initial values.
+Optional `catalogs` uses those same six keys, with arrays of strings or
+`{value, label, provider?, disabled?}` records. The LLM model catalog also accepts
+`CoreLocalModelCatalog` records shaped `{preferenceValue, providerValue, label}`.
+Only the LLM model list uses provider filtering; existing options may supply
+their provider in `data-provider`. An initial LLM option without that attribute
+belongs to the initial default LLM provider. An explicitly supplied catalog entry
+without a provider is shared across providers. Rendered options retain their
+provider metadata. Caller catalog entries merge with the selects'
+existing options, retaining supplied disabled states. Entries with the same value
+use the later catalog definition, and discovered entries take precedence over
+authored entries. Unknown saved selections receive an option
+containing their exact value; values and labels are never trimmed or shortened.
+
+- `getSelection()` returns a mutable copy of the current six-slot tuple.
+- `hydrate(tupleOrPromise)` explicitly applies saved selections. Missing tuple
+  entries use application defaults. Native `input` or `change` edits made after
+  hydration starts survive its completion, and the LLM provider/model pair is
+  preserved together when either is edited. The newest hydration owns updates.
+- `discover()` explicitly invokes optional `inventory({selection, signal})`.
+  The caller returns per-slot catalog arrays; they merge with authored options
+  without replacing selected values or drafts. A newer discovery aborts the
+  preceding signal and owns subsequent catalog updates. There is no polling.
+- `state` returns `{hydrating, discovering, disposed, hydrationError,
+  discoveryError}`. Async failures retain their complete rejection objects.
+- `dispose()` removes the owned native listeners, aborts pending inventory work,
+  and prevents late hydration or discovery from changing the controls. New work
+  after disposal rejects; existing asynchronous callers still own their promises.
+
+Successful `hydrate()` and `discover()` calls resolve a current six-slot tuple
+copy. Superseded successful operations also return the current selection without
+reapplying their older data. `discover()` with no inventory callback returns the
+current selection without starting work. `dispose()` returns `true` on its first
+call and `false` on subsequent calls; the last selection remains readable.
+When constructing a new controller over the same controls, supply the complete
+app catalogs again: provider-filtered choices are retained by the current
+controller, while only the current provider's choices appear in the DOM.
+
+When the user changes the LLM provider, the controller remembers the preceding
+provider's model. Returning to a provider restores its remembered model.
+Otherwise, it selects the application's default provider/model pair when
+applicable, the first enabled matching catalog model, or an empty value.
+An explicitly saved or remembered disabled selection is retained.
+It never carries a different provider's model forward as the new selection.
+The other four slots remain independent.
+
+### Availability and normalization
+
+**Browser / native WebView.** This controller requires supplied select elements,
+uses native `input` and `change` events, and creates no custom event bus. It does
+not query Core or infer readiness from inventory presence. An application may
+provide an inventory callback that obtains `localAI.status` and passes its
+`CoreLocalModelCatalog` projection; platform access remains with that caller.
+
+Missing controls, non-string selection values or labels, a non-array hydration
+result, and a supplied non-function inventory raise `TypeError`. Hydration and
+discovery preserve complete caller failures through their promises; the latest
+operation also records its error in the corresponding state field. Disposal
+errors describe that lifecycle boundary. Selection itself has no persistence,
+network, provider-transition, or activation side effect.
+
+### Example
+
+This example uses an app-owned form containing the six named selects above and
+a `<pre id="selected-models">` result. Their existing options and initial values
+are the catalog and defaults, so changing one control visibly shows the tuple
+the application can choose to save. No model policy or storage is added.
+
+```javascript
+import AIModelSelectionController from 'arcane-os/modules/AIModelSelectionController.js';
+
+const form = document.querySelector('#model-preferences');
+const controller = new AIModelSelectionController(
+    {
+        selects: form.elements
+    }
+);
+
+form.addEventListener(
+    'change',
+    function showModelSelection() {
+        document.querySelector('#selected-models').textContent = JSON.stringify(
+            controller.getSelection()
+        );
+    }
+);
+
+// Call controller.dispose() when the owning settings view is removed.
+```
+
 ## AIPreferenceRuntime.js
 
 ### Overview
@@ -721,7 +839,11 @@ Exact exports: `AI_PREFERENCE_SLOT_KEYS`, `aiPreferenceTuplesEqual`, `normalizeA
 
 ### Availability and normalization
 
-**Cross-host.** Fully normalized frozen tuple. Transport: In-process only. [Deep protocol details](protocols.md).
+**Cross-host.** The slot-order array and returned tuples are mutable. Existing
+token trimming, aliases, caller-selected allowed values, and default selection
+are unchanged. `AIModelSelectionController` reuses the canonical slot order
+without applying token normalization to saved selections. Transport: In-process
+only. [Deep protocol details](protocols.md).
 
 ### Example
 

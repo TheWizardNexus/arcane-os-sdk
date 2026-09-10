@@ -18,6 +18,9 @@ export const RUNTIME_DOCUMENTED_CALLABLE_MEMBERS={
         'configureTTSSegmentation','streamTTS','prepareTTS','playPreparedTTS','finishTTS','fetchSTT',
         'stopAudio','resumeAudio','playAudio'
     ],
+    'AIModelSelectionController.js':[
+        'getSelection','hydrate','discover','dispose'
+    ],
     'AIPreferenceRuntime.js':[
         'setAIPreferenceRuntimeOverride','getAIPreferencesForRuntime'
     ],

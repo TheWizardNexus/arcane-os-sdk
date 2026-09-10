@@ -8,9 +8,9 @@
     "sdkVersion": "0.6.0",
     "protocol": "arcane/1"
   },
-  "artifactCount": 85,
-  "javascriptArtifactCount": 83,
-  "esmExportCount": 353,
+  "artifactCount": 86,
+  "javascriptArtifactCount": 84,
+  "esmExportCount": 355,
   "artifacts": [
     {
       "file": "runtime/arcane/modules/AI.js",
@@ -31,6 +31,20 @@
       "protocol": "arcane-ai-browser-speech-configuration/1, AIProviderRuntime arcane-ai-provider/2 routes, globalThis.arcaneEvents, TWiN Cloud HTTPS, Arcane.ollama, Arcane.speech, Android WebView bridge",
       "normalization": "Complete mutable caller-owned browser speech authority, SDK-owned provider registration/replacement/disposal, explicit STT/TTS activation, normalized Whisper STT and Kokoro TTS execution with default capacities 1 and 4 respectively, explicit provider-neutral execution snapshots through status(role,{execution:true}), sticky readiness, canonical window.user readiness without compatibility-event object-identity admission or polling, exact ordered structural calls with required arguments.message, atomic nonblank all-ID tool-result sequencing, complete all-choice streaming/data validation, native Ollama structural adaptation, complete-response then all validated tool callbacks then completion ordering, observed async callbacks, Blob/File transcription, automatic repeated-formatting-mark removal from cloned outbound TTS input while caller and visible content stays exact, immediate exact-segment synthesis, per-call voice/speed capture, optional final-segment pause on the existing audio clock, optional per-call terminal playback completion, detached preparation with complete semantic DBOPFS audio reuse and same-owner pending request sharing, independent prepared playback without a model load for cached audio, ordered audio-clock scheduling, playable audio, active-generation TTS operation-failure routing, mute, and cancellation are normalized; provider/model/runtime/voice policy remains caller-owned. Both speech roles default execution.device to auto: webnn-npu when navigator.ml.createContext is exposed, then webgpu when navigator.gpu is exposed, then wasm for CPU execution. Failed backend loads clean up the pool before trying fresh Workers with the same prepared model and dtype; explicit devices never fall back. STT capacity only accepts 1; TTS accepts 1 through 4. Execution snapshots expose requestedDevice, selectedDevice, maxConcurrentRequests, and activeRequestCount for both roles; selectedDevice is null while unloaded and names the successful upstream session backend request when loaded. It does not prove every operation used the physical NPU: WebNN unsupported operations may use WASM, and compatibility depends on the browser, driver, hardware, and graph.",
       "surface": "Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; explicit `providerRuntime.status(role,{execution:true})` snapshots; `streamTTS(text,end,options={})` with optional voice, speed, pauseAfterMs, and waitForPlayback; automatic speech-input cleanup with SDK-internal preparation metadata; `prepareTTS({parts,storage,identity,signal,onState})` returning ordered segments, state, ready, getAudio(index), and cancel(); `playPreparedTTS(prepared,{signal,onState})` returning state, error, finished, pause(), resume(), and stop() with one playback lane per AI and observational state/error callbacks; configure/dispose speech, route lifecycle, declaration-validated chat/stream requests with exact ordered calls; optional streamRequest toolText:{name,field} and onToolText(text,call,displayId) for decoded selected argument text with actual call identity, distinct from ordinary prose and terminal tool execution; synthesis/transcription and playback controls; initializes from current canonical user readiness, installs `window.ai`, and projects `ai-ready` plus active-generation `ai-tts-failure`."
+    },
+    {
+      "file": "runtime/arcane/modules/AIModelSelectionController.js",
+      "name": "AIModelSelectionController.js",
+      "kind": "esm",
+      "exports": [
+        "AIModelSelectionController",
+        "default"
+      ],
+      "summary": "Binds six caller-owned provider/model selects with draft-safe hydration, explicit inventory discovery, and paired LLM selection.",
+      "availability": "Browser / native WebView with supplied select elements",
+      "protocol": "In-process selection state and native input/change events",
+      "normalization": "Mutable six-slot selection copies preserve complete exact saved values, unknown options, labels, and newer drafts. Caller-owned catalogs merge with existing options; unscoped initial LLM options belong to the initial provider while unscoped explicit catalog entries are shared. LLM provider/model pairing preserves each provider's remembered model, with default-pair, first-enabled-match, or empty selection for a new provider. Explicit hydration and discovery track independent latest operations and retain complete errors. No User writes, storage, model activation, download, polling, or Core call occurs.",
+      "surface": "Named/default AIModelSelectionController; constructor({selects,defaults,catalogs,inventory}); getSelection(), hydrate(tupleOrPromise), discover(), state, and dispose(). Slot order: llmProvider, sttProvider, ttsProvider, llmModel, ttsModel, sttModel."
     },
     {
       "file": "runtime/arcane/modules/AIPreferenceRuntime.js",
@@ -58,7 +72,7 @@
       "summary": "Normalizes and compares the six provider/model preference slots.",
       "availability": "Cross-host",
       "protocol": "In-process only",
-      "normalization": "Fully normalized frozen tuple.",
+      "normalization": "Mutable slot-order array and normalized tuple. Existing token trimming, aliases, caller-selected allowed values, and defaults remain unchanged; selection controllers can reuse the order independently of token normalization.",
       "surface": "`AI_PREFERENCE_SLOT_KEYS`, `normalizeAIPreferenceTuple()`, `aiPreferenceTuplesEqual()`."
     },
     {

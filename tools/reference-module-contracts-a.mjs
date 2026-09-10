@@ -24,6 +24,32 @@ async function sayHello(applicationRuntime) {
 }`
     },
     {
+        name:'AIModelSelectionController.js',
+        classification:'public-first-party',
+        lifecycleSideEffects:'Binds native input/change listeners to six caller-owned select elements and updates their options. Hydration and inventory discovery begin only through explicit method calls. Imports and construction perform no storage writes, model activation, downloads, polling, or Core calls. dispose() removes listeners, aborts pending inventory work, and prevents later DOM updates.',
+        paramsResults:'new AIModelSelectionController({selects, defaults, catalogs, inventory}) accepts named llmProvider, sttProvider, ttsProvider, llmModel, ttsModel, and sttModel selects. getSelection() returns a mutable tuple copy in that order. Defaults fall back to the existing select values. Per-slot catalogs merge existing options with caller-owned string or {value,label,provider?,disabled?} entries; LLM catalogs also accept Core {preferenceValue,providerValue,label} descriptors. Initial LLM options without data-provider belong to the initial default provider; explicitly supplied catalog entries without provider are shared. Rendering preserves provider metadata; a new controller needs the complete app catalogs again because the DOM shows only current-provider choices. Unknown values and complete labels remain intact. hydrate(tupleOrPromise) preserves newer input/change drafts, treating the LLM provider and model as one pair; the latest hydration owns settlement. discover() calls the optional inventory({selection,signal}) once, merges returned per-slot catalogs without replacing selections, and supersedes previous discovery. Both methods resolve the current tuple copy, including superseded successful operations; discover without inventory returns it without work. LLM provider changes restore that provider\'s remembered model, otherwise use its supplied default pair, first enabled matching catalog entry, or an empty value; explicitly saved or remembered disabled selections remain intact. The state getter exposes hydrating, discovering, disposed, hydrationError, and discoveryError. dispose() returns true once and false thereafter, retaining the final readable selection. All persistence, catalogs, defaults, readiness, and activation policy remain application-owned.',
+        events:['consumes native input/change on the supplied selects; emits no custom event'],
+        errors:['TypeError for missing selects, non-string values or labels, non-array hydration, or a non-function inventory','Error when starting work after disposal','Complete caller hydration or inventory rejection'],
+        capabilitiesCore:'Browser / native WebView selection only. Optional caller inventory may project Core localAI.status through CoreLocalModelCatalog; the controller neither calls Core nor infers readiness from catalog presence.',
+        example:`import AIModelSelectionController from 'arcane-os/modules/AIModelSelectionController.js';
+
+const form = document.querySelector('#model-preferences');
+const controller = new AIModelSelectionController(
+    {
+        selects: form.elements
+    }
+);
+form.addEventListener(
+    'change',
+    function showModelSelection() {
+        document.querySelector('#selected-models').textContent = JSON.stringify(
+            controller.getSelection()
+        );
+    }
+);
+// Call controller.dispose() when the owning settings view is removed.`
+    },
+    {
         name:'AIPreferenceRuntime.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Stores an optional six-slot override in a WeakMap keyed by the user object; it never persists or mutates the user entity.',
@@ -46,7 +72,7 @@ console.log(getAIPreferencesForRuntime(user));`
         name:'AIPreferenceTuple.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Pure in-process normalization and comparison with no persistence or host calls.',
-        paramsResults:'normalizeAIPreferenceTuple(value, {defaults, allowedValues, aliases}) returns a normalized six-element array in the documented slot order. aiPreferenceTuplesEqual(left, right) requires two six-entry arrays with exact values.',
+        paramsResults:'AI_PREFERENCE_SLOT_KEYS is the mutable six-slot order array. normalizeAIPreferenceTuple(value, {defaults, allowedValues, aliases}) returns a mutable normalized six-element array in that order; existing token trimming, aliases, caller-selected allowed values, and default selection are unchanged. aiPreferenceTuplesEqual(left, right) requires two six-entry arrays with exact values. AIModelSelectionController uses the shared order without applying this token normalizer to saved selection values.',
         events:[],
         errors:['TypeError for invalid defaults, allowed-value collections, or disallowed defaults'],
         capabilitiesCore:'Normalizes profile tokens only; Core admission remains a separate status and catalog concern.',
