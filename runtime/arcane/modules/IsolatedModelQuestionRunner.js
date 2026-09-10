@@ -1,8 +1,8 @@
 import Is from 'strong-type';
 const is=new Is(false);
 
-const SENTENCE_BOUNDARY=/[.!?]+(?:["'\\u2019\\u201d)\\]}]+)?(?=\\s|$)/gu;
-const WORD_OR_NUMBER=/[\\p{L}\\p{N}]/u;
+const SENTENCE_BOUNDARY = /[.!?]+(?:["'\u2019\u201d)\]}]+)?(?=\s|$)/gu;
+const WORD_OR_NUMBER = /[\p{L}\p{N}]/u;
 
 function codedError(code,message,ErrorType=Error){
     const error=new ErrorType(message);

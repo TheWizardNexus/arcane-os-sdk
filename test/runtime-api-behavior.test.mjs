@@ -5,6 +5,9 @@ import test from '../src/testing.mjs';
 import AIModelSelectionController, {
     AIModelSelectionController as NamedAIModelSelectionController
 } from 'arcane-os/modules/AIModelSelectionController.js';
+import IsolatedModelQuestionRunner, {
+    countSentences
+} from 'arcane-os/modules/IsolatedModelQuestionRunner.js';
 import {arcaneEvents} from '../src/event-manager.mjs';
 import {
     getCoreLocalModelCatalog,
@@ -171,6 +174,76 @@ function draftModelSelection(select, value, eventType = 'change') {
     assert.equal(select.value, value, 'The authored choice must exist in the select.');
     select.dispatchEvent(new Event(eventType));
 }
+
+test(
+    'isolated question sentence counting accepts punctuation, closing marks and Unicode text',
+    function isolatedQuestionSentenceCounting() {
+        const cases = [
+            ['', 0],
+            [' \t\n ', 0],
+            ['Unpunctuated response', 1],
+            ['One...?!', 1],
+            ['First. Second?\nThird!', 3],
+            ['“One.” ‘Two!’ (Three?) [Four.] {Five!}', 5],
+            ['One.\t世界', 2],
+            ['One.\n٤٢', 2],
+            ['One. $$$', 1]
+        ];
+        for (const [answer, expected] of cases) {
+            assert.equal(countSentences(answer), expected, answer);
+            assert.equal(countSentences(answer), expected, 'Repeated calls reset the matcher.');
+        }
+        assert.throws(
+            function rejectNonStringSentenceInput() {
+                countSentences(null);
+            },
+            TypeError
+        );
+    }
+);
+
+test(
+    'isolated question runner preserves the complete provider result while adding its sentence count',
+    async function isolatedQuestionCompleteResult() {
+        const answer = '“First.”\n\n世界 without final punctuation  ';
+        const result = {answer, model: 'fixture-model', detail: {complete: 'provider metadata'}};
+        const calls = [];
+        const localAI = {
+            inspectIsolatedModel: function unusedModelInspection() {
+                assert.fail('Running a question must not add an inspection call.');
+            },
+            runIsolatedQuestion: async function runSelectedQuestion(request, streamOptions) {
+                calls.push(
+                    {request, streamOptions}
+                );
+                return result;
+            }
+        };
+        const runner = new IsolatedModelQuestionRunner(
+            {localAI}
+        );
+        const request = {
+            model: 'fixture-model',
+            prompt: '  Keep this exact question.\n',
+            systemPrompt: 'Complete answer only.',
+            options: {temperature: 0.2}
+        };
+        function onPhase() {}
+        const actual = await runner.runQuestion(
+            {...request, onPhase}
+        );
+        assert.equal(calls.length, 1);
+        assert.deepEqual(calls[0].request, request);
+        assert.equal(calls[0].streamOptions.onPhase, onPhase);
+        assert.deepEqual(
+            actual,
+            {...result, sentenceCount: 2}
+        );
+        assert.equal(actual.answer, answer);
+        assert.equal(actual.detail, result.detail);
+        assert.equal(Object.hasOwn(result, 'sentenceCount'), false);
+    }
+);
 
 test(
     'public model selection owns six named selects without starting inventory or rewriting unknown values',
