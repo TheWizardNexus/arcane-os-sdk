@@ -19,7 +19,7 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles share the theme, packaging, event, cancellation,
 and browser run contracts while retaining their selected application layout.
 
-This checkout defines the `0.33.0` SDK contract. Applications pin one exact npm
+This checkout defines the `0.33.1` SDK contract. Applications pin one exact npm
 version and lockfile; registry state is deliberately not baked into application
 artifacts.
 
@@ -85,7 +85,7 @@ Create one browser application, install its pinned SDK, and start its source
 server:
 
 ```bash
-npx arcane-os@0.33.0 new hello-speech --path ./hello-speech --target browser
+npx arcane-os@0.33.1 new hello-speech --path ./hello-speech --target browser
 cd hello-speech
 npm install
 ```

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.33.1
+
+- Preserve application and pre-existing body classes when the shared header
+  applies a saved User skin. Repeated ready notifications replace only skin
+  classes previously added by that header, retaining its existing readiness,
+  navigation and online-status behavior.
+
 ## 0.33.0
 
 - Add the default and named `AIModelSelectionController` export at
