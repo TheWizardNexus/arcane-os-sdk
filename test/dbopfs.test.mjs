@@ -6,6 +6,171 @@ import test from '../src/testing.mjs';
 const repositoryRoot=new URL('../',import.meta.url);
 
 test(
+    'file manager initializes its tree provider before immediate or deferred storage readiness',
+    async function testFileManagerStorageReadiness() {
+        const source = await readFile(
+            new URL('runtime/arcane/components/file-manager.html', repositoryRoot),
+            'utf8'
+        );
+        const script = source.match(/<script type="module">([\s\S]*?)<\/script>/u);
+        assert.ok(script, 'Exercise the complete component script in source order.');
+        const AsyncFunction = Object.getPrototypeOf(async function componentScript() {}).constructor;
+        const runComponent = new AsyncFunction(
+            'window', 'document', 'dbopfs', 'importModule',
+            script[1].replaceAll('import(', 'importModule(')
+        );
+
+        class ComponentElement extends EventTarget {
+            constructor() {
+                super();
+                this.children = [];
+                this.attributes = new Map();
+            }
+
+            append(...children) {
+                this.children.push(...children);
+            }
+
+            replaceChildren(...children) {
+                this.children = children;
+            }
+
+            setAttribute(name, value) {
+                this.attributes.set(name, String(value));
+            }
+        }
+
+        for (const mode of ['already-ready', 'ready-event', 'custom-provider']) {
+            const storageRequests = [];
+            const providerRequests = [];
+            const publications = [];
+            const failures = [];
+            const dbopfs = {
+                ready: mode === 'already-ready',
+                async getTableNames(includeAll) {
+                    storageRequests.push(includeAll);
+                    return [];
+                }
+            };
+            const window = new EventTarget();
+            window.dbopfs = dbopfs;
+            const fileManager = new ComponentElement();
+            const elements = new Map(
+                [
+                    ['.file-manager', fileManager],
+                    ['style', new ComponentElement()],
+                    ['#fileUpload', new ComponentElement()],
+                    ['#directoryModal', new ComponentElement()],
+                    ['#fileModal', new ComponentElement()],
+                    ['#deleteModal', new ComponentElement()]
+                ]
+            );
+            const host = {
+                dataset: {layout: 'tree'},
+                shadowRoot: {
+                    querySelector(selector) {
+                        return elements.get(selector);
+                    }
+                },
+                getAttribute(name) {
+                    return name === 'href' ? './file-manager.html' : null;
+                },
+                hasAttribute() {
+                    return false;
+                }
+            };
+            const document = {
+                baseURI: 'https://file-manager.example/',
+                createElement() {
+                    return new ComponentElement();
+                }
+            };
+            const initialization = Promise.withResolvers();
+            const eventSource = {
+                descriptor: {instanceId: mode},
+                dispatch(name, detail) {
+                    publications.push({name, detail});
+                    if (name === 'file-manager-ready') {
+                        initialization.resolve();
+                    }
+                    return {accepted: true, occurrence: {type: name, detail}};
+                },
+                dispose() {}
+            };
+
+            async function importModule(specifier) {
+                switch (specifier) {
+                    case 'strong-type':
+                        return import('strong-type');
+                    case 'arcane-os/logging':
+                        return {
+                            arcaneLogging: {
+                                error(message, error) {
+                                    failures.push({message, error});
+                                    initialization.resolve();
+                                }
+                            }
+                        };
+                    case 'arcane-os/event-manager':
+                        return {
+                            createArcaneEventSource() {return eventSource;},
+                            projectArcaneDOMEvent() {}
+                        };
+                    case '../modules/WaitForComponent.js':
+                        return {default: async function waitForComponent() {}};
+                    case '../modules/DBOPFS.js':
+                    case '../entities/File.js':
+                        return {};
+                    default:
+                        assert.fail(`Unexpected component import: ${specifier}`);
+                }
+            }
+
+            try {
+                await runComponent.call(host, window, document, dbopfs, importModule);
+                if (mode !== 'already-ready') {
+                    assert.equal(host.ready, false);
+                    assert.deepEqual(storageRequests, []);
+                    if (mode === 'custom-provider') {
+                        await host.setProvider(
+                            {
+                                async list(path) {
+                                    providerRequests.push(path);
+                                    return [];
+                                }
+                            }
+                        );
+                    } else {
+                        dbopfs.ready = true;
+                        window.dispatchEvent(new Event('dbopfs-ready'));
+                    }
+                }
+
+                await initialization.promise;
+                assert.deepEqual(failures, [], mode);
+                assert.equal(host.ready, true, mode);
+                assert.equal(fileManager.attributes.get('aria-busy'), 'false');
+                assert.equal(fileManager.children[0].className, 'tree-root');
+                assert.equal(fileManager.children[1].innerText, 'No files are available.');
+                dbopfs.ready = true;
+                window.dispatchEvent(new Event('dbopfs-ready'));
+                assert.deepEqual(storageRequests, mode === 'custom-provider' ? [] : [true]);
+                assert.deepEqual(providerRequests, mode === 'custom-provider' ? [''] : []);
+                assert.deepEqual(
+                    publications.map(function eventName(publication) {return publication.name;}),
+                    ['file-manager-ready']
+                );
+            } finally {
+                host.destroy();
+            }
+            assert.equal(host.ready, false);
+            window.dispatchEvent(new Event('dbopfs-ready'));
+            assert.deepEqual(storageRequests, mode === 'custom-provider' ? [] : [true]);
+        }
+    }
+);
+
+test(
     'DBOPFS creates only requested tables and preserves the memories directory alias',
     async function testDBOPFSLazyTableDirectories(){
         function missingEntry(name){

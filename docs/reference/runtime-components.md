@@ -753,6 +753,11 @@ Slots: `title`, `preview`, `metadata`, `actions`.
 
 Browses, filters, selects, opens, and acts on app-scoped files.
 
+The default tree provider is initialized before storage readiness starts the
+first load. Already-ready DBOPFS loads immediately; otherwise the component
+starts on `dbopfs-ready`. Both paths retain the same `file-manager-ready` event
+and `destroy()` cleanup, without delaying unrelated component startup.
+
 ### Public surface
 
 Methods/properties: `setProvider()`, `loadAll()`, `setFilter()`, `select()`, `clearSelection()`, `destroy()`.

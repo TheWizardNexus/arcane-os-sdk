@@ -452,16 +452,6 @@
         return isVisibleEntry({name:fileName,path:fileName,kind:'file'});
     }
 
-    window.addEventListener(
-        'dbopfs-ready',
-        init,
-        {once:true,signal:lifecycleController.signal}
-    );
-
-    if(window.dbopfs?.ready){
-        init();
-    }
-
     fileUpload.addEventListener(
         'change',
         ()=>uploadFiles().catch(
@@ -697,6 +687,17 @@
             }
         }
     };
+
+    // Immediate readiness can enter loadTree before init reaches its first await.
+    window.addEventListener(
+        'dbopfs-ready',
+        init,
+        {once:true,signal:lifecycleController.signal}
+    );
+
+    if(window.dbopfs?.ready){
+        init();
+    }
 
     function activeTreeProvider(){
         return provider||dbopfsTreeProvider;
