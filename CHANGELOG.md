@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.33.2
+
+- Initialize the shared file manager's default tree provider before an
+  already-ready DBOPFS starts loading. Preserve deferred readiness, custom
+  providers, duplicate-ready handling and component disposal without adding
+  a startup wait.
+- Correct the isolated-model question runner's sentence and Unicode matcher
+  literals so the public module imports successfully. Keep complete questions,
+  answers and provider metadata while adding the existing sentence count.
+- Retain standalone app-root hosting through `/node_modules/arcane-os/...`;
+  this patch requires no app-local SDK changes or copied `/arcane` tree.
+
 ## 0.33.1
 
 - Preserve application and pre-existing body classes when the shared header
