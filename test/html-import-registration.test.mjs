@@ -1,5 +1,85 @@
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import test from '../src/testing.mjs';
+
+test(
+    'header saved skin preserves application body classes across ready notifications',
+    async function headerSkinClassOwnership() {
+        const source = await readFile(
+            new URL('../runtime/arcane/components/header.html', import.meta.url),
+            'utf8'
+        );
+        const setter = source.match(/^    async function setSkin\(\) \{[\s\S]*?^    \}/mu);
+        assert.ok(setter, 'Exercise the actual component skin setter.');
+        assert.ok(
+            source.indexOf('const appliedSkinClasses=new Set();')
+                < source.indexOf('if (window.user?.ready)')
+        );
+        const names = new Set(['app-layout', 'sidebar-visible', 'shared-token']);
+        const document = {
+            body: {
+                classList: {
+                    contains(name) {return names.has(name);},
+                    add(name) {names.add(name);},
+                    remove(name) {names.delete(name);}
+                }
+            }
+        };
+        Object.defineProperty(
+            document.body,
+            'className',
+            {
+                set() {assert.fail('The header must never replace body.className.');}
+            }
+        );
+        const errors = [];
+        const messages = [];
+        const arcaneLogging = {
+            error(message, error) {errors.push({message, error});},
+            log(message) {messages.push(message);}
+        };
+        const window = {user: {skin: 'default'}};
+        const setSkin = Function(
+            'window', 'document', 'arcaneLogging', 'appliedSkinClasses',
+            `${setter[0]}\nreturn setSkin;`
+        )(window, document, arcaneLogging, new Set());
+
+        await setSkin();
+        names.add('app-added-after-ready');
+        await setSkin();
+        assert.deepEqual(
+            [...names],
+            ['app-layout', 'sidebar-visible', 'shared-token', 'default', 'app-added-after-ready']
+        );
+        window.user.skin = 'warm\tshared-token\naccent\fnon\u00a0breaking';
+        await setSkin();
+        assert.deepEqual(
+            [...names],
+            ['app-layout', 'sidebar-visible', 'shared-token', 'app-added-after-ready', 'warm', 'accent', 'non\u00a0breaking']
+        );
+        window.user.skin = 7;
+        await setSkin();
+        assert.deepEqual(
+            [...names],
+            ['app-layout', 'sidebar-visible', 'shared-token', 'app-added-after-ready', '7']
+        );
+        window.user.skin = '';
+        await setSkin();
+        assert.equal(names.has('7'), true, 'No saved skin retains the existing presentation.');
+        assert.equal(messages.length, 1);
+        assert.deepEqual(errors, []);
+
+        const failure = new Error('Original skin read failure');
+        Object.defineProperty(
+            window.user,
+            'skin',
+            {get() {throw failure;}}
+        );
+        await setSkin();
+        assert.equal(errors[0].error, failure);
+        assert.equal(names.has('app-layout'), true);
+    }
+);
 
 test(
     'HTMLImport URL variants share one usable registered element and its lifecycle',

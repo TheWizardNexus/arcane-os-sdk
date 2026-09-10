@@ -780,6 +780,12 @@ Shared dependencies: [`DBOPFS.js`](runtime-modules.md#dbopfsjs), [`File.js`](run
 
 Shared title bar with history, reload, online marker, presentation labels, and 988 link.
 
+The saved User skin adds its class tokens to the document body without replacing
+application layout or other pre-existing classes. Repeated ready notifications
+replace only skin classes previously added by that header. Skin application
+keeps the existing already-ready check and `user-entity-loaded` subscription;
+navigation and online-status behavior are unchanged.
+
 ### Public surface
 
 This fragment declares no public host method.

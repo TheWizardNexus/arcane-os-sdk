@@ -83,6 +83,7 @@
     import('../entities/User.js');
     
     const host=this;
+    const appliedSkinClasses=new Set();
 
     window.addEventListener('user-entity-loaded', setSkin);
     window.addEventListener('online', checkInternet);
@@ -123,7 +124,22 @@
         try {
             const skin = window.user?.skin;
             if (skin) {
-                document.body.className = skin;
+                const nextClasses=new Set(String(skin).match(/[^\t\n\f\r ]+/gu)||[]);
+                const classes=document.body.classList;
+                // Only replace classes added by this header; application layout
+                // and independently owned theme classes stay with their owners.
+                for(const name of appliedSkinClasses){
+                    if(!nextClasses.has(name)){
+                        classes.remove(name);
+                        appliedSkinClasses.delete(name);
+                    }
+                }
+                for(const name of nextClasses){
+                    if(!classes.contains(name)){
+                        classes.add(name);
+                        appliedSkinClasses.add(name);
+                    }
+                }
             } else {
                 arcaneLogging.log('No saved skin found. Using default.');
             }
