@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.33.3
+
+- Show selected language-model readiness in the shared chat's callback mode
+  instead of leaving its initial session-connection message. Ready requires a
+  selected provider and model whose runtime role is ready and loaded; loading,
+  unloaded, unavailable, error, unloading and disposed states stay distinct.
+- Refresh that status when the existing application-owned `modelName` label
+  changes, preserving asynchronous component startup without a new status API.
+- Preserve session binding, message, tool and error status after binding begins.
+  Model readiness does not claim network connectivity or start model loading.
+
 ## 0.33.2
 
 - Initialize the shared file manager's default tree provider before an

@@ -610,7 +610,7 @@
         role="status"
         aria-live="polite"
         data-state="idle"
-    >Chat session is not connected.</output>
+    >Waiting for language model status.</output>
     <section
         id="ai_activation"
         class="ai_activation"
@@ -1784,8 +1784,17 @@
     });
     host.destroy=destroy;
     host.session=null;
-    host.sessionStatus={state:'idle',message:'Chat session is not connected.'};
-    host.modelName=is.string(host.modelName)?host.modelName:'';
+    host.sessionStatus={state:'idle',message:'Waiting for language model status.'};
+    let modelName=is.string(host.modelName)?host.modelName:'';
+    Object.defineProperty(host,'modelName',{
+        configurable:true,
+        enumerable:true,
+        get:function getModelName(){return modelName;},
+        set:function setModelName(value){
+            modelName=value;
+            applyAIAvailability(host.aiAvailability);
+        }
+    });
     host.aiAvailability={llm:false,stt:false,tts:false};
     host.conversationComplete=false;
     applyAIAvailability(host.aiAvailability);
@@ -2019,6 +2028,25 @@
             ?'Send message'
             :'The selected language model service is unavailable.';
         send.setAttribute('aria-label',send.title);
+        if(!destroyed&&sessionBindingGeneration===0&&!boundChatSession&&!sessionBindingPending){
+            const state=selectedRole?.state==='ready'&&selectedRole.loaded!==true
+                ?'unloaded'
+                :selectedRole?.state??(latestAIRuntimeRoles?'unavailable':'idle');
+            const label=is.string(host.modelName)&&host.modelName
+                ?host.modelName
+                :selectedRole?.modelId||'Language model';
+            const status={
+                idle:'Waiting for language model status.',
+                unavailable:'Unavailable',
+                unloaded:'Not loaded',
+                loading:'Loading',
+                ready:'Ready',
+                unloading:'Unloading',
+                error:'Error',
+                disposed:'Disposed'
+            };
+            setSessionStatus(state,state==='idle'?status.idle:`${label} — ${status[state]}`);
+        }
     }
 
     function createAIActivationController({

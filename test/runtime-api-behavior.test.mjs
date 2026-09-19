@@ -3939,6 +3939,89 @@ test(
     }
 );
 
+test('callback chat status follows runtime readiness without taking session ownership',async function testCallbackChatStatus(){
+    const source=await readFile(new URL('runtime/arcane/components/chat.html',repositoryRoot),'utf8');
+    const {default:Is}=await import('strong-type');
+    function functionSource(start,end){
+        const first=source.indexOf(start);
+        const last=source.indexOf(end,first);
+        assert.notEqual(first,-1);
+        assert.ok(last>first);
+        return source.slice(first,last);
+    }
+    const create=Function('is',`
+        return function createStatusFixture(initialName=''){
+            const host={modelName:initialName,aiAvailability:{llm:false},conversationComplete:false};
+            const chatSessionStatus={dataset:{},value:'',textContent:''};
+            const chatArea={dataset:{}};
+            const send={setAttribute(){}};
+            let latestAIRuntimeRoles=null;
+            let destroyed=false;
+            let sessionBindingGeneration=0;
+            let boundChatSession=null;
+            let sessionBindingPending=false;
+            let sessionMessagePending=false;
+            let pendingStructuralToolMessage='';
+            let sessionHistoryRecoveryMessage='';
+            const aiActivationController={synchronize(){}};
+            ${functionSource('function setSessionStatus(', '\n    function compatibleChatSession')}
+            ${functionSource('function hasSelectedAIRuntimeRole(', '\n    function createAIActivationController')}
+            ${functionSource('function synchronizeAIRuntimeState(', '\n    function formatConversationTime')}
+            ${functionSource('let modelName=', '\n    host.aiAvailability=')}
+            applyAIAvailability(host.aiAvailability);
+            return {
+                host,chatSessionStatus,send,
+                replay(role){synchronizeAIRuntimeState({roles:{llm:role,stt:{state:'unloaded'},tts:{state:'unloaded'}}});},
+                protect(kind){
+                    if(kind==='binding')sessionBindingPending=true;
+                    if(kind==='bound')boundChatSession={};
+                    if(kind==='failed-binding')sessionBindingGeneration=1;
+                    if(kind==='destroyed')destroyed=true;
+                    setSessionStatus(kind,'Owned status remains.');
+                }
+            };
+        };
+    `)(new Is(false));
+    assert.match(source,/>Waiting for language model status[.]<\/output>/u);
+    const fixture=create('Cloud label');
+    assert.deepEqual(fixture.host.sessionStatus,{state:'idle',message:'Waiting for language model status.'});
+    const role={providerId:'cloud',modelId:'model-a',localOnly:false,state:'ready',loaded:true};
+    for(const [state,loaded,label] of [
+        ['loading',false,'Loading'],['unloaded',false,'Not loaded'],
+        ['ready',false,'Not loaded'],['ready',true,'Ready'],
+        ['error',false,'Error'],['unloading',true,'Unloading'],
+        ['disposed',false,'Disposed'],['unavailable',false,'Unavailable']
+    ]){
+        fixture.replay({...role,state,loaded});
+        assert.equal(fixture.host.sessionStatus.message,`Cloud label — ${label}`);
+        assert.equal(fixture.host.sessionStatus.state,state==='ready'&&!loaded?'unloaded':state);
+        assert.equal(fixture.chatSessionStatus.textContent,fixture.host.sessionStatus.message);
+        assert.equal(fixture.chatSessionStatus.value,fixture.host.sessionStatus.message);
+        assert.equal(fixture.chatSessionStatus.dataset.state,fixture.host.sessionStatus.state);
+    }
+    fixture.replay(role);
+    fixture.host.modelName='Later label';
+    assert.equal(fixture.host.sessionStatus.message,'Later label — Ready');
+    fixture.host.modelName='';
+    assert.equal(fixture.host.sessionStatus.message,'model-a — Ready');
+    fixture.replay({...role,modelId:'model-b',state:'unloaded',loaded:false});
+    assert.equal(fixture.host.sessionStatus.message,'model-b — Not loaded');
+    for(const missing of [{providerId:null},{modelId:null}]){
+        fixture.replay({...role,...missing});
+        assert.equal(fixture.host.sessionStatus.state,'unavailable');
+        assert.equal(fixture.host.sessionStatus.message,'Language model — Unavailable');
+    }
+    for(const kind of ['binding','bound','failed-binding','destroyed']){
+        const protectedFixture=create();
+        protectedFixture.protect(kind);
+        for(const state of ['ready','loading','error']){
+            protectedFixture.replay({...role,state});
+            protectedFixture.host.modelName='New label';
+            assert.deepEqual(protectedFixture.host.sessionStatus,{state:kind,message:'Owned status remains.'});
+        }
+    }
+});
+
 test(
     'chat requires explicit selected-unloaded AI activation before reporting a usable route',
     async function testChatAIActivationContract() {

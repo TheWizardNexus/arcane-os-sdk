@@ -314,6 +314,16 @@ extension callbacks. The component installs warning-only defaults when the host
 does not supply them; applications may instead consume the corresponding
 `chat-send-message` and `chat-language-changed` events.
 
+Before any session binding begins, callback-mode `sessionStatus` follows the
+selected sticky LLM role and the existing application-owned `modelName` label
+(or the selected model ID). Assigning `modelName` refreshes that status even
+after component initialization. It reports Ready only for a selected provider and
+model whose role is both ready and loaded; loading, unloaded, error, unloading,
+unavailable, and disposed states remain distinct. The initial status waits for
+runtime replay. This describes model readiness, not network connectivity.
+Once `bindSession()` begins, session binding, message, tool, and error status
+remain owned by that session lifecycle; runtime updates do not replace them.
+
 `submitMessage(textOverride='',context={})` returns `Promise<boolean>`.
 `context` accepts `source`, `preserveDraft`, `synthetic`, an optional exact
 `operationId`, and an optional caller-owned `AbortSignal`. The component owns a
