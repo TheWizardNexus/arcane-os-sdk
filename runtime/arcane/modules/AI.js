@@ -5176,7 +5176,9 @@ class AI {
             if(observeToolText){
                 await reader.cancel(error).catch(
                     function reportToolTextReaderCleanupFailure(cleanupError){
-                        arcaneLogging.error('Arcane tool text reader cleanup failed.',cleanupError);
+                        if(!isAIRequestAbort(error,signal)||!isAIRequestAbort(cleanupError)){
+                            arcaneLogging.error('Arcane tool text reader cleanup failed.',cleanupError);
+                        }
                     }
                 );
             }

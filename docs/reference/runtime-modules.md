@@ -465,6 +465,11 @@ preserves the existing callback path. Invalid selection or callback input throws
 `ARCANE_AI_TOOL_TEXT_INVALID`. Callback errors reach the request owner and
 cancellation prevents later delivery.
 
+Cancelling an HTTP tool-text stream still cancels and releases its reader and
+rejects with the ordinary request `AbortError`. If reader cancellation repeats
+that expected abort, it is not reported as a cleanup failure. Other reader
+cleanup errors remain visible in developer-console diagnostics.
+
 Request observers receive
 `onRequest(request,id,metadata)` and any transport metadata supplied by the
 selected route is forwarded unchanged. Every async native, HTTP, provider, and

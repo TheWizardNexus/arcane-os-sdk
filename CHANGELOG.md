@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.33.4
+
+- Treat a repeated reader `AbortError` during intentional HTTP tool-text stream
+  cancellation as normal cancellation rather than a cleanup failure.
+- Preserve reader cancellation, lock release, the public request-aborted result,
+  and full diagnostics for genuine reader cleanup failures. Request content,
+  tool selection, callback ordering, and application behavior are unchanged.
+
 ## 0.33.3
 
 - Show selected language-model readiness in the shared chat's callback mode
