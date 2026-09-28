@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.33.5
+
+- Deliver the first visible streamed chat chunk to speech exactly once, without
+  waiting for speech playback or changing response order.
+- Keep a following transcript at its actual bottom through message and composer
+  layout changes while preserving a reader's deliberate scroll-away choice.
+- Retry pre-response Fetch failures and HTTP 529 up to three times after a
+  three-second delay. Preserve existing HTTP 429 overload retries, cancellation,
+  complete request content, and terminal errors without replaying streams or tools.
+- Add observational `onRetry` waiting/requesting notifications to portable TWiN
+  and shared AI request APIs, including queued built-in provider requests.
+- Let modal task jobs report complete transient progress to their own row through
+  `task(reportProgress)`, preserving parallel work and settled results.
+
 ## 0.33.4
 
 - Treat a repeated reader `AbortError` during intentional HTTP tool-text stream
