@@ -370,7 +370,7 @@ class UserEntity {
 
         this.#current_time = v;
 
-        this.#persist();
+        this.#persist({current_time:v});
     }
 
     /** @returns {number} */
@@ -386,7 +386,7 @@ class UserEntity {
 
         this.#last_successful_time = v;
 
-        this.#persist();
+        this.#persist({last_successful_time:v});
     }
 
      /** @returns {string} */
@@ -857,9 +857,11 @@ class UserEntity {
 
     /**
      * Applies and durably saves an explicit profile update as one serialized
-     * operation. A failed write restores the prior in-memory values.
+     * operation. A callback computes a partial update from the fresh profile;
+     * its null result skips the write. It must not await another queued User
+     * operation on this instance. A failed write restores the fresh baseline.
      *
-     * @param {UserEntityData|string|Object} src
+     * @param {UserEntityData|string|Object|function(UserEntityData): (Object|null|Promise<Object|null>)} src
      * @returns {Promise<UserEntityData>}
      */
     updateExplicit(src){
@@ -883,7 +885,19 @@ class UserEntity {
                 this.persist=false;
                 try{
                     this.explicit=baseline;
-                    this.explicit=src;
+                }finally{
+                    this.persist=persist;
+                }
+
+                const conditional=is.function(src);
+                const update=conditional?await src(this.explicit):src;
+                if(conditional&&update===null){
+                    return this.explicit;
+                }
+
+                this.persist=false;
+                try{
+                    this.explicit=update;
                 }finally{
                     this.persist=persist;
                 }
@@ -1107,8 +1121,17 @@ class UserEntity {
     /**
      * Internal persistence trigger
      */
-    #persist(){
+    #persist(update){
         if(this.persist){
+            // TimeGuard's ordinary timestamp setters must merge only their
+            // fields into the fresh profile, never overwrite another tab's edits.
+            if(!is.undefined(update)){
+                const operation=this.updateExplicit(update);
+                void operation.catch(function reportTimestampSaveFailure(error){
+                    arcaneLogging.error('The user timestamp could not be saved.',error);
+                });
+                return operation;
+            }
             return this.save();
         }
 

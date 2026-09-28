@@ -274,6 +274,46 @@ Owns persisted user preference/profile fields, explicit-preference updates,
 fresh reads, saves, and JSON projection. It installs `window.user` after its
 DBLS/DBOPFS lifecycle and emits `user-entity-loaded`.
 
+### updateExplicit(update)
+
+Accepts an ordinary partial profile object, a JSON string, or a function
+`current => partialOrNull`. It returns `Promise<UserEntityData>` with the
+resulting explicit profile, retaining the existing field setters and their
+validation behavior.
+
+The function is called once after the latest durable profile has been read,
+inside the existing serialized update and Web Lock. It may return a promise.
+Return only the fields to change, or return `null` to skip the durable write
+and receive the fresh profile unchanged. This no-write meaning applies only
+to the callback result; ordinary object/string inputs and direct `null` retain
+their existing behavior. With `persist=false`, the callback uses current
+memory and performs no durable read or write.
+
+```javascript
+const displayedName = user.username;
+const profile = await user.updateExplicit(function renameTheCaptain(current) {
+    if (current.username !== displayedName) return null;
+    return {username: 'Captain Moonboots'};
+});
+```
+
+Callbacks compute a patch without mutating `current`. Do not call or await
+`updateExplicit()`, `withFreshExplicit()`, or `refresh()` on the same instance
+inside the callback: those operations depend on the current queue entry
+finishing. Fetch outside the callback; compare against `current` at the write
+boundary. Rendering and unrelated background work need not await this update.
+
+A thrown or rejected callback causes no save and rejects with the original
+error. A failed save restores the fresh baseline in memory and rejects with
+the save error. The persistence setting is restored and later queued updates
+remain usable. The existing `current_time` and `last_successful_time` setters
+keep their immediate in-memory assignment, then save only their timestamp
+field through this same fresh partial-update owner. This preserves newer
+durable profile fields when TimeGuard records a check. Automatic timestamp
+save failures are reported through Arcane logging; callers requiring durable
+completion use and await `updateExplicit({current_time: value})` or the
+corresponding `last_successful_time` partial update.
+
 ### profileUpdateFromSearchParams(searchParams)
 
 Named export from `arcane-os/entities/User.js`. Pass an existing

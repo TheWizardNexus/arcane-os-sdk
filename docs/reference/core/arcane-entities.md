@@ -41,7 +41,7 @@ authoritative in the linked contract document.
 | `arcane/entities/Theme.js#themeTokens` | constant | `themeTokens` | Frozen ordered definitions that map public theme-token keys to CSS custom properties, labels, and defaults. |
 | `arcane/entities/Theme.js#themeColorToHex` | function | `themeColorToHex` | Validates an RGB, RGBA, or six-digit hexadecimal color and returns its RGB channels as a normalized six-digit hexadecimal color. |
 | `arcane/entities/Theme.js#default` | class | `Theme` | Validates and freezes a named light or dark token set and can serialize, restore, apply, or clear that theme on a document root. |
-| `arcane/entities/User.js#default` | class | `UserEntity` | Owns the browser user's validated settings and profile record, including DBOPFS load, refresh, serialized updates, and optional persistence. |
+| `arcane/entities/User.js#default` | class | `UserEntity` | Owns the browser user's settings and profile record, including DBOPFS load, refresh, serialized partial or fresh-baseline callback updates, and optional persistence. Callback null skips saving; timestamp setters merge only their fields through the same write owner. |
 | `arcane/entities/Weather.js#WeatherLocation` | class | `WeatherLocation` | Validates and freezes geographic identity, coordinates, and timezone metadata for a weather location. |
 | `arcane/entities/Weather.js#WeatherObservation` | class | `WeatherObservation` | Validates and freezes one timestamped current-weather observation and its units. |
 | `arcane/entities/Weather.js#WeatherDay` | class | `WeatherDay` | Validates and freezes one daily forecast with temperature, precipitation, and optional sunrise and sunset times. |
