@@ -81,8 +81,11 @@ two failure types share that three-retry budget. HTTP `429` with a message
 containing `overload` (case-insensitive) retains its unlimited three-second
 retry behavior and does not consume that budget. Each attempt reuses the exact
 destination, Fetch options, serialized request, and signal. Other HTTP errors,
-response decoding failures, and application callback failures do not retry.
-The last complete failure is thrown unchanged when recovery is exhausted.
+successful-response decoding failures, and application callback failures do not
+retry. A known HTTP `529` also retries when reading or parsing its diagnostic
+body fails; `onRetry.error` retains that exact failure, which is thrown unchanged
+if recovery is exhausted. Diagnostic-body failures for other HTTP statuses do
+not retry. The last complete failure is thrown unchanged when recovery is exhausted.
 Pass a fresh
 `AbortController`'s `signal` and call `abort()` to cancel. Cancellation during
 the request, response-body read, retry wait, or callback settlement prevents

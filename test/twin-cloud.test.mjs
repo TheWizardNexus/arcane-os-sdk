@@ -463,6 +463,233 @@ test(
 );
 
 test(
+    'TWiN retries HTTP 529 malformed JSON and failed diagnostic reads with the original failures',
+    async function recoverUnreadableOverloadDiagnostics(context) {
+        const bodyReadError = new TypeError('The moon server closed its diagnostic stream.');
+        const parsed = {choices: [{message: {content: 'The moon server recovered.'}}]};
+        const retries = [];
+        let parsingError;
+        let attempts = 0;
+        const fixture = runtimeFixture(
+            context,
+            async function answerUnreadableOverloadDiagnostics() {
+                attempts += 1;
+                if (attempts === 1) {
+                    return {
+                        ...response(529, null),
+                        async json() {
+                            try {
+                                return JSON.parse('{The moon server is overloaded.');
+                            } catch (error) {
+                                parsingError = error;
+                                throw error;
+                            }
+                        }
+                    };
+                }
+                if (attempts === 2) {
+                    return {
+                        ...response(529, null, 'text/plain'),
+                        async text() {
+                            throw bodyReadError;
+                        }
+                    };
+                }
+                return response(200, parsed);
+            }
+        );
+        const result = await fetchRequest(
+            {
+                twinKey,
+                model,
+                messages: [{role: 'user', content: '  Preserve the complete moon report.\n  '}],
+                onRetry(state) {
+                    retries.push(state);
+                }
+            }
+        );
+        assert.equal(result, parsed);
+        assert.ok(parsingError instanceof SyntaxError);
+        assert.deepEqual(
+            retries,
+            [
+                {phase: 'waiting', attempt: 1, delayMs: 3000, status: 529, error: parsingError},
+                {phase: 'requesting', attempt: 1, delayMs: 3000, status: 529, error: parsingError},
+                {phase: 'waiting', attempt: 2, delayMs: 3000, status: 529, error: bodyReadError},
+                {phase: 'requesting', attempt: 2, delayMs: 3000, status: 529, error: bodyReadError}
+            ]
+        );
+        assert.equal(fixture.requests.length, 3);
+        assert.deepEqual(
+            fixture.delays,
+            [3000, 3000]
+        );
+        for (const request of fixture.requests) {
+            assert.equal(request.options, fixture.requests[0].options);
+        }
+        assert.deepEqual(
+            JSON.parse(fixture.requests[0].options.body).messages,
+            [{role: 'user', content: '  Preserve the complete moon report.\n  '}]
+        );
+    }
+);
+
+test(
+    'TWiN exhausts HTTP 529 diagnostic retries with the exact final reading failure',
+    async function exhaustUnreadableOverloadDiagnostics(context) {
+        const failures = [
+            new TypeError('First complete diagnostic read failure.'),
+            new TypeError('Second complete diagnostic read failure.'),
+            new TypeError('Third complete diagnostic read failure.'),
+            new TypeError('Final complete diagnostic read failure.')
+        ];
+        const retries = [];
+        let attempts = 0;
+        const fixture = runtimeFixture(
+            context,
+            async function failEveryOverloadDiagnosticRead() {
+                const failure = failures[attempts];
+                attempts += 1;
+                return {
+                    ...response(529, null, 'text/plain'),
+                    async text() {
+                        throw failure;
+                    }
+                };
+            }
+        );
+        await assert.rejects(
+            fetchRequest(
+                {
+                    twinKey,
+                    model,
+                    onRetry(state) {
+                        retries.push(state);
+                    }
+                }
+            ),
+            function preserveFinalDiagnosticFailure(error) {
+                assert.equal(error, failures[3]);
+                return true;
+            }
+        );
+        assert.equal(fixture.requests.length, 4);
+        assert.deepEqual(
+            fixture.delays,
+            [3000, 3000, 3000]
+        );
+        assert.equal(retries.length, 6);
+        for (let index = 0; index < retries.length; index += 1) {
+            assert.equal(retries[index].status, 529);
+            assert.equal(retries[index].error, failures[Math.floor(index / 2)]);
+        }
+    }
+);
+
+test(
+    'TWiN cancellation during HTTP 529 diagnostic reading prevents retries',
+    async function abortUnreadableOverloadDiagnostics(context) {
+        let selectedResponse;
+        const fixture = runtimeFixture(
+            context,
+            async function answerCancelledOverloadDiagnostics() {
+                return selectedResponse;
+            }
+        );
+        for (const contentType of ['application/json', 'text/plain']) {
+            for (const cancellation of ['body-abort', 'signal-abort']) {
+                const controller = new AbortController();
+                const failure = cancellation === 'body-abort'
+                    ? new DOMException('The diagnostic body was cancelled.', 'AbortError')
+                    : new TypeError('The diagnostic body closed during cancellation.');
+                async function failCancelledDiagnosticRead() {
+                    await Promise.resolve();
+                    if (cancellation === 'signal-abort') {
+                        controller.abort('Moon recovery was cancelled.');
+                    }
+                    throw failure;
+                }
+                selectedResponse = {
+                    ...response(529, null, contentType),
+                    json: failCancelledDiagnosticRead,
+                    text: failCancelledDiagnosticRead
+                };
+                await assert.rejects(
+                    fetchRequest(
+                        {
+                            twinKey,
+                            model,
+                            signal: controller.signal,
+                            onRetry() {
+                                assert.fail('A cancelled diagnostic read must not retry.');
+                            }
+                        }
+                    ),
+                    function preserveDiagnosticCancellation(error) {
+                        requestAborted(error);
+                        assert.equal(error.cause, failure);
+                        return true;
+                    }
+                );
+            }
+        }
+        assert.equal(fixture.requests.length, 4);
+        assert.deepEqual(
+            fixture.delays,
+            []
+        );
+    }
+);
+
+test(
+    'TWiN leaves diagnostic decoding failures for other HTTP statuses unchanged',
+    async function preserveOtherHTTPDiagnosticFailures(context) {
+        let selectedResponse;
+        const fixture = runtimeFixture(
+            context,
+            async function answerOtherUnreadableDiagnostics() {
+                return selectedResponse;
+            }
+        );
+        for (const status of [429, 503]) {
+            for (const contentType of ['application/json', 'text/plain']) {
+                const failure = contentType === 'application/json'
+                    ? new SyntaxError('Complete malformed overload diagnostic.')
+                    : new TypeError('Complete overload diagnostic read failure.');
+                async function failOtherDiagnosticRead() {
+                    throw failure;
+                }
+                selectedResponse = {
+                    ...response(status, null, contentType),
+                    json: failOtherDiagnosticRead,
+                    text: failOtherDiagnosticRead
+                };
+                await assert.rejects(
+                    fetchRequest(
+                        {
+                            twinKey,
+                            model,
+                            onRetry() {
+                                assert.fail('Other diagnostic decoding failures must not retry.');
+                            }
+                        }
+                    ),
+                    function preserveOtherDiagnosticFailure(error) {
+                        assert.equal(error, failure);
+                        return true;
+                    }
+                );
+            }
+        }
+        assert.equal(fixture.requests.length, 4);
+        assert.deepEqual(
+            fixture.delays,
+            []
+        );
+    }
+);
+
+test(
     'TWiN retry observers cannot fail or delay request recovery',
     async function observeCloudRetryFailures(context) {
         const previousConsoleError = console.error;

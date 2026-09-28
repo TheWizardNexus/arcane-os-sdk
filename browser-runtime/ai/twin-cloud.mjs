@@ -170,16 +170,23 @@ export async function fetchHTTPResponse(url, options, {onRetry = null} = {}) {
             if (response?.ok) {
                 return response;
             }
+            const status = response?.status ?? null;
             if (response) {
                 const contentType = response.headers.get('content-type') || '';
-                error = contentType.includes('application/json')
-                    ? await response.json()
-                    : await response.text();
+                try {
+                    error = contentType.includes('application/json')
+                        ? await response.json()
+                        : await response.text();
+                } catch (bodyError) {
+                    if (status !== 529 || isAIRequestAbort(bodyError, signal)) {
+                        throw bodyError;
+                    }
+                    error = bodyError;
+                }
                 if (signal?.aborted) {
                     throw normalizeAIRequestAbort(signal.reason);
                 }
             }
-            const status = response?.status ?? null;
             const message = is.string(error)
                 ? error
                 : error?.error?.message ?? error?.message;
