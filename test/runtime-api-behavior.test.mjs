@@ -3608,6 +3608,189 @@ test(
             });
             assert.equal(unregisterTTS(),true);
 
+            const queuedProviderLoads=[];
+            function createQueuedSpeechProvider(id){
+                let state='unloaded';
+                return {
+                    protocol:AI_PROVIDER_PROTOCOL,
+                    role:'tts',
+                    id,
+                    localOnly:false,
+                    maxConcurrentRequests:2,
+                    catalog:ttsProvider.catalog,
+                    inspect(selection){
+                        return {
+                            available:true,
+                            authority:{
+                                protocol:AI_MODEL_AUTHORITY_PROTOCOL,
+                                providerId:id,
+                                modelId:selection.modelId
+                            }
+                        };
+                    },
+                    status(){return {state,loaded:state==='ready',busy:false};},
+                    async load(){
+                        queuedProviderLoads.push(id);
+                        state='ready';
+                    },
+                    request:ttsProvider.request,
+                    async unload(){state='unloaded';},
+                    async dispose(){state='disposed';}
+                };
+            }
+            const firstQueuedProvider=createQueuedSpeechProvider('first-queued-tts');
+            const requestsBeforeQueuedConfiguration=ttsRequests.length;
+            const firstQueuedConfiguration=ai.configureSpeechProvider('tts',firstQueuedProvider);
+            assert.equal(runtime.selection('tts'),null);
+            const mutedQueuedText=ai.streamTTS('Muted krakens remain silent.',true);
+            const firstQueuedActivation=ai.setSpeechMuted(false);
+            assert.equal(ai.speechActivationPending,true);
+            assert.equal(ai.muted,true);
+            const firstQueuedSpeech=ai.streamTTS('The kraken sings before registration completes.',true);
+            const firstQueuedGeneration=ai.speechGeneration;
+            assert.equal(ttsRequests.length,requestsBeforeQueuedConfiguration);
+            assert.equal(await mutedQueuedText,false);
+            await firstQueuedConfiguration;
+            assert.equal(await firstQueuedActivation,true);
+            assert.equal(await firstQueuedSpeech,true);
+            assert.equal(ai.speechGeneration,firstQueuedGeneration);
+            assert.equal(ai.muted,false);
+            assert.equal(runtime.status('tts').state,'ready');
+            assert.deepEqual(queuedProviderLoads,['first-queued-tts']);
+            assert.deepEqual(ttsRequests.slice(requestsBeforeQueuedConfiguration).map(
+                function queuedConfigurationSpeechInput(request){return request.input;}
+            ),['The kraken sings before registration completes.']);
+
+            let releaseQueuedDisposal;
+            let markQueuedDisposal;
+            const queuedDisposal=new Promise(function retainQueuedDisposal(resolve){
+                releaseQueuedDisposal=resolve;
+            });
+            const queuedDisposalStarted=new Promise(function observeQueuedDisposal(resolve){
+                markQueuedDisposal=resolve;
+            });
+            const disposeFirstQueuedProvider=firstQueuedProvider.dispose;
+            firstQueuedProvider.dispose=async function holdQueuedProviderDisposal(){
+                markQueuedDisposal();
+                await queuedDisposal;
+                return disposeFirstQueuedProvider();
+            };
+            const oldQueuedSources=[...ai.sourceNodes];
+            const nextQueuedProvider=createQueuedSpeechProvider('next-queued-tts');
+            const nextQueuedConfiguration=ai.configureSpeechProvider('tts',nextQueuedProvider);
+            try{
+                const abandonedQueuedActivation=ai.setSpeechMuted(false);
+                const abandonedQueuedSpeech=ai.streamTTS('Cancel this earlier chorus.',true);
+                assert.ok(oldQueuedSources.every(function oldRoutePlaybackStopped(source){
+                    return source.stopped;
+                }));
+                await Promise.race([queuedDisposalStarted,nextQueuedConfiguration]);
+                const mutedQueuedActivation=ai.setSpeechMuted(true);
+                const renewedQueuedActivation=ai.setSpeechMuted(false);
+                const renewedQueuedSpeech=ai.streamTTS('The renewed chorus survives.',true);
+                assert.equal(await abandonedQueuedActivation,false);
+                assert.equal(await abandonedQueuedSpeech,false);
+                assert.equal(ai.speechActivationPending,true);
+                assert.deepEqual(queuedProviderLoads,['first-queued-tts']);
+                releaseQueuedDisposal();
+                await nextQueuedConfiguration;
+                await mutedQueuedActivation;
+                assert.equal(await renewedQueuedActivation,true);
+                assert.equal(await renewedQueuedSpeech,true);
+                assert.equal(ai.speechActivationPending,false);
+                assert.equal(ai.muted,false);
+                assert.deepEqual(queuedProviderLoads,['first-queued-tts','next-queued-tts']);
+                assert.deepEqual(ttsRequests.slice(requestsBeforeQueuedConfiguration).map(
+                    function retainedQueuedSpeechInput(request){return request.input;}
+                ),[
+                    'The kraken sings before registration completes.',
+                    'The renewed chorus survives.'
+                ]);
+            }finally{
+                releaseQueuedDisposal();
+            }
+
+            const rejectedQueuedProvider=createQueuedSpeechProvider('rejected-queued-tts');
+            const queuedConfigurationFailure=new Error('The selected voice catalog could not be read.');
+            rejectedQueuedProvider.catalog=function rejectQueuedProviderCatalog(){
+                throw queuedConfigurationFailure;
+            };
+            const rejectedQueuedConfiguration=ai.configureSpeechProvider('tts',rejectedQueuedProvider);
+            const rejectedQueuedActivation=ai.setSpeechMuted(false);
+            await Promise.all([
+                assert.rejects(rejectedQueuedConfiguration,queuedConfigurationFailure),
+                assert.rejects(rejectedQueuedActivation,queuedConfigurationFailure)
+            ]);
+            assert.equal(runtime.ownsProvider('tts',nextQueuedProvider),true);
+            assert.equal(rejectedQueuedProvider.status().state,'disposed');
+            assert.equal(ai.muted,true);
+            assert.equal(ai.speechActivationPending,false);
+            assert.deepEqual(queuedProviderLoads,['first-queued-tts','next-queued-tts']);
+
+            const cancelledQueuedProvider=createQueuedSpeechProvider('cancelled-queued-tts');
+            const queuedConfigurationAbort=new AbortController();
+            queuedConfigurationAbort.abort();
+            const cancelledQueuedConfiguration=ai.configureSpeechProvider(
+                'tts',cancelledQueuedProvider,{signal:queuedConfigurationAbort.signal}
+            );
+            const cancelledQueuedActivation=ai.setSpeechMuted(false);
+            await Promise.all([
+                assert.rejects(cancelledQueuedConfiguration,{name:'AbortError'}),
+                assert.rejects(cancelledQueuedActivation,{name:'AbortError'})
+            ]);
+            assert.equal(runtime.ownsProvider('tts',nextQueuedProvider),true);
+            assert.equal(ai.muted,true);
+            assert.deepEqual(queuedProviderLoads,['first-queued-tts','next-queued-tts']);
+            await ai.setSpeechMuted(false);
+
+            const staleQueuedProvider=createQueuedSpeechProvider('stale-queued-tts');
+            const unchangedQueuedGeneration=ai.speechGeneration;
+            const unchangedQueuedStatus=runtime.status('tts');
+            assert.equal(await ai.configureSpeechProvider(
+                'tts',staleQueuedProvider,{expectedProvider:firstQueuedProvider}
+            ),false);
+            assert.equal(ai.speechGeneration,unchangedQueuedGeneration);
+            assert.equal(ai.muted,false);
+            assert.deepEqual(runtime.status('tts'),unchangedQueuedStatus);
+
+            const supersededQueuedProvider=createQueuedSpeechProvider('superseded-queued-tts');
+            const supersededQueuedConfiguration=ai.configureSpeechProvider('tts',supersededQueuedProvider);
+            const supersededQueuedActivation=ai.setSpeechMuted(false);
+            const supersededQueuedSpeech=ai.streamTTS('This superseded song must stop.',true);
+            const latestQueuedProvider=createQueuedSpeechProvider('latest-queued-tts');
+            const latestQueuedConfiguration=ai.configureSpeechProvider('tts',latestQueuedProvider);
+            const latestQueuedActivation=ai.setSpeechMuted(false);
+            const latestQueuedSpeech=ai.streamTTS('Only the latest kraken sings.',true);
+            assert.equal(await supersededQueuedActivation,false);
+            assert.equal(await supersededQueuedSpeech,false);
+            await supersededQueuedConfiguration;
+            await latestQueuedConfiguration;
+            assert.equal(await latestQueuedActivation,true);
+            assert.equal(await latestQueuedSpeech,true);
+            assert.deepEqual(queuedProviderLoads,[
+                'first-queued-tts','next-queued-tts','latest-queued-tts'
+            ]);
+
+            const removedQueuedProvider=createQueuedSpeechProvider('removed-queued-tts');
+            const removedQueuedConfiguration=ai.configureSpeechProvider('tts',removedQueuedProvider);
+            const removedQueuedActivation=ai.setSpeechMuted(false);
+            const removedQueuedSpeech=ai.streamTTS('The dismissed chorus stays quiet.',true);
+            const removeQueuedConfiguration=ai.configureSpeechProvider('tts',null);
+            await removedQueuedConfiguration;
+            await removeQueuedConfiguration;
+            assert.equal(await removedQueuedActivation,false);
+            assert.equal(await removedQueuedSpeech,false);
+            assert.equal(runtime.selection('tts'),null);
+            assert.equal(ai.muted,true);
+            assert.equal(ai.speechActivationPending,false);
+            assert.deepEqual(queuedProviderLoads,[
+                'first-queued-tts','next-queued-tts','latest-queued-tts'
+            ]);
+            assert.equal(await ai.setSpeechMuted(false),true);
+            assert.equal(ai.muted,false);
+            assert.equal(ai.speechActivationPending,false);
+            await ai.setSpeechMuted(true);
+
             const pendingTTSSelection = {
                 providerId: 'catalog-tts',
                 modelId: 'catalog-tts-model',

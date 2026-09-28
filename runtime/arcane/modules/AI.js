@@ -1176,6 +1176,7 @@ class AI {
     #builtInSpeechReadiness=Promise.resolve(null);
     #speechControlGeneration=0;
     #speechActivation=null;
+    #speechProviderConfiguration=null;
     #speechFailureSequence=0;
     #speechDiagnosticSequence=0;
     #speechJobSequence=0;
@@ -3436,6 +3437,10 @@ class AI {
         }
         const {modelId,signal,expectedProvider}=options;
         const runtime=this;
+        const speechConfiguration=role==='tts'
+            ?{generation:this.#speechControlGeneration,promise:null}
+            :null;
+        if(speechConfiguration)this.#speechProviderConfiguration=speechConfiguration;
         // Use the existing configuration lane. Unlike a replacement of the
         // same browser configuration, a disjoint role must not cancel its peer.
         const scheduled=this.#browserSpeechTransition.then(
@@ -3489,7 +3494,10 @@ class AI {
                         &&boundary.expectedProviders[role]===null
                         &&priorSelection?.providerId===provider.id
                         &&priorSelection.modelId===selectedModelId;
-                    if(role==='tts'&&!hydratesPendingSelection){
+                    const preservesNewerActivation=speechConfiguration
+                        &&runtime.#speechActivation?.configuration
+                        &&runtime.#speechActivation.generation>speechConfiguration.generation;
+                    if(role==='tts'&&!hydratesPendingSelection&&!preservesNewerActivation){
                         runtime.#invalidateSpeechControl();
                     }
                     await runtime.#unloadSpeechProviderRolesForTransition(
@@ -3559,7 +3567,9 @@ class AI {
                     }
                     if(role==='tts'&&provider
                         &&runtime.#providerRuntime.selection('tts')?.providerId===provider.id
-                        &&!runtime.#providerRuntime.hasProvider('tts',provider.id)){
+                        &&!runtime.#providerRuntime.hasProvider('tts',provider.id)
+                        &&!(runtime.#speechActivation?.configuration
+                            &&runtime.#speechActivation.generation>speechConfiguration.generation)){
                         runtime.#invalidateSpeechControl();
                     }
                     if(provider&&!alreadyOwned&&!candidateDisposalAttempted
@@ -3574,9 +3584,15 @@ class AI {
                         }
                     }
                     throw error;
+                }finally{
+                    if(speechConfiguration
+                        &&runtime.#speechProviderConfiguration===speechConfiguration){
+                        runtime.#speechProviderConfiguration=null;
+                    }
                 }
             }
         );
+        if(speechConfiguration)speechConfiguration.promise=scheduled;
         this.#browserSpeechTransition=scheduled.then(
             function completeSingleSpeechRoleConfiguration(){},
             function retainSingleSpeechRoleConfigurationFailure(){}
@@ -3956,7 +3972,13 @@ class AI {
         if(!is.boolean(muted)){
             throw new TypeError('AI speech muted state must be a boolean.');
         }
-        if(!muted&&this.#speechActivation)return this.#speechActivation.promise;
+        const configuration=this.#speechProviderConfiguration;
+        if(!muted&&this.#speechActivation){
+            if(!configuration||this.#speechActivation.configuration===configuration){
+                return this.#speechActivation.promise;
+            }
+            this.#invalidateSpeechControl();
+        }
         const generation=++this.#speechControlGeneration;
         this.muted=true;
         if(muted){
@@ -3964,7 +3986,8 @@ class AI {
             this.#speechActivation=null;
             this.stopAudio();
         }
-        if(!this.#usesProviderRuntime('tts',this.ttsService)){
+        if(!this.#usesProviderRuntime('tts',this.ttsService)
+            &&(muted||!configuration)){
             if(generation===this.#speechControlGeneration)this.muted=muted;
             this.#traceSpeech('setSpeechMuted.result',{callId,result:true});
             return true;
@@ -3974,10 +3997,20 @@ class AI {
             return true;
         }
         const runtime=this;
-        const activation={controller:new AbortController(),promise:null};
+        // A pending route owns the next utterance. Release old-route audio now,
+        // before callers can queue text for this explicit activation.
+        if(configuration)this.stopAudio();
+        const activation={controller:new AbortController(),promise:null,generation,configuration};
         this.#speechActivation=activation;
         activation.promise=Promise.resolve().then(async function activateRequestedSpeech(){
             try{
+                if(configuration){
+                    const configured=await runtime.#waitForSpeechOperation(
+                        configuration.promise,activation.controller.signal
+                    );
+                    activation.controller.signal.throwIfAborted();
+                    if(!configured)return false;
+                }
                 // Selection may precede registration. Observe the owner's sticky
                 // state rather than treating that ordinary waiting state as failure.
                 await runtime.#waitForSpeechOperation(
