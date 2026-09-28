@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.34.0
+
+- Add `createDigitalOceanFalTTSProvider` through `arcane-os/ai/browser-speech`
+  for DigitalOcean's asynchronous FAL speech service. Applications select the
+  model and voice and supply a current credential getter, which may return a
+  promise. Configuration and activation make no provider request; synthesis
+  preserves complete input and fetches returned audio without forwarding the
+  inference credential. Status polling never retries a paid submission.
+- Add `AI.configureSpeechProvider(role, provider, options)` for independent
+  STT or TTS replacement and removal, preserving the other selected role.
+  Credential waits, synthesis, and local polling follow cancellation and
+  provider teardown. Cancelling local work does not establish cancellation of
+  an already-submitted remote job.
+- Preserve explicit unmute intent while the canonical AI owner, selected
+  provider registration, or speech configuration is still becoming ready.
+  Muting and teardown cancel that pending activation.
+
 ## 0.33.6
 
 - Resume transcript bottom-follow when an accepted non-synthetic user message
