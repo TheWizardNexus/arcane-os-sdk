@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.33.6
+
+- Resume transcript bottom-follow when an accepted non-synthetic user message
+  is sent, including when the reader had scrolled upward. Preserve reading
+  position for incoming content, synthetic requests, and canceled submissions.
+- Keep HTTP 529 on its existing bounded retry path when reading its diagnostic
+  body fails. Preserve the actual parser or body-read error in retry observations
+  and final failure, with cancellation and other HTTP behavior unchanged.
+
 ## 0.33.5
 
 - Deliver the first visible streamed chat chunk to speech exactly once, without
