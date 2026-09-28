@@ -1484,7 +1484,8 @@ class AI {
                     return Promise.resolve(
                         runtime.#requestBuiltInLLMChat(
                             context.payload,
-                            context.signal
+                            context.signal,
+                            controls.onRetry
                         )
                     ).finally(releaseBuiltInLLMRequest);
                 }
@@ -1494,7 +1495,8 @@ class AI {
                             return runtime.#requestBuiltInLLMStream(
                                 context.payload,
                                 bridge,
-                                controls.observeToolText
+                                controls.observeToolText,
+                                controls.onRetry
                             );
                         },
                         context.signal
@@ -4154,7 +4156,7 @@ class AI {
         return is.string(content)?content:completion;
     }
 
-    #requestBuiltInLLMChat(payload={},signal=null){
+    #requestBuiltInLLMChat(payload = {}, signal = null, onRetry = null) {
         const parallelToolCalls=payload.parallelToolCalls!==undefined
             ?payload.parallelToolCalls
             :payload.parallel_tool_calls;
@@ -4168,11 +4170,12 @@ class AI {
             payload.id??Date.now(),
             function ignoreBuiltInLLMProviderRequest(){},
             signal,
-            payload.reasoningEffort
+            payload.reasoningEffort,
+            onRetry
         );
     }
 
-    #requestBuiltInLLMStream(payload={},bridge,observeToolText=null){
+    #requestBuiltInLLMStream(payload = {}, bridge, observeToolText = null, onRetry = null) {
         const parallelToolCalls=payload.parallelToolCalls!==undefined
             ?payload.parallelToolCalls
             :payload.parallel_tool_calls;
@@ -4198,7 +4201,8 @@ class AI {
             emitBuiltInLLMStreamData,
             function ignoreBuiltInLLMStreamResult(){},
             payload.reasoningEffort,
-            observeToolText
+            observeToolText,
+            onRetry
         );
     }
 
@@ -4357,6 +4361,7 @@ class AI {
         toolChoice='auto',
         onToolCall=function ignoreEarlyFunction(){},
         onRequest=function ignoreStreamRequest(){},
+        onRetry = null,
         parallelToolCalls,
         id=Date.now(),
         seeThinking=false,
@@ -4438,7 +4443,7 @@ class AI {
                         localOnly,
                         signal
                     },
-                    {observeToolText}
+                    {observeToolText, onRetry}
                 );
                 for await(const chunk of handle){
                     if(signal?.aborted){
@@ -4523,7 +4528,8 @@ class AI {
                 onDataChunk,
                 onDataResult,
                 normalizedReasoningEffort,
-                observeToolText
+                observeToolText,
+                onRetry
             );
             const structuralToolCalls=normalizeAICompletionToolCalls(
                 completion
@@ -4631,7 +4637,8 @@ class AI {
         dataChunkHandler=function ignoreBuiltInStreamDataChunk(){},
         dataResultHandler=function ignoreBuiltInStreamDataResult(){},
         reasoningEffort,
-        observeToolText=null
+        observeToolText=null,
+        onRetry = null
     ){
         let speechTurnCompleted=false;
 
@@ -4863,7 +4870,8 @@ class AI {
                 headers:this.#serviceHeaders[this.llmService],
                 body,
                 ...(signal?{signal}:{})
-            }
+            },
+            {onRetry}
         );
 
         let sseBuffer='';
@@ -5357,6 +5365,7 @@ class AI {
         signal=null,
         onRequest=function ignoreFetchRequest(){},
         onResponse=function ignoreFetchResponse(){},
+        onRetry = null,
         maxOutputTokens,
         maxTokens,
         temperature,
@@ -5420,7 +5429,8 @@ class AI {
                     payload:request,
                     localOnly,
                     signal
-                }
+                },
+                {onRetry}
             );
             if(signal?.aborted){
                 throw normalizeAIRequestAbort();
@@ -5443,7 +5453,8 @@ class AI {
             id,
             onRequest,
             signal,
-            normalizedReasoningEffort
+            normalizedReasoningEffort,
+            onRetry
         );
     }
 
@@ -5496,7 +5507,8 @@ class AI {
         id=Date.now(),
         requestHandler=function ignoreFetchRequest(){},
         signal=null,
-        reasoningEffort
+        reasoningEffort,
+        onRetry = null
     ){
         validateAIStructuralRequest(messages,tools,parallel_tool_calls);
         this.#assertServiceConfigured(this.llmService);
@@ -5613,7 +5625,8 @@ class AI {
                 headers:this.#serviceHeaders[this.llmService],
                 body,
                 ...(signal?{signal}:{})
-            }
+            },
+            {onRetry}
         );
 
         if(signal?.aborted){

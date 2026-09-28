@@ -166,7 +166,8 @@ provider implementations; neither form is a retired compatibility API.
 Built-in cloud chat decodes an HTTP error body once as JSON or text and rejects
 with that complete value unchanged. It does not reconstruct an Error, replace
 the message, or add `providerMessage`, `status`, or an SDK failure code to the
-provider body. Network and decoding errors also pass through; cancellation
+provider body. Network errors pass through after the retry policy below;
+decoding errors pass through immediately. Cancellation
 retains the existing `ARCANE_AI_REQUEST_ABORTED` contract.
 
 When the HTTP status is `429` and the existing `error.message`, `message`, or
@@ -178,8 +179,26 @@ the same destination, headers, complete serialized body, and cancellation
 signal; `onRequest` runs once for the logical request. Cancellation stops the
 delay and prevents another attempt. Retrying happens before a successful
 response is consumed, so partial streams and tool callbacks are never replayed.
-Native Ollama and externally supplied provider adapters retain their own
-transport behavior.
+Rejected Fetch calls and HTTP `529` share a separate budget of three retries,
+each after the same `3000` millisecond delay. HTTP `429` overload retries do not
+consume that budget. The final complete network error or provider body passes
+through unchanged when recovery is exhausted. Aborts, other HTTP errors,
+successful-response body reads, stream decoding, and application callbacks
+never start another attempt.
+
+`fetchRequest()` and `streamRequest()` accept
+`onRetry({phase,attempt,delayMs,status,error})`. The observer receives
+`phase:'waiting'` before the abortable delay and `phase:'requesting'` immediately
+before the next Fetch. `attempt` is the one-based upcoming retry number across
+both retry policies; `delayMs` is `3000`; `status` is the HTTP status or `null`
+for rejected Fetch; `error` is the complete original failure value. The SDK
+invokes this observational callback synchronously and observes a returned
+promise without awaiting it. Callback throws and rejections are logged through
+the shared console owner without changing request success or causing retries.
+The callback remains outside model payloads and is forwarded through built-in
+provider controls, including queued requests, with the request owner's existing
+cancellation lifetime. Native Ollama and externally supplied provider adapters
+retain their own transport behavior.
 
 Initialization uses the canonical realm user's actual readiness state. If
 `window.user?.ready` is already true, AI initializes immediately. Otherwise one
@@ -472,8 +491,10 @@ cleanup errors remain visible in developer-console diagnostics.
 
 Request observers receive
 `onRequest(request,id,metadata)` and any transport metadata supplied by the
-selected route is forwarded unchanged. Every async native, HTTP, provider, and
-built-in callback is observed before the next callback or terminal settlement.
+selected route is forwarded unchanged. Async request, response, content, and
+tool callbacks are observed before the next callback or terminal settlement.
+The observational `onRetry` callback has the separate nonblocking behavior
+described above.
 
 Native Ollama responses are adapted before the shared structural validator:
 provider-native calls may omit `id` and `type` or provide object arguments, so
@@ -913,6 +934,12 @@ caller's payload and request records remain unchanged. The optional
 `{speechInputPrepared:true}` prevents a second pass after another SDK speech
 boundary has already cleaned the copy. Applications omit that argument. LLM
 and STT payloads are unaffected.
+
+SDK-owned LLM delegation also carries `onRetry` in the separate `preparation`
+control record, alongside `observeToolText` for streams. The runtime preserves
+these controls across its request queue and passes them to the selected
+provider without inserting callbacks in the provider payload. Applications use
+the `AI.fetchRequest()` and `AI.streamRequest()` options described above.
 
 `register()` returns the provider's single unregister closure; caller-
 registered providers remain caller-owned. The high-level

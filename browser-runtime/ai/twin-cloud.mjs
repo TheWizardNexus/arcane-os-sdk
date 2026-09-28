@@ -17,7 +17,8 @@ export async function fetchRequest({
     signal = null,
     id = Date.now(),
     onRequest = function observeTWiNRequest(){},
-    onResponse = function observeTWiNResponse(){}
+    onResponse = function observeTWiNResponse(){},
+    onRetry = null
 } = {}){
     if(signal?.aborted){
         throw normalizeAIRequestAbort(signal.reason);
@@ -67,7 +68,8 @@ export async function fetchRequest({
                 },
                 body:JSON.stringify(request),
                 ...(signal ? {signal} : {})
-            }
+            },
+            {onRetry}
         );
         if(signal?.aborted){
             throw normalizeAIRequestAbort(signal.reason);
@@ -141,72 +143,128 @@ export function openAIResponseFormat(format){
 }
 
 /** Shared with browser streaming; consume no successful body at this boundary. */
-export async function fetchHTTPResponse(url, options){
+export async function fetchHTTPResponse(url, options, {onRetry = null} = {}) {
     const {signal} = options;
     const retryDelayMs = 3000;
-    try{
-        while(true){
-            if(signal?.aborted){
+    const maxRecoveryRetries = 3;
+    let recoveryRetries = 0;
+    let attempt = 0;
+    try {
+        while (true) {
+            if (signal?.aborted) {
                 throw normalizeAIRequestAbort(signal.reason);
             }
-            const response = await fetch(url, options);
-            if(signal?.aborted){
+            let response;
+            let error;
+            try {
+                response = await fetch(url, options);
+            } catch (fetchError) {
+                if (isAIRequestAbort(fetchError, signal)) {
+                    throw normalizeAIRequestAbort(fetchError);
+                }
+                error = fetchError;
+            }
+            if (signal?.aborted) {
                 throw normalizeAIRequestAbort(signal.reason);
             }
-            if(response.ok){
+            if (response?.ok) {
                 return response;
             }
-            const contentType = response.headers.get('content-type') || '';
-            const error = contentType.includes('application/json')
-                ? await response.json()
-                : await response.text();
-            if(signal?.aborted){
-                throw normalizeAIRequestAbort(signal.reason);
+            if (response) {
+                const contentType = response.headers.get('content-type') || '';
+                error = contentType.includes('application/json')
+                    ? await response.json()
+                    : await response.text();
+                if (signal?.aborted) {
+                    throw normalizeAIRequestAbort(signal.reason);
+                }
             }
+            const status = response?.status ?? null;
             const message = is.string(error)
                 ? error
                 : error?.error?.message ?? error?.message;
-            if(
-                response.status !== 429
-                || !is.string(message)
-                || !message.toLowerCase().includes('overload')
-            ){
-                throw error;
+            const overload = status === 429
+                && is.string(message)
+                && message.toLowerCase().includes('overload');
+            if (!overload) {
+                if ((status !== null && status !== 529)
+                    || recoveryRetries >= maxRecoveryRetries) {
+                    throw error;
+                }
+                recoveryRetries += 1;
             }
+            attempt += 1;
             arcaneLogging.warn(
-                `${message}\nRetrying in ${retryDelayMs / 1000} seconds`,
+                `${message ?? 'AI request transport failed.'}\nRetrying in ${retryDelayMs / 1000} seconds`,
                 error
             );
-            await new Promise(function waitForOverloadRetry(resolve, reject){
-                function finishRetryDelay(){
-                    signal?.removeEventListener('abort', cancelRetryDelay);
-                    resolve();
+            observeRequestRetry(
+                onRetry,
+                {phase: 'waiting', attempt, delayMs: retryDelayMs, status, error}
+            );
+            await new Promise(
+                function waitForRequestRetry(resolve, reject) {
+                    function finishRetryDelay() {
+                        signal?.removeEventListener('abort', cancelRetryDelay);
+                        resolve();
+                    }
+                    function cancelRetryDelay() {
+                        clearTimeout(timer);
+                        signal.removeEventListener('abort', cancelRetryDelay);
+                        reject(normalizeAIRequestAbort(signal.reason));
+                    }
+                    const timer = setTimeout(finishRetryDelay, retryDelayMs);
+                    signal?.addEventListener(
+                        'abort',
+                        cancelRetryDelay,
+                        {once: true}
+                    );
+                    if (signal?.aborted) {
+                        cancelRetryDelay();
+                    }
                 }
-                function cancelRetryDelay(){
-                    clearTimeout(timer);
-                    signal.removeEventListener('abort', cancelRetryDelay);
-                    reject(normalizeAIRequestAbort(signal.reason));
-                }
-                const timer = setTimeout(finishRetryDelay, retryDelayMs);
-                signal?.addEventListener('abort', cancelRetryDelay, {once:true});
-                if(signal?.aborted){
-                    cancelRetryDelay();
-                }
-            });
+            );
+            if (signal?.aborted) {
+                throw normalizeAIRequestAbort(signal.reason);
+            }
+            observeRequestRetry(
+                onRetry,
+                {phase: 'requesting', attempt, delayMs: retryDelayMs, status, error}
+            );
         }
-    }catch(error){
-        if(isAIRequestAbort(error, signal)){
+    } catch (error) {
+        if (isAIRequestAbort(error, signal)) {
             throw normalizeAIRequestAbort(error);
         }
         throw error;
     }
 }
 
+function observeRequestRetry(onRetry, state) {
+    if (!is.function(onRetry)) {
+        return;
+    }
+    function reportRetryObserverFailure(error) {
+        arcaneLogging.error('Arcane AI retry observer failed.', error);
+    }
+    try {
+        Promise.resolve(
+            onRetry(state)
+        ).catch(reportRetryObserverFailure);
+    } catch (error) {
+        reportRetryObserverFailure(error);
+    }
+}
+
 /** Return the entire parsed completion without selecting or rewriting choices. */
-export async function fetchJSONResponse(url, options){
+export async function fetchJSONResponse(url, options, {onRetry = null} = {}) {
     const {signal} = options;
     try{
-        const response = await fetchHTTPResponse(url, options);
+        const response = await fetchHTTPResponse(
+            url,
+            options,
+            {onRetry}
+        );
         if(signal?.aborted){
             throw normalizeAIRequestAbort(signal.reason);
         }

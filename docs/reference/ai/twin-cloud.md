@@ -75,9 +75,15 @@ The key is
 transport authentication, not part of either callback's message payload. Keep
 credentials out of application logging as well.
 
-Only HTTP `429` with a message containing `overload` (case-insensitive) repeats automatically,
-after `3000` milliseconds. Another overload repeats the same complete request;
-other HTTP failures do not become an automatic retry loop. Pass a fresh
+Before a successful response is consumed, a rejected Fetch or HTTP `529` can
+retry up to three times, waiting `3000` milliseconds before each retry. These
+two failure types share that three-retry budget. HTTP `429` with a message
+containing `overload` (case-insensitive) retains its unlimited three-second
+retry behavior and does not consume that budget. Each attempt reuses the exact
+destination, Fetch options, serialized request, and signal. Other HTTP errors,
+response decoding failures, and application callback failures do not retry.
+The last complete failure is thrown unchanged when recovery is exhausted.
+Pass a fresh
 `AbortController`'s `signal` and call `abort()` to cancel. Cancellation during
 the request, response-body read, retry wait, or callback settlement prevents
 successful result delivery and rejects with `ARCANE_AI_REQUEST_ABORTED`.
@@ -85,6 +91,17 @@ Other HTTP failures throw the complete parsed JSON error body or text body.
 A missing key uses `AI_PROVIDER_NOT_CONFIGURED`, a missing explicit model
 throws `TypeError`, and an unsupported `structuredOutput` input uses
 `AI_STRUCTURED_OUTPUT_INVALID`.
+
+Optional `onRetry({phase,attempt,delayMs,status,error})` observes each retry.
+`phase:'waiting'` arrives before the abortable delay; `phase:'requesting'`
+arrives immediately before the next Fetch. `attempt` is the one-based upcoming
+retry number across both retry policies, `delayMs` is `3000`, `status` is the
+HTTP status or `null` for a rejected Fetch, and `error` is the complete original
+failure value. This observer runs synchronously without awaiting its returned
+promise. Synchronous throws and rejected promises are reported through the
+shared console logger and cannot change the request outcome or trigger another
+retry. `onRequest` still runs once per logical request. Retry observations stay
+outside the model payload and retained history.
 
 The SDK retains no request or response history between calls and uses no
 DBOPFS, chat entity, or memory extraction. Each call's `messages` are its
@@ -104,8 +121,8 @@ the existing implementation rather than maintain another retry or body reader.
 
 | Export | Contract |
 | --- | --- |
-| `fetchHTTPResponse(url,options)` | Uses the caller's Fetch options, overload retry and cancellation; returns a successful `Response` with its body unconsumed. |
-| `fetchJSONResponse(url,options)` | Uses that HTTP owner, requires `application/json`, and returns the complete parsed body without selecting choices. |
+| `fetchHTTPResponse(url,options,{onRetry=null}={})` | Uses the caller's exact Fetch options and shared retry/cancellation behavior; returns a successful `Response` with its body unconsumed. The separate optional control observes retries without entering Fetch options. |
+| `fetchJSONResponse(url,options,{onRetry=null}={})` | Uses that HTTP owner and retry observer, requires `application/json`, and returns the complete parsed body without selecting choices. |
 | `structuredOutputFormat(value=false)` | Maps false/null/undefined to null, true/`'json'` to `'json'`, and preserves a supplied plain JSON Schema object. Other inputs use `AI_STRUCTURED_OUTPUT_INVALID`. |
 | `openAIResponseFormat(format)` | Maps the normalized value to `json_object`, strict `json_schema` named `structured_response`, or null. |
 | `isAIRequestAbort(error,signal)` | Recognizes an aborted signal, `AbortError`, or the existing Arcane AI/request cancellation codes. |
@@ -113,8 +130,8 @@ the existing implementation rather than maintain another retry or body reader.
 
 These helpers start no work on import. HTTP helpers require explicit URL and
 options; they do not add a key, model, browser state, or retained conversation.
-Overload warnings use the shared console logger and preserve the complete
-provider error.
+Retry warnings and observer failures use the shared console logger and preserve
+the complete original error.
 
 ## Existing browser AI interface
 

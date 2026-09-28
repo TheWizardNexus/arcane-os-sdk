@@ -271,7 +271,7 @@ test(
 );
 
 test(
-    'TWiN retries only overload responses at the shared three-second interval',
+    'TWiN preserves unlimited overload retries and reports each attempt once',
     async function cloudOverloadRetry(context) {
         const parsed = {choices: [{message: {role: 'assistant', content: 'Complete eventual response.'}}]};
         const replies = [
@@ -284,8 +284,10 @@ test(
                 {message: 'Temporary overload.'}
             ),
             response(429, 'Server OverLoad continues.', 'text/plain'),
+            response(429, 'Overload still continues.', 'text/plain'),
             response(200, parsed)
         ];
+        const retries = [];
         let requestCallbacks = 0;
         let responseCallbacks = 0;
         const fixture = runtimeFixture(
@@ -304,20 +306,306 @@ test(
                 },
                 onResponse() {
                     responseCallbacks += 1;
+                },
+                onRetry(state) {
+                    retries.push(state);
                 }
             }
         );
         assert.equal(result, parsed);
         assert.deepEqual(
             fixture.delays,
-            [3000, 3000, 3000]
+            [3000, 3000, 3000, 3000]
         );
-        assert.equal(fixture.requests.length, 4);
+        assert.equal(fixture.requests.length, 5);
         for (const request of fixture.requests) {
             assert.equal(request.options.body, fixture.requests[0].options.body);
         }
         assert.equal(requestCallbacks, 1);
         assert.equal(responseCallbacks, 1);
+        assert.equal(retries.length, 8);
+        for (let index = 0; index < retries.length; index += 2) {
+            assert.deepEqual(
+                retries[index],
+                {
+                    phase: 'waiting',
+                    attempt: index / 2 + 1,
+                    delayMs: 3000,
+                    status: 429,
+                    error: retries[index].error
+                }
+            );
+            assert.deepEqual(
+                retries[index + 1],
+                {...retries[index], phase: 'requesting'}
+            );
+        }
+    }
+);
+
+test(
+    'TWiN recovers rejected Fetch and HTTP 529 using the exact request and retry cause',
+    async function recoverCloudTransport(context) {
+        const networkError = new TypeError('Failed to fetch. Complete network detail.');
+        const overloadError = {error: {message: 'Temporarily unavailable.', detail: ['whole', 'body']}};
+        const parsed = {choices: [{message: {role: 'assistant', content: 'Recovered response.'}}]};
+        const events = [];
+        let attempts = 0;
+        const fixture = runtimeFixture(
+            context,
+            async function answerRecoveringRequest() {
+                attempts += 1;
+                events.push(`fetch:${attempts}`);
+                if (attempts === 1) {
+                    throw networkError;
+                }
+                return attempts === 2 ? response(529, overloadError) : response(200, parsed);
+            }
+        );
+        const retries = [];
+        const controller = new AbortController();
+        const result = await fetchRequest(
+            {
+                twinKey,
+                model,
+                messages: [{role: 'user', content: '  Keep this exact\ndocument.  '}],
+                signal: controller.signal,
+                onRequest() {
+                    events.push('request');
+                },
+                onRetry(state) {
+                    retries.push(state);
+                    events.push(`${state.phase}:${state.attempt}`);
+                },
+                onResponse() {
+                    events.push('response');
+                }
+            }
+        );
+        assert.equal(result, parsed);
+        assert.deepEqual(
+            events,
+            ['request', 'fetch:1', 'waiting:1', 'requesting:1', 'fetch:2', 'waiting:2', 'requesting:2', 'fetch:3', 'response']
+        );
+        assert.deepEqual(
+            retries,
+            [
+                {phase: 'waiting', attempt: 1, delayMs: 3000, status: null, error: networkError},
+                {phase: 'requesting', attempt: 1, delayMs: 3000, status: null, error: networkError},
+                {phase: 'waiting', attempt: 2, delayMs: 3000, status: 529, error: overloadError},
+                {phase: 'requesting', attempt: 2, delayMs: 3000, status: 529, error: overloadError}
+            ]
+        );
+        for (const request of fixture.requests) {
+            assert.equal(request.options, fixture.requests[0].options);
+            assert.equal(request.options.signal, controller.signal);
+            assert.equal(Object.hasOwn(request.options, 'onRetry'), false);
+            assert.equal(Object.hasOwn(JSON.parse(request.options.body), 'onRetry'), false);
+        }
+    }
+);
+
+test(
+    'TWiN limits Fetch and HTTP 529 recovery to three retries and preserves the terminal failure',
+    async function boundedCloudRecovery(context) {
+        const networkError = new TypeError('Complete final network failure.');
+        const overloadError = {message: 'Complete final HTTP 529 failure.', details: ['one', 'two']};
+        let attempt = 0;
+        let retryCount = 0;
+        let networkOnly = false;
+        const fixture = runtimeFixture(
+            context,
+            async function rejectRepeatedCloudRequest() {
+                attempt += 1;
+                if (networkOnly || attempt % 2 === 1) {
+                    throw networkError;
+                }
+                return response(529, overloadError);
+            }
+        );
+        await assert.rejects(
+            fetchRequest(
+                {
+                    twinKey,
+                    model,
+                    onRetry() {
+                        retryCount += 1;
+                    }
+                }
+            ),
+            function preserveFinalCloudFailure(error) {
+                assert.equal(error, overloadError);
+                return true;
+            }
+        );
+        assert.equal(fixture.requests.length, 4);
+        assert.equal(retryCount, 6);
+        assert.deepEqual(
+            fixture.delays,
+            [3000, 3000, 3000]
+        );
+        networkOnly = true;
+        await assert.rejects(
+            fetchRequest(
+                {twinKey, model}
+            ),
+            function preserveTerminalNetworkFailure(error) {
+                assert.equal(error, networkError);
+                return true;
+            }
+        );
+        assert.equal(fixture.requests.length, 8);
+        assert.deepEqual(
+            fixture.delays,
+            [3000, 3000, 3000, 3000, 3000, 3000]
+        );
+    }
+);
+
+test(
+    'TWiN retry observers cannot fail or delay request recovery',
+    async function observeCloudRetryFailures(context) {
+        const previousConsoleError = console.error;
+        const diagnostics = [];
+        console.error = function recordRetryObserverFailure(...args) {
+            diagnostics.push(args);
+        };
+        context.after(
+            function restoreRetryObserverConsole() {
+                console.error = previousConsoleError;
+            }
+        );
+        const synchronousFailure = new Error('Complete synchronous observer failure.');
+        const asynchronousFailure = new Error('Complete asynchronous observer failure.');
+        const parsed = {choices: [{message: {content: 'Recovered with broken observer.'}}]};
+        let attempts = 0;
+        const fixture = runtimeFixture(
+            context,
+            async function answerAfterObserverFailures() {
+                attempts += 1;
+                if (attempts < 3) {
+                    throw new TypeError('Failed to fetch.');
+                }
+                return response(200, parsed);
+            }
+        );
+        const result = await fetchRequest(
+            {
+                twinKey,
+                model,
+                onRetry(state) {
+                    if (state.attempt === 1 && state.phase === 'waiting') {
+                        throw synchronousFailure;
+                    }
+                    if (state.attempt === 1) {
+                        return Promise.reject(asynchronousFailure);
+                    }
+                    return new Promise(
+                        function retainPendingObserver() {}
+                    );
+                }
+            }
+        );
+        assert.equal(result, parsed);
+        assert.equal(fixture.requests.length, 3);
+        assert.deepEqual(
+            diagnostics,
+            [
+                ['Arcane AI retry observer failed.', synchronousFailure],
+                ['Arcane AI retry observer failed.', asynchronousFailure]
+            ]
+        );
+    }
+);
+
+test(
+    'TWiN cancellation from either retry phase prevents a repeated Fetch',
+    async function abortObservedCloudRetry(context) {
+        const networkError = new TypeError('Failed to fetch.');
+        const fixture = runtimeFixture(
+            context,
+            async function rejectBeforeRetryAbort() {
+                throw networkError;
+            }
+        );
+        for (const phase of ['waiting', 'requesting']) {
+            const controller = new AbortController();
+            const observed = [];
+            await assert.rejects(
+                fetchRequest(
+                    {
+                        twinKey,
+                        model,
+                        signal: controller.signal,
+                        onRetry(state) {
+                            observed.push(state.phase);
+                            if (state.phase === phase) {
+                                controller.abort('The request owner cancelled recovery.');
+                            }
+                        }
+                    }
+                ),
+                requestAborted
+            );
+            assert.deepEqual(
+                observed,
+                phase === 'waiting' ? ['waiting'] : ['waiting', 'requesting']
+            );
+        }
+        assert.equal(fixture.requests.length, 2);
+    }
+);
+
+test(
+    'TWiN does not retry successful response decoding or request and response callbacks',
+    async function preserveCloudNontransportFailures(context) {
+        const decodingError = new TypeError('Complete body-read failure.');
+        const callbackError = new TypeError('Complete callback failure.');
+        let failDecoding = true;
+        let retryObservations = 0;
+        const fixture = runtimeFixture(
+            context,
+            async function returnDecodingBoundary() {
+                return {
+                    ...response(200, null),
+                    async json() {
+                        if (failDecoding) {
+                            throw decodingError;
+                        }
+                        return {choices: [{message: {content: 'Complete response.'}}]};
+                    }
+                };
+            }
+        );
+        for (const boundary of ['decode', 'request', 'response']) {
+            failDecoding = boundary === 'decode';
+            await assert.rejects(
+                fetchRequest(
+                    {
+                        twinKey,
+                        model,
+                        onRequest() {
+                            if (boundary === 'request') {
+                                throw callbackError;
+                            }
+                        },
+                        onResponse() {
+                            throw callbackError;
+                        },
+                        onRetry() {
+                            retryObservations += 1;
+                        }
+                    }
+                ),
+                function preserveBoundaryFailure(error) {
+                    assert.equal(error, boundary === 'decode' ? decodingError : callbackError);
+                    return true;
+                }
+            );
+        }
+        assert.equal(fixture.requests.length, 2);
+        assert.deepEqual(fixture.delays, []);
+        assert.equal(retryObservations, 0);
     }
 );
 
