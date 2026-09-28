@@ -16,6 +16,11 @@
 - Preserve explicit unmute intent while the canonical AI owner, selected
   provider registration, or speech configuration is still becoming ready.
   Muting and teardown cancel that pending activation.
+- Allow `user.updateExplicit(current => partialOrNull)` to make a conditional
+  profile update against fresh durable fields inside the existing serialized
+  write owner. Async callbacks are supported; `null` returns the fresh profile
+  without saving. Existing object and JSON updates remain supported. Timestamp
+  setters save only their changed fields so they preserve newer profile edits.
 
 ## 0.33.6
 
