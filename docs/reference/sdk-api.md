@@ -67,7 +67,7 @@ runtime layouts.
 | `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, complete DBOPFS model storage, streaming, cancellation, and structural tool-call results. |
 | `arcane-os/ai/tool-text-stream` | Shared selected tool-argument text observer for provider integration. |
 | `arcane-os/ai/twin-cloud` | Complete TWiN Cloud requests from Node or a browser with an explicit key/model and shared retry/cancellation behavior. |
-| `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS provider mechanisms, ordinary upstream assets, materialized/native routing, Workers, and cancellation. |
+| `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS, explicit DigitalOcean FAL remote TTS, ordinary upstream assets, role lifecycle, and cancellation. |
 | `arcane-os/mail` | Portable Mail runtime, durable outbox, complete transport responses, and provider-neutral acceptance contracts. |
 
 These lowercase runtime-module entrypoints expose their existing exports; they
@@ -178,6 +178,7 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `getPwaInstall()` | function | `arcane-os/pwa` | Progressive web applications | Browser native installation events; waiting state while no prompt is available |
 | `mountPwaInstallPrompt()` | function | `arcane-os/pwa` | Progressive web applications | Browser document and managed HTML import; resolves to null without a document |
 | `createDbopfsSpeechArtifactStore()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with ready DBOPFS, Web Locks, Fetch, File/Blob, and object URLs |
+| `createDigitalOceanFalTTSProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser or Node with Fetch, Blob, and an application-supplied DigitalOcean inference key |
 | `removeBrowserSpeechModelCache()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser CacheStorage; explicit removal of one selected upstream model |
 | `createNativeBuildPlan()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `createNativeTargetAdapter()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
@@ -6763,7 +6764,7 @@ releaseProvider();
 
 # Browser speech providers
 
-`arcane-os/ai/browser-speech` exports exactly the seven package members below.
+`arcane-os/ai/browser-speech` exports the package members below.
 It ships provider, authority, artifact-store, and Worker mechanisms but no
 Whisper/Kokoro model weights, adapter runtime artifacts, voices, download URLs,
 default catalog, CDN loader, native bridge, or cloud fallback. The providers
@@ -7120,6 +7121,69 @@ async function transcribeAfterUserChoice(audioBlob) {
     console.log(transcript.text);
 }
 ```
+
+## createDigitalOceanFalTTSProvider()
+
+### Overview
+
+Creates a `localOnly:false` provider/2 TTS adapter for the caller-selected
+DigitalOcean FAL model. It submits independent synthesis jobs, polls their
+completion, and returns each complete downloaded audio `Blob`. The shared AI
+queue owns punctuation segmentation, bounded concurrent requests, and playback
+in input order; this is not provider-native live audio streaming.
+
+### Signature and parameters
+
+```text
+createDigitalOceanFalTTSProvider({id,model,getApiKey,maxConcurrentRequests=4,fetch=globalThis.fetch}={})
+```
+
+`id` is the application-owned provider identifier. `model` contains the selected
+`id` and `defaultVoice`; the supported multilingual-v2 selection is
+`fal-ai/elevenlabs/tts/multilingual-v2`. `getApiKey()` returns the
+application's current DigitalOcean inference key or a promise for it. The credential is never
+included in catalog or status. `maxConcurrentRequests` is a positive integer;
+the runtime owns admission and its FIFO queue. Optional `fetch` supplies the
+standard Fetch interface.
+
+### Availability and normalization
+
+The adapter needs Fetch, Blob, and AbortController; it needs no Worker or
+DBOPFS. Browser access depends on endpoint CORS support. Construction makes
+no network request. Inspection and activation await the application's key
+reader without making an SDK network request. Activation checks
+local credential presence, not remote validity. Status reports remote
+execution and current activity. Requests preserve complete text, selected
+voice, and speed; multilingual-v2 speed outside `0.7` through `1.2` rejects
+instead of clamping. Returned media is fetched without the inference key.
+Cancelling a credential wait leaves the application's shared refresh alone
+and prevents a late result from starting this cancelled operation.
+
+Each provider/2 `tts/synthesize` request returns one complete audio Blob.
+Request cancellation, unload, and disposal stop local polling/downloads and
+discard late results; they cannot promise cancellation of an already submitted
+remote job. HTTP, provider, and media failures remain observable. The adapter
+does not select a fallback or silently resubmit a paid synthesis POST.
+
+### Example
+
+```javascript
+import {createDigitalOceanFalTTSProvider} from 'arcane-os/ai/browser-speech';
+
+async function configureCloudVoice(ai, getApiKey) {
+  const provider = createDigitalOceanFalTTSProvider({
+    id: 'selected-cloud-voice',
+    model: {id: 'fal-ai/elevenlabs/tts/multilingual-v2', defaultVoice: 'Rachel'},
+    getApiKey
+  });
+  await ai.configureSpeechProvider('tts', provider);
+  return provider;
+}
+```
+
+Call activation and synthesis from the application's explicit speech action.
+For streaming text, cancellation, and independent STT configuration, see
+[DigitalOcean FAL speech](ai/browser-speech.md#digitalocean-fal-text-to-speech).
 
 ## createBrowserKokoroProvider()
 

@@ -1,10 +1,90 @@
 # Browser speech providers
 
-`arcane-os/ai/browser-speech` is the browser-only SDK boundary for
-caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It
+`arcane-os/ai/browser-speech` supplies caller-selected Whisper speech-to-text,
+Kokoro text-to-speech, and DigitalOcean FAL text-to-speech providers. Its local path
 provides artifact storage, live module routing, role Workers, provider/2
 adapters, bounded parallel TTS synthesis, audio normalization, cancellation,
 and cleanup.
+
+## DigitalOcean FAL text-to-speech
+
+Use the same AI speech queue with an explicitly selected remote provider.
+The application supplies its current DigitalOcean inference key through a
+function returning a string or promise; never place that key in source, logs, or model records.
+This example receives an existing `ai` and application-owned key reader:
+
+```javascript
+import {createDigitalOceanFalTTSProvider} from 'arcane-os/ai/browser-speech';
+
+async function selectCloudVoice(ai, getApiKey) {
+  const provider = createDigitalOceanFalTTSProvider({
+    id: 'my-digitalocean-voice',
+    model: {
+      id: 'fal-ai/elevenlabs/tts/multilingual-v2',
+      defaultVoice: 'Rachel'
+    },
+    getApiKey,
+    maxConcurrentRequests: 4
+  });
+  await ai.configureSpeechProvider('tts', provider, {
+    modelId: provider.catalog()[0].id
+  });
+  return provider;
+}
+```
+
+Construction and configuration make no network request. Explicit
+`ai.setSpeechMuted(false)` awaits the key reader, checks credential presence, and activates
+the adapter; its ready state does not prove remote credential validity.
+Only synthesis submits text. Keep local STT configured independently, before
+or after this TTS selection. Existing shared Chat/Speech controls own user
+mute/unmute intent; do not reapply a saved unmute over a later manual mute.
+An asynchronous key reader may await the application's already-running key
+refresh at this activation boundary; it does not delay provider configuration
+or page rendering. Cancellation releases this request's wait without cancelling
+the application's shared refresh, and no late key result starts synthesis.
+
+Once explicit activation is requested, feed each arriving text chunk immediately through
+`ai.streamTTS(chunk)` and observe each promise without awaiting it ahead of
+the next chunk. Pending activation retains these segments in the existing queue
+until the selected provider is ready; text does not initiate activation itself.
+`ai.finishTTS()` submits the final remainder. The existing
+punctuation segmentation, concurrent provider queue, and original-order
+playback remain the only owners. Use
+`ai.configureTTSSegmentation({punctuation:'any',wordCadence:null})` when each
+punctuation boundary should submit promptly. This is incremental playback of
+completed synthesis jobs, not a live audio stream from DigitalOcean.
+
+The transport submits `POST https://inference.do-ai.run/v1/async-invoke`, then
+reads that job until its completed `output.audio.url` is available. Each
+segment is submitted once; only status reads retry a `429` with `Retry-After`.
+The audio download never receives the inference Authorization header.
+The selected multilingual-v2 service supports speed `0.7` through `1.2`;
+unsupported speeds reject rather than being silently clamped. Complete
+input remains intact except for the existing explicitly owned speech-only
+formatting cleanup described below. A cloud failure never selects local TTS.
+
+`ai.stopAudio()` cancels the current local request/poll/download/playback
+lifetime. Mute additionally unloads TTS. DigitalOcean exposes no documented
+job cancellation operation through this contract: a submitted remote job may
+continue after local cancellation. Browser use also depends on the inference
+and returned media endpoints allowing the requesting origin.
+
+Release this exact configured provider with:
+
+```javascript
+// Keep the provider returned by selectCloudVoice(ai, getApiKey).
+await ai.configureSpeechProvider('tts', null, {expectedProvider: provider});
+```
+
+The identity is rechecked inside the SDK's serialized configuration operation,
+so a later selected provider remains untouched. Returning to local TTS uses
+the normal TTS-only `configureBrowserSpeech()` configuration. Neither action
+unloads STT or changes its stored artifacts.
+
+Transport references: [DigitalOcean asynchronous inference](https://docs.digitalocean.com/reference/api/reference/serverless-inference/#inference_create_async_invoke),
+[DigitalOcean FAL guide](https://docs.digitalocean.com/products/inference/how-to/use-fal-models/),
+and [multilingual-v2 model schema](https://fal.ai/models/fal-ai/elevenlabs/tts/multilingual-v2/api).
 
 ## Quick start: say one sentence
 
@@ -844,8 +924,8 @@ records; this contract does not freeze them or shorten their content.
 | --- | --- | --- |
 | Browser | Shipped | Requires Workers, Fetch, Blob/File, object URLs, DBOPFS/OPFS, and Web Locks. Blob/File STT requests also require the browser audio decoder. |
 | Native WebView | Conditional | Available when the WebView exposes the browser APIs above. It does not invoke Core speech. |
-| Node | Importable, execution unavailable | The ESM subpath imports, but the SDK supplies no Node speech storage, Worker, or audio-decoder host. |
-| Cloud | Not offered | The SDK's built-in speech profile is device-only: Whisper owns STT and Kokoro owns TTS. |
+| Node | Remote adapter available; local execution unavailable | DigitalOcean FAL uses Fetch and Blob. The local providers have no SDK Node speech-storage, Worker, or audio-decoder host. |
+| Remote TTS | Explicitly selected | DigitalOcean FAL uses standard Fetch and Blob with an application-owned key; no Worker, OPFS, or local model is needed for this adapter. |
 
 STT and TTS own independent provider lifecycles. A failure or cancellation in
 one role does not disable the other role or authorize a fallback provider.
@@ -860,7 +940,8 @@ import {
   createBrowserSpeechArtifactGraph,
   createBrowserSpeechAuthority,
   createBrowserWhisperProvider,
-  createDbopfsSpeechArtifactStore
+  createDbopfsSpeechArtifactStore,
+  createDigitalOceanFalTTSProvider
 } from 'arcane-os/ai/browser-speech';
 ```
 

@@ -6,7 +6,7 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 217,
+  "memberCount": 218,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
@@ -3105,6 +3105,20 @@
       "availability": "Browser metadata; model/runtime use requires DBOPFS, Web Locks, Workers, and caller-selected artifacts",
       "protocol": "arcane-ai-browser-speech-artifacts/1 over arcane-ai-provider/2",
       "normalization": "Exact protocol string; it grants no model authority and names no model download"
+    },
+    {
+      "id": "browser-speech:createDigitalOceanFalTTSProvider",
+      "name": "createDigitalOceanFalTTSProvider",
+      "displayName": "createDigitalOceanFalTTSProvider()",
+      "kind": "function",
+      "signature": "createDigitalOceanFalTTSProvider({id,model,getApiKey,maxConcurrentRequests=4,fetch=globalThis.fetch}={})",
+      "entrypoints": ["arcane-os/ai/browser-speech"],
+      "primaryImport": "arcane-os/ai/browser-speech",
+      "group": "Browser speech providers",
+      "summary": "Creates an explicitly selected DigitalOcean FAL remote TTS provider using standard Fetch and completed audio jobs.",
+      "availability": "Browser or Node with Fetch, Blob, AbortController, and an application-owned DigitalOcean inference key",
+      "protocol": "arcane-ai-provider/2 tts/synthesize",
+      "normalization": "Construction and activation make no adapter network requests. Activation awaits the application-owned string or promise key reader. localOnly false, concurrent requests, complete audio Blob results, and local cancellation without claiming remote-job cancellation. Applications own model, voice, credentials, and activation."
     },
     {
       "id": "browser-speech:createBrowserKokoroProvider",

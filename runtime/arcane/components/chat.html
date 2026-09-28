@@ -2965,13 +2965,13 @@
         const clearThinking=thinkingHTML;
         
         //console.table(arguments);
+        const aiRuntime=boundChatAI??globalThis.ai;
         if(
             !isThinking
             &&text
-            &&host.aiAvailability.tts
-            &&speech.muted===false
+            &&((host.aiAvailability.tts&&speech.muted===false)
+                ||aiRuntime?.speechActivationPending===true)
         ){
-            const aiRuntime=boundChatAI??globalThis.ai;
             if(is.function(aiRuntime?.streamTTS)){
                 void Promise.resolve(aiRuntime.streamTTS(text)).catch(
                     reportTTSError
@@ -3837,10 +3837,12 @@
             }
             scrollTranscriptToBottom(!eventContext.synthetic);
 
-            if(host.aiAvailability.tts&&speech.muted===false){
-                const aiRuntime=boundChatAI??globalThis.ai;
+            const aiRuntime=boundChatAI??globalThis.ai;
+            if((host.aiAvailability.tts&&speech.muted===false)
+                ||aiRuntime?.speechActivationPending===true){
                 aiRuntime?.stopAudio?.();
-                if(is.function(aiRuntime?.resumeAudio)){
+                if(host.aiAvailability.tts&&speech.muted===false
+                    &&is.function(aiRuntime?.resumeAudio)){
                     void Promise.resolve(aiRuntime.resumeAudio()).catch(
                         function reportPlaybackResumeFailure(error){
                             reportTTSError(error,'playback-resume');

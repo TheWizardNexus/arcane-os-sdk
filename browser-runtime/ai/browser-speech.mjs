@@ -10,3 +10,4 @@ export {
   createBrowserKokoroProvider,
   createBrowserWhisperProvider,
 } from "./browser-speech-providers.mjs";
+export { createDigitalOceanFalTTSProvider } from "./digitalocean-speech.mjs";

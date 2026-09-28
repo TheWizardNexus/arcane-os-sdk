@@ -392,6 +392,7 @@
     recordButton.addEventListener('blur', handleRecordBlur, lifecycleListenerOptions);
     stopButton.addEventListener('click', stop, lifecycleListenerOptions);
     muteButton.addEventListener('click', muteToggle, lifecycleListenerOptions);
+    window.addEventListener('ai-ready', synchronizeAIReadiness, lifecycleListenerOptions);
     window.addEventListener(
         'pagehide',
         handlePageHide,
@@ -417,11 +418,7 @@
     renderStatus();
     void observeMicrophonePermission();
     void aiModuleImport.then(
-        function synchronizeMutedStateAfterAIImport() {
-            if (!destroyed) {
-                synchronizeAIMutedState();
-            }
-        },
+        synchronizeAIReadiness,
         function reportAIModuleImportFailure(error) {
             if (destroyed) {
                 return;
@@ -544,6 +541,17 @@
         }
         clearSettledTTSIntent();
         applyRoleTransitions(previousSTTRole, previousTTSRole);
+    }
+
+    function synchronizeAIReadiness() {
+        if (destroyed) {
+            return;
+        }
+        settleSuccessfulUnmute();
+        continuePendingUnmute();
+        synchronizeAIMutedState();
+        renderControls();
+        renderStatus();
     }
 
     function applyRoleTransitions(previousSTTRole, previousTTSRole) {
@@ -996,6 +1004,13 @@
         ) {
             return false;
         }
+        if (!is.function(globalThis.ai?.setSpeechMuted)) {
+            pendingUnmute = true;
+            host.muted = true;
+            renderControls();
+            renderStatus();
+            return false;
+        }
         const providerSelected = is.string(ttsRole.providerId)
             && ttsRole.providerId.length > 0
             && is.string(ttsRole.modelId)
@@ -1016,8 +1031,12 @@
         }
 
         pendingUnmute = true;
+        const generation = ttsIntentGeneration + 1;
         const requested = await requestTTSIntent('load', 'user');
-        if (!requested || destroyed) {
+        if (destroyed || generation !== ttsIntentGeneration) {
+            return false;
+        }
+        if (!requested) {
             pendingUnmute = false;
             host.muted = true;
             stopTTSPlayback();
@@ -1774,7 +1793,12 @@
             return;
         }
 
+        const cancelPendingUnmute = activeTTSIntent?.action === 'load';
         destroyed = true;
+        ttsIntentGeneration += 1;
+        pendingUnmute = false;
+        pendingTTSIntent = null;
+        activeTTSIntent = null;
         runtimeStateAbortController.abort();
         sttActivationController?.destroy();
         window.removeEventListener('pagehide', handlePageHide);
@@ -1785,6 +1809,16 @@
         );
         cancelSTTOperation('component-destroyed');
         stopTTSPlayback();
+        const aiRuntime = globalThis.ai;
+        if (cancelPendingUnmute
+            && aiRuntime?.speechActivationPending === true
+            && is.function(aiRuntime.setSpeechMuted)) {
+            void Promise.resolve(aiRuntime.setSpeechMuted(true)).catch(
+                function reportSpeechTeardownFailure(error) {
+                    arcaneLogging.error('Speech activation could not be cancelled during component teardown.', error);
+                }
+            );
+        }
         events.dispose();
         host.componentReady = false;
         renderControls();

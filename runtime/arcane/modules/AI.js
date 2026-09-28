@@ -9,6 +9,7 @@ import {
     projectArcaneDOMEvent
 } from 'arcane-os/event-manager';
 import {getAIPreferencesForRuntime} from './AIPreferenceRuntime.js';
+import {subscribeAIRuntimeState} from './AIRuntimeState.js';
 import {
     AI_MODEL_AUTHORITY_PROTOCOL,
     AI_PROVIDER_PROTOCOL,
@@ -1171,8 +1172,10 @@ class AI {
     #builtInLLMProviders=new Map();
     #builtInLLMReadiness=Promise.resolve(null);
     #builtInSpeechProviders=new Map();
+    #configuredSpeechProviders=new Map();
     #builtInSpeechReadiness=Promise.resolve(null);
     #speechControlGeneration=0;
+    #speechActivation=null;
     #speechFailureSequence=0;
     #speechDiagnosticSequence=0;
     #speechJobSequence=0;
@@ -1231,6 +1234,10 @@ class AI {
 
     get providerRuntime(){
         return this.#providerRuntime;
+    }
+
+    get speechActivationPending(){
+        return this.#speechActivation!==null;
     }
 
     [AI_PUBLISH_READY](){
@@ -2056,10 +2063,6 @@ class AI {
             }
             return value;
         });
-        next[1]='LOCAL_SPEACH';
-        next[2]='LOCAL_SPEACH';
-        next[4]='LOCAL_SPEACH';
-        next[5]='LOCAL_SPEACH';
         return completeValue(next);
     }
 
@@ -2075,21 +2078,12 @@ class AI {
     }
 
     #assertDeviceSpeechConfiguration(configuration){
-        for(const role of ['stt','tts']){
-            for(const routeName of ['default','localOnly']){
-                const selection=configuration?.[role]?.[routeName];
-                if(selection&&selection.localOnly!==true){
-                    const operation=role==='stt'
-                        ?'Speech recognition'
-                        :'Speech synthesis';
-                    const error=new TypeError(
-                        `${operation} supports on-device providers only.`
-                    );
-                    error.code=role==='stt'
-                        ?'AI_STT_DEVICE_ONLY'
-                        :'AI_TTS_DEVICE_ONLY';
-                    throw error;
-                }
+        for(const routeName of ['default','localOnly']){
+            const selection=configuration?.stt?.[routeName];
+            if(selection&&selection.localOnly!==true){
+                const error=new TypeError('Speech recognition supports on-device providers only.');
+                error.code='AI_STT_DEVICE_ONLY';
+                throw error;
             }
         }
     }
@@ -2537,6 +2531,8 @@ class AI {
 
     #invalidateSpeechControl(){
         this.#speechControlGeneration+=1;
+        this.#speechActivation?.controller.abort();
+        this.#speechActivation=null;
         this.muted=true;
         this.stopAudio();
     }
@@ -2601,7 +2597,10 @@ class AI {
                 expectedProviders[role]=null;
                 continue;
             }
-            const record=this.#builtInSpeechProviders.get(
+            const configured=this.#configuredSpeechProviders.get(role);
+            const record=configured?.providerId===selection.providerId
+                ?configured
+                :this.#builtInSpeechProviders.get(
                 this.#builtInSpeechProviderKey(role,selection.providerId)
             );
             if(!record
@@ -2615,7 +2614,7 @@ class AI {
                     continue;
                 }
                 throw this.#browserSpeechProviderRouteOwnershipError(
-                    `The selected ${role} route is not owned by the replaceable built-in AI speech boundary.`
+                    `The selected ${role} route is not owned by this AI speech configuration.`
                 );
             }
             expectedProviders[role]=record.provider;
@@ -2649,6 +2648,9 @@ class AI {
                 if(this.#builtInSpeechProviders.get(key)===record){
                     this.#builtInSpeechProviders.delete(key);
                 }
+                if(this.#configuredSpeechProviders.get(record.role)===record){
+                    this.#configuredSpeechProviders.delete(record.role);
+                }
                 this.#browserSpeechRetiredBuiltInRecords.delete(record);
             }catch(error){
                 failures.push(error);
@@ -2658,12 +2660,12 @@ class AI {
             throw aiBrowserSpeechError(
                 AI_BROWSER_SPEECH_ERROR_CODES.providerDisposalRejected,
                 AI_BROWSER_SPEECH_REASONS.providerDisposalRejected,
-                'The replaced built-in speech providers could not be disposed.',
+                'The replaced speech providers could not be disposed.',
                 failures.length===1
                     ?failures[0]
                     :new AggregateError(
                         failures,
-                        'Multiple replaced built-in speech provider disposals were rejected.'
+                        'Multiple replaced speech provider disposals were rejected.'
                     ),
                 {committed}
             );
@@ -2673,17 +2675,21 @@ class AI {
 
     #assertSynchronousBrowserSpeechSupersession(method){
         if(!this.#browserSpeechConfigurationRecord
-            &&this.#browserSpeechRetiredRecords.size===0){
+            &&this.#browserSpeechRetiredRecords.size===0
+            &&this.#configuredSpeechProviders.size===0){
             return;
         }
         throw aiBrowserSpeechError(
             AI_BROWSER_SPEECH_ERROR_CODES.asyncTransitionRequired,
             AI_BROWSER_SPEECH_REASONS.asyncTransitionRequired,
-            `${method} cannot replace SDK-owned browser speech providers synchronously; await AI.disposeBrowserSpeech() or use an asynchronous transition method.`
+            `${method} cannot replace SDK-owned speech providers synchronously; use configureSpeechProvider, disposeBrowserSpeech, or an asynchronous transition method.`
         );
     }
 
     async #supersedeBrowserSpeechForRouteChange(){
+        for(const role of [...this.#configuredSpeechProviders.keys()]){
+            await this.configureSpeechProvider(role,null);
+        }
         if(!this.#browserSpeechConfigurationRecord
             &&this.#browserSpeechRetiredRecords.size===0){
             return false;
@@ -3416,6 +3422,168 @@ class AI {
         return descriptor;
     }
 
+    configureSpeechProvider(role,provider,options={}){
+        if(role!=='stt'&&role!=='tts'){
+            throw new TypeError('AI.configureSpeechProvider requires stt or tts.');
+        }
+        if(provider!==null&&provider?.role!==role){
+            throw new TypeError('The speech provider must implement the selected role.');
+        }
+        if(role==='stt'&&provider&&provider.localOnly!==true){
+            const error=new TypeError('Speech recognition supports on-device providers only.');
+            error.code='AI_STT_DEVICE_ONLY';
+            throw error;
+        }
+        const {modelId,signal,expectedProvider}=options;
+        const runtime=this;
+        // Use the existing configuration lane. Unlike a replacement of the
+        // same browser configuration, a disjoint role must not cancel its peer.
+        const scheduled=this.#browserSpeechTransition.then(
+            async function configureSelectedSpeechRole(){
+                let committed=false;
+                let candidateDisposalAttempted=false;
+                const alreadyOwned=provider
+                    &&runtime.#providerRuntime.ownsProvider(role,provider);
+                try{
+                    signal?.throwIfAborted();
+                    if(expectedProvider!==undefined
+                        &&(!runtime.#providerRuntime.ownsProvider(role,expectedProvider)
+                            ||runtime.#providerRuntime.selection(role)?.providerId
+                                !==expectedProvider?.id)){
+                        if(provider&&!alreadyOwned){
+                            candidateDisposalAttempted=true;
+                            await provider.dispose({role});
+                        }
+                        return false;
+                    }
+                    const previousBrowser=runtime.#browserSpeechConfigurationRecord;
+                    if(previousBrowser&&!runtime.#browserSpeechRecordIsActive(previousBrowser)){
+                        throw runtime.#browserSpeechProviderRouteOwnershipError(
+                            'Browser speech ownership changed before single-role replacement.'
+                        );
+                    }
+                    const boundary=runtime.#browserSpeechReplacementBoundary(
+                        previousBrowser,[role]
+                    );
+                    const selectedModelId=provider
+                        ?modelId??provider.catalog()[0]?.id
+                        :null;
+                    if(provider&&!selectedModelId){
+                        throw new TypeError('A speech provider model must be selected.');
+                    }
+                    const selection=provider
+                        ?{providerId:provider.id,modelId:selectedModelId,localOnly:provider.localOnly}
+                        :null;
+                    const routes={
+                        default:selection,
+                        localOnly:selection?.localOnly===true?selection:null
+                    };
+                    if(provider===boundary.expectedProviders[role]
+                        &&runtime.#sameBrowserSpeechSelection(
+                            runtime.#providerRuntime.selection(role),selection
+                        )){
+                        return selection;
+                    }
+                    const priorSelection=runtime.#providerRuntime.selection(role);
+                    const hydratesPendingSelection=provider
+                        &&boundary.expectedProviders[role]===null
+                        &&priorSelection?.providerId===provider.id
+                        &&priorSelection.modelId===selectedModelId;
+                    if(role==='tts'&&!hydratesPendingSelection){
+                        runtime.#invalidateSpeechControl();
+                    }
+                    await runtime.#unloadSpeechProviderRolesForTransition(
+                        signal,boundary.expectedProviders,[role]
+                    );
+                    signal?.throwIfAborted();
+                    const replacement=runtime.#providerRuntime.replaceSpeechProvider(
+                        role,{
+                            provider,routes,
+                            expectedProvider:boundary.expectedProviders[role]
+                        }
+                    );
+                    committed=true;
+                    if(provider){
+                        runtime.#configuredSpeechProviders.set(role,{
+                            role,providerId:provider.id,provider,
+                            unregister:replacement.unregister
+                        });
+                    }else{
+                        runtime.#configuredSpeechProviders.delete(role);
+                    }
+                    for(const record of boundary.builtInRecords){
+                        if(record.provider!==provider){
+                            runtime.#browserSpeechRetiredBuiltInRecords.add(record);
+                        }
+                    }
+                    if(previousBrowser?.managedRoles.includes(role)){
+                        const remaining=previousBrowser.managedRoles.filter(
+                            function retainOtherSpeechRole(candidate){return candidate!==role;}
+                        );
+                        runtime.#retireBrowserSpeechRegistration(previousBrowser,[role]);
+                        if(remaining.length){
+                            const configuration={...previousBrowser.configuration};
+                            delete configuration[role];
+                            runtime.#browserSpeechConfigurationRecord={
+                                ...previousBrowser,
+                                configuration,
+                                configurationByRole:{...previousBrowser.configurationByRole,[role]:null},
+                                descriptor:{...previousBrowser.descriptor,[role]:null},
+                                providers:{...previousBrowser.providers,[role]:null},
+                                routes:runtime.#currentSpeechRoutes(),
+                                managedRoles:remaining,
+                                candidateRoles:remaining,
+                                unregisters:{...previousBrowser.unregisters,[role]:null},
+                                registrationState:{...previousBrowser.registrationState,[role]:false},
+                                retirementState:{stt:false,tts:false}
+                            };
+                        }else{
+                            runtime.#browserSpeechConfigurationRecord=null;
+                        }
+                    }
+                    runtime.#applySpeechPreferenceTuple(
+                        runtime.#tupleFromSpeechProviderRoutes(runtime.#currentSpeechRoutes())
+                    );
+                    await runtime.#cleanupRetiredBuiltInSpeechProviders({committed:true});
+                    if(previousBrowser?.retirementState[role]){
+                        await runtime.#cleanupBrowserSpeechRecord(previousBrowser,{committed:true});
+                    }
+                    return selection;
+                }catch(error){
+                    if(committed){
+                        const committedError=error instanceof Error
+                            ?error
+                            :new Error('Speech provider cleanup failed.',{cause:error});
+                        committedError.committed=true;
+                        throw committedError;
+                    }
+                    if(role==='tts'&&provider
+                        &&runtime.#providerRuntime.selection('tts')?.providerId===provider.id
+                        &&!runtime.#providerRuntime.hasProvider('tts',provider.id)){
+                        runtime.#invalidateSpeechControl();
+                    }
+                    if(provider&&!alreadyOwned&&!candidateDisposalAttempted
+                        &&!runtime.#providerRuntime.ownsProvider(role,provider)){
+                        try{
+                            await provider.dispose({role});
+                        }catch(cleanupError){
+                            throw new AggregateError(
+                                [error,cleanupError],
+                                'Speech configuration and candidate disposal failed.'
+                            );
+                        }
+                    }
+                    throw error;
+                }
+            }
+        );
+        this.#browserSpeechTransition=scheduled.then(
+            function completeSingleSpeechRoleConfiguration(){},
+            function retainSingleSpeechRoleConfigurationFailure(){}
+        );
+        return scheduled;
+    }
+
     configureBrowserSpeech(configuration,options={}){
         this.#traceSpeech('configureBrowserSpeech.call',{configuration,options});
         const normalized=normalizeBrowserSpeechConfiguration(configuration);
@@ -3719,6 +3887,8 @@ class AI {
     async startProviders(options){
         const normalized=normalizeAIStartupOptions(options);
         const generation=++this.#speechControlGeneration;
+        this.#speechActivation?.controller.abort();
+        this.#speechActivation=null;
         this.muted=true;
         if(normalized.startMuted){
             this.stopAudio();
@@ -3742,14 +3912,56 @@ class AI {
         return handle;
     }
 
+    #waitForSelectedSpeechProvider(signal){
+        const runtime=this;
+        const selected=this.#providerRuntime.selection('tts');
+        if(!selected)return Promise.resolve(false);
+        return new Promise(function observeSelectedSpeechRegistration(resolve,reject){
+            let unsubscribe=null;
+            let settled=false;
+            function finish(value,error){
+                if(settled)return;
+                settled=true;
+                signal.removeEventListener('abort',cancel);
+                unsubscribe?.();
+                if(error)reject(error);
+                else resolve(value);
+            }
+            function cancel(){
+                finish(false,signal.reason??new DOMException('Speech activation cancelled.','AbortError'));
+            }
+            function observe(snapshot){
+                const current=runtime.#providerRuntime.selection('tts');
+                if(current?.providerId!==selected.providerId
+                    ||current?.modelId!==selected.modelId){
+                    finish(false);
+                }else if(runtime.#providerRuntime.hasProvider('tts',current.providerId)){
+                    finish(true);
+                }else if(snapshot.roles.tts.state==='disposed'){
+                    finish(false);
+                }else if(snapshot.roles.tts.state==='error'){
+                    finish(false,snapshot.roles.tts.error
+                        ??new Error('Speech provider registration failed.'));
+                }
+            }
+            signal.addEventListener('abort',cancel,{once:true});
+            if(signal.aborted){cancel();return;}
+            unsubscribe=subscribeAIRuntimeState(observe);
+            if(settled)unsubscribe();
+        });
+    }
+
     async setSpeechMuted(muted){
         const callId=this.#traceSpeech('setSpeechMuted.call',{requestedMuted:muted});
         if(!is.boolean(muted)){
             throw new TypeError('AI speech muted state must be a boolean.');
         }
+        if(!muted&&this.#speechActivation)return this.#speechActivation.promise;
         const generation=++this.#speechControlGeneration;
         this.muted=true;
         if(muted){
+            this.#speechActivation?.controller.abort();
+            this.#speechActivation=null;
             this.stopAudio();
         }
         if(!this.#usesProviderRuntime('tts',this.ttsService)){
@@ -3757,15 +3969,42 @@ class AI {
             this.#traceSpeech('setSpeechMuted.result',{callId,result:true});
             return true;
         }
-        await this.#providerRuntime.setSpeechMuted(muted);
-        if(generation===this.#speechControlGeneration){
-            const status=this.#providerRuntime.status('tts');
-            this.muted=muted
-                ||status.state!=='ready'
-                ||status.loaded!==true;
+        if(muted){
+            await this.#providerRuntime.setSpeechMuted(true);
+            return true;
         }
-        this.#traceSpeech('setSpeechMuted.result',{callId,result:true});
-        return true;
+        const runtime=this;
+        const activation={controller:new AbortController(),promise:null};
+        this.#speechActivation=activation;
+        activation.promise=Promise.resolve().then(async function activateRequestedSpeech(){
+            try{
+                // Selection may precede registration. Observe the owner's sticky
+                // state rather than treating that ordinary waiting state as failure.
+                await runtime.#waitForSpeechOperation(
+                    runtime.#browserSpeechTransition,activation.controller.signal
+                );
+                if(!await runtime.#waitForSelectedSpeechProvider(activation.controller.signal)){
+                    return false;
+                }
+                // A registration event can fire before its configuration finishes.
+                await runtime.#waitForSpeechOperation(
+                    runtime.#browserSpeechTransition,activation.controller.signal
+                );
+                activation.controller.signal.throwIfAborted();
+                await runtime.#providerRuntime.setSpeechMuted(false);
+                if(runtime.#speechActivation!==activation)return false;
+                const status=runtime.#providerRuntime.status('tts');
+                runtime.muted=status.state!=='ready'||status.loaded!==true;
+                return !runtime.muted;
+            }catch(error){
+                if(activation.controller.signal.aborted)return false;
+                throw error;
+            }finally{
+                if(runtime.#speechActivation===activation)runtime.#speechActivation=null;
+                runtime.#traceSpeech('setSpeechMuted.result',{callId,result:!runtime.muted});
+            }
+        });
+        return activation.promise;
     }
 
     #nativeOllama(){
@@ -5934,7 +6173,7 @@ class AI {
     ){
         const callId=this.#traceSpeech('streamTTS.call',{text,end,options});
         for(const playback of this.#preparedSpeechPlaybacks) playback.stop();
-        if(this.muted){
+        if(this.muted&&!this.speechActivationPending){
             if(end){
                 this.audioMessageChunks='';
                 this.#markdownSpeech.reset();
@@ -5963,7 +6202,9 @@ class AI {
         }
 
         try{
-            this.#assertServiceConfigured(this.ttsService,'tts');
+            if(!this.speechActivationPending){
+                this.#assertServiceConfigured(this.ttsService,'tts');
+            }
         }catch(error){
             this.#traceSpeech('streamTTS.error',{callId,error});
             this.#publishTTSFailure(error,{
@@ -5999,7 +6240,7 @@ class AI {
     }
 
     #finishStreamingSpeech(){
-        if(this.muted){
+        if(this.muted&&!this.speechActivationPending){
             for(const playback of this.#preparedSpeechPlaybacks) playback.stop();
             this.audioMessageChunks='';
             this.#markdownSpeech.reset();
@@ -6163,7 +6404,7 @@ class AI {
         const job={
             diagnosticId:++this.#speechJobSequence,
             diagnosticCallId:options.diagnosticCallId,
-            abortController:null,
+            abortController:new AbortController(),
             audioBuffer:null,
             audioContext:null,
             generation,
@@ -6203,7 +6444,31 @@ class AI {
         return playback||preparation;
     }
 
+    #waitForSpeechOperation(operation,signal){
+        return new Promise(function observeSpeechOperation(resolve,reject){
+            let settled=false;
+            function finish(value,error){
+                if(settled)return;
+                settled=true;
+                signal.removeEventListener('abort',cancel);
+                if(error)reject(error);
+                else resolve(value);
+            }
+            function cancel(){finish(false);}
+            signal.addEventListener('abort',cancel,{once:true});
+            if(signal.aborted){cancel();return;}
+            operation.then(
+                function speechOperationCompleted(value){finish(value);},
+                function speechOperationFailed(error){finish(false,error);}
+            );
+        });
+    }
+
     async #prepareSpeechJob(job){
+        const activation=this.#speechActivation;
+        if(activation&&job.generation===this.speechGeneration){
+            await this.#waitForSpeechOperation(activation.promise,job.abortController.signal);
+        }
         if(job.generation!==this.speechGeneration||this.muted){
             return this.#cancelSpeechJob(job);
         }
@@ -6229,7 +6494,7 @@ class AI {
     }
 
     async #requestSpeechAudio(job){
-        job.abortController=new AbortController();
+        job.abortController??=new AbortController();
         const selection=this.#providerRuntime.selection('tts');
         const voice=job.voice===undefined
             ?(selection?this.#providerSpeechVoice():null)

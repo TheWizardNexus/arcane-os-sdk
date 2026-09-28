@@ -338,6 +338,7 @@ test('the public package API inventory matches every JavaScript export and MDN e
             ['BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL','const BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL'],
             ['BROWSER_SPEECH_ARTIFACT_PROTOCOL','const BROWSER_SPEECH_ARTIFACT_PROTOCOL'],
             ['createBrowserKokoroProvider','createBrowserKokoroProvider(options={})'],
+            ['createDigitalOceanFalTTSProvider','createDigitalOceanFalTTSProvider({id,model,getApiKey,maxConcurrentRequests=4,fetch=globalThis.fetch}={})'],
             ['createBrowserSpeechArtifactGraph',"createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', security, providerId=null, role, model, runtime, files }={})"],
             ['createBrowserSpeechAuthority','createBrowserSpeechAuthority({ providerId, role, model, runtime, security }={})'],
             ['createBrowserWhisperProvider','createBrowserWhisperProvider(options={})'],
@@ -362,7 +363,11 @@ test('the public package API inventory matches every JavaScript export and MDN e
                     :'function'
             );
             assert.match(member.availability,/\bBrowser\b/u);
-            assert.doesNotMatch(member.availability,/\b(?:Node|Cloud)\b/u);
+            if(member.name==='createDigitalOceanFalTTSProvider'){
+                assert.match(member.availability,/\bNode\b/u);
+            }else{
+                assert.doesNotMatch(member.availability,/\b(?:Node|Cloud)\b/u);
+            }
         }
     });
 

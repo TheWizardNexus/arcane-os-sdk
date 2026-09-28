@@ -1519,3 +1519,630 @@ test("an unexpected ready speech Worker crash remains visible", async (t) => {
   assert.equal(whisper.status().errorCode, "ARCANE_AI_WORKER_CRASHED");
   assert.equal(contract.terminated, true);
 });
+
+import {createDigitalOceanFalTTSProvider} from '../browser-runtime/ai/digitalocean-speech.mjs';
+
+function cloudSpeechFixture(fetchImpl, options = {}) {
+    return createDigitalOceanFalTTSProvider(
+        {
+            id: 'cloud-narrator',
+            model: {
+                id: 'fal-ai/elevenlabs/tts/multilingual-v2',
+                defaultVoice: 'Rachel'
+            },
+            getApiKey: function readSyntheticSpeechKey() {
+                return 'synthetic-inference-key';
+            },
+            fetch: fetchImpl,
+            ...options
+        }
+    );
+}
+
+function cloudSpeechRequest(input, options = {}) {
+    return {
+        role: 'tts',
+        operation: 'synthesize',
+        payload: {input},
+        ...options
+    };
+}
+
+function completedCloudSpeech(url) {
+    return Response.json(
+        {status: 'COMPLETED', output: {audio: {url}}}
+    );
+}
+
+test(
+    'cloud speech configuration and activation are local and expose no credential',
+    async function cloudSpeechActivationContract() {
+        const calls = [];
+        const provider = cloudSpeechFixture(
+            async function unusedCloudSpeechFetch(...argumentsList) {
+                calls.push(argumentsList);
+                throw new Error('Activation must not call the network.');
+            }
+        );
+        const selected = {
+            providerId: provider.id,
+            modelId: provider.catalog()[0].id,
+            localOnly: false
+        };
+        assert.equal(provider.protocol, 'arcane-ai-provider/2');
+        assert.equal(provider.localOnly, false);
+        assert.deepEqual(
+            provider.catalog()[0].speech,
+            {responseFormats: ['provider-native'], defaultResponseFormat: 'provider-native'}
+        );
+        assert.equal(provider.status().state, 'unloaded');
+        assert.equal(provider.status().execution.selectedDevice, null);
+        const inspected = await provider.inspect(
+            selected,
+            {role: 'tts'}
+        );
+        assert.equal(inspected.available, true);
+        assert.equal(inspected.authority.protocol, 'arcane-ai-model-authority/1');
+        assert.equal(inspected.authority.modelId, selected.modelId);
+        const loaded = await provider.load(
+            {role: 'tts', selection: selected}
+        );
+        assert.equal(loaded.state, 'ready');
+        assert.equal(loaded.loaded, true);
+        assert.equal(loaded.execution.selectedDevice, 'remote');
+        assert.equal(loaded.execution.maxConcurrentRequests, 4);
+        assert.equal(JSON.stringify({inspected, loaded}).includes('synthetic-inference-key'), false);
+        assert.deepEqual(calls, []);
+        assert.equal((await provider.unload()).state, 'unloaded');
+        assert.equal((await provider.dispose()).state, 'disposed');
+        await assert.rejects(
+            provider.load(),
+            {code: 'ARCANE_AI_PROVIDER_DISPOSED'}
+        );
+        assert.deepEqual(calls, []);
+    }
+);
+
+test(
+    'cloud speech preserves full input and admits concurrent results without forwarding the inference credential',
+    async function cloudSpeechConcurrentRequestContract() {
+        const submissions = [];
+        const mediaRequests = [];
+        const provider = cloudSpeechFixture(
+            function deferredCloudSpeechFetch(url, options) {
+                if (options.method === 'POST') {
+                    return new Promise(
+                        function retainSpeechSubmission(resolve) {
+                            submissions.push(
+                                {url, options, resolve}
+                            );
+                        }
+                    );
+                }
+                mediaRequests.push(
+                    {url, options}
+                );
+                return Promise.resolve(
+                    new Response(
+                        url,
+                        {headers: {'Content-Type': 'audio/mpeg'}}
+                    )
+                );
+            },
+            {maxConcurrentRequests: 2}
+        );
+        await provider.load();
+        const firstInput = '  The disco squid says: **complete** text.\nKeep every mark!  ';
+        const first = provider.request(
+            cloudSpeechRequest(
+                firstInput,
+                {payload: {input: firstInput, voice: 'Sarah', speed: 0.7, responseFormat: 'provider-native'}}
+            )
+        );
+        const second = provider.request(
+            cloudSpeechRequest('Second squid.')
+        );
+        assert.equal(provider.status().state, 'ready');
+        assert.equal(provider.status().busy, true);
+        assert.equal(provider.status().execution.activeRequestCount, 2);
+        await assert.rejects(
+            provider.request(
+                cloudSpeechRequest('Wait in the runtime queue.')
+            ),
+            {code: 'ARCANE_AI_PROVIDER_BUSY'}
+        );
+        assert.equal(submissions.length, 2);
+        assert.deepEqual(
+            JSON.parse(submissions[0].options.body),
+            {
+                model_id: 'fal-ai/elevenlabs/tts/multilingual-v2',
+                input: {text: firstInput, voice: 'Sarah', speed: 0.7}
+            }
+        );
+        assert.equal(submissions[0].url, 'https://inference.do-ai.run/v1/async-invoke');
+        assert.equal(submissions[0].options.headers.Authorization, 'Bearer synthetic-inference-key');
+        assert.equal(JSON.parse(submissions[1].options.body).input.voice, 'Rachel');
+        submissions[1].resolve(
+            completedCloudSpeech('https://audio.example/second.mp3')
+        );
+        const secondAudio = await second;
+        assert.equal(await secondAudio.text(), 'https://audio.example/second.mp3');
+        assert.equal(provider.status().execution.activeRequestCount, 1);
+        submissions[0].resolve(
+            completedCloudSpeech('https://audio.example/first.mp3')
+        );
+        const firstAudio = await first;
+        assert.equal(await firstAudio.text(), 'https://audio.example/first.mp3');
+        assert.equal(firstAudio.type, 'audio/mpeg');
+        assert.equal(provider.status().busy, false);
+        for (const request of mediaRequests) {
+            assert.equal(request.options.headers, undefined);
+            assert.equal(JSON.stringify(request).includes('synthetic-inference-key'), false);
+        }
+        await provider.dispose();
+    }
+);
+
+test(
+    'cloud speech follows queued and running jobs and retries only a rate-limited status read',
+    async function cloudSpeechStatusPollingContract() {
+        const calls = [];
+        let reads = 0;
+        const provider = cloudSpeechFixture(
+            async function cloudSpeechStatusFetch(url, options) {
+                calls.push(
+                    {url, method: options.method}
+                );
+                if (options.method === 'POST') {
+                    return Response.json(
+                        {status: 'QUEUED', request_id: 'squid-job'}
+                    );
+                }
+                if (options.method === 'GET') {
+                    assert.equal(url, 'https://inference.do-ai.run/v1/async-invoke/squid-job');
+                    assert.equal(options.headers.Authorization, 'Bearer synthetic-inference-key');
+                    reads += 1;
+                    if (reads === 1) {
+                        return new Response(
+                            'Try the status again.',
+                            {status: 429, headers: {'Retry-After': '0'}}
+                        );
+                    }
+                    if (reads === 2) {
+                        return Response.json(
+                            {status: 'IN_PROGRESS', request_id: 'squid-job'}
+                        );
+                    }
+                    return completedCloudSpeech('https://audio.example/squid.mp3');
+                }
+                return new Response(
+                    'Finished speech.',
+                    {headers: {'Content-Type': 'audio/mpeg'}}
+                );
+            }
+        );
+        await provider.load();
+        const audio = await provider.request(
+            cloudSpeechRequest('Read every tentacle report.')
+        );
+        assert.equal(await audio.text(), 'Finished speech.');
+        assert.deepEqual(
+            calls.map(
+                function cloudSpeechMethod(call) {
+                    return call.method;
+                }
+            ),
+            ['POST', 'GET', 'GET', 'GET', undefined]
+        );
+        await provider.dispose();
+    }
+);
+
+test(
+    'cloud speech cancellation aborts an active media request and unload settles all owned work',
+    async function cloudSpeechCancellationContract() {
+        let announceMedia;
+        const mediaStarted = new Promise(
+            function captureCloudSpeechMediaStart(resolve) {
+                announceMedia = resolve;
+            }
+        );
+        let mediaSignal;
+        const provider = cloudSpeechFixture(
+            function pendingCloudSpeechMediaFetch(url, options) {
+                if (options.method === 'POST') {
+                    return Promise.resolve(
+                        completedCloudSpeech('https://audio.example/cancel.mp3')
+                    );
+                }
+                mediaSignal = options.signal;
+                announceMedia();
+                return new Promise(
+                    function waitForSpeechMediaAbort(resolve, reject) {
+                        options.signal.addEventListener(
+                            'abort',
+                            function abortSyntheticSpeechMedia() {
+                                reject(
+                                    new DOMException('Aborted media request.', 'AbortError')
+                                );
+                            },
+                            {once: true}
+                        );
+                    }
+                );
+            }
+        );
+        await provider.load();
+        const request = provider.request(
+            cloudSpeechRequest('Cancel this squid.')
+        );
+        const rejected = assert.rejects(
+            request,
+            {name: 'AbortError', code: 'ARCANE_AI_REQUEST_ABORTED'}
+        );
+        await mediaStarted;
+        const unloaded = await provider.unload();
+        await rejected;
+        assert.equal(mediaSignal.aborted, true);
+        assert.equal(unloaded.state, 'unloaded');
+        assert.equal(unloaded.busy, false);
+        assert.equal(unloaded.execution.activeRequestCount, 0);
+        await provider.dispose();
+    }
+);
+
+test(
+    'cloud speech cancels the status wait and suppresses a late submission result',
+    async function cloudSpeechLateResultContract() {
+        let resolveSubmission;
+        let submissionSignal;
+        let announceSubmission;
+        const submissionStarted = new Promise(
+            function captureLateSpeechSubmissionStart(resolve) {
+                announceSubmission = resolve;
+            }
+        );
+        const calls = [];
+        const provider = cloudSpeechFixture(
+            function retainedCloudSpeechSubmission(url, options) {
+                calls.push(url);
+                submissionSignal = options.signal;
+                return new Promise(
+                    function saveCloudSpeechSubmission(resolve) {
+                        resolveSubmission = resolve;
+                        announceSubmission();
+                    }
+                );
+            }
+        );
+        await provider.load();
+        const controller = new AbortController();
+        const request = provider.request(
+            cloudSpeechRequest(
+                'One complete sentence.',
+                {signal: controller.signal}
+            )
+        );
+        const rejected = assert.rejects(
+            request,
+            {name: 'AbortError', code: 'ARCANE_AI_REQUEST_ABORTED'}
+        );
+        await submissionStarted;
+        controller.abort('The speaker stopped.');
+        resolveSubmission(
+            completedCloudSpeech('https://audio.example/must-not-fetch.mp3')
+        );
+        await rejected;
+        assert.equal(submissionSignal.aborted, true);
+        assert.equal(calls.length, 1);
+        assert.equal(provider.status().execution.activeRequestCount, 0);
+        await provider.dispose();
+
+        const pollingController = new AbortController();
+        let announcePolling;
+        const pendingStatus = new Promise(
+            function captureSpeechPollingStart(resolve) {
+                announcePolling = resolve;
+            }
+        );
+        const pollingProvider = cloudSpeechFixture(
+            async function cancelledCloudSpeechStatusFetch(url, options) {
+                assert.equal(options.method, 'POST');
+                return {
+                    ok: true,
+                    async json() {
+                        announcePolling();
+                        return {status: 'QUEUED', request_id: 'cancel-queued-job'};
+                    }
+                };
+            }
+        );
+        await pollingProvider.load();
+        const polling = pollingProvider.request(
+            cloudSpeechRequest(
+                'Stop the pending job observation.',
+                {signal: pollingController.signal}
+            )
+        );
+        const pollingRejected = assert.rejects(
+            polling,
+            {name: 'AbortError'}
+        );
+        await pendingStatus;
+        await Promise.resolve();
+        pollingController.abort();
+        await pollingRejected;
+        await pollingProvider.dispose();
+    }
+);
+
+test(
+    'cloud speech reports missing credentials, unsupported speed, failed jobs and complete HTTP errors without retrying submission',
+    async function cloudSpeechFailureContract() {
+        let calls = 0;
+        const missingKey = cloudSpeechFixture(
+            async function unexpectedCloudSpeechFetch() {
+                calls += 1;
+            },
+            {
+                getApiKey: function missingSpeechKey() {
+                    return '';
+                }
+            }
+        );
+        await assert.rejects(
+            missingKey.inspect(),
+            {code: 'ARCANE_AI_CLOUD_SPEECH_KEY_REQUIRED'}
+        );
+        await assert.rejects(
+            missingKey.load(),
+            {code: 'ARCANE_AI_CLOUD_SPEECH_KEY_REQUIRED'}
+        );
+        assert.equal(calls, 0);
+        await missingKey.dispose();
+
+        const credentialCause = new Error('The credential store is unavailable.');
+        const credentialFailure = new Error(
+            'The credential read failed.',
+            {cause: credentialCause}
+        );
+        const unavailableKey = cloudSpeechFixture(
+            async function unusedCredentialFailureFetch() {
+                calls += 1;
+            },
+            {
+                getApiKey: async function failSpeechCredentialRead() {
+                    throw credentialFailure;
+                }
+            }
+        );
+        await assert.rejects(
+            unavailableKey.inspect(),
+            function retainOriginalCredentialFailure(error) {
+                return error === credentialFailure && error.cause === credentialCause;
+            }
+        );
+        assert.equal(unavailableKey.status().state, 'unloaded');
+        assert.equal(Object.hasOwn(unavailableKey.status(), 'error'), false);
+        assert.equal(calls, 0);
+        await unavailableKey.dispose();
+
+        const completeError = 'Provider rejected this submission.\nThe whole diagnostic remains available.';
+        const provider = cloudSpeechFixture(
+            async function rejectedCloudSpeechSubmission() {
+                calls += 1;
+                return new Response(
+                    completeError,
+                    {status: 429, headers: {'Retry-After': '0'}}
+                );
+            }
+        );
+        await provider.load();
+        await assert.rejects(
+            provider.request(
+                cloudSpeechRequest(
+                    'Too quick.',
+                    {payload: {input: 'Too quick.', speed: 1.3}}
+                )
+            ),
+            {name: 'RangeError', code: 'ARCANE_AI_TTS_SPEED_INVALID'}
+        );
+        assert.equal(calls, 0);
+        await assert.rejects(
+            provider.request(
+                cloudSpeechRequest('This submission must not be retried.')
+            ),
+            function completeCloudSpeechError(error) {
+                return error.code === 'ARCANE_AI_CLOUD_SPEECH_HTTP_ERROR' && error.message.includes(completeError);
+            }
+        );
+        assert.equal(calls, 1);
+        await provider.dispose();
+
+        const failed = cloudSpeechFixture(
+            async function failedCloudSpeechJob() {
+                return Response.json(
+                    {status: 'FAILED', error: {message: 'Model unavailable.'}}
+                );
+            }
+        );
+        await failed.load();
+        await assert.rejects(
+            failed.request(
+                cloudSpeechRequest('A failed job stays visible.')
+            ),
+            function reportedFailedSpeechJob(error) {
+                return error.code === 'ARCANE_AI_CLOUD_SPEECH_GENERATION_FAILED'
+                    && error.message.includes('Model unavailable.');
+            }
+        );
+        await failed.dispose();
+    }
+);
+
+test(
+    'cloud speech waits for the application credential only during inspection, activation and synthesis',
+    async function delayedCloudSpeechCredentialContract() {
+        const calls = [];
+        let keyReads = 0;
+        let releaseKey;
+        let currentKey = new Promise(
+            function retainCloudActivationKey(resolve) {
+                releaseKey = resolve;
+            }
+        );
+        const provider = cloudSpeechFixture(
+            async function completeCredentialGatedSpeech(url, options) {
+                calls.push(
+                    {url, options}
+                );
+                if (options.method === 'POST') {
+                    return completedCloudSpeech('https://audio.example/after-key.ogg');
+                }
+                return new Response(
+                    'The patient kraken sings.',
+                    {headers: {'Content-Type': 'audio/ogg'}}
+                );
+            },
+            {
+                getApiKey: function readApplicationCredentialRefresh() {
+                    keyReads += 1;
+                    return currentKey;
+                }
+            }
+        );
+        provider.catalog();
+        provider.status();
+        assert.equal(keyReads, 0);
+        assert.deepEqual(calls, []);
+        const inspection = provider.inspect();
+        const activation = provider.load();
+        assert.equal(keyReads, 2);
+        assert.equal(provider.status().state, 'loading');
+        assert.equal(provider.status().loaded, false);
+        assert.deepEqual(calls, []);
+        releaseKey('synthetic-refreshed-speech-key');
+        assert.equal((await inspection).available, true);
+        assert.equal((await activation).state, 'ready');
+        assert.deepEqual(calls, []);
+
+        currentKey = new Promise(
+            function retainCloudInferenceKey(resolve) {
+                releaseKey = resolve;
+            }
+        );
+        const speech = provider.request(
+            cloudSpeechRequest('The patient kraken sings.')
+        );
+        assert.equal(keyReads, 3);
+        assert.equal(provider.status().busy, true);
+        assert.deepEqual(calls, []);
+        releaseKey('synthetic-rotated-speech-key');
+        const audio = await speech;
+        assert.equal(audio.type, 'audio/ogg');
+        assert.equal(await audio.text(), 'The patient kraken sings.');
+        assert.equal(calls[0].options.method, 'POST');
+        assert.equal(calls[0].options.headers.Authorization, 'Bearer synthetic-rotated-speech-key');
+        assert.equal(calls[1].options.headers, undefined);
+        assert.equal(calls.length, 2);
+        assert.equal(JSON.stringify(provider.status()).includes('synthetic-rotated-speech-key'), false);
+        await provider.dispose();
+    }
+);
+
+test(
+    'cloud speech cancellation settles before a shared credential refresh and never submits a late request',
+    async function cancelledCloudSpeechCredentialContract() {
+        for (const operation of ['inspect', 'load', 'request']) {
+            let currentKey = 'synthetic-initial-speech-key';
+            let releaseKey;
+            const calls = [];
+            const provider = cloudSpeechFixture(
+                async function unexpectedCancelledCredentialFetch(url) {
+                    calls.push(url);
+                    throw new Error('A cancelled credential wait must not submit speech.');
+                },
+                {
+                    getApiKey: function readSharedSpeechCredential() {
+                        return currentKey;
+                    }
+                }
+            );
+            if (operation === 'request') await provider.load();
+            const sharedRefresh = new Promise(
+                function retainSharedCredentialRefresh(resolve) {
+                    releaseKey = resolve;
+                }
+            );
+            currentKey = sharedRefresh;
+            const controller = new AbortController();
+            const pending = operation === 'inspect'
+                ? provider.inspect(undefined, {signal: controller.signal})
+                : operation === 'load'
+                    ? provider.load({signal: controller.signal})
+                    : provider.request(
+                        cloudSpeechRequest(
+                            'This kraken stopped waiting.',
+                            {signal: controller.signal}
+                        )
+                    );
+            const rejected = assert.rejects(
+                pending,
+                {name: 'AbortError', code: 'ARCANE_AI_REQUEST_ABORTED'}
+            );
+            controller.abort('The caller cancelled its wait.');
+            await rejected;
+            assert.equal(provider.status().state, operation === 'request' ? 'ready' : 'unloaded');
+            assert.equal(provider.status().busy, false);
+            assert.deepEqual(calls, []);
+            releaseKey('synthetic-late-shared-key');
+            assert.equal(await sharedRefresh, 'synthetic-late-shared-key');
+            await Promise.resolve();
+            assert.deepEqual(calls, []);
+            assert.equal(provider.status().state, operation === 'request' ? 'ready' : 'unloaded');
+            await provider.dispose();
+        }
+    }
+);
+
+test(
+    'cloud speech unload and disposal cancel pending credential activation without resurrecting readiness',
+    async function retiredCloudSpeechCredentialContract() {
+        for (const transition of ['unload', 'dispose']) {
+            let releaseKey;
+            const sharedRefresh = new Promise(
+                function retainRetiringSpeechCredential(resolve) {
+                    releaseKey = resolve;
+                }
+            );
+            const provider = cloudSpeechFixture(
+                async function unusedRetiredSpeechFetch() {
+                    throw new Error('Retired speech must not fetch.');
+                },
+                {
+                    getApiKey: function readRetiringSpeechCredential() {
+                        return sharedRefresh;
+                    }
+                }
+            );
+            const inspectionRejected = assert.rejects(
+                provider.inspect(),
+                {name: 'AbortError'}
+            );
+            const activationRejected = assert.rejects(
+                provider.load(),
+                {name: 'AbortError'}
+            );
+            await provider[transition]();
+            await Promise.all([inspectionRejected, activationRejected]);
+            const expectedState = transition === 'dispose' ? 'disposed' : 'unloaded';
+            assert.equal(provider.status().state, expectedState);
+            releaseKey('synthetic-retired-refresh-key');
+            assert.equal(await sharedRefresh, 'synthetic-retired-refresh-key');
+            await Promise.resolve();
+            assert.equal(provider.status().state, expectedState);
+            assert.equal(provider.status().loaded, false);
+            await provider.dispose();
+        }
+    }
+);

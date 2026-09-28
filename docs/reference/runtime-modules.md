@@ -144,10 +144,11 @@ playback.
 
 ### Public surface
 
-default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and
+default `AI`; read-only `providerRuntime`, `speechActivationPending`, `browserSpeechConfiguration`, and
 `browserSpeechDescriptor`; `configureBrowserSpeech(configuration,{signal})`,
 `disposeBrowserSpeech({signal})`, `setAI()`, `configureProviders()`,
-`configureSpeechProviders()`, `transitionAI()`, `transitionProviders()`,
+`configureSpeechProviders()`, `configureSpeechProvider(role,provider,options)`,
+`transitionAI()`, `transitionProviders()`,
 `transitionSpeechProviders()`, `startProviders()`, `setSpeechMuted()`,
 `streamRequest()`, `streamMessage()`, `fetchRequest()`, `fetch()`,
 read-only `ttsSegmentation`, `configureTTSSegmentation()`,
@@ -217,16 +218,17 @@ returns aggregate runtime status; `transitionProviders()` returns the configured
 three-role route configuration. Selected TWiN Cloud `TWIN` LLM, `OLLAMA` LLM,
 and Core `LOCAL_SPEACH` STT/TTS built-in routes expose truthful capability-only
 readiness through internal provider/2 adapters without probing, downloading, or
-hiding a load. Configured `OPENAI` speech preferences migrate to on-device
-`LOCAL_SPEACH`, with Whisper for STT and Kokoro for TTS. TWiN Cloud availability
+hiding a load. Explicit speech preference slots remain unchanged, including a
+selected external provider that the application registers after AI startup.
+TWiN Cloud availability
 requires the selected LLM route, its model, a credential, and `fetch`; Core speech
 availability requires the exact selected `Arcane.speech.transcribe` or
 `synthesize` method. `fetchRequest()`
 keeps the selected provider's public response shape. Browser speech routes
 translate the existing AI.js STT `{audio:Blob|File,mimeType,model}` and TTS
 `{model,input,responseFormat,voice?,speed?}` requests at the provider boundary;
-only WAV is accepted for the shared TTS result. TTS voice selection comes from
-the exact selected local provider/model catalog `defaultVoice`; a saved
+the selected provider declares its supported audio format. TTS voice selection comes from
+the exact selected provider/model catalog `defaultVoice`; a saved
 OpenAI-route voice is never forwarded to another provider route.
 
 The TWiN Cloud built-in provider and default-model preference sentinel are
@@ -252,13 +254,33 @@ tool declarations, emitted tool calls, or callback ordering.
 
 `configureSpeechProviders({stt,tts})` commits only the two speech routes and
 leaves the current LLM route and sticky lifecycle record unchanged. Both speech
-roles must be unloaded, use local-only selections, and own no request, load,
-unload, or dispose operation. Non-local STT and TTS selections reject with
-`AI_STT_DEVICE_ONLY` and `AI_TTS_DEVICE_ONLY`, respectively.
+roles must be unloaded and own no request, load, unload, or dispose operation.
+STT remains local-only (`AI_STT_DEVICE_ONLY` for a remote selection); an
+explicit TTS provider may declare `localOnly:false`.
 `transitionSpeechProviders({stt,tts})` stops queued audio, explicitly unloads
 only STT and TTS, then commits that same closed speech route record. Neither
 method loads a model, selects a fallback, or changes caller-owned model or voice
 policy.
+
+`configureSpeechProvider(role,provider,{modelId,signal,expectedProvider})`
+asynchronously registers and selects one provider/2 speech role, unloading and
+disposing only its previous SDK-owned provider. `modelId` defaults to the first
+catalog entry. It returns the selected `{providerId,modelId,localOnly}` record;
+passing `null` removes that role and returns `null`. An optional
+`expectedProvider` is compared inside the configuration lane; if another
+provider has taken ownership, removal resolves `false` without changing it.
+An unaccepted candidate is disposed on failure; a failure after replacement
+has `committed:true`, and runtime ownership identifies the installed provider.
+
+This method composes with an STT-only or TTS-only `configureBrowserSpeech()`
+in either order. The other speech role and LLM keep their routes, readiness,
+requests, and storage. Use sequential disposal when combining this method
+with `disposeBrowserSpeech()`. Configuration does not activate the new provider
+or make a network request. `setSpeechMuted(false)` waits for an in-progress
+configuration before activating the committed TTS selection; a later mute
+cancels that pending unmute. The application keeps model, voice, and credential
+selection. See [DigitalOcean FAL speech](ai/browser-speech.md#digitalocean-fal-text-to-speech)
+for the public remote adapter and completed-job audio transport.
 
 `startProviders({startLanguageModel=true,startMuted=true,startTranscription=false,signal=null}={})`
 starts provider-owned text chat without requesting an STT load by default.
@@ -273,6 +295,14 @@ user activation intent exposed by the shared speech component.
 `setSpeechMuted(false)` records the public unmuted state only after the selected
 TTS route reaches ready; a failed load leaves the public state muted. In contrast,
 `setSpeechMuted(true)` cancels active TTS work and unloads that role.
+An explicit unmute may wait for its selected external provider to register.
+`speechActivationPending` distinguishes that intent from an ordinary muted
+state. Streamed text and its final remainder may enter the existing speech
+queue during that wait; synthesis waits for the same activation promise.
+Text never activates a provider itself. Stop cancels queued preparation even
+while registration is pending; mute, disposal, a new startup operation, or an
+actual route replacement also revoke the pending activation. Initial
+registration of the already-selected provider/model preserves queued speech.
 The optional browser-speech `stt.execution` and `tts.execution` records select
 `device:'auto'|'webnn-npu'|'webgpu'|'wasm'` and `maxConcurrentRequests`.
 Omission uses NPU, GPU, then CPU automatic selection with one Whisper slot and

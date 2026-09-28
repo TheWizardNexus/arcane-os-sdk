@@ -4,6 +4,167 @@ import {readFile} from 'node:fs/promises';
 import test from '../src/testing.mjs';
 
 test(
+    'initial speech unmute waits for the canonical AI owner before provider registration',
+    async function preservePreHydrationSpeechIntent() {
+        const source = await readFile(
+            new URL('../runtime/arcane/components/speech.html', import.meta.url),
+            'utf8'
+        );
+        function section(startMarker, endMarker) {
+            const start = source.indexOf(startMarker);
+            const end = source.indexOf(endMarker, start);
+            assert.notEqual(start, -1);
+            assert.notEqual(end, -1);
+            return source.slice(start, end);
+        }
+        const readyListener = source.split('\n').find(
+            function findAIReadyListener(line) {
+                return line.includes("window.addEventListener('ai-ready',");
+            }
+        );
+        assert.ok(readyListener);
+        const createSpeechHarness = Function(
+            `'use strict';
+            return function createSpeechHarness() {
+                const globalThis = {};
+                const window = new EventTarget();
+                const runtimeStateAbortController = new AbortController();
+                const lifecycleListenerOptions = {signal: runtimeStateAbortController.signal};
+                const host = {muted: true, availability: {}, componentReady: true};
+                const errors = [];
+                const fallbackIntents = [];
+                const is = {
+                    function: function isFunction(value) {return typeof value === 'function';},
+                    string: function isString(value) {return typeof value === 'string';}
+                };
+                const arcaneLogging = {error: function reportError(message, error) {errors.push(error);}};
+                const events = {dispose: function disposeEvents() {}};
+                const sttActivationController = null;
+                const transcriptionEnabled = true;
+                const microphonePermissionStatus = null;
+                const microphonePermissionListener = null;
+                let sttRole = {state: 'unavailable'};
+                let ttsRole = {state: 'unavailable', providerId: null, modelId: null};
+                let pendingUnmute = false;
+                let pendingTTSIntent = null;
+                let activeTTSIntent = null;
+                let ttsIntentGeneration = 0;
+                let ttsOperationId = null;
+                let destroyed = false;
+                function completeValue(value) {return value;}
+                function nextSpeechOperationId() {return 'fixture-operation';}
+                function renderControls() {}
+                function renderStatus() {}
+                function cancelSTTOperation() {}
+                function reportTTSLifecycleError(error) {errors.push(error);}
+                function reportTTSError(error) {errors.push(error);}
+                function requestAIRuntimeIntent(intent) {
+                    fallbackIntents.push(intent);
+                    return intent;
+                }
+                ${section('    function selectedRole(', '    function configure(')}
+                ${section('    function applyConfiguredMutedState(', '    function renderSTTActivationState(')}
+                ${section('    function clearSettledTTSIntent(', '    function renderControls(')}
+                ${section('    function requestUserMute(', '    function reportTTSLifecycleError(')}
+                ${section('    function stopTTSPlayback(', '    async function transcribe(')}
+                ${section('    function handlePageHide(', '</script>')}
+                ${readyListener}
+                return {
+                    host,
+                    errors,
+                    fallbackIntents,
+                    start: function start() {applyConfiguredMutedState(false);},
+                    mute: requestUserMute,
+                    destroy,
+                    publish: function publish(state) {
+                        synchronizeAIRuntimeState({
+                            roles: {
+                                stt: {state: 'unavailable'},
+                                tts: {
+                                    state,
+                                    providerId: 'digitalocean-fal',
+                                    modelId: 'fal-ai/elevenlabs/tts/multilingual-v2',
+                                    loaded: state === 'ready'
+                                }
+                            }
+                        });
+                    },
+                    installAI: function installAI(ai) {globalThis.ai = ai;},
+                    ready: function ready() {window.dispatchEvent(new Event('ai-ready'));},
+                    state: function state() {return {pendingUnmute, pendingTTSIntent, destroyed};}
+                };
+            };`
+        )();
+        function createAI() {
+            const calls = [];
+            let completeActivation;
+            const ai = {
+                muted: true,
+                speechActivationPending: false,
+                stopAudio: function stopAudio() {},
+                resumeAudio: function resumeAudio() {return Promise.resolve(true);},
+                setSpeechMuted: function setSpeechMuted(muted) {
+                    calls.push(muted);
+                    ai.muted = true;
+                    if(muted) {
+                        ai.speechActivationPending = false;
+                        return Promise.resolve(true);
+                    }
+                    ai.speechActivationPending = true;
+                    return new Promise(
+                        function captureActivation(resolve) {
+                            completeActivation = function complete() {
+                                ai.speechActivationPending = false;
+                                ai.muted = false;
+                                resolve(true);
+                            };
+                        }
+                    );
+                }
+            };
+            return {ai, calls, complete: function complete() {completeActivation();}};
+        }
+
+        const fixture = createSpeechHarness();
+        fixture.start();
+        fixture.publish('unloaded');
+        assert.deepEqual(fixture.fallbackIntents, []);
+        assert.deepEqual(fixture.state(), {
+            pendingUnmute: true, pendingTTSIntent: null, destroyed: false
+        });
+        const runtime = createAI();
+        fixture.installAI(runtime.ai);
+        fixture.ready();
+        assert.deepEqual(runtime.calls, [false]);
+        assert.equal(fixture.host.muted, true);
+        fixture.publish('unloaded');
+        assert.deepEqual(runtime.calls, [false]);
+        fixture.publish('ready');
+        runtime.complete();
+        await Promise.resolve();
+        await Promise.resolve();
+        assert.equal(fixture.host.muted, false);
+        assert.deepEqual(fixture.fallbackIntents, []);
+        assert.deepEqual(fixture.errors, []);
+        fixture.destroy();
+
+        for(const cancellation of ['mute', 'destroy']) {
+            const cancelled = createSpeechHarness();
+            cancelled.start();
+            cancelled.publish('unloaded');
+            cancelled[cancellation]();
+            const laterRuntime = createAI();
+            cancelled.installAI(laterRuntime.ai);
+            cancelled.ready();
+            assert.deepEqual(laterRuntime.calls, []);
+            assert.deepEqual(cancelled.fallbackIntents, []);
+            assert.equal(cancelled.host.muted, true);
+            cancelled.destroy();
+        }
+    }
+);
+
+test(
     'shared chat forwards its first visible chunk once without waiting for speech',
     async function preserveFirstChatSpeechChunk() {
         const source = await readFile(
@@ -124,6 +285,7 @@ test(
                     spoken,
                     globalSpoken,
                     errors,
+                    runtime,
                     releaseSpeech
                 };
             };`
@@ -174,6 +336,18 @@ test(
             [pending, visible]
         );
         thinking.releaseSpeech(true);
+
+        for(const useBoundRuntime of [false,true]){
+            const loading=createStreamHarness(useBoundRuntime);
+            loading.runtime.speechActivationPending=true;
+            loading.speech.muted=true;
+            loading.host.aiAvailability.tts=false;
+            await loading.stream('Visible while voice activates.','loading',false);
+            assert.deepEqual(loading.spoken,['Visible while voice activates.']);
+            assert.equal(loading.chatOutput.children[0].querySelector('.markdown').raw,
+                'Visible while voice activates.');
+            loading.releaseSpeech(true);
+        }
 
         for(const state of [{muted: true, ready: true}, {muted: false, ready: false}]) {
             const fixture = createStreamHarness();

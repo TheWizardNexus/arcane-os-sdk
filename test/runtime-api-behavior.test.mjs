@@ -2931,10 +2931,20 @@ test(
                 '../runtime/arcane/modules/AI.js?twin-cloud-device-speech-readiness'
             );
             const ai=new AI(
-                'TWIN','OPENAI','OPENAI',
-                'TWIN','OPENAI','OPENAI'
+                'TWIN','selected-stt','selected-tts',
+                'TWIN','selected-voice-model','selected-transcription-model'
             );
             const runtime=ai.providerRuntime;
+            assert.equal(ai.sttService,'selected-stt');
+            assert.equal(ai.ttsService,'selected-tts');
+            assert.equal(ai.modelTTS,'selected-voice-model');
+            assert.equal(ai.modelSTT,'selected-transcription-model');
+            assert.equal(runtime.selection('stt').providerId,'selected-stt');
+            assert.equal(runtime.selection('tts').providerId,'selected-tts');
+            ai.setAI(
+                'TWIN','LOCAL_SPEACH','LOCAL_SPEACH',
+                'TWIN','LOCAL_SPEACH','LOCAL_SPEACH'
+            );
             assert.equal(ai.llmService,'TWIN');
             assert.equal(ai.sttService,'LOCAL_SPEACH');
             assert.equal(ai.ttsService,'LOCAL_SPEACH');
@@ -3111,13 +3121,18 @@ test(
                 }),
                 error=>error?.code==='AI_STT_DEVICE_ONLY'
             );
-            assert.throws(
-                ()=>ai.configureSpeechProviders({
-                    stt:{default:null,localOnly:null},
-                    tts:{default:remoteSelection,localOnly:null}
-                }),
-                error=>error?.code==='AI_TTS_DEVICE_ONLY'
-            );
+            const deviceSTTSelection=runtime.selection('stt');
+            const deviceTTSSelection=runtime.selection('tts');
+            ai.configureSpeechProviders({
+                stt:{default:deviceSTTSelection,localOnly:deviceSTTSelection},
+                tts:{default:remoteSelection,localOnly:null}
+            });
+            assert.deepEqual(runtime.selection('tts'),remoteSelection);
+            assert.deepEqual(runtime.selection('stt'),deviceSTTSelection);
+            ai.configureSpeechProviders({
+                stt:{default:deviceSTTSelection,localOnly:deviceSTTSelection},
+                tts:{default:deviceTTSSelection,localOnly:deviceTTSSelection}
+            });
 
             ai.license='';
             await runtime.unload('llm');
@@ -3215,6 +3230,8 @@ test(
             const speechStarts=[];
             const speechDurations=new Map();
             let ttsState='unloaded';
+            let pendingTTSLoad=null;
+            let markTTSLoadStarted=null;
 
             function deferTTSResponse(id,duration){
                 let markStarted;
@@ -3276,6 +3293,10 @@ test(
                     return {state:ttsState,loaded:ttsState==='ready',busy:false};
                 },
                 async load({progress}){
+                    if(pendingTTSLoad){
+                        markTTSLoadStarted?.();
+                        await pendingTTSLoad;
+                    }
                     progress({
                         phase:'capability',completed:1,total:1,unit:'items',heartbeat:false
                     });
@@ -3531,12 +3552,230 @@ test(
             assert.equal(ttsRequests[6].input,'Next');
             ai.stopAudio();
             await ai.setSpeechMuted(true);
+            let finishTTSLoad;
+            pendingTTSLoad=new Promise(function retainDelayedSpeechLoad(resolve){
+                finishTTSLoad=resolve;
+            });
+            const delayedLoadStarted=new Promise(function observeDelayedSpeechLoad(resolve){
+                markTTSLoadStarted=resolve;
+            });
+            ai.configureTTSSegmentation({punctuation:'sentence',wordCadence:null});
+            const beforeActivationRequests=ttsRequests.length;
+            const activation=ai.setSpeechMuted(false);
+            assert.equal(ai.speechActivationPending,true);
+            const firstWhileLoading=ai.streamTTS('Waiting sentence. ');
+            const remainderWhileLoading=ai.streamTTS('Remaining words');
+            const flushWhileLoading=ai.finishTTS();
+            assert.equal(ttsRequests.length,beforeActivationRequests);
+            await delayedLoadStarted;
+            assert.equal(runtime.status('tts').state,'loading');
+            assert.equal(ttsRequests.length,beforeActivationRequests);
+            finishTTSLoad();
+            assert.equal(await activation,true);
+            assert.deepEqual(await Promise.all([
+                firstWhileLoading,remainderWhileLoading,flushWhileLoading
+            ]),[true,true,true]);
+            assert.equal(ttsRequests.slice(beforeActivationRequests).map(
+                function speechInput(request){return request.input;}
+            ).join(''),'Waiting sentence. Remaining words');
+            assert.equal(ai.speechActivationPending,false);
+            ai.stopAudio();
+            await ai.setSpeechMuted(true);
+            pendingTTSLoad=new Promise(function retainCancelledSpeechLoad(resolve){
+                finishTTSLoad=resolve;
+            });
+            const cancelledLoadStarted=new Promise(function observeCancelledSpeechLoad(resolve){
+                markTTSLoadStarted=resolve;
+            });
+            const cancelledActivation=ai.setSpeechMuted(false);
+            const beforeCancelledRequests=ttsRequests.length;
+            const cancelledPreparation=ai.streamTTS('Do not keep this queued sentence.',true);
+            ai.stopAudio();
+            assert.equal(await cancelledPreparation,false);
+            assert.equal(ai.speechActivationPending,true);
+            assert.equal(ai.speechJobs.length,0);
+            assert.equal(ttsRequests.length,beforeCancelledRequests);
+            await cancelledLoadStarted;
+            finishTTSLoad();
+            await cancelledActivation;
+            pendingTTSLoad=null;
+            markTTSLoadStarted=null;
+            await ai.setSpeechMuted(true);
             ai.configureProviders({
                 llm:{default:null,localOnly:null},
                 stt:{default:null,localOnly:null},
                 tts:{default:null,localOnly:null}
             });
             assert.equal(unregisterTTS(),true);
+
+            const pendingTTSSelection = {
+                providerId: 'catalog-tts',
+                modelId: 'catalog-tts-model',
+                localOnly: null
+            };
+            ai.configureSpeechProviders(
+                {
+                    stt: {default: null, localOnly: null},
+                    tts: {default: pendingTTSSelection, localOnly: null}
+                }
+            );
+            assert.equal(runtime.hasProvider('tts', pendingTTSSelection.providerId), false);
+            assert.equal(runtime.status('tts').state, 'unloaded');
+            const pendingRegistrationGeneration = ai.speechGeneration;
+            const pendingRegistrationRequests = ttsRequests.length;
+            const pendingFirstAudio = deferTTSResponse(71, 0.5);
+            const pendingLastAudio = deferTTSResponse(72, 0.5);
+            const pendingRegistrationActivation = ai.setSpeechMuted(false);
+            assert.equal(ai.speechActivationPending, true);
+            assert.equal(ai.muted, true);
+            const pendingFirstSentence = ai.streamTTS('The kraken is waiting. ');
+            const pendingLastSentence = ai.streamTTS('Its complete song remains queued.', true);
+            const pendingRegistrationJobs = [...ai.speechJobs];
+            assert.equal(pendingRegistrationJobs.length, 2);
+            assert.equal(ttsRequests.length, pendingRegistrationRequests);
+            await ai.configureSpeechProvider(
+                'tts', ttsProvider, {modelId: pendingTTSSelection.modelId}
+            );
+            assert.equal(await pendingRegistrationActivation, true);
+            await Promise.all([pendingFirstAudio.started, pendingLastAudio.started]);
+            assert.equal(ai.speechGeneration, pendingRegistrationGeneration);
+            assert.equal(ai.muted, false);
+            assert.equal(runtime.ownsProvider('tts', ttsProvider), true);
+            assert.ok(
+                pendingRegistrationJobs.every(
+                    function preservesPendingRegistrationJob(job) {
+                        return ai.speechJobs.includes(job);
+                    }
+                )
+            );
+            assert.equal(
+                ttsRequests.slice(pendingRegistrationRequests).map(
+                    function pendingRegistrationText(request) {
+                        return request.input;
+                    }
+                ).join(''),
+                'The kraken is waiting. Its complete song remains queued.'
+            );
+            pendingLastAudio.release();
+            pendingFirstAudio.release();
+            assert.deepEqual(
+                await Promise.all([pendingFirstSentence, pendingLastSentence]),
+                [true, true]
+            );
+            ai.stopAudio();
+            await ai.setSpeechMuted(true);
+            await ai.configureSpeechProvider('tts', null);
+
+            const cancelledPendingSelection = {
+                providerId: 'not-yet-registered-tts',
+                modelId: 'waiting-voice-model',
+                localOnly: null
+            };
+            ai.configureSpeechProviders(
+                {
+                    stt: {default: null, localOnly: null},
+                    tts: {default: cancelledPendingSelection, localOnly: null}
+                }
+            );
+            const muteBeforeRegistration = ai.setSpeechMuted(false);
+            const cancelledBeforeRegistration = ai.streamTTS('Cancel the waiting chorus.', true);
+            assert.equal(ai.speechActivationPending, true);
+            await Promise.resolve();
+            const pendingRegistrationMute = ai.setSpeechMuted(true);
+            assert.equal(await muteBeforeRegistration, false);
+            assert.equal(await cancelledBeforeRegistration, false);
+            await pendingRegistrationMute;
+            assert.equal(ai.speechActivationPending, false);
+            assert.equal(ai.speechJobs.length, 0);
+            assert.equal(ai.muted, true);
+            assert.equal(runtime.hasProvider('tts', cancelledPendingSelection.providerId), false);
+
+            const heldSTTSelection = {
+                providerId: 'LOCAL_SPEACH',
+                modelId: 'whisper-small',
+                localOnly: true
+            };
+            ai.configureSpeechProviders(
+                {
+                    stt: {default: heldSTTSelection, localOnly: heldSTTSelection},
+                    tts: {default: cancelledPendingSelection, localOnly: null}
+                }
+            );
+            await runtime.load('stt');
+            let releaseHeldTranscription;
+            let markHeldTranscriptionStarted;
+            const heldTranscriptionStarted = new Promise(
+                function observeHeldNativeTranscription(resolve) {
+                    markHeldTranscriptionStarted = resolve;
+                }
+            );
+            const originalTranscribe = globalThis.Arcane.speech.transcribe;
+            globalThis.Arcane.speech.transcribe = function holdNativeTranscription() {
+                return new Promise(
+                    function retainNativeTranscription(resolve) {
+                        releaseHeldTranscription = resolve;
+                        markHeldTranscriptionStarted();
+                    }
+                );
+            };
+            const heldTranscription = ai.fetchSTT(
+                new Blob(
+                    ['A synthetic microphone recording.'],
+                    {type: 'audio/webm'}
+                )
+            );
+            const heldTranscriptionRejected = assert.rejects(
+                heldTranscription,
+                {name: 'AbortError'}
+            );
+            await heldTranscriptionStarted;
+            let markSTTUnloading;
+            const sttUnloading = new Promise(
+                function observeHeldSTTUnload(resolve) {
+                    markSTTUnloading = resolve;
+                }
+            );
+            const stopObservingSTTUnload = subscribeAIRuntimeState(
+                function observeDisjointSTTTransition(snapshot) {
+                    if (snapshot.roles.stt.state === 'unloading') markSTTUnloading();
+                },
+                {emitCurrent: false}
+            );
+            let sttConfigurationSettled = false;
+            const heldSTTConfiguration = ai.configureSpeechProvider('stt', null).then(
+                function completeHeldSTTConfiguration(value) {
+                    sttConfigurationSettled = true;
+                    return value;
+                }
+            );
+            await sttUnloading;
+            stopObservingSTTUnload();
+            const activationBehindSTT = ai.setSpeechMuted(false);
+            assert.equal(ai.speechActivationPending, true);
+            await Promise.resolve();
+            const muteBehindSTT = ai.setSpeechMuted(true);
+            assert.equal(await activationBehindSTT, false);
+            await muteBehindSTT;
+            assert.equal(sttConfigurationSettled, false);
+            assert.equal(runtime.status('stt').state, 'unloading');
+            assert.deepEqual(runtime.selection('stt'), heldSTTSelection);
+            assert.equal(ai.speechActivationPending, false);
+            assert.equal(ai.muted, true);
+            releaseHeldTranscription(
+                {text: 'The independently owned transcription settled.'}
+            );
+            await heldTranscriptionRejected;
+            await heldSTTConfiguration;
+            assert.equal(sttConfigurationSettled, true);
+            assert.equal(runtime.selection('stt'), null);
+            globalThis.Arcane.speech.transcribe = originalTranscribe;
+            ai.configureProviders(
+                {
+                    llm: {default: null, localOnly: null},
+                    stt: {default: null, localOnly: null},
+                    tts: {default: null, localOnly: null}
+                }
+            );
             assert.equal(runtime.providerIdentity('llm','OLLAMA'),null);
             assert.equal(runtime.status('llm').state,'unavailable');
         }finally{
@@ -3654,7 +3893,7 @@ test(
             for(const role of ['stt','tts']){
                 runtime.unregister(role,'LOCAL_SPEACH');
             }
-            ai=new AI('TWIN','OPENAI','OPENAI','TWIN','OPENAI','OPENAI');
+            ai=new AI('TWIN','LOCAL_SPEACH','LOCAL_SPEACH','TWIN','LOCAL_SPEACH','LOCAL_SPEACH');
             const initialLocalTTSSelection=runtime.selection('tts');
             const pendingSTTSelection={
                 providerId:'saved-stt-route',
@@ -3923,6 +4162,177 @@ test(
                 assert.equal(await ai.disposeBrowserSpeech(),true);
             }
             assert.deepEqual(dbopfsReads,[]);
+
+            const {createDigitalOceanFalTTSProvider} = await import(
+                '../browser-runtime/ai/digitalocean-speech.mjs'
+            );
+            for (const order of ['browser-first', 'cloud-first']) {
+                const cloudRequests = [];
+                function createCloudSpeechRole(suffix, fetchImpl) {
+                    return createDigitalOceanFalTTSProvider(
+                        {
+                            id: `cloud-tts-${order}-${suffix}`,
+                            model: {
+                                id: 'fal-ai/elevenlabs/tts/multilingual-v2',
+                                defaultVoice: 'Rachel'
+                            },
+                            getApiKey: function readSpeechContractKey() {
+                                return 'synthetic-cloud-speech-key';
+                            },
+                            fetch: fetchImpl ?? async function unexpectedSpeechContractFetch(url, options) {
+                                cloudRequests.push(
+                                    {url, options}
+                                );
+                                throw new Error('Speech configuration and load must remain local.');
+                            }
+                        }
+                    );
+                }
+                let cloud = createCloudSpeechRole('selected');
+                const localSTT = {
+                    protocol: AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+                    id: `browser-stt-with-cloud-${order}`,
+                    dbopfs,
+                    stt: browserSpeechRole('stt', `browser-stt-${order}`, order)
+                };
+                if (order === 'browser-first') {
+                    await ai.configureBrowserSpeech(localSTT);
+                    await ai.configureSpeechProvider('tts', cloud);
+                } else {
+                    await ai.configureSpeechProvider('tts', cloud);
+                    await ai.setSpeechMuted(false);
+                    const cloudStatus = runtime.status('tts');
+                    await ai.configureBrowserSpeech(localSTT);
+                    assert.deepEqual(runtime.status('tts'), cloudStatus);
+                }
+                const retainedSTT = runtime.selection('stt');
+                const retainedSTTState = runtime.status('stt');
+                const retainedSTTIdentity = runtime.providerIdentity('stt', retainedSTT.providerId);
+                assert.equal(retainedSTT.localOnly, true);
+                assert.equal(runtime.selection('tts').localOnly, false);
+                assert.equal(ai.sttService, retainedSTT.providerId);
+                assert.equal(ai.ttsService, cloud.id);
+                assert.equal(ai.modelSTT, retainedSTT.modelId);
+                assert.equal(ai.modelTTS, cloud.catalog()[0].id);
+                assert.equal(ai.browserSpeechConfiguration.stt, localSTT.stt);
+                assert.equal(ai.browserSpeechConfiguration.tts, undefined);
+                await ai.setSpeechMuted(false);
+                assert.equal(runtime.status('tts').state, 'ready');
+                assert.equal(runtime.status('tts', {execution: true}).execution.selectedDevice, 'remote');
+                assert.deepEqual(cloudRequests, []);
+                assert.deepEqual(dbopfsReads, []);
+                assert.deepEqual(runtime.status('stt'), retainedSTTState);
+
+                const previousCloud = cloud;
+                cloud = createCloudSpeechRole('selected');
+                const replacement = ai.configureSpeechProvider('tts', cloud);
+                const staleRemoval = ai.configureSpeechProvider(
+                    'tts', null, {expectedProvider: previousCloud}
+                );
+                await replacement;
+                assert.equal(await staleRemoval, false);
+                assert.equal(previousCloud.status().state, 'disposed');
+                assert.equal(runtime.ownsProvider('tts', cloud), true);
+                const rejectedCandidate = createCloudSpeechRole('stale-candidate');
+                assert.equal(
+                    await ai.configureSpeechProvider(
+                        'tts', rejectedCandidate, {expectedProvider: previousCloud}
+                    ),
+                    false
+                );
+                assert.equal(rejectedCandidate.status().state, 'disposed');
+                assert.deepEqual(runtime.selection('stt'), retainedSTT);
+                assert.deepEqual(runtime.status('stt'), retainedSTTState);
+
+                const cancelledCandidate = createCloudSpeechRole('cancelled-candidate');
+                const cancelledConfiguration = new AbortController();
+                cancelledConfiguration.abort();
+                await assert.rejects(
+                    ai.configureSpeechProvider(
+                        'tts', cancelledCandidate, {signal: cancelledConfiguration.signal}
+                    ),
+                    {name: 'AbortError'}
+                );
+                assert.equal(cancelledCandidate.status().state, 'disposed');
+                assert.equal(runtime.ownsProvider('tts', cloud), true);
+                assert.deepEqual(cloudRequests, []);
+
+                const localTTS = {
+                    protocol: AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
+                    id: `return-to-browser-tts-${order}`,
+                    dbopfs,
+                    tts: browserSpeechRole('tts', `returned-browser-tts-${order}`, order)
+                };
+                await ai.configureBrowserSpeech(localTTS);
+                assert.equal(cloud.status().state, 'disposed');
+                assert.equal(runtime.selection('tts').localOnly, true);
+                assert.equal(runtime.selection('tts').providerId, localTTS.tts.providerId);
+                assert.deepEqual(runtime.selection('stt'), retainedSTT);
+                assert.deepEqual(runtime.status('stt'), retainedSTTState);
+                assert.deepEqual(runtime.providerIdentity('stt', retainedSTT.providerId), retainedSTTIdentity);
+                await ai.configureSpeechProvider('tts', null);
+                assert.equal(runtime.selection('tts'), null);
+                assert.equal(runtime.providerIdentity('tts', localTTS.tts.providerId), null);
+                assert.deepEqual(runtime.selection('stt'), retainedSTT);
+                assert.equal(ai.browserSpeechConfiguration.stt, localSTT.stt);
+
+                let signalSubmissionStarted;
+                const submissionStarted = new Promise(
+                    function retainCloudSubmissionStart(resolve) {
+                        signalSubmissionStarted = resolve;
+                    }
+                );
+                let submissionSignal;
+                const cancellableCloud = createCloudSpeechRole(
+                    'cancellation',
+                    function pendingCloudContractFetch(url, options) {
+                        cloudRequests.push(
+                            {url, options}
+                        );
+                        submissionSignal = options.signal;
+                        return new Promise(
+                            function awaitCloudSubmissionCancellation(resolve, reject) {
+                                options.signal.addEventListener(
+                                    'abort',
+                                    function rejectCancelledCloudSubmission() {
+                                        reject(new DOMException('Speech request cancelled.', 'AbortError'));
+                                    },
+                                    {once: true}
+                                );
+                                signalSubmissionStarted();
+                            }
+                        );
+                    }
+                );
+                await ai.configureSpeechProvider('tts', cancellableCloud);
+                await ai.setSpeechMuted(false);
+                assert.deepEqual(cloudRequests, []);
+                const speech = runtime.synthesize(
+                    {input: 'The kraken cancelled its karaoke reservation.'},
+                    {localOnly: false}
+                );
+                const rejectedSpeech = assert.rejects(
+                    speech,
+                    {name: 'AbortError'}
+                );
+                await submissionStarted;
+                assert.equal(runtime.cancel('tts'), true);
+                await rejectedSpeech;
+                assert.equal(submissionSignal.aborted, true);
+                assert.equal(cloudRequests.length, 1);
+                assert.equal(runtime.status('tts').state, 'ready');
+                assert.equal(cancellableCloud.status().busy, false);
+                assert.deepEqual(runtime.status('stt'), retainedSTTState);
+                await ai.configureSpeechProvider(
+                    'tts', null, {expectedProvider: cancellableCloud}
+                );
+                assert.equal(cancellableCloud.status().state, 'disposed');
+                assert.equal(runtime.selection('tts'), null);
+                assert.deepEqual(runtime.selection('stt'), retainedSTT);
+                assert.equal(await ai.disposeBrowserSpeech(), true);
+                assert.equal(runtime.selection('stt'), null);
+                assert.deepEqual(dbopfsReads, []);
+            }
             ai.configureProviders({
                 llm:{default:null,localOnly:null},
                 stt:{default:null,localOnly:null},
