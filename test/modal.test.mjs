@@ -222,6 +222,18 @@ function dismissThroughCloseButton(fixture) {
 
 const dismissalGestures = [dismissThroughCancel, dismissThroughBackdrop, dismissThroughCloseButton];
 
+function pendingTask() {
+    let resolve;
+    let reject;
+    const promise = new Promise(
+        function retainTaskSettlement(resolveTask, rejectTask) {
+            resolve = resolveTask;
+            reject = rejectTask;
+        }
+    );
+    return {promise, resolve, reject};
+}
+
 test(
     'modal retains default dismissal and configured owner-only closure through population and reopen',
     async function exerciseModalDismissibility(context) {
@@ -417,5 +429,139 @@ test(
             );
             assert.equal(host.opened, false);
         }
+    }
+);
+
+test(
+    'modal reports complete per-job progress concurrently and ignores settled reports',
+    async function exerciseIndependentTaskProgress(context) {
+        const fixture = await modalFixture(context);
+        const first = pendingTask();
+        const second = pendingTask();
+        const reporters = [];
+        const started = [];
+        const result = {message: 'Moon fragments recovered.'};
+        const failure = new Error('The second moon is still missing.');
+        const pending = fixture.host.runTasks(
+            'Recover both moons',
+            [
+                {
+                    name: 'First moon',
+                    task: function recoverFirstMoon(reportProgress) {
+                        started.push('first');
+                        reporters[0] = reportProgress;
+                        reportProgress('Retrying the complete first-moon request in three seconds.');
+                        return first.promise;
+                    }
+                },
+                {
+                    name: 'Second moon',
+                    task: function recoverSecondMoon(reportProgress) {
+                        started.push('second');
+                        reporters[1] = reportProgress;
+                        reportProgress('Waiting for the second-moon response.');
+                        return second.promise;
+                    }
+                }
+            ]
+        );
+        await Promise.resolve();
+        const rows = fixture.content.children[2].children;
+        assert.deepEqual(started, ['first', 'second']);
+        assert.equal(rows[0].children[1].innerText, 'Retrying the complete first-moon request in three seconds.');
+        assert.equal(rows[1].children[1].innerText, 'Waiting for the second-moon response.');
+        assert.equal(reporters[0]('First-moon retry dispatched.'), true);
+        assert.equal(rows[1].children[1].innerText, 'Waiting for the second-moon response.');
+        first.resolve(result);
+        await Promise.resolve();
+        assert.equal(rows[0].children[1].innerText, 'Complete');
+        assert.equal(reporters[0]('Late first-moon progress'), false);
+        assert.equal(rows[0].children[1].innerText, 'Complete');
+        assert.equal(reporters[1]('Second-moon retry dispatched.'), true);
+        second.reject(failure);
+        const settled = await pending;
+        assert.deepEqual(settled, [
+            {status: 'fulfilled', value: result},
+            {status: 'rejected', reason: failure}
+        ]);
+        assert.equal(rows[1].children[1].innerText, 'Unable to complete');
+        assert.equal(reporters[1]('Late second-moon progress'), false);
+        assert.strictEqual(fixture.errors[0][1], failure);
+    }
+);
+
+test(
+    'modal progress display failure does not reject a successful task',
+    async function exerciseProgressObservationLifetime(context) {
+        const fixture = await modalFixture(context);
+        const task = pendingTask();
+        let report;
+        const pending = fixture.host.runTasks(
+            'Recover the moon',
+            [{
+                name: 'Moon',
+                task: function recoverMoon(reportProgress) {
+                    report = reportProgress;
+                    return task.promise;
+                }
+            }]
+        );
+        await Promise.resolve();
+        const row = fixture.content.children[2].children[0];
+        const status = row.children[1];
+        const displayError = new Error('The status surface is unavailable.');
+        Object.defineProperty(status, 'innerText', {
+            configurable: true,
+            get: function readStatus() {
+                return 'Working...';
+            },
+            set: function rejectStatusWrite() {
+                throw displayError;
+            }
+        });
+        assert.equal(report('Retrying the request.'), false);
+        assert.strictEqual(fixture.errors[0][1], displayError);
+        assert.equal(fixture.host.running, true);
+        task.resolve('Complete application result');
+        assert.deepEqual(await pending, [
+            {status: 'fulfilled', value: 'Complete application result'}
+        ]);
+        assert.equal(report('Progress after settlement'), false);
+        assert.equal(row.dataset.status, 'complete');
+        assert.equal(fixture.host.running, false);
+        assert.equal(fixture.errors.length, 2);
+        assert.strictEqual(fixture.errors[1][1], displayError);
+    }
+);
+
+test(
+    'modal destruction stops progress presentation without cancelling application work',
+    async function exerciseDisposedProgressLifetime(context) {
+        const fixture = await modalFixture(context);
+        const task = pendingTask();
+        let report;
+        const pending = fixture.host.runTasks(
+            'Recover the moon',
+            [{
+                name: 'Moon',
+                task: function recoverMoon(reportProgress) {
+                    report = reportProgress;
+                    return task.promise;
+                }
+            }]
+        );
+        await Promise.resolve();
+        const row = fixture.content.children[2].children[0];
+        assert.equal(report('Waiting for moon recovery.'), true);
+        fixture.host.destroy();
+        assert.equal(report('Progress after destruction'), false);
+        task.resolve('Complete application result');
+        assert.deepEqual(await pending, [
+            {status: 'fulfilled', value: 'Complete application result'}
+        ]);
+        assert.equal(row.dataset.status, 'pending');
+        assert.equal(row.children[1].innerText, 'Waiting for moon recovery.');
+        assert.equal(fixture.host.running, false);
+        assert.equal(fixture.errors.length, 0);
     }
 );

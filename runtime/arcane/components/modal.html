@@ -421,16 +421,38 @@
         await open();
 
         activeRun=Promise.allSettled(tasks.map(async function runProgressTask(job,index){
+            let settled = false;
+            function displayTaskProgress(message, state) {
+                if (disposed) {
+                    return false;
+                }
+                try {
+                    if (state) {
+                        rows[index].row.dataset.status = state;
+                    }
+                    rows[index].status.innerText = message;
+                    return true;
+                } catch (error) {
+                    arcaneLogging.error(`Unable to display progress for ${job.name}:`, error);
+                    return false;
+                }
+            }
+            function reportProgress(message) {
+                if (settled || !is.string(message)) {
+                    return false;
+                }
+                return displayTaskProgress(message);
+            }
             try{
-                const result=await job.task();
-                rows[index].row.dataset.status='complete';
-                rows[index].status.innerText='Complete';
+                const result=await job.task(reportProgress);
+                displayTaskProgress('Complete', 'complete');
                 return result;
             }catch(error){
-                rows[index].row.dataset.status='failed';
-                rows[index].status.innerText='Unable to complete';
+                displayTaskProgress('Unable to complete', 'failed');
                 arcaneLogging.error(`Unable to complete ${job.name}:`,error);
                 throw error;
+            } finally {
+                settled = true;
             }
         }));
 
@@ -439,6 +461,9 @@
             return result.status==='rejected';
         });
         running=false;
+        if (disposed) {
+            return results;
+        }
         updateCloseButton();
 
         if(failed){

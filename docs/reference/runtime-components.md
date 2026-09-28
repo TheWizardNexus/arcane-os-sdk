@@ -988,6 +988,16 @@ to `true`; `destroy()` releases the component. Product-specific conditions for
 closing a modal belong to the application. Content, actions and task results
 are preserved, and `runTasks()` continues to execute independent jobs concurrently.
 
+`runTasks(title, jobs)` calls each `job.task(reportProgress)` concurrently.
+The optional callback accepts complete plain-text status for that pending job
+only and returns `true` when displayed. For example, a request can report its
+retry delay without replacing another job's progress. Reports after that job
+settles or the modal is destroyed return `false` and change no UI. A display
+failure is logged without rejecting the task. Existing zero-argument task
+functions remain supported, results retain `Promise.allSettled` order, and
+destruction does not cancel the application-owned work. Progress is transient
+display content, never a task result or conversation record.
+
 Events: `modal-ready`, `modal-opened`, `modal-closed`, `modal-action`.
 
 Slots: `header`, `body`, `footer`.
