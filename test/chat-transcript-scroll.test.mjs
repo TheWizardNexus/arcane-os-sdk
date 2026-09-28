@@ -13,10 +13,14 @@ const visibilityStart = source.indexOf('        if(!conversationVisible && !host
 const visibilityEnd = source.indexOf('        send.disabled=', visibilityStart);
 const resizeStart = source.indexOf('    async function resizeTextArea(');
 const resizeEnd = source.indexOf('\n\n    function renderSessionMessageFailure', resizeStart);
+const ownershipStart = source.indexOf('    function isAbortSignal(');
+const ownershipEnd = source.indexOf('\n    host.sendMessage=', ownershipStart);
+const submissionStart = source.indexOf('    async function submitMessage(');
+const submissionEnd = source.indexOf('\n\n    function receivedMessage', submissionStart);
 const restoreStart = source.indexOf('\n    function restoreFromPageCache(){');
 const destroyStart = source.indexOf('\n    function destroy(){');
 const destroyEnd = source.indexOf('        aiActivationController.destroy();', destroyStart);
-for(const boundary of [scrollStart, scrollEnd, visibilityStart, visibilityEnd, resizeStart, resizeEnd, restoreStart, destroyStart, destroyEnd]) {
+for(const boundary of [scrollStart, scrollEnd, visibilityStart, visibilityEnd, resizeStart, resizeEnd, ownershipStart, ownershipEnd, submissionStart, submissionEnd, restoreStart, destroyStart, destroyEnd]) {
     assert.notEqual(boundary, -1);
 }
 
@@ -32,22 +36,76 @@ const initializeScrolling = Function(
     const is = {
         function: function isFunction(value) {
             return typeof value === 'function';
-        }
+        },
+        string: function isString(value) {
+            return typeof value === 'string';
+        },
+        object: function isObject(value) {
+            return typeof value === 'object';
+        },
+        boolean: function isBoolean(value) {
+            return typeof value === 'boolean';
+        },
+        array: Array.isArray
     };
     let destroyed = false;
     let sessionBindingGeneration = 0;
+    let hostSubmissionGeneration = 0;
+    let submissionSequence = 0;
+    const sessionBindingPending = false;
+    const sessionMessagePending = false;
+    const pendingStructuralToolMessage = '';
+    const sessionHistoryRecoveryMessage = '';
+    const boundChatSession = null;
     const aiRuntimeStateAbortController = new AbortController();
     const activeSubmissionOwnerships = new Set();
-    const chatReasons = {componentDestroyed: 'component-destroyed'};
-    const host = {conversationComplete: false};
+    const chatReasons = {
+        componentDestroyed: 'component-destroyed',
+        callerSignalAborted: 'caller-signal-aborted',
+        messageSubmissionRequested: 'message-submission-requested',
+        messageSubmissionCancelled: 'message-submission-cancelled'
+    };
+    const chatErrorCodes = {messageSubmissionAborted: 'ARCANE_CHAT_MESSAGE_SUBMISSION_ABORTED'};
+    const submission = {accepted: true, events: [], sent: [], onDispatch: null, onSend: null};
+    const host = {
+        name: 'User',
+        conversationComplete: false,
+        aiAvailability: {llm: true, tts: false},
+        sendMessage(text, context) {
+            const request = {text, context};
+            submission.sent.push(request);
+            submission.onSend?.(request);
+            return true;
+        }
+    };
     const chatArea = {dataset: {}};
     function setSessionStatus() {}
     function setAIAvailability() {}
-    function createChatSubmissionAbort(reason, message) {
-        return new Error(message);
+    function nextChatOperationId(kind) {
+        submissionSequence += 1;
+        return kind + ':' + submissionSequence;
+    }
+    function dispatchChatEvent(type, detail, options) {
+        submission.events.push(
+            {type, detail, options}
+        );
+        submission.onDispatch?.(detail);
+        return submission.accepted;
+    }
+    function appendTranscriptMessage(role, text, name) {
+        const item = {localName: 'li', dataset: {role}, text, name, parentElement: chatOutput};
+        chatOutput.children.push(item);
+        chatOutput.scrollHeight += 240;
+        scrollTranscriptToBottom();
+        return item;
+    }
+    function observeHostSubmission(result, context, ownership) {
+        return Promise.resolve(result).finally(ownership.release);
     }
     ${source.slice(scrollStart, scrollEnd)}
     ${source.slice(resizeStart, resizeEnd)}
+    ${source.slice(ownershipStart, ownershipEnd)}
+    ${source.slice(submissionStart, submissionEnd)}
     ${source.slice(restoreStart, destroyStart)}
     ${source.slice(destroyStart, destroyEnd)}
         return true;
@@ -55,6 +113,9 @@ const initializeScrolling = Function(
     return {
         scroll: scrollTranscriptToBottom,
         resize: resizeTextArea,
+        submit: submitMessage,
+        submission,
+        host,
         restore: restoreFromPageCache,
         destroy,
         signal: aiRuntimeStateAbortController.signal,
@@ -137,7 +198,7 @@ function createScrollFixture(cards = []) {
     }
 
     const viewport = new TranscriptViewport();
-    const textArea = {scrollHeight: 80, style: {height: ''}};
+    const textArea = {value: '', scrollHeight: 80, style: {height: ''}};
     for(const card of cards) {
         card.parentElement = viewport;
     }
@@ -284,6 +345,149 @@ test(
                 fixture.destroy();
             }
         }
+    }
+);
+
+test(
+    'accepted user sends and retries resume following from earlier transcript content',
+    async function resumeFollowingOnAcceptedUserSubmission() {
+        for(const retry of [false, true]) {
+            const existing = {localName: 'li', dataset: {role: 'user'}};
+            const cards = retry ? [existing] : [];
+            const fixture = createScrollFixture(cards);
+            fixture.scroll();
+            fixture.viewport.scrollTop = 900;
+            fixture.viewport.dispatchEvent(
+                new Event('scroll')
+            );
+            fixture.submission.onSend = function showSubmissionStatus() {
+                fixture.viewport.clientHeight = 300;
+            };
+            const text = '  Please continue.\nKeep this complete text.  ';
+            fixture.textArea.value = text;
+            const context = retry
+                ? {source: 'user-retry', reuseVisibleMessage: true}
+                : {source: 'user'};
+            const pending = fixture.submit('', context);
+            assert.equal(fixture.viewport.scrollTop, retry ? 1200 : 1440);
+            assert.equal(fixture.viewport.children.length, 1);
+            assert.equal(fixture.submission.sent.length, 1);
+            assert.equal(fixture.submission.sent[0].text, text);
+            assert.equal(fixture.submission.events[0].detail.message, text);
+            assert.equal(fixture.textArea.value, '');
+            assert.equal(await pending, true);
+
+            fixture.resizeObserver.deliver();
+            assert.equal(fixture.viewport.scrollTop, retry ? 1300 : 1540);
+            fixture.viewport.scrollHeight += 400;
+            fixture.resizeObserver.deliver();
+            assert.equal(fixture.viewport.scrollTop, retry ? 1700 : 1940);
+            fixture.destroy();
+        }
+    }
+);
+
+test(
+    'accepted user submissions resume following after the transcript becomes visible',
+    async function resumeAcceptedSubmissionFromHiddenTranscript() {
+        const fixture = createScrollFixture();
+        fixture.scroll();
+        fixture.viewport.scrollTop = 900;
+        fixture.viewport.dispatchEvent(
+            new Event('scroll')
+        );
+        fixture.viewport.clientHeight = 0;
+        fixture.viewport.scrollTop = 0;
+        fixture.resizeObserver.deliver();
+        const result = await fixture.submit('Continue when the view returns.');
+        assert.equal(result, true);
+        assert.equal(fixture.viewport.scrollTop, 0);
+        assert.equal(fixture.submission.sent.length, 1);
+
+        fixture.viewport.clientHeight = 400;
+        fixture.resizeObserver.deliver();
+        assert.equal(fixture.viewport.scrollTop, 1440);
+        fixture.destroy();
+    }
+);
+
+test(
+    'unaccepted user submissions preserve reader position and draft',
+    async function preserveReaderOnUnacceptedSubmission() {
+        for(const reason of ['cancelled', 'pre-aborted', 'destroyed', 'unavailable', 'abort-during-dispatch', 'destroy-during-dispatch']) {
+            const fixture = createScrollFixture();
+            fixture.scroll();
+            fixture.viewport.scrollTop = 900;
+            fixture.viewport.dispatchEvent(
+                new Event('scroll')
+            );
+            const text = '  Keep my unsent draft.\nAll of it.  ';
+            fixture.textArea.value = text;
+            const caller = new AbortController();
+            if(reason === 'cancelled') fixture.submission.accepted = false;
+            if(reason === 'pre-aborted') {
+                caller.abort(
+                    new Error('Cancelled before submission.')
+                );
+            }
+            if(reason === 'destroyed') fixture.destroy();
+            if(reason === 'unavailable') fixture.host.aiAvailability.llm = false;
+            if(reason === 'abort-during-dispatch') {
+                fixture.submission.onDispatch = function abortBeforeHostCallback() {
+                    caller.abort(
+                        new Error('Cancelled during submission dispatch.')
+                    );
+                };
+            }
+            if(reason === 'destroy-during-dispatch') {
+                fixture.submission.onDispatch = function destroyBeforeHostCallback() {
+                    fixture.destroy();
+                };
+            }
+            const result = await fixture.submit(
+                '',
+                {source: 'user', signal: caller.signal}
+            );
+            assert.equal(result, false, reason);
+            assert.equal(fixture.viewport.scrollTop, 900, reason);
+            assert.equal(fixture.viewport.children.length, 0, reason);
+            assert.equal(fixture.submission.sent.length, 0, reason);
+            assert.equal(fixture.textArea.value, text, reason);
+
+            fixture.viewport.scrollHeight += 400;
+            fixture.resizeObserver.deliver();
+            assert.equal(fixture.viewport.scrollTop, 900, reason);
+            fixture.destroy();
+        }
+    }
+);
+
+test(
+    'accepted synthetic submissions preserve the reader position through later layout',
+    async function preserveReaderOnSyntheticSubmission() {
+        const fixture = createScrollFixture();
+        fixture.scroll();
+        fixture.viewport.scrollTop = 900;
+        fixture.textArea.value = 'An unfinished user draft.';
+        const text = '  Internal timebox notice.\nKeep its original text.  ';
+        const result = await fixture.submit(
+            text,
+            {source: 'conversation-timebox', synthetic: true, preserveDraft: true}
+        );
+        assert.equal(result, true);
+        assert.equal(fixture.viewport.scrollTop, 900);
+        assert.equal(fixture.viewport.children.length, 0);
+        assert.equal(fixture.submission.sent.length, 1);
+        assert.equal(fixture.submission.sent[0].text, text);
+        assert.equal(fixture.submission.events[0].detail.message, text);
+        assert.equal(fixture.textArea.value, 'An unfinished user draft.');
+
+        fixture.viewport.clientHeight = 300;
+        fixture.resizeObserver.deliver();
+        fixture.viewport.scrollHeight += 400;
+        fixture.resizeObserver.deliver();
+        assert.equal(fixture.viewport.scrollTop, 900);
+        fixture.destroy();
     }
 );
 

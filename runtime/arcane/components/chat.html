@@ -1161,9 +1161,13 @@
         scrollTranscriptToBottom();
     }
 
-    function scrollTranscriptToBottom() {
+    function scrollTranscriptToBottom(resumeFollowing = false) {
         // Read movement before writing: a reader's scroll event may still be queued.
-        if(!trackTranscriptScrollPosition() || !transcriptFollowing) return false;
+        const visible = trackTranscriptScrollPosition();
+        if(resumeFollowing === true && !destroyed) {
+            transcriptFollowing = true;
+        }
+        if(!visible || !transcriptFollowing) return false;
         chatOutput.scrollTop = chatOutput.scrollHeight;
         transcriptScrollTop = chatOutput.scrollTop;
         return true;
@@ -3831,7 +3835,7 @@
                 const visibleMessage=appendTranscriptMessage('user',text,host.name);
                 visibleMessage.dataset.operationId=operationId;
             }
-            scrollTranscriptToBottom();
+            scrollTranscriptToBottom(!eventContext.synthetic);
 
             if(host.aiAvailability.tts&&speech.muted===false){
                 const aiRuntime=boundChatAI??globalThis.ai;

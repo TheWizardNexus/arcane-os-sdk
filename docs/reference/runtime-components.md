@@ -342,7 +342,9 @@ transcript is a masked vertical scroll viewport; status and composer remain
 outside it. Initial restoration follows the true bottom. User, assistant, tool,
 streaming, progress, and failure updates continue following it, including later
 message-card, status, composer, or viewport resizing, until the reader scrolls
-toward earlier content. Scrolling down to the bottom resumes following. Layout
+toward earlier content. Scrolling down to the bottom or submitting an accepted
+non-synthetic user message resumes following. Canceled or rejected submissions
+and synthetic requests preserve the reader's position. Layout
 clamping, hidden views, and BFCache restoration preserve that choice;
 destruction releases scroll observation. Each
 restored or new message uses a separate semantic `<time>` element at the card's
