@@ -822,7 +822,7 @@ class UserEntity {
             src=this.explicit;
         }
 
-        if(!is.union(src,'object','string')){
+        if(!is.union(src,'object|string')){
             throw new Error('UserEntity.explicit setter expects object or JSON string');
         }
 
