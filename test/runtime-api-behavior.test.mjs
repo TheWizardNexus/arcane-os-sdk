@@ -4440,18 +4440,22 @@ test(
             /overflow-x:\s*auto;[\s\S]*?overflow-y:\s*auto;[\s\S]*?overscroll-behavior:\s*contain;/u,
             'The transcript viewport must mask overflow while retaining complete scrollable content.'
         );
-        const scrollStart=source.indexOf('function scrollTranscriptToBottom()');
+        const scrollStart=source.indexOf('function trackTranscriptScrollPosition()');
         const scrollEnd=source.indexOf('\n\n    function transcriptTime',scrollStart);
         assert.notEqual(scrollStart,-1);
         assert.notEqual(scrollEnd,-1);
         const scrollHarness=Function(
             `'use strict';
             return function scrollHarness(chatOutput){
+                const destroyed=false;
+                let transcriptFollowing=true;
+                let transcriptScrollTop=chatOutput.scrollTop;
+                let transcriptWasHidden=false;
                 ${source.slice(scrollStart,scrollEnd)}
                 return scrollTranscriptToBottom();
             };`
         )();
-        const transcriptViewport={scrollHeight:947,scrollTop:19};
+        const transcriptViewport={scrollHeight:947,scrollTop:19,clientHeight:200};
         assert.equal(scrollHarness(transcriptViewport),true);
         assert.equal(
             transcriptViewport.scrollTop,
@@ -4514,7 +4518,7 @@ test(
                 scrolls:1
             },
             {
-                start:'async function receivedMessage(',
+                start:'function receivedMessage(',
                 end:'\n\n    function reportTTSError',
                 mutation:"const message=appendTranscriptMessage('assistant',text,name);",
                 scrolls:1
@@ -4536,11 +4540,11 @@ test(
                 .map(match=>match.index);
             assert.ok(
                 scrollIndexes.length>=contract.scrolls,
-                `${contract.start} must restore true-bottom scrolling after each mutation path`
+                `${contract.start} must request following after each mutation path`
             );
             assert.ok(
                 scrollIndexes.some(index=>index>mutationIndex),
-                `${contract.start} must scroll after its terminal transcript mutation`
+                `${contract.start} must request following after its terminal transcript mutation`
             );
         }
         assert.match(
@@ -4585,7 +4589,7 @@ test(
         );
         assert.match(
             source,
-            /async function streamMessage\(text=''[\s\S]*?typeof text!=='string'[\s\S]*?ARCANE_CHAT_STREAM_CONTENT_INVALID/u,
+            /async function streamMessage\(text=''[\s\S]*?!is[.]string\(text\)[\s\S]*?ARCANE_CHAT_STREAM_CONTENT_INVALID/u,
             'Nontext stream content must be diagnosed instead of rendered into the transcript.'
         );
         assert.match(
@@ -4776,13 +4780,16 @@ test(
                 };
                 const chatOutput=node('ol');
                 chatOutput.scrollHeight=947;
-                let transcriptScrollTop=0;
+                chatOutput.clientHeight = 200;
+                const aiRuntimeStateAbortController = new AbortController();
+                chatOutput.addEventListener = function registerTranscriptListener() {};
+                let transcriptPosition = 0;
                 let transcriptScrollWrites=0;
                 Object.defineProperty(chatOutput,'scrollTop',{
                     configurable:true,
-                    get(){return transcriptScrollTop;},
+                    get(){return transcriptPosition;},
                     set(value){
-                        transcriptScrollTop=value;
+                        transcriptPosition = value;
                         transcriptScrollWrites+=1;
                     }
                 });
@@ -4904,7 +4911,7 @@ test(
                             sessionBindingPending,
                             status:{...host.sessionStatus},
                             transcriptReads,
-                            transcriptScrollTop,
+                            transcriptScrollTop: transcriptPosition,
                             transcriptScrollWrites
                         };
                     }
@@ -5210,7 +5217,7 @@ test(
             submissionStart
         );
         const submissionEnd=source.indexOf(
-            '\n\n    async function receivedMessage',
+            '\n\n    function receivedMessage',
             submissionStart
         );
         for(const boundary of [

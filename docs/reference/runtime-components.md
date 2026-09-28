@@ -339,8 +339,12 @@ suppressed.
 module or an existing compatible session, restores the UI transcript when
 available, and uses provider-safe history as its restoration fallback. The
 transcript is a masked vertical scroll viewport; status and composer remain
-outside it. Initial restoration and every user, assistant, tool, streaming,
-progress, or failure mutation scrolls that viewport to its true bottom. Each
+outside it. Initial restoration follows the true bottom. User, assistant, tool,
+streaming, progress, and failure updates continue following it, including later
+message-card, status, composer, or viewport resizing, until the reader scrolls
+toward earlier content. Scrolling down to the bottom resumes following. Layout
+clamping, hidden views, and BFCache restoration preserve that choice;
+destruction releases scroll observation. Each
 restored or new message uses a separate semantic `<time>` element at the card's
 lower-right with an ISO `datetime`, full local title, and local 24-hour `HH:MM`
 text.
@@ -475,10 +479,13 @@ terminal result of the segments submitted by one invocation; Chat continues
 to feed chunks without waiting for playback. Runtime mute, cancellation,
 permission waiting, and stale generations remain non-errors.
 
-Each visible model chunk is forwarded to `AI.streamTTS(text)` in arrival
-order. The AI owner automatically removes repeated formatting marks from an
-outbound speech-input copy before the
-configured segmentation, admits completed segments to bounded synthesis
+Each visible model chunk, including the first chunk that creates its assistant
+card, renders once in arrival order. When speech is ready and unmuted, each
+chunk also reaches `AI.streamTTS(text)` once. Card creation is synchronous, so
+consecutive chunks retain their original order without waiting for speech
+preparation or playback. Thinking content remains outside speech forwarding.
+The AI owner automatically removes repeated formatting marks from an outbound
+speech-input copy before the configured segmentation, admits completed segments to bounded synthesis
 immediately, and schedules the contiguous ready audio prefix on the audio
 clock. Chat retains the original Markdown for display and storage and owns no
 second speech queue. No app option selects or disables this cleanup. Single

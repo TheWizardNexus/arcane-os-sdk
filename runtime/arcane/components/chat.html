@@ -1083,8 +1083,89 @@
             &&is.function(session.send);
     }
 
-    function scrollTranscriptToBottom(){
-        chatOutput.scrollTop=chatOutput.scrollHeight;
+    let transcriptFollowing = true;
+    let transcriptScrollTop = chatOutput.scrollTop;
+    let transcriptWasHidden = chatOutput.clientHeight === 0;
+    const transcriptResizeObserver = is.function(globalThis.ResizeObserver)
+        ? new ResizeObserver(scrollTranscriptToBottom)
+        : null;
+    const transcriptMutationObserver = is.function(globalThis.MutationObserver)
+        ? new MutationObserver(handleTranscriptChildren)
+        : null;
+
+    chatOutput.addEventListener(
+        'scroll',
+        trackTranscriptScrollPosition,
+        {
+            passive: true,
+            signal: aiRuntimeStateAbortController.signal
+        }
+    );
+    transcriptResizeObserver?.observe(
+        chatOutput,
+        {box: 'border-box'}
+    );
+    for(const item of chatOutput.children) {
+        if(item.localName === 'li') {
+            transcriptResizeObserver?.observe(
+                item,
+                {box: 'border-box'}
+            );
+        }
+    }
+    transcriptMutationObserver?.observe(
+        chatOutput,
+        {childList: true}
+    );
+
+    function trackTranscriptScrollPosition() {
+        if(destroyed) return false;
+        if(chatOutput.clientHeight === 0) {
+            transcriptWasHidden = true;
+            return false;
+        }
+        const scrollTop = chatOutput.scrollTop;
+        if(transcriptWasHidden) {
+            transcriptWasHidden = false;
+            transcriptScrollTop = scrollTop;
+            return true;
+        }
+        const atBottom = chatOutput.scrollHeight - chatOutput.clientHeight - scrollTop <= 1;
+        // A layout clamp reaching the bottom does not resume a reader's following.
+        if(scrollTop < transcriptScrollTop && !atBottom) {
+            transcriptFollowing = false;
+        } else if(scrollTop > transcriptScrollTop && atBottom) {
+            transcriptFollowing = true;
+        }
+        transcriptScrollTop = scrollTop;
+        return true;
+    }
+
+    function handleTranscriptChildren(records) {
+        if(destroyed) return;
+        for(const record of records) {
+            for(const item of record.removedNodes) {
+                if(item.localName === 'li' && item.parentElement !== chatOutput) {
+                    transcriptResizeObserver?.unobserve(item);
+                }
+            }
+            for(const item of record.addedNodes) {
+                if(item.localName === 'li' && item.parentElement === chatOutput) {
+                    transcriptResizeObserver?.observe(
+                        item,
+                        {box: 'border-box'}
+                    );
+                }
+            }
+        }
+        scrollTranscriptToBottom();
+    }
+
+    function scrollTranscriptToBottom() {
+        // Read movement before writing: a reader's scroll event may still be queued.
+        if(!trackTranscriptScrollPosition() || !transcriptFollowing) return false;
+        chatOutput.scrollTop = chatOutput.scrollHeight;
+        transcriptScrollTop = chatOutput.scrollTop;
         return true;
     }
 
@@ -1513,6 +1594,8 @@
             actionable?[...restoredPendingToolCalls.values()]:[]
         );
         chatOutput.replaceChildren(fragment);
+        transcriptFollowing = true;
+        transcriptScrollTop = chatOutput.scrollTop;
         scrollTranscriptToBottom();
         return rendered;
     }
@@ -2014,6 +2097,10 @@
             ? selectedRole.localOnly === false
                 || (selectedRole.state === 'ready' && selectedRole.loaded)
             : availability.llm;
+        if(!conversationVisible && !host.conversationComplete) {
+            trackTranscriptScrollPosition();
+            transcriptWasHidden = true;
+        }
         chatArea.dataset.modelStartRequired = String(!conversationVisible);
         send.disabled=host.conversationComplete
             ||!availability.llm
@@ -2835,21 +2922,15 @@
             return false;
         }
 
-        let message=[...chatOutput.children].find(
-            candidate=>candidate.id===`message-${id}`
-        )||null;
-        
-        if(!message){
-            await receivedMessage(host.aiName,isThinking?'':text,id);
-            if(!isThinking){
-                return false;
+        let message = [...chatOutput.children].find(
+            function findStreamedMessage(candidate) {
+                return candidate.id === `message-${id}`;
             }
-            message=[...chatOutput.children].find(
-                candidate=>candidate.id===`message-${id}`
-            )||null;
-            if(!message){
-                return false;
-            }
+        ) || null;
+
+        if(!message) {
+            // The first chunk uses the same display and speech path as later chunks.
+            message = receivedMessage(host.aiName, '', id);
         }
 
         let target=message.querySelector('.markdown');
@@ -3060,8 +3141,12 @@
         }
 
         // Reset height to shrink to content size
+        trackTranscriptScrollPosition();
         textArea.style.height = 'auto';
         textArea.style.height = `${textArea.scrollHeight}px`;
+        // The intermediate auto height can clamp scrollTop before final layout.
+        transcriptScrollTop = chatOutput.scrollTop;
+        scrollTranscriptToBottom();
     }
 
     function renderSessionMessageFailure(messageId,error){
@@ -3164,7 +3249,7 @@
         applyAIAvailability(host.aiAvailability);
         setSessionStatus('sending','AI is responding…');
         try{
-            await receivedMessage(host.aiName,'',messageId);
+            receivedMessage(host.aiName, '', messageId);
             await streamMessage('',messageId,true);
             setMessageProgress(
                 messageId,
@@ -3775,7 +3860,7 @@
         }
     }
 
-    async function receivedMessage(name = 'Assistant', text = '', id=''){
+    function receivedMessage(name = 'Assistant', text = '', id = '') {
         const message=appendTranscriptMessage('assistant',text,name);
         if(id){
             message.id=`message-${id}`;
@@ -3854,6 +3939,8 @@
         sessionBindingGeneration+=1;
         setSessionStatus('destroyed','Chat closed.');
         destroyed=true;
+        transcriptResizeObserver?.disconnect();
+        transcriptMutationObserver?.disconnect();
         const destroyReason=createChatSubmissionAbort(
             chatReasons.componentDestroyed,
             'The chat component was destroyed before message submission settled.'
