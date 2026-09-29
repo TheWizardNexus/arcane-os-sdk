@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.36.0
+
+- Add optional continuous microphone capture to `voice-transcription` through
+  `configure({capture:{mode:'continuous'}})`. The AudioWorklet retains rolling
+  pre-roll and emits complete mono Float32 WAV segments at amplitude-based
+  pauses, periodic boundaries, and final stop. Manual capture remains the default.
+- Keep microphone capture independent of the ordered transcription/save queue.
+  Failed transcription retains its clip; a failed save retains its text and
+  retries only that save. Stop releases the microphone, flushes the final clip,
+  and drains accepted work. Explicit cancellation aborts callbacks and discards
+  outstanding clips. Optional simple Start/Stop controls preserve the default
+  Complete action and application-owned persistence.
+- Add async `file-manager.previewDescriptor(originalFile, context)` for complete
+  text, Markdown, HTML, JSON, conversation, nested collection, media and download
+  views. Media loaders run only on explicit selection; closing or replacing a
+  preview aborts pending work and releases owned media resources. Existing
+  `previewTransform` remains supported.
+- Add `directoryFilter` before DBOPFS key and metadata reads, with `data-view`
+  forwarding the preview/filter hooks before loading. Preserve complete native
+  JSONL text, MIME-based HTML/Markdown handling and original binary downloads.
+  Application schemas, record mapping, persistence and presentation choices remain
+  application-owned; no saved-data migration or provider/model default changes.
+
 ## 0.35.0
 
 - Add `DBOPFS.createCompressedPNG({tableNames, additionalTables, signal})` to
