@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.34.2
+
+- Remove temporary `persist:false` Chat cards on completion, failure,
+  cancellation, destruction and session replacement. Temporary input is not
+  restored into the composer after a rejected request.
+- Track each submission's exact created cards, preserving earlier persistent
+  cards and newer submissions even when operation identifiers are reused.
+  Persistent transcript and draft behavior remain unchanged; existing saved
+  history is not migrated or rewritten.
+
 ## 0.34.1
 
 - Honor an optional request-local `model` in `AI.fetchRequest()` and
