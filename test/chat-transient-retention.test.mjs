@@ -139,8 +139,8 @@ function createFixture(session) {
 
 function submit(fixture, persist = false, context = {operationId: 'current-operation'}) {
     const content = '  Temporary dragon census.\nKeep the complete input.  ';
-    fixture.appendCard('user', content, context.operationId);
-    return fixture.send(content, context, {role: 'user', content, persist});
+    const requestCard = fixture.appendCard('user', content, context.operationId);
+    return fixture.send(content, context, {role: 'user', content, persist}, null, [requestCard]);
 }
 
 function deferred() {
@@ -263,6 +263,71 @@ test('terminal cleanup preserves a reentrant turn that reuses the operation iden
     assert.equal(fixture.ui.chatOutput.children[2].markdown.raw, response().message.content);
     assert.equal(fixture.pending(), false);
 });
+
+test(
+    'transient reused identifiers preserve earlier persistent cards through every terminal path',
+    async function preserveEarlierPersistentCards() {
+        for(const [role, mode] of [
+            ['user', 'success'],
+            ['user', 'provider'],
+            ['user', 'structural'],
+            ['user', 'abort'],
+            ['tool', 'provider'],
+            ['tool', 'structural']
+        ]) {
+            const failure = new Error(`Synthetic ${mode} failure.`);
+            if(mode === 'structural') failure.code = 'AI_CHAT_INVALID_TOOL_CALL';
+            if(mode === 'abort') failure.name = 'AbortError';
+            const controller = new AbortController();
+            let requests = 0;
+            const fixture = createFixture(
+                {
+                    async send(request) {
+                        requests++;
+                        if(requests === 1 || mode === 'success') return response();
+                        if(mode === 'abort') {
+                            assert.equal(request.signal, controller.signal);
+                            controller.abort(failure);
+                        }
+                        throw failure;
+                    }
+                }
+            );
+            await submit(fixture, true);
+            const earlierCards = [...fixture.ui.chatOutput.children];
+            earlierCards[1].timestamp = '2026-09-28T10:00:00.000Z';
+            earlierCards[2].timestamp = '2026-09-28T10:00:01.000Z';
+            const earlierContent = earlierCards.map(function retainEarlierContent(card) {
+                return {content: card.markdown.raw, timestamp: card.timestamp};
+            });
+            const context = {operationId: 'current-operation', signal: controller.signal};
+            let pending;
+            if(role === 'user') {
+                pending = submit(fixture, false, context);
+            } else {
+                const messages = ['First dragon counted.', 'Second dragon counted.'].map(
+                    function transientToolMessage(content, index) {
+                        return {role: 'tool', content, persist: false, tool_call_id: `count-${index}`};
+                    }
+                );
+                const cards = messages.map(function appendToolResult(message) {
+                    return fixture.appendCard('tool', message.content, context.operationId);
+                });
+                pending = fixture.send('Both dragon counts.', context, messages, null, cards);
+            }
+            if(mode === 'success') await pending;
+            else await assert.rejects(pending, function preservesFailure(error) { return error === failure; });
+            assert.equal(fixture.ui.chatOutput.children.length, earlierCards.length, `${role}/${mode}`);
+            for(const [index, card] of earlierCards.entries()) {
+                assert.equal(fixture.ui.chatOutput.children[index], card, `${role}/${mode}`);
+                assert.equal(card.markdown.raw, earlierContent[index].content, `${role}/${mode}`);
+                assert.equal(card.timestamp, earlierContent[index].timestamp, `${role}/${mode}`);
+            }
+            assert.equal(fixture.textArea.value, 'A newer unsent draft.', `${role}/${mode}`);
+            assert.equal(fixture.pending(), false, `${role}/${mode}`);
+        }
+    }
+);
 
 test('persistent success and rejection retain their existing transcript and draft behavior', async function preservePersistentTurns() {
     for(const mode of ['success', 'provider', 'structural']) {

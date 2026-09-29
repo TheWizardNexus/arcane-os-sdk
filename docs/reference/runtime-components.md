@@ -418,6 +418,9 @@ requests. Temporary input is not restored into the composer, and a temporary
 failure does not become an assistant history card. The request still rejects
 normally and keeps its diagnostic/status reporting. Cleanup owns the exact
 operation's nodes so a completion listener can start another turn safely.
+Submission code passes those card references directly when it creates them;
+reusing an operation identifier never selects earlier conversation cards for
+cleanup or timestamp updates.
 Persistent-turn recovery and existing saved history remain unchanged.
 
 For streaming sessions, every provisional structural card and the terminal

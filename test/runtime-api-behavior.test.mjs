@@ -5167,8 +5167,13 @@ test(
         );
         assert.match(
             source,
-            /const retainTurn=sessionRequestMessages[.]every\(message=>message[.]persist!==false\);[\s\S]*?function removeTransientSessionCards\(\)[\s\S]*?if\(retainTurn\)\{[\s\S]*?\}else\{\s*removeTransientSessionCards\(\);\s*setPendingStructuralToolCalls\(previousPendingToolCalls\);[\s\S]*?finally\{\s*removeTransientSessionCards\(\);/u,
+            /const retainTurn=sessionRequestMessages[.]every\(message=>message[.]persist!==false\);[\s\S]*?const transientCards=retainTurn\?\[\]:\[\.\.\.requestMessages\];[\s\S]*?function removeTransientSessionCards\(\)[\s\S]*?if\(retainTurn\)\{[\s\S]*?\}else\{\s*removeTransientSessionCards\(\);\s*setPendingStructuralToolCalls\(previousPendingToolCalls\);[\s\S]*?finally\{\s*removeTransientSessionCards\(\);/u,
             'A nonpersistent session turn must leave no retained Chat cards or pending context.'
+        );
+        assert.match(
+            source,
+            /async function submitMessage\([\s\S]*?const requestMessages=\[\];[\s\S]*?requestMessages[.]push\(visibleMessage\);[\s\S]*?sendMessageThroughBoundSession\(\s*text,eventContext,undefined,null,requestMessages\s*\)/u,
+            'User submission must pass only its newly created cards to the bound session.'
         );
         assert.match(
             source,
@@ -5219,7 +5224,7 @@ test(
         );
         assert.match(
             structuralFailureSource,
-            /restoreRejectedStructuralDraft\(messageId,context[.]operationId,text\);/u,
+            /restoreRejectedStructuralDraft\(messageId,requestMessages,text\);/u,
             'A rejected user turn must be restored after its textarea draft was cleared.'
         );
         assert.doesNotMatch(
@@ -5449,9 +5454,10 @@ test(
                     text,
                     context,
                     requestMessages,
-                    perTurnRequest
+                    perTurnRequest,
+                    requestCards
                 ){
-                    sends.push({text,context,requestMessages,perTurnRequest});
+                    sends.push({text,context,requestMessages,perTurnRequest,requestCards});
                     return Promise.resolve({accepted:true});
                 }
                 function observeHostSubmission(result,context,ownership){
@@ -5695,6 +5701,10 @@ test(
             {accepted:true}
         );
         assert.equal(parallelChat.sends.length,1);
+        const submittedCards=parallelChat.sends[0].requestCards;
+        assert.equal(submittedCards.length,2);
+        assert.equal(submittedCards[0],parallelChat.chatOutput.children.at(-2));
+        assert.equal(submittedCards[1],parallelChat.chatOutput.children.at(-1));
         assert.deepEqual(
             parallelChat.sends[0].requestMessages,
             [
@@ -5774,7 +5784,7 @@ test(
         assert.equal(restoredChat.sends[0].requestMessages.length,1);
         assert.equal(restoredChat.sends[0].requestMessages[0].tool_call_id,'restored-tool');
 
-        restoredChat.appendRejectedDraftTurn(
+        const rejectedDraft=restoredChat.appendRejectedDraftTurn(
             'Preserve this rejected user request.',
             'rejected-operation',
             'rejected-response'
@@ -5783,7 +5793,7 @@ test(
         assert.equal(
             restoredChat.restoreRejectedStructuralDraft(
                 'rejected-response',
-                'rejected-operation',
+                [rejectedDraft.request],
                 'Preserve this rejected user request.'
             ),
             true

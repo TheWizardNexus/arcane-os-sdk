@@ -3188,15 +3188,12 @@
         ].includes(error?.code);
     }
 
-    function restoreRejectedStructuralDraft(messageId,operationId,text){
+    function restoreRejectedStructuralDraft(messageId,requestMessages,text){
         const response=[...chatOutput.children].find(
             candidate=>candidate.id===`message-${messageId}`
         )||null;
-        const request=[...chatOutput.children].find(
-            candidate=>candidate.dataset.operationId===operationId
-        )||null;
         response?.remove();
-        request?.remove();
+        for(const request of requestMessages) request.remove();
         const existing=textArea.value;
         if(existing!==text){
             textArea.value=existing
@@ -3206,14 +3203,15 @@
         textArea.style.height='auto';
         textArea.style.height=`${textArea.scrollHeight}px`;
         scrollTranscriptToBottom();
-        return Boolean(response||request);
+        return Boolean(response||requestMessages.length);
     }
 
     async function sendMessageThroughBoundSession(
         text,
         context,
         sessionRequest={content:text,role:'user'},
-        perTurnRequest=null
+        perTurnRequest=null,
+        requestMessages=[]
     ){
         const session=boundChatSession;
         const bindingGeneration=sessionBindingGeneration;
@@ -3248,12 +3246,10 @@
         const streamedStructuralToolCalls=[];
         const messageId=`session-${++sessionMessageSequence}`;
         const sessionMessageToken=Symbol(messageId);
-        const transientCards=retainTurn?[]:[...chatOutput.children].filter(
-            candidate=>candidate.dataset.operationId===context.operationId
-        );
+        const transientCards=retainTurn?[]:[...requestMessages];
         function removeTransientSessionCards(){
             if(!transientCards.length) return;
-            // Capture this operation's nodes so reentrant submissions stay untouched.
+            // The submitter supplies only nodes created for this submission.
             for(const card of transientCards) card.remove();
             transientCards.length=0;
             scrollTranscriptToBottom();
@@ -3348,9 +3344,6 @@
                 result.message.content,
                 committedTurn?.response?.timestamp??result.message.timestamp
             );
-            const requestMessages=[...chatOutput.children].filter(
-                candidate=>candidate.dataset.operationId===context.operationId
-            );
             for(const [index,requestMessage] of requestMessages.entries()){
                 setTranscriptMessageTimestamp(
                     requestMessage,
@@ -3426,16 +3419,13 @@
                     const response=[...chatOutput.children].find(
                         candidate=>candidate.id===`message-${messageId}`
                     )||null;
-                    const requestMessages=[...chatOutput.children].filter(
-                        candidate=>candidate.dataset.operationId===context.operationId
-                    );
                     response?.remove();
                     for(const requestMessage of requestMessages){
                         requestMessage.remove();
                     }
                     scrollTranscriptToBottom();
                 }else if(retainTurn){
-                    restoreRejectedStructuralDraft(messageId,context.operationId,text);
+                    restoreRejectedStructuralDraft(messageId,requestMessages,text);
                 }
                 arcaneLogging.error('Arcane structural tool protocol failure.',error);
                 setSessionStatus(
@@ -3445,9 +3435,6 @@
             }else if(!destroyed&&bindingGeneration===sessionBindingGeneration){
                 arcaneLogging.error('Arcane chat request failed.',error);
                 if(sessionRequestMessages.every(message=>message.role==='tool')){
-                    const requestMessages=[...chatOutput.children].filter(
-                        candidate=>candidate.dataset.operationId===context.operationId
-                    );
                     for(const requestMessage of requestMessages){
                         requestMessage.remove();
                     }
@@ -3635,6 +3622,7 @@
             return false;
         }
         try{
+            const requestMessages=[];
             for(const result of orderedResults){
                 const visibleMessage=appendTranscriptMessage(
                     'tool',
@@ -3643,12 +3631,14 @@
                 );
                 visibleMessage.dataset.operationId=operationId;
                 visibleMessage.dataset.toolCallId=result.tool_call_id;
+                requestMessages.push(visibleMessage);
             }
             const result=sendMessageThroughBoundSession(
                 orderedResults.map(message=>message.content).join('\n'),
                 eventContext,
                 orderedResults,
-                perTurnRequest
+                perTurnRequest,
+                requestMessages
             );
             return observeHostSubmission(result,eventContext,ownership);
         }catch(error){
@@ -3834,6 +3824,7 @@
             return false;
         }
         try{
+            const requestMessages=[];
             if(!eventContext.preserveDraft){
                 textArea.value='';
             }
@@ -3844,6 +3835,7 @@
                 hostSubmissionGeneration++;
                 const visibleMessage=appendTranscriptMessage('user',text,host.name);
                 visibleMessage.dataset.operationId=operationId;
+                requestMessages.push(visibleMessage);
             }
             scrollTranscriptToBottom(!eventContext.synthetic);
 
@@ -3864,7 +3856,9 @@
             let result;
             try{
                 result=boundChatSession
-                    ?sendMessageThroughBoundSession(text,eventContext)
+                    ?sendMessageThroughBoundSession(
+                        text,eventContext,undefined,null,requestMessages
+                    )
                     :host.sendMessage(text,eventContext);
             }catch(error){
                 result=Promise.reject(error);
