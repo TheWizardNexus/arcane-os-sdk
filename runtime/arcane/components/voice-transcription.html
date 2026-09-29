@@ -1117,69 +1117,77 @@
         if(destroyed||completionAbortController||state==='complete'){
             return false;
         }
-        if(continuousSession){
-            const session=continuousSession;
-            await stopContinuousRecording(session);
-            if(!isCurrentContinuousSession(session)||session.queue.length){
-                return false;
-            }
-        }
-        if(destroyed||completionAbortController||transcript.length===0
-            ||!['idle','error'].includes(state)){
+        const session=continuousSession;
+        if(!session&&(transcript.length===0||!['idle','error'].includes(state))){
             return false;
         }
         const generation=sessionGeneration;
-        const completionTranscript=transcript;
         const completionController=new AbortController();
+        // Reserve completion before stopping capture: drain callbacks may reenter.
         completionAbortController=completionController;
-        const complete=options.onComplete||(
-            is.function(host.complete)?host.complete.bind(host):null
-        );
-        setState('completing',options.messages.completing,{
-            beginOperation:'completion'
-        });
-        if(!isCurrentVoiceOperation(generation,'completing')){
-            return false;
-        }
         try{
-            if(complete){
-                const input={transcript:completionTranscript};
-                if(continuousSession){
-                    input.signal=completionController.signal;
-                }
-                const result=await waitForContinuousOperation(
-                    complete(input),completionController.signal
-                );
-                if(result===false&&continuousSession){
-                    throw new Error('Transcription completion was not accepted.');
+            if(session){
+                await stopContinuousRecording(session);
+                if(!isCurrentContinuousSession(session)||session.queue.length){
+                    return false;
                 }
             }
+            if(destroyed||completionController.signal.aborted
+                ||completionAbortController!==completionController
+                ||generation!==sessionGeneration||transcript.length===0
+                ||!['idle','error'].includes(state)){
+                return false;
+            }
+            const completionTranscript=transcript;
+            const complete=options.onComplete||(
+                is.function(host.complete)?host.complete.bind(host):null
+            );
+            setState('completing',options.messages.completing,{
+                beginOperation:'completion'
+            });
             if(!isCurrentVoiceOperation(generation,'completing')){
                 return false;
             }
-            dispatchVoiceEvent(
-                'voice-transcription-complete',
-                {transcript:completionTranscript},
-                {
-                    bubbles:true,
-                    composed:true,
-                    publicDetail:{
-                        transcript:completionTranscript
+            try{
+                if(complete){
+                    const input={transcript:completionTranscript};
+                    if(session){
+                        input.signal=completionController.signal;
+                    }
+                    const result=await waitForContinuousOperation(
+                        complete(input),completionController.signal
+                    );
+                    if(result===false&&session){
+                        throw new Error('Transcription completion was not accepted.');
                     }
                 }
-            );
-            if(!isCurrentVoiceOperation(generation,'completing')){
+                if(!isCurrentVoiceOperation(generation,'completing')){
+                    return false;
+                }
+                dispatchVoiceEvent(
+                    'voice-transcription-complete',
+                    {transcript:completionTranscript},
+                    {
+                        bubbles:true,
+                        composed:true,
+                        publicDetail:{
+                            transcript:completionTranscript
+                        }
+                    }
+                );
+                if(!isCurrentVoiceOperation(generation,'completing')){
+                    return false;
+                }
+                setState('complete',options.messages.complete);
+                return isCurrentVoiceOperation(generation,'complete');
+            }catch(error){
+                if(!isCurrentVoiceOperation(generation,'completing')){
+                    return false;
+                }
+                arcaneLogging.error('Unable to complete transcription:',error);
+                setState('error',options.messages.completeError);
                 return false;
             }
-            setState('complete',options.messages.complete);
-            return isCurrentVoiceOperation(generation,'complete');
-        }catch(error){
-            if(!isCurrentVoiceOperation(generation,'completing')){
-                return false;
-            }
-            arcaneLogging.error('Unable to complete transcription:',error);
-            setState('error',options.messages.completeError);
-            return false;
         }finally{
             if(completionAbortController===completionController){
                 completionAbortController=null;

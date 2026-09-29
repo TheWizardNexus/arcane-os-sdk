@@ -626,12 +626,14 @@ test(
 test(
     'continuous completion invokes its callback once across overlapping and reentrant requests',
     async function testSingleCompletion(t) {
+        const flush = deferred();
         const entered = deferred();
         const pending = deferred();
         let fixture;
         let reentrant;
         let calls = 0;
         fixture = createQueueFixture({
+            flush,
             initialValue: 'Completed dragon report.',
             persist: false,
             transcribe() { return 'Unused synthetic text.'; },
@@ -644,10 +646,14 @@ test(
         });
         t.after(function cleanupQueue() {
             fixture.cancel();
+            flush.resolve();
             pending.resolve();
         });
         const first = fixture.complete();
         const overlapping = fixture.complete();
+        assert.equal(await overlapping, false, 'The first invocation owns completion while capture flushes.');
+        assert.equal(calls, 0);
+        flush.resolve();
         await entered.promise;
         assert.equal(await reentrant, false);
         assert.equal(await overlapping, false);
