@@ -185,15 +185,31 @@ async function fileManagerFixture(options = {}) {
         async getFileMetadata(directory, fileName) {
             metadataRead.push([directory, fileName]);
             return {type: files[directory][fileName].mime || ''};
+        },
+        async readFile(directory, fileName) {
+            fileReads.push([directory, fileName]);
+            return files[directory][fileName].file;
         }
     };
     const window = new EventTarget();
     window.dbopfs = dbopfs;
 
+    let FileEntity = FixtureFileEntity;
+    if (options.realFileEntity) {
+        const entitySource = await readFile(new URL('../runtime/arcane/entities/File.js', import.meta.url), 'utf8');
+        const loadFileEntity = Function(
+            'Is', 'MD', 'dbopfs',
+            entitySource
+                .replace(/^import[^\r\n]*;\r?$/gmu, '')
+                .replace('export default FileEntity;', 'return FileEntity;')
+        );
+        FileEntity = loadFileEntity(Is, FakeMarkdown, dbopfs);
+    }
+
     async function loadDependency(specifier) {
         if (specifier === 'strong-type') return {default: Is};
         if (specifier === '../modules/DBOPFS.js') return {};
-        if (specifier === '../entities/File.js') return {default: FixtureFileEntity};
+        if (specifier === '../entities/File.js') return {default: FileEntity};
         if (specifier === '../modules/MD.js') return {default: FakeMarkdown};
         if (specifier === '../modules/WaitForComponent.js') {
             return {default: async function readyComponent(component) {return component;}};
@@ -394,6 +410,115 @@ test('an unreadable file keeps its modal delete control available', async functi
         const remove = fixture.descendants(fixture.fileModal, function isDelete(element) {return element.className === 'file-view-delete';})[0];
         await remove.fire('click');
         assert.equal(fixture.host.shadowRoot.querySelector('#deleteModal').opened, true);
+    } finally {
+        fixture.host.destroy();
+    }
+});
+
+test('real FileEntity infers native audio previews without a supplied MIME or text decoding', async function storedAudioMIMEContract() {
+    const formats = {
+        mp3: 'audio/mpeg',
+        wav: 'audio/wav',
+        ogg: 'audio/ogg',
+        oga: 'audio/ogg',
+        opus: 'audio/ogg',
+        aac: 'audio/aac',
+        m4a: 'audio/mp4',
+        flac: 'audio/flac',
+        weba: 'audio/webm'
+    };
+    const payload = 'The complete synthetic moon-whale recording — unchanged from storage.';
+    const files = {visible: {}};
+    const opened = [];
+    let textReads = 0;
+    for (const extension of Object.keys(formats)) {
+        const name = `recording.${extension === 'mp3' ? 'MP3' : extension}`;
+        const file = new File([payload], name);
+        file.text = async function rejectAudioTextDecoding() {
+            textReads += 1;
+            throw new Error('Audio previews must not decode the stored file as text.');
+        };
+        files.visible[name] = {file};
+    }
+    const fixture = await fileManagerFixture({
+        realFileEntity: true,
+        files,
+        previewDescriptor: function useNativeAudio(file, context) {
+            opened.push({file, context});
+            return null;
+        }
+    });
+    try {
+        for (const [name, source] of Object.entries(files.visible)) {
+            await fixture.open(name);
+            const extension = name.split('.').at(-1).toLowerCase();
+            const expectedMIME = formats[extension];
+            const current = opened.at(-1);
+            assert.equal(current.file, source.file);
+            assert.equal(current.file.ext, extension);
+            assert.equal(current.file.type, '');
+            assert.equal(current.file.mime, expectedMIME);
+            assert.equal(current.file.parsed, null);
+            assert.equal(current.context.mimeType, expectedMIME);
+            const audio = fixture.descendants(fixture.fileModal, function isAudio(element) {return element.localName === 'audio';})[0];
+            assert.ok(audio, `${name} reaches native audio controls.`);
+            assert.equal(audio.controls, true);
+            const renderedContent = fixture.createdURLs.at(-1).content;
+            assert.equal(renderedContent.type, expectedMIME);
+            assert.equal(await Blob.prototype.text.call(renderedContent), payload);
+            assert.equal(textReads, 0);
+            await fixture.fileModal.close();
+        }
+        assert.deepEqual(fixture.errors, []);
+        assert.deepEqual(fixture.fileReads, Object.keys(files.visible).map(function storedFileRead(name) {return ['visible', name];}));
+        assert.deepEqual(fixture.revokedURLs, fixture.createdURLs.map(function createdURL(entry) {return entry.url;}));
+    } finally {
+        fixture.host.destroy();
+    }
+});
+
+test('real FileEntity preserves supplied MIME and leaves untyped WebM uninferred', async function suppliedAudioMIMEContract() {
+    const cases = [
+        {name: 'movie.ogg', type: 'video/ogg', expected: 'video/ogg', audio: false},
+        {name: 'custom.wav', type: 'application/x-recording', expected: 'application/x-recording', audio: false},
+        {name: 'generic.mp3', type: 'application/octet-stream', expected: 'application/octet-stream', audio: false},
+        {name: 'custom.mp3', type: 'audio/x-recording', expected: 'audio/x-recording', audio: true},
+        {name: 'movie.webm', type: 'video/webm', expected: 'video/webm', audio: false},
+        {name: 'sound.webm', type: 'audio/webm;codecs=opus', expected: 'audio/webm;codecs=opus', audio: true},
+        {name: 'untyped.webm', type: '', expected: 'application/octet-stream', audio: false}
+    ];
+    const payload = 'The original supplied recording remains complete.';
+    const files = {visible: {}};
+    let textReads = 0;
+    for (const entry of cases) {
+        const file = new File([payload], entry.name, {type: entry.type});
+        file.text = async function rejectBinaryTextDecoding() {
+            textReads += 1;
+            throw new Error('Binary previews must not decode the stored file as text.');
+        };
+        files.visible[entry.name] = {file, mime: entry.type};
+    }
+    const fixture = await fileManagerFixture({realFileEntity: true, files});
+    try {
+        for (const entry of cases) {
+            await fixture.open(entry.name);
+            const original = files.visible[entry.name].file;
+            assert.equal(original.type, entry.type);
+            assert.equal(original.mime, entry.expected);
+            const audio = fixture.descendants(fixture.fileModal, function isAudio(element) {return element.localName === 'audio';});
+            assert.equal(audio.length, entry.audio ? 1 : 0, entry.name);
+            const renderedContent = fixture.createdURLs.at(-1).content;
+            if (!entry.audio) {
+                const download = fixture.descendants(fixture.fileModal, function isDownload(element) {return element.localName === 'a';})[0];
+                assert.equal(download.download, entry.name);
+                assert.equal(renderedContent, original);
+            }
+            assert.equal(await Blob.prototype.text.call(renderedContent), payload);
+            assert.equal(textReads, 0);
+            await fixture.fileModal.close();
+        }
+        assert.deepEqual(fixture.errors, []);
+        assert.deepEqual(fixture.revokedURLs, fixture.createdURLs.map(function createdURL(entry) {return entry.url;}));
     } finally {
         fixture.host.destroy();
     }

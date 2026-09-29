@@ -80,8 +80,22 @@ class FileEntity {
             (this.fileName.lastIndexOf('.')+1)
         ).toLowerCase();
 
+        // Storage may omit MIME metadata; preserve a supplied type before inferring audio.
+        const audioMimeTypes={
+            "mp3": "audio/mpeg",
+            "wav": "audio/wav",
+            "ogg": "audio/ogg",
+            "oga": "audio/ogg",
+            "opus": "audio/ogg",
+            "aac": "audio/aac",
+            "m4a": "audio/mp4",
+            "flac": "audio/flac",
+            "weba": "audio/webm"
+        };
+
         const mime=mimeTypes[file.ext]||
             file.type||
+            audioMimeTypes[file.ext]||
             'application/octet-stream';
 
         file.mime=mime;
