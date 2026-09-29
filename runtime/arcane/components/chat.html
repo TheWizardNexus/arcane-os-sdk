@@ -3248,12 +3248,23 @@
         const streamedStructuralToolCalls=[];
         const messageId=`session-${++sessionMessageSequence}`;
         const sessionMessageToken=Symbol(messageId);
+        const transientCards=retainTurn?[]:[...chatOutput.children].filter(
+            candidate=>candidate.dataset.operationId===context.operationId
+        );
+        function removeTransientSessionCards(){
+            if(!transientCards.length) return;
+            // Capture this operation's nodes so reentrant submissions stay untouched.
+            for(const card of transientCards) card.remove();
+            transientCards.length=0;
+            scrollTranscriptToBottom();
+        }
         activeSessionMessageToken=sessionMessageToken;
         sessionMessagePending=true;
         applyAIAvailability(host.aiAvailability);
         setSessionStatus('sending','AI is responding…');
         try{
-            receivedMessage(host.aiName, '', messageId);
+            const responseCard=receivedMessage(host.aiName, '', messageId);
+            if(!retainTurn) transientCards.push(responseCard);
             await streamMessage('',messageId,true);
             setMessageProgress(
                 messageId,
@@ -3365,10 +3376,8 @@
                 }
                 setPendingStructuralToolCalls(terminalToolCalls);
             }else{
-                for(const requestMessage of requestMessages) requestMessage.remove();
-                message.remove();
+                removeTransientSessionCards();
                 setPendingStructuralToolCalls(previousPendingToolCalls);
-                scrollTranscriptToBottom();
             }
             setSessionStatus(
                 pendingStructuralToolMessage?'tool':'ready',
@@ -3425,7 +3434,7 @@
                         requestMessage.remove();
                     }
                     scrollTranscriptToBottom();
-                }else{
+                }else if(retainTurn){
                     restoreRejectedStructuralDraft(messageId,context.operationId,text);
                 }
                 arcaneLogging.error('Arcane structural tool protocol failure.',error);
@@ -3443,7 +3452,7 @@
                         requestMessage.remove();
                     }
                 }
-                renderSessionMessageFailure(messageId,error);
+                if(retainTurn) renderSessionMessageFailure(messageId,error);
                 setSessionStatus(
                     'error',
                     visibleErrorMessage(error,'The AI request failed.')
@@ -3471,6 +3480,7 @@
             }
             throw error;
         }finally{
+            removeTransientSessionCards();
             if(activeSessionMessageToken===sessionMessageToken){
                 activeSessionMessageToken=null;
                 sessionMessagePending=false;

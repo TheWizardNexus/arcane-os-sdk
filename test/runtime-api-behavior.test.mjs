@@ -5167,7 +5167,7 @@ test(
         );
         assert.match(
             source,
-            /const retainTurn=sessionRequestMessages[.]every\(message=>message[.]persist!==false\);[\s\S]*?if\(retainTurn\)\{[\s\S]*?\}else\{[\s\S]*?requestMessage[.]remove\(\);[\s\S]*?message[.]remove\(\);[\s\S]*?setPendingStructuralToolCalls\(previousPendingToolCalls\);/u,
+            /const retainTurn=sessionRequestMessages[.]every\(message=>message[.]persist!==false\);[\s\S]*?function removeTransientSessionCards\(\)[\s\S]*?if\(retainTurn\)\{[\s\S]*?\}else\{\s*removeTransientSessionCards\(\);\s*setPendingStructuralToolCalls\(previousPendingToolCalls\);[\s\S]*?finally\{\s*removeTransientSessionCards\(\);/u,
             'A nonpersistent session turn must leave no retained Chat cards or pending context.'
         );
         assert.match(

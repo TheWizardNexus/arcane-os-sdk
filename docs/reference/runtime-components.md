@@ -413,6 +413,12 @@ the public result term; `disposition` remains an accepted input spelling.
 When a submitted turn uses `persist:false`, Chat may show its cards while that
 one operation is active, then removes them when the operation settles; neither
 the input nor response remains in the retained transcript or model context.
+This cleanup also applies to failed, cancelled, detached, or replaced-session
+requests. Temporary input is not restored into the composer, and a temporary
+failure does not become an assistant history card. The request still rejects
+normally and keeps its diagnostic/status reporting. Cleanup owns the exact
+operation's nodes so a completion listener can start another turn safely.
+Persistent-turn recovery and existing saved history remain unchanged.
 
 For streaming sessions, every provisional structural card and the terminal
 result must preserve the same choice, ordered call position, exact ID, type,
