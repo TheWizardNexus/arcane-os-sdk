@@ -67,7 +67,7 @@ runtime layouts.
 | `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, complete DBOPFS model storage, streaming, cancellation, and structural tool-call results. |
 | `arcane-os/ai/tool-text-stream` | Shared selected tool-argument text observer for provider integration. |
 | `arcane-os/ai/twin-cloud` | Complete TWiN Cloud requests from Node or a browser with an explicit key/model and shared retry/cancellation behavior. |
-| `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS, explicit DigitalOcean FAL remote TTS, ordinary upstream assets, role lifecycle, and cancellation. |
+| `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS, explicit TWiN Cloud remote TTS, ordinary upstream assets, role lifecycle, and cancellation. |
 | `arcane-os/mail` | Portable Mail runtime, durable outbox, complete transport responses, and provider-neutral acceptance contracts. |
 
 These lowercase runtime-module entrypoints expose their existing exports; they
@@ -178,7 +178,8 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `getPwaInstall()` | function | `arcane-os/pwa` | Progressive web applications | Browser native installation events; waiting state while no prompt is available |
 | `mountPwaInstallPrompt()` | function | `arcane-os/pwa` | Progressive web applications | Browser document and managed HTML import; resolves to null without a document |
 | `createDbopfsSpeechArtifactStore()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with ready DBOPFS, Web Locks, Fetch, File/Blob, and object URLs |
-| `createDigitalOceanFalTTSProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser or Node with Fetch, Blob, and an application-supplied DigitalOcean inference key |
+| `createDigitalOceanFalTTSProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Compatibility name for `createTwinCloudTTSProvider()` |
+| `createTwinCloudTTSProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser or Node with Fetch, Blob, and an application-supplied inference key |
 | `removeBrowserSpeechModelCache()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser CacheStorage; explicit removal of one selected upstream model |
 | `createNativeBuildPlan()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
 | `createNativeTargetAdapter()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
@@ -7184,42 +7185,63 @@ async function transcribeAfterUserChoice(audioBlob) {
 }
 ```
 
-## createDigitalOceanFalTTSProvider()
+## createTwinCloudTTSProvider()
 
 ### Overview
 
-Creates a `localOnly:false` provider/2 TTS adapter for the caller-selected
-DigitalOcean FAL model. It submits independent synthesis jobs, polls their
-completion, and returns each complete downloaded audio `Blob`. The shared AI
+Creates a `localOnly:false` TWiN Cloud provider/2 TTS adapter for the caller-selected
+model. It submits independent synthesis jobs, polls their completion, and returns
+each complete downloaded audio `Blob`. The shared AI
 queue owns punctuation segmentation, bounded concurrent requests, and playback
 in input order; this is not provider-native live audio streaming.
 
-### Signature and parameters
+### Signature and result
 
 ```text
-createDigitalOceanFalTTSProvider({id,model,getApiKey,maxConcurrentRequests=4,fetch=globalThis.fetch}={})
+createTwinCloudTTSProvider({id,model,getApiKey,maxConcurrentRequests=4,followUpQueue:{maxConcurrentRequests=4,intervalMs=250}={},fetch=globalThis.fetch}={})
 ```
 
 `id` is the application-owned provider identifier. `model` contains the selected
 `id` and `defaultVoice`; the supported multilingual-v2 selection is
 `fal-ai/elevenlabs/tts/multilingual-v2`. `getApiKey()` returns the
 application's current DigitalOcean inference key or a promise for it. The credential is never
-included in catalog or status. `maxConcurrentRequests` is a positive integer;
-the runtime owns admission and its FIFO queue. Optional `fetch` supplies the
-standard Fetch interface.
+included in catalog or status. `maxConcurrentRequests` remains the positive
+whole-synthesis-job capacity used by the shared AI runtime. It is independent
+from `followUpQueue.maxConcurrentRequests`, which controls follow-up HTTP
+operations. `followUpQueue.intervalMs` controls the spacing between those
+dispatch starts. Optional `fetch` supplies the standard Fetch interface.
 
 ### Availability and normalization
 
 The adapter needs Fetch, Blob, and AbortController; it needs no Worker or
 DBOPFS. Browser access depends on endpoint CORS support. Construction makes
-no network request. Inspection and activation await the application's key
-reader without making an SDK network request. Activation checks
+no network request. Its provider-local `js-queue` is created only when this
+factory is called; importing the entrypoint does not create a queue or load a
+model. Local Kokoro and Whisper retain their independent paths. Inspection and
+activation await the application's key reader without making an SDK network
+request. Activation checks
 local credential presence, not remote validity. Status reports remote
 execution and current activity. Requests preserve complete text, selected
 voice, and speed; multilingual-v2 speed outside `0.7` through `1.2` rejects
 instead of clamping. Returned media is fetched without the inference key.
 Cancelling a credential wait leaves the application's shared refresh alone
 and prevents a late result from starting this cancelled operation.
+
+The SDK sends each initial synthesis POST immediately after credential readiness,
+outside the follow-up queue. One queue handles only status/result GETs and the
+final audio download. Its defaults are four in-flight follow-ups and 250 ms
+between dispatch starts, with each slot held through complete JSON, Blob, or
+error-body consumption. Each job awaits its response and body before enqueueing
+its next incomplete-status check; there is no per-job polling delay.
+
+A readable `Retry-After` postpones only the affected job's next eligibility.
+Other jobs and initial submissions remain independent. One readable HTTP 429
+retry is allowed per submission or status read; POST retries retain a one-second minimum, and
+follow-up retries use the configured queue cadence plus any longer readable
+`Retry-After`. An accepted job's failed status Fetch may retry once after a
+network failure, not after a JSON parsing failure. Repeated failures surface
+complete developer diagnostics without cancelling sibling jobs. An ambiguous
+paid POST network failure is never automatically replayed.
 
 Each provider/2 `tts/synthesize` request returns one complete audio Blob.
 Request cancellation, unload, and disposal stop local polling/downloads and
@@ -7230,13 +7252,14 @@ does not select a fallback or silently resubmit a paid synthesis POST.
 ### Example
 
 ```javascript
-import {createDigitalOceanFalTTSProvider} from 'arcane-os/ai/browser-speech';
+import {createTwinCloudTTSProvider} from 'arcane-os/ai/browser-speech';
 
 async function configureCloudVoice(ai, getApiKey) {
-  const provider = createDigitalOceanFalTTSProvider({
+  const provider = createTwinCloudTTSProvider({
     id: 'selected-cloud-voice',
     model: {id: 'fal-ai/elevenlabs/tts/multilingual-v2', defaultVoice: 'Rachel'},
-    getApiKey
+    getApiKey,
+    followUpQueue: {maxConcurrentRequests: 4, intervalMs: 250}
   });
   await ai.configureSpeechProvider('tts', provider);
   return provider;
@@ -7245,7 +7268,42 @@ async function configureCloudVoice(ai, getApiKey) {
 
 Call activation and synthesis from the application's explicit speech action.
 For streaming text, cancellation, and independent STT configuration, see
-[DigitalOcean FAL speech](ai/browser-speech.md#digitalocean-fal-text-to-speech).
+[TWiN Cloud speech](ai/browser-speech.md#twin-cloud-text-to-speech).
+
+## createDigitalOceanFalTTSProvider()
+
+### Overview
+
+Compatibility export of `createTwinCloudTTSProvider`, using the same function
+and implementation. The canonical public name is TWiN Cloud; the underlying
+DigitalOcean FAL endpoint and job protocol remain unchanged.
+
+### Signature and result
+
+```text
+createDigitalOceanFalTTSProvider({id,model,getApiKey,maxConcurrentRequests=4,followUpQueue:{maxConcurrentRequests=4,intervalMs=250}={},fetch=globalThis.fetch}={})
+```
+
+Accepts the same options and returns the same provider as
+[`createTwinCloudTTSProvider()`](#createtwincloudttsprovider).
+
+### Availability and normalization
+
+The alias shares the canonical factory's Browser and Node requirements,
+immediate submission, queued follow-ups, cancellation, and result contract.
+Existing caller imports, stored provider IDs, and credentials remain valid;
+renaming a caller's import requires no saved-data migration.
+
+### Example
+
+```javascript
+import {
+  createTwinCloudTTSProvider,
+  createDigitalOceanFalTTSProvider
+} from 'arcane-os/ai/browser-speech';
+
+console.log(createDigitalOceanFalTTSProvider === createTwinCloudTTSProvider);
+```
 
 ## createBrowserKokoroProvider()
 

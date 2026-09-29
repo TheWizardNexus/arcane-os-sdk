@@ -338,7 +338,8 @@ test('the public package API inventory matches every JavaScript export and MDN e
             ['BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL','const BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL'],
             ['BROWSER_SPEECH_ARTIFACT_PROTOCOL','const BROWSER_SPEECH_ARTIFACT_PROTOCOL'],
             ['createBrowserKokoroProvider','createBrowserKokoroProvider(options={})'],
-            ['createDigitalOceanFalTTSProvider','createDigitalOceanFalTTSProvider({id,model,getApiKey,maxConcurrentRequests=4,fetch=globalThis.fetch}={})'],
+            ['createDigitalOceanFalTTSProvider','createDigitalOceanFalTTSProvider({id,model,getApiKey,maxConcurrentRequests=4,followUpQueue:{maxConcurrentRequests=4,intervalMs=250}={},fetch=globalThis.fetch}={})'],
+            ['createTwinCloudTTSProvider','createTwinCloudTTSProvider({id,model,getApiKey,maxConcurrentRequests=4,followUpQueue:{maxConcurrentRequests=4,intervalMs=250}={},fetch=globalThis.fetch}={})'],
             ['createBrowserSpeechArtifactGraph',"createBrowserSpeechArtifactGraph({ kind='browser-speech-authenticated-artifact-graph', security, providerId=null, role, model, runtime, files }={})"],
             ['createBrowserSpeechAuthority','createBrowserSpeechAuthority({ providerId, role, model, runtime, security }={})'],
             ['createBrowserWhisperProvider','createBrowserWhisperProvider(options={})'],
@@ -363,7 +364,8 @@ test('the public package API inventory matches every JavaScript export and MDN e
                     :'function'
             );
             assert.match(member.availability,/\bBrowser\b/u);
-            if(member.name==='createDigitalOceanFalTTSProvider'){
+            if(member.name==='createDigitalOceanFalTTSProvider'
+                ||member.name==='createTwinCloudTTSProvider'){
                 assert.match(member.availability,/\bNode\b/u);
             }else{
                 assert.doesNotMatch(member.availability,/\b(?:Node|Cloud)\b/u);
@@ -492,6 +494,23 @@ test('the public package API inventory matches every JavaScript export and MDN e
             /checks[.]byteLength|checks[.]sha256|observed byte length|identitySha256|artifactGraphAdmission/u
         );
         assert.match(guide,/arcane\.ai\.browser-wasm\.webgpu\.adapter\.selected/u);
+    });
+
+    await t.test('TWiN Cloud documents immediate submission and provider-local queued follow-ups',()=>{
+        const sdkSections=sectionsByHeading(guide);
+        const headings=['Overview','Signature and result','Availability and normalization','Example'];
+        const canonical=requireGuideSection(sdkSections,'createTwinCloudTTSProvider()',headings);
+        const compatibility=requireGuideSection(sdkSections,'createDigitalOceanFalTTSProvider()',headings);
+        assert.match(canonical,/followUpQueue:\{maxConcurrentRequests=4,intervalMs=250\}=\{\}/u);
+        assert.match(canonical,/initial synthesis POST immediately after credential readiness,[\s\S]*outside the follow-up queue/u);
+        assert.match(canonical,/status\/result GETs and the[\s\S]*final audio download/u);
+        assert.match(canonical,/each slot held through complete JSON, Blob, or[\s\S]*error-body consumption/u);
+        assert.match(canonical,/`Retry-After` postpones only the affected job's next eligibility/u);
+        assert.match(canonical,/Local Kokoro and Whisper retain their independent paths/u);
+        assert.match(compatibility,/same function[\s\S]*and implementation/u);
+        assert.match(compatibility,/stored provider IDs, and credentials remain valid/u);
+        assert.match(browserSpeechGuide,/followUpQueue: \{maxConcurrentRequests: 4, intervalMs: 250\}/u);
+        assert.doesNotMatch(browserSpeechGuide,/postpones[\s\S]*all pending inference starts/u);
     });
 
     await t.test('the focused browser-speech guide owns the exact shipped browser contract',()=>{

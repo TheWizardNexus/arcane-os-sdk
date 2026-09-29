@@ -1,12 +1,14 @@
 # Browser speech providers
 
 `arcane-os/ai/browser-speech` supplies caller-selected Whisper speech-to-text,
-Kokoro text-to-speech, and DigitalOcean FAL text-to-speech providers. Its local path
+Kokoro text-to-speech, and TWiN Cloud text-to-speech providers. Its local path
 provides artifact storage, live module routing, role Workers, provider/2
 adapters, bounded parallel TTS synthesis, audio normalization, cancellation,
 and cleanup.
 
-## DigitalOcean FAL text-to-speech
+<a id="digitalocean-fal-text-to-speech"></a>
+
+## TWiN Cloud text-to-speech
 
 Use the same AI speech queue with an explicitly selected remote provider.
 The application supplies its current DigitalOcean inference key through a
@@ -14,17 +16,18 @@ function returning a string or promise; never place that key in source, logs, or
 This example receives an existing `ai` and application-owned key reader:
 
 ```javascript
-import {createDigitalOceanFalTTSProvider} from 'arcane-os/ai/browser-speech';
+import {createTwinCloudTTSProvider} from 'arcane-os/ai/browser-speech';
 
 async function selectCloudVoice(ai, getApiKey) {
-  const provider = createDigitalOceanFalTTSProvider({
-    id: 'my-digitalocean-voice',
+  const provider = createTwinCloudTTSProvider({
+    id: 'my-cloud-voice',
     model: {
       id: 'fal-ai/elevenlabs/tts/multilingual-v2',
       defaultVoice: 'Rachel'
     },
     getApiKey,
-    maxConcurrentRequests: 4
+    maxConcurrentRequests: 4,
+    followUpQueue: {maxConcurrentRequests: 4, intervalMs: 250}
   });
   await ai.configureSpeechProvider('tts', provider, {
     modelId: provider.catalog()[0].id
@@ -32,6 +35,10 @@ async function selectCloudVoice(ai, getApiKey) {
   return provider;
 }
 ```
+
+`createDigitalOceanFalTTSProvider` remains a compatibility export of the same
+factory. Existing provider IDs and credentials remain valid; the TWiN Cloud
+name does not change the underlying DigitalOcean FAL endpoint or protocol.
 
 Construction and configuration make no network request. Explicit
 `ai.setSpeechMuted(false)` awaits the key reader, checks credential presence, and activates
@@ -53,24 +60,49 @@ punctuation segmentation, concurrent provider queue, and original-order
 playback remain the only owners. Use
 `ai.configureTTSSegmentation({punctuation:'any',wordCadence:null})` when each
 punctuation boundary should submit promptly. This is incremental playback of
-completed synthesis jobs, not a live audio stream from DigitalOcean.
+completed synthesis jobs, not a live audio stream from TWiN Cloud.
 
-The transport submits `POST https://inference.do-ai.run/v1/async-invoke`, then
-reads that job until its completed `output.audio.url` is available. One provider
-spaces inference request starts at least one second apart across its concurrent
-jobs; it does not wait for one remote job to finish before starting another.
-A readable `429` rejection permits one retry of the same submission or status
-request after at least one second. A longer readable `Retry-After` postpones
-all pending inference starts for that provider. A failed status Fetch may also
-retry once for the same accepted job. Repeated failures surface their complete
-diagnostics without an endless retry loop; a failed job does not cancel siblings.
-Retry diagnostics remain in the developer console, outside conversation history.
+The SDK submits `POST https://inference.do-ai.run/v1/async-invoke` immediately
+after credential readiness, outside the follow-up queue. It then reads that job
+until its completed `output.audio.url` is available. The provider's
+`maxConcurrentRequests` retains its whole-synthesis-job meaning; it is separate
+from `followUpQueue.maxConcurrentRequests`.
+
+One provider-local `js-queue` owns only follow-up status/result GETs and the final
+audio GET. `followUpQueue` defaults to `{maxConcurrentRequests:4,intervalMs:250}`;
+the application may supply those settings explicitly. A follow-up slot remains
+occupied through the complete JSON, audio Blob, or error response body. Dispatch
+starts observe `intervalMs`, with at most the configured number in flight. Each
+job awaits its current response and body before immediately enqueueing another
+request only when incomplete or eligible for a retry. There is no additional
+per-job polling delay.
+
+A readable `Retry-After` changes only the affected job's next eligibility, not
+sibling requests or initial submissions. A readable `429` permits one retry of
+that submission or status read; submission retries retain a one-second minimum, while
+follow-up retries use the queue cadence and any longer readable `Retry-After`.
+An accepted job's status Fetch network failure may retry once for the same job;
+JSON parsing failures are not network retries. Repeated failures surface their
+complete diagnostics without an endless retry loop; a failed job does not cancel
+siblings. Retry diagnostics remain in the developer console, outside conversation
+history.
+
+The queue is created when this cloud factory is called, not when the browser
+speech entrypoint is imported. Local Kokoro and Whisper do not use this queue;
+their setup, Workers, synthesis/transcription, and lifecycle remain independent.
+
+The SDK pins published `js-queue` through npm. Its browser Queue entry, original
+package metadata, and license are projected unchanged by
+`node tools/sync-js-queue.mjs` after an SDK dependency update. The existing runtime
+materializer serves that same entry; applications do not need another import-map
+setting. `easy-stack` remains an npm dependency and is not imported by the Queue
+entry. Do not hand-edit this upstream projection.
 
 An ambiguous submission network failure is not automatically resubmitted: a
 browser cannot distinguish a rejected preflight from an accepted paid job whose
 response was lost. This contract has no submission idempotency mechanism, and
-unreadable response headers cannot supply a server cooldown. Pacing reduces local
-request bursts; it does not claim to free upstream concurrency slots or fix CORS.
+unreadable response headers cannot supply a retry delay. Follow-up pacing does
+not claim to free upstream concurrency slots or fix CORS.
 The audio download never receives the inference Authorization header.
 The selected multilingual-v2 service supports speed `0.7` through `1.2`;
 unsupported speeds reject rather than being silently clamped. Complete
@@ -937,8 +969,8 @@ records; this contract does not freeze them or shorten their content.
 | --- | --- | --- |
 | Browser | Shipped | Requires Workers, Fetch, Blob/File, object URLs, DBOPFS/OPFS, and Web Locks. Blob/File STT requests also require the browser audio decoder. |
 | Native WebView | Conditional | Available when the WebView exposes the browser APIs above. It does not invoke Core speech. |
-| Node | Remote adapter available; local execution unavailable | DigitalOcean FAL uses Fetch and Blob. The local providers have no SDK Node speech-storage, Worker, or audio-decoder host. |
-| Remote TTS | Explicitly selected | DigitalOcean FAL uses standard Fetch and Blob with an application-owned key; no Worker, OPFS, or local model is needed for this adapter. |
+| Node | Remote adapter available; local execution unavailable | TWiN Cloud uses Fetch and Blob. The local providers have no SDK Node speech-storage, Worker, or audio-decoder host. |
+| Remote TTS | Explicitly selected | TWiN Cloud uses standard Fetch and Blob with an application-owned key; no Worker, OPFS, or local model is needed for this adapter. |
 
 STT and TTS own independent provider lifecycles. A failure or cancellation in
 one role does not disable the other role or authorize a fallback provider.
@@ -954,7 +986,8 @@ import {
   createBrowserSpeechAuthority,
   createBrowserWhisperProvider,
   createDbopfsSpeechArtifactStore,
-  createDigitalOceanFalTTSProvider
+  createDigitalOceanFalTTSProvider,
+  createTwinCloudTTSProvider
 } from 'arcane-os/ai/browser-speech';
 ```
 

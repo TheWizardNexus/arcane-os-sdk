@@ -8,6 +8,7 @@ import {
   createBrowserSpeechAuthority,
   createBrowserWhisperProvider,
   createDbopfsSpeechArtifactStore,
+  createTwinCloudTTSProvider,
 } from "../browser-runtime/ai/browser-speech.mjs";
 import {
   createSpeechWorkerRuntime,
@@ -1522,9 +1523,10 @@ test("an unexpected ready speech Worker crash remains visible", async (t) => {
 });
 
 import {createDigitalOceanFalTTSProvider} from '../browser-runtime/ai/digitalocean-speech.mjs';
+import {createTwinCloudTTSProvider as createCanonicalTwinCloudTTSProvider} from '../browser-runtime/ai/twin-cloud-speech.mjs';
 
 function cloudSpeechFixture(fetchImpl, options = {}) {
-    return createDigitalOceanFalTTSProvider(
+    return createTwinCloudTTSProvider(
         {
             id: 'cloud-narrator',
             model: {
@@ -1554,6 +1556,355 @@ function completedCloudSpeech(url) {
         {status: 'COMPLETED', output: {audio: {url}}}
     );
 }
+
+function deferredCloudSpeech() {
+    let resolve;
+    const promise = new Promise(function retainCloudSpeechResult(accept) {
+        resolve = accept;
+    });
+    return {promise, resolve};
+}
+
+test('TWiN Cloud speech preserves its previous factory as the same public function', function cloudSpeechFactoryCompatibility() {
+    assert.equal(createTwinCloudTTSProvider, createCanonicalTwinCloudTTSProvider);
+    assert.equal(createDigitalOceanFalTTSProvider, createTwinCloudTTSProvider);
+});
+
+test(
+    'cloud speech holds at most four follow-up slots through complete JSON, audio and error bodies while siblings progress',
+    async function cloudSpeechResponseBodySlots(context) {
+        for (const bodyKind of ['json', 'blob', 'text']) {
+            const intervalMs = 20;
+            const heldBodies = Array.from({length: 4}, deferredCloudSpeech);
+            const fourthBodyStarted = deferredCloudSpeech();
+            const starts = [];
+            let active = 0;
+            let maximumActive = 0;
+            let firstSettled = false;
+            const provider = cloudSpeechFixture(async function bodyHeldCloudSpeechFetch(url, options) {
+                if (options.method === 'POST') {
+                    const id = JSON.parse(options.body).input.text;
+                    return bodyKind === 'blob'
+                        ? completedCloudSpeech(`https://audio.example/${id}.mp3`)
+                        : Response.json({status: 'QUEUED', request_id: id});
+                }
+                const index = starts.length;
+                starts.push({url, options, startedAt: Date.now()});
+                active += 1;
+                maximumActive = Math.max(maximumActive, active);
+                const kind = bodyKind === 'text' ? 'text' : options.method === 'GET' ? 'json' : 'blob';
+                const response = {
+                    ok: kind !== 'text',
+                    status: kind === 'text' ? 503 : 200,
+                    headers: new Headers(),
+                    async [kind]() {
+                        if (index === 3) fourthBodyStarted.resolve();
+                        try {
+                            if (index < heldBodies.length) await heldBodies[index].promise;
+                            if (kind === 'text') return `Complete squid rejection for ${url}.\nEvery detail remains.`;
+                            if (kind === 'blob') return new Blob([url], {type: 'audio/mpeg'});
+                            return {status: 'COMPLETED', output: {audio: {url: `https://audio.example/${url.split('/').at(-1)}.mp3`}}};
+                        } finally {
+                            active -= 1;
+                        }
+                    }
+                };
+                return response;
+            }, {maxConcurrentRequests: 6, followUpQueue: {maxConcurrentRequests: 4, intervalMs}});
+            context.after(async function releaseHeldCloudSpeechBodies() {
+                for (const body of heldBodies) body.resolve();
+                await provider.dispose();
+            });
+            await provider.load();
+            const requests = Array.from({length: 6}, function beginBodyHeldSpeech(_, index) {
+                return provider.request(cloudSpeechRequest(`squid-${index}`)).then(
+                    function speechBodyCompleted(audio) {return {audio};},
+                    function speechBodyFailed(error) {return {error};}
+                );
+            });
+            requests[0].then(function recordFirstSpeechSettlement() {firstSettled = true;});
+            await fourthBodyStarted.promise;
+            await waitForCloudSpeechWindow(intervalMs * 2);
+            assert.equal(starts.length, 4);
+            assert.equal(active, 4);
+            assert.equal(provider.status().execution.activeRequestCount, 6);
+            for (const body of heldBodies.slice(1)) body.resolve();
+            const siblings = await Promise.all(requests.slice(1));
+            assert.equal(firstSettled, false);
+            assert.equal(active, 1);
+            assert.equal(starts.filter(function firstJobRead(call) {return call.url.endsWith('/squid-0') || call.url.endsWith('/squid-0.mp3');}).length, 1);
+            assert.equal(maximumActive, 4);
+            for (const result of siblings) {
+                if (bodyKind === 'text') {
+                    assert.equal(result.error.code, 'ARCANE_AI_CLOUD_SPEECH_HTTP_ERROR');
+                    assert.match(result.error.message, /\nEvery detail remains\./u);
+                } else assert.equal(result.audio.type, 'audio/mpeg');
+            }
+            heldBodies[0].resolve();
+            await requests[0];
+            assert.equal(active, 0);
+            for (let index = 1; index < starts.length; index += 1) {
+                assert.ok(starts[index].startedAt - starts[index - 1].startedAt >= intervalMs);
+            }
+            await provider.dispose();
+        }
+    }
+);
+
+test(
+    'cloud speech requeues a pending job only after its full status body settles',
+    async function cloudSpeechSequentialStatusBodies(context) {
+        const firstStatus = deferredCloudSpeech();
+        const firstBody = deferredCloudSpeech();
+        let bodySettled = false;
+        let reads = 0;
+        const provider = cloudSpeechFixture(async function sequentialCloudSpeechFetch(url, options) {
+            if (options.method === 'POST') {
+                const text = JSON.parse(options.body).input.text;
+                return text === 'Waiting squid.'
+                    ? Response.json({status: 'QUEUED', request_id: 'waiting-squid'})
+                    : completedCloudSpeech('https://audio.example/independent-squid.mp3');
+            }
+            if (options.method !== 'GET') return new Response(url, {headers: {'Content-Type': 'audio/mpeg'}});
+            reads += 1;
+            assert.equal(url, 'https://inference.do-ai.run/v1/async-invoke/waiting-squid');
+            if (reads > 1) {
+                assert.equal(bodySettled, true);
+                return completedCloudSpeech('https://audio.example/waiting-squid.mp3');
+            }
+            return {
+                ok: true,
+                status: 200,
+                headers: new Headers(),
+                async json() {
+                    firstStatus.resolve();
+                    await firstBody.promise;
+                    bodySettled = true;
+                    return {status: 'IN_PROGRESS', request_id: 'waiting-squid'};
+                }
+            };
+        }, {followUpQueue: {maxConcurrentRequests: 4, intervalMs: 20}});
+        context.after(async function releaseSequentialSpeechBody() {firstBody.resolve(); await provider.dispose();});
+        await provider.load();
+        const waiting = provider.request(cloudSpeechRequest('Waiting squid.'));
+        await firstStatus.promise;
+        const sibling = await provider.request(cloudSpeechRequest('Independent squid.'));
+        assert.equal(await sibling.text(), 'https://audio.example/independent-squid.mp3');
+        assert.equal(reads, 1);
+        firstBody.resolve();
+        assert.equal(await (await waiting).text(), 'https://audio.example/waiting-squid.mp3');
+        assert.equal(reads, 2);
+    }
+);
+
+test(
+    'cloud speech pending responses and bounded retries rejoin the follow-up queue before later sibling work',
+    async function cloudSpeechImmediateFollowUpRequeue(context) {
+        for (const outcome of ['pending', 'rate-limit', 'network']) {
+            const firstAttempt = deferredCloudSpeech();
+            const followUps = [];
+            let reads = 0;
+            const provider = cloudSpeechFixture(async function immediateRequeueSpeechFetch(url, options) {
+                if (options.method === 'POST') {
+                    return JSON.parse(options.body).input.text === 'First squid.'
+                        ? Response.json({status: 'QUEUED', request_id: 'first-squid'})
+                        : completedCloudSpeech('https://audio.example/later-sibling.mp3');
+                }
+                followUps.push({url, startedAt: Date.now()});
+                if (options.method !== 'GET') return new Response(url, {headers: {'Content-Type': 'audio/mpeg'}});
+                if (++reads > 1) return completedCloudSpeech('https://audio.example/first-squid.mp3');
+                firstAttempt.resolve();
+                if (outcome === 'network') throw new TypeError('The first status fetch was interrupted.');
+                if (outcome === 'rate-limit') return new Response('Retry this read once.', {status: 429});
+                return Response.json({status: 'IN_PROGRESS', request_id: 'first-squid'});
+            }, {followUpQueue: {maxConcurrentRequests: 1, intervalMs: 50}});
+            context.after(async function disposeImmediateRequeueProvider() {await provider.dispose();});
+            await provider.load();
+            const first = provider.request(cloudSpeechRequest('First squid.'));
+            await firstAttempt.promise;
+            // Let the settled fetch/body promise rejoin the queue before the later job arrives.
+            await waitForCloudSpeechWindow(0);
+            const sibling = provider.request(cloudSpeechRequest('Later sibling.'));
+            await Promise.all([first, sibling]);
+            assert.equal(reads, 2);
+            assert.equal(followUps[0].url, 'https://inference.do-ai.run/v1/async-invoke/first-squid');
+            assert.equal(followUps[1].url, followUps[0].url);
+            for (let index = 1; index < followUps.length; index += 1) {
+                assert.ok(followUps[index].startedAt - followUps[index - 1].startedAt >= 50);
+            }
+            await provider.dispose();
+        }
+    }
+);
+
+test(
+    'cloud speech Retry-After eligibility belongs only to the pending or rate-limited status job',
+    async function cloudSpeechLocalStatusEligibility(context) {
+        for (const status of [200, 429]) {
+            const firstRead = deferredCloudSpeech();
+            const reads = [];
+            const provider = cloudSpeechFixture(async function eligibleCloudSpeechFetch(url, options) {
+                if (options.method === 'POST') {
+                    return JSON.parse(options.body).input.text === 'Delayed squid.'
+                        ? Response.json({status: 'QUEUED', request_id: 'delayed-squid'})
+                        : completedCloudSpeech('https://audio.example/eligible-sibling.mp3');
+                }
+                if (options.method !== 'GET') return new Response(url, {headers: {'Content-Type': 'audio/mpeg'}});
+                reads.push({url, startedAt: Date.now()});
+                if (reads.length > 1) return completedCloudSpeech('https://audio.example/delayed-squid.mp3');
+                firstRead.resolve();
+                const headers = {'Retry-After': '1'};
+                return status === 429
+                    ? new Response('Only this status read must wait.', {status, headers})
+                    : Response.json({status: 'IN_PROGRESS', request_id: 'delayed-squid'}, {headers});
+            }, {followUpQueue: {maxConcurrentRequests: 4, intervalMs: 20}});
+            context.after(async function disposeEligibleSpeechProvider() {await provider.dispose();});
+            await provider.load();
+            const delayed = provider.request(cloudSpeechRequest('Delayed squid.'));
+            await firstRead.promise;
+            const sibling = await provider.request(cloudSpeechRequest('Eligible sibling.'));
+            assert.equal(await sibling.text(), 'https://audio.example/eligible-sibling.mp3');
+            assert.equal(reads.length, 1);
+            assert.equal(await (await delayed).text(), 'https://audio.example/delayed-squid.mp3');
+            assert.equal(reads.length, 2);
+            assert.equal(reads[0].url, reads[1].url);
+            assert.ok(reads[1].startedAt - reads[0].startedAt >= 1000);
+            await provider.dispose();
+        }
+    }
+);
+
+test(
+    'cloud speech does not retry JSON or body-parser failures as network failures',
+    async function cloudSpeechParserFailureBoundary(context) {
+        for (const failure of [new SyntaxError('The complete JSON document is malformed.'), new TypeError('The status body parser failed.')]) {
+            const calls = [];
+            const provider = cloudSpeechFixture(async function malformedCloudSpeechStatus(url, options) {
+                calls.push({url, options});
+                if (options.method === 'POST') return Response.json({status: 'QUEUED', request_id: 'malformed-squid'});
+                return {ok: true, status: 200, headers: new Headers(), async json() {throw failure;}};
+            });
+            context.after(async function disposeMalformedSpeechProvider() {await provider.dispose();});
+            await provider.load();
+            await assert.rejects(provider.request(cloudSpeechRequest('Read the complete document.')), function originalParserFailure(error) {return error === failure;});
+            assert.deepEqual(calls.map(function parserRequestMethod(call) {return call.options.method;}), ['POST', 'GET']);
+            assert.equal(provider.status().execution.activeRequestCount, 0);
+            await provider.dispose();
+        }
+    }
+);
+
+test(
+    'cloud speech cancels queued GETs without fetching and retains an aborted active slot until its body settles',
+    async function cloudSpeechQueuedAndActiveCancellation(context) {
+        const bodyStarted = deferredCloudSpeech();
+        const retainedBody = deferredCloudSpeech();
+        const submissions = [];
+        const downloads = [];
+        const provider = cloudSpeechFixture(async function cancellableQueuedSpeechFetch(url, options) {
+            if (options.method === 'POST') {
+                const input = JSON.parse(options.body).input.text;
+                submissions.push(input);
+                return completedCloudSpeech(`https://audio.example/${input}.mp3`);
+            }
+            downloads.push({url, options});
+            if (!url.endsWith('/active.mp3')) return new Response(url, {headers: {'Content-Type': 'audio/mpeg'}});
+            return {
+                ok: true,
+                status: 200,
+                headers: new Headers(),
+                async blob() {
+                    bodyStarted.resolve();
+                    await retainedBody.promise;
+                    return new Blob(['The late active recording.'], {type: 'audio/mpeg'});
+                }
+            };
+        }, {followUpQueue: {maxConcurrentRequests: 1, intervalMs: 20}});
+        context.after(async function releaseCancelledSpeechBody() {retainedBody.resolve(); await provider.dispose();});
+        await provider.load();
+        const activeController = new AbortController();
+        const queuedController = new AbortController();
+        const active = assert.rejects(provider.request(cloudSpeechRequest('active', {signal: activeController.signal})), {name: 'AbortError'});
+        await bodyStarted.promise;
+        const queued = assert.rejects(provider.request(cloudSpeechRequest('queued', {signal: queuedController.signal})), {name: 'AbortError'});
+        const sibling = provider.request(cloudSpeechRequest('sibling'));
+        await waitForCloudSpeechWindow(40);
+        assert.deepEqual(submissions, ['active', 'queued', 'sibling']);
+        queuedController.abort('Cancel the queued audio retrieval.');
+        await queued;
+        activeController.abort('Cancel the active audio retrieval.');
+        await waitForCloudSpeechWindow(40);
+        assert.equal(downloads.length, 1);
+        assert.equal(downloads[0].options.signal.aborted, true);
+        retainedBody.resolve();
+        await active;
+        assert.equal(await (await sibling).text(), 'https://audio.example/sibling.mp3');
+        assert.deepEqual(downloads.map(function downloadedSpeechUrl(call) {return call.url;}), ['https://audio.example/active.mp3', 'https://audio.example/sibling.mp3']);
+        assert.equal(downloads[1].options.signal.aborted, false);
+        assert.equal(downloads[1].options.headers, undefined);
+        assert.equal(provider.status().state, 'ready');
+        assert.equal(provider.status().busy, false);
+    }
+);
+
+test(
+    'cloud speech unload aborts active and queued follow-ups without starting queued downloads',
+    async function cloudSpeechUnloadQueuedFollowUps(context) {
+        const bodyStarted = deferredCloudSpeech();
+        const bodyReleased = deferredCloudSpeech();
+        const allSubmitted = deferredCloudSpeech();
+        const submissions = [];
+        const downloads = [];
+        const provider = cloudSpeechFixture(async function unloadQueuedSpeechFetch(url, options) {
+            if (options.method === 'POST') {
+                const input = JSON.parse(options.body).input.text;
+                submissions.push({input, signal: options.signal});
+                if (submissions.length === 3) allSubmitted.resolve();
+                return completedCloudSpeech(`https://audio.example/${input}.mp3`);
+            }
+            downloads.push({url, signal: options.signal});
+            return {
+                ok: true,
+                status: 200,
+                headers: new Headers(),
+                async blob() {
+                    bodyStarted.resolve();
+                    await bodyReleased.promise;
+                    return new Blob(['The retired recording.'], {type: 'audio/mpeg'});
+                }
+            };
+        }, {followUpQueue: {maxConcurrentRequests: 4, intervalMs: 60000}});
+        context.after(async function releaseUnloadedSpeechBody() {bodyReleased.resolve(); await provider.dispose();});
+        await provider.load();
+        const rejections = ['active', 'queued-one', 'queued-two'].map(function startRetiringSpeech(input) {
+            return assert.rejects(provider.request(cloudSpeechRequest(input)), {name: 'AbortError'});
+        });
+        await Promise.all([bodyStarted.promise, allSubmitted.promise]);
+        await waitForCloudSpeechWindow(0);
+        // Make queued siblings eligible before their timer callback runs. An
+        // abort listener must not dispatch them from inside unload's abort loop.
+        const readClock = Date.now;
+        let unloading;
+        try {
+            Date.now = function elapsedCloudSpeechCadence() {return readClock() + 60000;};
+            unloading = provider.unload();
+        } finally {
+            Date.now = readClock;
+        }
+        await waitForCloudSpeechWindow(40);
+        assert.equal(downloads.length, 1);
+        for (const submission of submissions) assert.equal(submission.signal.aborted, true);
+        assert.equal(downloads[0].signal.aborted, true);
+        bodyReleased.resolve();
+        const unloaded = await unloading;
+        await Promise.all(rejections);
+        await waitForCloudSpeechWindow(40);
+        assert.deepEqual(downloads.map(function retiredSpeechUrl(call) {return call.url;}), ['https://audio.example/active.mp3']);
+        assert.equal(unloaded.state, 'unloaded');
+        assert.equal(unloaded.busy, false);
+        assert.equal(unloaded.execution.activeRequestCount, 0);
+    }
+);
 
 test(
     'cloud speech retries a readable submission rejection once with the complete original body and no Retry-After header',
@@ -1586,8 +1937,8 @@ test(
 );
 
 test(
-    'cloud speech applies a longer Retry-After cooldown to waiting sibling request starts',
-    async function sharedCloudSpeechCooldown(context) {
+    'cloud speech submission Retry-After delays only its own retry while a sibling completes',
+    async function localCloudSpeechSubmissionCooldown(context) {
         const calls = [];
         let announceFirstSubmission;
         const firstSubmission = new Promise(function firstSubmissionStarted(resolve) {announceFirstSubmission = resolve;});
@@ -1598,7 +1949,7 @@ test(
             calls.push({url, options, input, startedAt: Date.now()});
             if (input === 'First squid.' && ++firstAttempts === 1) {
                 announceFirstSubmission();
-                return new Response('Wait for the shared concurrency slot.', {status: 429, headers: {'Retry-After': '2'}});
+                return new Response('Wait before retrying this submission.', {status: 429, headers: {'Retry-After': '2'}});
             }
             return completedCloudSpeech(input === 'First squid.'
                 ? 'https://audio.example/first-cooldown.mp3' : 'https://audio.example/sibling-cooldown.mp3');
@@ -1608,14 +1959,16 @@ test(
         const first = provider.request(cloudSpeechRequest('First squid.'));
         await firstSubmission;
         const sibling = provider.request(cloudSpeechRequest('Sibling squid.'));
-        const [firstAudio, siblingAudio] = await Promise.all([first, sibling]);
-        assert.equal(await firstAudio.text(), 'https://audio.example/first-cooldown.mp3');
+        const siblingAudio = await sibling;
         assert.equal(await siblingAudio.text(), 'https://audio.example/sibling-cooldown.mp3');
+        assert.equal(firstAttempts, 1);
+        const firstAudio = await first;
+        assert.equal(await firstAudio.text(), 'https://audio.example/first-cooldown.mp3');
         assert.equal(calls.length, 3);
         assert.equal(calls.filter(function firstRequest(call) {return call.input === 'First squid.';}).length, 2);
         assert.equal(calls.filter(function siblingRequest(call) {return call.input === 'Sibling squid.';}).length, 1);
-        for (const call of calls.slice(1)) assert.ok(call.startedAt - calls[0].startedAt >= 2000);
-        assert.ok(calls[2].startedAt - calls[1].startedAt >= 1000);
+        assert.deepEqual(calls.map(function submissionInput(call) {return call.input;}), ['First squid.', 'Sibling squid.', 'First squid.']);
+        assert.ok(calls[2].startedAt - calls[0].startedAt >= 2000);
         assert.equal(provider.status().state, 'ready');
         assert.equal(provider.status().busy, false);
     }
@@ -1646,7 +1999,7 @@ test(
         assert.equal(calls[2].url, expectedUrl);
         assert.equal(calls[1].options.signal, calls[2].options.signal);
         assert.equal(calls[2].options.signal.aborted, false);
-        assert.ok(calls[2].startedAt - calls[1].startedAt >= 1000);
+        assert.ok(calls[2].startedAt - calls[1].startedAt >= 250);
         assert.equal(provider.status().execution.activeRequestCount, 0);
     }
 );
@@ -1676,7 +2029,7 @@ test(
             assert.deepEqual(calls.map(function requestMethod(call) {return call.options.method;}), ['POST', 'GET', 'GET']);
             assert.equal(reads, 2);
             assert.equal(calls[1].url, calls[2].url);
-            assert.ok(calls[2].startedAt - calls[1].startedAt >= 1000);
+            assert.ok(calls[2].startedAt - calls[1].startedAt >= 250);
             assert.equal(provider.status().state, 'ready');
             assert.equal(provider.status().busy, false);
             await provider.dispose();
@@ -1706,43 +2059,34 @@ test(
 );
 
 test(
-    'cloud speech cancellation during spacing or a retry cooldown prevents every late request start',
-    async function cancelCloudSpeechRequestWindows(context) {
-        for (const window of ['spacing', 'cooldown']) {
-            const calls = [];
-            let announceRejection;
-            const rejectionRead = new Promise(function rejectedSubmissionRead(resolve) {announceRejection = resolve;});
-            const provider = cloudSpeechFixture(async function cancelledWindowSpeechFetch(url, options) {
-                calls.push({url, options});
-                if (options.method !== 'POST') return new Response('The initial recording.', {headers: {'Content-Type': 'audio/mpeg'}});
-                if (window === 'spacing') return completedCloudSpeech('https://audio.example/initial.mp3');
-                const response = new Response('The concurrency slot is unavailable.', {status: 429});
-                const readError = response.text.bind(response);
-                response.text = async function observeReadableRejection() {
-                    const detail = await readError();
-                    announceRejection();
-                    return detail;
-                };
-                return response;
-            });
-            context.after(async function disposeCancelledWindowProvider() {await provider.dispose();});
-            await provider.load();
-            if (window === 'spacing') await provider.request(cloudSpeechRequest('Initial recording.'));
-            const controller = new AbortController();
-            const pending = provider.request(cloudSpeechRequest('Cancel the waiting recording.', {signal: controller.signal}));
-            const rejected = assert.rejects(pending, {name: 'AbortError', code: 'ARCANE_AI_REQUEST_ABORTED'});
-            if (window === 'cooldown') await rejectionRead;
-            await Promise.resolve();
-            await Promise.resolve();
-            controller.abort('The caller stopped this recording.');
-            await rejected;
-            await waitForCloudSpeechWindow(1100);
-            assert.equal(calls.filter(function inferenceSubmission(call) {return call.options.method === 'POST';}).length, 1);
-            assert.equal(calls.filter(function inferenceRead(call) {return call.options.method === 'GET';}).length, 0);
-            assert.equal(provider.status().state, 'ready');
-            assert.equal(provider.status().busy, false);
-            await provider.dispose();
-        }
+    'cloud speech cancellation during a submission retry delay prevents a late resubmission',
+    async function cancelCloudSpeechSubmissionRetry(context) {
+        const calls = [];
+        const rejectionRead = deferredCloudSpeech();
+        const provider = cloudSpeechFixture(async function cancelledRetrySpeechFetch(url, options) {
+            calls.push({url, options});
+            assert.equal(options.method, 'POST');
+            const response = new Response('The concurrency slot is unavailable.', {status: 429});
+            const readError = response.text.bind(response);
+            response.text = async function observeReadableRejection() {
+                const detail = await readError();
+                rejectionRead.resolve();
+                return detail;
+            };
+            return response;
+        });
+        context.after(async function disposeCancelledRetryProvider() {await provider.dispose();});
+        await provider.load();
+        const controller = new AbortController();
+        const pending = provider.request(cloudSpeechRequest('Cancel the waiting recording.', {signal: controller.signal}));
+        const rejected = assert.rejects(pending, {name: 'AbortError', code: 'ARCANE_AI_REQUEST_ABORTED'});
+        await rejectionRead.promise;
+        controller.abort('The caller stopped this recording.');
+        await rejected;
+        await waitForCloudSpeechWindow(1100);
+        assert.equal(calls.length, 1);
+        assert.equal(provider.status().state, 'ready');
+        assert.equal(provider.status().busy, false);
     }
 );
 
@@ -1856,7 +2200,7 @@ test(
 );
 
 test(
-    'cloud speech preserves full input and admits concurrent results without forwarding the inference credential',
+    'cloud speech submits immediately before either response settles and preserves full input without forwarding credentials to audio',
     async function cloudSpeechConcurrentRequestContract() {
         const submissions = [];
         const mediaRequests = [];
@@ -1899,6 +2243,8 @@ test(
         const second = provider.request(
             cloudSpeechRequest('Second squid.')
         );
+        await waitForCloudSpeechWindow(0);
+        assert.equal(submissions.length, 2);
         assert.equal(provider.status().state, 'ready');
         assert.equal(provider.status().busy, true);
         assert.equal(provider.status().execution.activeRequestCount, 2);
@@ -1910,7 +2256,8 @@ test(
         );
         await submissionsStarted;
         assert.equal(submissions.length, 2);
-        assert.ok(submissions[1].startedAt - submissions[0].startedAt >= 1000);
+        assert.deepEqual(mediaRequests, []);
+        assert.equal(provider.status().execution.activeRequestCount, 2);
         assert.deepEqual(
             JSON.parse(submissions[0].options.body),
             {
@@ -1993,8 +2340,8 @@ test(
             ),
             ['POST', 'GET', 'GET', 'GET', undefined]
         );
-        for (let index = 1; index < 4; index += 1) {
-            assert.ok(calls[index].startedAt - calls[index - 1].startedAt >= 1000);
+        for (let index = 2; index < calls.length; index += 1) {
+            assert.ok(calls[index].startedAt - calls[index - 1].startedAt >= 250);
         }
         await provider.dispose();
     }
@@ -2054,7 +2401,7 @@ test(
 );
 
 test(
-    'cloud speech cancels the status wait and suppresses a late submission result',
+    'cloud speech suppresses late submission headers and a late submission body after cancellation',
     async function cloudSpeechLateResultContract() {
         let resolveSubmission;
         let submissionSignal;
@@ -2107,6 +2454,7 @@ test(
                 announcePolling = resolve;
             }
         );
+        const submissionBody = deferredCloudSpeech();
         const pollingProvider = cloudSpeechFixture(
             async function cancelledCloudSpeechStatusFetch(url, options) {
                 assert.equal(options.method, 'POST');
@@ -2114,6 +2462,7 @@ test(
                     ok: true,
                     async json() {
                         announcePolling();
+                        await submissionBody.promise;
                         return {status: 'QUEUED', request_id: 'cancel-queued-job'};
                     }
                 };
@@ -2131,8 +2480,8 @@ test(
             {name: 'AbortError'}
         );
         await pendingStatus;
-        await Promise.resolve();
         pollingController.abort();
+        submissionBody.resolve();
         await pollingRejected;
         await pollingProvider.dispose();
     }

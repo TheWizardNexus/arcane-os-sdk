@@ -124,6 +124,7 @@
   },
   "dependencies": {
     "event-pubsub": "6.1.0",
+    "js-queue": "3.1.1",
     "node-http-server": "10.0.0",
     "strong-type": "2.0.1",
     "vanilla-test": "2.1.3"

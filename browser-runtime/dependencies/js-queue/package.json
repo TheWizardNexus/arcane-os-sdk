@@ -1,0 +1,100 @@
+{
+  "name": "js-queue",
+  "version": "3.1.1",
+  "description": "A tiny FIFO task queue with explicit flow control for Node and browsers",
+  "type": "module",
+  "main": "./queue.js",
+  "module": "./queue.js",
+  "browser": "./queue.js",
+  "exports": {
+    ".": {
+      "import": "./queue.js",
+      "require": "./queue.js",
+      "default": "./queue.js"
+    },
+    "./queue": {
+      "import": "./queue.js",
+      "require": "./queue.js"
+    },
+    "./queue.js": {
+      "import": "./queue.js",
+      "require": "./queue.js"
+    },
+    "./queue-vanilla.js": "./queue-vanilla.js",
+    "./stack": {
+      "import": "./stack.js",
+      "require": "./stack.js"
+    },
+    "./stack.js": {
+      "import": "./stack.js",
+      "require": "./stack.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "queue.js",
+    "queue-vanilla.js",
+    "stack.js",
+    "assets/js-queue-header.png",
+    "assets/vanilla-test-header.png",
+    "assets/benchmark-construct.svg",
+    "assets/benchmark-tasks.svg",
+    "README.md",
+    "CHANGELOG.md",
+    "MIGRATION.md",
+    "licence.md"
+  ],
+  "sideEffects": [
+    "./queue-vanilla.js"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "test": "node ./scripts/test.js",
+    "test:unit": "node ./scripts/test.js unit",
+    "test:functional": "node ./scripts/test.js functional",
+    "test:behavioral": "node ./scripts/test.js behavioral",
+    "test:integration": "node ./scripts/test.js integration",
+    "test:regression": "node ./scripts/test.js regression",
+    "test:core": "node ./scripts/test.js core",
+    "test:playground": "node ./scripts/test.js playground",
+    "test:package": "node ./scripts/test.js package",
+    "test:consumer": "node ./scripts/test.js consumer",
+    "test:server": "node ./scripts/test.js server",
+    "test:docs": "node ./scripts/test.js docs",
+    "coverage": "vanilla-test coverage",
+    "coverage:node": "vanilla-test coverage node",
+    "coverage:chrome": "vanilla-test coverage chrome",
+    "benchmark": "node --expose-gc ./scripts/benchmark.js",
+    "start": "node ./scripts/serve.js",
+    "check": "npm test && npm run coverage:node"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RIAEvangelist/js-queue.git"
+  },
+  "keywords": [
+    "queue",
+    "fifo",
+    "task-queue",
+    "flow-control",
+    "async",
+    "browser",
+    "node",
+    "esm",
+    "commonjs"
+  ],
+  "author": "Brandon Nozaki Miller",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/RIAEvangelist/js-queue/issues"
+  },
+  "homepage": "https://riaevangelist.github.io/js-queue/",
+  "dependencies": {
+    "easy-stack": "2.1.0"
+  },
+  "devDependencies": {
+    "vanilla-test": "2.1.1"
+  }
+}

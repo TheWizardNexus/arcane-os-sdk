@@ -8,6 +8,9 @@ informational notice and is not itself a grant of commercial rights.
 Third-party material retains its own terms:
 
 - event-pubsub 6.1.0: MIT License; see its installed `licence` file.
+- js-queue 3.1.1: MIT License; see browser-runtime/dependencies/js-queue/licence.md.
+- js-queue's easy-stack 2.1.0 dependency: MIT License; see its installed
+  `licence` file. The browser Queue entry does not import this stack module.
 - node-http-server 10.0.0: MIT License; see its installed `licence` file.
 - strong-type 2.0.1: MIT License; see its installed `licence` file.
 - vanilla-test 2.1.3: MIT License; see its installed `licence` file.

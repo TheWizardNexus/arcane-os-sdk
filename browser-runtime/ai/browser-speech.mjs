@@ -10,4 +10,7 @@ export {
   createBrowserKokoroProvider,
   createBrowserWhisperProvider,
 } from "./browser-speech-providers.mjs";
-export { createDigitalOceanFalTTSProvider } from "./digitalocean-speech.mjs";
+export {
+  createTwinCloudTTSProvider,
+  createTwinCloudTTSProvider as createDigitalOceanFalTTSProvider,
+} from "./twin-cloud-speech.mjs";
