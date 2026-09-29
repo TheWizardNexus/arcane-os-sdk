@@ -67,12 +67,12 @@ appropriate.
 | [`conversation-view.html`](#conversation-viewhtml) | Provider-neutral conversation display, advisory actions, composer, busy state, and status. | `setConversation()`<br>`setBusy()`<br>`setStatus()`<br>`clearComposer()`<br>`destroy()` | `conversation-view-ready`<br>`communication-send`<br>`communication-advisory-action` | DOM-normalized |
 | [`dashboard-config.html`](#dashboard-confightml) | Selects which normalized chart definitions are visible on a dashboard. | `configure()`<br>`setDefinitions()`<br>`setVisibility()`<br>`getChartOptions()`<br>`getEffectiveVisibility()`<br>`open()`<br>`close()`<br>`destroy()` | `dashboard-config-ready`<br>`dashboard-config-opened`<br>`dashboard-config-closed`<br>`dashboard-config-change` | Fully normalized definitions and visibility |
 | [`data-maintenance.html`](#data-maintenancehtml) | Runs destructive cleanup of empty chats and memories inside the current app data scope. | `open()`<br>`destroy()` | `data-maintenance-ready`<br>`data-maintenance-complete` | Normalized counts; DBOPFS failures mixed |
-| [`data-view.html`](#data-viewhtml) | Opens a generic modal-style data view around an injected provider. | `beforeOpen()`<br>`open()`<br>`destroy()` | `data-view-ready` | DOM-native result |
+| [`data-view.html`](#data-viewhtml) | Opens a modal file view and forwards application-owned preview and directory-filter callbacks. | `beforeOpen()`<br>`open()`<br>`destroy()` | `data-view-ready` | DOM-native result; preview/filter configuration reaches the child before loading |
 | [`directory-picker.html`](#directory-pickerhtml) | Presents the provider-owned OS directory chooser with change/cancel/error states. | `configure()`<br>`focus()`<br>`select()`<br>`destroy()` | `directory-picker-ready`<br>`directory-picker-change`<br>`directory-picker-cancel`<br>`directory-picker-error` | Complete plain-text paths and native selection/error |
 | [`document-inspector.html`](#document-inspectorhtml) | Inspects PDF, text, or source documents and records review state. | `loadDocument()`<br>`selectView()`<br>`markSaved()`<br>`destroy()` | `document-inspector-ready`<br>`document-review-change` | Document state normalized; browser document APIs mixed |
 | [`file-drop.html`](#file-drophtml) | Acquires complete file selections by drag/drop or picker and presents busy, progress, error, and cleared state. | `configure()`<br>`openPicker()`<br>`clear()`<br>`setBusy()`<br>`setError()`<br>`setProgress()`<br>`destroy()` | `file-drop-ready`<br>`file-drop-selected`<br>`file-drop-progress`<br>`file-drop-state`<br>`file-drop-error` | Complete selections preserved; browser File/drop errors mixed |
 | [`file-inspector.html`](#file-inspectorhtml) | Displays file metadata, preview, busy/error state, and caller-defined actions. | `configure()`<br>`show()`<br>`clear()`<br>`setActions()`<br>`setBusy()`<br>`setError()`<br>`setPreview()`<br>`destroy()` | `file-inspector-ready`<br>`file-inspector-action`<br>`file-inspector-change`<br>`file-inspector-cleared`<br>`file-inspector-error` | State normalized; preview/provider behavior mixed |
-| [`file-manager.html`](#file-managerhtml) | Browses, filters, selects, opens, and acts on app-scoped files. | `setProvider()`<br>`loadAll()`<br>`setFilter()`<br>`select()`<br>`clearSelection()`<br>`destroy()` | `file-manager-ready`<br>`file-manager-select`<br>`file-manager-open`<br>`file-manager-action` | Selection/filter state normalized; storage/provider behavior mixed |
+| [`file-manager.html`](#file-managerhtml) | Browses app-scoped files, filters directories before reads, and renders application-described previews. | `setProvider()`<br>`loadAll()`<br>`setFilter()`<br>`setDirectoryFilter()`<br>`select()`<br>`clearSelection()`<br>`destroy()` | `file-manager-ready`<br>`file-manager-select`<br>`file-manager-open`<br>`file-manager-action` | Selection/filter state, neutral preview descriptors, cancellation, and media cleanup normalized; storage/provider behavior mixed |
 | [`header.html`](#headerhtml) | Shared title bar with history, reload, online marker, presentation labels, and 988 link. | None | No component-specific event | Browser/platform-native behavior; no component-ready contract |
 | [`integration-settings.html`](#integration-settingshtml) | Edits non-secret communication service configuration and service actions. | `configure()`<br>`getValues()`<br>`setStatus()`<br>`destroy()` | `integration-settings-ready`<br>`integration-settings-save`<br>`integration-settings-close`<br>`integration-action` | Normalized non-secret values |
 | [`local-ai-status.html`](#local-ai-statushtml) | Presents local-AI standby, failure, recovery, guidance, retry, and dismissal states. | `configure()`<br>`begin()`<br>`present()`<br>`destroy()`<br>`hidden` | `local-ai-status-ready`<br>`local-ai-status-dismissed`<br>`local-ai-retry` | Fully normalized LocalAIReadiness report |
@@ -641,11 +641,21 @@ Shared dependencies: [`DataMaintenance.js`](runtime-modules.md#datamaintenancejs
 
 ### Overview
 
-Opens a generic modal-style data view around an injected provider.
+Opens a modal file view using the shared file manager. Applications supply their
+own record mappings through the same preview callbacks as the standalone
+[`file-manager.html`](#file-managerhtml).
 
 ### Public surface
 
 Methods/properties: `beforeOpen()`, `open()`, `destroy()`.
+
+Assign `previewDescriptor`, `previewTransform`, and `directoryFilter` on the
+host before opening. The component forwards those callbacks, comma-separated
+`data-hidden-prefixes`, and the presence of `data-show-hidden` to its child
+before the child's first load. Reopening refreshes those values before
+`loadAll()`, so changed callbacks and hidden-directory choices take effect.
+`beforeOpen()` is awaited before this configuration is consumed. `data-dirs`
+selects the initial directories; `data-layout` defaults to `files`.
 
 Events: `data-view-ready`.
 
@@ -653,7 +663,11 @@ Shared dependencies: [`WaitForComponent.js`](runtime-modules.md#waitforcomponent
 
 ### Availability and normalization
 
-**Browser and supported native WebViews.** DOM-native result. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app's capabilities. [Deep protocol details](protocols.md).
+**Browser and supported native WebViews.** DOM-native result. Preview records
+and directory policy remain application-owned; the child owns rendering,
+preview cancellation, and media cleanup. `destroy()` also destroys the child
+file manager and modal. HTMLImport + DOM; native methods remain subject to the
+bound app's capabilities. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -779,7 +793,9 @@ Slots: `title`, `preview`, `metadata`, `actions`.
 
 ### Overview
 
-Browses, filters, selects, opens, and acts on app-scoped files.
+Browses, filters, selects, opens, and acts on app-scoped files. Optional neutral
+preview descriptors let an application display complete text, documents,
+conversations, and related media without adding its record schemas to the SDK.
 
 The default tree provider is initialized before storage readiness starts the
 first load. Already-ready DBOPFS loads immediately; otherwise the component
@@ -788,15 +804,93 @@ and `destroy()` cleanup, without delaying unrelated component startup.
 
 ### Public surface
 
-Methods/properties: `setProvider()`, `loadAll()`, `setFilter()`, `select()`, `clearSelection()`, `destroy()`.
+Methods/properties: `setProvider()`, `loadAll()`, `setFilter()`,
+`setDirectoryFilter()`, `select()`, `clearSelection()`, `destroy()`,
+`previewDescriptor`, `previewTransform`, `directoryFilter`.
+
+Assign `directoryFilter(entry, context)` before the first load, or call
+`setDirectoryFilter(fn|null)` to replace it and reload an initialized manager.
+Returning exactly `false` excludes a directory. Context is
+`{directory,fileName,path,layout}`; directory-level calls have an empty
+`fileName`. The built-in DBOPFS paths apply this predicate before reading an
+excluded directory's keys or file metadata. Tree-provider entries are also
+filtered before display and expansion; an injected provider still owns the
+reads inside its own `list()` implementation.
+
+Comma-separated `data-hidden-prefixes` now applies to directory names as well
+as the existing filename filtering. `data-show-hidden` disables the prefix
+rule, while the explicit directory predicate remains active. Existing
+`setFilter(fn|null)` and provider `filter` predicates retain their entry first
+argument and false-only exclusion behavior; their optional second argument
+is the same `{directory,fileName,path,layout}` context.
+
+`previewDescriptor(file, context)` receives the original opened `File`, not a
+serialized copy or a JSON-only projection. Context is
+`{directory,fileName,extension,path,mimeType,signal}`. It may return a descriptor
+or a promise for one. Returning `null` or `undefined` continues through the
+existing preview path. Application record parsing and mapping belong in this
+callback; the SDK supplies no conversation or media-storage schema.
+
+Each descriptor accepts an optional `title`. Supported shapes are:
+
+| Kind | Content |
+| --- | --- |
+| `text` | `content`: complete string, displayed as preformatted text |
+| `markdown` | `content`: complete Markdown string, rendered by the shared Markdown owner |
+| `html` | `content`: complete HTML string assigned unchanged to a titled iframe's `srcdoc` |
+| `json` | `content`: value displayed as formatted JSON |
+| `conversation` | `messages`: ordered `{role,content,timestamp,name?,status?}` records |
+| `collection` | `items`: ordered descriptors, including nested collections |
+| `image`, `audio`, `pdf`, `download` | `content`: a `Blob` or `File`, or a function receiving `{signal}` and resolving to one |
+
+Conversation `role` and complete Markdown `content` are strings. Optional
+`name` and `status` are displayed alongside the role and time. Valid supplied
+timestamps are displayed in local time with their real ISO datetime; absent
+timestamps display `Time unavailable`, and an unrecognized supplied timestamp
+is displayed as supplied. No timestamp is invented.
+
+Images may supply `alt`; downloads require `fileName`. A media/download
+function is lazy: only that item's explicit **Load** button invokes it, with
+the preview's abort signal. A failed item shows `Unable to load this item.`
+and makes the same button available for retry; sibling items remain visible.
+The shared logger receives the original error. Immediate
+Blobs render directly. Audio exposes native controls without autoplay. The
+component does not automatically read every related media variant.
+
+Closing the preview, opening another file, or destroying the manager aborts
+the preview signal, ignores late descriptor/loader results, stops owned audio,
+removes iframe `srcdoc`, and revokes every owned object URL, including those
+in nested collections.
+Applications should observe the supplied signal in their asynchronous reads.
+Descriptor and file-open failures show `Unable to open this file.` in the
+current modal and send the original error to the shared logger.
+
+When no descriptor is returned, the existing
+`previewTransform(parsed,{directory,extension,fileName})` callback remains
+available for JSON-family files. Native image, audio, PDF, HTML, Markdown,
+JSON, and text presentation remains available. HTML and Markdown also use
+`text/html` and `text/markdown` MIME routing when a filename has no matching
+extension. Routing compares the lowercase MIME essence without its parameters;
+the callback's `mimeType` and the file content remain unchanged.
+HTML uses its complete original string in `srcdoc` without an
+added sandbox policy; Markdown reads the complete original text before
+rendering. Untransformed JSONL/NDJSON shows its complete original text,
+including lines that are not JSON records. Other binary files offer a download
+of the original `File`.
+The larger file-preview dialog reuses `--modal-width`, `--modal-max-height`,
+and `--modal-padding`; applications can override those existing modal values.
 
 Events: `file-manager-ready`, `file-manager-select`, `file-manager-open`, `file-manager-action`.
 
-Shared dependencies: [`DBOPFS.js`](runtime-modules.md#dbopfsjs), [`File.js`](runtime-entities.md#filejs), [`WaitForComponent.js`](runtime-modules.md#waitforcomponentjs).
+Shared dependencies: [`DBOPFS.js`](runtime-modules.md#dbopfsjs), [`File.js`](runtime-entities.md#filejs), [`MD.js`](runtime-modules.md#mdjs), [`WaitForComponent.js`](runtime-modules.md#waitforcomponentjs).
 
 ### Availability and normalization
 
-**Browser and supported native WebViews.** Selection/filter state normalized; storage/provider behavior mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app's capabilities. [Deep protocol details](protocols.md).
+**Browser and supported native WebViews.** Selection/filter state, neutral
+preview descriptors, complete content delivery, cancellation, and media
+cleanup are normalized; storage/provider behavior remains mixed. HTMLImport
+and DOM; injected Arcane/provider modules where listed. Native methods remain
+subject to the bound app's capabilities. [Deep protocol details](protocols.md).
 
 ### Example
 

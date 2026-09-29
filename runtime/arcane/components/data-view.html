@@ -85,12 +85,12 @@
 
             heading.innerText=host.dataset.title||'Data';
             fileManager.className='file-manager';
-            fileManager.previewTransform=host.previewTransform;
+            forwardPreviewOptions();
             fileManager.dataset.dirs=host.dataset.dirs||'';
             fileManager.dataset.layout=host.dataset.layout||'files';
             fileManager.setAttribute(
                 'href',
-                new URL('./file-manager.html?v=18',componentHref).href
+                new URL('./file-manager.html?v=19',componentHref).href
             );
 
             content.append(heading,fileManager);
@@ -98,6 +98,10 @@
             if(destroyed||generation!==operationGeneration){
                 return false;
             }
+        }
+
+        if(reload){
+            forwardPreviewOptions();
         }
 
         const manager=await waitForComponent(
@@ -122,6 +126,18 @@
 
         modal.open();
         return true;
+    }
+
+    function forwardPreviewOptions(){
+        fileManager.previewTransform=host.previewTransform;
+        fileManager.previewDescriptor=host.previewDescriptor;
+        fileManager.directoryFilter=host.directoryFilter;
+        if(host.dataset.hiddenPrefixes===undefined){
+            delete fileManager.dataset.hiddenPrefixes;
+        }else{
+            fileManager.dataset.hiddenPrefixes=host.dataset.hiddenPrefixes;
+        }
+        fileManager.toggleAttribute('data-show-hidden',host.hasAttribute('data-show-hidden'));
     }
 
     function destroy(){

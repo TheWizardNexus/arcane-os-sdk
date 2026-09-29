@@ -272,7 +272,7 @@
     {
       "file": "runtime/arcane/components/data-view.html",
       "name": "data-view.html",
-      "purpose": "Opens a generic modal-style data view around an injected provider.",
+      "purpose": "Opens a modal file view and forwards application-owned preview and directory-filter callbacks to the shared file manager.",
       "methods": [
         "beforeOpen()",
         "open()",
@@ -287,7 +287,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "DOM-native result"
+      "normalization": "DOM-native result. Forwards previewDescriptor, previewTransform, directoryFilter, data-hidden-prefixes, and data-show-hidden before the child file manager first loads; reopening refreshes them before loadAll. beforeOpen runs before those values are consumed. The child owns neutral preview rendering, cancellation, and media cleanup; destroy also destroys the child and modal."
     },
     {
       "file": "runtime/arcane/components/directory-picker.html",
@@ -396,11 +396,12 @@
     {
       "file": "runtime/arcane/components/file-manager.html",
       "name": "file-manager.html",
-      "purpose": "Browses, filters, selects, opens, and acts on app-scoped files.",
+      "purpose": "Browses app-scoped files, filters directories before reads, and renders application-described complete document, conversation, collection, and media previews.",
       "methods": [
         "setProvider()",
         "loadAll()",
         "setFilter()",
+        "setDirectoryFilter()",
         "select()",
         "clearSelection()",
         "destroy()"
@@ -415,11 +416,12 @@
       "dependencies": [
         "DBOPFS.js",
         "File.js",
+        "MD.js",
         "WaitForComponent.js"
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "Selection/filter state normalized; storage/provider behavior mixed"
+      "normalization": "Selection/filter state and neutral previews normalized; storage/provider behavior mixed. Initial directoryFilter and setDirectoryFilter(fn|null) use false-only exclusion before built-in DBOPFS key/metadata reads; data-hidden-prefixes also applies to directories unless data-show-hidden is present. Existing file predicates preserve their first argument and receive optional directory/fileName/path/layout context. previewDescriptor(original File,{directory,fileName,extension,path,mimeType,signal}) may asynchronously return text/markdown/html/json content, conversation messages with role/content/real timestamp and optional name/status, collection items, or image/audio/pdf/download content as Blob/File or a lazy ({signal}) loader. Downloads require fileName; descriptors accept title and images accept alt. Lazy items load only on explicit request and retain item-local retry. Close, replacement, and destroy abort the preview signal, suppress late output, remove iframe srcdoc, stop audio, and revoke all owned object URLs. HTML preserves the exact string in iframe srcdoc; HTML/Markdown MIME fallback supports extensionless files. Nullish descriptors preserve previewTransform for JSON-family files and native previews; untransformed JSONL/NDJSON retains complete raw text, and other binary files download the original File."
     },
     {
       "file": "runtime/arcane/components/header.html",
