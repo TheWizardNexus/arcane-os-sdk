@@ -6164,7 +6164,7 @@ test(
         loading.configure(false);
         assert.deepEqual(
             loading.snapshot(),
-            {pendingUnmute: true, muted: true, loadRequests: 0}
+            {pendingUnmute: true, muted: false, loadRequests: 0}
         );
         loading.transition('ready');
         assert.deepEqual(

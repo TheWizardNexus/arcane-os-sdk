@@ -518,7 +518,7 @@
             requestUserMute();
         } else {
             pendingUnmute = true;
-            host.muted = true;
+            host.muted = false;
             if (!settleSuccessfulUnmute()) {
                 synchronizeAIMutedState();
                 continuePendingUnmute();
@@ -567,21 +567,24 @@
         if (sttBecameUnready) {
             cancelSTTOperation('runtime-unready');
         }
-        if (ttsBecameUnready) {
+        if (ttsBecameUnready && ttsRole.state !== 'error') {
             pendingUnmute = false;
-            host.muted = true;
             stopTTSPlayback();
         }
-        if (ttsRole.state === 'error' && (pendingUnmute || !host.muted)) {
+        if (ttsRole.state === 'error') {
             pendingUnmute = false;
-            host.muted = true;
-            stopTTSPlayback();
         }
 
-        settleSuccessfulUnmute();
+        const unmuteSettled = settleSuccessfulUnmute();
         continuePendingUnmute();
 
         synchronizeAIMutedState();
+        if (!unmuteSettled
+            && previousTTSRole.state !== 'ready'
+            && ttsRole.state === 'ready'
+            && !host.muted) {
+            resumeTTSPlayback();
+        }
         renderControls();
         renderStatus();
     }
@@ -720,6 +723,9 @@
             if (pendingTTSIntent === 'load') {
                 label = 'Cancel voice load';
                 description = 'Cancel loading the selected voice.';
+            } else if (!host.muted) {
+                label = 'Load voice';
+                description = 'Load the selected voice.';
             }
         } else if (ttsRole.state === 'error') {
             disabled = !providerSelected;
@@ -960,7 +966,7 @@
             return;
         }
 
-        if (host.muted) {
+        if (host.muted || ['unloaded', 'error'].includes(ttsRole.state)) {
             void requestUserUnmute();
         } else {
             requestUserMute();
@@ -976,7 +982,7 @@
         }
         const wasMuted = host.muted;
         pendingUnmute = false;
-        const shouldUnload = !wasMuted
+        const shouldUnload = (!wasMuted && is.function(globalThis.ai?.setSpeechMuted))
             || pendingTTSIntent === 'load'
             || ['loading', 'ready', 'error'].includes(ttsRole.state);
         host.muted = true;
@@ -1004,9 +1010,9 @@
         ) {
             return false;
         }
+        host.muted = false;
         if (!is.function(globalThis.ai?.setSpeechMuted)) {
             pendingUnmute = true;
-            host.muted = true;
             renderControls();
             renderStatus();
             return false;
@@ -1021,8 +1027,7 @@
                 && ['unloaded', 'loading', 'error'].includes(ttsRole.state)
             );
         if (!canRequestLoad) {
-            host.muted = true;
-            stopTTSPlayback();
+            pendingUnmute = false;
             reportTTSLifecycleError(
                 new Error('No selected speech provider is available to load.'),
                 'load'
@@ -1038,8 +1043,6 @@
         }
         if (!requested) {
             pendingUnmute = false;
-            host.muted = true;
-            stopTTSPlayback();
             renderControls();
             renderStatus();
             return false;
@@ -1117,8 +1120,6 @@
             pendingTTSIntent = null;
             if (action === 'load') {
                 pendingUnmute = false;
-                host.muted = true;
-                stopTTSPlayback();
             }
             reportTTSLifecycleError(error, action, operationId);
             return false;
@@ -1211,8 +1212,6 @@
             : 'synthesis';
         const failure = failures[normalizedBoundary];
         const message = visibleErrorMessage(error, failure.message);
-        host.muted = true;
-        stopTTSPlayback();
         localStatus = {
             message,
             tone: 'error'

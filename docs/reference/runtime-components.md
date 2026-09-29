@@ -1566,8 +1566,10 @@ boundary applies to STT activation, transcription, TTS lifecycle, synthesis,
 and playback failures.
 
 `reportTTSError()` recognizes `synthesis`, `decode`, `playback-start`, and
-`playback-resume`. It mutes and stops the failed operation, preserves sticky
-provider readiness, and emits `speech-synthesis-error` with the exact boundary,
+`playback-resume`. It preserves the user's mute choice, sticky provider
+readiness, and accepted sibling speech jobs. The AI runtime owns settlement of
+the failed job; reporting an error neither stops the queue nor retries it. The
+component emits `speech-synthesis-error` with the exact boundary,
 stable reason/code, generic user-safe status, and complete Error in the local
 event detail.
 
@@ -1600,8 +1602,16 @@ same capture operation id rather than inventing a second correlation boundary.
 User Unmute calls the shared `AI.setSpeechMuted(false)` lifecycle owner before
 or with publishing the TTS load intent, so the runtime can legally load TTS.
 Configured `initialMuted:false` records that same unmute intent even when the
-TTS route is still unselected or loading; the component remains publicly muted
-until the selected role reaches `ready`, then applies the preserved intent.
+TTS route is still unselected or loading. Public `muted` expresses the user's
+choice; role availability and the AI runtime still prevent playback until the
+selected role reaches `ready`, when the waiting intent is applied. A failed
+load ends its activation attempt without changing that choice or starting
+another attempt. Retry voice explicitly starts a new attempt, including when
+the preserved choice is unmuted; an unloaded selected voice offers Load voice.
+When a role returns to ready, permitted queued playback resumes through the
+existing AI owner without repeating activation or replaying failed jobs.
+Synthesis, decode, and playback failures also
+preserve that choice and do not automatically replay failed speech.
 Mute calls `AI.setSpeechMuted(true)`, stops playback, cancels active TTS work,
 and unloads the selected TTS role. Lifecycle failures remain visible through
 `speech-tts-lifecycle-error` and sticky role state.

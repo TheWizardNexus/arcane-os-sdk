@@ -31,6 +31,7 @@ test(
                 const runtimeStateAbortController = new AbortController();
                 const lifecycleListenerOptions = {signal: runtimeStateAbortController.signal};
                 const host = {muted: true, availability: {}, componentReady: true};
+                const muteButton = {setAttribute: function setAttribute() {}};
                 const errors = [];
                 const fallbackIntents = [];
                 const is = {
@@ -53,7 +54,7 @@ test(
                 let destroyed = false;
                 function completeValue(value) {return value;}
                 function nextSpeechOperationId() {return 'fixture-operation';}
-                function renderControls() {}
+                function renderControls() {renderTTSControl();}
                 function renderStatus() {}
                 function cancelSTTOperation() {}
                 function reportTTSLifecycleError(error) {errors.push(error);}
@@ -65,16 +66,20 @@ test(
                 ${section('    function selectedRole(', '    function configure(')}
                 ${section('    function applyConfiguredMutedState(', '    function renderSTTActivationState(')}
                 ${section('    function clearSettledTTSIntent(', '    function renderControls(')}
-                ${section('    function requestUserMute(', '    function reportTTSLifecycleError(')}
+                ${section('    function renderTTSControl(', '    function renderStatus(')}
+                ${section('    function muteToggle(', '    function reportTTSLifecycleError(')}
                 ${section('    function stopTTSPlayback(', '    async function transcribe(')}
                 ${section('    function handlePageHide(', '</script>')}
                 ${readyListener}
                 return {
                     host,
+                    muteButton,
                     errors,
                     fallbackIntents,
                     start: function start() {applyConfiguredMutedState(false);},
                     mute: requestUserMute,
+                    unmute: requestUserUnmute,
+                    toggle: muteToggle,
                     destroy,
                     publish: function publish(state) {
                         synchronizeAIRuntimeState({
@@ -97,12 +102,15 @@ test(
         )();
         function createAI() {
             const calls = [];
+            const stops = [];
+            const resumes = [];
             let completeActivation;
+            let rejectActivation;
             const ai = {
                 muted: true,
                 speechActivationPending: false,
-                stopAudio: function stopAudio() {},
-                resumeAudio: function resumeAudio() {return Promise.resolve(true);},
+                stopAudio: function stopAudio() {stops.push(true);},
+                resumeAudio: function resumeAudio() {resumes.push(true); return Promise.resolve(true);},
                 setSpeechMuted: function setSpeechMuted(muted) {
                     calls.push(muted);
                     ai.muted = true;
@@ -112,17 +120,27 @@ test(
                     }
                     ai.speechActivationPending = true;
                     return new Promise(
-                        function captureActivation(resolve) {
+                        function captureActivation(resolve, reject) {
                             completeActivation = function complete() {
+                                if(ai.speechActivationPending) {
+                                    ai.muted = false;
+                                }
                                 ai.speechActivationPending = false;
-                                ai.muted = false;
                                 resolve(true);
+                            };
+                            rejectActivation = function fail(error) {
+                                ai.speechActivationPending = false;
+                                reject(error);
                             };
                         }
                     );
                 }
             };
-            return {ai, calls, complete: function complete() {completeActivation();}};
+            return {
+                ai, calls, stops, resumes,
+                complete: function complete() {completeActivation();},
+                reject: function reject(error) {rejectActivation(error);}
+            };
         }
 
         const fixture = createSpeechHarness();
@@ -136,7 +154,8 @@ test(
         fixture.installAI(runtime.ai);
         fixture.ready();
         assert.deepEqual(runtime.calls, [false]);
-        assert.equal(fixture.host.muted, true);
+        assert.equal(fixture.host.muted, false);
+        assert.equal(runtime.ai.muted, true);
         fixture.publish('unloaded');
         assert.deepEqual(runtime.calls, [false]);
         fixture.publish('ready');
@@ -158,8 +177,146 @@ test(
             cancelled.ready();
             assert.deepEqual(laterRuntime.calls, []);
             assert.deepEqual(cancelled.fallbackIntents, []);
-            assert.equal(cancelled.host.muted, true);
+            assert.equal(cancelled.host.muted, cancellation === 'mute');
             cancelled.destroy();
+        }
+
+        const failed = createSpeechHarness();
+        const failedRuntime = createAI();
+        failed.installAI(failedRuntime.ai);
+        failed.publish('unloaded');
+        const activation = failed.unmute();
+        const failure = new Error('The selected voice load failed.');
+        failedRuntime.reject(failure);
+        assert.equal(await activation, false);
+        assert.equal(failed.host.muted, false);
+        assert.equal(failed.state().pendingUnmute, false);
+        assert.deepEqual(failed.errors, [failure]);
+        assert.deepEqual(failedRuntime.stops, []);
+        failed.publish('error');
+        failed.publish('error');
+        failed.publish('unloaded');
+        failed.ready();
+        assert.deepEqual(failedRuntime.calls, [false]);
+        assert.deepEqual(failedRuntime.stops, []);
+        assert.equal(failed.muteButton.textContent, 'Load voice');
+
+        failed.toggle();
+        assert.deepEqual(failedRuntime.calls, [false, false]);
+        failed.publish('ready');
+        failedRuntime.complete();
+        await Promise.resolve();
+        await Promise.resolve();
+        assert.equal(failed.host.muted, false);
+        assert.equal(failedRuntime.ai.muted, false);
+        assert.equal(failedRuntime.resumes.length, 1);
+        failed.publish('error');
+        assert.equal(failed.host.muted, false);
+        assert.equal(failedRuntime.ai.muted, true);
+        failed.publish('ready');
+        assert.equal(failedRuntime.ai.muted, false);
+        assert.equal(failedRuntime.resumes.length, 2);
+        failed.publish('ready');
+        assert.equal(failedRuntime.resumes.length, 2);
+        assert.deepEqual(failedRuntime.calls, [false, false]);
+        assert.deepEqual(failedRuntime.stops, []);
+        failed.publish('error');
+        assert.equal(failed.muteButton.textContent, 'Retry voice');
+        failed.toggle();
+        assert.deepEqual(failedRuntime.calls, [false, false, false]);
+        failed.publish('loading');
+        failed.toggle();
+        assert.deepEqual(failedRuntime.calls, [false, false, false, true]);
+        assert.equal(failedRuntime.stops.length, 1);
+        failedRuntime.complete();
+        await Promise.resolve();
+        await Promise.resolve();
+        failed.publish('ready');
+        assert.equal(failed.host.muted, true);
+        assert.equal(failedRuntime.ai.muted, true);
+        assert.equal(failed.state().pendingUnmute, false);
+        failed.destroy();
+    }
+);
+
+test(
+    'speech failure reporting preserves user intent and accepted sibling jobs',
+    async function preserveSiblingSpeechJobsAfterFailure() {
+        const source = await readFile(
+            new URL('../runtime/arcane/components/speech.html', import.meta.url),
+            'utf8'
+        );
+        const start = source.indexOf('    function reportTTSError(');
+        const end = source.indexOf('    function synchronizeAIMutedState(', start);
+        assert.notEqual(start, -1);
+        assert.notEqual(end, -1);
+        const createHarness = Function(
+            'host', 'ai',
+            `'use strict';
+            const globalThis = {ai};
+            const destroyed = false;
+            const errors = [];
+            const events = [];
+            let localStatus = null;
+            let renders = 0;
+            const arcaneLogging = {error: function log(message, error) {errors.push(error);}};
+            function visibleErrorMessage(error, fallback) {return fallback;}
+            function publicSpeechErrorFields(error, code) {return {code, causeCode: error.code};}
+            function nextSpeechOperationId(kind) {return kind;}
+            function dispatchSpeechEvent(name, detail, options) {events.push({name, detail, options});}
+            function renderControls() {renders += 1;}
+            function renderStatus() {renders += 1;}
+            ${source.slice(start, end)}
+            return {
+                reportTTSError, errors, events,
+                state: function state() {return {localStatus, renders};}
+            };`
+        );
+        for(const muted of [false, true]) {
+            const host = {muted};
+            const jobs = [
+                {id: 'accepted-first', controller: new AbortController()},
+                {id: 'accepted-second', controller: new AbortController()}
+            ];
+            const originalJobs = [...jobs];
+            const originalIds = jobs.map(function jobId(job) {return job.id;});
+            const calls = [];
+            const ai = {
+                muted,
+                generation: 7,
+                jobs,
+                stopAudio: function stopAudio() {
+                    calls.push('stop');
+                    ai.generation += 1;
+                    for(const job of jobs) job.controller.abort();
+                    jobs.length = 0;
+                },
+                setSpeechMuted: function setSpeechMuted(value) {calls.push(value);}
+            };
+            const fixture = createHarness(host, ai);
+            const boundaries = ['synthesis', 'decode', 'playback-start', 'playback-resume'];
+            for(const boundary of boundaries) {
+                const error = new Error(`Complete ${boundary} failure diagnostic.`);
+                error.code = 'PROVIDER_REJECTED';
+                assert.equal(fixture.reportTTSError(error, boundary), false);
+                assert.equal(host.muted, muted);
+                assert.equal(ai.muted, muted);
+                assert.equal(ai.generation, 7);
+                assert.deepEqual(calls, []);
+                assert.equal(ai.jobs, jobs);
+                assert.equal(jobs.length, originalJobs.length);
+                for(const [index, job] of originalJobs.entries()) {
+                    assert.equal(jobs[index], job);
+                    assert.equal(jobs[index].id, originalIds[index]);
+                    assert.equal(job.controller.signal.aborted, false);
+                }
+                assert.equal(fixture.errors.at(-1), error);
+                assert.equal(fixture.events.at(-1).name, 'speech-synthesis-error');
+                assert.equal(fixture.events.at(-1).detail.error, error);
+                assert.equal(fixture.events.at(-1).detail.boundary, boundary);
+                assert.equal(fixture.state().localStatus.tone, 'error');
+            }
+            assert.equal(fixture.state().renders, boundaries.length * 2);
         }
     }
 );

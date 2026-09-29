@@ -113,6 +113,7 @@ export function createDigitalOceanFalTTSProvider({
     let generation = 0;
     let unloadOperation = null;
     let disposeOperation = null;
+    let nextInferenceStart = 0;
 
     function authority() {
         return {
@@ -214,12 +215,62 @@ export function createDigitalOceanFalTTSProvider({
         };
     }
 
+    async function fetchInference(url, options, operation) {
+        const signal = options.signal;
+        let retryError = null;
+        while (true) {
+            // Space request starts across jobs, not their completion. Remote jobs
+            // still run concurrently and the runtime retains ordered playback.
+            while (true) {
+                assertNotAborted(signal);
+                const delay = nextInferenceStart - Date.now();
+                if (delay <= 0) break;
+                await waitForStatus(delay, signal);
+            }
+            nextInferenceStart = Date.now() + POLL_INTERVAL_MS;
+            let response;
+            try {
+                response = await fetchImpl(url, options);
+            } catch (error) {
+                assertNotAborted(signal);
+                // A lost POST response may represent an accepted paid job. Only
+                // an identified job's status read can retry a network failure.
+                if (!retryError && options.method === 'GET' && error instanceof TypeError) {
+                    nextInferenceStart = Math.max(nextInferenceStart, Date.now() + POLL_INTERVAL_MS);
+                    retryError = error;
+                    console.warn('Retrying the cloud speech status read once.', error);
+                    continue;
+                }
+                throw error;
+            }
+            assertNotAborted(signal);
+            if (response.status === 429) {
+                // A readable rejection is safe to retry. Its cooldown also
+                // applies to waiting siblings, including when this retry ends.
+                const delay = Math.max(POLL_INTERVAL_MS, retryAfterDelay(response) ?? POLL_INTERVAL_MS);
+                nextInferenceStart = Math.max(nextInferenceStart, Date.now() + delay);
+            }
+            try {
+                await requireSuccessfulResponse(response, signal, operation);
+            } catch (error) {
+                assertNotAborted(signal);
+                if (!retryError && response.status === 429) {
+                    retryError = error;
+                    console.warn(`Retrying the cloud speech ${operation} once.`, error);
+                    continue;
+                }
+                throw error;
+            }
+            return response;
+        }
+    }
+
     async function synthesize(payload, controller, requestGeneration) {
         const signal = controller.signal;
         const apiKey = await readApiKey(signal);
         assertNotAborted(signal);
         const headers = {Authorization: `Bearer ${apiKey}`};
-        const response = await fetchImpl(
+        const response = await fetchInference(
             INVOKE_URL,
             {
                 method: 'POST',
@@ -235,9 +286,9 @@ export function createDigitalOceanFalTTSProvider({
                     }
                 ),
                 signal
-            }
+            },
+            'submission'
         );
-        await requireSuccessfulResponse(response, signal, 'submission');
         let result = await response.json();
         assertNotAborted(signal);
         const requestId = result?.request_id;
@@ -249,22 +300,11 @@ export function createDigitalOceanFalTTSProvider({
                 );
             }
             await waitForStatus(POLL_INTERVAL_MS, signal);
-            let statusResponse;
-            do {
-                statusResponse = await fetchImpl(
-                    `${INVOKE_URL}/${encodeURIComponent(requestId)}`,
-                    {method: 'GET', headers, signal}
-                );
-                assertNotAborted(signal);
-                const retryDelay = statusResponse.status === 429
-                    ? retryAfterDelay(statusResponse)
-                    : null;
-                if (retryDelay === null) break;
-                // Only status reads may be retried; submitting twice can create two paid jobs.
-                await statusResponse.text();
-                await waitForStatus(retryDelay, signal);
-            } while (true);
-            await requireSuccessfulResponse(statusResponse, signal, 'status read');
+            const statusResponse = await fetchInference(
+                `${INVOKE_URL}/${encodeURIComponent(requestId)}`,
+                {method: 'GET', headers, signal},
+                'status read'
+            );
             result = await statusResponse.json();
             assertNotAborted(signal);
         }

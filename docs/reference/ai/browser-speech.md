@@ -56,8 +56,21 @@ punctuation boundary should submit promptly. This is incremental playback of
 completed synthesis jobs, not a live audio stream from DigitalOcean.
 
 The transport submits `POST https://inference.do-ai.run/v1/async-invoke`, then
-reads that job until its completed `output.audio.url` is available. Each
-segment is submitted once; only status reads retry a `429` with `Retry-After`.
+reads that job until its completed `output.audio.url` is available. One provider
+spaces inference request starts at least one second apart across its concurrent
+jobs; it does not wait for one remote job to finish before starting another.
+A readable `429` rejection permits one retry of the same submission or status
+request after at least one second. A longer readable `Retry-After` postpones
+all pending inference starts for that provider. A failed status Fetch may also
+retry once for the same accepted job. Repeated failures surface their complete
+diagnostics without an endless retry loop; a failed job does not cancel siblings.
+Retry diagnostics remain in the developer console, outside conversation history.
+
+An ambiguous submission network failure is not automatically resubmitted: a
+browser cannot distinguish a rejected preflight from an accepted paid job whose
+response was lost. This contract has no submission idempotency mechanism, and
+unreadable response headers cannot supply a server cooldown. Pacing reduces local
+request bursts; it does not claim to free upstream concurrency slots or fix CORS.
 The audio download never receives the inference Authorization header.
 The selected multilingual-v2 service supports speed `0.7` through `1.2`;
 unsupported speeds reject rather than being silently clamped. Complete
