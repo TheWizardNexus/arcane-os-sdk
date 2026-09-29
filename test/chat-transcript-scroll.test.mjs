@@ -116,6 +116,7 @@ const initializeScrolling = Function(
     const pendingStructuralToolMessage = '';
     const sessionHistoryRecoveryMessage = '';
     const boundChatSession = null;
+    const boundChatAI = null;
     const aiRuntimeStateAbortController = new AbortController();
     const activeSubmissionOwnerships = new Set();
     const chatReasons = {

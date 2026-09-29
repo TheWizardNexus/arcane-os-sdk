@@ -33,9 +33,25 @@ function chatDB(){
 
 const db=chatDB();
 const windowTarget=new EventTarget();
+const localValues=new Map();
+const localStorage={
+    getItem(key){return localValues.get(String(key))??null;},
+    setItem(key,value){localValues.set(String(key),String(value));},
+    removeItem(key){localValues.delete(String(key));},
+    key(index){return [...localValues.keys()][index]??null;},
+    get length(){return localValues.size;},
+};
+const documentObject={
+    documentElement:{dataset:{arcaneAppId:'persistent-session-contract'}},
+    querySelector(){return null;},
+};
 windowTarget.dbopfs=db;
 windowTarget.ai={ready:false};
+windowTarget.document=documentObject;
+windowTarget.localStorage=localStorage;
 globalThis.window=windowTarget;
+globalThis.document=documentObject;
+globalThis.localStorage=localStorage;
 globalThis.dbopfs=db;
 let memoryFetchCount=0;
 globalThis.ai={fetch:async()=>{
@@ -501,6 +517,8 @@ test('persistent streaming accepts terminal-only calls and compares complete str
 test('persistent chat uses nonpersistent turns once without retaining context or history',async()=>{
     const requests=[];
     const session=await PersistentAIChatSession.create({
+        chatFileName:'nonpersistent-turn-retention.jsonl',
+        loadExisting:false,
         chat:async request=>{
             requests.push(structuredClone(request));
             return {message:{role:'assistant',content:`reply-${requests.length}`}};
@@ -540,6 +558,8 @@ test('persistent chat uses nonpersistent turns once without retaining context or
 
 test('response persistence inherits message persistence and rejects incoherent mixed turns',async()=>{
     const session=await PersistentAIChatSession.create({
+        chatFileName:'response-persistence-inheritance.jsonl',
+        loadExisting:false,
         chat:async()=>({message:{role:'assistant',content:'independent response'}}),
         memory:false,
     });
