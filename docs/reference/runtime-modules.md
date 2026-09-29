@@ -1986,6 +1986,15 @@ default `DBOPFS`; installs `window.dbopfs`, emits `dbopfs-ready`; table/file/bac
 
 Exact exports: `DBOPFS_EVENT_TYPES`, `DBOPFS_REASONS`, `default`.
 
+`restoreFromPNG(file)` preserves the existing deflate/RGB backup format and
+restores through `setMany()` without changing its settled-result API or per-key
+write ordering. Restore resolves only when every record write succeeds. It
+continues the table batches after individual rejected writes, then rejects an
+`AggregateError` with code `DBOPFS_RESTORE_WRITE_FAILED`, original reasons in
+`errors`, and `failures` entries `{tableName, fileName, reason}`. Successful
+writes remain saved; restore is not an all-or-nothing transaction. The decoded
+image is closed after pixel extraction, including canvas failures.
+
 ### Availability and normalization
 
 **Browser / native WebView.** App scope and recognized JSON/JSONL file parsing
