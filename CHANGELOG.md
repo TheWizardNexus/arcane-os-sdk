@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.35.0
+
+- Add `DBOPFS.createCompressedPNG({tableNames, additionalTables, signal})` to
+  return a PNG Blob without downloading or writing storage. Omitted table names
+  select all saved tables; an empty list selects none. Caller-supplied tables
+  replace matching saved tables in the export only.
+- Preserve `downloadCompressedPNG(name)` and accept the same optional export
+  options. Cancellation stops further preparation and prevents a later download;
+  browser file reads and canvas encoding already underway finish normally.
+- Add optional async `restoreFromPNG(file, {selectTables})` selection over the
+  complete decoded table/file map before any writes. The callback owns selection
+  and projection; existing one-argument restore remains supported.
+- Report rejected restore writes after all selected table batches settle through
+  `DBOPFS_RESTORE_WRITE_FAILED`, retaining original errors and table/file details.
+  Successful writes remain saved; restore is not an atomic transaction. Release
+  decoded image resources on both success and extraction failure.
+
 ## 0.34.2
 
 - Remove temporary `persist:false` Chat cards on completion, failure,
