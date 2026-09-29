@@ -157,7 +157,7 @@ test('standalone root discovery selects the declared id and packages complete co
     );
     const inspected=await inspectApp({workspaceRoot:selected.workspaceRoot,appId:'complete-app'});
     assert.deepEqual(inspected.files,[
-        'apps/complete-app/index.html','arcane/modules/complete.js','content/document.txt','index.html'
+        'arcane/modules/complete.js','content/document.txt','index.html'
     ]);
     assert.equal(inspected.output,'dist/complete-app');
     assert.deepEqual(inspected.browserDocuments.map(function appDocument(document){
@@ -169,6 +169,7 @@ test('standalone root discovery selects the declared id and packages complete co
     assert.equal(await readFile(path.join(packaged.outputRoot,'index.html'),'utf8'),selected.html);
     assert.equal(await readFile(path.join(packaged.outputRoot,'content/document.txt'),'utf8'),selected.document);
     assert.equal(await readFile(path.join(packaged.outputRoot,'arcane/modules/complete.js'),'utf8'),selected.module);
+    await assert.rejects(lstat(path.join(packaged.outputRoot,'apps')), {code:'ENOENT'});
     assert.equal(await readFile(path.join(selected.appRoot,'index.html'),'utf8'),selected.html);
     const verified=await verifyApp({workspaceRoot:selected.workspaceRoot,appId:'complete-app'});
     assert.equal(verified.verified,true);

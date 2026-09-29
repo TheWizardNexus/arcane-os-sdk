@@ -213,7 +213,7 @@ test('target registry distinguishes browser availability from native pairing req
     assert.equal(targets[0].status,'available');
     assert.equal(targets[1].status,'pairing-required');
     assert.deepEqual(targets[1].signingModes,['unsigned-local-test']);
-    assert.match(targets[1].reason,/--arcane-root/);
+    assert.match(targets[1].reason,/Arcane OS native provider/);
     assert.deepEqual(targets.find(target=>target.id==='windows-x64').formats,['exe']);
     assert.deepEqual(targets.find(target=>target.id==='windows-x64').signingModes,['unsigned-local-test']);
     assert.deepEqual(targets.find(target=>target.id==='linux-x64').formats,['deb']);
@@ -261,22 +261,42 @@ test('unknown targets use a stable unavailable error',()=>{
     );
 });
 
-test('browser target carries a verified release receipt into packaged serving',async t=>{
+test('browser target builds, explicitly verifies and serves the selected packaged release',async function browserTargetLifecycle(t){
+    useSyntheticTls(t);
     const parent=await temporaryDirectory(t,{prefix:'arcane-browser-target-'});
     const workspaceRoot=path.join(parent,'workspace');
     await createWorkspace({targetPath:workspaceRoot,appId:'target-app'});
     await installSdkPayload(workspaceRoot);
     const adapter=getTargetAdapter('browser');
     const built=await adapter.build({workspaceRoot,appId:'target-app'});
-    assert.equal(built.release.receipt.kind,'arcane-app-release-verification');
+    const releaseRoot=path.join(workspaceRoot,'dist','target-app');
+    assert.equal(built.target,'browser');
+    assert.equal(built.format,'directory');
+    assert.equal(built.release.outputRoot,releaseRoot);
+    assert.equal(built.release.manifest.kind,'arcane-app-release');
+    assert.equal(built.release.manifest.app.id,'target-app');
+    const verified=await adapter.verify({workspaceRoot,appId:'target-app'});
+    assert.equal(verified.target,'browser');
+    assert.equal(verified.release.verified,true);
+    assert.equal(verified.release.outputRoot,releaseRoot);
+    assert.deepEqual(verified.release.manifest,built.release.manifest);
+    const packagedPage=await readFile(path.join(releaseRoot,'index.html'),'utf8');
+    await writeFile(path.join(workspaceRoot,'index.html'),'Changed source remains outside the selected release.\n');
+    await writeSyntheticTlsFiles(workspaceRoot);
     const instance=await adapter.run({
         workspaceRoot,
         appId:'target-app',
         host:'127.0.0.1',
-        port:0
+        port:0,
+        httpPort:0
     });
-    t.after(()=>instance.close());
-    assert.equal(instance.verified.verified,true);
-    assert.match(instance.url,/\?arcane_session=[0-9a-f]{64}$/);
-    assert.doesNotMatch(instance.cleanUrl,/arcane_session/);
+    t.after(async function closePackagedBrowserTarget(){await instance.close();});
+    assert.equal(instance.mode,'packaged');
+    assert.equal(instance.protocol,'https:');
+    assert.equal(instance.releaseRoot,releaseRoot);
+    assert.equal(instance.url,`${instance.origin}/index.html`);
+    assert.equal(instance.cleanUrl,instance.url);
+    const response=await fetchSyntheticTls(instance.url);
+    assert.equal(response.status,200);
+    assert.equal(await response.text(),packagedPage);
 });
