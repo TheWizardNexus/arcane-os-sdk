@@ -409,7 +409,7 @@ console.log(registry.has('demo'),registry.list());`
         name:'ComponentContracts.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Normalization and formatting helpers are pure. createSTTActivationController installs one button listener, publishes and projects activation request or error events, invokes the configured host activation callback, reports presentation changes through onChange, and destroy removes the listener and disposes only an event source it created.',
-        paramsResults:'Normalizers cover chart options and rows, dashboard definitions, options, and visibility, Markdown formats and options, and voice options. applyMarkdownFormat and appendTranscription return deterministic editor text and selection results. formatAIRuntimeProgress(progress,fallback) preserves complete finite completed/total measures, including fractional and over-total values, when total is positive and unit is nonempty; otherwise it returns the phase or fallback. createSTTActivationController({host,button,onChange,EventClass,eventSource}) returns mutable action, error, label, pending, selected, status, title, and visible getters plus request(action), synchronize(role), and destroy().',
+        paramsResults:'Normalizers cover chart options and rows, dashboard definitions, options, and visibility, Markdown formats and options, and voice options. normalizeVoiceOptions preserves manual capture and standard controls by default; capture accepts mode manual or continuous with preRollMs:1500, quietMs:2000, chunkMs:30000, activityThreshold:0.02, plus controls simple, showComplete, and retry/cancel labels. Quiet/chunk durations must be finite and positive; pre-roll/activity values must be finite and nonnegative. applyMarkdownFormat and appendTranscription return deterministic editor text and selection results. formatAIRuntimeProgress(progress,fallback) preserves complete finite completed/total measures, including fractional and over-total values, when total is positive and unit is nonempty; otherwise it returns the phase or fallback. createSTTActivationController({host,button,onChange,EventClass,eventSource}) returns mutable action, error, label, pending, selected, status, title, and visible getters plus request(action), synchronize(role), and destroy().',
         events:['emits speech-stt-activation-request','emits speech-stt-activation-error'],
         errors:['TypeError or RangeError for invalid normalized records, values, callbacks, or chart bounds','ARCANE_STT_ACTIVATION_BUTTON_INVALID','ARCANE_STT_ACTIVATION_BUTTON_LISTENER_FAILED','ARCANE_STT_ACTIVATION_DOM_PROJECTION_UNAVAILABLE','ARCANE_STT_ACTIVATION_EVENT_CLASS_INVALID','ARCANE_STT_ACTIVATION_EVENT_SOURCE_INVALID','ARCANE_STT_ACTIVATION_HOST_INVALID','ARCANE_STT_ACTIVATION_ON_CHANGE_INVALID','ARCANE_STT_ACTIVATION_PRESENTATION_CALLBACK_FAILED','ARCANE_STT_ACTIVATION_REQUEST_REJECTED'],
         capabilitiesCore:'Shared normalized value and explicit STT activation presentation layer for browser components. The configured host remains the lifecycle authority; this module implements no privileged Core service.',
@@ -440,6 +440,24 @@ const session=new ConfiguredAIChatSession({
     })
 });
 console.log(await session.send('Hello'));`
+    },
+    {
+        name:'ContinuousVoiceCapture.js',
+        classification:'public-first-party',
+        lifecycleSideEffects:'Explicit start requests microphone permission, creates one Web Audio capture graph, loads the static sibling worklet, and owns its stream, audio context, port, and signal. Stop releases the microphone immediately and waits for the final worklet flush. Cancel or destroy releases owned resources and suppresses late segments, including after pending startup settles.',
+        paramsResults:'ContinuousVoiceCapture({preRollMs=1500,quietMs=2000,chunkMs=30000,activityThreshold=0.02,onSegment,onError,onState}); start({mediaConstraints={audio:true},signal}={}) resolves boolean; stop() resolves after flush; cancel() and destroy() release the owned session. onSegment receives complete {audio:Blob,sequence,reason,durationMs}, with mono Float32 audio/wav, session-local 1-based sequence, and pause/periodic/stop reason. Inactive capture emits no segment, pre-roll is used once, and periodic segments do not repeat samples. Activity is amplitude detection, not semantic speech recognition.',
+        events:['onSegment for each complete captured clip','onState: starting, listening, stopped, interrupted','onError with the original capture error'],
+        errors:['Original microphone, Web Audio, worklet, and callback failures are reported through the capture owner.'],
+        capabilitiesCore:'Browser and supported native-WebView microphone capture with AudioWorklet. No model, transcription, persistence, application policy, or implicit Core service.',
+        example:`import ContinuousVoiceCapture from '/arcane/modules/ContinuousVoiceCapture.js';
+
+const capture=new ContinuousVoiceCapture({
+    onSegment:queueTranscription,
+    onError:showCaptureError
+});
+// Invoke from the application's recording action.
+await capture.start();
+await capture.stop();`
     },
     {
         name:'ConversationActionItems.js',

@@ -72,6 +72,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`CommunicationProviderRegistry.js`](#communicationproviderregistryjs) | esm | Registers and queries validated provider definitions, channels, and required methods. | Cross-host | Strict normalized registry. |
 | [`ComponentContracts.js`](#componentcontractsjs) | esm | Owns normalized configuration/value contracts and shared explicit STT activation behavior for chart, dashboard, Markdown, and voice components. | Cross-host | Fully normalized labels, rows, definitions, visibility, formats, editor and voice options, plus capability-neutral STT activation intent and presentation state. Complete finite progress measures remain visible, including fractional and over-total values. |
 | [`ConfiguredAIChatSession.js`](#configuredaichatsessionjs) | esm | Owns ordinary visible recurring AI turns, one active structural continuation, context construction, provider-response preservation, and atomic history commit. | Native bridge by default; cross-host with injected chat | Normalized session/result; provider rejection preserved. |
+| [`ContinuousVoiceCapture.js`](#continuousvoicecapturejs) | esm | Owns continuous microphone capture with pre-roll, pause/periodic WAV segments, final flush, and cancellation. | Browser / native WebView with AudioWorklet | Complete ordered clips; audio activity and timing are normalized, microphone availability remains browser-owned. |
 | [`ConversationActionItems.js`](#conversationactionitemsjs) | esm | Normalizes, creates, updates, remembers, selects, and formats complete conversation action items. | Cross-host | Fully normalized status/base/presentation contract. |
 | [`ConversationClosingReport.js`](#conversationclosingreportjs) | esm | Defines the closing-report tool, instruction, result normalizer, call classifier, and formatter. | Cross-host | Fully normalized report contract. |
 | [`ConversationTimebox.js`](#conversationtimeboxjs) | esm | Owns conversation limits, control messages, submission barriers, elapsed formatting, and delivery proof. | Cross-host | Fully normalized state/command/delivery errors. |
@@ -131,6 +132,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`uPlot.iife.min.js`](#uplotiifeminjs) | classic-script | Vendored uPlot chart constructor and rendering runtime. | Browser vendor script | Vendor-native. |
 | [`uPlot.LICENSE.txt`](#uplotlicensetxt) | license | License companion for the bundled uPlot vendor runtime. | Documentation asset | Not executable. |
 | [`uPlot.min.css`](#uplotmincss) | stylesheet | Bundled uPlot presentation stylesheet. | Browser stylesheet | Presentation only. |
+| [`VoiceCaptureWorklet.js`](#voicecaptureworkletjs) | worker | Segments and encodes continuous microphone audio on the audio rendering thread. | AudioWorkletGlobalScope | Rolling pre-roll, activity/quiet/periodic boundaries, complete WAV clips, and final stop acknowledgement. |
 | [`WaitForComponent.js`](#waitforcomponentjs) | esm | Waits for a component property, method, or readiness event with optional error event and bounded timeout. | Cross-host EventTarget / browser component | Normalized coded readiness, error, and timeout results. |
 | [`YouTubeMedia.js`](#youtubemediajs) | esm | Parses YouTube video/playlist locators and constructs ordinary embed URLs with opt-in privacy enhancement. | Cross-host | Fully normalized mutable locators. |
 
@@ -1637,7 +1639,15 @@ behavior for chart, dashboard, Markdown, and voice components.
 ### Public surface
 
 Constant sets plus normalization, formatting, and explicit STT activation
-helpers. `createSTTActivationController({host,button,progress=null,onChange,EventClass=CustomEvent})`
+helpers. `normalizeVoiceOptions(input,previous)` keeps `capture.mode:'manual'`
+and `controls:'standard'` as defaults. Continuous capture accepts
+`{mode:'continuous',preRollMs:1500,quietMs:2000,chunkMs:30000,activityThreshold:0.02}`;
+`controls:'simple'`, `showComplete`, and the `retry`/`cancel` labels configure
+the shared voice component. Positive quiet/chunk durations and nonnegative
+pre-roll/activity values must be finite. Complete callback payloads remain
+owned by the component and application.
+
+`createSTTActivationController({host,button,progress=null,onChange,EventClass=CustomEvent})`
 consumes only normalized
 [`AIRuntimeState`](#airuntimestatejs) `stt` role records. Its mutable controller
 exposes `action`, `error`, `label`, `pending`, `selected`, `status`, `title`, and
@@ -1795,6 +1805,76 @@ const session = new ConfiguredAIChatSession({
   })
 });
 console.log(await session.send('Hello'));
+```
+
+## ContinuousVoiceCapture.js
+
+### Overview
+
+Owns a continuous microphone session whose audio worklet keeps rolling
+pre-roll and produces complete clips at quiet or periodic boundaries. The
+capture owner has no model, transcription, persistence, or application policy.
+The shared [`voice-transcription.html`](runtime-components.md#voice-transcriptionhtml)
+component adds ordered STT, persistence, retry, and presentation.
+
+### Public surface
+
+Default export `ContinuousVoiceCapture` accepts
+`{preRollMs=1500,quietMs=2000,chunkMs=30000,activityThreshold=0.02,onSegment,onError,onState}`.
+`start({mediaConstraints={audio:true},signal}={})` acquires microphone input and
+resolves `true` once capture starts, or `false` after cancellation or a
+reported start failure. Starting capture is an explicit caller action.
+
+`onSegment({audio,sequence,reason,durationMs})` receives a complete
+`audio/wav` Blob containing mono Float32 audio. Sequence starts at one for
+each capture session; reason is `pause`, `periodic`, or `stop`. The detector
+uses amplitude to find activity, including noise; it does not determine
+whether a person is speaking. Inactive windows produce no clips. Pre-roll is
+used once when activity starts, and periodic segments remain adjacent without
+repeated samples. Pre-roll longer than `chunkMs` remains complete in the first
+active clip, so that clip may exceed the periodic duration.
+
+`stop()` releases microphone tracks immediately and returns a promise that
+settles after the worklet flushes the final active clip and acknowledges stop.
+Capture cancellation while microphone permission or worklet loading is
+pending releases late-acquired resources. `cancel()` and `destroy()` discard
+pending capture and suppress late segment delivery. They do not cancel
+application work that already accepted a segment; its owner supplies that
+cancellation boundary. The optional signal cancels this capture session.
+
+`onState` reports `starting`, `listening`, `stopped`, or `interrupted`;
+`onError` receives the original capture error. A naturally ended microphone
+flushes the active clip before reporting interruption while the worklet remains
+available. A failed audio context or processor reports interruption directly;
+audio still inside an unavailable processor cannot be recovered. Callback
+promises are observed without delaying capture or stop acknowledgement.
+Capture state is independent
+of model readiness, STT processing, and application save state.
+
+### Availability and normalization
+
+**Browser / supported native WebView.** Requires browser microphone access,
+`AudioContext`, and `AudioWorklet`. Browser secure-context and permission rules
+apply at those platform APIs. The static sibling
+[`VoiceCaptureWorklet.js`](#voicecaptureworkletjs) owns sample processing and
+WAV encoding on the audio rendering thread. No audio model or third-party
+capture runtime is loaded. Native hosts use the same browser APIs where
+available, with no Core service selected implicitly.
+
+### Example
+
+```javascript
+import ContinuousVoiceCapture from '/arcane/modules/ContinuousVoiceCapture.js';
+
+const capture=new ContinuousVoiceCapture({
+    onSegment:queueTranscription,
+    onError:showCaptureError,
+    onState:showCaptureState
+});
+// Call from the application's explicit recording action.
+await capture.start();
+// The application's stop action waits for the final clip.
+await capture.stop();
 ```
 
 ## ConversationActionItems.js
@@ -3793,6 +3873,34 @@ Load with a stylesheet link before rendering uPlot charts.
 ```html
 <link rel="stylesheet" href="/arcane/modules/uPlot.min.css">
 ```
+
+## VoiceCaptureWorklet.js
+
+### Overview
+
+Internal audio processor for [`ContinuousVoiceCapture.js`](#continuousvoicecapturejs).
+It keeps rolling pre-roll, detects audio amplitude, preserves complete active
+audio through quiet and periodic cuts, and encodes mono Float32 WAV clips on
+the audio rendering thread. It performs no semantic speech detection or STT.
+
+### Public surface
+
+No ESM exports. The capture owner loads this static file with
+`audioContext.audioWorklet.addModule()` and creates the
+`arcane-continuous-voice-capture` processor with
+`{preRollMs,quietMs,chunkMs,activityThreshold}` in `processorOptions`.
+The owner sends `{type:'stop'}`. The processor transfers each complete
+`{type:'segment',audio:ArrayBuffer,sampleRate,sequence,reason,durationMs}`
+and finally `{type:'stopped'}`. Each complete WAV includes its own format,
+sample-count, and data framing. Quiet-only capture emits no segments, and
+periodic segments never repeat samples.
+
+### Availability and normalization
+
+**AudioWorkletGlobalScope only.** This is an owner-local native MessagePort
+protocol, with no separate event bus, model request, or persistence. Applications
+use `ContinuousVoiceCapture` or the shared voice component rather than importing
+this processor in a document or Worker.
 
 ## WaitForComponent.js
 

@@ -696,6 +696,21 @@ const chart = new uPlot(
         example:String.raw`<link rel="stylesheet" href="/arcane/modules/uPlot.min.css">`
     },
     {
+        name:'VoiceCaptureWorklet.js',
+        classification:'internal-worker',
+        lifecycleSideEffects:'The ContinuousVoiceCapture owner loads this static AudioWorklet processor. Audio rendering supplies microphone samples; the processor keeps rolling pre-roll, cuts activity-bearing pause/periodic segments without overlap, and transfers complete mono Float32 WAV audio. Stop flushes the final active clip and acknowledges completion.',
+        paramsResults:'Processor arcane-continuous-voice-capture receives processorOptions {preRollMs,quietMs,chunkMs,activityThreshold}. Owner messages use {type:"stop"}. Processor messages use {type:"segment",audio:ArrayBuffer,sampleRate,sequence,reason,durationMs} followed by {type:"stopped"} at stop. Inactive audio produces no clip; amplitude detection does not recognize semantic speech.',
+        events:['owner-local MessagePort segment and stopped messages'],
+        errors:['Native AudioWorklet processor errors are observed by ContinuousVoiceCapture.'],
+        capabilitiesCore:'Internal AudioWorkletGlobalScope only; no ESM exports, model, persistence, or Core service. Applications use ContinuousVoiceCapture or voice-transcription.html.',
+        example:`import ContinuousVoiceCapture from '/arcane/modules/ContinuousVoiceCapture.js';
+
+const capture=new ContinuousVoiceCapture({onSegment:queueTranscription});
+// ContinuousVoiceCapture owns worklet loading and the internal port.
+await capture.start();
+await capture.stop();`
+    },
+    {
         name:'WaitForComponent.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Attaches configured readiness/error listeners and an optional timer no longer than 60 seconds, then removes all of them on resolution/rejection. Immediate-ready paths clean up synchronously.',

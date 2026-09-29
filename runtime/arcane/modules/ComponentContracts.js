@@ -876,9 +876,11 @@ function createSTTActivationController({
 }
 
 const VOICE_LABELS=completeValue({
+    cancel:'Cancel pending transcription',
     complete:'Complete Transcription',
     description:'Record one or more segments. Each segment is transcribed after you press Stop.',
     empty:'Your transcription will appear here after you stop recording.',
+    retry:'Retry failed segment',
     start:'Start',
     stop:'Stop',
     transcription:'Voice transcription'
@@ -889,8 +891,10 @@ const VOICE_MESSAGES=completeValue({
     complete:'Complete.',
     completeError:'Unable to complete this transcription.',
     completing:'Completing transcription...',
+    draining:'Microphone stopped. Finishing captured segments...',
     emptyAudio:'No audio was captured. Try recording again.',
     interrupted:'Recording was interrupted. Your completed transcription is still available.',
+    listening:'Listening...',
     noSpeech:'No speech was transcribed. You can try another segment.',
     ready:'Ready.',
     recording:'Recording...',
@@ -904,7 +908,8 @@ const VOICE_MESSAGES=completeValue({
     transcribeError:'Unable to transcribe this recording.',
     transcribing:'Transcribing this segment...',
     transcriptReplaced:'Transcript replaced.',
-    unsupported:'Audio recording is not supported by this browser.'
+    unsupported:'Audio recording is not supported by this browser.',
+    waiting:'Captured audio is waiting for the selected transcription service.'
 });
 
 function normalizeVoiceOptions(input={},previous={}){
@@ -953,6 +958,29 @@ function normalizeVoiceOptions(input={},previous={}){
     if(!is.string(separator)){
         throw new TypeError('separator must be a string');
     }
+    const capture={
+        mode:'manual',
+        preRollMs:1500,
+        quietMs:2000,
+        chunkMs:30000,
+        activityThreshold:0.02,
+        ...record(previous.capture,'Previous voice capture options'),
+        ...record(input.capture,'Voice capture options')
+    };
+    if(!['manual','continuous'].includes(capture.mode)){
+        throw new TypeError('capture.mode must be manual or continuous');
+    }
+    for(const key of ['preRollMs','quietMs','chunkMs','activityThreshold']){
+        const value=capture[key];
+        if(!is.finite(value)||value<0
+            ||(['quietMs','chunkMs'].includes(key)&&value===0)){
+            throw new TypeError(`capture.${key} must be a finite ${key==='quietMs'||key==='chunkMs'?'positive':'nonnegative'} number`);
+        }
+    }
+    const controls=option(input,previous,'controls','standard');
+    if(!['standard','simple'].includes(controls)){
+        throw new TypeError('controls must be standard or simple');
+    }
 
     return {
         labels,
@@ -966,6 +994,9 @@ function normalizeVoiceOptions(input={},previous={}){
             'Voice messages'
         ),
         mediaConstraints:{...constraints},
+        capture,
+        controls,
+        showComplete:option(input,previous,'showComplete',true)!==false,
         mimeTypes:[...new Set(mimeTypes.map(value=>value.trim()).filter(Boolean))],
         persist:option(input,previous,'persist',true)!==false,
         transcribe:optionalCallback(input,previous,['transcribe']),

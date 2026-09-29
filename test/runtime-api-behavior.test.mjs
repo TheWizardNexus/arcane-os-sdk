@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import Is from '../browser-runtime/dependencies/strong-type/index.js';
 
 import test from '../src/testing.mjs';
 import AIModelSelectionController, {
@@ -6649,8 +6650,10 @@ test(
             startLifecycleStart
         );
         const createStartLifecycleHarness = Function(
+            'Is',
             `'use strict';
             return function createStartLifecycleHarness(destroyOnState=''){
+                const is=new Is(false);
                 let chunks=[];
                 let mediaStream=null;
                 let recorder=null;
@@ -6673,6 +6676,7 @@ test(
                     getTracks(){return [track];}
                 };
                 const options={
+                    capture:{mode:'manual'},
                     mediaConstraints:{audio:true},
                     messages:{
                         ready:'Ready.',
@@ -6683,6 +6687,7 @@ test(
                     }
                 };
                 class MediaRecorder {}
+                const globalThis={MediaRecorder};
                 const navigator={
                     mediaDevices:{
                         getUserMedia(){
@@ -6748,7 +6753,7 @@ test(
                     get trackStops(){return trackStops;}
                 };
             };`
-        )();
+        )(Is);
         const busyDuringPermission = createStartLifecycleHarness();
         const busyStart=busyDuringPermission.start();
         busyDuringPermission.busy();
@@ -6782,6 +6787,7 @@ test(
             `'use strict';
             let state='recording';
             let destroyed=false;
+            const continuousSession=null;
             let sessionGeneration=9;
             let stopCalls=0;
             let recorder={state:'recording',stop(){stopCalls+=1;}};
@@ -6808,7 +6814,7 @@ test(
         assert.equal(stopDuringDestroy.stopCalls, 0);
         assert.match(
             voiceSource,
-            /<button id="start" type="button" disabled><\/button>[\s\S]*<button id="sttActivation" type="button" hidden disabled>/u
+            /<button id="start" part="primary-action" type="button" disabled><\/button>[\s\S]*<button id="sttActivation" type="button" hidden disabled>/u
         );
         assert.match(
             voiceSource,
@@ -6883,9 +6889,10 @@ test(
             'const result=await transcribeAudio('
         );
         const transcribeSegment = voiceSource.indexOf(
-            "const segment=typeof result==='string'",
+            "const segment=is.string(result)?result:'';",
             transcribeAwait
         );
+        assert.notEqual(transcribeSegment, -1);
         const saveBlockStart = voiceSource.indexOf(
             'if(options.persist){',
             transcribeSegment
@@ -6895,16 +6902,20 @@ test(
             saveBlockStart
         );
         const createReplacementHarness = Function(
+            'Is',
             `'use strict';
             return function createReplacementHarness(
                 initialState,
                 withController=true,
                 settings={}
             ){
+                const is=new Is(false);
                 let state=initialState;
                 let transcript='original';
                 let sessionGeneration=12;
                 let destroyed=false;
+                const continuousSession=null;
+                let completionAbortController=null;
                 const controller=withController?new AbortController():null;
                 let transcriptionAbortController=controller;
                 let releases=0;
@@ -6941,6 +6952,7 @@ test(
                     }
                 }
                 function releaseMicrophone(){releases+=1;}
+                function releaseContinuousSession(){return false;}
                 function renderTranscript(){}
                 function reportSTTCancellation(reason,message){
                     cancellations.push({reason,message});
@@ -6978,6 +6990,10 @@ test(
                 function transcribeAudio(file,context,signal){
                     return settings.transcribe(file,context,signal);
                 }
+                ${voiceSource.slice(
+                    voiceSource.indexOf('function waitForContinuousOperation('),
+                    voiceSource.indexOf('function processContinuousQueue(')
+                )}
                 ${voiceSource.slice(completionStart, completionEnd)}
                 ${voiceSource.slice(replacementStart, replacementEnd)}
                 async function settleTranscription(){
@@ -7011,7 +7027,7 @@ test(
                     get transitions(){return transitions;}
                 };
             };`
-        )();
+        )(Is);
         for (const activeState of [
             'starting',
             'transcribing',
@@ -7427,7 +7443,7 @@ test(
         );
         assert.match(
             voiceSource,
-            /async function completeStream\(\)\{[\s\S]*const completionTranscript=transcript[\s\S]*setState\('completing'[\s\S]*isCurrentVoiceOperation\(generation,'completing'\)[\s\S]*await complete\(\{transcript:completionTranscript\}\)[\s\S]*isCurrentVoiceOperation\(generation,'completing'\)/u,
+            /async function completeStream\(\)\{[\s\S]*const completionTranscript=transcript[\s\S]*setState\('completing'[\s\S]*isCurrentVoiceOperation\(generation,'completing'\)[\s\S]*const input=\{transcript:completionTranscript\}[\s\S]*await waitForContinuousOperation\([\s\S]*complete\(input\),completionController[.]signal[\s\S]*isCurrentVoiceOperation\(generation,'completing'\)/u,
             'Complete must remain terminal after destroy, including late callback settlement.'
         );
         assert.match(
@@ -7463,6 +7479,7 @@ test(
             function releaseMicrophone(){
                 throw new Error('No media release expected.');
             }
+            function releaseContinuousSession(){return false;}
             function renderState(){
                 throw new Error('No cancellation render expected.');
             }
@@ -7679,6 +7696,7 @@ test(
                 return function createPageLifecycleHarness(){
                     let destroyed=false;
                     let destroyCount=0;
+                    const continuousSession=null;
                     const restoredCalls=${JSON.stringify(restoredCalls)};
                     function destroy(){
                         if(destroyed){

@@ -96,7 +96,7 @@ appropriate.
 | [`theme-editor.html`](#theme-editorhtml) | Edits, previews, saves, and resets semantic custom theme tokens. | `configure()`<br>`getTheme()`<br>`setTheme()`<br>`setBusy()`<br>`setStatus()`<br>`destroy()` | `theme-editor-ready`<br>`theme-preview`<br>`theme-save`<br>`theme-reset` | Fully normalized Theme values |
 | [`theme-switcher.html`](#theme-switcherhtml) | Selects and refreshes system, light, dark, or custom theme mode. | `setMode()`<br>`refresh()` | No component-specific event | Preference/native appearance behavior mixed; no component-ready contract |
 | [`unified-inbox.html`](#unified-inboxhtml) | Displays provider-neutral communication threads with active/loading state. | `configure()`<br>`setThreads()`<br>`setActive()`<br>`setLoading()`<br>`destroy()` | `unified-inbox-ready`<br>`inbox-refresh`<br>`thread-select` | DOM-normalized |
-| [`voice-transcription.html`](#voice-transcriptionhtml) | Records segmented microphone audio only after authoritative STT readiness, exposes explicit selected-STT activation, transcribes complete content with cancellation, persists, and completes a combined transcript. | `configure()`<br>`requestSTTActivation()`<br>`startRecording()`<br>`stopRecording()`<br>`save()`<br>`completeTranscription()/complete()`<br>`clear()`<br>`reset()`<br>`destroy()` | `voice-transcription-ready`<br>`voice-transcription-state`<br>`voice-transcription-segment`<br>`voice-transcription-change`<br>`voice-transcription-complete`<br>`speech-transcription-complete`<br>`speech-transcription-cancelled`<br>`speech-stt-activation-request`<br>`speech-stt-activation-error` | Sticky runtime STT readiness, explicit activation, request cancellation, and complete state/text are normalized; media/provider behavior remains external |
+| [`voice-transcription.html`](#voice-transcriptionhtml) | Records manual clips or optional continuous microphone audio with pause/periodic segments, ordered transcription and saves, retained failures, and complete transcript delivery. | `configure()`<br>`requestSTTActivation()`<br>`startRecording()`<br>`stopRecording()`<br>`retryTranscription()`<br>`cancelRecording()`<br>`save()`<br>`completeTranscription()/complete()`<br>`clear()`<br>`reset()`<br>`destroy()` | `voice-transcription-ready`<br>`voice-transcription-state`<br>`voice-transcription-segment`<br>`voice-transcription-empty`<br>`voice-transcription-error`<br>`voice-transcription-change`<br>`voice-transcription-complete`<br>`speech-transcription-complete`<br>`speech-transcription-cancelled`<br>`speech-stt-activation-request`<br>`speech-stt-activation-error` | Sticky STT readiness, capture/queue lifecycle, retry, cancellation, and complete state/text are normalized; media/provider behavior remains external |
 | [`weather-widget.html`](#weather-widgethtml) | Displays normalized current and daily weather with refresh intent. | `setWeather()`<br>`clear()`<br>`destroy()` | `weather-widget-ready`<br>`weather-refresh` | Display normalized; provider supplied externally |
 | [`web-navigator.html`](#web-navigatorhtml) | Guards embedded/external navigation and surfaces allow/block/open intents. | `configure()`<br>`navigate()`<br>`currentUrl()`<br>`destroy()` | `web-navigator-ready`<br>`web-navigate`<br>`web-navigation-blocked`<br>`web-open-external` | Navigation intent/decision normalized; browser navigation result platform-native |
 
@@ -1633,25 +1633,29 @@ Events: `unified-inbox-ready`, `inbox-refresh`, `thread-select`.
 
 ### Overview
 
-Records segmented microphone audio only after authoritative STT readiness,
-exposes explicit selected-STT activation, transcribes with cancellation,
-persists, and completes a combined transcript.
+Records manual clips by default, with optional continuous capture that cuts
+segments after quiet periods or at a periodic boundary. Transcription and
+application saves run in capture order while microphone capture continues.
+The component exposes explicit selected-STT activation, cancellation, retry,
+and completion of the combined transcript.
 
 ### Public surface
 
 Methods/properties: `configure()`, `requestSTTActivation()`, `startRecording()`,
-`stopRecording()`, `save()`, `completeTranscription()/complete()`, `clear()`,
-`reset()`, `destroy()`.
+`stopRecording()`, `retryTranscription()`, `cancelRecording()`, `save()`,
+`completeTranscription()/complete()`, `clear()`, `reset()`, `destroy()`.
 
 Events: `voice-transcription-ready`, `voice-transcription-state`,
-`voice-transcription-segment`, `voice-transcription-change`,
+`voice-transcription-segment`, `voice-transcription-empty`,
+`voice-transcription-error`, `voice-transcription-change`,
 `voice-transcription-complete`, `speech-transcription-complete`,
 `speech-transcription-cancelled`, `speech-stt-activation-request`, and
 `speech-stt-activation-error`.
 
 Shared dependencies: [`MD.js`](runtime-modules.md#mdjs),
 [`ComponentContracts.js`](runtime-modules.md#componentcontractsjs),
-[`AIRuntimeState.js`](runtime-modules.md#airuntimestatejs), and
+[`AIRuntimeState.js`](runtime-modules.md#airuntimestatejs),
+[`ContinuousVoiceCapture.js`](runtime-modules.md#continuousvoicecapturejs), and
 [`AI.js`](runtime-modules.md#aijs).
 
 ### Availability and normalization
@@ -1659,9 +1663,12 @@ Shared dependencies: [`MD.js`](runtime-modules.md#mdjs),
 **Browser and supported native WebViews.** The component subscribes
 synchronously to sticky `AIRuntimeState.roles.stt`; its recording Start button
 and public `startRecording()` both remain unavailable unless that role is exactly
-`ready` and not busy. A configured `transcribe(file,context)` callback remains
+`ready` and not busy. Once continuous capture starts, a busy STT lane does not
+interrupt the microphone session.
+A configured `transcribe(file,context)` callback remains
 request plumbing rather than readiness authority. Its context now includes the
-owned `signal` additively. The default route calls `AI.fetchSTT(file,signal)` so
+owned `signal` additively, and continuous clips also include their `sequence`.
+The default route calls `AI.fetchSTT(file,signal)` so
 readiness loss or destruction can abort delivery.
 
 For a selected `unloaded`, `loading`, `unloading`, or `error` role, the component
@@ -1682,7 +1689,7 @@ Unknown provider/runtime diagnostics remain complete in the developer console
 and error events, while controls use generic visible outcomes unless the Error
 owner explicitly marks nonblank copy with `userSafe:true`.
 
-If sticky readiness is lost during microphone acquisition, capture, or the STT
+For the default manual mode, if sticky readiness is lost during microphone acquisition, capture, or the STT
 request, the component invalidates the session, aborts the owned request signal,
 releases media, discards late completion, and emits
 `speech-transcription-cancelled`. Its source-local reason is
@@ -1704,10 +1711,12 @@ advances its generation, aborts owned STT delivery, releases owned media, emits
 `speech-transcription-cancelled` with
 `reason:'transcript-replaced'`, and suppresses
 late settlement before publishing the assigned transcript. Assigning transcript
-text during active recording preserves that recording and changes the transcript
+text during active manual recording preserves that recording and changes the transcript
 to which the captured segment will be appended.
 On a BFCache-persisted `pagehide`, the component and its owned state remain
-live. A persisted `pageshow` rerenders the retained authoritative state without
+live. An active continuous microphone session requests its final stop and
+flush; the manual recording lifecycle is unchanged. A persisted `pageshow`
+rerenders the retained authoritative state without
 restarting capture, transcription, or activation. Nonpersisted `pagehide`
 retains terminal destruction.
 `destroy()` aborts the state subscription, cancels active work, removes the
@@ -1715,13 +1724,77 @@ activation listener, sets component `ready` to `false`, and returns `true`;
 repeated destruction is
 idempotent. Destruction is terminal: Start, activation, and Complete remain
 disabled and status remains unavailable. `voice-transcription-state` detail is
-the mutable complete `{message,state,stt}` record, where `state` remains the component
+the mutable complete `{message,state,stt}` record, extended during a continuous
+session with `{capture,processing,queued,errorPhase,error}`, where `state` remains the component
 workflow and `stt` is the authoritative mutable role record. Transcript
 completion stays available when STT is unavailable before destruction.
 State/text, explicit activation, and request cancellation are normalized;
 provider/model authority and media behavior remain external. HTMLImport + DOM;
 injected Arcane/provider modules where listed.
 Native methods remain subject to the bound app's capabilities. [Deep protocol details](protocols.md).
+
+### Continuous capture and controls
+
+`configure({capture:{mode:'continuous'}})` opts into the SDK's
+[`ContinuousVoiceCapture`](runtime-modules.md#continuousvoicecapturejs) owner.
+The default capture settings are `preRollMs:1500`, `quietMs:2000`,
+`chunkMs:30000`, and `activityThreshold:0.02`. These are audio amplitude and
+timing settings: the detector observes sound activity, including background
+noise, and does not perform semantic voice-activity recognition. The worklet
+keeps a rolling pre-roll, emits no clips containing only inactivity, and does
+not repeat samples across periodic segments. If `preRollMs` exceeds `chunkMs`,
+the first active clip preserves all that pre-roll and may exceed the periodic
+duration. Each emitted clip contains a
+complete mono Float32 WAV and a session-local sequence starting at one.
+
+The component runs one clip's transcription and save before the next clip's
+transcription. Captured clips wait in memory while STT is busy. With the
+default `persist:true`, `onSave({transcript,segment,sequence,signal})` or the
+existing `host.save` callback must resolve before that segment's success event
+and before the next clip proceeds. Returning `false` from a continuous save or
+completion callback reports that the application did not accept the operation.
+Text is preserved completely; the
+configured separator joins successful segments. An STT failure retains its
+audio. A save failure retains the successful text and exact save payload so
+`retryTranscription()` repeats only that save and does not retranscribe or
+append the segment again. Retry resumes the ordered queue after the retained
+stage succeeds. Waiting clips remain available if the selected STT role becomes
+unready. An in-flight STT request is aborted if its selected provider/model
+changes or becomes unready; its clip remains at the failed stage for explicit
+retry. A provider result with no text emits
+`voice-transcription-empty` and advances the queue without appending text.
+
+Continuous `stopRecording()` releases the microphone immediately, flushes the
+final active segment, and returns a promise that resolves `true` after the
+queue drains or `false` while a failure remains. Default manual
+`stopRecording()` keeps its synchronous boolean return. Complete waits for
+the continuous flush and all saves before calling
+`onComplete({transcript,signal})` or the existing `host.complete` callback.
+After a capture interruption, explicit completion can use the retained
+transcript once every queued clip has settled. A pending clip failure still
+prevents completion. Overlapping completion requests invoke the application
+callback once.
+`cancelRecording()` explicitly discards outstanding clips, aborts active
+callbacks, and suppresses late text, save, and completion delivery. Callbacks
+must observe the supplied signal to cancel their own external effects; an
+already accepted external save is not undone. Replacing configuration or the
+transcript explicitly cancels a continuous session and its outstanding clips.
+`clear()` refuses a retained queue; use the explicit Cancel action before
+discarding it.
+
+`voice-transcription-segment` and `speech-transcription-complete` retain their
+complete `{text,transcript}` detail and add `sequence` for continuous clips.
+State events distinguish `capture`, `processing`, queued clips, `errorPhase`,
+and the complete `error` from the existing workflow `state` and selected `stt`
+role. Errors remain visible and retryable without implicitly discarding audio.
+
+`controls:'simple'` uses one large primary Start/Stop button, and
+`showComplete:false` hides the secondary Complete action. Standard controls
+and the Complete action remain the defaults. `labels` can supply `start`,
+`stop`, `complete`, `retry`, and `cancel` strings. Applications can style the
+exposed parts `primary-action`, `stop-action`, `complete-action`,
+`retry-action`, `cancel-action`, `transcript`, `status`, `controls`, and
+`description` without reaching into the component's markup.
 
 ### Example
 
@@ -1730,6 +1803,19 @@ Native methods remain subject to the bound app's capabilities. [Deep protocol de
   id="voice-transcription.html"
   href="/arcane/components/voice-transcription.html">
 </html-import>
+```
+
+After the component is ready, configure the selected capture mode and the
+application's real persistence callback:
+
+```javascript
+voice.configure({
+    capture:{mode:'continuous',preRollMs:1500,quietMs:2000,chunkMs:30000},
+    controls:'simple',
+    labels:{start:'Start recording',stop:'Stop recording'},
+    onSave:saveTranscript,
+    onComplete:completeTranscript
+});
 ```
 
 ## weather-widget.html

@@ -37,6 +37,20 @@
         margin:0;
     }
 
+    .controls[data-simple='true'] #start{
+        flex:1 1 100%;
+        min-height:4rem;
+        font-size:1.25em;
+    }
+
+    .voice-transcription[data-simple='true']{
+        grid-template-rows:auto auto auto minmax(12em,1fr);
+    }
+
+    [hidden]{
+        display:none!important;
+    }
+
     .recording{
         color:var(--danger-color);
     }
@@ -65,10 +79,10 @@
 </style>
 
 <section class="voice-transcription">
-    <p id="description" class="description"></p>
-    <section id="transcript" class="transcript"></section>
+    <p id="description" class="description" part="description"></p>
+    <section id="transcript" class="transcript" part="transcript"></section>
     <div class="transcription-feedback">
-        <p id="status" class="status" role="status" aria-live="polite"></p>
+        <p id="status" class="status" part="status" role="status" aria-live="polite"></p>
         <progress
             id="sttActivationProgress"
             class="stt-activation-progress"
@@ -76,11 +90,13 @@
             hidden
         ></progress>
     </div>
-    <section class="controls">
-        <button id="start" type="button" disabled></button>
+    <section class="controls" part="controls">
+        <button id="start" part="primary-action" type="button" disabled></button>
         <button id="sttActivation" type="button" hidden disabled>Start transcription</button>
-        <button id="stop" type="button" disabled></button>
-        <button id="complete" type="button" disabled></button>
+        <button id="stop" part="stop-action" type="button" disabled></button>
+        <button id="retry" part="retry-action" type="button" hidden></button>
+        <button id="cancel" part="cancel-action" type="button" hidden></button>
+        <button id="complete" part="complete-action" type="button" disabled></button>
     </section>
 </section>
 
@@ -105,6 +121,8 @@
                 'voice-transcription-ready',
                 'voice-transcription-state',
                 'voice-transcription-segment',
+                'voice-transcription-empty',
+                'voice-transcription-error',
                 'voice-transcription-change',
                 'voice-transcription-complete',
                 'speech-transcription-complete',
@@ -114,16 +132,17 @@
             ]
         }
     );
-    const {default:MD}=await import('../modules/MD.js?v=2');
-    const {
-        appendTranscription,
-        createSTTActivationController,
-        normalizeVoiceOptions
-    }=await import('../modules/ComponentContracts.js');
-    const {
-        requestAIRuntimeIntent,
-        subscribeAIRuntimeState
-    }=await import('../modules/AIRuntimeState.js');
+    const [
+        {default:MD},
+        {appendTranscription,createSTTActivationController,normalizeVoiceOptions},
+        {requestAIRuntimeIntent,subscribeAIRuntimeState},
+        {default:ContinuousVoiceCapture}
+    ]=await Promise.all([
+        import('../modules/MD.js?v=2'),
+        import('../modules/ComponentContracts.js'),
+        import('../modules/AIRuntimeState.js'),
+        import('../modules/ContinuousVoiceCapture.js')
+    ]);
     const description=host.shadowRoot.querySelector('#description');
     const transcriptElement=host.shadowRoot.querySelector('#transcript');
     const status=host.shadowRoot.querySelector('#status');
@@ -131,6 +150,10 @@
     const sttActivationButton=host.shadowRoot.querySelector('#sttActivation');
     const sttActivationProgress = host.shadowRoot.querySelector('#sttActivationProgress');
     const stopButton=host.shadowRoot.querySelector('#stop');
+    const retryButton=host.shadowRoot.querySelector('#retry');
+    const cancelButton=host.shadowRoot.querySelector('#cancel');
+    const controlsElement=host.shadowRoot.querySelector('.controls');
+    const feedbackElement=host.shadowRoot.querySelector('.transcription-feedback');
     const completeButton=host.shadowRoot.querySelector('#complete');
     const runtimeStateAbortController=new AbortController();
 
@@ -146,6 +169,8 @@
     let eventOperationSequence=0;
     let voiceOperationId=null;
     let destroyed=false;
+    let continuousSession=null;
+    let completionAbortController=null;
     let options=normalizeVoiceOptions(optionsFromDataset());
 
     function nextVoiceOperationId(kind){
@@ -216,6 +241,8 @@
     host.reset=clear;
     host.startRecording=startRecording;
     host.stopRecording=stopRecording;
+    host.retryTranscription=retryTranscription;
+    host.cancelRecording=cancelRecording;
     host.requestSTTActivation=host.requestSTTActivation
         ||function requestSTTActivation(intent){
             return requestAIRuntimeIntent(intent);
@@ -233,8 +260,10 @@
     const lifecycleListenerOptions=completeValue(
         {signal:runtimeStateAbortController.signal}
     );
-    startButton.addEventListener('click',startRecording,lifecycleListenerOptions);
+    startButton.addEventListener('click',handlePrimaryClick,lifecycleListenerOptions);
     stopButton.addEventListener('click',stopRecording,lifecycleListenerOptions);
+    retryButton.addEventListener('click',retryTranscription,lifecycleListenerOptions);
+    cancelButton.addEventListener('click',cancelRecording,lifecycleListenerOptions);
     completeButton.addEventListener('click',completeStream,lifecycleListenerOptions);
     window.addEventListener(
         'pagehide',
@@ -327,7 +356,419 @@
         return getOptions();
     }
 
+    function handlePrimaryClick(){
+        if(options.controls==='simple'&&continuousSession?.listening){
+            return stopRecording();
+        }
+        return startRecording();
+    }
+
+    function isCurrentContinuousSession(session){
+        return !destroyed&&continuousSession===session
+            &&session.generation===sessionGeneration
+            &&!session.controller.signal.aborted;
+    }
+
+    async function startContinuousRecording(){
+        if(!canStartVoiceRecording(sttRole,state,destroyed)
+            ||continuousSession?.queue.length){
+            return false;
+        }
+        releaseContinuousSession();
+        const session={
+            generation:++sessionGeneration,
+            controller:new AbortController(),
+            requestController:null,
+            capture:null,
+            captureState:'starting',
+            listening:true,
+            flushing:false,
+            processing:'idle',
+            queue:[],
+            failure:null,
+            captureError:null,
+            worker:null,
+            waiters:[]
+        };
+        continuousSession=session;
+        setState('starting',options.messages.requesting,{beginOperation:'transcription'});
+        try{
+            if(!isCurrentContinuousSession(session)||!session.listening){
+                return false;
+            }
+            session.capture=new ContinuousVoiceCapture({
+                ...options.capture,
+                onSegment:function capturedSegment(clip){
+                    if(!isCurrentContinuousSession(session)){
+                        return;
+                    }
+                    session.queue.push({...clip,stage:'transcribe',segment:null});
+                    processContinuousQueue(session);
+                },
+                onState:function captureStateChanged(nextState){
+                    if(!isCurrentContinuousSession(session)){
+                        return;
+                    }
+                    session.captureState=nextState;
+                    if(nextState==='stopped'||nextState==='interrupted'){
+                        session.listening=false;
+                    }
+                    renderContinuousState(session);
+                },
+                onError:function captureFailed(error){
+                    if(!isCurrentContinuousSession(session)){
+                        return;
+                    }
+                    session.captureError=error;
+                    session.captureState='interrupted';
+                    session.listening=false;
+                    reportContinuousError(session,'capture',error);
+                    settleContinuousDrain(session);
+                }
+            });
+            const started=await session.capture.start({
+                mediaConstraints:options.mediaConstraints,
+                signal:session.controller.signal
+            });
+            if(!isCurrentContinuousSession(session)){
+                session.capture.cancel();
+                return false;
+            }
+            if(!started){
+                session.listening=false;
+                if(!session.captureError){
+                    session.captureState='stopped';
+                }
+            }
+            renderContinuousState(session);
+            settleContinuousDrain(session);
+            return started;
+        }catch(error){
+            if(!isCurrentContinuousSession(session)){
+                return false;
+            }
+            session.listening=false;
+            session.captureError=error;
+            session.captureState='interrupted';
+            session.capture?.cancel();
+            reportContinuousError(session,'capture',error);
+            settleContinuousDrain(session);
+            return false;
+        }
+    }
+
+    function continuousDetails(session){
+        return {
+            capture:session.captureState,
+            processing:session.processing,
+            queued:session.queue.length,
+            errorPhase:session.failure?.phase||(session.captureError?'capture':null),
+            error:session.failure?.error||session.captureError||null
+        };
+    }
+
+    function renderContinuousState(session){
+        if(!isCurrentContinuousSession(session)){
+            return;
+        }
+        const messages=[];
+        if(session.captureError){
+            messages.push(options.messages.interrupted);
+        }else if(session.listening){
+            messages.push(session.captureState==='starting'
+                ?options.messages.requesting:options.messages.listening);
+        }else if(session.flushing||session.queue.length){
+            messages.push(options.messages.draining);
+        }
+        const processingMessages={
+            transcribing:options.messages.transcribing,
+            saving:options.messages.saving,
+            waiting:options.messages.waiting
+        };
+        if(session.failure){
+            messages.push(session.failure.phase==='save'
+                ?options.messages.saveError:options.messages.transcribeError);
+        }else if(processingMessages[session.processing]){
+            messages.push(processingMessages[session.processing]);
+        }
+        const nextState=session.listening
+            ?(session.captureState==='starting'?'starting':'recording')
+            :session.failure||session.captureError?'error'
+            :session.flushing||session.queue.length?'transcribing':'idle';
+        setState(nextState,messages.join(' ')||options.messages.ready);
+    }
+
+    function reportContinuousError(session,phase,error){
+        arcaneLogging.error(`Continuous voice ${phase} failed:`,error);
+        renderContinuousState(session);
+        if(!isCurrentContinuousSession(session)){
+            return;
+        }
+        const detail={phase,error,sequence:session.queue[0]?.sequence??null};
+        dispatchVoiceEvent('voice-transcription-error',detail,{
+            bubbles:true,composed:true,publicDetail:detail
+        });
+    }
+
+    function waitForContinuousOperation(result,signal){
+        return new Promise(function observeContinuousOperation(resolve,reject){
+            function aborted(){
+                reject(signal.reason||new DOMException('Transcription canceled.','AbortError'));
+            }
+            if(signal.aborted){
+                aborted();
+            }else{
+                signal.addEventListener('abort',aborted,{once:true});
+            }
+            Promise.resolve(result).then(function completed(value){
+                signal.removeEventListener('abort',aborted);
+                resolve(value);
+            },function failed(error){
+                signal.removeEventListener('abort',aborted);
+                reject(error);
+            });
+        });
+    }
+
+    function processContinuousQueue(session){
+        if(!isCurrentContinuousSession(session)||session.worker||session.failure
+            ||!session.queue.length){
+            return;
+        }
+        // One ordered transcription/save consumer; microphone capture never waits for it.
+        const work=Promise.resolve().then(function beginOrderedDrain(){
+            return drainContinuousQueue(session);
+        });
+        session.worker=work;
+        work.then(function queueSettled(){
+            if(session.worker===work){
+                session.worker=null;
+            }
+            if(!isCurrentContinuousSession(session)){
+                return;
+            }
+            renderContinuousState(session);
+            settleContinuousDrain(session);
+            if(session.queue.length&&!session.failure
+                &&sttRole.state==='ready'&&!sttRole.busy){
+                processContinuousQueue(session);
+            }
+        },function unexpectedQueueFailure(error){
+            if(session.worker===work){
+                session.worker=null;
+            }
+            if(isCurrentContinuousSession(session)){
+                session.failure={phase:session.queue[0]?.stage==='save'?'save':'transcribe',error};
+                session.processing='error';
+                reportContinuousError(session,session.failure.phase,error);
+                settleContinuousDrain(session);
+            }
+        });
+    }
+
+    async function drainContinuousQueue(session){
+        while(isCurrentContinuousSession(session)&&session.queue.length&&!session.failure){
+            const clip=session.queue[0];
+            if(clip.stage==='transcribe'&&(sttRole.state!=='ready'||sttRole.busy)){
+                session.processing='waiting';
+                renderContinuousState(session);
+                return;
+            }
+            const controller=new AbortController();
+            session.requestController=controller;
+            try{
+                if(clip.stage==='transcribe'){
+                    session.processing='transcribing';
+                    renderContinuousState(session);
+                    if(!isCurrentContinuousSession(session)||controller.signal.aborted){
+                        return;
+                    }
+                    const file=new File([clip.audio],`segment-${clip.sequence}.wav`,{type:clip.audio.type});
+                    const result=await waitForContinuousOperation(transcribeAudio(file,{
+                        audio:clip.audio,mimeType:clip.audio.type,transcript,
+                        sequence:clip.sequence,signal:controller.signal
+                    },controller.signal),controller.signal);
+                    if(!isCurrentContinuousSession(session)){
+                        return;
+                    }
+                    if(controller.signal.aborted){
+                        throw controller.signal.reason||new DOMException('Transcription canceled.','AbortError');
+                    }
+                    if(!is.string(result)){
+                        throw new TypeError('Transcription must return the complete text as a string.');
+                    }
+                    clip.segment=result;
+                    if(result.length===0){
+                        session.queue.shift();
+                        const detail={sequence:clip.sequence,transcript};
+                        dispatchVoiceEvent('voice-transcription-empty',detail,{
+                            bubbles:true,composed:true,publicDetail:detail
+                        });
+                        continue;
+                    }
+                    clip.transcript=appendTranscription(transcript,result,options.separator);
+                    clip.stage='save';
+                    transcript=clip.transcript;
+                    renderTranscript();
+                }
+                if(options.persist){
+                    const save=options.onSave||(is.function(host.save)?host.save.bind(host):null);
+                    if(!save){
+                        throw new Error('Transcription saving is not configured.');
+                    }
+                    session.processing='saving';
+                    renderContinuousState(session);
+                    if(!isCurrentContinuousSession(session)||controller.signal.aborted){
+                        return;
+                    }
+                    const result=await waitForContinuousOperation(save({
+                        transcript:clip.transcript,segment:clip.segment,
+                        sequence:clip.sequence,signal:controller.signal
+                    }),controller.signal);
+                    if(result===false){
+                        throw new Error('The transcription save was not accepted.');
+                    }
+                }
+                if(!isCurrentContinuousSession(session)){
+                    return;
+                }
+                if(controller.signal.aborted){
+                    throw controller.signal.reason||new DOMException('Transcription canceled.','AbortError');
+                }
+                session.queue.shift();
+                const detail={text:clip.segment,transcript:clip.transcript,sequence:clip.sequence};
+                dispatchVoiceEvent('speech-transcription-complete',detail,{
+                    bubbles:true,composed:true,publicDetail:detail
+                });
+                if(!isCurrentContinuousSession(session)){
+                    return;
+                }
+                dispatchVoiceEvent('voice-transcription-segment',detail,{
+                    bubbles:true,composed:true,publicDetail:detail
+                });
+            }catch(error){
+                if(!isCurrentContinuousSession(session)){
+                    return;
+                }
+                session.failure={phase:clip.stage==='save'?'save':'transcribe',error};
+                session.processing='error';
+                reportContinuousError(session,session.failure.phase,error);
+                return;
+            }finally{
+                if(session.requestController===controller){
+                    session.requestController=null;
+                }
+            }
+        }
+        session.processing='idle';
+    }
+
+    function settleContinuousDrain(session){
+        if(session.listening||session.flushing||session.worker){
+            return;
+        }
+        if(session.queue.length&&!session.failure){
+            return;
+        }
+        const success=isCurrentContinuousSession(session)
+            &&!session.failure&&!session.captureError;
+        for(const resolve of session.waiters.splice(0)){
+            resolve(success);
+        }
+    }
+
+    function continuousDrain(session){
+        return new Promise(function awaitContinuousDrain(resolve){
+            if(!isCurrentContinuousSession(session)){
+                resolve(false);
+                return;
+            }
+            session.waiters.push(resolve);
+            settleContinuousDrain(session);
+        });
+    }
+
+    async function stopContinuousRecording(session){
+        if(!isCurrentContinuousSession(session)){
+            return false;
+        }
+        if((completionAbortController||state==='complete')
+            &&!session.listening&&!session.flushing&&!session.queue.length){
+            return true;
+        }
+        if(session.listening){
+            session.listening=false;
+            session.flushing=true;
+            session.captureState='stopped';
+            // stop() releases microphone tracks before waiting for its final worklet message.
+            const stopping=session.capture?.stop();
+            renderContinuousState(session);
+            try{
+                await stopping;
+            }catch(error){
+                if(isCurrentContinuousSession(session)){
+                    session.captureError=error;
+                    reportContinuousError(session,'capture',error);
+                }
+            }finally{
+                session.flushing=false;
+            }
+        }
+        if(!isCurrentContinuousSession(session)){
+            return false;
+        }
+        processContinuousQueue(session);
+        renderContinuousState(session);
+        return continuousDrain(session);
+    }
+
+    function retryTranscription(){
+        const session=continuousSession;
+        if(!session||!isCurrentContinuousSession(session)||!session.failure){
+            return false;
+        }
+        session.failure=null;
+        session.processing='idle';
+        processContinuousQueue(session);
+        renderContinuousState(session);
+        return true;
+    }
+
+    function releaseContinuousSession(){
+        const session=continuousSession;
+        if(!session){
+            return false;
+        }
+        continuousSession=null;
+        session.controller.abort();
+        session.requestController?.abort();
+        session.capture?.cancel();
+        session.queue=[];
+        for(const resolve of session.waiters.splice(0)){
+            resolve(false);
+        }
+        return true;
+    }
+
+    function cancelRecording(){
+        if(destroyed){
+            return false;
+        }
+        const hadContinuous=releaseContinuousSession();
+        completionAbortController?.abort();
+        completionAbortController=null;
+        if(hadContinuous){
+            sessionGeneration+=1;
+            reportSTTCancellation('user-cancelled',options.messages.cancelled);
+            return true;
+        }
+        return cancelSTTOperation('user-cancelled');
+    }
+
     async function startRecording(){
+        if(options.capture.mode==='continuous'){
+            return startContinuousRecording();
+        }
         if(!canStartVoiceRecording(sttRole,state,destroyed)){
             return false;
         }
@@ -433,6 +874,9 @@
     }
 
     function stopRecording(){
+        if(continuousSession){
+            return stopContinuousRecording(continuousSession);
+        }
         if(destroyed||state!=='recording'||recorder?.state!=='recording'){
             return false;
         }
@@ -670,11 +1114,24 @@
     }
 
     async function completeStream(){
-        if(destroyed||transcript.length===0||!['idle','error'].includes(state)){
+        if(destroyed||completionAbortController||state==='complete'){
+            return false;
+        }
+        if(continuousSession){
+            const session=continuousSession;
+            await stopContinuousRecording(session);
+            if(!isCurrentContinuousSession(session)||session.queue.length){
+                return false;
+            }
+        }
+        if(destroyed||completionAbortController||transcript.length===0
+            ||!['idle','error'].includes(state)){
             return false;
         }
         const generation=sessionGeneration;
         const completionTranscript=transcript;
+        const completionController=new AbortController();
+        completionAbortController=completionController;
         const complete=options.onComplete||(
             is.function(host.complete)?host.complete.bind(host):null
         );
@@ -686,7 +1143,16 @@
         }
         try{
             if(complete){
-                await complete({transcript:completionTranscript});
+                const input={transcript:completionTranscript};
+                if(continuousSession){
+                    input.signal=completionController.signal;
+                }
+                const result=await waitForContinuousOperation(
+                    complete(input),completionController.signal
+                );
+                if(result===false&&continuousSession){
+                    throw new Error('Transcription completion was not accepted.');
+                }
             }
             if(!isCurrentVoiceOperation(generation,'completing')){
                 return false;
@@ -714,10 +1180,20 @@
             arcaneLogging.error('Unable to complete transcription:',error);
             setState('error',options.messages.completeError);
             return false;
+        }finally{
+            if(completionAbortController===completionController){
+                completionAbortController=null;
+            }
         }
     }
 
     function supersedeForTranscriptReplacement(){
+        if(releaseContinuousSession()){
+            sessionGeneration+=1;
+            completionAbortController?.abort();
+            completionAbortController=null;
+            return true;
+        }
         const hadActiveOperation=[
             'starting',
             'transcribing',
@@ -728,6 +1204,8 @@
             return false;
         }
         sessionGeneration+=1;
+        completionAbortController?.abort();
+        completionAbortController=null;
         transcriptionAbortController?.abort();
         transcriptionAbortController=null;
         releaseMicrophone();
@@ -735,6 +1213,12 @@
     }
 
     function supersedeForConfigurationReplacement(){
+        if(releaseContinuousSession()){
+            sessionGeneration+=1;
+            completionAbortController?.abort();
+            completionAbortController=null;
+            return true;
+        }
         const hadActiveOperation=[
             'starting',
             'recording',
@@ -746,6 +1230,8 @@
             return false;
         }
         sessionGeneration+=1;
+        completionAbortController?.abort();
+        completionAbortController=null;
         transcriptionAbortController?.abort();
         transcriptionAbortController=null;
         releaseMicrophone();
@@ -784,9 +1270,11 @@
     }
 
     function clear(){
-        if(destroyed||!['complete','error','idle'].includes(state)){
+        if(destroyed||!['complete','error','idle'].includes(state)
+            ||continuousSession?.queue.length){
             return false;
         }
+        releaseContinuousSession();
         transcript='';
         renderTranscript();
         setState('idle',options.messages.ready);
@@ -813,6 +1301,17 @@
         startButton.innerText=options.labels.start;
         stopButton.innerText=options.labels.stop;
         completeButton.innerText=options.labels.complete;
+        retryButton.innerText=options.labels.retry;
+        cancelButton.innerText=options.labels.cancel;
+        completeButton.hidden=!options.showComplete;
+        controlsElement.dataset.simple=String(options.controls==='simple');
+        host.shadowRoot.querySelector('.voice-transcription').dataset.simple=
+            String(options.controls==='simple');
+        if(options.controls==='simple'){
+            description.after(controlsElement,feedbackElement,transcriptElement);
+        }else{
+            description.after(transcriptElement,feedbackElement,controlsElement);
+        }
     }
 
     function releaseMicrophone(){
@@ -857,6 +1356,22 @@
             arcaneLogging.error('Arcane transcription runtime failed.',sttRole.error);
         }
         sttActivationController.synchronize(sttRole);
+        if(continuousSession){
+            const session=continuousSession;
+            if(['completing','complete'].includes(state)){
+                renderState();
+                return;
+            }
+            if(session.processing==='transcribing'
+                &&(sttRole.state!=='ready'
+                    ||previousRole.providerId!==sttRole.providerId
+                    ||previousRole.modelId!==sttRole.modelId)){
+                session.requestController?.abort();
+            }
+            processContinuousQueue(session);
+            renderContinuousState(session);
+            return;
+        }
         if(previousRole.state==='ready'&&sttRole.state!=='ready'){
             if(cancelSTTOperation('runtime-unready')){
                 return;
@@ -866,6 +1381,13 @@
     }
 
     function cancelSTTOperation(reason){
+        if(releaseContinuousSession()){
+            sessionGeneration+=1;
+            completionAbortController?.abort();
+            completionAbortController=null;
+            reportSTTCancellation(reason,options.messages.cancelled);
+            return true;
+        }
         const hadActiveOperation=['starting','recording','transcribing'].includes(state)
             ||Boolean(mediaStream)
             ||Boolean(recorder)
@@ -917,13 +1439,26 @@
                 )
             )
         );
-        startButton.disabled=!canStartVoiceRecording(sttRole,state,destroyed);
-        startButton.title=recordingButtonTitle();
+        const session=continuousSession;
+        const continuousListening=Boolean(session?.listening);
+        const simpleStop=options.controls==='simple'&&continuousListening;
+        startButton.disabled=simpleStop?destroyed
+            :!canStartVoiceRecording(sttRole,state,destroyed)||Boolean(session?.queue.length);
+        startButton.innerText=simpleStop?options.labels.stop:options.labels.start;
+        startButton.title=simpleStop?options.labels.stop:recordingButtonTitle();
         startButton.setAttribute('aria-label',startButton.title);
-        stopButton.disabled=state!=='recording';
+        startButton.setAttribute('aria-pressed',String(continuousListening));
+        stopButton.hidden=options.controls==='simple'&&options.capture.mode==='continuous';
+        stopButton.disabled=destroyed||(session?!continuousListening:state!=='recording');
+        retryButton.hidden=!session?.failure;
+        retryButton.disabled=destroyed;
+        cancelButton.hidden=!session||session.listening
+            ||(!session.flushing&&!session.queue.length&&!completionAbortController);
+        cancelButton.disabled=destroyed;
         completeButton.disabled=destroyed
             ||transcript.length===0
-            ||!['idle','error'].includes(state);
+            ||!['idle','error'].includes(state)
+            ||Boolean(session?.queue.length||session?.flushing||session?.listening);
         sttActivationButton.hidden=destroyed||!sttActivationController.visible;
         sttActivationButton.disabled=destroyed
             ||sttActivationController.pending
@@ -945,13 +1480,15 @@
                 {
                     message:status.innerText,
                     state,
-                    stt:sttRole
+                    stt:sttRole,
+                    ...(session?continuousDetails(session):{})
                 }
             ),
             {
                 bubbles:true,
                 composed:true,
-                publicDetail:{message:status.innerText,state,stt:sttRole}
+                publicDetail:{message:status.innerText,state,stt:sttRole,
+                    ...(session?continuousDetails(session):{})}
             }
         );
     }
@@ -982,6 +1519,9 @@
         if(destroyed){
             return 'Transcription unavailable.';
         }
+        if(continuousSession){
+            return stateMessage;
+        }
         return sttRole.state==='ready'
             &&!sttRole.busy
             &&!sttActivationController.pending
@@ -1010,12 +1550,18 @@
             labels:{...options.labels},
             messages:{...options.messages},
             mediaConstraints:{...options.mediaConstraints},
+            capture:{...options.capture},
             mimeTypes:options.mimeTypes.slice()
         };
     }
 
     function handlePageHide(event){
         if(event.persisted===true){
+            if(continuousSession?.listening){
+                stopContinuousRecording(continuousSession).catch(function pageCaptureStopFailed(error){
+                    arcaneLogging.error('Unable to finish captured speech before page caching:',error);
+                });
+            }
             return;
         }
         destroy();
@@ -1037,6 +1583,8 @@
             return true;
         }
         destroyed=true;
+        completionAbortController?.abort();
+        completionAbortController=null;
         runtimeStateAbortController.abort();
         sttActivationController.destroy();
         window.removeEventListener('pagehide',handlePageHide);
