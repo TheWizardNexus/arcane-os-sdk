@@ -14,6 +14,12 @@
   rendering or profile readiness. Preserve unrelated body classes, custom theme
   values and saved profile data. Scoped `data-arcane-palette` previews may select
   their own `data-color-scheme` without changing the current page theme.
+- Extend the shared Install presentation with an explicit Update action after
+  a complete successful cache refresh detects a server-declared modification
+  or a new resource in an established inventory. Preserve change evidence
+  through interrupted refreshes and worker restarts. Initial fills, unchanged
+  resources and failed refreshes do not announce an update. Reload occurs only
+  on the user's action and preserves ordinary unsaved-work cancellation.
 
 ## 0.38.0
 
