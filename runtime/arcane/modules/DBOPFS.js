@@ -1049,165 +1049,194 @@ class DBOPFS {
     }
 
     /**
-     * Downloads the entire database as a compressed PNG backup.
+     * Creates a PNG backup without downloading or writing database records.
+     * JSON is deflated and framed with the existing little-endian payload
+     * length, then encoded in RGB channels with opaque alpha for restoration.
      *
-     * The database is streamed as JSON, compressed using gzip via
-     * CompressionStream, and encoded into RGBA pixels inside a PNG.
-     *
-     * Each pixel stores 4 bytes of payload data.
-     * The first 4 bytes store the gzip byte length header.
-     *
-     * Output example:
-     *
-     *     DBOPFS-backup-2026-03-10-13-45-12.png
-     *
-     * @param {string} name
-     * Base name used for the generated backup filename.
-     *
+     * @param {Object} options
+     * @param {string[]} [options.tableNames] Saved tables; omitted selects all.
+     * @param {Object<string,Object<string,*>>} [options.additionalTables]
+     * Caller-owned tables. Each replaces the matching saved table in this
+     * export only. Values must be JSON-serializable; no storage write occurs.
+     * @param {AbortSignal} [options.signal]
+     * Stops further preparation and prevents a subsequent download. Browser
+     * file reads and canvas encoding already in progress cannot be interrupted.
+     * @returns {Promise<Blob>} An image/png Blob in the existing backup format.
+     */
+    async createCompressedPNG({tableNames, additionalTables = {}, signal} = {}) {
+        signal?.throwIfAborted();
+        if (!('CompressionStream' in window)) {
+            throw new Error('CompressionStream not supported.');
+        }
+
+        await this.readyPromise;
+        signal?.throwIfAborted();
+        await this.getTableNames(true);
+        signal?.throwIfAborted();
+
+        function logicalTableName(name) {
+            return tableNameForDirectory(directoryNameForTable(name));
+        }
+
+        const selectedNames = new Set(
+            (tableNames === undefined ? Object.keys(this.#tableHandles) : tableNames)
+                .map(logicalTableName)
+        );
+        const suppliedTables = new Map();
+        for (const [name, records] of Object.entries(additionalTables)) {
+            const tableName = logicalTableName(name);
+            selectedNames.add(tableName);
+            suppliedTables.set(tableName, records);
+        }
+
+        const database = this;
+        const encoder = new TextEncoder();
+
+        async function* tableRecords(tableName) {
+            if (suppliedTables.has(tableName)) {
+                yield* Object.entries(suppliedTables.get(tableName));
+                return;
+            }
+
+            const table = database.#tableHandles[tableName];
+            if (!table) return;
+            for await (const [fileName] of table.entries()) {
+                signal?.throwIfAborted();
+                const value = await database.get(tableName, fileName);
+                signal?.throwIfAborted();
+                yield [fileName, value];
+            }
+        }
+
+        async function* encodeDatabase() {
+            yield encoder.encode('{');
+            let firstTable = true;
+            for (const tableName of selectedNames) {
+                signal?.throwIfAborted();
+                if (!firstTable) yield encoder.encode(',');
+                firstTable = false;
+                yield encoder.encode(`${JSON.stringify(tableName)}:{`);
+
+                let firstRecord = true;
+                for await (const [fileName, value] of tableRecords(tableName)) {
+                    signal?.throwIfAborted();
+                    if (!firstRecord) yield encoder.encode(',');
+                    firstRecord = false;
+                    const serialized = JSON.stringify(value);
+                    if (serialized === undefined) {
+                        throw new TypeError(`PNG record ${tableName}/${fileName} is not JSON-serializable.`);
+                    }
+                    yield encoder.encode(`${JSON.stringify(fileName)}:${serialized}`);
+                }
+                yield encoder.encode('}');
+            }
+            yield encoder.encode('}');
+        }
+
+        const encoded = encodeDatabase();
+        const jsonStream = new ReadableStream(
+            {
+                async pull(controller) {
+                    signal?.throwIfAborted();
+                    const {done, value} = await encoded.next();
+                    if (done) controller.close();
+                    else controller.enqueue(value);
+                },
+                async cancel() {
+                    await encoded.return();
+                }
+            }
+        );
+        const compressedStream = jsonStream.pipeThrough(
+            new CompressionStream('deflate'),
+            {signal}
+        );
+        const reader = compressedStream.getReader();
+        const chunks = [];
+        let totalLength = 0;
+        try {
+            while (true) {
+                const {done, value} = await reader.read();
+                signal?.throwIfAborted();
+                if (done) break;
+                chunks.push(value);
+                totalLength += value.length;
+            }
+        } finally {
+            reader.releaseLock();
+        }
+
+        // Length and channel offsets belong only to the existing PNG format.
+        const payload = new Uint8Array(totalLength + 4);
+        const view = new DataView(payload.buffer);
+        view.setUint32(0, totalLength, true);
+        let offset = 4;
+        for (const chunk of chunks) {
+            payload.set(chunk, offset);
+            offset += chunk.length;
+        }
+
+        const size = Math.ceil(Math.sqrt(payload.length / 3));
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            throw new Error('Canvas 2D context unavailable.');
+        }
+
+        const imgData = ctx.createImageData(size, size);
+        let position = 0;
+        for (let index = 0; index < imgData.data.length; index += 4) {
+            imgData.data[index] = payload[position] ?? 0;
+            imgData.data[index + 1] = payload[position + 1] ?? 0;
+            imgData.data[index + 2] = payload[position + 2] ?? 0;
+            imgData.data[index + 3] = 255;
+            position += 3;
+        }
+        ctx.putImageData(imgData, 0, 0);
+
+        const blob = await new Promise(
+            function encodeBackupPNG(resolve) {
+                canvas.toBlob(resolve, 'image/png');
+            }
+        );
+        signal?.throwIfAborted();
+        if (!blob) {
+            throw new Error('PNG export failed.');
+        }
+        return blob;
+    }
+
+    /**
+     * Downloads one PNG backup using the same options as createCompressedPNG.
+     * Existing one-argument callers still export the whole database.
+     * @param {string} name Base filename; an ISO timestamp is appended.
+     * @param {Object} options PNG table selection and optional signal.
      * @returns {Promise<void>}
      */
-    async downloadCompressedPNG(name='DBOPFS-backup'){
-        if(!('CompressionStream' in window)){
-            throw new Error('CompressionStream not supported.')
-        }
-
-        const encoder=new TextEncoder()
-        await this.getTableNames(true)
-
-        const tableNames=Object.keys(this.#tableHandles)
-
-        const jsonStream=new ReadableStream({
-            start:async controller=>{
-                controller.enqueue(encoder.encode('{'))
-
-                for(let t=0;t<tableNames.length;t++){
-                    const tableName=tableNames[t]
-                    const table=await this.getTableHandle(tableName)
-
-                    if(t>0){
-                        controller.enqueue(encoder.encode(','))
-                    }
-
-                    controller.enqueue(
-                        encoder.encode(`${JSON.stringify(tableName)}:{`)
-                    )
-
-                    let first=true
-
-                    for await(const [fileName]of table.entries()){
-                        const value=await this.get(tableName,fileName)
-
-                        if(!first){
-                            controller.enqueue(encoder.encode(','))
-                        }
-
-                        first=false
-
-                        const json=`${JSON.stringify(fileName)}:${JSON.stringify(value)}`
-
-                        controller.enqueue(encoder.encode(json))
-                    }
-
-                    controller.enqueue(encoder.encode('}'))
-                }
-
-                controller.enqueue(encoder.encode('}'))
-                controller.close()
-            }
-        })
-
-        const gzipStream=jsonStream.pipeThrough(
-            new CompressionStream('deflate')
-        )
-
-        const reader=gzipStream.getReader()
-
-        const chunks=[]
-        let totalLength=0
-
-        while(true){
-            const {done,value}=await reader.read()
-
-            if(done){
-                break
-            }
-
-            chunks.push(value)
-            totalLength+=value.length
-        }
-
-        const gzipBytes=new Uint8Array(totalLength)
-
-        let offset=0
-        for(const chunk of chunks){
-            gzipBytes.set(chunk,offset)
-            offset+=chunk.length
-        }
-
-        const payload=new Uint8Array(totalLength+4)
-
-        const view=new DataView(payload.buffer)
-        view.setUint32(0,totalLength,true)
-
-        payload.set(gzipBytes,4)
-
-        const size=Math.ceil(Math.sqrt(payload.length/3))
-
-        const totalPixels=size*size
-
-        if(totalPixels*3 < payload.length){
-            throw new Error('PNG canvas too small for payload.')
-        }
-
-        const canvas=document.createElement('canvas')
-        canvas.width=size
-        canvas.height=size
-
-        const ctx=canvas.getContext('2d')
-
-        if(!ctx){
-            throw new Error('Canvas 2D context unavailable.')
-        }
-
-        const imgData=ctx.createImageData(size,size)
-        imgData.data.fill(0);
-        
-        let p=0;
-
-        for(let i=0;i<imgData.data.length;i+=4){
-
-            imgData.data[i]   = payload[p]   ?? 0;
-            imgData.data[i+1] = payload[p+1] ?? 0;
-            imgData.data[i+2] = payload[p+2] ?? 0;
-            imgData.data[i+3] = 255;
-
-            p+=3;
-        }
-
-        ctx.putImageData(imgData,0,0)
-
-        const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'))
-
-        if(!blob){
-            throw new Error('PNG export failed.')
-        }
-
-        const stamp=new Date()
+    async downloadCompressedPNG(name = 'DBOPFS-backup', options = {}) {
+        const blob = await this.createCompressedPNG(options);
+        options.signal?.throwIfAborted();
+        const stamp = new Date()
             .toISOString()
-            .slice(0,19)
-            .replace(/[:T]/g,'-')
+            .slice(0, 19)
+            .replace(/[:T]/g, '-');
 
-        const url=URL.createObjectURL(blob)
+        const url = URL.createObjectURL(blob);
 
-        const a=document.createElement('a')
-        a.href=url
-        a.download=`${name}-${stamp}.png`
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${name}-${stamp}.png`;
 
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-
-        URL.revokeObjectURL(url)
+        try {
+            document.body.appendChild(a);
+            options.signal?.throwIfAborted();
+            a.click();
+        } finally {
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
     }
 
     /**
@@ -1229,13 +1258,17 @@ class DBOPFS {
      *
      * @param {File|Blob} file
      * PNG backup file generated by DBOPFS.
+     * @param {Object} options
+     * @param {function(Object): Object|Promise<Object>} [options.selectTables]
+     * Receives the complete decoded table/file map once, before writes. Only
+     * its returned map is restored; the application owns selection/projection.
      *
      * @returns {Promise<void>}
      * Resolves after every write succeeds. Rejected writes are collected after
      * all table batches settle and reported in an AggregateError with the
      * original reasons and table/file associations; successful writes remain.
      */
-    async restoreFromPNG(file){
+    async restoreFromPNG(file, {selectTables} = {}) {
         const img=await createImageBitmap(
             file,
             {premultiplyAlpha:'none'}
@@ -1248,7 +1281,7 @@ class DBOPFS {
             canvas.height = img.height;
 
             const ctx = canvas.getContext('2d');
-            if(!ctx) {
+            if (!ctx) {
                 throw new Error('Canvas 2D context unavailable.');
             }
 
@@ -1288,16 +1321,19 @@ class DBOPFS {
 
         const json=await new Response(stream).text()
 
-        const db=JSON.parse(json)
+        const decodedTables = JSON.parse(json);
+        const db = selectTables === undefined
+            ? decodedTables
+            : await selectTables(decodedTables);
 
         const tables=Object.keys(db)
 
         const failures = [];
-        for(const tableName of tables) {
+        for (const tableName of tables) {
             const fileNames = Object.keys(db[tableName]);
             const results = await this.setMany(tableName, db[tableName]);
-            for(const [index, result] of results.entries()) {
-                if(result.status === 'rejected') {
+            for (const [index, result] of results.entries()) {
+                if (result.status === 'rejected') {
                     failures.push(
                         {tableName, fileName: fileNames[index], reason: result.reason}
                     );
@@ -1305,11 +1341,13 @@ class DBOPFS {
             }
         }
 
-        if(failures.length > 0) {
+        if (failures.length > 0) {
             const error = new AggregateError(
-                failures.map(function restoreWriteReason(failure) {
-                    return failure.reason;
-                }),
+                failures.map(
+                    function restoreWriteReason(failure) {
+                        return failure.reason;
+                    }
+                ),
                 'PNG restore could not save every record.'
             );
             error.code = 'DBOPFS_RESTORE_WRITE_FAILED';

@@ -1986,9 +1986,33 @@ default `DBOPFS`; installs `window.dbopfs`, emits `dbopfs-ready`; table/file/bac
 
 Exact exports: `DBOPFS_EVENT_TYPES`, `DBOPFS_REASONS`, `default`.
 
-`restoreFromPNG(file)` preserves the existing deflate/RGB backup format and
+`createCompressedPNG({tableNames, additionalTables, signal})` returns an
+`image/png` Blob without downloading or writing records. Omitted `tableNames`
+selects all discovered saved tables; `[]` selects none. Named absent tables
+are encoded as empty tables without creating OPFS directories. The existing
+`memories`/`memory` alias is retained. `additionalTables` is an application-owned
+`{tableName:{fileName:value}}` map. Each supplied table replaces the matching
+saved table in this export only, rather than inheriting records the caller did
+not select. Values retain the existing JSON serialization contract. Applications
+own recipient policy, profile projections, and any product format marker.
+
+`downloadCompressedPNG(name, options)` uses that same method and its options,
+then initiates one timestamp-named download. Existing `downloadCompressedPNG(name)`
+calls retain full-database behavior. An optional `AbortSignal` stops further
+record preparation and prevents a later download. File reads and browser canvas
+encoding already in progress cannot be interrupted; their result is discarded
+on cancellation. No object URL or download is created by `createCompressedPNG`.
+
+`restoreFromPNG(file, {selectTables})` preserves the existing deflate/RGB backup format and
 restores through `setMany()` without changing its settled-result API or per-key
-write ordering. Restore resolves only when every record write succeeds. It
+write ordering. The optional callback receives the complete decoded table/file
+map exactly once and may return a map or promise of a map. Only its returned
+tables and records are written, allowing application-owned selection and
+projection of older full backups without a second decoder or temporary storage
+writes. Callback failure rejects before any writes. With no callback, all
+decoded tables are restored as before.
+
+Restore resolves only when every selected record write succeeds. It
 continues the table batches after individual rejected writes, then rejects an
 `AggregateError` with code `DBOPFS_RESTORE_WRITE_FAILED`, original reasons in
 `errors`, and `failures` entries `{tableName, fileName, reason}`. Successful
