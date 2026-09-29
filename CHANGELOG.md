@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.41.0
+
+- Add `createTwinCloudTTSProvider` through `arcane-os/ai/browser-speech`,
+  retaining `createDigitalOceanFalTTSProvider` as the identical compatibility
+  function. Existing provider IDs, credentials, models, voices and endpoints
+  remain unchanged; no saved-data migration is performed.
+- Submit cloud synthesis jobs immediately through the existing whole-job
+  capacity owner. Queue only follow-up status and audio GET operations through
+  one provider-local published `js-queue`, with independently configurable
+  `followUpQueue: {maxConcurrentRequests: 4, intervalMs: 250}` defaults.
+  Follow-up slots remain occupied through complete response-body consumption,
+  with spacing between actual dispatch starts and ordered same-job requeue.
+- Preserve per-job Retry-After eligibility, bounded retries, cancellation and
+  unload without delaying eligible siblings or replaying ambiguous paid
+  submissions. Existing ordered playback, enabled speech intent and local
+  Whisper/Kokoro provider paths remain unchanged.
+
 ## 0.40.1
 
 - Include complete selected local resource URL variants in generated static
