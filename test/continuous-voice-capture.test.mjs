@@ -23,7 +23,7 @@ const [captureSource, workletSource] = await Promise.all([
     readFile(new URL('../runtime/arcane/modules/VoiceCaptureWorklet.js', import.meta.url), 'utf8')
 ]);
 
-function createWorkletFixture(options = {}, onMessage = function observeMessage() {}) {
+function createWorkletFixture(options = {}, onMessage = function observeMessage() {}, sampleRate = 1000) {
     const messages = [];
     let Processor;
     class FakeAudioWorkletProcessor {
@@ -39,7 +39,7 @@ function createWorkletFixture(options = {}, onMessage = function observeMessage(
     }
     const context = createContext({
         AudioWorkletProcessor: FakeAudioWorkletProcessor,
-        sampleRate: 1000,
+        sampleRate,
         registerProcessor(name, Constructor) {
             assert.equal(name, 'arcane-continuous-voice-capture');
             Processor = Constructor;
@@ -570,18 +570,21 @@ test(
         assert.equal(silent.segments.length, 0);
         assert.equal(silent.messages.at(-1).type, 'stopped');
 
-        const capture = createWorkletFixture();
-        const quiet = [0, 0.001, 0.002, 0.003, 0.004, 0.005];
+        const capture = createWorkletFixture({chunkMs:100});
+        const quiet = new Array(20).fill(0.005);
+        const active = new Array(20).fill(0.25);
         capture.feed(quiet);
-        capture.feed([0.25, -0.5, 0, 0, 0]);
+        capture.feed(active);
+        capture.feed(new Array(20).fill(0));
         assert.equal(capture.segments.length, 1);
         const first = capture.segments[0];
         assert.equal(first.reason, 'pause');
         assert.equal(first.sequence, 1);
-        assert.equal(first.durationMs, 9);
+        assert.equal(first.durationMs, 27);
         assert.deepEqual(wavSamples(first.audio), Array.from(Float32Array.from([
-            0.002, 0.003, 0.004, 0.005, 0.25, -0.5, 0, 0, 0
+            ...quiet.slice(-4), ...active, 0, 0, 0
         ])));
+        capture.feed(new Array(20).fill(0.006));
         capture.feed([0.006, 0.007, 0.5]);
         capture.stop();
         assert.equal(capture.segments.length, 2);
@@ -589,17 +592,155 @@ test(
         assert.equal(last.sequence, 2);
         assert.equal(last.reason, 'stop');
         assert.deepEqual(wavSamples(last.audio), Array.from(Float32Array.from([
-            0.006, 0.007, 0.5
+            0.006, 0.006, 0.006, 0.006, 0.006, 0.007, 0.5
         ])));
         assert.equal(capture.messages.at(-1).type, 'stopped');
 
         const longerPreRoll = createWorkletFixture({preRollMs: 6, chunkMs: 3});
-        longerPreRoll.feed([0, 0.001, 0.002, 0.003, 0.004, 0.005, 0.5]);
+        longerPreRoll.feed([
+            ...new Array(14).fill(0), 0, 0.001, 0.002, 0.003, 0.004, 0.005
+        ]);
+        longerPreRoll.feed([0.5]);
         longerPreRoll.stop();
         assert.equal(longerPreRoll.segments[0].durationMs, 7);
         assert.deepEqual(wavSamples(longerPreRoll.segments[0].audio), Array.from(Float32Array.from([
             0, 0.001, 0.002, 0.003, 0.004, 0.005, 0.5
         ])));
+    }
+);
+
+test(
+    'capture quiet gaps use fixed audio windows despite brief background peaks and callback sizes',
+    function testQuietGapWithBackgroundPeaks() {
+        const sampleRate = 48000;
+        const samples = new Float32Array(sampleRate * 5);
+        for (let index = 0; index < samples.length; index += 1) {
+            samples[index] = index < sampleRate
+                ? 0.2 * Math.sin(2 * Math.PI * 220 * index / sampleRate)
+                : index % 9600 < 192 ? 0.04 : 0.002;
+        }
+        const options = {preRollMs:1500,quietMs:1000,chunkMs:10000,activityThreshold:0.02};
+        for (const blockLengths of [[128], [37, 251, 83]]) {
+            const capture = createWorkletFixture(options, undefined, sampleRate);
+            let offset = 0;
+            let block = 0;
+            while (offset < samples.length) {
+                const end = Math.min(samples.length, offset + blockLengths[block % blockLengths.length]);
+                capture.feed(samples.subarray(offset, end));
+                offset = end;
+                block += 1;
+            }
+            assert.deepEqual(capture.segments.map(function boundary(segment) {
+                return [segment.sequence, segment.reason, segment.durationMs];
+            }), [[1, 'pause', 2000]], 'The pause segment is delivered while capture remains live.');
+            assert.deepEqual(wavSamples(capture.segments[0].audio), Array.from(samples.subarray(0, sampleRate * 2)));
+            capture.stop();
+            assert.equal(capture.segments.length, 1, 'The following quiet audio does not create another clip.');
+        }
+    }
+);
+
+test(
+    'capture pauses on the reported sine-wave noise gaps at default and caller-selected RMS sensitivity',
+    function testReportedSineWaveGaps() {
+        const sampleRate = 48000;
+        for (const briefPeaks of [true, false]) {
+            const samples = new Float32Array(sampleRate * 5);
+            for (let index = 0; index < samples.length; index += 1) {
+                const time = index / sampleRate;
+                const amplitude = time < 1 ? 0.2
+                    : briefPeaks && time % 0.2 < 0.004 ? 0.04 : 0.002;
+                samples[index] = amplitude * Math.sin(2 * Math.PI * 220 * time);
+            }
+            for (const activityThreshold of [0.02, 0.014]) {
+                const capture = createWorkletFixture(
+                    {preRollMs:1500,quietMs:1000,chunkMs:10000,activityThreshold},
+                    undefined,
+                    sampleRate
+                );
+                capture.feed(samples);
+                assert.deepEqual(capture.segments.map(function boundary(segment) {
+                    return [segment.sequence, segment.reason, segment.durationMs];
+                }), [[1, 'pause', 2000]], 'The sine-wave gap is delivered before Stop.');
+                assert.deepEqual(wavSamples(capture.segments[0].audio), Array.from(samples.subarray(0, sampleRate * 2)));
+                capture.stop();
+                assert.equal(capture.segments.length, 1);
+            }
+        }
+    }
+);
+
+test(
+    'capture activityThreshold measures RMS and preserves softer trailing audio',
+    function testRmsThresholdAndTrailingAudio() {
+        const below = createWorkletFixture();
+        below.feed(new Array(20).fill(0.0199));
+        below.stop();
+        assert.equal(below.segments.length, 0);
+
+        const above = createWorkletFixture({preRollMs:0,quietMs:40,chunkMs:100});
+        const active = new Array(20).fill(0.0201);
+        const trailing = new Array(7).fill(0.0199);
+        above.feed(active);
+        above.feed(trailing);
+        above.stop();
+        assert.equal(above.segments.length, 1);
+        assert.equal(above.segments[0].reason, 'stop');
+        assert.deepEqual(wavSamples(above.segments[0].audio), Array.from(Float32Array.from([...active, ...trailing])));
+
+        const sampleRate = 48000;
+        const lowSine = new Float32Array(sampleRate / 5);
+        for (let index = 0; index < lowSine.length; index += 1) {
+            lowSine[index] = 0.025 * Math.sin(2 * Math.PI * 220 * index / sampleRate);
+        }
+        const peakAboveRmsBelow = createWorkletFixture({}, undefined, sampleRate);
+        peakAboveRmsBelow.feed(lowSine);
+        peakAboveRmsBelow.stop();
+        assert.equal(peakAboveRmsBelow.segments.length, 0, 'A peak above the threshold is not sustained RMS activity.');
+    }
+);
+
+test(
+    'capture caller-selected RMS sensitivity retains soft sine audio, pre-roll and a partial quiet tail',
+    function testSelectedSoftAudioThreshold() {
+        const sampleRate = 48000;
+        const leadingFrames = sampleRate / 10;
+        const activeFrames = sampleRate;
+        const trailingFrames = sampleRate * 7 / 1000;
+        const samples = new Float32Array(leadingFrames + activeFrames + trailingFrames);
+        for (let index = 0; index < samples.length; index += 1) {
+            samples[index] = index >= leadingFrames && index < leadingFrames + activeFrames
+                ? 0.025 * Math.sin(2 * Math.PI * 220 * (index - leadingFrames) / sampleRate)
+                : 0.002;
+        }
+        const capture = createWorkletFixture(
+            {preRollMs:1500,quietMs:1000,chunkMs:10000,activityThreshold:0.014},
+            undefined,
+            sampleRate
+        );
+        capture.feed(samples);
+        assert.equal(capture.segments.length, 0);
+        capture.stop();
+        assert.deepEqual(capture.segments.map(function boundary(segment) {
+            return [segment.sequence, segment.reason, segment.durationMs];
+        }), [[1, 'stop', 1107]]);
+        assert.deepEqual(wavSamples(capture.segments[0].audio), Array.from(samples));
+    }
+);
+
+test(
+    'capture stop classifies a short final burst using its actual samples without padding',
+    function testPartialAnalysisWindow() {
+        const capture = createWorkletFixture({preRollMs:0});
+        const samples = new Array(7).fill(0.025);
+        capture.feed(samples);
+        assert.equal(capture.segments.length, 0);
+        capture.stop();
+        capture.stop();
+        assert.deepEqual(capture.segments.map(function boundary(segment) {
+            return [segment.sequence, segment.reason, segment.durationMs];
+        }), [[1, 'stop', 7]]);
+        assert.deepEqual(wavSamples(capture.segments[0].audio), Array.from(Float32Array.from(samples)));
     }
 );
 
@@ -669,14 +810,17 @@ test(
 test(
     'capture worklet periodic boundaries preserve adjacent samples and flush once',
     function testPeriodicAdjacency() {
-        const capture = createWorkletFixture({preRollMs: 0, chunkMs: 4, quietMs: 8});
-        const original = [0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1, -0.5, -0.25];
+        const capture = createWorkletFixture({preRollMs: 0, chunkMs: 20, quietMs: 80});
+        const original = Array.from({length:45}, function alternatingSample(unused, index) {
+            return index % 2 ? 0.25 : -0.5;
+        });
         capture.feed(original);
+        assert.equal(capture.segments.length, 2, 'Periodic clips arrive before Stop.');
         capture.stop();
         capture.stop();
         assert.deepEqual(capture.segments.map(function boundary(segment) {
             return [segment.sequence, segment.reason, segment.durationMs];
-        }), [[1, 'periodic', 4], [2, 'periodic', 4], [3, 'stop', 2]]);
+        }), [[1, 'periodic', 20], [2, 'periodic', 20], [3, 'stop', 5]]);
         assert.deepEqual(capture.segments.flatMap(function decode(segment) {
             return wavSamples(segment.audio);
         }), original);
@@ -686,9 +830,15 @@ test(
         assert.equal(capture.processor.process([[]], [[]]), false);
 
         const quietContinuation = createWorkletFixture({preRollMs: 0, chunkMs: 4, quietMs: 3});
-        quietContinuation.feed([0.125, 0.25, 0.375, 0.5, 0, 0, 0, 0, 0]);
+        const active = new Array(20).fill(0.25);
+        quietContinuation.feed(active);
+        assert.equal(quietContinuation.segments.length, 5);
+        quietContinuation.feed(new Array(20).fill(0));
         quietContinuation.stop();
-        assert.equal(quietContinuation.segments.length, 1);
+        assert.equal(quietContinuation.segments.length, 5);
+        assert.deepEqual(quietContinuation.segments.flatMap(function decode(segment) {
+            return wavSamples(segment.audio);
+        }), active);
     }
 );
 

@@ -1393,7 +1393,7 @@
       "summary": "Segments microphone samples on the audio rendering thread and transfers complete mono Float32 WAV clips to ContinuousVoiceCapture.",
       "availability": "AudioWorkletGlobalScope",
       "protocol": "AudioWorklet processor arcane-continuous-voice-capture and its owner-local MessagePort",
-      "normalization": "Rolling pre-roll, amplitude activity, quiet and periodic boundaries, sequence, complete WAV audio, and stop acknowledgement are owned here. Silence does not emit clips; adjacent periodic clips have no repeated samples.",
+      "normalization": "Rolling pre-roll, fixed 20 ms RMS activity windows independent of callback length, audio-frame quiet duration, periodic boundaries, sequence, complete original WAV audio, and stop acknowledgement are owned here. activityThreshold is RMS amplitude, not peak amplitude. Stop classifies a partial final window using its actual samples and retains softer trailing audio in the active clip. Inactive capture emits no clips; adjacent periodic clips have no repeated samples.",
       "surface": "No ESM exports. ContinuousVoiceCapture loads this static worklet, supplies processorOptions, receives segment messages, and requests stop followed by the stopped acknowledgement."
     },
     {

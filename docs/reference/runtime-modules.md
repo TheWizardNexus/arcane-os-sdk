@@ -4069,7 +4069,7 @@ Load with a stylesheet link before rendering uPlot charts.
 ### Overview
 
 Internal audio processor for [`ContinuousVoiceCapture.js`](#continuousvoicecapturejs).
-It keeps rolling pre-roll, detects audio amplitude, preserves complete active
+It keeps rolling pre-roll, detects RMS audio level, preserves complete active
 audio through quiet and periodic cuts, and encodes mono Float32 WAV clips on
 the audio rendering thread. It performs no semantic speech detection or STT.
 
@@ -4079,6 +4079,22 @@ No ESM exports. The capture owner loads this static file with
 `audioContext.audioWorklet.addModule()` and creates the
 `arcane-continuous-voice-capture` processor with
 `{preRollMs,quietMs,chunkMs,activityThreshold}` in `processorOptions`.
+`activityThreshold` measures root-mean-square amplitude over fixed 20 ms
+windows counted from the audio sample rate, independently of browser callback
+lengths. Brief peaks do not reset the quiet duration when the window's RMS
+remains below that threshold. This is an RMS threshold, not a peak threshold:
+a sine wave with peak amplitude `0.025` can remain below the default `0.02`
+RMS threshold. Applications can select the existing threshold for their audio
+level; no relative-noise or semantic speech classifier is implied.
+
+Classification selects segment boundaries without modifying the captured
+samples. Quiet duration advances by audio frames, pre-roll remains complete,
+and periodic clips remain adjacent. Stop classifies any partial final window
+using its actual samples and flushes the final active clip, including softer
+trailing audio before the quiet boundary. Analysis adds at most one 20 ms
+window of capture-to-segmentation delay; model processing is independently
+owned by the transcription queue.
+
 The owner sends `{type:'stop'}`. The processor transfers each complete
 `{type:'segment',audio:ArrayBuffer,sampleRate,sequence,reason,durationMs}`
 and finally `{type:'stopped'}`. Each complete WAV includes its own format,

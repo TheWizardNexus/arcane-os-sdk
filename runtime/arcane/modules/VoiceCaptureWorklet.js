@@ -7,6 +7,9 @@ class ArcaneVoiceCaptureProcessor extends AudioWorkletProcessor {
     #quietFrames;
     #chunkFrames;
     #activityThreshold;
+    #analysisSamples;
+    #analysisCount = 0;
+    #analysisEnergy = 0;
     #active = false;
     #hasActivity = false;
     #quietCount = 0;
@@ -25,6 +28,9 @@ class ArcaneVoiceCaptureProcessor extends AudioWorkletProcessor {
         this.#quietFrames = Math.max(1, Math.round(configuration.quietMs * sampleRate / 1000));
         this.#chunkFrames = Math.max(1, Math.round(configuration.chunkMs * sampleRate / 1000));
         this.#activityThreshold = configuration.activityThreshold;
+        // Measure sustained loudness, not individual peaks. The audio clock
+        // owns this fixed 20 ms window, independently of callback block sizes.
+        this.#analysisSamples = new Float32Array(Math.max(1, Math.round(sampleRate * 0.02)));
         this.port.onmessage = this.#receiveControl.bind(this);
     }
 
@@ -32,6 +38,7 @@ class ArcaneVoiceCaptureProcessor extends AudioWorkletProcessor {
         if (this.#stopped || event.data.type !== 'stop') return;
         this.#stopped = true;
         try {
+            this.#flushAnalysis();
             this.#emit('stop');
             this.#release();
             this.port.postMessage(
@@ -50,15 +57,33 @@ class ArcaneVoiceCaptureProcessor extends AudioWorkletProcessor {
         const samples = inputs[0]?.[0];
         if (!samples) return true;
         try {
-            for (const sample of samples) this.#capture(sample);
+            for (const sample of samples) {
+                this.#analysisSamples[this.#analysisCount] = sample;
+                this.#analysisCount += 1;
+                this.#analysisEnergy += sample * sample;
+                if (this.#analysisCount === this.#analysisSamples.length) {
+                    this.#flushAnalysis();
+                }
+            }
         } catch (error) {
             this.#fail(error);
         }
         return !this.#stopped;
     }
 
-    #capture(sample) {
-        const activity = Math.abs(sample) > this.#activityThreshold;
+    #flushAnalysis() {
+        if (!this.#analysisCount) return;
+        const activity = Math.sqrt(this.#analysisEnergy / this.#analysisCount) > this.#activityThreshold;
+        // Classification selects boundaries only. Every original sample still
+        // enters capture in order, including a partial final analysis window.
+        for (let index = 0; index < this.#analysisCount; index += 1) {
+            this.#capture(this.#analysisSamples[index], activity);
+        }
+        this.#analysisCount = 0;
+        this.#analysisEnergy = 0;
+    }
+
+    #capture(sample, activity) {
         if (!this.#active) {
             if (!activity) {
                 this.#retainPreRoll(sample);
@@ -185,6 +210,9 @@ class ArcaneVoiceCaptureProcessor extends AudioWorkletProcessor {
         this.#view = null;
         this.#preRoll = new Float32Array(0);
         this.#preRollLength = 0;
+        this.#analysisSamples = new Float32Array(0);
+        this.#analysisCount = 0;
+        this.#analysisEnergy = 0;
         this.#sampleCount = 0;
         this.#hasActivity = false;
         this.#active = false;
