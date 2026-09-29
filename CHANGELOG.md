@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.40.0
+
+- Add optional `arcane-package.json` `outputDirectory` to select the final
+  workspace-relative package directory without an appended application ID.
+  For example, `"ai"` selects `<workspace>/ai`; omission preserves `dist/<id>`.
+  Descriptor refresh retains this package-local setting, and preview,
+  verification, bundles and native browser-content inputs use the selected
+  root. Source layout, app identity and internal release URLs are unchanged.
+  Packaging replaces only the selected destination through its existing staged
+  swap, preserving old destinations and siblings when that selection changes.
+- Serve selected cached static HTML documents for navigation query variants
+  without redirecting or losing the requested URL. Exact selected query
+  variants retain precedence; a missing cached document fetches the original
+  request without replacing the canonical cached body. Assets, API requests,
+  non-navigation requests and update/refresh lifecycle remain unchanged.
+
 ## 0.39.1
 
 - Preserve the Markdown editor's current source viewport and selection during
