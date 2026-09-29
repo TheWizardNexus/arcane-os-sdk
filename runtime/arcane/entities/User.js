@@ -110,6 +110,7 @@ function userEntityLifecycleError(code,reason,message){
  * @property {string|number} contact_4
  * @property {string|number} contact_5
  * @property {string|number} contact_6
+ * @property {string} AI_name
  * @property {string} AI_personality
  * @property {string} religion
  * @property {string} AI_voice
@@ -176,6 +177,7 @@ class UserEntity {
         'contact_5',
         'contact_6',
 
+        'AI_name',
         'AI_personality',
         'religion',
         'AI_voice',
@@ -211,6 +213,7 @@ class UserEntity {
     #contact_5 = '';
     #contact_6 = '';
 
+    #aiName = '';
     #AI_personality = '';
     #religion = '';
     #AI_voice = '';
@@ -514,6 +517,22 @@ class UserEntity {
     }
 
 
+
+    /** @returns {string} */
+    get AI_name() {
+        return this.#aiName;
+    }
+
+    /** @param {string} v */
+    set AI_name(v) {
+        if (!is.string(v)) {
+            throw new Error('AI_name must be string');
+        }
+
+        this.#aiName = v;
+
+        this.#persist();
+    }
 
     /** @returns {string} */
     get AI_personality(){
@@ -889,6 +908,7 @@ class UserEntity {
                     this.persist=persist;
                 }
 
+                baseline = this.explicit;
                 const conditional=is.function(src);
                 const update=conditional?await src(this.explicit):src;
                 if(conditional&&update===null){

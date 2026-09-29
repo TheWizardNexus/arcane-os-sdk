@@ -73,11 +73,15 @@ async function createUserFixture() {
             }
         },
         function createEvents() {
-            return {dispose() { return true; }};
+            return {
+                instanceId: 'user-profile-fixture',
+                dispatch(type, detail) {
+                    return {occurrence: {type, detail}};
+                },
+                dispose() { return true; }
+            };
         },
-        function projectEvent() {
-            throw new Error('The update fixture does not dispatch storage readiness.');
-        },
+        function projectEvent() {},
         window,
         dbopfs,
         browser
@@ -103,6 +107,7 @@ async function createUserFixture() {
         replaceDurable(update) {
             durableJSON = JSON.stringify({...JSON.parse(durableJSON), ...update});
         },
+        createUser() { return new UserEntity(user.fileName); },
         failNextSave(error) { saveError = error; }
     };
 }
@@ -114,6 +119,166 @@ function deferred() {
     });
     return {promise, resolve};
 }
+
+test(
+    'User AI_name defaults to empty and loading an older record does not rewrite storage',
+    async function aiNameDefaultAndOlderRecord() {
+        const fixture = await createUserFixture();
+        assert.equal(fixture.user.AI_name, '');
+        assert.equal(fixture.user.explicit.AI_name, '');
+        assert.equal(JSON.parse(fixture.user.toJSON()).AI_name, '');
+        fixture.replaceDurable(
+            {AI_name: undefined, AI_personality: 'A patient comet cartographer'}
+        );
+        const olderRecord = fixture.durable();
+        assert.equal(Object.hasOwn(olderRecord, 'AI_name'), false);
+
+        const loaded = await fixture.user.load();
+
+        assert.equal(loaded.AI_name, '');
+        assert.equal(fixture.user.AI_name, '');
+        assert.equal(fixture.user.AI_personality, olderRecord.AI_personality);
+        assert.equal(fixture.user.ready, true);
+        assert.deepEqual(fixture.durable(), olderRecord);
+        assert.deepEqual(fixture.writes, []);
+    }
+);
+
+test(
+    'User AI_name preserves complete strings and the existing persistence setting',
+    async function aiNameCompleteString() {
+        const fixture = await createUserFixture();
+        const name = ' \tCaptain 🌙 e\u0301 雪\n  ';
+        const durable = fixture.durable();
+        fixture.user.persist = false;
+        fixture.user.AI_name = name;
+
+        assert.equal(fixture.user.AI_name, name);
+        assert.equal(fixture.user.explicit.AI_name, name);
+        assert.equal(JSON.parse(fixture.user.toJSON()).AI_name, name);
+        assert.deepEqual(fixture.durable(), durable);
+        assert.deepEqual(fixture.reads, []);
+        assert.deepEqual(fixture.writes, []);
+        assert.throws(
+            function assignNonStringName() {
+                fixture.user.AI_name = 42;
+            },
+            {message: 'AI_name must be string'}
+        );
+        assert.equal(fixture.user.AI_name, name);
+
+        fixture.user.AI_name = '';
+        assert.equal(fixture.user.AI_name, '');
+        assert.equal(fixture.user.persist, false);
+        assert.deepEqual(fixture.writes, []);
+    }
+);
+
+test(
+    'User AI_name persists through explicit updates and reloads without changing other preferences',
+    async function aiNamePersistenceAndReload() {
+        const fixture = await createUserFixture();
+        const name = ' \tCaptain 🌙 e\u0301 雪\n  ';
+        fixture.replaceDurable(
+            {username: 'Moon librarian', AI_personality: 'A patient comet cartographer'}
+        );
+        const baseline = fixture.durable();
+        const saved = await fixture.user.updateExplicit(
+            {AI_name: name}
+        );
+
+        assert.deepEqual(saved, {...baseline, AI_name: name});
+        assert.deepEqual(fixture.durable(), saved);
+        assert.equal(fixture.writes.length, 1);
+        const reloaded = fixture.createUser();
+        assert.equal(reloaded.AI_name, '');
+        assert.deepEqual(await reloaded.load(), saved);
+        assert.equal(reloaded.AI_name, name);
+        assert.equal(JSON.parse(reloaded.toJSON()).AI_name, name);
+        assert.equal(fixture.writes.length, 1);
+
+        const updated = await reloaded.updateExplicit(
+            function updatePersonality(current) {
+                assert.equal(current.AI_name, name);
+                return {AI_personality: 'An enthusiastic orbit gardener'};
+            }
+        );
+        assert.deepEqual(updated, {...saved, AI_personality: 'An enthusiastic orbit gardener'});
+        assert.deepEqual(await fixture.user.refresh(), updated);
+
+        const cleared = await fixture.user.updateExplicit('{"AI_name":""}');
+        assert.deepEqual(cleared, {...updated, AI_name: ''});
+        assert.deepEqual(fixture.durable(), cleared);
+    }
+);
+
+test(
+    'User AI_name save failure restores the fresh durable name and allows later updates',
+    async function aiNameSaveRollback() {
+        const fixture = await createUserFixture();
+        const name = '  Comet 雪\n';
+        fixture.replaceDurable(
+            {AI_name: name, AI_personality: 'A patient comet cartographer', phone: '555-0184'}
+        );
+        const baseline = fixture.durable();
+        const failure = new Error('The synthetic AI-name save failed.');
+        fixture.failNextSave(failure);
+
+        await assert.rejects(
+            fixture.user.updateExplicit(
+                function chooseName(current) {
+                    assert.equal(current.AI_name, name);
+                    return {AI_name: 'Jupiter gardener'};
+                }
+            ),
+            function originalNameSaveFailure(error) {
+                assert.equal(error, failure);
+                return true;
+            }
+        );
+        assert.deepEqual(fixture.user.explicit, baseline);
+        assert.equal(fixture.user.AI_name, name);
+        assert.deepEqual(fixture.durable(), baseline);
+        assert.equal(fixture.user.persist, true);
+        assert.equal(fixture.activeLocks, 0);
+
+        const recovered = await fixture.user.updateExplicit(
+            {AI_name: 'Jupiter gardener'}
+        );
+        assert.deepEqual(recovered, {...baseline, AI_name: 'Jupiter gardener'});
+        assert.deepEqual(fixture.durable(), recovered);
+    }
+);
+
+test(
+    'User AI_name failed save on an older record restores the empty default without migrating storage',
+    async function aiNameOlderRecordRollback() {
+        const fixture = await createUserFixture();
+        fixture.replaceDurable(
+            {AI_name: undefined, username: 'Fresh comet librarian', phone: '555-0185'}
+        );
+        const olderRecord = fixture.durable();
+        const failure = new Error('The synthetic older-profile save failed.');
+        fixture.failNextSave(failure);
+
+        await assert.rejects(
+            fixture.user.updateExplicit(
+                {AI_name: 'Jupiter gardener'}
+            ),
+            function originalOlderProfileFailure(error) {
+                assert.equal(error, failure);
+                return true;
+            }
+        );
+        assert.equal(fixture.user.AI_name, '');
+        assert.deepEqual(fixture.user.explicit, {...olderRecord, AI_name: ''});
+        assert.deepEqual(fixture.durable(), olderRecord);
+        assert.equal(Object.hasOwn(fixture.durable(), 'AI_name'), false);
+        assert.equal(fixture.writes.length, 1);
+        assert.equal(fixture.user.persist, true);
+        assert.equal(fixture.activeLocks, 0);
+    }
+);
 
 test('User conditional updates compare the fresh durable profile and preserve unrelated fields', async function freshConditionalUpdate() {
     const fixture = await createUserFixture();

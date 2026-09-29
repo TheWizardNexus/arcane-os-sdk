@@ -274,6 +274,29 @@ Owns persisted user preference/profile fields, explicit-preference updates,
 fresh reads, saves, and JSON projection. It installs `window.user` after its
 DBLS/DBOPFS lifecycle and emits `user-entity-loaded`.
 
+### AI_name
+
+Saved AI-name preference alongside `AI_personality`. It is a string with an
+empty-string default and preserves the complete supplied text, including
+Unicode, whitespace, and an explicitly empty value. The property setter follows
+the same persistence setting as `AI_personality`; non-string assignments throw
+`Error('AI_name must be string')`.
+
+`explicit`, `toJSON()`, `load()`, `refresh()`, and `updateExplicit()` include
+this field through the existing profile schema. Loading an older record that
+omits it leaves a new entity's empty default in memory and does not rewrite the
+stored record. Partial updates that omit it retain the current value.
+
+```javascript
+await user.updateExplicit(
+    {AI_name: 'Captain Moonboots'}
+);
+```
+
+The application owns naming choices and any mapping to its AI display name;
+this preference changes neither the human `username` nor chat history. No
+automatic migration or naming policy runs when it is loaded or saved.
+
 ### updateExplicit(update)
 
 Accepts an ordinary partial profile object, a JSON string, or a function
