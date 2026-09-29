@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.36.1
+
+- Infer ordinary audio MIME types from mp3, wav, ogg, oga, opus, aac, m4a,
+  flac and weba filenames when stored files have no supplied MIME metadata.
+  Native file previews can select audio controls without decoding audio as text.
+- Preserve supplied MIME types, existing non-audio classification, the original
+  file and complete payload. An untyped webm remains ambiguous and retains its
+  ordinary download behavior. No stored files are rewritten.
+
 ## 0.36.0
 
 - Add optional continuous microphone capture to `voice-transcription` through
