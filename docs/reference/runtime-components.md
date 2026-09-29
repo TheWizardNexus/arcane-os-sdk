@@ -1067,6 +1067,14 @@ programmatic value replacement, and ordinary preview scrolling do not request
 edit-position following. Moving the selection alone does not trigger following,
 and following never scrolls the input pane or containing page. The title
 remains a native plain-text input.
+Preview rendering preserves the source pane's current horizontal and vertical
+scroll offsets and selection. Value replacement and reconfiguration retain
+those offsets and the selection positions that still fit the new text; layout
+changes move only the preview, keeping the live textarea attached. Toolbar
+formatting focuses the source without scrolling its ancestors, selects the
+formatted text, and preserves the source viewport. Native typing, keyboard
+selection, and manual source scrolling retain their ordinary behavior; there
+is no scroll lock or deferred restoration of an earlier source position.
 Following uses the shared [Markdown block mapping](runtime-modules.md#mdjs);
 lists, quotes, and tables follow their block, while invisible source positions
 use a nearby available rendered block rather than exact glyph geometry.

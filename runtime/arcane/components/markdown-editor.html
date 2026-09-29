@@ -224,6 +224,7 @@
         if(destroyed){
             return false;
         }
+        const sourceView = captureSourceView();
         const setInitialValue=Object.prototype.hasOwnProperty.call(
             input||{},
             'initialValue'
@@ -240,9 +241,12 @@
         }
         if(setInitialValue){
             supersedeSave('markdown-content-replaced');
-            textarea.value=options.initialValue;
+            if (textarea.value !== options.initialValue) {
+                textarea.value = options.initialValue;
+            }
         }
         updatePreview();
+        restoreSourceView(sourceView);
         return getOptions();
     }
 
@@ -250,13 +254,14 @@
         host.dataset.fit=String(options.fit);
         editor.classList.toggle('fit',options.fit);
         editor.classList.toggle('without-preview',!options.showPreview);
-        // Keyboard order follows the displayed order in each layout.
-        if(options.fit){
-            editor.insertBefore(toolbar,preview);
-            editor.insertBefore(textarea,preview);
-        }else{
-            editor.insertBefore(preview,toolbar);
-            editor.insertBefore(textarea,toolbar.nextSibling);
+        // Move only the preview when the layout changes. Reattaching the live
+        // textarea during ordinary configuration would disturb focus/selection.
+        if (options.fit) {
+            if (textarea.nextSibling !== preview) {
+                editor.insertBefore(preview, textarea.nextSibling);
+            }
+        } else if (preview.nextSibling !== toolbar) {
+            editor.insertBefore(preview, toolbar);
         }
         titleInput.placeholder=options.labels.titlePlaceholder;
         titleInput.setAttribute('aria-label',options.labels.titlePlaceholder);
@@ -331,6 +336,36 @@
         previewFollowPending=false;
     }
 
+    function captureSourceView() {
+        return {
+            scrollTop: textarea.scrollTop,
+            scrollLeft: textarea.scrollLeft,
+            selectionStart: textarea.selectionStart,
+            selectionEnd: textarea.selectionEnd,
+            selectionDirection: textarea.selectionDirection
+        };
+    }
+
+    function restoreSourceView(view) {
+        if (textarea.selectionStart !== view.selectionStart ||
+            textarea.selectionEnd !== view.selectionEnd ||
+            textarea.selectionDirection !== view.selectionDirection) {
+            textarea.setSelectionRange(
+                view.selectionStart,
+                view.selectionEnd,
+                view.selectionDirection
+            );
+        }
+        // Native value/focus/selection updates may pan the textarea. Restore
+        // this operation's viewport, never a position retained across user input.
+        if (textarea.scrollTop !== view.scrollTop) {
+            textarea.scrollTop = view.scrollTop;
+        }
+        if (textarea.scrollLeft !== view.scrollLeft) {
+            textarea.scrollLeft = view.scrollLeft;
+        }
+    }
+
     function updatePreview(follow=false){
         if(destroyed){
             return;
@@ -340,6 +375,7 @@
         }
         previewFrame=0;
         previewFollowPending=false;
+        const sourceView = captureSourceView();
         const scrollTop=preview.scrollTop;
         const scrollLeft=preview.scrollLeft;
         const markdown=new MD(textarea.value,{sourceMap:options.followPreview});
@@ -355,6 +391,7 @@
         if(follow&&options.followPreview&&options.showPreview){
             followTypingPosition(markdown.sourceMap);
         }
+        restoreSourceView(sourceView);
     }
 
     function followTypingPosition(sourceMap){
@@ -434,6 +471,7 @@
             return;
         }
 
+        const sourceView = captureSourceView();
         const result=applyMarkdownFormat(
             textarea.value,
             textarea.selectionStart,
@@ -441,8 +479,12 @@
             format
         );
         textarea.value=result.value;
-        textarea.focus();
-        textarea.setSelectionRange(result.selectionStart,result.selectionEnd);
+        textarea.focus(
+            {preventScroll: true}
+        );
+        sourceView.selectionStart = result.selectionStart;
+        sourceView.selectionEnd = result.selectionEnd;
+        restoreSourceView(sourceView);
         contentChanged();
     }
 
@@ -524,8 +566,13 @@
             return false;
         }
         supersedeSave('markdown-content-replaced');
-        textarea.value=`${value??''}`;
+        const sourceView = captureSourceView();
+        const nextValue = `${value ?? ''}`;
+        if (textarea.value !== nextValue) {
+            textarea.value = nextValue;
+        }
         updatePreview();
+        restoreSourceView(sourceView);
         return textarea.value;
     }
 

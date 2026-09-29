@@ -19,12 +19,13 @@ const initialize = new AsyncFunction(
 // Run the complete component script with controlled DOM geometry. Markdown
 // parsing and native browser layout have their own owners; this fixture supplies
 // explicit source-map records and rendered blocks without implementing a parser.
-async function editorFixture(context, {dataset = {}, layout = []} = {}) {
+async function editorFixture(context, {dataset = {}, layout = [], viewportEffects = false} = {}) {
     const publications = [];
     const errors = [];
     const renders = [];
     const frames = new Map();
     const cancelledFrames = [];
+    const treeMoves = [];
     const document = {activeElement: null};
     let frameSequence = 0;
     let eventSourceDisposed = false;
@@ -50,6 +51,7 @@ async function editorFixture(context, {dataset = {}, layout = []} = {}) {
             this.scrollHeight = 2400;
             this.selectionStart = 0;
             this.selectionEnd = 0;
+            this.selectionDirection = 'none';
             const classes = new Set();
             this.classList = {
                 contains(name) {return classes.has(name);},
@@ -82,6 +84,12 @@ async function editorFixture(context, {dataset = {}, layout = []} = {}) {
 
         insertBefore(node, reference) {
             if (node === reference) return node;
+            treeMoves.push(node);
+            if (viewportEffects && node.tagName === 'TEXTAREA') {
+                if (document.activeElement === node) document.activeElement = null;
+                node.scrollTop = 0;
+                node.scrollLeft = 0;
+            }
             const oldIndex = this.children.indexOf(node);
             if (oldIndex !== -1) this.children.splice(oldIndex, 1);
             const nextIndex = reference === null ? this.children.length : this.children.indexOf(reference);
@@ -101,8 +109,34 @@ async function editorFixture(context, {dataset = {}, layout = []} = {}) {
         setAttribute(name, value) {this.attributes.set(name, String(value));}
         getAttribute(name) {return this.attributes.get(name) ?? null;}
         removeAttribute(name) {this.attributes.delete(name);}
-        focus() {document.activeElement = this;}
-        setSelectionRange(start, end) {this.selectionStart = start; this.selectionEnd = end;}
+        focus(options) {
+            document.activeElement = this;
+            this.focusOptions = options;
+            if (viewportEffects && this.tagName === 'TEXTAREA' && !options?.preventScroll) {
+                this.scrollTop = this.scrollHeight;
+                this.scrollLeft = 0;
+            }
+        }
+        setSelectionRange(start, end, direction = 'none') {
+            this.selectionStart = Math.min(start, this.value.length);
+            this.selectionEnd = Math.min(end, this.value.length);
+            this.selectionDirection = direction;
+            if (viewportEffects && this.tagName === 'TEXTAREA') {
+                this.scrollTop = this.scrollHeight;
+                this.scrollLeft = 0;
+            }
+        }
+        get value() {return this.text ?? '';}
+        set value(value) {
+            this.text = value;
+            if (viewportEffects && this.tagName === 'TEXTAREA') {
+                this.selectionStart = value.length;
+                this.selectionEnd = value.length;
+                this.selectionDirection = 'none';
+                this.scrollTop = this.scrollHeight ?? 0;
+                this.scrollLeft = 0;
+            }
+        }
         closest(selector) {return selector === '[data-format]' && this.dataset.format ? this : null;}
         querySelectorAll(selector) {return selector === 'a' ? this.links ?? [] : [];}
 
@@ -115,6 +149,12 @@ async function editorFixture(context, {dataset = {}, layout = []} = {}) {
         get innerHTML() {return this.html ?? '';}
         set innerHTML(value) {
             this.html = value;
+            // Model layout adjustment at the replaced preview boundary. The
+            // controller must preserve the source pane without a scroll lock.
+            if (viewportEffects && this === preview) {
+                input.scrollTop = 0;
+                input.scrollLeft = 0;
+            }
             this.replaceChildren();
             this.comments = [];
             for (const entry of renderedEntries) {
@@ -256,7 +296,7 @@ async function editorFixture(context, {dataset = {}, layout = []} = {}) {
 
     return {
         host, editor, title, preview, toolbar, input, actions, status, save, document,
-        publications, errors, renders, frames, cancelledFrames,
+        publications, errors, renders, frames, cancelledFrames, treeMoves,
         get eventSourceDisposed() {return eventSourceDisposed;},
         flushFrames() {
             for (const [id, callback] of [...frames]) {
@@ -416,6 +456,99 @@ test('Markdown editor retains labels, hidden controls, read-only and save failur
     assert.equal(host.clear(), true);
     assert.equal(host.value, '');
     assert.equal(host.entryTitle, '');
+});
+
+test('Markdown editor preserves source viewport and selection through configuration, replacement and formatting', async function preserveSourceView(context) {
+    const fixture = await editorFixture(
+        context,
+        {dataset: {fit: 'true', followPreview: 'true'}, viewportEffects: true}
+    );
+    const {host, input, title, preview, toolbar, editor, actions} = fixture;
+    const markdown = 'The kraken waves.\n\nThe complete journal remains here.\n';
+    const entryTitle = '  <Kraken & friends>  ';
+    const saves = [];
+    host.configure(
+        {
+            initialValue: markdown,
+            initialTitle: entryTitle,
+            clearOnSave: false,
+            onSave(payload) {saves.push(payload);}
+        }
+    );
+    input.focus({preventScroll: true});
+    input.setSelectionRange(4, 10, 'backward');
+    input.scrollTop = 730;
+    input.scrollLeft = 51;
+    const movesBeforeUpdate = fixture.treeMoves.length;
+    host.configure({saveLabel: 'Keep this draft'});
+    assert.equal(fixture.treeMoves.length, movesBeforeUpdate, 'An unchanged layout must not reparent controls.');
+    host.configure({fit: false});
+    assert.deepEqual(editor.children, [title, preview, toolbar, input, actions]);
+    host.configure({fit: true});
+    assert.deepEqual(editor.children, [title, toolbar, input, preview, actions]);
+    assert.equal(fixture.treeMoves.includes(input), false, 'Layout changes must keep the live textarea attached.');
+    assert.equal(fixture.document.activeElement, input);
+
+    const extended = `${markdown}The octopus keeps every line.\n`;
+    host.value = extended;
+    host.configure({initialValue: extended});
+    assert.equal(host.value, extended);
+    assert.equal(host.entryTitle, entryTitle);
+    assert.deepEqual([input.selectionStart, input.selectionEnd, input.selectionDirection], [4, 10, 'backward']);
+    assert.deepEqual([input.scrollTop, input.scrollLeft], [730, 51]);
+
+    fixture.format('bold');
+    const formatted = extended.replace('kraken', '**kraken**');
+    assert.equal(host.value, formatted);
+    assert.deepEqual([input.selectionStart, input.selectionEnd, input.selectionDirection], [6, 12, 'backward']);
+    assert.deepEqual(input.focusOptions, {preventScroll: true});
+    assert.deepEqual([input.scrollTop, input.scrollLeft], [730, 51]);
+    fixture.flushFrames();
+    assert.equal(fixture.renders.at(-1).raw, formatted);
+    assert.deepEqual([input.scrollTop, input.scrollLeft], [730, 51]);
+    assert.equal(await host.saveEntry(), true);
+    assert.deepEqual(saves, [{title: entryTitle, markdown: formatted}]);
+    assert.equal(host.value, formatted);
+    assert.deepEqual([input.scrollTop, input.scrollLeft], [730, 51]);
+});
+
+test('Markdown preview retains the latest native editing and manual source viewport before its queued render', async function preserveCurrentSourceView(context) {
+    const markdown = 'The kraken reads.\n\nThe octopus keeps the whole journal.\n';
+    const second = markdown.indexOf('The octopus');
+    const fixture = await editorFixture(
+        context,
+        {
+            dataset: {fit: 'true', followPreview: 'true'},
+            viewportEffects: true,
+            layout: [
+                {start: 0, end: second, marker: 'viewport-first', type: 'paragraph', top: 0, height: 80},
+                {start: second, end: markdown.length, marker: 'viewport-second', type: 'paragraph', top: 1700, height: 120}
+            ]
+        }
+    );
+    const {input, preview} = fixture;
+    fixture.edit(markdown, second + 4);
+    // Native typing can reveal its caret; the SDK must not restore an older
+    // position captured before that user operation or a later manual scroll.
+    input.scrollTop = 620;
+    input.scrollLeft = 35;
+    input.dispatchEvent(new Event('scroll'));
+    input.setSelectionRange(second + 2, second + 8, 'backward');
+    input.scrollTop = 880;
+    input.scrollLeft = 57;
+    input.dispatchEvent(new Event('keydown'));
+    input.dispatchEvent(new Event('select'));
+    preview.scrollTop = 400;
+    fixture.flushFrames();
+    assert.deepEqual([input.scrollTop, input.scrollLeft], [880, 57]);
+    assert.deepEqual([input.selectionStart, input.selectionEnd, input.selectionDirection], [second + 2, second + 8, 'backward']);
+    assert.equal(fixture.renders.at(-1).raw, markdown);
+    assert.notEqual(preview.scrollTop, 400, 'Only the preview follows the edited block.');
+    input.scrollTop = 270;
+    input.scrollLeft = 12;
+    input.dispatchEvent(new Event('scroll'));
+    assert.equal(fixture.frames.size, 0, 'Manual source scrolling must not schedule a restoration.');
+    assert.deepEqual([input.scrollTop, input.scrollLeft], [270, 12]);
 });
 
 test('Markdown preview follows the edited source block without coupling independent scrollers', async function followEditedBlock(context) {
