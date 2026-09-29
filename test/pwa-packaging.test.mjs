@@ -450,6 +450,61 @@ test(
 );
 
 test(
+    'PWA packaging resolves SDK component runtime resources independently of nesting while ordinary pages retain their base',
+    async function componentRuntimeResourceInventory(context) {
+        const fixture = await workspaceFixture(context, {enabled: true, offline: {exclude: ['content']}});
+        const rootConfig = JSON.parse(await readFile(path.join(fixture.workspaceRoot, 'arcane-packager.json'), 'utf8'));
+        rootConfig.sharedPayloads['browser-runtime'][0].include.push('css');
+        const componentSources = new Map([
+            ['components/query-panel.html', '<base href="./">'
+                + '<link rel="stylesheet" href="./arcane/css/layout.css?v=2&amp;theme=night&amp;tag=first&amp;tag=second#palette">'
+                + '<script type="module" src="./arcane/modules/Widget.js?v=2&amp;mode=full#entry"></script>'
+                + '<p>Keep ./arcane/css/layout.css?v=2 as complete visible content. </p>\n'],
+            ['components/forms/deep/query-panel.html', '<base href="./">'
+                + '<link rel="stylesheet" href="./arcane/css/layout.css?v=2&amp;theme=day&amp;density=comfortable#palette">'
+                + '<script type="module" src="./arcane/modules/Widget.js?v=2&amp;mode=nested#entry"></script>'
+                + '<p>Complete nested component content. </p>\n']
+        ]);
+        const page = '<!doctype html><html lang="en"><head><base href="./">'
+            + '<script type="importmap" data-arcane-import-map>{"imports":{}}</script>'
+            + '<link rel="stylesheet" href="./arcane/css/layout.css?v=2&amp;theme=local">'
+            + '</head><body><p>Ordinary app resource belongs to this page base. </p></body></html>\n';
+        await Promise.all([
+            writeJson(fixture.workspaceRoot, 'arcane-packager.json', rootConfig),
+            writeText(fixture.workspaceRoot, 'runtime/css/layout.css', '.component { color: rebeccapurple; }\n'),
+            writeText(fixture.workspaceRoot, 'runtime/modules/Widget.js', 'export const label = "Complete component module.";\n'),
+            writeText(fixture.appRoot, 'pages/runtime-lookalike.html', page),
+            writeText(fixture.appRoot, 'pages/arcane/css/layout.css', '.page { color: teal; }\n'),
+            ...Array.from(componentSources, function writeComponent([relative, content]) {
+                return writeText(fixture.workspaceRoot, `runtime/${relative}`, content);
+            })
+        ]);
+        const packaged = await packageApp({workspaceRoot: fixture.workspaceRoot, appId: 'pwa-app'});
+        const offline = JSON.parse(await readFile(path.join(packaged.outputRoot, 'arcane-offline.json'), 'utf8'));
+        for (const resource of [
+            './arcane/css/layout.css?v=2&theme=night&tag=first&tag=second',
+            './arcane/css/layout.css?v=2&theme=day&density=comfortable',
+            './arcane/modules/Widget.js?v=2&mode=full',
+            './arcane/modules/Widget.js?v=2&mode=nested',
+            './apps/pwa-app/pages/arcane/css/layout.css?v=2&theme=local'
+        ]) {
+            assert.ok(offline.assets.includes(resource), resource);
+        }
+        assert.equal(offline.assets.some(function fictitiousComponentRuntime(resource) {
+            return /\/components\/(?:forms\/deep\/)?arcane\//u.test(resource);
+        }), false);
+        assert.equal(offline.assets.includes('./arcane/css/layout.css?v=2&theme=local'), false);
+        for (const [relative, source] of componentSources) {
+            assert.equal(await readFile(path.join(packaged.outputRoot, 'arcane', relative), 'utf8'), source);
+            assert.equal(await readFile(path.join(fixture.workspaceRoot, 'runtime', relative), 'utf8'), source);
+        }
+        assert.equal(await readFile(path.join(fixture.appRoot, 'pages/runtime-lookalike.html'), 'utf8'), page);
+        assert.equal(await readFile(path.join(packaged.outputRoot, 'apps/pwa-app/content/document.html'), 'utf8'), CORPUS_HTML);
+        assert.equal(await readFile(path.join(fixture.appRoot, 'content/document.html'), 'utf8'), CORPUS_HTML);
+    }
+);
+
+test(
     'app-selected output retains PWA application identity and deployment-relative resource roots',
     async function selectedOutputPwaRoots(context) {
         const fixture = await workspaceFixture(context, {enabled: true, offline: {exclude: ['content']}});

@@ -1281,6 +1281,23 @@ export function rewriteAssetReferences(source,{filePath,version=SDK_VERSION,onRe
     return source;
 }
 
+export function resolveAssetReference({url,baseHref,baseKind},{ownerUrl,documentUrl=ownerUrl,managedMap=false}){
+    if(baseKind==='component-runtime'&&url.startsWith('./arcane/')){
+        const owner=new URL(ownerUrl);
+        const marker='/arcane/components/';
+        const componentIndex=owner.pathname.lastIndexOf(marker);
+        if(componentIndex>=0){
+            // HTMLImport resolves these component attributes against their
+            // installed runtime, independently of the host document's base.
+            const runtimeRoot=new URL(owner.pathname.slice(0,componentIndex+'/arcane/'.length),owner.origin);
+            return new URL(url.slice('./arcane/'.length),runtimeRoot);
+        }
+    }
+    const base=baseHref?new URL(baseHref,ownerUrl)
+        :managedMap||baseKind==='document'?documentUrl:ownerUrl;
+    return new URL(url,base);
+}
+
 function registerSpecifier(registry,specifier,target){
     registry.set(specifier,{specifier,target});
 }
@@ -2071,7 +2088,9 @@ function htmlReferenceEdits(source,version,onReference){
                 :element.tag==='link'&&relationships.includes('preload')
                     &&['script','worker','style'].includes(destination)?destination==='style'?'style':'script':'asset';
             const view=htmlAttributeView(original);
-            if(view)reportAssetReference(reportHtmlReference,view.decoded,kind);
+            if(view)reportAssetReference(reportHtmlReference,view.decoded,kind,
+                (name==='href'||name==='src')&&view.decoded.startsWith('./arcane/')
+                    ?'component-runtime':undefined);
             const value=versionHtmlAttribute(original,version);
             if(value===original)continue;
             const position=attributes.positions.get(name);

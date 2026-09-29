@@ -93,6 +93,16 @@ The application entry and generated PWA shell records are retained. Select the
 resources needed by every offline page, including its shared modules and styles.
 The worker script itself is never an application cache entry.
 
+For direct installed-package root applications, public `arcane import-map`
+generation follows the same source resource graph as `arcane dev` before writing
+the static offline inventory. Imports from unvisited pages, shared runtime
+modules, component styles, and statically declared Worker URLs retain their
+authored query values. SDK component `./arcane/` resource attributes resolve from
+that component's actual runtime root, including installed package aliases and
+nested component directories; ordinary application document bases keep their
+normal meaning. The graph selects resources already present in the configured
+routes. It does not invent resource paths or enumerate user-specific page URLs.
+
 These settings describe published application resources. They do not select
 user uploads, provider responses, live API requests, saved conversations,
 preferences, IndexedDB, OPFS, or a model owner's download/cache lifecycle.
@@ -180,7 +190,7 @@ without loading certificates; see [explicit HTTP development](cli.md#explicit-ht
 `--public` selects the IPv4 wildcard bind address; it does not enable PWA
 configuration, change manifest metadata, or determine browser installability.
 
-Source inventory work begins when the browser requests the worker or current
+Live source inventory work begins when the browser requests the worker or current
 offline manifest, after the page can start. It traverses the selected route
 inventory once for that request, follows page and runtime resource references
 to retain selected query variants, and shares an in-flight traversal with
@@ -188,6 +198,11 @@ concurrent requests. Each referenced source file is read once per traversal;
 document corpus bodies remain under their existing owner. It does not rebuild
 the application. Installation metadata and bootstrap requests reuse the current
 generated bundle.
+
+An explicit root import-map refresh also performs that traversal to produce the
+committed static PWA files. It opens no server or listener. Its generated
+inventory is available to ordinary static hosting without first visiting each
+page through the development server.
 
 The SDK owns version information in `arcane-offline.json`:
 

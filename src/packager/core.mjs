@@ -19,6 +19,7 @@ import {
     applyPwaEntryReferences,
     inspectImportMapHtml,
     readWorkspaceAssetVersion,
+    resolveAssetReference,
     rewriteAssetReferences,
     versionAssetUrl
 } from '../import-map.mjs';
@@ -967,17 +968,19 @@ async function packageWithContext(context,options={}){
                 resource={references,...(pwaDocumentSources.has(relative)?{content}:{})};
                 resources.set(relative,resource);
             }
-            for(const {url,kind,baseHref,baseKind} of resource.references){
+            for(const reference of resource.references){
+                const {url,kind,baseHref}=reference;
                 const traversable=kind!=='fetch'&&(kind!=='asset'||/\.css(?:[?#]|$)/iu.test(url))
                     &&(kind!=='import'||/^(?:\.{1,2}\/|\/)/u.test(url));
                 if(!pwaEnabled&&!traversable)continue;
                 if(kind==='import'&&!/^(?:\.{1,2}\/|\/)/u.test(url))continue;
                 try{
                     const ownerUrl=new URL(packageResourceUrl(relative),entryUrl.origin);
-                    const base=baseHref?new URL(baseHref,ownerUrl)
-                        :baseKind==='document'||path.posix.basename(relative)==='arcane.importmap.json'
-                            ?current.documentUrl:ownerUrl;
-                    const target=new URL(url,base);
+                    const target=resolveAssetReference(reference,{
+                        ownerUrl,
+                        documentUrl:current.documentUrl,
+                        managedMap:path.posix.basename(relative)==='arcane.importmap.json'
+                    });
                     if(target.origin===entryUrl.origin){
                         const file=decodeURIComponent(target.pathname).replace(/^\//u,'');
                         if(pwaEnabled&&offlineInventory.has(file)){

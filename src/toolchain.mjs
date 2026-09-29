@@ -11,7 +11,7 @@ import {
     validateWorkspace
 } from './workspace.mjs';
 import {loadArcaneIntegratedProvider} from './integrated-provider-loader.mjs';
-import {startDevServer} from './dev-server.mjs';
+import {collectSourcePwaAssets,startDevServer} from './dev-server.mjs';
 import {applyPwaEntryReferences,generateImportMap,readApplicationTestImportMapContext} from './import-map.mjs';
 import {createPwaArtifacts} from './pwa.mjs';
 import {readInstalledSdkLayout} from './sdk-runtime-layout.mjs';
@@ -337,11 +337,21 @@ async function refreshRootApplicationFiles(prepared,inspected,importMap,{signal,
         ...inspected.files.filter(file=>file!=='index.html'||manifest.include.includes('index.html')),
         importMap.artifactRelativePath
     ])];
+    const sourceOrigin='http://arcane.invalid';
+    const selectedPaths=new Set(files.map(function selectedStaticPath(file){
+        return new URL(`/${file.split('/').map(encodeURIComponent).join('/')}`,sourceOrigin).pathname;
+    }));
+    const assets=installed?.direct&&manifest.pwa?.enabled
+        ?(await collectSourcePwaAssets({workspaceRoot,appId,signal,onEvent})).filter(function selectedStaticVariant(value){
+            const url=new URL(value,sourceOrigin);
+            return url.origin===sourceOrigin&&selectedPaths.has(url.pathname);
+        }):[];
     const pwa=installed?.direct&&manifest.pwa?.enabled?createPwaArtifacts({
         app:{id:appId,displayName:manifest.displayName,version:manifest.version,entry},
         sdkVersion:installed.version,
         pwa:manifest.pwa,
         files,
+        assets,
         basePath:'/',
         appBase:'/',
         installationId:`/apps/${appId}/`,

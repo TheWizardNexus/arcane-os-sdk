@@ -13,7 +13,7 @@ import {APP_CONFIG_NAME, validateAppConfig} from './packager/core.mjs';
 import {createEventQueue} from './event-queue.mjs';
 import {
     applyPwaEntryReferences,inspectImportMapHtml,MANAGED_IMPORT_MAP_ATTRIBUTE,
-    readWorkspaceAssetVersion,rewriteAssetReferences,versionAssetUrl
+    readWorkspaceAssetVersion,resolveAssetReference,rewriteAssetReferences,versionAssetUrl
 } from './import-map.mjs';
 import {createPwaArtifacts,selectPwaFiles} from './pwa.mjs';
 
@@ -658,14 +658,15 @@ async function sourcePwaAssets(routeSet, mappings, signal, resourceUrls, resourc
                 }
             }
         }
-        for (const {url, kind, baseHref, baseKind} of references) {
+        for (const reference of references) {
+            const {url, kind} = reference;
             if (kind === 'import' && !/^(?:\.{1,2}\/|\/)/u.test(url)) continue;
             let target;
-            let base;
             try {
-                base = baseHref ? new URL(baseHref, current.url)
-                    : managedMap || baseKind === 'document' ? documentUrl : current.url;
-                target = new URL(versionAssetUrl(url, null), base);
+                target = resolveAssetReference(
+                    {...reference, url: versionAssetUrl(url, null)},
+                    {ownerUrl: current.url, documentUrl, managedMap}
+                );
             } catch {
                 // Non-URL source values retain their authored behavior.
                 continue;
@@ -693,6 +694,11 @@ async function sourcePwaAssets(routeSet, mappings, signal, resourceUrls, resourc
         if (selectedUrls.has(url.pathname)) selectedUrls.add(resourceUrl);
     }
     return [...selectedUrls].sort();
+}
+
+export async function collectSourcePwaAssets({workspaceRoot,appId,signal,onEvent}={}){
+    const routes=await sourceRoutes(workspaceRoot,appId,{signal,onEvent});
+    return sourcePwaAssets(routes,routes.mappings,signal,new Set(),new Set());
 }
 
 function closeDevelopmentListeners(fileServer, tlsServer) {
@@ -1236,13 +1242,16 @@ async function startOwnedDevServer({
                     .includes(request.headers['sec-fetch-dest']);
                 const rewrite=runtimeResource||entryDocument||browserResource||managedMap
                     ||resourcePaths.has(target.path);
-                const onReference = function observeServedResource({url,kind,baseHref,baseKind}) {
+                const onReference = function observeServedResource(reference) {
+                    const {url,kind,baseKind}=reference;
                     if (pwaEnabled && kind !== 'fetch'
                         && !(kind === 'import' && !/^(?:\.{1,2}\/|\/)/u.test(url))) {
                         try {
                             const documentUrl = new URL(target.path, 'http://arcane.invalid');
-                            const base = baseHref ? new URL(baseHref, documentUrl) : documentUrl;
-                            const resource = new URL(versionAssetUrl(url, null), base);
+                            const resource = resolveAssetReference(
+                                {...reference,url:versionAssetUrl(url,null)},
+                                {ownerUrl:documentUrl}
+                            );
                             if (resource.origin === documentUrl.origin) {
                                 pwaResourceUrls.add(`${resource.pathname}${resource.search}`);
                             }
@@ -1254,8 +1263,7 @@ async function startOwnedDevServer({
                         ||(kind==='import'&&!/^(?:\.{1,2}\/|\/)/u.test(url)))return;
                     try{
                         const documentUrl=new URL(target.path,'http://arcane.invalid');
-                        const base=baseHref?new URL(baseHref,documentUrl):documentUrl;
-                        const resource=new URL(url,base);
+                        const resource=resolveAssetReference(reference,{ownerUrl:documentUrl});
                         if(resource.origin===documentUrl.origin
                             &&/\.(?:m?js|html?|css)$/iu.test(resource.pathname)){
                             resourcePaths.add(decodeURIComponent(resource.pathname));

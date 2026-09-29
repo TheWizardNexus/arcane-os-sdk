@@ -5,15 +5,15 @@ import {setTimeout as waitForHttpDateChange} from 'node:timers/promises';
 import test from '../src/testing.mjs';
 import {startDevServer} from '../src/dev-server.mjs';
 import {createWorkspace} from '../src/scaffold.mjs';
-import {developApplication} from '../src/toolchain.mjs';
+import {developApplication, executeOperation} from '../src/toolchain.mjs';
 import {installedSdkRoutes} from '../src/sdk-runtime-layout.mjs';
 import {ARCANE_PROTOCOL, SDK_VERSION} from '../src/constants.mjs';
 import {
-    fetchSyntheticTls as fetch,temporaryDirectory,useSyntheticTls,writeSyntheticTlsFiles
+    fetchSyntheticTls as fetch,repositoryRoot,temporaryDirectory,useSyntheticTls,writeSyntheticTlsFiles
 } from './helpers.mjs';
 
 async function sourceFixture(context, {
-    enabled = true, authored = false, http = false, rootApp = false, directPackage = null
+    enabled = true, authored = false, http = false, rootApp = false, directPackage = null, serve = true
 } = {}) {
     if (!http) useSyntheticTls(context);
     const workspaceRoot = await temporaryDirectory(context, {prefix: 'arcane-dev-pwa-'});
@@ -140,11 +140,96 @@ async function sourceFixture(context, {
         await mkdir(path.dirname(location), {recursive: true});
         await writeFile(location, content, 'utf8');
     }));
+    if (!serve) return {workspaceRoot, entry, documentHtml, documentJavaScript};
     const instance = await startDevServer({workspaceRoot, appId: 'fixture', port: 0, http});
     context.after(async function closeFixtureServer() {
         await instance.close();
     });
     return {workspaceRoot, instance, entry, documentHtml, documentJavaScript};
+}
+
+for (const packageSource of ['node_modules/arcane-os', 'node_modules/arcane-sdk']) {
+    test(`public root import-map writes complete PWA resource URLs for ${packageSource}`, async function staticRootPwaGraph(context) {
+        const {workspaceRoot, entry, documentHtml, documentJavaScript} = await sourceFixture(context, {
+            rootApp: true, directPackage: packageSource, authored: true, http: true, serve: false
+        });
+        const runtimeRoot = `${packageSource}/runtime/arcane`;
+        const browserRoot = `${packageSource}/browser-runtime`;
+        for (const directory of ['components', 'css', 'entities', 'img']) {
+            await mkdir(path.join(workspaceRoot, runtimeRoot, directory), {recursive: true});
+        }
+        const component = '<base href="./"><link rel="stylesheet" '
+            + 'href="./arcane/css/query-panel.css?v=2&amp;mode=a%20b&amp;tag=one&amp;tag=two#palette">'
+            + '<script type="module" src="./arcane/modules/panel.js?v=3&amp;mode=full"></script>'
+            + '<p>  Keep the complete component text.  </p>\n';
+        const style = '.query-panel { background: url(./panel.svg?theme=a%20b&v=4#icon); }\n';
+        const speechRuntime = await readFile(
+            path.join(repositoryRoot, 'browser-runtime/ai/speech-worker-runtime.mjs'), 'utf8'
+        );
+        const files = new Map([
+            [`${runtimeRoot}/css/theme.css`, ':root { color-scheme: light dark; }\n'],
+            [`${runtimeRoot}/css/primitives.css`, '.surface { display: block; }\n'],
+            [`${runtimeRoot}/css/query-panel.css`, style],
+            [`${runtimeRoot}/css/panel.svg`, '<svg xmlns="http://www.w3.org/2000/svg"/>\n'],
+            [`${runtimeRoot}/components/nested/query-panel.html`, component],
+            [`${runtimeRoot}/modules/panel.js`, "export {child} from './child.js?v=7&mode=panel';\n"],
+            [`${browserRoot}/ai/speech-worker-runtime.mjs`, speechRuntime],
+            [`${browserRoot}/ai/browser-whisper-worker.mjs`, "import './speech-worker-runtime.mjs';\n"],
+            [`${browserRoot}/ai/browser-kokoro-worker.mjs`, "import './speech-worker-runtime.mjs';\n"]
+        ]);
+        await Promise.all([...files].map(async function writeStaticGraphResource([relative, content]) {
+            const file = path.join(workspaceRoot, relative);
+            await mkdir(path.dirname(file), {recursive: true});
+            await writeFile(file, content, 'utf8');
+        }));
+        const source = entry.replace('<head>', '<head><meta name="arcane-app-id" content="fixture">')
+            .replace('<link rel="stylesheet" href="./styles.css?v=4">',
+                `<link rel="stylesheet" href="./${runtimeRoot}/css/theme.css">`
+                + `<link rel="stylesheet" href="./${runtimeRoot}/css/primitives.css">`
+                + '<link rel="stylesheet" href="./styles.css?v=4">');
+        await writeFile(path.join(workspaceRoot, 'index.html'), source, 'utf8');
+
+        // Exercise the public static generator before starting any source server.
+        const result = await executeOperation('import-map', {workspaceRoot, appId: 'fixture'});
+        assert.deepEqual(result.importMap.documentPaths, [
+            path.join(workspaceRoot, 'index.html'), path.join(workspaceRoot, 'secondary.html')
+        ]);
+        const offline = JSON.parse(await readFile(path.join(workspaceRoot, 'arcane-offline.json'), 'utf8'));
+        for (const resource of [
+            '/secondary.html',
+            '/modules/deep.js?mode=a%20b&v=4',
+            '/modules/leaf.js?mode=a+b',
+            '/modules/leaf.js?mode=worker&v=4',
+            '/modules/worker.js?mode=a%20b&v=4',
+            `/${runtimeRoot}/modules/child.js?v=4`,
+            `/${runtimeRoot}/modules/child.js?v=7&mode=panel`,
+            `/${runtimeRoot}/modules/panel.js?v=3&mode=full`,
+            `/${runtimeRoot}/css/query-panel.css?v=2&mode=a%20b&tag=one&tag=two`,
+            `/${runtimeRoot}/css/panel.svg?theme=a%20b&v=4`,
+            `/${browserRoot}/ai/browser-whisper-worker.mjs?arcaneSpeechWorkerMode=artifact-module-worker`,
+            `/${browserRoot}/ai/browser-kokoro-worker.mjs?arcaneSpeechWorkerMode=artifact-module-worker`
+        ]) assert.ok(offline.assets.includes(resource), resource);
+        assert.equal(offline.assets.some(function fictitiousComponentRoot(resource) {
+            return resource.includes('/components/nested/arcane/');
+        }), false);
+        assert.equal(offline.assets.includes('/documents/excluded.txt'), false);
+        assert.equal(offline.assets.includes('/documents/raw.js?v=4'), false);
+        assert.equal(offline.mode, 'development');
+        assert.equal(offline.sdkVersion, SDK_VERSION);
+        assert.deepEqual(offline.navigationAliases, {'/': '/index.html'});
+        const manifest = JSON.parse(await readFile(path.join(workspaceRoot, 'arcane.webmanifest'), 'utf8'));
+        assert.equal(manifest.id, '/apps/fixture/');
+        assert.equal(manifest.scope, '/');
+        const worker = await readFile(path.join(workspaceRoot, 'arcane-sw.js'), 'utf8');
+        assert.ok(worker.includes(`/${runtimeRoot}/css/query-panel.css?v=2&mode=a%20b&tag=one&tag=two`));
+        for (const [relative, content] of files) {
+            assert.equal(await readFile(path.join(workspaceRoot, relative), 'utf8'), content, relative);
+        }
+        assert.equal(await readFile(path.join(workspaceRoot, 'documents/payload.html'), 'utf8'), documentHtml);
+        assert.equal(await readFile(path.join(workspaceRoot, 'documents/payload.js'), 'utf8'), documentJavaScript);
+        await assert.rejects(lstat(path.join(workspaceRoot, 'dist')), {code: 'ENOENT'});
+        await assert.rejects(lstat(path.join(workspaceRoot, '.arcane/dev')), {code: 'ENOENT'});
+    });
 }
 
 test('root source PWA retains identity and follows direct installed alias routes', async function rootSourcePwa(context) {
