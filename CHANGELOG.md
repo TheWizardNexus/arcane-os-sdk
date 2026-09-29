@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.39.0
+
+- Add application-owned assistant display names to new Chat turns through
+  `aiName` and the `addAIMessage`/`addTurn` name option. Capture the selected
+  display name before asynchronous work and preserve complete nonblank names
+  in new ordinary saved records. Restored turns use their saved name or `AI`;
+  existing history is not rewritten, and display labels stay outside model
+  context and memory. Request-only `persist:false` behavior is unchanged.
+- Add shared `applyUserSkin(skin,{root,body,cache})`, named light/dark palettes,
+  and classic `ThemePresentation.js` for cached appearance before styles load.
+  Cache presentation under the declared application ID without delaying page
+  rendering or profile readiness. Preserve unrelated body classes, custom theme
+  values and saved profile data. Scoped `data-arcane-palette` previews may select
+  their own `data-color-scheme` without changing the current page theme.
+
 ## 0.38.0
 
 - Add `User.AI_name` as an application-owned complete string with an empty-string
