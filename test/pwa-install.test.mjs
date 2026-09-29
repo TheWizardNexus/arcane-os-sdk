@@ -305,6 +305,45 @@ test('PWA component update visibility ignores installation dismissal and preserv
     }
 });
 
+for (const installationState of ['pending', 'failed']) {
+    test(`PWA update presentation keeps ${installationState} installation status separate`, async function separateUpdateStatus(context) {
+        const fixture = browserFixture(context);
+        const owner = getPwaInstall();
+        await owner.ready;
+        let settleChoice;
+        const failure = new Error('Complete native installation failure.');
+        offerInstall(fixture.window, function nativeInstallChoice() {
+            if (installationState === 'failed') throw failure;
+            return new Promise(function pendingChoice(resolve) { settleChoice = resolve; });
+        });
+        const {host, elements} = await installComponentFixture();
+        const source = createArcaneEventSource({}, {source: 'arcane.pwa', eventTypes: ['arcane.pwa.state']});
+        const operation = host.install();
+        try {
+            if (installationState === 'failed') {
+                await assert.rejects(operation, function completeFailure(error) { return error === failure; });
+            }
+            const status = elements.get('#status');
+            const installationMessage = status.textContent;
+            assert.ok(installationMessage);
+            source.dispatch('arcane.pwa.state', {status: 'active', scope: 'https://example.test/', updateAvailable: true});
+            assert.equal(elements.get('#installTitle').textContent, 'Update available');
+            assert.equal(status.textContent, '');
+            assert.equal(status.hidden, true);
+            assert.equal(status.dataset.error, 'false');
+            host.dismissUpdate();
+            assert.equal(status.textContent, installationMessage);
+            assert.equal(status.hidden, false);
+            assert.equal(status.dataset.error, String(installationState === 'failed'));
+        } finally {
+            settleChoice?.({outcome: 'dismissed'});
+            await operation.catch(function observedNativeFailure() {});
+            host.destroy();
+            source.dispose();
+        }
+    });
+}
+
 test('Installation state replays availability and calls each native prompt once in the click stack',
     async function nativeInstallLifecycle(context) {
         const {window, storage} = browserFixture(context);

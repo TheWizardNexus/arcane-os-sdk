@@ -153,12 +153,12 @@
         installButton.textContent=updating?options.updateLabel:options.installLabel;
         closeButton.setAttribute('aria-label',updating?options.updateCloseLabel:options.closeLabel);
         installButton.disabled=updating?false:pending||!currentState.available;
-        const message=requestError
+        const message=updating?'':requestError
             ?is.string(requestError.message)?requestError.message:String(requestError)
             :pending?options.promptingLabel:'';
         status.textContent=message;
         status.hidden=!message;
-        status.dataset.error=String(Boolean(requestError));
+        status.dataset.error=String(!updating&&Boolean(requestError));
     }
 
     function observeInstallState(state){

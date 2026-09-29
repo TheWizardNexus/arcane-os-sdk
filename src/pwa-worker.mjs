@@ -24,6 +24,7 @@ function installPwaWorker(manifest, clientUrl) {
     let refreshState = null;
     let priorUrls = null;
     let changeSaved = null;
+    let refreshStateWrite = Promise.resolve();
 
     function cacheUrl(value) {
         const url = new URL(value, scope);
@@ -212,12 +213,20 @@ function installPwaWorker(manifest, clientUrl) {
             }
             const previousModified = Date.parse(cached.response?.headers.get('last-modified'));
             const nextModified = Date.parse(response.headers.get('last-modified'));
+            const changed = Number.isFinite(previousModified) && Number.isFinite(nextModified)
+                && previousModified !== nextModified;
+            if (validate && priorUrls && changed) {
+                // Keep the prior date before replacement so a failed later metadata write
+                // cannot erase a completed resource change across worker termination.
+                refreshState.previousModified ??= {};
+                refreshState.previousModified[url] ??= previousModified;
+                await saveRefreshState();
+            }
             return {
                 response,
                 saved: cached.cache.put(url, response.clone()),
                 checked: true,
-                modified: Number.isFinite(previousModified) && Number.isFinite(nextModified)
-                    && previousModified !== nextModified,
+                modified: changed,
                 error: null
             };
         } catch (cause) {
@@ -329,9 +338,15 @@ function installPwaWorker(manifest, clientUrl) {
         return lastChecked === null || Date.now() - lastChecked > interval;
     }
 
-    async function saveRefreshState() {
-        const cache = await caches.open(cacheName);
-        await cache.put(refreshStateUrl, new Response(JSON.stringify(refreshState)));
+    function saveRefreshState() {
+        const content = JSON.stringify(refreshState);
+        async function writeRefreshState() {
+            const cache = await caches.open(cacheName);
+            await cache.put(refreshStateUrl, new Response(content));
+        }
+        // Only writes to this one shared metadata entry require ordering.
+        refreshStateWrite = refreshStateWrite.then(writeRefreshState, writeRefreshState);
+        return refreshStateWrite;
     }
 
     async function beginRefresh() {
@@ -339,6 +354,13 @@ function installPwaWorker(manifest, clientUrl) {
         const pending = await cache.match(refreshStateUrl);
         if (pending) {
             refreshState = await pending.json();
+            for (const [url, previousModified] of Object.entries(refreshState.previousModified ?? {})) {
+                const response = await cache.match(url);
+                const modified = Date.parse(response?.headers.get('last-modified'));
+                if (Number.isFinite(modified) && modified !== previousModified) {
+                    refreshState.changed = true;
+                }
+            }
         } else {
             const cached = await findCachedResource(manifestUrl);
             let prior = null;

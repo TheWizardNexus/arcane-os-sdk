@@ -23,14 +23,14 @@ function workerManifest(overrides = {}) {
 function cacheStore() {
     const stores = new Map();
     const pauses = [];
-    let pauseWrites = false;
+    let pausedUrl = null;
     return {
         stores,
-        pauseWrites() {
-            pauseWrites = true;
+        pauseWrites(url) {
+            pausedUrl = url;
         },
         resumeWrites() {
-            pauseWrites = false;
+            pausedUrl = null;
             for (const resume of pauses.splice(0)) {
                 resume();
             }
@@ -51,7 +51,7 @@ function cacheStore() {
                     return entries.delete(url);
                 },
                 async put(url, response) {
-                    if (pauseWrites) {
+                    if (url === pausedUrl) {
                         await new Promise(
                             function pauseCacheWrite(resolve) {
                                 pauses.push(resolve);
@@ -425,7 +425,7 @@ async function developmentNetworkAndOffline() {
             changedRequestStarted = resolve;
         }
     );
-    storage.pauseWrites();
+    storage.pauseWrites(`${scope}app.mjs`);
     const refreshing = fixture.refresh();
     await changedRequest;
     const request = fixture.request(`${scope}app.mjs`);
@@ -592,8 +592,8 @@ for (const modifiedResource of [true, false]) {
     test(`PWA partial evidence and prior inventory survive worker termination with modified resource ${modifiedResource}`, async function retainedPartialEvidence() {
         const storage = cacheStore();
         let now = 1000000;
-        const initial = workerManifest({mode: 'development', assets: ['app.mjs', 'arcane-offline.json']});
-        const expanded = {...initial, assets: [...initial.assets, 'new.mjs']};
+        const initial = workerManifest({mode: 'development', assets: ['app.mjs', 'other.mjs', 'arcane-offline.json']});
+        const expanded = modifiedResource ? initial : {...initial, assets: [...initial.assets, 'new.mjs']};
         const first = workerFixture({manifest: initial, storage, now() { return now; }});
         await first.lifecycle('install');
         const installed = await first.refresh();
@@ -603,6 +603,7 @@ for (const modifiedResource of [true, false]) {
             fetchResource(request) {
                 if (request.url.endsWith('arcane-offline.json')) return new Response(JSON.stringify(expanded));
                 if (request.url.endsWith('new.mjs')) return new Response('not ready', {status: 503});
+                if (request.url.endsWith('other.mjs')) return new Response('not ready', {status: 503});
                 return modifiedResource
                     ? new Response('complete replacement', {headers: {'last-modified': 'Mon, 07 Sep 2026 00:02:01 GMT'}})
                     : new Response(null, {status: 304});
@@ -616,6 +617,12 @@ for (const modifiedResource of [true, false]) {
         const pending = await cache.get(`${scope}.arcane-pwa/refresh-state`).clone().json();
         assert.equal(pending.changed, modifiedResource);
         assert.equal(pending.assets.includes(`${scope}new.mjs`), false);
+        if (modifiedResource) {
+            assert.deepEqual(pending.assets, initial.assets.map(function absoluteAsset(asset) {
+                return new URL(asset, scope).href;
+            }));
+            assert.equal(pending.previousModified[`${scope}app.mjs`], Date.parse('Mon, 07 Sep 2026 00:00:00 GMT'));
+        }
         const restarted = workerFixture({
             manifest: initial, storage, now() { return now; },
             fetchResource(request) {
@@ -630,6 +637,63 @@ for (const modifiedResource of [true, false]) {
         const nextPage = workerFixture({manifest: initial, storage, now() { return now; }});
         assert.equal((await nextPage.refresh(complete.lastChecked)).updateAvailable, false);
         assert.deepEqual(nextPage.messages, []);
+    });
+}
+
+for (const failurePhase of ['before replacement', 'after replacement']) {
+    test(`PWA recovers actual resource changes when refresh metadata fails ${failurePhase}`, async function metadataWriteRecovery() {
+        const storage = cacheStore();
+        const open = storage.open;
+        const manifest = workerManifest({mode: 'development', assets: ['app.mjs', 'arcane-offline.json']});
+        let rejectMetadata = false;
+        let replacementSaved = false;
+        storage.open = async function openWithMetadataFailure(name) {
+            const cache = await open(name);
+            const put = cache.put;
+            cache.put = async function writeResourceOrMetadata(url, response) {
+                if (rejectMetadata && url === `${scope}.arcane-pwa/refresh-state`) {
+                    const pending = await response.clone().json();
+                    if (pending.previousModified && (failurePhase === 'before replacement' || replacementSaved)) {
+                        throw new Error(`Metadata failed ${failurePhase}.`);
+                    }
+                }
+                await put(url, response);
+                if (rejectMetadata && url === `${scope}app.mjs`) replacementSaved = true;
+            };
+            return cache;
+        };
+        let now = 1000000;
+        const installed = workerFixture({manifest, storage, now() { return now; }});
+        await installed.lifecycle('install');
+        now += 120001;
+        rejectMetadata = true;
+        const partial = workerFixture({
+            manifest, storage, now() { return now; },
+            fetchResource(request) {
+                if (request.url.endsWith('arcane-offline.json')) return new Response(null, {status: 304});
+                return new Response('complete changed resource\n', {
+                    headers: {'last-modified': 'Mon, 07 Sep 2026 00:02:01 GMT'}
+                });
+            }
+        });
+        const failed = await partial.refresh();
+        assert.ok(failed.error);
+        assert.equal(failed.updateAvailable, false);
+        assert.equal(replacementSaved, failurePhase === 'after replacement');
+        assert.equal(partial.messages.some(function updateMessage(message) { return message.updateAvailable === true; }), false);
+        rejectMetadata = false;
+        const restarted = workerFixture({
+            manifest, storage, now() { return now; },
+            fetchResource() { return new Response(null, {status: 304}); }
+        });
+        const result = await restarted.refresh();
+        assert.equal(result.error, null);
+        assert.equal(result.updateAvailable, replacementSaved);
+        assert.equal(restarted.messages.length, replacementSaved ? 1 : 0);
+        const response = await restarted.request(`${scope}app.mjs`).response;
+        assert.equal(await response.text(), replacementSaved ? 'complete changed resource\n' : `original:${scope}app.mjs`);
+        const cache = [...storage.stores.values()][0];
+        assert.equal(cache.has(`${scope}.arcane-pwa/refresh-state`), false);
     });
 }
 

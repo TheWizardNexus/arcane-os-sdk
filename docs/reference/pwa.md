@@ -278,10 +278,16 @@ replacement behavior. A host without meaningful modification dates cannot
 announce same-URL changes through this contract.
 
 The resource cache privately retains the pre-refresh inventory membership and
-a pending-change flag while a refresh is incomplete. This lifecycle record is
-outside the resource inventory and is never fetched from the server. Evidence
-is recorded only after the resource's cache write succeeds, survives worker
-termination and partial refresh failure, and is cleared after complete success.
+a pending-change flag while a refresh is incomplete. Before replacing a resource
+with a different modification date, it also saves that resource's prior date.
+Writes to this one metadata entry are ordered; independent resource fetches
+remain concurrent. This lifecycle record is outside the resource inventory and
+is never fetched from the server. A change becomes evidence only after the
+resource's cache write succeeds. After interruption, the cached response's date
+is compared with the retained prior date, so a failed later metadata write cannot
+lose that evidence. Failed replacements alone establish no update. The record
+survives worker termination and partial refresh failure and is cleared after
+complete success.
 Partial failure never announces a newly available update. The completed worker
 reply and a scoped message to existing window clients carry the result; each
 page owner keeps its own sticky availability state. A new page does not replay
