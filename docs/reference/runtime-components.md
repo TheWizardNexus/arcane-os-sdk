@@ -351,6 +351,15 @@ restored or new message uses a separate semantic `<time>` element at the card's
 lower-right with an ISO `datetime`, full local title, and local 24-hour `HH:MM`
 text.
 
+Restored assistant cards use the record's exact nonblank string `name`, or
+`AI` when absent. The current profile/model/voice name never renames older
+messages. For live session replies, the card starts with `session.aiName`
+when nonblank, otherwise the existing `host.aiName` display value; the terminal
+result aligns it with the name captured by the session for that operation.
+Set the session/entity name as well as the live component label when the
+application intends new saved turns to retain that attribution. The shared
+component does not persist the profile name or choose a naming policy.
+
 Assistant structural calls render their nonempty `function.arguments.message`
 as ordinary visible progress. The exact call name and argument string are
 retained inside a collapsed `Tool call details` inspection surface. Displaying

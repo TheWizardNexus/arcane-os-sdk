@@ -62,6 +62,14 @@ function providerRequestWithoutLifecycleCallbacks(value){
     );
 }
 
+function assistantDisplayResponse(response,name,timestamp){
+    const message={...response.message};
+    delete message.name;
+    if(is.string(name)&&name.trim()) message.name=name;
+    if(timestamp!==undefined) message.timestamp=timestamp;
+    return {...response,message};
+}
+
 async function configuredArcaneChat(request){
     const api=globalThis.Arcane?.ai;
     if(!is.function(api?.chat)){
@@ -348,7 +356,7 @@ class PersistentAIChatSession{
         assertKnownKeys(
             options,
             new Set([
-                'ai','chat','chatEntity','chatFileName','contextBuilder','loadExisting','memory',
+                'ai','aiName','chat','chatEntity','chatFileName','contextBuilder','loadExisting','memory',
                 'request','responseLength','systemPrompt'
             ]),
             'Persistent chat options',
@@ -391,6 +399,7 @@ class PersistentAIChatSession{
         const systemPrompt=options.systemPrompt??'';
         if(!is.string(systemPrompt)) throw new TypeError('systemPrompt must be a string.');
         this.#entity=options.chatEntity??new ChatEntity(systemPrompt);
+        if(options.aiName!==undefined) this.aiName=options.aiName;
         if(options.chatFileName!==undefined){
             this.#entity.fileName=fileName(options.chatFileName);
         }
@@ -417,6 +426,11 @@ class PersistentAIChatSession{
     get chatEntity(){return this.#entity;}
     get fileName(){return this.#entity.fileName;}
     get ai(){return this.#options.ai??null;}
+    get aiName(){return this.#entity.aiName;}
+    set aiName(value){
+        if(!is.string(value)) throw new TypeError('aiName must be a string.');
+        this.#entity.aiName=value;
+    }
 
     async #requestConfiguredAI(request){
         const providerRequest=providerRequestWithoutLifecycleCallbacks(request);
@@ -542,6 +556,7 @@ class PersistentAIChatSession{
     /** Persists one model-authored opening while retaining none of its bootstrap request. */
     async open(input){
         const settings=normalizeOpening(input);
+        const name=this.aiName;
         if(this.#pending){
             throw coded(new Error('A chat request is already active for this session.'),'AI_CHAT_BUSY');
         }
@@ -563,22 +578,15 @@ class PersistentAIChatSession{
             );
             await this.#entity.addAIMessage(
                 prepared.response.message.content,
-                {extractMemory:false,persist:true},
+                {extractMemory:false,persist:true,name},
             );
             const committed=prepared.commit();
             prepared=null;
             const assistantRecord=this.#entity.transcript.at(-1);
-            return assistantRecord?.role==='assistant'
-                ?{
-                    ...committed,
-                    message:{
-                        ...committed.message,
-                        ...(assistantRecord.timestamp!==undefined
-                            ?{timestamp:assistantRecord.timestamp}
-                            :{}),
-                    },
-                }
-                :committed;
+            return assistantDisplayResponse(
+                committed,name,
+                assistantRecord?.role==='assistant'?assistantRecord.timestamp:undefined,
+            );
         }catch(error){
             prepared?.rollback();
             throw error;
@@ -589,6 +597,7 @@ class PersistentAIChatSession{
 
     async #requestTurn(input,streamHandlers=null){
         const settings=normalizeSend(input);
+        const name=this.aiName;
         if(this.#pending){
             throw coded(new Error('A chat request is already active for this session.'),'AI_CHAT_BUSY');
         }
@@ -668,7 +677,7 @@ class PersistentAIChatSession{
             if(!settings.messagePersist){
                 prepared.rollback();
                 prepared=null;
-                return result;
+                return assistantDisplayResponse(result,name);
             }
             await this.#entity.addTurn({
                 assistantMessage:result.message,
@@ -680,6 +689,7 @@ class PersistentAIChatSession{
                     })
                 ),
                 messagePersist:settings.messagePersist,
+                name,
                 ...(settings.entityRequestMessages.length===1
                     ?{requestMessage:settings.entityRequestMessages[0]}
                     :{requestMessages:settings.entityRequestMessages}),
@@ -696,17 +706,10 @@ class PersistentAIChatSession{
             }
             const transcript=this.#entity.transcript;
             const assistantRecord=transcript.at(-1);
-            return assistantRecord?.role==='assistant'
-                ?{
-                    ...committed,
-                    message:{
-                        ...committed.message,
-                        ...(assistantRecord.timestamp!==undefined
-                            ?{timestamp:assistantRecord.timestamp}
-                            :{}),
-                    },
-                }
-                :committed;
+            return assistantDisplayResponse(
+                committed,name,
+                assistantRecord?.role==='assistant'?assistantRecord.timestamp:undefined,
+            );
         }catch(error){
             prepared?.rollback();
             throw error;

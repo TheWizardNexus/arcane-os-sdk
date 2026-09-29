@@ -1576,7 +1576,9 @@
                         :'Tool'
                     :message.role==='system'
                     ?'System'
-                    :host.aiName;
+                    :is.string(message.name)&&message.name.trim()
+                        ?message.name
+                        :'AI';
                 item=createTranscriptMessage(message.role,message.content,name,{
                     timestamp:message.timestamp,
                     toolCalls:calls,
@@ -3245,6 +3247,9 @@
         const previousPendingToolCalls=[...pendingStructuralToolCalls];
         const streamedStructuralToolCalls=[];
         const messageId=`session-${++sessionMessageSequence}`;
+        const responseName=is.string(session.aiName)&&session.aiName.trim()
+            ?session.aiName
+            :host.aiName;
         const sessionMessageToken=Symbol(messageId);
         const transientCards=retainTurn?[]:[...requestMessages];
         function removeTransientSessionCards(){
@@ -3259,7 +3264,7 @@
         applyAIAvailability(host.aiAvailability);
         setSessionStatus('sending','AI is responding…');
         try{
-            const responseCard=receivedMessage(host.aiName, '', messageId);
+            const responseCard=receivedMessage(responseName, '', messageId);
             if(!retainTurn) transientCards.push(responseCard);
             await streamMessage('',messageId,true);
             setMessageProgress(
@@ -3344,6 +3349,10 @@
                 result.message.content,
                 committedTurn?.response?.timestamp??result.message.timestamp
             );
+            const assistantName=committedTurn?.response?.name??result.message.name;
+            if(is.string(assistantName)&&assistantName.trim()){
+                message.querySelector('.message_header strong').textContent=assistantName;
+            }
             for(const [index,requestMessage] of requestMessages.entries()){
                 setTranscriptMessageTimestamp(
                     requestMessage,

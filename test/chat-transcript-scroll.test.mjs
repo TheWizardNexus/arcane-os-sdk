@@ -7,6 +7,65 @@ const source = await readFile(
     new URL('../runtime/arcane/components/chat.html', import.meta.url),
     'utf8'
 );
+const historyStart = source.indexOf('    function renderSessionHistory(history){');
+const historyEnd = source.indexOf('\n    async function bindSession(', historyStart);
+assert.notEqual(historyStart, -1);
+assert.notEqual(historyEnd, -1);
+
+// Exercise the actual restoration function with record-only DOM substitutes.
+const initializeHistory = Function('host', `'use strict';
+    const is = {array: Array.isArray, string: value => typeof value === 'string'};
+    const isPlainRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+    let sessionHistoryRecoveryMessage = '';
+    let transcriptFollowing = false;
+    let transcriptScrollTop = 0;
+    const chatOutput = {
+        scrollTop: 0,
+        children: [],
+        ownerDocument: {
+            createDocumentFragment() {
+                return {children: [], append(item) {this.children.push(item);}};
+            }
+        },
+        replaceChildren(fragment) {this.children = fragment.children;}
+    };
+    function normalizeVisibleToolCalls(calls) {return calls ?? [];}
+    function setPendingStructuralToolCalls() {}
+    function scrollTranscriptToBottom() {}
+    function createTranscriptMessage(role, content, name, options) {
+        return {role, content, name, ...options};
+    }
+    function chatError(message, code) {return Object.assign(new Error(message), {code});}
+    const arcaneLogging = {error(message, error) {throw error;}};
+    function createSavedRecordFallback() {throw new Error('Unexpected saved-record fallback.');}
+    ${source.slice(historyStart, historyEnd)}
+    return {render: renderSessionHistory, chatOutput};
+`);
+
+test('chat history restores exact saved assistant names without current-name inference', function restoreSavedNames() {
+    const host = {name: 'Current user', aiName: 'Current assistant is different'};
+    const fixture = initializeHistory(host);
+    const history = [
+        {role: 'assistant', content: 'Complete named reply.\nSecond line.', name: '  Orbit / 🐙  ', timestamp: 1},
+        {role: 'assistant', content: 'Older nameless reply.', timestamp: 2},
+        {role: 'assistant', content: 'Blank saved name.', name: ' \n\t ', timestamp: 3},
+        {role: 'assistant', content: 'Nonstrings are not display names.', name: 42, timestamp: 4},
+        {role: 'assistant', content: 'Null is not a display name.', name: null, timestamp: 5},
+        {role: 'user', content: 'User content.', name: 'Saved user metadata', timestamp: 6},
+        {role: 'tool', content: 'Complete tool message.', name: 'lookup', status: 'completed', timestamp: 7},
+        {role: 'system', content: 'Existing system record.', timestamp: 8},
+    ];
+    const original = structuredClone(history);
+    const rendered = fixture.render(history);
+    assert.deepEqual(rendered.map(message => message.name),
+        ['  Orbit / 🐙  ', 'AI', 'AI', 'AI', 'AI', 'Current user', 'Tool · lookup', 'System']);
+    assert.deepEqual(rendered.map(message => message.content), history.map(message => message.content));
+    assert.deepEqual(rendered.map(message => message.timestamp), history.map(message => message.timestamp));
+    host.aiName = 'Another future assistant';
+    assert.deepEqual(fixture.render(history), rendered);
+    assert.deepEqual(history, original);
+});
+
 const scrollStart = source.indexOf('    let transcriptFollowing = true;');
 const scrollEnd = source.indexOf('\n\n    function transcriptTime', scrollStart);
 const visibilityStart = source.indexOf('        if(!conversationVisible && !host.conversationComplete)');

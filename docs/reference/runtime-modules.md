@@ -3013,12 +3013,23 @@ semantics; it does not define a new storage protocol.
 Exact exports: `PersistentAIChatSession`, `createPersistentAIChatSession`, and
 `default`.
 
-Constructor and factory options are `{ai,chat,chatEntity,chatFileName,
+Constructor and factory options are `{ai,aiName,chat,chatEntity,chatFileName,
 contextBuilder,loadExisting,memory,request,responseLength,systemPrompt}`. Public members are
 static `create()`, getters `ai`, `chatEntity`, and `fileName`, and `ready()`,
 `history()`, `transcript()`, `settleMemory()`, `open(input)`, `send(input)`, and
 `stream(input,handlers)`.
 `ready()` waits for initialization and resolves the same session instance.
+
+Optional `aiName` is an application-owned string, also exposed through the
+session's getter/setter. `open()`, `send()`, and `stream()` capture it at operation
+entry before awaiting readiness, memory, or the provider, so later name changes
+apply only to subsequent operations. A nonblank name is preserved exactly on
+the copied terminal `message.name` and the retained assistant transcript record;
+the terminal copy carries the assistant record's real timestamp when one exists.
+Empty or whitespace-only names omit this display field. The complete raw
+`providerResponse` stays unchanged. Configured model context and memory inputs
+omit the application display name. Existing stored history is never renamed or
+rewritten when `aiName` changes; `persist:false` remains operation-only.
 
 `open({message:{content,persist:false?},request?,signal?})` performs one
 application-authored bootstrap request only when the retained conversation is
@@ -3049,8 +3060,9 @@ system prompt and every complete ordinary visible committed turn. Only a
 currently unresolved structural-call tail remains raw for its matching active
 continuation. `transcript()` returns the sanitized human-readable ChatEntity
 projection.
-User and assistant records retain only role, complete visible content, and the
-real timestamp. Tool records retain only role, the required user-facing
+User and assistant records retain role, complete visible content, and the
+real timestamp, with an optional exact nonblank application display name on
+assistant records. Tool records retain only role, the required user-facing
 `message` as content, and optional public `name` and result `status`.
 
 `stream()` accepts the same input as `send()` and optional

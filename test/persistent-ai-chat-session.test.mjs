@@ -46,6 +46,7 @@ globalThis.ai={fetch:async()=>{
 const {default:PersistentAIChatSession}=await import(
     '../runtime/arcane/modules/PersistentAIChatSession.js?persistent-session-contract'
 );
+const {default:ChatEntity}=await import('../runtime/arcane/entities/Chat.js');
 const {default:ConfiguredAIChatSession}=await import(
     '../runtime/arcane/modules/ConfiguredAIChatSession.js?recurring-history-contract'
 );
@@ -249,6 +250,146 @@ test('persistent chat stores only a model-authored opening and reloads it withou
     assert.ok(!(await reloaded.history()).some(
         message=>message.content==='Internal application bootstrap.'
     ));
+});
+
+test('assistant entity names belong to new records and never rename saved history',async()=>{
+    const entity=new ChatEntity();
+    entity.fileName='application-assistant-entity-name.jsonl';
+    assert.equal(entity.aiName,'');
+    entity.aiName='  Orbit / 🐙  ';
+    await entity.addAIMessage('Complete opening.\nSecond line.',{extractMemory:false});
+    entity.aiName='Comet';
+    await entity.addAIMessage('Explicit attribution.',{extractMemory:false,name:'  Vega  '});
+    const providerMessage={role:'assistant',content:'Complete reply.',name:'provider-protocol-name'};
+    await entity.addTurn({
+        requestMessage:{role:'user',content:'Question.'},
+        assistantMessage:providerMessage,
+        extractMemory:false,
+    });
+    await entity.addTurn({
+        requestMessage:{role:'user',content:'Another question.'},
+        assistantMessage:providerMessage,
+        extractMemory:false,
+        name:'',
+    });
+    const assistants=entity.transcript.filter(message=>message.role==='assistant');
+    assert.deepEqual(assistants.map(message=>message.name),['  Orbit / 🐙  ','  Vega  ','Comet',undefined]);
+    assert.equal(assistants[0].content,'Complete opening.\nSecond line.');
+    for(const message of assistants){
+        assert.ok(Number.isFinite(message.timestamp));
+        assert.deepEqual(Object.keys(message).sort(),
+            message.name===undefined?['content','role','timestamp']:['content','name','role','timestamp']);
+    }
+    assert.equal(providerMessage.name,'provider-protocol-name');
+    assert.ok(entity.messages.every(message=>!Object.hasOwn(message,'name')));
+    const saved=db.raw('chats',entity.fileName);
+    const reloaded=new ChatEntity();
+    reloaded.fileName=entity.fileName;
+    reloaded.aiName='New current name';
+    await reloaded.load();
+    assert.equal(db.raw('chats',entity.fileName),saved);
+    assert.deepEqual(reloaded.transcript,entity.transcript);
+    await reloaded.addAIMessage('Operation only.',{extractMemory:false,persist:false});
+    assert.deepEqual(reloaded.transcript,entity.transcript);
+    assert.equal(db.raw('chats',entity.fileName),saved);
+});
+
+test('persistent opening and turns capture application names before asynchronous work',async()=>{
+    const requests=[];
+    let releaseOpening;
+    const openingResponse=new Promise(resolve=>{releaseOpening=resolve;});
+    let releaseStream;
+    const streamResponse=new Promise(resolve=>{releaseStream=resolve;});
+    const ai={
+        async fetchRequest(request){
+            requests.push(structuredClone(request));
+            return requests.length===1?openingResponse:{
+                message:{role:'assistant',content:'Named next turn.',name:'provider metadata'},
+            };
+        },
+        async streamRequest(request){
+            requests.push({messages:structuredClone(request.messages)});
+            await request.onChunk('Complete streamed reply.');
+            return streamResponse;
+        },
+    };
+    const session=await PersistentAIChatSession.create({
+        ai,aiName:'  Opening name  ',chatFileName:'captured-assistant-names.jsonl',memory:false,
+    });
+    const opening=session.open({message:{content:'Internal bootstrap.',persist:false}});
+    session.aiName='Turn name';
+    releaseOpening({message:{role:'assistant',content:'Complete opening.',name:'provider opening'}});
+    const opened=await opening;
+    assert.equal(opened.message.name,'  Opening name  ');
+    assert.equal(opened.providerResponse.message.name,'provider opening');
+    assert.ok(Number.isFinite(opened.message.timestamp));
+    const sent=await session.send({message:{content:'A question.'}});
+    assert.equal(sent.message.name,'Turn name');
+    assert.equal(sent.providerResponse.message.name,'provider metadata');
+    session.aiName='Stream name';
+    const chunks=[];
+    const streaming=session.stream({message:{content:'Stream a reply.'}},
+        {onChunk:chunk=>chunks.push(chunk)});
+    session.aiName='Future name';
+    releaseStream({message:{role:'assistant',content:'Complete streamed reply.',name:'provider stream'}});
+    const streamed=await streaming;
+    assert.equal(streamed.message.name,'Stream name');
+    assert.deepEqual(chunks,['Complete streamed reply.']);
+    assert.ok(Number.isFinite(streamed.message.timestamp));
+    assert.equal(session.chatEntity.aiName,'Future name');
+    assert.deepEqual((await session.transcript()).filter(message=>message.role==='assistant')
+        .map(message=>message.name),['  Opening name  ','Turn name','Stream name']);
+    for(const request of requests){
+        assert.ok(request.messages.every(message=>!Object.hasOwn(message,'name')));
+    }
+    assert.ok((await session.history()).every(message=>!Object.hasOwn(message,'name')));
+    const stored=db.raw('chats',session.fileName);
+    const reloaded=await PersistentAIChatSession.create({
+        ai,aiName:'Reload name',chatFileName:session.fileName,memory:false,
+    });
+    assert.equal(db.raw('chats',session.fileName),stored);
+    assert.deepEqual(await reloaded.transcript(),await session.transcript());
+    assert.ok((await reloaded.history()).every(message=>!Object.hasOwn(message,'name')));
+});
+
+test('application names stay out of active tool context and nonpersistent retention',async()=>{
+    const requests=[];
+    const call={id:'named-tool-call',type:'function',function:{
+        name:'lookup',arguments:'{"message":"Looking up the complete result."}',
+    }};
+    const session=await PersistentAIChatSession.create({
+        aiName:'  Application guide  ',chatFileName:'named-tools-and-transient.jsonl',memory:false,
+        async chat(request){
+            requests.push(structuredClone(request));
+            return {message:requests.length===1?{
+                role:'assistant',content:'Looking now.',name:'provider protocol',tool_calls:[call],
+            }:{role:'assistant',content:'Complete result.',name:'provider protocol'}};
+        },
+    });
+    const toolTurn=await session.send({message:{content:'Look it up.'}});
+    assert.equal(toolTurn.message.name,'  Application guide  ');
+    assert.equal(toolTurn.providerResponse.message.name,'provider protocol');
+    assert.equal(toolTurn.message.tool_calls[0].function.name,'lookup');
+    const entityTail=session.chatEntity.messages.at(-1);
+    assert.equal(Object.hasOwn(entityTail,'name'),false);
+    assert.equal(entityTail.tool_calls[0].function.name,'lookup');
+    assert.equal((await session.history()).at(-1).name,'provider protocol');
+    await session.send({message:{role:'tool',tool_call_id:call.id,
+        content:'{"complete":"raw tool result"}',message:'Lookup completed.',name:'lookup',status:'completed'}});
+    const continuation=requests[1].messages.find(message=>message.tool_calls);
+    assert.equal(continuation.name,'provider protocol');
+    assert.deepEqual(continuation.tool_calls,[call]);
+    assert.ok(requests.every(request=>request.messages.every(
+        message=>message.name!=='  Application guide  ')));
+    const before=await session.transcript();
+    const history=await session.history();
+    const stored=db.raw('chats',session.fileName);
+    session.aiName='Transient name';
+    const transient=await session.send({message:{content:'One operation.',persist:false}});
+    assert.equal(transient.message.name,'Transient name');
+    assert.deepEqual(await session.transcript(),before);
+    assert.deepEqual(await session.history(),history);
+    assert.equal(db.raw('chats',session.fileName),stored);
 });
 
 test('persistent streaming accepts terminal-only calls and compares complete structural envelopes',async()=>{
@@ -688,12 +829,14 @@ test('existing stored rows remain unchanged while later entity writes use the na
     await db.set('chats',chatFileName,existingContent);
     const session=await PersistentAIChatSession.create({
         chat:async()=>({message:{role:'assistant',content:'unused'}}),
+        aiName:'New turns only',
         chatFileName,
         loadExisting:true,
         memory:false,
     });
 
     assert.equal(db.raw('chats',chatFileName),existingContent);
+    assert.equal(Object.hasOwn((await session.transcript())[1],'name'),false);
     await session.chatEntity.addUserMessage('New user turn.');
     await session.chatEntity.addAIMessage('New assistant turn.',{extractMemory:false});
 
@@ -710,7 +853,7 @@ test('existing stored rows remain unchanged while later entity writes use the na
         }),
         [
             {role:'user',content:'New user turn.'},
-            {role:'assistant',content:'New assistant turn.'},
+            {role:'assistant',content:'New assistant turn.',name:'New turns only'},
         ],
     );
 });

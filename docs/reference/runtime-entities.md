@@ -78,8 +78,9 @@ call and its matching results remain raw only through their one active provider
 continuation. Once that continuation settles, `messages` replaces the protocol
 with complete ordinary visible call, public result, and assistant content.
 `transcript` returns the narrow human-readable projection owned by the durable
-storage boundary. User and assistant records contain only role, complete
-visible content, and their real timestamp. A visible tool record may
+storage boundary. User and assistant records contain role, complete
+visible content, and their real timestamp. An assistant record may also carry
+its application-owned display `name`. A visible tool record may
 additionally carry its public name and plain result status, while its `content`
 comes only from the tool call's required user-facing `message`. System prompts,
 reasoning, provider-extension fields, memory flags, raw tool calls, call IDs,
@@ -89,6 +90,15 @@ they are not retained in `messages`, `transcript`, memory extraction, or DBOPFS.
 One complete nonblank assistant record is also a durable conversation entry, so
 a model-authored opening can be stored and survive maintenance before the first
 ordinary user turn. No synthetic user record is required or written.
+
+`aiName` defaults to an empty string. `addAIMessage(text,{name=chat.aiName,...})`
+and `addTurn({name=chat.aiName,...})` capture that application-owned name on the
+new assistant record. A nonblank string is preserved exactly; blank or
+nonstring names are omitted. Provider `message.name` never establishes that
+display attribution. The name is transcript-only metadata: `messages` and
+memory extraction omit it, including during a pending tool continuation.
+Changing `aiName` affects later messages only; loading existing records does
+not rename or rewrite them.
 
 An assistant record may open an ordered array of structural calls with unique
 IDs in transient provider state. Until every pending ID receives exactly one
