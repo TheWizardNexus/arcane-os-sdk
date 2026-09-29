@@ -417,7 +417,7 @@
       "availability": "Cross-host with an injected event constructor outside DOM hosts",
       "protocol": "In-process only",
       "normalization": "Fully normalized labels, rows, definitions, visibility, formats, editor and voice options, plus capability-neutral STT activation intent and presentation state. Complete finite progress measures remain visible, including fractional and over-total values.",
-      "surface": "Constant sets plus normalization, complete finite-progress formatting, and explicit STT activation helpers. normalizeVoiceOptions preserves manual capture and standard controls by default and accepts continuous capture timing/activity options, simple controls, showComplete, and retry/cancel labels."
+      "surface": "Constant sets plus normalization, complete finite-progress formatting, and explicit STT activation helpers. normalizeVoiceOptions preserves manual capture and standard controls by default and accepts continuous capture timing/activity options, simple controls, showComplete, and retry/cancel labels. normalizeMarkdownOptions adds fit and followPreview strict booleans default false, retains omitted prior values, and accepts explicit false resets without changing existing editor options."
     },
     {
       "file": "runtime/arcane/modules/ConfiguredAIChatSession.js",
@@ -885,11 +885,11 @@
       "exports": [
         "default"
       ],
-      "summary": "Renders complete Markdown with Marked and exposes the complete rendered markup.",
+      "summary": "Renders complete Markdown with Marked and optionally maps source blocks to rendered comment anchors.",
       "availability": "Browser / native WebView",
       "protocol": "Marked",
-      "normalization": "Complete raw and rendered Marked values; parse errors remain vendor-native.",
-      "surface": "default `MD`; `raw`, `rendered`, `safeRendered`, `append()`."
+      "normalization": "Complete raw and rendered Marked values; parse errors remain vendor-native. Opt-in source mapping preserves original UTF-16 offsets and adds only comment anchors to complete rendered output. Lists, quotes, and tables map at top-level block granularity; invisible source or unavailable parsed anchors use the consumer's nearest available block behavior. Mapping is rebuilt on raw replacement and append, without persistence or viewport movement.",
+      "surface": "default MD; new MD(raw,{sourceMap:true}) enables ordered sourceMap records {start,end,marker,type}, with inclusive start/exclusive end in original UTF-16 source positions and marker equal to generated comment data. Locate anchors with a comment TreeWalker, not a CSS selector. Markers are opaque and may change after edits. sourceMap exposes the current mutable array, replaced after each successful render. raw, rendered, safeRendered, and append() remain; default sourceMap is empty and ordinary output is unchanged. Rendering and getters are DOM-independent."
     },
     {
       "file": "runtime/arcane/modules/MemoryRecords.js",

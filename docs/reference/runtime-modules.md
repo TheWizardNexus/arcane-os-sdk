@@ -98,7 +98,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`MailTransport.mjs`](#mailtransportmjs) | esm | Sends one complete mail report to a normalized HTTP(S) endpoint. | Browser/server with fetch + cloud | Normalized endpoint and transport errors; remote detail preserved. |
 | [`MarkdownSpeech.js`](#markdownspeechjs) | esm | Removes repeated Markdown formatting marks from streamed narration. | Cross-host | Speech-only filtering; single marks and ordinary punctuation remain literal. |
 | [`Marked.min.js`](#markedminjs) | esm | Vendored Marked 18.0.5 Markdown lexer, parser, renderer, extension, and walk-token API. | Cross-host vendor module | Vendor-native Marked contract. |
-| [`MD.js`](#mdjs) | esm | Renders complete Markdown with Marked and exposes the complete rendered markup. | Browser / native WebView | Complete raw and rendered Marked values; parse errors vendor-native. |
+| [`MD.js`](#mdjs) | esm | Renders complete Markdown with Marked and optionally maps source blocks to rendered comment anchors. | Browser / native WebView | Complete raw and rendered Marked values; opt-in original-source offsets; parse errors vendor-native. |
 | [`MemoryRecords.js`](#memoryrecordsjs) | esm | Normalizes memory content and detects meaningful stored memory. | Cross-host | Fully normalized string/boolean results. |
 | [`MessageAdvisory.js`](#messageadvisoryjs) | esm | Normalizes message content advisories and contains per-message inspection failures. | Cross-host | Normalized advisory records; inspector failures converted to unavailable results. |
 | [`ModelDefinition.js`](#modeldefinitionjs) | esm | Parses the deterministic packaged Modelfile subset and extracts the SYSTEM prompt. | Cross-host | Complete mutable definition with coded malformed-input errors. |
@@ -1647,6 +1647,14 @@ the shared voice component. Positive quiet/chunk durations and nonnegative
 pre-roll/activity values must be finite. Complete callback payloads remain
 owned by the component and application.
 
+`normalizeMarkdownOptions(input,previous)` adds strict opt-in `fit` and
+`followPreview` booleans, both defaulting to `false`. Omitted fields preserve
+the corresponding previous value; explicit `false` disables the option.
+Existing Markdown labels, formats, visibility, read-only state, save behavior,
+callbacks, complete initial Markdown, and plain initial title remain intact.
+The shared editor consumes these options for bounded responsive panes and
+body-edit preview following; the normalizer itself performs no DOM work.
+
 `createSTTActivationController({host,button,progress=null,onChange,EventClass=CustomEvent})`
 consumes only normalized
 [`AIRuntimeState`](#airuntimestatejs) `stt` role records. Its mutable controller
@@ -2759,25 +2767,66 @@ console.log(Object.keys(module));
 ### Overview
 
 Renders complete Markdown with Marked and exposes the same complete rendered
-markup through `rendered` and `safeRendered`.
+markup through `rendered` and `safeRendered`. Optional source mapping lets a
+consumer locate rendered blocks without adding visible wrappers or changing
+the authored Markdown.
 
 ### Public surface
 
-default `MD`; `raw`, `rendered`, `safeRendered`, `append()`.
+Default `MD`; `raw`, `rendered`, `safeRendered`, `sourceMap`, `append()`.
+
+`new MD(raw,{sourceMap:true})` enables block mapping. The `sourceMap` getter
+returns ordered `{start,end,marker,type}` records. `start` is inclusive and
+`end` is exclusive, measured in UTF-16 positions in the exact original `raw`
+string, matching native textarea selection offsets. `marker` is the complete
+data of a generated HTML comment, not a CSS selector. A consumer can locate
+it after rendering with `document.createTreeWalker(root,NodeFilter.SHOW_COMMENT)`.
+The generated marker prefix is chosen so it does not collide with authored
+source comments. Marker values are opaque and may change after an edit.
+The getter exposes the current mutable array; each successful render replaces
+it with a new array, so a previously retained array describes the prior render.
+
+In this opt-in mode, `rendered` and `safeRendered` contain the complete rendered
+Markdown plus comment anchors; no element wrappers or attributes are added.
+Lists, block quotes, and tables map at their top-level block rather than to
+individual characters. Blank space and definitions have no visible block;
+raw HTML can also absorb a comment during DOM parsing. A consumer follows the
+nearest available rendered block in those cases. This is block-position
+mapping, not exact rendered glyph or caret geometry.
+
+Assigning `raw` or calling `append(string)` rebuilds both the complete rendered
+result and its current mapping. Without `sourceMap:true`, `sourceMap` is empty
+and the ordinary rendered output is unchanged. Existing raw content, link
+behavior, no-op `rendered` setter, and complete `append()` result remain.
 
 Exact exports: `default`.
 
 ### Availability and normalization
 
 **Browser / native WebView.** Raw Marked behavior is preserved; parse errors are
-vendor-native. Transport: Marked. [Deep protocol details](protocols.md).
+vendor-native. Rendering and the getters are DOM-independent. DOM lookup and
+scrolling belong to the consuming component;
+mapping performs no persistence or viewport movement. Transport: Marked.
+[Deep protocol details](protocols.md).
 
 ### Example
 
 ```javascript
-import * as module from '/arcane/modules/MD.js';
+import MD from '/arcane/modules/MD.js';
 
-console.log(Object.keys(module));
+const notes=new MD('# Dragon field notes\n\nThe library dragon ate the index.',{
+    sourceMap:true
+});
+const preview=document.querySelector('#preview');
+preview.innerHTML=notes.safeRendered;
+const comments=document.createTreeWalker(preview,NodeFilter.SHOW_COMMENT);
+const firstBlock=notes.sourceMap[0];
+while(comments.nextNode()){
+    if(comments.currentNode.data===firstBlock.marker){
+        console.log(firstBlock,comments.currentNode.nextSibling);
+        break;
+    }
+}
 ```
 
 ## MemoryRecords.js

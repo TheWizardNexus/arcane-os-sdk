@@ -515,7 +515,7 @@
     {
       "file": "runtime/arcane/components/markdown-editor.html",
       "name": "markdown-editor.html",
-      "purpose": "Configurable Markdown authoring, toolbar, preview, title, and save surface.",
+      "purpose": "Configurable Markdown authoring, toolbar, preview, plain-text title, and save surface with optional bounded input/preview panes and edit-position following.",
       "methods": [
         "configure()",
         "focus()",
@@ -535,7 +535,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "Editor values normalized; injected save result mixed"
+      "normalization": "Editor values and optional presentation behavior normalized; injected save result mixed. fit and followPreview default false, preserve omitted prior configuration, and accept explicit false resets; data-fit and data-follow-preview select the initial options. Fit requires an application-bounded host and provides independent input/preview scrolling in roomy columns or narrow stacked panes without changing the application shell. Following responds to body typing/format edits, leaves manual preview scrolling independent until the next edit, and does not treat title edits or programmatic value replacement as follow requests. Public parts editor/title/toolbar/input/preview/actions/status/save-action allow application styling while the title stays native plain text. Existing controls, complete save payload, save cancellation, and destruction behavior remain."
     },
     {
       "file": "runtime/arcane/components/media-embed.html",

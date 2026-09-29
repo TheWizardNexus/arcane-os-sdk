@@ -147,11 +147,11 @@ console.log(marked.parse('# Ready'));`
     {
         name:'MD.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Import applies Arcane Marked options to the shared vendored singleton. Construction, raw assignment, and append() reparse complete Markdown; safeRendered returns the same complete rendered markup.',
-        paramsResults:'new MD(raw); raw getter/setter; rendered getter with intentionally no-op setter; safeRendered returns rendered without stripping markup; append(string) returns the updated complete raw Markdown.',
+        lifecycleSideEffects:'Import applies Arcane Marked options to the shared vendored singleton. Construction, raw assignment, and append() reparse complete Markdown and rebuild opted-in source mapping; safeRendered returns the same complete rendered markup. Source mapping adds generated comment anchors only and owns no DOM scrolling or persistence.',
+        paramsResults:'new MD(raw,{sourceMap:true}) opts into a sourceMap getter with ordered {start,end,marker,type} records; start is inclusive and end exclusive in UTF-16 positions of the exact original raw string. marker is complete generated comment data for TreeWalker(SHOW_COMMENT) lookup, not a CSS selector, and its prefix avoids authored-source collision. Markers are opaque and may change after edits. sourceMap exposes the current mutable array, replaced after each successful render. Rendered output remains complete with only added comment anchors, no element wrappers or attributes. Lists, quotes, and tables use top-level blocks; consumers use the nearest available block for invisible source or an anchor absorbed by raw HTML, rather than exact glyph/caret geometry. Default sourceMap is empty and ordinary output unchanged. raw getter/setter; rendered getter with intentionally no-op setter; safeRendered returns rendered without stripping markup; append(string) returns the updated complete raw Markdown.',
         events:[],
-        errors:['Marked parse or DOM exceptions can propagate.','Non-string raw/append input is contained with console.trace and leaves state unchanged.'],
-        capabilitiesCore:'None; safeRendered requires browser/native-WebView DOM.',
+        errors:['Marked parse exceptions can propagate.','Non-string raw/append input is reported through arcaneLogging.trace and leaves the existing value unchanged.'],
+        capabilitiesCore:'No Core service; rendering and getters are DOM-independent. Consumers own DOM anchor lookup and viewport behavior.',
         example:String.raw`import MD from '/arcane/modules/MD.js';
 
 const md = new MD('# Ready\n<script>alert(1)</script>');

@@ -77,7 +77,7 @@ appropriate.
 | [`integration-settings.html`](#integration-settingshtml) | Edits non-secret communication service configuration and service actions. | `configure()`<br>`getValues()`<br>`setStatus()`<br>`destroy()` | `integration-settings-ready`<br>`integration-settings-save`<br>`integration-settings-close`<br>`integration-action` | Normalized non-secret values |
 | [`local-ai-status.html`](#local-ai-statushtml) | Presents local-AI standby, failure, recovery, guidance, retry, and dismissal states. | `configure()`<br>`begin()`<br>`present()`<br>`destroy()`<br>`hidden` | `local-ai-status-ready`<br>`local-ai-status-dismissed`<br>`local-ai-retry` | Fully normalized LocalAIReadiness report |
 | [`markdown-document.html`](#markdown-documenthtml) | Renders and navigates a complete Markdown document with focusable fragments. | `configure()`<br>`load()`<br>`render()`<br>`clear()`<br>`fail()`<br>`focus()`<br>`focusFragment()`<br>`destroy()` | `markdown-document-ready`<br>`markdown-document-state`<br>`markdown-document-loading`<br>`markdown-document-rendered`<br>`markdown-document-empty`<br>`markdown-document-error`<br>`markdown-document-navigate` | Complete Markdown/state normalized; malformed input and Marked/DOM failures remain visible |
-| [`markdown-editor.html`](#markdown-editorhtml) | Configurable Markdown authoring, toolbar, preview, title, and save surface. | `configure()`<br>`focus()`<br>`clear()`<br>`saveEntry()`<br>`destroy()` | `markdown-editor-ready`<br>`markdown-editor-change`<br>`markdown-editor-saved` | Editor values normalized; injected save result mixed |
+| [`markdown-editor.html`](#markdown-editorhtml) | Configurable Markdown authoring with optional bounded input/preview panes and edit-position following. | `configure()`<br>`focus()`<br>`clear()`<br>`saveEntry()`<br>`destroy()` | `markdown-editor-ready`<br>`markdown-editor-change`<br>`markdown-editor-saved` | Editor values, opt-in fit layout, and preview following normalized; injected save result mixed |
 | [`media-embed.html`](#media-embedhtml) | Loads a parsed YouTube video or playlist embed with ordinary hosting by default, optional privacy enhancement, and an external-platform action. | `configure()`<br>`load()`<br>`destroy()` | `media-embed-ready`<br>`media-load`<br>`media-error`<br>`media-open-platform` | URL/error normalized; iframe/platform behavior native |
 | [`modal.html`](#modalhtml) | Generic modal with population, configurable user dismissal, actions, and concurrent task execution. | `configure()`<br>`populate()`<br>`open()`<br>`close()`<br>`runTasks()`<br>`destroy()`<br>`running`<br>`opened` | `modal-ready`<br>`modal-opened`<br>`modal-closed`<br>`modal-action` | Modal state normalized; injected task results mixed |
 | [`output-panel.html`](#output-panelhtml) | Presents status, output, body, coverage, actions, pending, error, and cleared states. | `configure()`<br>`setOutput()`<br>`setBody()`<br>`setCoverage()`<br>`setActions()`<br>`setPending()`<br>`setStatus()`<br>`setError()`<br>`clear()`<br>`destroy()` | `output-panel-ready`<br>`output-panel-state`<br>`output-panel-change`<br>`output-panel-action`<br>`output-panel-error`<br>`output-panel-cleared` | DOM-normalized |
@@ -1021,11 +1021,56 @@ subject to the bound app's capabilities. [Deep protocol details](protocols.md).
 
 ### Overview
 
-Configurable Markdown authoring, toolbar, preview, title, and save surface.
+Configurable Markdown authoring, toolbar, preview, plain-text title, and save
+surface. The default editor retains its growing stacked layout and existing
+controls. Optional fit mode keeps the Markdown input and rendered preview
+inside an application-supplied bounded area.
 
 ### Public surface
 
-Methods/properties: `configure()`, `focus()`, `clear()`, `saveEntry()`, `destroy()`.
+Methods/properties: `configure()`, `focus()`, `clear()`, `saveEntry()`,
+`destroy()`, `value`, `entryTitle`, `options`.
+
+`configure({fit:true,followPreview:true})` opts into the two independent
+behaviors. Both options default to `false`; omitted options retain their
+previous values during reconfiguration, and explicit `false` disables either.
+Initial markup can use `data-fit="true"` and `data-follow-preview="true"`.
+
+`fit:true` fills the host's available height. The application must supply a
+bounded host height and allow its enclosing flex/grid item to shrink, for
+example with `min-height:0`. Input and preview have independent scroll areas:
+two columns when room permits and two bounded stacked panes on narrow widths.
+Title, toolbar, status, and save remain outside those scrolling panes. Hiding
+the preview leaves the input the available pane space. Fit mode does not
+change the application's fixed shell or scroll the page.
+
+`followPreview:true` follows the Markdown body's active edit position after
+typing or applying a toolbar format. It scrolls the preview only as needed
+to bring a short corresponding block into view; a block taller than the pane
+uses the caret's approximate fraction within that block. Users can scroll the
+preview independently, and rerendering retains that reading position; the next
+body edit may reposition it. Title edits,
+programmatic value replacement, and ordinary preview scrolling do not request
+edit-position following. Moving the selection alone does not trigger following,
+and following never scrolls the input pane or containing page. The title
+remains a native plain-text input.
+Following uses the shared [Markdown block mapping](runtime-modules.md#mdjs);
+lists, quotes, and tables follow their block, while invisible source positions
+use a nearby available rendered block rather than exact glyph geometry.
+
+Public CSS parts are `editor`, `title`, `toolbar`, `input`, `preview`,
+`actions`, `status`, and `save-action`. Applications can make the title
+borderless and compact through `::part(title)` while retaining its native
+editing behavior and visible keyboard focus. These parts are styling hooks,
+not slots or replacement controls.
+
+Existing `showTitle`, `showToolbar`, `showSave`, `showPreview`, `readOnly`,
+`clearOnSave`, labels, formats, and callbacks keep their behavior. `onSave`
+or the host's `save` receives complete `{title,markdown}` plus a second
+`{signal,operationId}` context; layout and following add no fields to the
+saved content. Edits, replacement, clear, and destruction retain the existing
+save cancellation and late-result suppression. Destruction also cancels the
+pending preview frame.
 
 Events: `markdown-editor-ready`, `markdown-editor-change`, `markdown-editor-saved`.
 
@@ -1033,7 +1078,10 @@ Shared dependencies: [`MD.js`](runtime-modules.md#mdjs), [`ComponentContracts.js
 
 ### Availability and normalization
 
-**Browser and supported native WebViews.** Editor values normalized; injected save result mixed. HTMLImport + DOM; injected Arcane/provider modules where listed. Native methods remain subject to the bound app's capabilities. [Deep protocol details](protocols.md).
+**Browser and supported native WebViews.** Editor values, opt-in fit layout,
+and preview following are normalized; the injected save result remains
+application-owned. HTMLImport + DOM; native methods remain subject to the
+bound app's capabilities. [Deep protocol details](protocols.md).
 
 ### Example
 
@@ -1041,6 +1089,28 @@ Shared dependencies: [`MD.js`](runtime-modules.md#mdjs), [`ComponentContracts.js
 <html-import
   id="markdown-editor.html"
   href="/arcane/components/markdown-editor.html">
+</html-import>
+```
+
+For a bounded editor, choose the height in the application and style only the
+public title part:
+
+```html
+<style>
+  #field-notes { display:block; height:32rem; min-height:0; }
+  #field-notes::part(title) {
+    border:0;
+    border-radius:0;
+    background:transparent;
+    padding:.35em 0;
+  }
+</style>
+<html-import
+  id="field-notes"
+  href="/arcane/components/markdown-editor.html"
+  data-fit="true"
+  data-follow-preview="true"
+  data-title-placeholder="Dragon field notes">
 </html-import>
 ```
 

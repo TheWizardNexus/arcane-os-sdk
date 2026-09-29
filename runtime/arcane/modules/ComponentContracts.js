@@ -1101,6 +1101,8 @@ function normalizeMarkdownOptions(input={},previous={}){
         showPreview:option(input,previous,'showPreview',true)!==false,
         showToolbar:option(input,previous,'showToolbar',true)!==false,
         showSave:option(input,previous,'showSave',true)!==false,
+        fit:option(input,previous,'fit',false)===true,
+        followPreview:option(input,previous,'followPreview',false)===true,
         readOnly:option(input,previous,'readOnly',false)===true,
         clearOnSave:option(input,previous,'clearOnSave',true)!==false,
         onSave:optionalCallback(input,previous,['onSave','save'],'onSave'),
