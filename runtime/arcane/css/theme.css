@@ -1,76 +1,293 @@
-/* Arcane OS shared appearance layer.
- * Load after the shared layout.css (when used) and before primitives or app CSS.
- * Explicit user preferences use data-color-scheme; otherwise the device
- * preference selects the light or dark base.
+/* Shared default and named palettes. layout.css imports this owner, and
+ * standalone applications may load it directly before their own styles.
+ * data-user-skin selects the root palette; data-arcane-palette scopes a swatch.
+ * Custom themes retain their root inline tokens and deliberate precedence.
  */
 
 :root,
-:root[data-color-scheme="light"]{
+[data-arcane-palette],
+:root:not([data-user-skin]):not([data-arcane-skin="custom"]) body:is(.default,.warm,.curious,.hopeful,.harmony,.warrior){
+    --arcane-palette-light-background:rgb(244, 246, 251);
+    --arcane-palette-light-modal-background:rgb(255, 255, 255);
+    --arcane-palette-light-text-color:rgb(23, 34, 56);
+    --arcane-palette-light-primary-color:rgb(23, 34, 56);
+    --arcane-palette-light-secondary-color:rgb(229, 233, 243);
+    --arcane-palette-light-accent-color:var(--focus-color);
+    --arcane-palette-light-button-text-color:rgb(255, 255, 255);
+    --arcane-palette-light-border-color:rgb(203, 211, 226);
+    --arcane-palette-light-focus-color:rgb(118, 87, 213);
+    --arcane-palette-light-muted-text-color:rgb(95, 107, 130);
+    --arcane-palette-light-success-color:rgb(39, 122, 75);
+    --arcane-palette-light-warning-color:rgb(154, 101, 0);
+    --arcane-palette-light-danger-color:rgb(165, 56, 56);
+    --arcane-palette-light-review-color:rgb(133, 85, 165);
+    --arcane-palette-light-shadow-color:rgba(23, 34, 56, .16);
+    --arcane-palette-light-platinum:rgb(102, 112, 133);
+    --arcane-palette-light-icon-filter:none;
+    --arcane-palette-light-file-icon-filter:hue-rotate(8deg) saturate(.62) brightness(.86);
+    --arcane-palette-dark-background:rgb(13, 18, 32);
+    --arcane-palette-dark-modal-background:rgb(21, 28, 45);
+    --arcane-palette-dark-text-color:rgb(237, 241, 250);
+    --arcane-palette-dark-primary-color:rgb(36, 43, 66);
+    --arcane-palette-dark-secondary-color:rgb(26, 33, 52);
+    --arcane-palette-dark-accent-color:var(--focus-color);
+    --arcane-palette-dark-button-text-color:rgb(255, 255, 255);
+    --arcane-palette-dark-border-color:rgb(59, 69, 94);
+    --arcane-palette-dark-focus-color:rgb(171, 148, 255);
+    --arcane-palette-dark-muted-text-color:rgb(174, 184, 204);
+    --arcane-palette-dark-success-color:rgb(97, 201, 144);
+    --arcane-palette-dark-warning-color:rgb(233, 184, 95);
+    --arcane-palette-dark-danger-color:rgb(240, 128, 128);
+    --arcane-palette-dark-review-color:rgb(198, 165, 242);
+    --arcane-palette-dark-shadow-color:rgba(0, 0, 0, .42);
+    --arcane-palette-dark-platinum:rgb(155, 167, 189);
+    --arcane-palette-dark-icon-filter:invert(.9) saturate(.7);
+    --arcane-palette-dark-file-icon-filter:invert(.84) sepia(.08) saturate(.72) hue-rotate(184deg) brightness(1.04);
     color-scheme:light;
-    --background:rgb(244, 246, 251);
-    --modal-background:rgb(255, 255, 255);
-    --text-color:rgb(23, 34, 56);
-    --primary-color:rgb(23, 34, 56);
-    --secondary-color:rgb(229, 233, 243);
-    --accent-color:var(--focus-color);
-    --button-text-color:rgb(255, 255, 255);
-    --border-color:rgb(203, 211, 226);
-    --focus-color:rgb(118, 87, 213);
-    --muted-text-color:rgb(95, 107, 130);
-    --success-color:rgb(39, 122, 75);
-    --warning-color:rgb(154, 101, 0);
-    --danger-color:rgb(165, 56, 56);
-    --review-color:rgb(133, 85, 165);
-    --shadow-color:rgba(23, 34, 56, .16);
-    --platinum:rgb(102, 112, 133);
-    --icon-filter:none;
-    --file-icon-filter:hue-rotate(8deg) saturate(.62) brightness(.86);
+    --background:var(--arcane-palette-light-background);
+    --modal-background:var(--arcane-palette-light-modal-background);
+    --text-color:var(--arcane-palette-light-text-color);
+    --primary-color:var(--arcane-palette-light-primary-color);
+    --secondary-color:var(--arcane-palette-light-secondary-color);
+    --accent-color:var(--arcane-palette-light-accent-color);
+    --button-text-color:var(--arcane-palette-light-button-text-color);
+    --border-color:var(--arcane-palette-light-border-color);
+    --focus-color:var(--arcane-palette-light-focus-color);
+    --muted-text-color:var(--arcane-palette-light-muted-text-color);
+    --success-color:var(--arcane-palette-light-success-color);
+    --warning-color:var(--arcane-palette-light-warning-color);
+    --danger-color:var(--arcane-palette-light-danger-color);
+    --review-color:var(--arcane-palette-light-review-color);
+    --shadow-color:var(--arcane-palette-light-shadow-color);
+    --platinum:var(--arcane-palette-light-platinum);
+    --icon-filter:var(--arcane-palette-light-icon-filter);
+    --file-icon-filter:var(--arcane-palette-light-file-icon-filter);
 }
 
-:root[data-color-scheme="dark"]{
+:root[data-user-skin="default"]:not([data-arcane-skin="custom"]),
+:root:not([data-user-skin]):not([data-arcane-skin="custom"]) body.default,
+[data-arcane-palette="default"]{
+    --arcane-palette-light-background:#E8EBF0;
+    --arcane-palette-light-modal-background:#F8F9FB;
+    --arcane-palette-light-text-color:#1F2937;
+    --arcane-palette-light-primary-color:#52677F;
+    --arcane-palette-light-secondary-color:#D8E1EB;
+    --arcane-palette-light-accent-color:#305F8D;
+    --arcane-palette-light-button-text-color:#FFFFFF;
+    --arcane-palette-light-border-color:#C6CED8;
+    --arcane-palette-light-focus-color:#2878B8;
+    --arcane-palette-light-muted-text-color:rgb(95, 107, 130);
+    --arcane-palette-light-success-color:#24804D;
+    --arcane-palette-light-warning-color:rgb(154, 101, 0);
+    --arcane-palette-light-danger-color:#B43C3C;
+    --arcane-palette-light-review-color:rgb(133, 85, 165);
+    --arcane-palette-light-shadow-color:rgba(30,41,59,.18);
+    --arcane-palette-light-platinum:#52606F;
+    --arcane-palette-light-icon-filter:none;
+    --arcane-palette-light-file-icon-filter:hue-rotate(-8deg) saturate(.65) brightness(.88);
+    --arcane-palette-dark-background:#0F1220;
+    --arcane-palette-dark-modal-background:#191D31;
+    --arcane-palette-dark-text-color:#EBEDF5;
+    --arcane-palette-dark-primary-color:#D94C94;
+    --arcane-palette-dark-secondary-color:#43B8AD;
+    --arcane-palette-dark-accent-color:#A58ADF;
+    --arcane-palette-dark-button-text-color:#161724;
+    --arcane-palette-dark-border-color:#3A4262;
+    --arcane-palette-dark-focus-color:#65D8CE;
+    --arcane-palette-dark-muted-text-color:rgb(174, 184, 204);
+    --arcane-palette-dark-success-color:#61C98B;
+    --arcane-palette-dark-warning-color:rgb(233, 184, 95);
+    --arcane-palette-dark-danger-color:#F07D7D;
+    --arcane-palette-dark-review-color:rgb(198, 165, 242);
+    --arcane-palette-dark-shadow-color:rgba(0,0,0,.42);
+    --arcane-palette-dark-platinum:#AEB5CA;
+    --arcane-palette-dark-icon-filter:brightness(0) invert(.78);
+    --arcane-palette-dark-file-icon-filter:hue-rotate(95deg) saturate(.8) brightness(1.12);
+}
+
+:root[data-user-skin="warm"]:not([data-arcane-skin="custom"]),
+:root:not([data-user-skin]):not([data-arcane-skin="custom"]) body.warm,
+[data-arcane-palette="warm"]{
+    --arcane-palette-light-background:#F8EFE5;
+    --arcane-palette-light-modal-background:#FFF9F3;
+    --arcane-palette-light-text-color:#352A24;
+    --arcane-palette-light-primary-color:#AF5822;
+    --arcane-palette-light-secondary-color:#F2D0AF;
+    --arcane-palette-light-accent-color:#8D4318;
+    --arcane-palette-light-border-color:#D8B99B;
+    --arcane-palette-light-platinum:#725848;
+    --arcane-palette-light-focus-color:#A64E19;
+    --arcane-palette-light-file-icon-filter:hue-rotate(160deg) saturate(.85) brightness(.9);
+    --arcane-palette-dark-background:#1D1613;
+    --arcane-palette-dark-modal-background:#2B211C;
+    --arcane-palette-dark-text-color:#F1E6DD;
+    --arcane-palette-dark-primary-color:#DF7C3B;
+    --arcane-palette-dark-secondary-color:#F1AA72;
+    --arcane-palette-dark-accent-color:#F0B783;
+    --arcane-palette-dark-border-color:#6A4939;
+    --arcane-palette-dark-platinum:#C9AB99;
+    --arcane-palette-dark-focus-color:#FFB27A;
+    --arcane-palette-dark-file-icon-filter:hue-rotate(160deg) saturate(.85) brightness(.9);
+    --arcane-palette-dark-button-text-color:#24160E;
+}
+
+:root[data-user-skin="curious"]:not([data-arcane-skin="custom"]),
+:root:not([data-user-skin]):not([data-arcane-skin="custom"]) body.curious,
+[data-arcane-palette="curious"]{
+    --arcane-palette-light-background:#EAF5EE;
+    --arcane-palette-light-modal-background:#F8FCF9;
+    --arcane-palette-light-text-color:#1E3327;
+    --arcane-palette-light-primary-color:#287A4E;
+    --arcane-palette-light-secondary-color:#CDE8D8;
+    --arcane-palette-light-accent-color:#1E6A42;
+    --arcane-palette-light-border-color:#AACDB8;
+    --arcane-palette-light-platinum:#4D6B5A;
+    --arcane-palette-light-focus-color:#1F7548;
+    --arcane-palette-light-file-icon-filter:hue-rotate(285deg) saturate(.65) brightness(.82);
+    --arcane-palette-dark-background:#101B16;
+    --arcane-palette-dark-modal-background:#1B2A22;
+    --arcane-palette-dark-text-color:#DFF1E6;
+    --arcane-palette-dark-primary-color:#4FAE78;
+    --arcane-palette-dark-secondary-color:#79C89B;
+    --arcane-palette-dark-accent-color:#86D1A7;
+    --arcane-palette-dark-border-color:#386247;
+    --arcane-palette-dark-platinum:#A6C4B0;
+    --arcane-palette-dark-focus-color:#8ED7AE;
+    --arcane-palette-dark-file-icon-filter:hue-rotate(285deg) saturate(.65) brightness(.82);
+    --arcane-palette-dark-button-text-color:#102117;
+}
+
+:root[data-user-skin="hopeful"]:not([data-arcane-skin="custom"]),
+:root:not([data-user-skin]):not([data-arcane-skin="custom"]) body.hopeful,
+[data-arcane-palette="hopeful"]{
+    --arcane-palette-light-background:#EAF3F9;
+    --arcane-palette-light-modal-background:#F8FCFF;
+    --arcane-palette-light-text-color:#203247;
+    --arcane-palette-light-primary-color:#2F6F9F;
+    --arcane-palette-light-secondary-color:#CFE4F3;
+    --arcane-palette-light-accent-color:#245F8B;
+    --arcane-palette-light-border-color:#B5CEDF;
+    --arcane-palette-light-platinum:#526C7F;
+    --arcane-palette-light-focus-color:#246A9D;
+    --arcane-palette-light-file-icon-filter:hue-rotate(345deg) saturate(.65) brightness(.95);
+    --arcane-palette-dark-background:#111821;
+    --arcane-palette-dark-modal-background:#1D2935;
+    --arcane-palette-dark-text-color:#E1EBF4;
+    --arcane-palette-dark-primary-color:#67A9D6;
+    --arcane-palette-dark-secondary-color:#96C7E8;
+    --arcane-palette-dark-accent-color:#A6D4F1;
+    --arcane-palette-dark-border-color:#3A5A72;
+    --arcane-palette-dark-platinum:#A8BAC9;
+    --arcane-palette-dark-focus-color:#9CD2F5;
+    --arcane-palette-dark-file-icon-filter:hue-rotate(345deg) saturate(.65) brightness(.95);
+    --arcane-palette-dark-button-text-color:#11202B;
+}
+
+:root[data-user-skin="harmony"]:not([data-arcane-skin="custom"]),
+:root:not([data-user-skin]):not([data-arcane-skin="custom"]) body.harmony,
+[data-arcane-palette="harmony"]{
+    --arcane-palette-light-background:#F2F0E5;
+    --arcane-palette-light-modal-background:#FCFAF4;
+    --arcane-palette-light-text-color:#303328;
+    --arcane-palette-light-primary-color:#90602F;
+    --arcane-palette-light-secondary-color:#DCE5C8;
+    --arcane-palette-light-accent-color:#386B4F;
+    --arcane-palette-light-border-color:#C9C6A9;
+    --arcane-palette-light-platinum:#646650;
+    --arcane-palette-light-focus-color:#4D7259;
+    --arcane-palette-light-file-icon-filter:hue-rotate(150deg) saturate(.55) brightness(.78);
+    --arcane-palette-dark-background:#191A14;
+    --arcane-palette-dark-modal-background:#282A21;
+    --arcane-palette-dark-text-color:#ECEBDB;
+    --arcane-palette-dark-primary-color:#D48A4B;
+    --arcane-palette-dark-secondary-color:#87B58E;
+    --arcane-palette-dark-accent-color:#E0AA70;
+    --arcane-palette-dark-border-color:#5C604A;
+    --arcane-palette-dark-platinum:#B9B9A3;
+    --arcane-palette-dark-focus-color:#A7CEA9;
+    --arcane-palette-dark-file-icon-filter:hue-rotate(150deg) saturate(.55) brightness(.78);
+    --arcane-palette-dark-button-text-color:#211A12;
+}
+
+:root[data-user-skin="warrior"]:not([data-arcane-skin="custom"]),
+:root:not([data-user-skin]):not([data-arcane-skin="custom"]) body.warrior,
+[data-arcane-palette="warrior"]{
+    --arcane-palette-light-background:#F5F7FA;
+    --arcane-palette-light-modal-background:#EFF2F6;
+    --arcane-palette-light-text-color:#1D232A;
+    --arcane-palette-light-primary-color:#FF7A1A;
+    --arcane-palette-light-secondary-color:#FFD166;
+    --arcane-palette-light-accent-color:#8C1D18;
+    --arcane-palette-light-border-color:#C7CDD6;
+    --arcane-palette-light-platinum:#A7A9AC;
+    --arcane-palette-light-button-text-color:#1D232A;
+    --arcane-palette-light-file-icon-filter:hue-rotate(160deg) saturate(1.2) brightness(1.03);
+    --arcane-palette-dark-background:#0E1216;
+    --arcane-palette-dark-modal-background:#151A20;
+    --arcane-palette-dark-text-color:#E9EEF3;
+    --arcane-palette-dark-primary-color:#FF7A1A;
+    --arcane-palette-dark-secondary-color:#FFB24A;
+    --arcane-palette-dark-accent-color:#E04F3D;
+    --arcane-palette-dark-border-color:#26313B;
+    --arcane-palette-dark-platinum:#A9B3BD;
+    --arcane-palette-dark-button-text-color:#1D232A;
+    --arcane-palette-dark-file-icon-filter:hue-rotate(160deg) saturate(1.2) brightness(1.03);
+    --arcane-palette-dark-focus-color:#FFB24A;
+}
+
+:root[data-color-scheme="dark"],
+[data-arcane-palette][data-color-scheme="dark"],
+:root[data-color-scheme="dark"] [data-arcane-palette]:not([data-color-scheme="light"]),
+:root[data-color-scheme="dark"]:not([data-user-skin]):not([data-arcane-skin="custom"]) body:is(.default,.warm,.curious,.hopeful,.harmony,.warrior){
     color-scheme:dark;
-    --background:rgb(13, 18, 32);
-    --modal-background:rgb(21, 28, 45);
-    --text-color:rgb(237, 241, 250);
-    --primary-color:rgb(36, 43, 66);
-    --secondary-color:rgb(26, 33, 52);
-    --accent-color:var(--focus-color);
-    --button-text-color:rgb(255, 255, 255);
-    --border-color:rgb(59, 69, 94);
-    --focus-color:rgb(171, 148, 255);
-    --muted-text-color:rgb(174, 184, 204);
-    --success-color:rgb(97, 201, 144);
-    --warning-color:rgb(233, 184, 95);
-    --danger-color:rgb(240, 128, 128);
-    --review-color:rgb(198, 165, 242);
-    --shadow-color:rgba(0, 0, 0, .42);
-    --platinum:rgb(155, 167, 189);
-    --icon-filter:invert(.9) saturate(.7);
-    --file-icon-filter:invert(.84) sepia(.08) saturate(.72) hue-rotate(184deg) brightness(1.04);
+    --background:var(--arcane-palette-dark-background);
+    --modal-background:var(--arcane-palette-dark-modal-background);
+    --text-color:var(--arcane-palette-dark-text-color);
+    --primary-color:var(--arcane-palette-dark-primary-color);
+    --secondary-color:var(--arcane-palette-dark-secondary-color);
+    --accent-color:var(--arcane-palette-dark-accent-color);
+    --button-text-color:var(--arcane-palette-dark-button-text-color);
+    --border-color:var(--arcane-palette-dark-border-color);
+    --focus-color:var(--arcane-palette-dark-focus-color);
+    --muted-text-color:var(--arcane-palette-dark-muted-text-color);
+    --success-color:var(--arcane-palette-dark-success-color);
+    --warning-color:var(--arcane-palette-dark-warning-color);
+    --danger-color:var(--arcane-palette-dark-danger-color);
+    --review-color:var(--arcane-palette-dark-review-color);
+    --shadow-color:var(--arcane-palette-dark-shadow-color);
+    --platinum:var(--arcane-palette-dark-platinum);
+    --icon-filter:var(--arcane-palette-dark-icon-filter);
+    --file-icon-filter:var(--arcane-palette-dark-file-icon-filter);
 }
 
 @media (prefers-color-scheme:dark){
-    :root:not([data-color-scheme]){
+    :root:not([data-color-scheme]),
+    :root:not([data-color-scheme]) [data-arcane-palette]:not([data-color-scheme="light"]),
+    :root:not([data-color-scheme]):not([data-user-skin]):not([data-arcane-skin="custom"]) body:is(.default,.warm,.curious,.hopeful,.harmony,.warrior){
         color-scheme:dark;
-        --background:rgb(13, 18, 32);
-        --modal-background:rgb(21, 28, 45);
-        --text-color:rgb(237, 241, 250);
-        --primary-color:rgb(36, 43, 66);
-        --secondary-color:rgb(26, 33, 52);
-        --accent-color:var(--focus-color);
-        --button-text-color:rgb(255, 255, 255);
-        --border-color:rgb(59, 69, 94);
-        --focus-color:rgb(171, 148, 255);
-        --muted-text-color:rgb(174, 184, 204);
-        --success-color:rgb(97, 201, 144);
-        --warning-color:rgb(233, 184, 95);
-        --danger-color:rgb(240, 128, 128);
-        --review-color:rgb(198, 165, 242);
-        --shadow-color:rgba(0, 0, 0, .42);
-        --platinum:rgb(155, 167, 189);
-        --icon-filter:invert(.9) saturate(.7);
-        --file-icon-filter:invert(.84) sepia(.08) saturate(.72) hue-rotate(184deg) brightness(1.04);
+        --background:var(--arcane-palette-dark-background);
+        --modal-background:var(--arcane-palette-dark-modal-background);
+        --text-color:var(--arcane-palette-dark-text-color);
+        --primary-color:var(--arcane-palette-dark-primary-color);
+        --secondary-color:var(--arcane-palette-dark-secondary-color);
+        --accent-color:var(--arcane-palette-dark-accent-color);
+        --button-text-color:var(--arcane-palette-dark-button-text-color);
+        --border-color:var(--arcane-palette-dark-border-color);
+        --focus-color:var(--arcane-palette-dark-focus-color);
+        --muted-text-color:var(--arcane-palette-dark-muted-text-color);
+        --success-color:var(--arcane-palette-dark-success-color);
+        --warning-color:var(--arcane-palette-dark-warning-color);
+        --danger-color:var(--arcane-palette-dark-danger-color);
+        --review-color:var(--arcane-palette-dark-review-color);
+        --shadow-color:var(--arcane-palette-dark-shadow-color);
+        --platinum:var(--arcane-palette-dark-platinum);
+        --icon-filter:var(--arcane-palette-dark-icon-filter);
+        --file-icon-filter:var(--arcane-palette-dark-file-icon-filter);
     }
+}
+
+:root[data-arcane-skin="custom"]{
+    --accent-color:var(--focus-color);
 }
 
 html{

@@ -124,7 +124,8 @@ export const RUNTIME_DOCUMENTED_CALLABLE_MEMBERS={
     'SystemToolRegistry.js':['quoteArgument'],
     'TerminalCommandRegistry.js':['splitCommandLine'],
     'ThemeBootstrap.js':['bootstrapArcaneTheme'],
-    'ThemeManager.js':['loadAndApplyTheme'],
+    'ThemeManager.js':['loadAndApplyTheme','applyUserSkin'],
+    'ThemePresentation.js':['applyUserSkin','remember','restore','reportError'],
     'ToolCallRouter.js':[
         'parseArguments','handleResponse','handleStreamedCalls'
     ],
@@ -1560,7 +1561,8 @@ export function extractModuleContract(source,{
 
 const CLASSIC_GLOBAL_OWNERS={
     'QRCode.min.js':'QRCode',
-    'SystemPlatformPresentation.js':'ArcaneSystemPlatformPresentation'
+    'SystemPlatformPresentation.js':'ArcaneSystemPlatformPresentation',
+    'ThemePresentation.js':'arcaneThemePresentation'
 };
 
 function allNamedFunctions(tokens,source,metadata,file){
@@ -1593,7 +1595,7 @@ function extractClassicContract(source,{
                 member.owner==='QRCode'&&!member.static
                 &&member.name===callableName
             );
-        }else if(name==='SystemPlatformPresentation.js'){
+        }else if(name==='SystemPlatformPresentation.js'||name==='ThemePresentation.js'){
             candidates=functions.filter(record=>record.name===callableName)
                 .map(record=>({
                     owner:CLASSIC_GLOBAL_OWNERS[name],

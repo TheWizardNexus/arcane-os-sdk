@@ -8,9 +8,9 @@
     "sdkVersion": "0.6.0",
     "protocol": "arcane/1"
   },
-  "artifactCount": 88,
-  "javascriptArtifactCount": 86,
-  "esmExportCount": 356,
+  "artifactCount": 89,
+  "javascriptArtifactCount": 87,
+  "esmExportCount": 357,
   "artifacts": [
     {
       "file": "runtime/arcane/modules/AI.js",
@@ -1292,25 +1292,37 @@
         "default",
         "disposeArcaneThemeBootstrap"
       ],
-      "summary": "Performs import-time Arcane theme loading and subscribes to native appearance changes.",
+      "summary": "Reuses the shared presentation owner, loads authoritative preferences, and observes native appearance and existing canonical User readiness without blocking rendering or starting User storage.",
       "availability": "Browser/native hybrid",
       "protocol": "ThemeManager + host Arcane.events projected once through the per-realm globalThis.arcaneEvents authority",
       "normalization": "Theme state normalized; storage/native errors mixed.",
-      "surface": "`bootstrapArcaneTheme()`, `disposeArcaneThemeBootstrap()`, `arcaneThemeReady`, and default ready promise."
+      "surface": "`bootstrapArcaneTheme()`, `disposeArcaneThemeBootstrap()`, `arcaneThemeReady`, and default ready promise. Shared bootstrap replays an already-ready User and disposes both appearance and user-ready subscriptions; presentation cache is nonauthoritative. Its module graph does not guarantee restoration before first paint; use the classic ThemePresentation entry after app-id and before CSS."
     },
     {
       "file": "runtime/arcane/modules/ThemeManager.js",
       "name": "ThemeManager.js",
       "kind": "esm",
       "exports": [
+        "applyUserSkin",
         "default",
         "loadAndApplyTheme"
       ],
       "summary": "Loads, applies, previews, saves, resets, and synchronizes semantic Arcane themes.",
       "availability": "Browser/native hybrid",
       "protocol": "PreferenceStore, DOM, Arcane.appearance",
-      "normalization": "Theme values/events normalized; storage/native failures mixed.",
-      "surface": "default `ThemeManager`, `loadAndApplyTheme()`; scheme/custom/system APIs and `arcane-theme-change`."
+      "normalization": "Theme values/events normalized; storage/native failures mixed. Scoped data-arcane-palette previews follow the page unless their own data-color-scheme is light or dark; this preview override leaves page mode unchanged, with chooser order/layout/toggle owned by the application.",
+      "surface": "default `ThemeManager`, `loadAndApplyTheme()`, synchronous `applyUserSkin(skin,{root?,body?,cache=true}={})` delegated to ThemePresentation; complete skin classes preserve unrelated body classes, names default/warm/curious/hopeful/harmony/warrior follow light/dark/system, custom themes retain precedence, and data-arcane-palette scopes shared-color previews. Bare root retains generic neutral colors. Complete strings and numeric class text are cached without a User write. apply() records only applied appearance attributes and Theme-owned custom properties; preview() stays transient. Cache is reconciled by saved preferences and existing User readiness; no profile migration or first-paint guarantee from module-only use. Existing scheme/custom/system APIs and arcane-theme-change remain."
+    },
+    {
+      "file": "runtime/arcane/modules/ThemePresentation.js",
+      "name": "ThemePresentation.js",
+      "kind": "classic-script",
+      "exports": [],
+      "summary": "Restores app-scoped presentation before CSS and owns complete skin-class application without starting profile storage.",
+      "availability": "Browser / native WebView classic script",
+      "protocol": "DOM and optional application-scoped localStorage",
+      "normalization": "Synchronous presentation only; complete strings and numeric class text remain usable, cache failures preserve rendering, and authoritative profile and appearance loads reconcile the cache.",
+      "surface": "No ESM exports; globalThis.arcaneThemePresentation with applyUserSkin(skin,{root?,body?,cache?}) returning palette|null, remember(fields,root?) returning boolean, restore(root?) returning cached record ({} on miss) or null when unavailable/failed, and reportError(message,error). Classic script runs after the existing app-id declaration and before CSS without type=module, async, or defer; first evaluation restores automatically. Cache fields: skin, palette, appearance:{colorScheme,density,reduceMotion,fontSize}, customProperties (Theme-owned applied CSS map or null). Complete Error goes to console.warn initially and shared logging after ThemeManager import. No User import, OPFS, model wait, profile snapshot, unrelated inline style capture, or migration; missing cache cannot supply an unloaded profile skin."
     },
     {
       "file": "runtime/arcane/modules/TimeGuard.js",

@@ -596,10 +596,10 @@ console.log(await commands.execute('greet Arcane'));`
     {
         name:'ThemeBootstrap.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Import immediately starts one shared load/apply promise, publishes globalThis.arcaneThemeReady, and installs one shared appearance.changed subscription when Arcane.events exists. Initial failures are warned and converted to an error-bearing result.',
-        paramsResults:'bootstrapArcaneTheme(options={}) returns Promise<{manager,state}|{manager:null,state:null,error}>. Empty options reuse the shared promise/listener. arcaneThemeReady and the default export are that promise.',
-        events:['Consumes Core appearance.changed; resulting ThemeManager work may emit global arcane-theme-change.'],
-        errors:['Initial load errors are contained in the resolved error object.','An appearance-change callback reload rejection is not wrapped by bootstrap.'],
+        lifecycleSideEffects:'Import reuses ThemePresentation and starts one shared authoritative preference load/apply promise, publishing globalThis.arcaneThemeReady. Module-graph evaluation may follow first paint; the classic ThemePresentation script after app-id and before CSS provides the early entry. Shared subscriptions observe appearance.changed and user-entity-loaded with already-ready User replay; bootstrap does not start a separate profile lifecycle or block rendering. Initial failures are warned and converted to an error-bearing result.',
+        paramsResults:'bootstrapArcaneTheme(options={}) returns Promise<{manager,state}|{manager:null,state:null,error}>. Empty options reuse the shared promise/listeners. arcaneThemeReady and the default export are that promise. disposeArcaneThemeBootstrap removes both appearance and user-ready subscriptions.',
+        events:['Consumes Core appearance.changed and canonical user-entity-loaded; resulting ThemeManager work may emit global arcane-theme-change.'],
+        errors:['Initial load errors are contained in the resolved error object.','Appearance reload, user skin, and presentation-cache errors are logged without blocking page rendering.'],
         capabilitiesCore:'Theme load may use preferences.read and appearance.read; persistence/application may require preferences.write and appearance.write. Arcane.events subscription grants no capability.',
         example:String.raw`import arcaneThemeReady,{bootstrapArcaneTheme} from '/arcane/modules/ThemeBootstrap.js';
 
@@ -609,15 +609,28 @@ console.log((await bootstrapArcaneTheme()).state);`
     {
         name:'ThemeManager.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Construction binds stores and appearance bridge without I/O. load() reads preferences and applies DOM state. Set/save/activate/reset methods persist settings, mutate root presentation, call native appearance, and emit. preview() mutates root without persistence.',
-        paramsResults:'new ThemeManager({appearanceStore?,skinStore?,systemAppearance?,root?}); load(), current(), apply(), setScheme(), saveCustom(), activateCustom(), preview(), resetCustom(), syncSystemAppearance(); loadAndApplyTheme(options) resolves {manager,state}.',
+        lifecycleSideEffects:'Import reuses the classic ThemePresentation owner and connects its complete-error logger; construction binds stores and appearance bridge without I/O. load() reads preferences and applies DOM state. Set/save/activate/reset methods persist settings, mutate root presentation, call native appearance, and emit. preview() mutates root without persistence. applyUserSkin delegates to ThemePresentation and applies complete class lists synchronously and normally remembers presentation in app-scoped local storage; cache:false suppresses that write. loadAndApplyTheme restores the nonauthoritative cache before asynchronous preference loading; apply() caches only its applied appearance attributes and Theme-owned custom CSS properties. No User import, profile migration, startup barrier, or first-paint guarantee from module-only use.',
+        paramsResults:'new ThemeManager({appearanceStore?,skinStore?,systemAppearance?,root?}); load(), current(), apply(), setScheme(), saveCustom(), activateCustom(), preview(), resetCustom(), syncSystemAppearance(); loadAndApplyTheme(options) resolves {manager,state}. applyUserSkin(skin,{root?,body?,cache=true}={}) preserves unrelated body classes and returns the selected named palette or null for no applicable skin/root. Strings, numbers, multi-class skins and unknown application classes remain usable; complete strings and numeric class text are cached without saving a User record. Falsy skins retain current presentation; an absent body receives the latest class list at DOMContentLoaded. Default/warm/curious/hopeful/harmony/warrior palettes honor light/dark/system and custom precedence. data-arcane-palette scopes the same CSS palette variables for chooser previews; an optional data-color-scheme=light|dark on that same element selects its variant independently of the page, while absence follows the page. Applications own preview ordering, layout, and toggles. Bare root retains generic neutral colors; the prior layout default belongs to explicit default palette selection.',
         events:['Global arcane-theme-change with current state after persisted changes.'],
-        errors:['Theme validation and preference/storage/native failures propagate.','Invalid stored custom theme is contained as null during load.'],
+        errors:['Theme validation and authoritative preference/storage/native failures propagate.','Invalid stored custom theme is contained as null during load.','Presentation-cache failures log the complete original Error without blocking rendering.'],
         capabilitiesCore:'Native preference reads/writes require preferences.read/preferences.write; system synchronization requires appearance.write, with related reads under appearance.read. Browser/local adapters need no Core.',
         example:String.raw`import {loadAndApplyTheme} from '/arcane/modules/ThemeManager.js';
 
 const {manager,state} = await loadAndApplyTheme();
 console.log(state.mode, manager.current());`
+    },
+    {
+        name:'ThemePresentation.js',
+        classification:'public-first-party',
+        lifecycleSideEffects:'First classic evaluation installs or reuses globalThis.arcaneThemePresentation and synchronously restores the app-scoped presentation before following CSS. Place after the existing app-id declaration with no type=module, async, or defer. No imports, User/OPFS/model startup, page hiding, polling, profile snapshot, or migration. Root colors apply before body exists; one DOMContentLoaded callback supplies the latest complete skin classes. Cache misses leave ordinary first-visit presentation; module-only use can evaluate after first paint.',
+        paramsResults:'No ESM exports. Global applyUserSkin(skin,{root?,body?,cache=true}={}) returns selected palette or null for falsy skin/missing root, preserving independent body classes and complete supplied strings; numbers cache their complete class text. remember(fields,root=document.documentElement) returns whether its write succeeded. restore(root=document.documentElement) returns cached record, {} on cache miss, or null when unavailable/failed. reportError(message,error) initially calls console.warn and is connected to arcaneLogging.warn by ThemeManager. Cache fields are skin, palette, appearance:{colorScheme,density,reduceMotion,fontSize}, and customProperties (applied Theme-owned CSS property map or null), under arcane.apps.<application-id>:arcane.theme.presentation. Existing profile readiness and authoritative appearance preferences reconcile this presentation-only record.',
+        events:['Consumes one native DOMContentLoaded only when complete skin classes were applied before body exists; no semantic event or User lifecycle is started.'],
+        errors:['Missing application identity or storage skips the cache.','Conflicting document identities, storage failures, and malformed JSON log the complete Error without blocking rendering. A later authoritative write can replace malformed cached JSON.'],
+        capabilitiesCore:'None; DOM and optional application-scoped localStorage only.',
+        example:String.raw`<meta name="arcane-app-id" content="dragon-observatory">
+<script src="/arcane/modules/ThemePresentation.js"></script>
+<link rel="stylesheet" href="/arcane/css/theme.css">
+<script type="module" src="/arcane/modules/ThemeBootstrap.js"></script>`
     },
     {
         name:'TimeGuard.js',

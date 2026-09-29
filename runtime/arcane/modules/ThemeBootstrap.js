@@ -2,11 +2,12 @@ import Is from 'strong-type';
 const is=new Is(false);
 
 import { arcaneLogging } from 'arcane-os/logging';
-import {loadAndApplyTheme} from './ThemeManager.js';
+import {applyUserSkin,loadAndApplyTheme} from './ThemeManager.js';
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 
 const sharedKey='arcaneThemeReady';
 const listenerKey='arcaneThemeAppearanceListener';
+const userListenerKey='arcaneThemeUserListener';
 const THEME_BOOTSTRAP_EVENT_OWNER={};
 let themeBootstrapOperationSequence=0;
 const themeBootstrapEvents=createArcaneEventSource(
@@ -76,28 +77,55 @@ function installAppearanceListener(ready){
     globalThis[listenerKey]=dispose;
 }
 
+function installUserSkinListener(){
+    if(globalThis[userListenerKey]||!is.function(globalThis.addEventListener)) return;
+    let active=true;
+    function applyReadyUserSkin(){
+        if(!active||!globalThis.user?.ready) return;
+        try{
+            applyUserSkin(globalThis.user.skin);
+        }catch(error){
+            arcaneLogging.warn('[Arcane theme] Unable to apply the saved user skin.',error);
+        }
+    }
+    globalThis.addEventListener('user-entity-loaded',applyReadyUserSkin);
+    globalThis[userListenerKey]=function disposeArcaneThemeUserListener(){
+        if(!active) return false;
+        active=false;
+        globalThis.removeEventListener('user-entity-loaded',applyReadyUserSkin);
+        delete globalThis[userListenerKey];
+        return true;
+    };
+    applyReadyUserSkin();
+}
+
 export function bootstrapArcaneTheme(options={}){
     const useSharedPromise=Object.keys(options).length===0;
     if(useSharedPromise&&globalThis[sharedKey]){
         installAppearanceListener(globalThis[sharedKey]);
+        installUserSkinListener();
         return globalThis[sharedKey];
     }
 
     const ready=loadAndApplyTheme(options).catch(error=>{
-        arcaneLogging.warn('[Arcane theme] Unable to load the saved appearance; using the system theme.',error);
+        arcaneLogging.warn('[Arcane theme] Unable to load the saved appearance; retaining the current presentation.',error);
         return {manager:null,state:null,error};
     });
 
     if(useSharedPromise) globalThis[sharedKey]=ready;
     if(useSharedPromise){
         installAppearanceListener(ready);
+        installUserSkinListener();
     }
     return ready;
 }
 
 export function disposeArcaneThemeBootstrap(){
     const dispose=globalThis[listenerKey];
-    return is.function(dispose)?dispose():false;
+    const disposeUser=globalThis[userListenerKey];
+    const appearanceDisposed=is.function(dispose)?dispose():false;
+    const userDisposed=is.function(disposeUser)?disposeUser():false;
+    return appearanceDisposed||userDisposed;
 }
 
 export const arcaneThemeReady=bootstrapArcaneTheme();

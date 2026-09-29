@@ -1,10 +1,12 @@
 import Is from 'strong-type';
 const is=new Is(false);
 
-import Theme,{arcaneDarkThemeTokens,arcaneLightThemeTokens} from '../entities/Theme.js';
+import Theme,{arcaneDarkThemeTokens,arcaneLightThemeTokens,themeTokens} from '../entities/Theme.js';
 import PreferenceStore from './PreferenceStore.js';
 import {applyAppearancePreferences,createAppearancePreferenceStore} from './AppearancePreferences.js';
 import SystemAppearance from './SystemAppearance.js';
+import './ThemePresentation.js';
+import {arcaneLogging} from 'arcane-os/logging';
 import {
     createArcaneEventSource,
     projectArcaneDOMEvent
@@ -14,6 +16,15 @@ const skinSchema=[
     {key:'appearance.activeSkin',type:'text',defaultValue:''},
     {key:'appearance.customSkin',type:'text',defaultValue:''}
 ];
+
+const presentation=globalThis.arcaneThemePresentation;
+presentation.reportError=function reportThemePresentationError(message,error){
+    arcaneLogging.warn(message,error);
+};
+
+export function applyUserSkin(skin,options){
+    return presentation.applyUserSkin(skin,options);
+}
 
 export default class ThemeManager{
     #events;
@@ -47,6 +58,19 @@ export default class ThemeManager{
         Theme.clear(this.root);
         applyAppearancePreferences(this.appearance,this.root);
         if(this.skinState['appearance.activeSkin']==='custom'&&this.customTheme) this.customTheme.apply(this.root);
+        presentation.remember({
+            appearance:{
+                colorScheme:this.root.dataset.colorScheme||null,
+                density:this.root.dataset.density||null,
+                reduceMotion:this.root.dataset.reduceMotion||null,
+                fontSize:this.root.style.fontSize||''
+            },
+            customProperties:this.skinState['appearance.activeSkin']==='custom'&&this.customTheme
+                ?Object.fromEntries(themeTokens.map(({property})=>[
+                    property,this.root.style.getPropertyValue(property)
+                ]))
+                :null
+        },this.root);
         return this.current();
     }
 
@@ -161,6 +185,14 @@ function parseTheme(value){
 
 export async function loadAndApplyTheme(options={}){
     const manager=options.manager||new ThemeManager(options);
+    // Synchronous presentation only: authoritative preferences still load in
+    // parallel below and never wait for the profile or page rendering.
+    presentation.restore(manager.root);
+    try{
+        if(globalThis.user?.ready) applyUserSkin(globalThis.user.skin,{root:manager.root});
+    }catch(error){
+        arcaneLogging.warn('[Arcane theme] Unable to apply the saved user skin.',error);
+    }
     const state=await manager.load();
     return {manager,state};
 }

@@ -11,12 +11,23 @@ test(
         );
         const setter = source.match(/^    async function setSkin\(\) \{[\s\S]*?^    \}/mu);
         assert.ok(setter, 'Exercise the actual component skin setter.');
-        assert.ok(
-            source.indexOf('const appliedSkinClasses=new Set();')
-                < source.indexOf('if (window.user?.ready)')
+        assert.match(source, /import\('\.\.\/modules\/ThemeManager.js'\)/u);
+        assert.match(setter[0], /applyUserSkin\(skin\)/u);
+        const managerSource = await readFile(
+            new URL('../runtime/arcane/modules/ThemeManager.js', import.meta.url),
+            'utf8'
         );
+        const presentationSource = await readFile(
+            new URL('../runtime/arcane/modules/ThemePresentation.js', import.meta.url),
+            'utf8'
+        );
+        const sharedSetter = managerSource.match(
+            /export function applyUserSkin\([\s\S]*?\r?\n\}/u
+        );
+        assert.ok(sharedSetter, 'Exercise the shared public skin owner.');
         const names = new Set(['app-layout', 'sidebar-visible', 'shared-token']);
         const document = {
+            documentElement: {dataset: {}},
             body: {
                 classList: {
                     contains(name) {return names.has(name);},
@@ -39,12 +50,20 @@ test(
             log(message) {messages.push(message);}
         };
         const window = {user: {skin: 'default'}};
+        const scope = {document};
+        Function('globalThis', presentationSource)(scope);
+        const applyUserSkin = Function(
+            'presentation',
+            sharedSetter[0].replace('export ', '')
+                + '\nreturn applyUserSkin;'
+        )(scope.arcaneThemePresentation);
         const setSkin = Function(
-            'window', 'document', 'arcaneLogging', 'appliedSkinClasses',
+            'window', 'arcaneLogging', 'applyUserSkin',
             `${setter[0]}\nreturn setSkin;`
-        )(window, document, arcaneLogging, new Set());
+        )(window, arcaneLogging, applyUserSkin);
 
         await setSkin();
+        assert.equal(document.documentElement.dataset.userSkin, 'default');
         names.add('app-added-after-ready');
         await setSkin();
         assert.deepEqual(
@@ -57,6 +76,7 @@ test(
             [...names],
             ['app-layout', 'sidebar-visible', 'shared-token', 'app-added-after-ready', 'warm', 'accent', 'non\u00a0breaking']
         );
+        assert.equal(document.documentElement.dataset.userSkin, 'warm');
         window.user.skin = 7;
         await setSkin();
         assert.deepEqual(

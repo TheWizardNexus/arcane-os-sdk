@@ -1,106 +1,5 @@
-/* layout.css */
-
-/* Base styles with default variables */
-:root {
-    color-scheme:light;
-    --background:#E8EBF0;
-    --modal-background:#F8F9FB;
-    --text-color:#1F2937;
-    --primary-color:#52677F;
-    --secondary-color:#D8E1EB;
-    --accent-color:#305F8D;
-    --border-color:#C6CED8;
-    --platinum:#52606F;
-    --button-text-color:#FFFFFF;
-    --focus-color:#2878B8;
-    --success-color:#24804D;
-    --danger-color:#B43C3C;
-    --shadow-color:rgba(30,41,59,.18);
-    --icon-filter:none;
-    --file-icon-filter:hue-rotate(-8deg) saturate(.65) brightness(.88);
-}
-
-/* Warm Theme */
-:root:not([data-color-scheme]):not([data-arcane-skin]) body.warm {
-    --background:#F8EFE5;
-    --modal-background:#FFF9F3;
-    --text-color:#352A24;
-    --primary-color:#AF5822;
-    --secondary-color:#F2D0AF;
-    --accent-color:#8D4318;
-    --border-color:#D8B99B;
-    --platinum:#725848;
-    --focus-color:#A64E19;
-    --file-icon-filter:hue-rotate(160deg) saturate(.85) brightness(.9);
-}
-
-/* Curious Theme */
-:root:not([data-color-scheme]):not([data-arcane-skin]) body.curious {
-    --background:#EAF5EE;
-    --modal-background:#F8FCF9;
-    --text-color:#1E3327;
-    --primary-color:#287A4E;
-    --secondary-color:#CDE8D8;
-    --accent-color:#1E6A42;
-    --border-color:#AACDB8;
-    --platinum:#4D6B5A;
-    --focus-color:#1F7548;
-    --file-icon-filter:hue-rotate(285deg) saturate(.65) brightness(.82);
-}
-
-/* Hopeful Theme */
-:root:not([data-color-scheme]):not([data-arcane-skin]) body.hopeful {
-    --background:#EAF3F9;
-    --modal-background:#F8FCFF;
-    --text-color:#203247;
-    --primary-color:#2F6F9F;
-    --secondary-color:#CFE4F3;
-    --accent-color:#245F8B;
-    --border-color:#B5CEDF;
-    --platinum:#526C7F;
-    --focus-color:#246A9D;
-    --file-icon-filter:hue-rotate(345deg) saturate(.65) brightness(.95);
-}
-
-/* Harmony Theme */
-:root:not([data-color-scheme]):not([data-arcane-skin]) body.harmony {
-    --background:#F2F0E5;
-    --modal-background:#FCFAF4;
-    --text-color:#303328;
-    --primary-color:#90602F;
-    --secondary-color:#DCE5C8;
-    --accent-color:#386B4F;
-    --border-color:#C9C6A9;
-    --platinum:#646650;
-    --focus-color:#4D7259;
-    --file-icon-filter:hue-rotate(150deg) saturate(.55) brightness(.78);
-}
-
-/* Warrior Spirit Theme (light)
-   Source cues: steel/gunmetal, ember heart, flame orange
-   Design intent: calm, confident neutrals with a hopeful flame CTA
-*/
-:root:not([data-color-scheme]):not([data-arcane-skin]) body.warrior {
-    /* Surfaces */
-    --background: #F5F7FA;          /* cool off‑white “steel light” */
-    --modal-background: #EFF2F6;    /* panel on the main surface */
-
-    /* Text */
-    --text-color: #1D232A;          /* gunmetal charcoal for body text */
-
-    /* Brand actions */
-    --primary-color: #FF7A1A;       /* flame orange (buttons, key actions) */
-    --secondary-color: #FFD166;     /* ember glow for hovers / highlights */
-    --accent-color: #8C1D18;        /* deep heart red for accents */
-
-    /* Lines & neutrals */
-    --border-color: #C7CDD6;        /* cool steel border */
-    --platinum: #A7A9AC;            /* neutral “platinum” metal */
-
-    /* Accessibility: keep button text dark on bright orange/gold */
-    --button-text-color: #1D232A;   /* ensures AA contrast on primary/hover */
-    --file-icon-filter:hue-rotate(160deg) saturate(1.2) brightness(1.03);
-}
+/* Layout and controls consume the canonical shared palette definitions. */
+@import url('./theme.css');
 
 /* General styles for the page layout */
 html {
@@ -112,7 +11,6 @@ html {
 body {
     display: grid;
     grid-template-columns:11em minmax(0,1fr); /* Sidebar and content split */
-    transition:background-color 250ms,color 250ms;
     grid-template-rows: auto 1fr; /* Header and main content */
     height: 100vh;
     margin: 0;
@@ -134,7 +32,6 @@ main {
     border-radius: 0.5em 0 0 0;
     overflow: auto;
     padding: 1em;
-    transition:background-color 250ms;
 }
 
 main.data-chat{
@@ -337,102 +234,12 @@ pre code{
     }
 }
 
-@media (prefers-color-scheme: dark) {
-    /* Base Dark Mode Variables */
-    :root:not([data-color-scheme]) {
-        color-scheme:dark;
-        --background:#0F1220;
-        --modal-background:#191D31;
-        --text-color:#EBEDF5;
-        --primary-color:#D94C94;
-        --secondary-color:#43B8AD;
-        --accent-color:#A58ADF;
-        --border-color:#3A4262;
-        --platinum:#AEB5CA;
-        --button-text-color:#161724;
-        --focus-color:#65D8CE;
-        --success-color:#61C98B;
-        --danger-color:#F07D7D;
-        --shadow-color:rgba(0,0,0,.42);
-        --icon-filter:brightness(0) invert(.78);
-        --file-icon-filter:hue-rotate(95deg) saturate(.8) brightness(1.12);
-    }
+:root[data-color-scheme="dark"] a{
+    color:var(--secondary-color);
+}
 
-    /* Dark Mode - Warm Theme */
-    :root:not([data-color-scheme]):not([data-arcane-skin]) body.warm {
-        --background:#1D1613;
-        --modal-background:#2B211C;
-        --text-color:#F1E6DD;
-        --primary-color:#DF7C3B;
-        --secondary-color:#F1AA72;
-        --accent-color:#F0B783;
-        --border-color:#6A4939;
-        --platinum:#C9AB99;
-        --button-text-color:#24160E;
-        --focus-color:#FFB27A;
-    }
-
-    /* Dark Mode - Curious Theme */
-    :root:not([data-color-scheme]):not([data-arcane-skin]) body.curious {
-        --background:#101B16;
-        --modal-background:#1B2A22;
-        --text-color:#DFF1E6;
-        --primary-color:#4FAE78;
-        --secondary-color:#79C89B;
-        --accent-color:#86D1A7;
-        --border-color:#386247;
-        --platinum:#A6C4B0;
-        --button-text-color:#102117;
-        --focus-color:#8ED7AE;
-    }
-
-    /* Dark Mode - Hopeful Theme */
-    :root:not([data-color-scheme]):not([data-arcane-skin]) body.hopeful {
-        --background:#111821;
-        --modal-background:#1D2935;
-        --text-color:#E1EBF4;
-        --primary-color:#67A9D6;
-        --secondary-color:#96C7E8;
-        --accent-color:#A6D4F1;
-        --border-color:#3A5A72;
-        --platinum:#A8BAC9;
-        --button-text-color:#11202B;
-        --focus-color:#9CD2F5;
-    }
-
-    /* Dark Mode - Harmony Theme */
-    :root:not([data-color-scheme]):not([data-arcane-skin]) body.harmony {
-        --background:#191A14;
-        --modal-background:#282A21;
-        --text-color:#ECEBDB;
-        --primary-color:#D48A4B;
-        --secondary-color:#87B58E;
-        --accent-color:#E0AA70;
-        --border-color:#5C604A;
-        --platinum:#B9B9A3;
-        --button-text-color:#211A12;
-        --focus-color:#A7CEA9;
-    } 
-    
-    /* Warrior Spirit — Dark */
-    :root:not([data-color-scheme]):not([data-arcane-skin]) body.warrior {
-        --background: #0E1216;          /* night steel */
-        --modal-background: #151A20;    /* panel against night steel */
-        --text-color: #E9EEF3;          /* soft steel-white for text */
-
-        /* Keep flame as the action color; hover warms slightly */
-        --primary-color: #FF7A1A;       /* flame orange (unchanged) */
-        --secondary-color: #FFB24A;     /* warm hover on dark */
-        --accent-color: #E04F3D;        /* ember red that reads on dark */
-        --border-color: #26313B;        /* subdued steel line */
-        --platinum:#A9B3BD;
-        --focus-color:#FFB24A;
-
-        /* Critical for contrast: dark text on bright buttons */
-        --button-text-color: #1D232A;
-    }
-
-    a{
-        color: var(--secondary-color);
+@media (prefers-color-scheme:dark){
+    :root:not([data-color-scheme]) a{
+        color:var(--secondary-color);
     }
 }
