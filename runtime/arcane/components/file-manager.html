@@ -387,6 +387,21 @@
         background:var(--background);
     }
 
+    .file-preview-message[data-role="user"]{
+        background:var(--arcane-action,var(--primary-color));
+        color:var(--arcane-action-text,var(--button-text-color,var(--text-color)));
+        border-color:var(--arcane-action,var(--primary-color));
+    }
+
+    .file-preview-message[data-role="user"] a{
+        color:inherit;
+    }
+
+    .file-preview-message[data-role="assistant"]{
+        background:var(--arcane-surface,var(--background));
+        color:var(--text-color);
+    }
+
     .file-preview-message header,
     .file-preview-message footer{
         display:flex;
@@ -1740,9 +1755,15 @@
                         const time=document.createElement('time');
                         article.className='file-preview-message';
                         article.dataset.role=message.role;
-                        speaker.textContent=message.name===undefined
-                            ?message.role
-                            :`${message.name} · ${message.role}`;
+                        if(message.role==='assistant'){
+                            speaker.textContent=is.string(message.name)&&message.name.trim()
+                                ?message.name
+                                :'AI';
+                        }else{
+                            speaker.textContent=message.name===undefined
+                                ?message.role
+                                :`${message.name} · ${message.role}`;
+                        }
                         header.append(speaker);
                         if(message.timestamp===undefined||message.timestamp===null){
                             time.textContent='Time unavailable';

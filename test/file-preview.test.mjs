@@ -265,7 +265,7 @@ async function fileManagerFixture(options = {}) {
         await settle();
     }
 
-    return {host, manager, fileModal, directoryModal, keysRead, metadataRead, fileReads, createdURLs, revokedURLs, errors, descendants, open, settle};
+    return {host, manager, fileModal, directoryModal, keysRead, metadataRead, fileReads, createdURLs, revokedURLs, errors, descendants, open, settle, source};
 }
 
 test('file preview filters directories before keys and preserves file-predicate input', async function directoryFilteringContract() {
@@ -519,6 +519,69 @@ test('real FileEntity preserves supplied MIME and leaves untyped WebM uninferred
         }
         assert.deepEqual(fixture.errors, []);
         assert.deepEqual(fixture.revokedURLs, fixture.createdURLs.map(function createdURL(entry) {return entry.url;}));
+    } finally {
+        fixture.host.destroy();
+    }
+});
+
+test('conversation preview preserves exact assistant names and uses shared role presentation', async function conversationPresentationContract() {
+    const cases = [
+        {role: 'assistant', name: 'Captain Comet', label: 'Captain Comet'},
+        {role: 'assistant', name: '  Moon pilot\t', label: '  Moon pilot\t'},
+        {role: 'assistant', name: 'assistant', label: 'assistant'},
+        {role: 'assistant', label: 'AI'},
+        {role: 'assistant', name: '', label: 'AI'},
+        {role: 'assistant', name: ' \t\n ', label: 'AI'},
+        {role: 'assistant', name: null, label: 'AI'},
+        {role: 'assistant', name: 42, label: 'AI'},
+        {role: 'assistant', name: {label: 'Not a saved string'}, label: 'AI'},
+        {role: 'user', label: 'user'},
+        {role: 'user', name: 'Astronaut', label: 'Astronaut · user'},
+        {role: 'user', name: null, label: 'null · user'},
+        {role: 'tool', name: 'Cargo manifest', label: 'Cargo manifest · tool'},
+        {role: 'tool', label: 'tool'},
+        {role: 'system', name: 'Recorded context', label: 'Recorded context · system'}
+    ];
+    const timestamp = '2026-09-29T06:00:00Z';
+    const messages = cases.map(function createSavedMessage(entry, index) {
+        const message = {
+            role: entry.role,
+            content: `Complete saved message ${index}: **moon cheese**\n\nEvery detail stays visible.`,
+            timestamp,
+            status: 'recorded'
+        };
+        if (Object.hasOwn(entry, 'name')) message.name = entry.name;
+        return message;
+    });
+    const originalMessages = structuredClone(messages);
+    const fixture = await fileManagerFixture({
+        previewDescriptor: function describeSavedConversation() {return {kind: 'conversation', messages};}
+    });
+    try {
+        await fixture.open();
+        const articles = fixture.descendants(fixture.fileModal, function isMessage(element) {
+            return element.className === 'file-preview-message';
+        });
+        assert.equal(articles.length, messages.length);
+        for (let index = 0; index < messages.length; index++) {
+            const article = articles[index];
+            const message = messages[index];
+            assert.equal(article.dataset.role, message.role);
+            assert.equal(article.children[0].children[0].textContent, cases[index].label);
+            assert.equal(article.children[1].children[0].innerHTML, `<fixture-markdown>${message.content}</fixture-markdown>`);
+            assert.equal(article.children[2].children[0].dateTime, new Date(timestamp).toISOString());
+            assert.equal(article.children[2].children[1].textContent, message.status);
+        }
+        assert.deepEqual(messages, originalMessages);
+        assert.deepEqual(fixture.errors, []);
+
+        // This asserts the authored palette contract, not browser-computed appearance.
+        const userRule = fixture.source.match(/\.file-preview-message\[data-role="user"\]\s*\{([^}]*)\}/u)[1];
+        const assistantRule = fixture.source.match(/\.file-preview-message\[data-role="assistant"\]\s*\{([^}]*)\}/u)[1];
+        assert.match(userRule, /background:\s*var\(--arcane-action,var\(--primary-color\)\)/u);
+        assert.match(userRule, /color:\s*var\(--arcane-action-text,var\(--button-text-color,var\(--text-color\)\)\)/u);
+        assert.match(assistantRule, /background:\s*var\(--arcane-surface,var\(--background\)\)/u);
+        assert.match(assistantRule, /color:\s*var\(--text-color\)/u);
     } finally {
         fixture.host.destroy();
     }

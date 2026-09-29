@@ -844,7 +844,11 @@ Each descriptor accepts an optional `title`. Supported shapes are:
 | `image`, `audio`, `pdf`, `download` | `content`: a `Blob` or `File`, or a function receiving `{signal}` and resolving to one |
 
 Conversation `role` and complete Markdown `content` are strings. Optional
-`name` and `status` are displayed alongside the role and time. Valid supplied
+assistant `name` is displayed exactly when it is a nonblank string; otherwise
+the assistant label is `AI`, without a role suffix. User and other role labels
+retain their supplied name alongside the role. User and assistant cards use
+distinct shared-theme backgrounds, and each card retains its original
+`data-role`. Optional `status` is displayed beside the time. Valid supplied
 timestamps are displayed in local time with their real ISO datetime; absent
 timestamps display `Time unavailable`, and an unrecognized supplied timestamp
 is displayed as supplied. No timestamp is invented.
