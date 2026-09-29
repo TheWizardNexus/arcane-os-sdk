@@ -164,6 +164,21 @@ entry points. `streamMessage(...)` and `streamRequest(options)` deliver
 incremental responses. The positional and object forms share the existing
 provider implementations; neither form is a retired compatibility API.
 
+`fetchRequest({model,...})` and `streamRequest({model,...})` accept an optional
+request-local model. On the built-in TWiN Cloud route, its exact value becomes
+the outbound `model` field; native Ollama receives the same request-local value.
+Omitting it or passing `undefined` preserves the configured model. Each built-in
+request captures its model before asynchronous callbacks, so concurrent requests
+may use different models without assigning `ai.model`, changing provider
+selection, or loading/unloading another model. Request observers and retries
+receive that request's model. Stream/native completion metadata uses it only
+when the provider omits its own `model` field.
+
+Registered providers receive a supplied `model` unchanged in their request
+payload; an omitted value remains absent. The provider owns interpretation.
+This option does not switch a loaded browser-WASM model or its lifecycle:
+explicit provider/model selection and activation remain necessary there.
+
 Built-in cloud chat decodes an HTTP error body once as JSON or text and rejects
 with that complete value unchanged. It does not reconstruct an Error, replace
 the message, or add `providerMessage`, `status`, or an SDK failure code to the

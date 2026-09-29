@@ -4443,7 +4443,8 @@ class AI {
             function ignoreBuiltInLLMProviderRequest(){},
             signal,
             payload.reasoningEffort,
-            onRetry
+            onRetry,
+            payload.model
         );
     }
 
@@ -4474,7 +4475,8 @@ class AI {
             function ignoreBuiltInLLMStreamResult(){},
             payload.reasoningEffort,
             observeToolText,
-            onRetry
+            onRetry,
+            payload.model
         );
     }
 
@@ -4555,7 +4557,7 @@ class AI {
         });
     }
 
-    #openAICompatibleOllamaResponse(response={},id=Date.now()){
+    #openAICompatibleOllamaResponse(response={},id=Date.now(),model=this.model){
         const responseRecord=isPlainAIRecord(response)?response:{};
         const message=isPlainAIRecord(responseRecord.message)
             ?responseRecord.message
@@ -4597,7 +4599,7 @@ class AI {
                 :Math.floor(Date.now()/1000),
             model:Object.hasOwn(responseRecord,'model')
                 ?responseRecord.model
-                :this.model,
+                :model,
             choices:[
                 {
                     index:0,
@@ -4620,6 +4622,7 @@ class AI {
 
     async streamRequest({
         messages=[],
+        model,
         structuredOutput=false,
         localOnly=false,
         onChunk=function ignoreStreamChunk(){},
@@ -4676,6 +4679,7 @@ class AI {
         if(this.#shouldUseProviderRuntime('llm',this.llmService,localOnly)){
             const request={
                 messages,
+                ...(model!==undefined?{model}:{}),
                 structuredOutput,
                 tools,
                 toolChoice,
@@ -4801,7 +4805,8 @@ class AI {
                 onDataResult,
                 normalizedReasoningEffort,
                 observeToolText,
-                onRetry
+                onRetry,
+                model
             );
             const structuralToolCalls=normalizeAICompletionToolCalls(
                 completion
@@ -4910,7 +4915,8 @@ class AI {
         dataResultHandler=function ignoreBuiltInStreamDataResult(){},
         reasoningEffort,
         observeToolText=null,
-        onRetry = null
+        onRetry = null,
+        model=this.model
     ){
         let speechTurnCompleted=false;
 
@@ -4934,7 +4940,7 @@ class AI {
             reasoningEffort===undefined?this.reasoningEffort:reasoningEffort
         );
         const request={
-            model:this.model,
+            model,
             messages:messages, 
             stream:true
         }
@@ -4981,7 +4987,7 @@ class AI {
             const ollamaMessages=this.#ollamaMessages(messages,tool_choice);
             const adaptNativeToolCalls=value=>this.#openAICompatibleOllamaToolCalls(value,id);
             const ollamaRequest={
-                model:this.model,
+                model,
                 messages:ollamaMessages,
                 stream:true,
                 ...(normalizedReasoningEffort
@@ -5091,7 +5097,8 @@ class AI {
                             :nativeContent
                     }
                 },
-                id
+                id,
+                model
             );
             const structuralToolCalls=normalizeAICompletionToolCalls(
                 nativeCompletion
@@ -5583,7 +5590,7 @@ class AI {
             created:Object.hasOwn(streamMetadata,'created')
                 ?streamMetadata.created
                 :Math.floor(Date.now()/1000),
-            model:Object.hasOwn(streamMetadata,'model')?streamMetadata.model:this.model,
+            model:Object.hasOwn(streamMetadata,'model')?streamMetadata.model:model,
             choices:completionChoices
         };
         const terminalToolCalls=normalizeAICompletionToolCalls(completion);
@@ -5628,6 +5635,7 @@ class AI {
 
     async fetchRequest({
         messages=[],
+        model,
         structuredOutput=false,
         localOnly=false,
         tools=[],
@@ -5670,6 +5678,7 @@ class AI {
             }
             const request={
                 messages,
+                ...(model!==undefined?{model}:{}),
                 structuredOutput,
                 tools,
                 toolChoice,
@@ -5726,7 +5735,8 @@ class AI {
             onRequest,
             signal,
             normalizedReasoningEffort,
-            onRetry
+            onRetry,
+            model
         );
     }
 
@@ -5780,7 +5790,8 @@ class AI {
         requestHandler=function ignoreFetchRequest(){},
         signal=null,
         reasoningEffort,
-        onRetry = null
+        onRetry = null,
+        model=this.model
     ){
         validateAIStructuralRequest(messages,tools,parallel_tool_calls);
         this.#assertServiceConfigured(this.llmService);
@@ -5799,7 +5810,7 @@ class AI {
             reasoningEffort===undefined?this.reasoningEffort:reasoningEffort
         );
         const request={
-            model:this.model,
+            model,
             messages:messages, 
             stream:false
         }
@@ -5838,7 +5849,7 @@ class AI {
             const ollamaTools=this.#ollamaTools(tools,tool_choice);
             const ollamaMessages=this.#ollamaMessages(messages,tool_choice);
             const nativeRequest={
-                model:this.model,
+                model,
                 messages:ollamaMessages,
                 stream:false,
                 ...(normalizedReasoningEffort
@@ -5869,7 +5880,8 @@ class AI {
             }
             const responseJSON=this.#openAICompatibleOllamaResponse(
                 nativeResponse,
-                id
+                id,
+                model
             );
             this.#assertRequiredOllamaToolCall(
                 normalizeAICompletionToolCalls(responseJSON),

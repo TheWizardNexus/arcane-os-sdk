@@ -211,6 +211,38 @@ controller's `abort()` when the operation is cancelled or its page detaches.
 `streamRequest()` is the corresponding object-form streaming API. See the
 [AI module reference](../runtime-modules.md#aijs) for its complete options.
 
+## Use a model for one browser request
+
+Both object-form methods accept `model` for that request. For example, an
+application can use 20B for document search while retaining its configured
+120B conversation model:
+
+```javascript
+const result = await ai.fetchRequest({
+  model: 'openai-gpt-oss-20b',
+  messages: searchMessages
+});
+
+await ai.streamRequest({
+  model: 'openai-gpt-oss-20b',
+  messages: summaryMessages,
+  onChunk: displaySummaryChunk
+});
+```
+
+`searchMessages`, `summaryMessages`, and `displaySummaryChunk` are supplied by
+the application. Their content and callbacks keep their ordinary contracts.
+The exact model goes into each TWiN request payload without changing `ai.model`
+or selecting another provider. Concurrent calls can choose different models;
+later calls that omit `model` (or pass `undefined`) use the configured model.
+Retries keep the same request model. Provider-returned model metadata remains
+authoritative; an assembled stream completion uses the request model only when
+the response omits it.
+
+The browser API forwards an explicitly supplied model to registered providers,
+whose own request contract determines its meaning. This does not switch or
+activate the loaded model of a browser-WASM provider.
+
 ## Migrate saved preference tuples before using them
 
 The six tuple slots consumed by `ai.setAI(...tuple)` are:
