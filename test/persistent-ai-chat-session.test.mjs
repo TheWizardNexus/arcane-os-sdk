@@ -814,6 +814,56 @@ test('createArcaneAI adapts controller completions and owns serial automatic mem
     ]);
 });
 
+test('same-clock new chats keep separate storage and reload by their exact saved names',async function separateConcurrentChats(){
+    const clock=Date.now;
+    const timestamp=1790668800000;
+    const chat=async request=>({message:{
+        role:'assistant',content:`Reply to ${request.messages.at(-1).content}`,
+    }});
+    let sessions;
+    try{
+        Date.now=()=>timestamp;
+        sessions=[
+            new PersistentAIChatSession({chat,memory:false}),
+            new PersistentAIChatSession({chat,memory:false}),
+        ];
+    }finally{
+        Date.now=clock;
+    }
+    await Promise.all(sessions.map(session=>session.ready()));
+    assert.notEqual(sessions[0].fileName,sessions[1].fileName);
+    for(const session of sessions){
+        assert.ok(session.fileName.startsWith(`chat-${timestamp}-`));
+        assert.ok(session.fileName.endsWith('.jsonl'));
+    }
+
+    const inputs=['The kraken keeps its journal.','The octopus keeps its shopping list.'];
+    await Promise.all(sessions.map((session,index)=>session.send({
+        message:{content:inputs[index]},
+    })));
+    for(const [index,session] of sessions.entries()){
+        const expected=[
+            {role:'user',content:inputs[index]},
+            {role:'assistant',content:`Reply to ${inputs[index]}`},
+        ];
+        assert.deepEqual(await session.history(),expected);
+        const stored=db.raw('chats',session.fileName);
+        assert.deepEqual(
+            String(stored).trim().split('\n').map(row=>{
+                const {role,content}=JSON.parse(row);
+                return {role,content};
+            }),
+            expected,
+        );
+        const restored=await PersistentAIChatSession.create({
+            chat,memory:false,chatFileName:session.fileName,loadExisting:true,
+        });
+        assert.equal(restored.fileName,session.fileName);
+        assert.deepEqual(await restored.history(),expected);
+        assert.equal(db.raw('chats',session.fileName),stored);
+    }
+});
+
 test('fresh named chat keeps its configured system prompt transient',async()=>{
     const chatFileName=`chat folders/Δ complete ${'long session name '.repeat(48)}.jsonl`;
     const session=await PersistentAIChatSession.create({

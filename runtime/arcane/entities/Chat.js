@@ -433,8 +433,8 @@ class ChatEntity{
     /**
      * Creates a new chat session.
      *
-     * A unique file name is generated automatically using
-     * the current timestamp.
+     * The default file name combines the current timestamp with an
+     * independent random identifier, including across concurrent tabs.
      *
      * Optionally accepts a system prompt which will be added
      * as the first message in the conversation.
@@ -444,7 +444,8 @@ class ChatEntity{
      */
     constructor(systemPrompt=''){
 
-        this.fileName=`chat-${Date.now()}.jsonl`;
+        const identity=globalThis.crypto.getRandomValues(new Uint32Array(4)).join('-');
+        this.fileName=`chat-${Date.now()}-${identity}.jsonl`;
 
         if(systemPrompt){
             this.#messages.push(

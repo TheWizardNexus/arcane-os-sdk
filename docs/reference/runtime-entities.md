@@ -73,6 +73,11 @@ console.log(new Calculation({expression: '2 + 2', result: 4}).toJSON());
 and optional app-scoped DBOPFS persistence. It installs no independent native
 authority; AI and storage dependencies must be available to the host.
 
+Each new chat receives a timestamp plus independently generated random identifier
+in its default `.jsonl` filename, so chats created during the same clock tick do
+not share a storage key. Explicit filenames and existing saved files remain
+unchanged; no saved records are renamed or migrated.
+
 `messages` returns provider-facing recurring context. An unresolved structural
 call and its matching results remain raw only through their one active provider
 continuation. Once that continuation settles, `messages` replaces the protocol
