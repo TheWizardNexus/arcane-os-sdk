@@ -902,7 +902,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Packaging and release bundles",
-      "summary": "Loads one validated packager app plan, including the shared descriptor-admitted browser document inventory.",
+      "summary": "Loads one validated packager app plan, including the shared descriptor-admitted browser document inventory and final workspace-relative output selected by app outputDirectory or default dist/appId.",
       "availability": "Node",
       "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Normalized SDK validation with complete canonical archive and release content"
@@ -1197,7 +1197,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Packaging and release bundles",
-      "summary": "Builds one selected browser application release through the low-level packager API; it never runs tests or checks automatically.",
+      "summary": "Builds one selected browser application release into app outputDirectory or default dist/appId through staged whole-directory replacement, preserving source and unrelated prior destinations; it never runs tests or checks automatically.",
       "availability": "Node",
       "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Normalized SDK validation with complete canonical archive and release content"
@@ -1214,7 +1214,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Headless toolchain operations",
-      "summary": "Runs the high-level package operation for one selected application.",
+      "summary": "Runs the high-level package operation for one selected application using the same app-selected final outputDirectory, defaulting to dist/appId, with no separate destination override.",
       "availability": "Node; selected operation may produce browser or native output",
       "protocol": "Shared headless operation API + arcane-cli-events/1",
       "normalization": "SDK-normalized inputs, errors, events, and documented result"
@@ -2031,7 +2031,7 @@
       ],
       "primaryImport": "arcane-os/packager",
       "group": "Packaging and release bundles",
-      "summary": "Validates one schema-1 packager app configuration and its relationship to the root config.",
+      "summary": "Validates one schema-1 packager app configuration and its relationship to the root config, including optional workspace-relative final outputDirectory without changing source layout or app identity.",
       "availability": "Node",
       "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Normalized SDK validation with complete canonical archive and release content"

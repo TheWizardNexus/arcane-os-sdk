@@ -96,6 +96,44 @@ materializes the complete required SDK runtime,
 browser-runtime, and managed-import-map closure inside that app's own artifact.
 No application polls for SDK changes.
 
+## App-selected package output
+
+An app may set `"outputDirectory": "ai"` in its schema-1
+`arcane-package.json`. This selects the final directory relative to the
+workspace: `<workspace>/ai`, not `<workspace>/ai/<app-id>`. Omitting the
+field retains `dist/<app-id>`. The root `arcane-packager.json` configuration
+and simple scaffold defaults remain unchanged.
+The destination is local to `arcane-package.json`, including apps with a
+schema-2 `arcane-app.json`. Descriptor refresh preserves it; no matching
+descriptor property or identity change is required.
+
+This field controls the destination of the complete packaged release. It does
+not relocate application source, rename the app, change its identity or OPFS
+scope, or alter the package's internal file paths. Source development continues
+to serve the same source tree. There is no migration of existing source,
+saved data, or previously generated output.
+
+The selected directory is wholly replaced through the packager's staged
+replacement operation, so it must be dedicated to that release. The prior
+contents remain until the replacement is ready; this is not an in-place merge.
+Changing the configured destination leaves the former output directory and
+unrelated siblings untouched. Output that would replace the app's source root,
+selected inputs, or required control files fails with `ARCANE_PACKAGE_INVALID`
+before output writes rather than overwriting those inputs.
+If an included source directory contains the output directory, use the existing
+`exclude` selection to keep that generated subtree outside the package inputs.
+
+Inspection and dry runs report this selected destination. Packaging,
+verification, and `arcane run --target browser` use the same release root.
+The normal bundle destination is beside that release directory as
+`<app-id>-<version>.arcane-app.tar.gz`; an explicit artifact path retains its
+existing meaning. Native packaging supplies the selected release root to the
+native provider, while native executable `outputRoot` remains a separate
+target-output setting. Selected app package directories and native artifact
+output must remain separate; a conflicting native assembly fails before it
+packages any app. App launch paths, resource URLs, and enabled PWA
+representations retain their package-relative layout.
+
 ## Installed-package browser routes
 
 An external application can serve and package its installed SDK directly,
@@ -340,7 +378,8 @@ catch-all `arcane/` prefix. Classic scripts, workers, stylesheets, and other
 non-ESM assets use their documented URL or host loading contract rather than
 invented package bindings. Development serves the selected app plus the
 complete selected tree.
-Packaging copies the same map, app entry, and physical content into `dist/<id>`;
+Packaging copies the same map, app entry, and physical content into the
+[selected package output](#app-selected-package-output), defaulting to `dist/<id>`;
 targets never resolve through the consumer workspace's root `node_modules/`.
 The two lowercase static runtime package specifiers above and the shared
 speech-text helper are exact npm package exports, so Node and managed-browser

@@ -450,6 +450,62 @@ test(
 );
 
 test(
+    'app-selected output retains PWA application identity and deployment-relative resource roots',
+    async function selectedOutputPwaRoots(context) {
+        const fixture = await workspaceFixture(context, {enabled: true, offline: {exclude: ['content']}});
+        fixture.packageManifest.outputDirectory = 'ai';
+        await writeJson(fixture.appRoot, 'arcane-package.json', fixture.packageManifest);
+        const packaged = await packageApp({workspaceRoot: fixture.workspaceRoot, appId: 'pwa-app'});
+        assert.equal(packaged.output, 'ai');
+        assert.equal(packaged.outputRoot, path.join(fixture.workspaceRoot, 'ai'));
+        assert.equal(packaged.manifest.app.id, 'pwa-app');
+        assert.equal(packaged.manifest.app.entry, 'index.html');
+        assert.equal(packaged.manifest.app.start, './apps/pwa-app/index.html');
+        const mount = new URL('https://example.test/ai/');
+        const manifest = JSON.parse(await readFile(path.join(packaged.outputRoot, 'arcane.webmanifest'), 'utf8'));
+        assert.equal(manifest.id, './');
+        assert.equal(manifest.scope, './');
+        assert.equal(manifest.start_url, packaged.manifest.app.start);
+        assert.equal(new URL(manifest.scope, mount).href, mount.href);
+        assert.equal(new URL(manifest.start_url, mount).href, `${mount.href}apps/pwa-app/index.html`);
+        for (const file of [
+            'apps/pwa-app/index.html',
+            'apps/pwa-app/about.html',
+            'apps/pwa-app/pages/settings.html',
+            'apps/pwa-app/pages/help.html'
+        ]) {
+            const html = await readFile(path.join(packaged.outputRoot, file), 'utf8');
+            const documentUrl = new URL(file, mount);
+            const base = html.match(/<base\b[^>]*\bhref="([^"]*)"[^>]*>/u)?.[1];
+            const resourceBase = base === undefined ? documentUrl : new URL(base, documentUrl);
+            const bootstrap = html.match(/<script\b[^>]*\bsrc="([^"]*arcane-pwa\.mjs)"[^>]*>/u)?.[1];
+            const webmanifest = html.match(/<link\b[^>]*\bhref="([^"]*arcane\.webmanifest)"[^>]*>/u)?.[1];
+            assert.ok(bootstrap, file);
+            assert.ok(webmanifest, file);
+            assert.equal(new URL(bootstrap, resourceBase).href, new URL('arcane-pwa.mjs', mount).href);
+            assert.equal(new URL(webmanifest, resourceBase).href, new URL('arcane.webmanifest', mount).href);
+            assert.ok(html.includes('<p>./modules/app.js?v=old&amp;language=fr#graph</p>'));
+        }
+        const offline = JSON.parse(await readFile(path.join(packaged.outputRoot, 'arcane-offline.json'), 'utf8'));
+        assert.equal(offline.appId, 'pwa-app');
+        assert.equal(offline.appVersion, '1.2.3');
+        assert.equal(offline.sdkVersion, '9.8.7');
+        assert.ok(offline.assets.includes('./apps/pwa-app/modules/app.js?v=old&language=fr'));
+        assert.ok(offline.assets.includes('./arcane/modules/Shared.js?v=old&mode=full'));
+        for (const resource of offline.assets) {
+            assert.ok(new URL(resource, mount).href.startsWith(mount.href), resource);
+        }
+        assert.equal(
+            await readFile(path.join(packaged.outputRoot, 'apps/pwa-app/content/document.html'), 'utf8'),
+            CORPUS_HTML
+        );
+        assert.equal(await readFile(path.join(fixture.appRoot, 'content/document.html'), 'utf8'), CORPUS_HTML);
+        assert.equal(await readFile(path.join(packaged.outputRoot, 'arcane/components/panel.html'), 'utf8'), COMPONENT_HTML);
+        assert.equal(JSON.parse(await readFile(path.join(fixture.appRoot, 'arcane-package.json'), 'utf8')).id, 'pwa-app');
+    }
+);
+
+test(
     'PWA entry filenames retain fragment and percent characters while generated links resolve at the deployment root',
     async function encodedPwaEntryPaths(context) {
         const fixture = await workspaceFixture(context);

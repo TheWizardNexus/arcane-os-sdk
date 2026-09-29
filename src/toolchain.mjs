@@ -1,5 +1,6 @@
 import Is from 'strong-type';
 import path from 'node:path';
+import {resolvePackageOutputRoot} from './app-layout.mjs';
 import {readdir,lstat,realpath,mkdir,readFile,writeFile} from 'node:fs/promises';
 import {createWorkspace,initWorkspace} from './scaffold.mjs';
 import {
@@ -1022,6 +1023,20 @@ async function executePairedNativeBuild(options,adapter,{
     }
     const dependencyApps=await nativeDependencyClosure(initialPrepared,{target,signal,onEvent});
     const prepared=initialPrepared;
+    const packageOutputs=[];
+    for(const app of [prepared.validation.app,...dependencyApps]){
+        const releaseRoot=resolvePackageOutputRoot(
+            prepared.workspaceRoot,prepared.validation.config,app.manifest
+        );
+        if(pathsOverlap(releaseRoot,outputRoot)
+            ||packageOutputs.some(existing=>pathsOverlap(existing,releaseRoot))){
+            throw new ArcaneError(
+                'ARCANE_PACKAGE_INVALID',
+                `Package output for ${app.appId} overlaps another selected package or native output directory.`
+            );
+        }
+        packageOutputs.push(releaseRoot);
+    }
     const selectedRelease=await packageNativeRelease(prepared,{
         appId:prepared.appId,
         appRoot:prepared.appRoot,
@@ -1180,6 +1195,9 @@ export async function runApplication(options={}){
     return runTarget({
         ...selectedOptions,
         ...prepared,
+        releaseRoot:resolvePackageOutputRoot(
+            prepared.workspaceRoot,prepared.validation.config,prepared.validation.app.manifest
+        ),
         target
     });
 }

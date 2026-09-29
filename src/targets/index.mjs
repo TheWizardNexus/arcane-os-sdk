@@ -148,9 +148,8 @@ const browserAdapter={
         throwIfAborted(signal);
         return {target:'browser',release:await verifyApp({workspaceRoot,appId,signal,onEvent})};
     },
-    async run({workspaceRoot,appId,host='127.0.0.1',port=0,httpPort=0,tls,certPath,keyPath,signal,onEvent}={}){
+    async run({workspaceRoot,appId,releaseRoot=path.join(workspaceRoot,'dist',appId),host='127.0.0.1',port=0,httpPort=0,tls,certPath,keyPath,signal,onEvent}={}){
         throwIfAborted(signal);
-        const releaseRoot=path.join(workspaceRoot,'dist',appId);
         const server=await startDevServer({
             workspaceRoot,
             appId,

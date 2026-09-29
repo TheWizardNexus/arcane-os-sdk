@@ -9,6 +9,10 @@ export function resolveAppRoot(workspaceRoot, config, appId) {
     return path.resolve(workspaceRoot, appRelativeRoot(config, appId));
 }
 
+export function resolvePackageOutputRoot(workspaceRoot, config, app) {
+    return path.resolve(workspaceRoot, app.outputDirectory ?? `${config.distRoot}/${app.id}`);
+}
+
 export function appBaseHref(workspaceRoot, appRoot, document = 'index.html') {
     const directory = path.dirname(path.resolve(appRoot, document));
     const relative = path.relative(directory, workspaceRoot).split(path.sep).join('/');

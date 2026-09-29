@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,readFile,rm,writeFile} from 'node:fs/promises';
+import {lstat,mkdtemp,mkdir,readdir,readFile,rm,writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from '../src/testing.mjs';
@@ -17,7 +17,7 @@ async function writeJson(filePath,value){
     await writeFile(filePath,`${JSON.stringify(value,null,2)}\n`,'utf8');
 }
 
-async function workspaceFixture(t,{security,appsRoot='apps'}={}){
+async function workspaceFixture(t,{security,appsRoot='apps',outputDirectory}={}){
     const workspaceRoot=await mkdtemp(path.join(os.tmpdir(),'arcane-packager-content-'));
     t.after(()=>rm(workspaceRoot,{recursive:true,force:true}));
     const appRoot=appsRoot==='.'?workspaceRoot:path.join(workspaceRoot,'apps','complete-app');
@@ -45,6 +45,7 @@ async function workspaceFixture(t,{security,appsRoot='apps'}={}){
         version:'1.2.3',
         entry:'index.html',
         strategy:'static',
+        ...(outputDirectory===undefined?{}:{outputDirectory}),
         ...(security===undefined?{}:{security}),
         include:['index.html','content'],
         exclude:[],
@@ -460,3 +461,194 @@ test('dry-run returns the complete structural inventory without creating release
         'index.html'
     ]);
 });
+
+test(
+    'app outputDirectory selects the final workspace directory without changing identity or package layout',
+    async function selectedPackageDirectory(context) {
+        for (const appsRoot of ['.', 'apps']) {
+            const selected = await workspaceFixture(context, {appsRoot});
+            const request = {workspaceRoot: selected.workspaceRoot, appId: 'complete-app'};
+            const defaultPackage = await packageApp(request);
+            assert.equal(defaultPackage.output, 'dist/complete-app');
+            assert.equal(defaultPackage.outputRoot, path.join(selected.workspaceRoot, 'dist', 'complete-app'));
+            const defaultManifest = await readFile(
+                path.join(defaultPackage.outputRoot, RELEASE_MANIFEST_NAME),
+                'utf8'
+            );
+            const configPath = path.join(selected.appRoot, 'arcane-package.json');
+            const config = JSON.parse(await readFile(configPath, 'utf8'));
+            config.outputDirectory = 'ai';
+            await writeJson(configPath, config);
+            const outputRoot = path.join(selected.workspaceRoot, 'ai');
+            const siblingPath = path.join(selected.workspaceRoot, 'ai-notes.txt');
+            const sibling = '  Preserve the sibling and its complete notes.\n';
+            await writeFile(siblingPath, sibling);
+
+            const inspected = await inspectApp(request);
+            assert.equal(inspected.output, 'ai');
+            assert.deepEqual(inspected.files, defaultPackage.files);
+            const dryRun = await packageApp({...request, dryRun: true});
+            assert.equal(dryRun.output, 'ai');
+            await assert.rejects(lstat(outputRoot), {code: 'ENOENT'});
+
+            const first = await packageApp(request);
+            assert.equal(first.output, 'ai');
+            assert.equal(first.outputRoot, outputRoot);
+            assert.deepEqual(first.manifest.app, defaultPackage.manifest.app);
+            assert.deepEqual(first.files, defaultPackage.files);
+            await assert.rejects(lstat(path.join(outputRoot, 'complete-app')), {code: 'ENOENT'});
+            const entry = appsRoot === '.' ? 'index.html' : 'apps/complete-app/index.html';
+            const document = appsRoot === '.' ? 'content/document.txt' : 'apps/complete-app/content/document.txt';
+            assert.equal(await readFile(path.join(outputRoot, entry), 'utf8'), selected.html);
+            const replacement = '  Updated complete document.\nSecond line and trailing space \n';
+            await writeFile(path.join(selected.appRoot, 'content/document.txt'), replacement);
+            const repeated = await packageApp(request);
+            assert.equal(repeated.outputRoot, outputRoot);
+            assert.deepEqual(repeated.files, first.files);
+            assert.equal(await readFile(path.join(outputRoot, document), 'utf8'), replacement);
+            const verified = await verifyApp(request);
+            assert.equal(verified.outputRoot, outputRoot);
+            assert.equal(verified.verified, true);
+            assert.equal(await readFile(path.join(defaultPackage.outputRoot, RELEASE_MANIFEST_NAME), 'utf8'), defaultManifest);
+            assert.equal(await readFile(siblingPath, 'utf8'), sibling);
+            assert.equal(await readFile(path.join(selected.appRoot, 'index.html'), 'utf8'), selected.html);
+
+            const completedManifest = await readFile(path.join(outputRoot, RELEASE_MANIFEST_NAME), 'utf8');
+            await mkdir(path.join(selected.appRoot, 'scripts'), {recursive: true});
+            await writeFile(
+                path.join(selected.appRoot, 'scripts/fail-package.mjs'),
+                'export async function buildArcanePackage({copyBase}) {\n'
+                    + '    await copyBase();\n'
+                    + '    throw new Error("Synthetic adapter failed after copying the stage.");\n'
+                    + '}\n'
+            );
+            config.strategy = 'adapter';
+            config.adapter = 'scripts/fail-package.mjs';
+            await writeJson(configPath, config);
+            await assert.rejects(
+                packageApp(request),
+                /Synthetic adapter failed after copying the stage\./u
+            );
+            assert.equal(await readFile(path.join(outputRoot, RELEASE_MANIFEST_NAME), 'utf8'), completedManifest);
+            assert.equal(await readFile(path.join(outputRoot, document), 'utf8'), replacement);
+            assert.equal(await readFile(siblingPath, 'utf8'), sibling);
+            assert.equal(JSON.parse(await readFile(configPath, 'utf8')).version, '1.2.3');
+            assert.deepEqual(
+                (await readdir(selected.workspaceRoot)).filter(
+                    function packageTransactionResidue(name) {
+                        return name.startsWith('.complete-app-staging-') || name.startsWith('ai.backup-');
+                    }
+                ),
+                []
+            );
+        }
+    }
+);
+
+test(
+    'a selected parent with an explicit output exclusion supports repeat packaging without copying its stage',
+    async function excludedNestedPackageOutput(context) {
+        const selected = await workspaceFixture(context, {appsRoot: '.', outputDirectory: 'content/ai'});
+        const configPath = path.join(selected.appRoot, 'arcane-package.json');
+        const config = JSON.parse(await readFile(configPath, 'utf8'));
+        config.exclude = ['content/ai'];
+        await writeJson(configPath, config);
+        const outputRoot = path.join(selected.workspaceRoot, 'content/ai');
+        await mkdir(outputRoot);
+        await writeFile(path.join(outputRoot, 'old-output.txt'), 'Previous selected output.\n');
+        const request = {workspaceRoot: selected.workspaceRoot, appId: 'complete-app'};
+        const first = await packageApp(request);
+        const second = await packageApp(request);
+        assert.equal(second.outputRoot, outputRoot);
+        assert.deepEqual(second.files, first.files);
+        assert.ok(second.files.includes('content/document.txt'));
+        assert.equal(
+            second.files.some(
+                function includesPackageTransaction(file) {
+                    return file.startsWith('content/ai/') || file.includes('-staging-') || file.includes('.backup-');
+                }
+            ),
+            false
+        );
+        assert.equal(await readFile(path.join(outputRoot, 'content/document.txt'), 'utf8'), selected.document);
+        assert.equal(await readFile(path.join(selected.appRoot, 'content/document.txt'), 'utf8'), selected.document);
+        await assert.rejects(lstat(path.join(outputRoot, 'old-output.txt')), {code: 'ENOENT'});
+        assert.deepEqual((await readdir(path.dirname(outputRoot))).sort(), ['ai', 'document.txt']);
+    }
+);
+
+test(
+    'output conflicts preserve selected inputs and existing targets before staging or replacement',
+    async function packageOutputConflicts(context) {
+        for (const outputDirectory of [
+            'content', 'content/new-output', 'runtime', 'runtime/modules/new-output',
+            'arcane-package.json', 'blocked', 'blocked/ai'
+        ]) {
+            const selected = await workspaceFixture(context, {appsRoot: '.', outputDirectory});
+            const blocked = '  Existing non-directory destination.\n';
+            const blockedPath = path.join(selected.workspaceRoot, 'blocked');
+            await writeFile(blockedPath, blocked);
+            const configPath = path.join(selected.appRoot, 'arcane-package.json');
+            const authoredConfig = await readFile(configPath, 'utf8');
+            await assert.rejects(
+                packageApp({workspaceRoot: selected.workspaceRoot, appId: 'complete-app'}),
+                function selectedOutputConflict(error) {
+                    return error?.code === 'ARCANE_PACKAGE_INVALID';
+                },
+                outputDirectory
+            );
+            assert.equal(await readFile(configPath, 'utf8'), authoredConfig);
+            assert.equal(await readFile(path.join(selected.appRoot, 'index.html'), 'utf8'), selected.html);
+            assert.equal(await readFile(path.join(selected.appRoot, 'content/document.txt'), 'utf8'), selected.document);
+            assert.equal(await readFile(path.join(selected.workspaceRoot, 'runtime/modules/complete.js'), 'utf8'), selected.module);
+            assert.equal(await readFile(blockedPath, 'utf8'), blocked);
+            assert.deepEqual((await readdir(path.join(selected.appRoot, 'content'))).sort(), ['document.txt']);
+            assert.deepEqual((await readdir(path.join(selected.workspaceRoot, 'runtime/modules'))).sort(), ['complete.js']);
+            assert.equal(
+                (await readdir(selected.workspaceRoot)).some(
+                    function hasUnexpectedStage(name) {
+                        return name.includes('-staging-') || name.includes('.backup-');
+                    }
+                ),
+                false
+            );
+        }
+    }
+);
+
+test(
+    'an app-selected output cannot replace an unselected application or its source directory',
+    async function neighboringApplicationOutput(context) {
+        for (const outputDirectory of ['apps/neighbor-app', 'apps/neighbor-app/generated']) {
+            const selected = await workspaceFixture(context);
+            const request = {workspaceRoot: selected.workspaceRoot, appId: 'complete-app'};
+            const previous = await packageApp(request);
+            const previousManifest = await readFile(path.join(previous.outputRoot, RELEASE_MANIFEST_NAME), 'utf8');
+            const configPath = path.join(selected.appRoot, 'arcane-package.json');
+            const config = JSON.parse(await readFile(configPath, 'utf8'));
+            const neighborRoot = path.join(selected.workspaceRoot, 'apps/neighbor-app');
+            await mkdir(neighborRoot);
+            const neighborConfig = `${JSON.stringify({...config, id: 'neighbor-app'}, null, 2)}\n`;
+            const neighborPage = '<main>Keep this unselected application and all its content.</main>\n';
+            await Promise.all([
+                writeFile(path.join(neighborRoot, 'arcane-package.json'), neighborConfig),
+                writeFile(path.join(neighborRoot, 'index.html'), neighborPage)
+            ]);
+            config.outputDirectory = outputDirectory;
+            await writeJson(configPath, config);
+            await assert.rejects(
+                packageApp(request),
+                function neighboringAppConflict(error) {
+                    return error?.code === 'ARCANE_PACKAGE_INVALID';
+                }
+            );
+            assert.equal(await readFile(path.join(neighborRoot, 'arcane-package.json'), 'utf8'), neighborConfig);
+            assert.equal(await readFile(path.join(neighborRoot, 'index.html'), 'utf8'), neighborPage);
+            assert.deepEqual((await readdir(neighborRoot)).sort(), ['arcane-package.json', 'index.html']);
+            assert.equal(await readFile(path.join(previous.outputRoot, RELEASE_MANIFEST_NAME), 'utf8'), previousManifest);
+            assert.equal(await readFile(path.join(previous.outputRoot, 'apps/complete-app/content/document.txt'), 'utf8'), selected.document);
+            assert.equal(await readFile(path.join(selected.appRoot, 'content/document.txt'), 'utf8'), selected.document);
+            assert.deepEqual((await readdir(path.join(selected.workspaceRoot, 'apps'))).sort(), ['complete-app', 'neighbor-app']);
+        }
+    }
+);

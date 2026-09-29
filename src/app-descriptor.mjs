@@ -448,6 +448,11 @@ export async function refreshAppPackageProjection({workspaceRoot, appId, signal,
         packagePath,
         `apps/${appId}/arcane-package.json`
     );
+    // The output destination belongs to this workspace's package configuration,
+    // not the portable application descriptor or its identity.
+    if (packageManifest.outputDirectory !== undefined) {
+        projection.outputDirectory = packageManifest.outputDirectory;
+    }
     const packageProjection = packageManifest.pwa === undefined ? packageManifest : {
         ...packageManifest,
         pwa: normalizePwaConfig(packageManifest.pwa)
@@ -474,10 +479,11 @@ export async function loadAppDescriptor({workspaceRoot,appRoot,appId,packageMani
     if(authored){
         const descriptor=validateAppDescriptor(authored,{appId});
         const projection=projectPackageManifest(authored);
-        const packageProjection=packageManifest.pwa===undefined?packageManifest:{
+        const packageProjection={
             ...packageManifest,
-            pwa:normalizePwaConfig(packageManifest.pwa)
+            ...(packageManifest.pwa===undefined?{}:{pwa:normalizePwaConfig(packageManifest.pwa)})
         };
+        delete packageProjection.outputDirectory;
         if(!isDeepStrictEqual(projection,packageProjection)){
             fail(`${APP_DESCRIPTOR_NAME} does not project exactly to arcane-package.json.`);
         }

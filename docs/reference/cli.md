@@ -529,14 +529,23 @@ npm exec -- arcane check --app hello-world
 
 ### Overview
 
-Creates one complete browser release beneath `dist/<id>/`, preserving the prior
-output until the replacement is complete. It consumes saved source and managed
+Creates one complete browser release in the app's selected output directory,
+defaulting to `dist/<id>/`, and preserves the prior output until the replacement
+is complete. It consumes saved source and managed
 import maps, keeps standalone app files at the output root, and retains the
 configured shared route destinations. Explicit multi-app workspaces retain
 their selected app beneath `apps/<id>/`. When selected shared content supplies no root
 `index.html`, the SDK generates one that opens the selected app entry.
 Source document bases and resource URLs therefore retain their development
 layout. Packaging does not run tests or checks automatically.
+
+Set `"outputDirectory": "ai"` in the selected app's `arcane-package.json`
+to emit directly to `<workspace>/ai`; the SDK appends no app ID. Omit the field
+to retain the default. There is no new CLI flag. The selected directory is
+wholly replaced, not merged; choose a directory dedicated to the release.
+Changing this setting preserves the old output and its siblings. Source/input
+overlap fails before output writes. App identity, source layout, and saved
+data remain unchanged. See the [output contract](protocols.md#app-selected-package-output).
 
 For `installed-v1`, the same four configured source routes supply the complete
 selected SDK content directly from `node_modules`. Only the portable output
@@ -603,7 +612,10 @@ arcane bundle [--app <id>] [--artifact <file>.arcane-app.tar.gz] [--overwrite]
 
 ### Replacement behavior
 
-The default output is `dist/<id>-<version>.arcane-app.tar.gz`. An existing path
+The default archive is `<id>-<version>.arcane-app.tar.gz` beside the app's
+selected package directory. With the default package location, this remains
+`dist/<id>-<version>.arcane-app.tar.gz`. Bundling reads the same selected release
+root used by packaging and preview. An existing path
 is refused unless `--overwrite` is explicit. Even then, the prior artifact is
 retained until the replacement is complete. A conflicting or uncertain path is
 preserved rather than overwritten.
@@ -697,6 +709,8 @@ The command selects one workspace, app, target, architecture, format, signing
 profile, and output root. Current providers emit a portable directory,
 Windows x64 EXE bundle, Linux x64/ARM64 DEB, or development-signed Android APK.
 The output remains target-specific inside the common plan contract.
+The app's `outputDirectory` selects its packaged browser-content input;
+native `--output-root` independently selects native build output.
 `--dry-run` is implemented for the browser build path. Native builds reject it
 rather than returning a fictional native artifact plan.
 
@@ -713,7 +727,8 @@ npm exec -- arcane build \
 
 ### Overview
 
-For `--target browser`, starts the existing current `dist/<app>` release; it
+For `--target browser`, starts the existing release in the app's configured
+`outputDirectory`, or `dist/<app>` when omitted; it
 does not package, rebuild, test, check, or verify that release automatically.
 It opens the release manifest's `app.start` URL. Older flat releases without
 that field continue to open their `app.entry` path.

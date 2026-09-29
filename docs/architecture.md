@@ -200,12 +200,13 @@ available until this wrapper and its explicit capability boundary are actually
 implemented.
 
 Packaging and release verification are separate explicit operations. Run
-`arcane package` to generate `dist/<id>`, then use
+`arcane package` to generate the selected app's `outputDirectory`, defaulting
+to `dist/<id>`, then use
 `arcane run --target browser` to serve that selected release. Packaging does
 not automatically run tests or checks; those run only when the user expressly
 requests them or when required for a separately selected release output. The browser
 run command does not substitute source files. If source changes after
-packaging, the prior `dist` remains intentionally unchanged until the next
+packaging, the prior packaged output remains intentionally unchanged until the next
 explicit package operation. Never use packaged `dist` as the everyday
 development tree, and never treat source-serving behavior as evidence for the
 release artifact.
@@ -223,6 +224,17 @@ dist/<id>/index.html
 dist/<id>/apps/<id>/index.html
 dist/<id>/ARCANE_APP_RELEASE.json
 ```
+
+These release paths show the default output location. An app's optional
+schema-1 `arcane-package.json` field `outputDirectory` selects the final
+workspace-relative directory instead: `"ai"` means `<workspace>/ai`, with no
+app-ID suffix. The selected directory is wholly replaced through the existing
+staged package swap; a changed destination preserves the old output and sibling
+directories. Input/source conflicts fail before output writes. This changes
+only package placement, not source layout, app identity, OPFS scope, or internal
+release URLs. Preview, verification, bundling, and native browser-content input
+consume that same selected release root; native executable output remains
+separate. See the [complete output contract](reference/protocols.md#app-selected-package-output).
 
 Packaging places each selected app file beneath `apps/<id>/` in the release
 and preserves every shared route destination. When no selected shared payload

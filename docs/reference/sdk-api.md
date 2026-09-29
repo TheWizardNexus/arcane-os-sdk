@@ -779,6 +779,10 @@ such as `apps/hello-world/index.html`. The complete `files` inventory uses
 package-relative paths and includes the root `index.html`. Shared
 files retain their configured route destinations.
 
+`output` is the selected workspace-relative final package directory. It uses
+the app's optional `arcane-package.json` `outputDirectory` directly, or
+`dist/<app-id>` when omitted; the SDK appends no app ID to an explicit value.
+
 ### Availability and normalization
 
 **Node.** Normalized SDK validation with complete canonical archive and release content. Deep protocol: [SDK packager and deterministic bundle contract](protocols.md).
@@ -838,6 +842,15 @@ ordinary `arcane dev` startup before selecting output that needs updated maps.
 The package preserves the complete selected content, applying the documented
 asset-version and enabled browser-PWA transformations to resource references.
 Malformed configuration or descriptors fail while preserving the prior output.
+
+The app's optional schema-1 `outputDirectory` selects the final
+workspace-relative destination. For example, `"ai"` emits directly into
+`<workspace>/ai`; omission retains `dist/<app-id>`. The selected directory is
+wholly replaced through the existing staged swap, not merged. Changing the
+destination preserves the former output and siblings. Conflicting source,
+selected input, or required control paths fail before output writes. Source
+layout, app identity, OPFS scope, and internal package paths remain unchanged.
+See [app-selected package output](protocols.md#app-selected-package-output).
 
 Selected app files are emitted beneath `apps/<id>/`; shared files retain their
 configured route destinations. When selected shared content supplies no root
@@ -1029,6 +1042,13 @@ console.log(validateAppBundlePath('payload/apps/example/index.html'));
 ### Overview
 
 Validates one schema-1 packager app configuration and its relationship to the root config.
+
+Optional `outputDirectory` is the final workspace-relative package directory;
+omission preserves `dist/<app-id>`. It is an app package field, not a change to
+the root configuration's `distRoot` or the schema-2 app identity. Packaging
+reports conflicting output/input selections with `ARCANE_PACKAGE_INVALID`
+before output writes. Authored-descriptor comparison treats the destination
+as package-local, and descriptor refresh preserves the existing setting.
 
 ### Signature and result
 
@@ -2650,6 +2670,11 @@ async function useresolveNativeBuildOutputRoot(...arguments_) {
 
 Invokes one target adapter run method and fails honestly when the artifact kind is not runnable.
 
+For the browser adapter, optional `releaseRoot` selects an existing packaged
+directory directly. Omission keeps the direct adapter's `dist/<app-id>`
+default, including callers with only a release workspace. The high-level
+`runApplication()` supplies the app-configured destination automatically.
+
 ### Signature and result
 
 ```text
@@ -4024,6 +4049,10 @@ async function usebuildApplication(...arguments_) {
 
 Creates one deterministic external application bundle from one authenticated packaged release.
 
+The high-level operation reads the app's selected package directory. Its
+default archive is placed beside that directory; an explicit artifact path
+retains the existing output-path contract.
+
 ### Signature and result
 
 ```text
@@ -4280,6 +4309,12 @@ import maps through `packageApp()`. Map generation remains the explicit
 Selected app files retain their `apps/<id>/` paths alongside the shared routes
 and root launcher described by `packageApp()`.
 
+The same low-level operation resolves the app's optional `outputDirectory`;
+there is no separate high-level destination override. `release.outputRoot`
+names the resulting complete release directory, with omitted configuration
+retaining `dist/<app-id>`. Browser preview, bundle creation, and native
+browser-content input use that selected root.
+
 Packaging does not automatically run tests or checks. Verification occurs only
 when explicitly requested or when required for the selected release output.
 A failure leaves the prior distribution untouched. Success returns the selected
@@ -4374,6 +4409,10 @@ async function userepositoryApplication(...arguments_) {
 ### Overview
 
 Runs a browser app or performs the selected native build/launch lifecycle for one target. It does not run tests or checks automatically; selected release-output verification remains explicit to that release operation.
+
+Browser runs resolve the app's current `outputDirectory`, defaulting to
+`dist/<app-id>`, and preview that existing release without repackaging it.
+Native artifact output remains separately selected by its target contract.
 
 ### Signature and result
 

@@ -34,6 +34,10 @@
     "entry": {
       "$ref": "#/$defs/relativePath"
     },
+    "outputDirectory": {
+      "$ref": "#/$defs/relativePath",
+      "description": "Final package directory relative to the workspace, with no appended app ID. Omission preserves dist/<id>. This directory is replaced when packaging succeeds; source layout and app identity remain unchanged."
+    },
     "strategy": {
       "enum": [
         "static",

@@ -12,7 +12,7 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {appRelativeRoot,resolveAppRoot} from '../app-layout.mjs';
+import {appRelativeRoot,resolveAppRoot,resolvePackageOutputRoot} from '../app-layout.mjs';
 import {readInstalledSdkLayout} from '../sdk-runtime-layout.mjs';
 import {withWorkspaceOperationLock} from '../workspace-operation-lock.mjs';
 import {
@@ -307,7 +307,7 @@ function normalizeOptionalRecord(value,label){
 export function validateAppConfig(value,appId,rootConfig,configPath=path.posix.join(appRelativeRoot(rootConfig,appId),APP_CONFIG_NAME)){
     assertOnlyKeys(value,new Set([
         'schemaVersion','id','displayName','version','entry','strategy','security',
-        'localAIModelPolicy','include','exclude','shared','adapter','pwa'
+        'localAIModelPolicy','include','exclude','shared','adapter','pwa','outputDirectory'
     ]),`${appId}/${APP_CONFIG_NAME}`);
     if(value.schemaVersion!==1)fail(`${appId}/${APP_CONFIG_NAME}.schemaVersion must be 1.`);
     if(!is.string(value.id)||value.id!==appId||!APP_ID_PATTERN.test(value.id)){
@@ -316,6 +316,9 @@ export function validateAppConfig(value,appId,rootConfig,configPath=path.posix.j
     const displayName=assertPresentationText(value.displayName,`${appId}/${APP_CONFIG_NAME}.displayName`);
     parseSemver(value.version);
     const entry=normalizeRelativePath(value.entry,`${appId}/${APP_CONFIG_NAME}.entry`);
+    const outputDirectory=value.outputDirectory===undefined?undefined:normalizeRelativePath(
+        value.outputDirectory,`${appId}/${APP_CONFIG_NAME}.outputDirectory`
+    );
     const include=validatePathList(value.include,`${appId}/${APP_CONFIG_NAME}.include`,{required:true});
     const exclude=validatePathList(value.exclude??[],`${appId}/${APP_CONFIG_NAME}.exclude`);
     if(include.some(allowed=>sameOrDescendant(APP_CONFIG_NAME,allowed))){
@@ -351,6 +354,7 @@ export function validateAppConfig(value,appId,rootConfig,configPath=path.posix.j
         displayName,
         version:value.version,
         entry,
+        ...(outputDirectory===undefined?{}:{outputDirectory}),
         strategy:value.strategy,
         ...(value.pwa===undefined?{}:{pwa:normalizePwaConfig(value.pwa)}),
         ...(value.security===undefined?{}:{security:normalizeOptionalRecord(
@@ -421,9 +425,65 @@ async function loadContext(requestedWorkspaceRoot,appId){
         appRoot,
         appId,
         config,
-        distRoot:path.join(workspaceRoot,rootConfig.distRoot),
-        outputRoot:path.join(workspaceRoot,rootConfig.distRoot,appId)
+        outputRoot:resolvePackageOutputRoot(workspaceRoot,rootConfig,config)
     };
+}
+
+async function assertPackageOutputLocation(context){
+    const output=context.outputRoot.split(path.sep).join('/');
+    const absolute=location=>path.resolve(location).split(path.sep).join('/');
+    const controls=[
+        context.appRoot,
+        path.join(context.workspaceRoot,ROOT_CONFIG_NAME),
+        path.join(context.appRoot,APP_CONFIG_NAME),
+        path.join(context.appRoot,APP_DESCRIPTOR_NAME),
+        ...(context.config.adapter?[path.join(context.appRoot,context.config.adapter)]:[])
+    ];
+    for(const control of controls){
+        if(sameOrDescendant(absolute(control),output)){
+            fail(`Package output would replace application source or configuration: ${control}.`);
+        }
+    }
+    for(const name of ['.git','.arcane','.agents','.codex','node_modules']){
+        const control=absolute(path.join(context.workspaceRoot,name));
+        if(sameOrDescendant(output,control)||sameOrDescendant(control,output)){
+            fail(`Package output overlaps the workspace control directory: ${name}.`);
+        }
+    }
+    if(context.rootConfig.appsRoot!=='.'){
+        const relative=path.relative(context.appsRoot,context.outputRoot);
+        if(relative&&!relative.startsWith(`..${path.sep}`)&&relative!=='..'&&!path.isAbsolute(relative)){
+            const [otherAppId]=relative.split(path.sep);
+            if(pathKey(otherAppId)!==pathKey(context.appId)){
+                const otherAppRoot=path.join(context.appsRoot,otherAppId);
+                for(const manifest of [APP_CONFIG_NAME,APP_DESCRIPTOR_NAME]){
+                    try{await lstat(path.join(otherAppRoot,manifest));}
+                    catch(error){if(error?.code==='ENOENT')continue;throw error;}
+                    fail(`Package output overlaps another application's source directory: ${otherAppRoot}.`);
+                }
+            }
+        }
+    }
+    function assertSelectedInput(sourceRoot,selected,excludes,label){
+        if(isExcluded(selected,excludes))return;
+        const source=absolute(path.resolve(sourceRoot,selected));
+        const relativeOutput=path.relative(sourceRoot,context.outputRoot).split(path.sep).join('/');
+        if(sameOrDescendant(source,output)
+            ||(sameOrDescendant(output,source)&&!isExcluded(relativeOutput,excludes))){
+            fail(`Package output overlaps selected ${label} content: ${selected}.`);
+        }
+    }
+    for(const selected of context.config.include){
+        assertSelectedInput(context.appRoot,selected,context.config.exclude,context.appId);
+    }
+    for(const sharedId of context.config.shared){
+        for(const route of context.rootConfig.sharedPayloads[sharedId]){
+            const sourceRoot=path.resolve(context.workspaceRoot,route.source);
+            for(const selected of route.include){
+                assertSelectedInput(sourceRoot,selected,route.exclude,`sharedPayloads.${sharedId}`);
+            }
+        }
+    }
 }
 
 function destinationJoin(root,relative){
@@ -495,6 +555,7 @@ async function collectSelectedPath({
 }
 
 async function collectPackageRecords(context,{signal}={}){
+    await assertPackageOutputLocation(context);
     const records=[];
     const destinations=new Set();
     for(const selected of context.config.include){
@@ -574,14 +635,15 @@ async function optionalDescriptor(context){
     }
 }
 
-async function inspectContext(context,{signal}={}){
-    const records=await collectPackageRecords(context,{signal});
-    const documents=await browserDocuments(records,context.config.entry);
+async function inspectContext(context,{signal,records}={}){
+    const selectedRecords=records??await collectPackageRecords(context,{signal});
+    const documents=await browserDocuments(selectedRecords,context.config.entry);
     return {
         appId:context.appId,
         displayName:context.config.displayName,
         version:context.config.version,
         entry:context.config.entry,
+        ...(context.config.outputDirectory===undefined?{}:{outputDirectory:context.config.outputDirectory}),
         strategy:context.config.strategy,
         ...(context.config.pwa===undefined?{}:{pwa:copyJson(context.config.pwa)}),
         include:[...context.config.include],
@@ -594,7 +656,7 @@ async function inspectContext(context,{signal}={}){
         ...(context.config.adapter===undefined?{}:{adapter:context.config.adapter}),
         descriptor:await optionalDescriptor(context),
         browserDocuments:documents,
-        files:[...new Set(['index.html',...records.map(record=>record.destination)])].sort(compareText),
+        files:[...new Set(['index.html',...selectedRecords.map(record=>record.destination)])].sort(compareText),
         output:path.relative(context.workspaceRoot,context.outputRoot).split(path.sep).join('/')
     };
 }
@@ -752,7 +814,8 @@ async function packageWithContext(context,options={}){
     const pwaEnabled=browserPwa&&context.config.pwa?.enabled===true;
     const appPath=appRelativeRoot(context.rootConfig,context.appId);
     const entryPath=appPackagePath(context,context.config.entry);
-    const inspected=await inspectContext(context,{signal});
+    const records=await collectPackageRecords(context,{signal});
+    const inspected=await inspectContext(context,{signal,records});
     if(options.dryRun){
         return {
             appId:context.appId,
@@ -770,17 +833,29 @@ async function packageWithContext(context,options={}){
             ].sort(compareText)
         };
     }
-    await mkdir(context.distRoot,{recursive:true});
-    const distInfo=await lstat(context.distRoot);
-    if(distInfo.isSymbolicLink()||!distInfo.isDirectory())fail('dist must be a real directory.');
+    // Directory replacement must stay on the requested physical path before
+    // mkdir or rename can affect an existing source tree through an ancestor.
+    let current=context.workspaceRoot;
+    for(const segment of path.relative(context.workspaceRoot,context.outputRoot).split(path.sep)){
+        current=path.join(current,segment);
+        let info;
+        try{info=await lstat(current);}
+        catch(error){if(error?.code==='ENOENT')break;throw error;}
+        if(info.isSymbolicLink()||!info.isDirectory()){
+            fail(`Package output must use real directories: ${current}.`);
+        }
+    }
+    const outputParent=path.dirname(context.outputRoot);
+    await mkdir(outputParent,{recursive:true});
+    const parentInfo=await lstat(outputParent);
+    if(parentInfo.isSymbolicLink()||!parentInfo.isDirectory())fail('Package output parent must be a real directory.');
     const stagingRoot=path.join(
-        context.distRoot,
+        outputParent,
         `.${context.appId}-staging-${process.pid}-${Date.now()}`
     );
     await mkdir(stagingRoot);
     let promoted=false;
     try{
-        const records=await collectPackageRecords(context,{signal});
         async function copyBase() {
             await copyRecords(records,stagingRoot,{signal,onEvent});
             if (!records.some(function selectedRootIndex(record) {
@@ -1009,7 +1084,7 @@ export async function packageApp(options={}){
 export async function verifyApp({workspaceRoot,appId,signal,onEvent}={}){
     throwIfAborted(signal);
     const context=await loadContext(workspaceRoot,appId);
-    const outputRoot=await realDirectory(context.outputRoot,`dist/${appId}`);
+    const outputRoot=await realDirectory(context.outputRoot,'Package output');
     const manifest=await readJson(path.join(outputRoot,RELEASE_MANIFEST_NAME),RELEASE_MANIFEST_NAME);
     if(!isPlainObject(manifest)||manifest.schemaVersion!==1||manifest.kind!=='arcane-app-release'
         ||manifest.packagerVersion!==PACKAGER_VERSION||manifest.app?.id!==appId

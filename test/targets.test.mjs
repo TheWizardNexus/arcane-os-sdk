@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
-import {cp,mkdir,writeFile} from 'node:fs/promises';
+import {cp,mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {createWorkspace} from '../src/scaffold.mjs';
 import {getTargetAdapter,listTargets} from '../src/targets/index.mjs';
+import {loadAppDescriptor,refreshAppPackageProjection,validateAppDescriptor} from '../src/app-descriptor.mjs';
+import {executeOperation,packageApplication,runApplication} from '../src/toolchain.mjs';
 import {
     fetchSyntheticTls,repositoryRoot,temporaryDirectory,useSyntheticTls,writeSyntheticTlsFiles
 } from './helpers.mjs';
@@ -79,6 +81,39 @@ test(
     }
 );
 
+test(
+    'direct browser preview serves an explicit release root without application source configuration',
+    async function explicitReleaseRootPreview(context) {
+        useSyntheticTls(context);
+        const workspaceRoot = await temporaryDirectory(context, {prefix: 'arcane-selected-preview-'});
+        const appId = 'selected-preview';
+        const releaseRoot = path.join(workspaceRoot, 'ai');
+        const defaultRoot = path.join(workspaceRoot, 'dist', appId);
+        await Promise.all([
+            mkdir(releaseRoot, {recursive: true}),
+            mkdir(defaultRoot, {recursive: true}),
+            writeSyntheticTlsFiles(workspaceRoot)
+        ]);
+        const content = '  The selected release keeps its complete content.\n';
+        await Promise.all([
+            writeFile(path.join(releaseRoot, 'index.html'), content),
+            writeFile(path.join(defaultRoot, 'index.html'), 'A separate default release.\n')
+        ]);
+        const instance = await getTargetAdapter('browser').run({
+            workspaceRoot, appId, releaseRoot, host: '127.0.0.1', port: 0, httpPort: 0
+        });
+        context.after(async function closeSelectedReleasePreview() {
+            await instance.close();
+        });
+        assert.equal(instance.releaseRoot, releaseRoot);
+        const response = await fetchSyntheticTls(instance.url);
+        assert.equal(response.status, 200);
+        assert.equal(await response.text(), content);
+        await assert.rejects(readFile(path.join(workspaceRoot, 'arcane-package.json')), {code: 'ENOENT'});
+        await assert.rejects(readFile(path.join(workspaceRoot, 'arcane-packager.json')), {code: 'ENOENT'});
+    }
+);
+
 async function installSdkPayload(workspaceRoot){
     const installedRoot=path.join(workspaceRoot,'node_modules','arcane-os');
     for(const directory of ['runtime','browser-runtime']){
@@ -104,6 +139,70 @@ async function installSdkPayload(workspaceRoot){
         await cp(path.join(repositoryRoot,license),path.join(installedRoot,license));
     }
 }
+
+test(
+    'public package and preview preserve a package-local output directory across descriptor refresh',
+    async function packageLocalOutputPreview(context) {
+        useSyntheticTls(context);
+        const parent = await temporaryDirectory(context, {prefix: 'arcane-package-output-preview-'});
+        const workspaceRoot = path.join(parent, 'workspace');
+        const appId = 'moon-tea';
+        await createWorkspace({targetPath: workspaceRoot, appId});
+        await installSdkPayload(workspaceRoot);
+        const configPath = path.join(workspaceRoot, 'arcane-package.json');
+        const descriptorPath = path.join(workspaceRoot, 'arcane-app.json');
+        const descriptor = JSON.parse(await readFile(descriptorPath, 'utf8'));
+        assert.equal(descriptor.schemaVersion, 2);
+        const config = JSON.parse(await readFile(configPath, 'utf8'));
+        config.outputDirectory = 'ai';
+        await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`);
+        const loaded = await loadAppDescriptor({
+            workspaceRoot, appRoot: workspaceRoot, appId, packageManifest: config
+        });
+        assert.deepEqual(loaded.descriptor, validateAppDescriptor(descriptor, {appId}));
+        assert.equal(loaded.source, 'authored');
+
+        descriptor.displayName = 'Moon Tea Delivery';
+        const authoredDescriptor = `${JSON.stringify(descriptor, null, 2)}\n`;
+        await writeFile(descriptorPath, authoredDescriptor);
+        assert.deepEqual(
+            await refreshAppPackageProjection({workspaceRoot, appId}),
+            {updated: true}
+        );
+        const refreshed = JSON.parse(await readFile(configPath, 'utf8'));
+        assert.equal(refreshed.outputDirectory, 'ai');
+        assert.equal(refreshed.id, appId);
+        assert.equal(refreshed.displayName, descriptor.displayName);
+        assert.equal(await readFile(descriptorPath, 'utf8'), authoredDescriptor);
+        assert.equal(Object.hasOwn(descriptor.package, 'outputDirectory'), false);
+        assert.deepEqual(
+            await refreshAppPackageProjection({workspaceRoot, appId}),
+            {updated: false}
+        );
+
+        await executeOperation('import-map', {workspaceRoot, appId});
+        const packaged = await packageApplication({workspaceRoot, appId});
+        const releaseRoot = path.join(workspaceRoot, 'ai');
+        assert.equal(packaged.release.output, 'ai');
+        assert.equal(packaged.release.outputRoot, releaseRoot);
+        assert.equal(packaged.release.manifest.app.id, appId);
+        assert.equal(packaged.release.manifest.app.start, './index.html');
+        const completePage = await readFile(path.join(releaseRoot, 'index.html'), 'utf8');
+        await writeSyntheticTlsFiles(workspaceRoot);
+        const instance = await runApplication({
+            workspaceRoot, appId, host: '127.0.0.1', port: 0, httpPort: 0
+        });
+        context.after(async function closePublicSelectedPreview() {
+            await instance.close();
+        });
+        assert.equal(instance.releaseRoot, releaseRoot);
+        const response = await fetchSyntheticTls(instance.url);
+        assert.equal(response.status, 200);
+        assert.equal(await response.text(), completePage);
+        assert.equal(await readFile(descriptorPath, 'utf8'), authoredDescriptor);
+        assert.equal(JSON.parse(await readFile(configPath, 'utf8')).outputDirectory, 'ai');
+    }
+);
 
 test('target registry distinguishes browser availability from native pairing requirements',async()=>{
     const targets=listTargets();
