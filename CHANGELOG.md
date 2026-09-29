@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.34.1
+
+- Honor an optional request-local `model` in `AI.fetchRequest()` and
+  `AI.streamRequest()`. Direct and registered built-in TWiN/native Ollama
+  requests carry the supplied model without changing the shared selection.
+  Calls that omit the option retain the selected default.
+- Preserve complete messages, streaming, tools, cancellation and request
+  observers. Provider-reported stream model metadata remains authoritative;
+  generated stream completion metadata falls back to the request's model.
+  The option does not load or switch a browser-WASM model.
+
 ## 0.34.0
 
 - Add `createDigitalOceanFalTTSProvider` through `arcane-os/ai/browser-speech`
