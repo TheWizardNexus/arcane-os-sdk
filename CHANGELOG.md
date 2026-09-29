@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.40.1
+
+- Include complete selected local resource URL variants in generated static
+  PWA inventories. Reuse the source resource graph, resolve shared component
+  styles and modules against their runtime root, and retain speech worker mode
+  queries. Application selection, source content and output locations remain
+  unchanged; regenerate through the public import-map workflow to receive the
+  corrected offline inventory.
+- Space DigitalOcean FAL inference request starts by one second while retaining
+  four concurrent jobs and ordered playback. Retry a readable rate-limit
+  rejection once, honoring longer readable Retry-After values, and retry a
+  same-job status network failure once. An ambiguous submission network failure
+  is surfaced without submitting another potentially paid job.
+- Preserve the user's enabled speech intent after a synthesis, playback or
+  provider lifecycle failure. A failed job leaves unrelated queued jobs intact;
+  explicit Retry, Load, Mute and Cancel remain user-controlled.
+
 ## 0.40.0
 
 - Add optional `arcane-package.json` `outputDirectory` to select the final
