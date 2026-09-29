@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.39.1
+
+- Preserve the Markdown editor's current source viewport and selection during
+  configuration, programmatic value changes, preview rendering and toolbar
+  formatting. Keep the live textarea attached; only the preview follows edits.
+  Native typing, manual scrolling, complete content and save behavior remain
+  independent and unchanged.
+- Generate default Chat filenames with a timestamp and an independent native
+  random identifier so sessions created in the same clock tick do not share a
+  storage name. Preserve explicit and saved filenames, existing stored content,
+  persistence format and request-only `persist:false` behavior.
+- Detect continuous-capture activity using fixed 20 ms RMS audio windows so
+  brief background peaks do not indefinitely postpone quiet-gap segments.
+  Preserve complete original samples, pre-roll, periodic clip adjacency and
+  partial final flush. `activityThreshold` now measures sustained RMS level;
+  callers retain control of sensitivity for softer input.
+
 ## 0.39.0
 
 - Add application-owned assistant display names to new Chat turns through
