@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.38.0
+
+- Add `User.AI_name` as an application-owned complete string with an empty-string
+  default, ordinary getter/setter, profile loading and `updateExplicit` support.
+  Preserve older saved profiles and restore the hydrated baseline after a failed
+  save; no existing history or provider/model selection is rewritten.
+- Distinguish saved conversation speakers in file previews using the shared
+  action/action-text colors for user cards and surface/text colors for assistant
+  cards. Assistant headings use the complete saved nonblank string name or `AI`,
+  without a role suffix. Preserve other role labels, timestamps, status, complete
+  content and persistence. Capturing names on new Chat turns is separate work.
+
 ## 0.37.0
 
 - Add opt-in `markdown-editor` fit layout and preview following through

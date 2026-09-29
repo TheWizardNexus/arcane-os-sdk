@@ -19,7 +19,7 @@ version-locked SDK runtime, while an integrated Arcane checkout uses its live
 `arcane/` runtime. Both profiles share the theme, packaging, event, cancellation,
 and browser run contracts while retaining their selected application layout.
 
-This checkout defines the `0.37.0` SDK contract. Applications pin one exact npm
+This checkout defines the `0.38.0` SDK contract. Applications pin one exact npm
 version and lockfile; registry state is deliberately not baked into application
 artifacts.
 
