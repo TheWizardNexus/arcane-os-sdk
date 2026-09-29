@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.37.0
+
+- Add opt-in `markdown-editor` fit layout and preview following through
+  `configure({fit:true, followPreview:true})` or `data-fit` and
+  `data-follow-preview`. Both options default to false. Fit mode keeps the
+  title, formatting controls, input, preview and save/status actions visible
+  in a bounded responsive layout with independent input and preview scrolling.
+- Follow body edits and formatting at their rendered Markdown block without
+  moving the input or containing page. Title edits and manual preview reading
+  preserve the reader's position. Expose named CSS parts for application styling.
+- Add `new MD(raw,{sourceMap:true})` with ordered original UTF-16 source ranges
+  and rendered comment anchors. Preserve complete raw content, ordinary default
+  rendering, formatting, save payloads, cancellation and cleanup. No saved-data
+  migration or model/provider/default changes.
+
 ## 0.36.1
 
 - Infer ordinary audio MIME types from mp3, wav, ogg, oga, opus, aac, m4a,
