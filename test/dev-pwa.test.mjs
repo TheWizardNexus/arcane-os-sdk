@@ -771,7 +771,7 @@ test(
         );
         const appId = 'authored-pwa';
         await createWorkspace(
-            {targetPath: workspaceRoot, appId, displayName: 'Authored PWA', target: 'browser'}
+            {targetPath: workspaceRoot, appId, appsRoot: 'apps', displayName: 'Authored PWA', target: 'browser'}
         );
         await writeSyntheticTlsFiles(workspaceRoot);
         // Use the existing integrated fixture profile with the scaffolded runtime.
