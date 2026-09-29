@@ -80,6 +80,12 @@ function serviceWorkerFixture() {
             event.source = worker;
             event.data = {type: 'arcane.pwa.error', error};
             container.dispatchEvent(event);
+        },
+        refreshed(worker, result) {
+            const event = new Event('message');
+            event.source = worker;
+            event.data = {type: 'arcane.pwa.refreshed', ...result};
+            container.dispatchEvent(event);
         }
     };
 }
@@ -112,6 +118,77 @@ function installNavigator(serviceWorker, {storage, locks} = {}) {
         }
     };
 }
+
+test('PWA completed refresh replies latch update availability without changing native update semantics', async function completedUpdateState() {
+    const fixture = serviceWorkerFixture();
+    fixture.registration.installing = null;
+    const worker = new WorkerFixture('activated');
+    fixture.registration.active = worker;
+    worker.refreshResult = function changedRefresh() {
+        return {lastChecked: 2000000, updateAvailable: true, error: null};
+    };
+    let saved;
+    const savedCheck = new Promise(function observeSavedCheck(resolve) { saved = resolve; });
+    const restore = installNavigator(fixture.container, {storage: {
+        readyPromise: Promise.resolve(),
+        async get() { return null; },
+        async set(table, key, value) { saved(); return value; }
+    }});
+    const owner = registerPwa({workerUrl: 'https://example.test/app/arcane-sw.js'});
+    const states = [];
+    owner.subscribe(function observeUpdateState(state) { states.push(state); });
+    try {
+        assert.equal(owner.state.updateAvailable, false);
+        fixture.resolve();
+        await owner.ready;
+        await savedCheck;
+        assert.equal(owner.state.updateAvailable, true);
+        assert.equal(owner.state.status, 'active');
+        const delivered = states.length;
+        fixture.refreshed(worker, {lastChecked: 2000000, updateAvailable: true, error: null});
+        assert.equal(states.length, delivered);
+        fixture.registration.dispatchEvent(new Event('updatefound'));
+        assert.equal(owner.state.updateAvailable, true);
+        let replay;
+        const unsubscribe = owner.subscribe(function observeReplay(state) { replay = state; });
+        assert.equal(replay.updateAvailable, true);
+        unsubscribe();
+        assert.equal(await owner.update(), fixture.registration);
+        assert.equal(fixture.updates, 1);
+        owner.dispose();
+        const disposedCount = states.length;
+        fixture.refreshed(worker, {lastChecked: 3000000, updateAvailable: true, error: null});
+        assert.equal(states.length, disposedCount);
+    } finally {
+        owner.dispose();
+        restore();
+    }
+});
+
+test('PWA scoped worker broadcasts reach existing page owners and ignore partial or unknown refresh outcomes', async function updateBroadcastState() {
+    const fixture = serviceWorkerFixture();
+    const restore = installNavigator(fixture.container);
+    const first = registerPwa({workerUrl: 'https://example.test/app/arcane-sw.js'});
+    const second = registerPwa({workerUrl: 'https://example.test/app/arcane-sw.js'});
+    try {
+        fixture.resolve();
+        await Promise.all([first.ready, second.ready]);
+        const worker = fixture.registration.installing;
+        fixture.refreshed(worker, {updateAvailable: false, error: null});
+        fixture.refreshed(worker, {updateAvailable: true, error: {message: 'Partial refresh failed.'}});
+        fixture.refreshed(new WorkerFixture('activated'), {updateAvailable: true, error: null});
+        assert.equal(first.state.updateAvailable, false);
+        assert.equal(second.state.updateAvailable, false);
+        fixture.refreshed(worker, {updateAvailable: true, error: null});
+        assert.equal(first.state.updateAvailable, true);
+        assert.equal(second.state.updateAvailable, true);
+        assert.equal(first.state.status, 'installing');
+    } finally {
+        first.dispose();
+        second.dispose();
+        restore();
+    }
+});
 
 test('PWA registration returns its owner synchronously and replays native lifecycle state', async function registrationLifecycle() {
     const fixture = serviceWorkerFixture();

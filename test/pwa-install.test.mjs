@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import test from '../src/testing.mjs';
-import {PWA_INSTALL_STATE_EVENT, getPwaInstall} from '../browser-runtime/pwa.mjs';
+import {PWA_INSTALL_STATE_EVENT, getPwaInstall, registerPwa} from '../browser-runtime/pwa.mjs';
 import {createPwaArtifacts} from '../src/pwa.mjs';
 import Is from '../browser-runtime/dependencies/strong-type/index.js';
-import {createArcaneEventSource} from '../browser-runtime/event-manager.mjs';
+import {arcaneEvents, createArcaneEventSource, projectArcaneDOMEvent} from '../browser-runtime/event-manager.mjs';
 
 function installStorageFixture({
     records = new Map(),
@@ -67,6 +67,7 @@ function browserFixture(context, {
     storage = installStorageFixture()
 } = {}) {
     const window = new EventTarget();
+    let reloads = 0;
     const display = new EventTarget();
     const installedDisplay = new EventTarget();
     display.matches = running;
@@ -83,6 +84,11 @@ function browserFixture(context, {
             setItem(key, value) { stored.set(key, value); }
         },
         navigator: {standalone},
+        onbeforeunload: function applicationUnloadHandler() {},
+        location: {
+            href: 'https://example.test/index.html',
+            reload() { reloads += 1; }
+        },
         dbopfs: storage
     };
     const previous = new Map();
@@ -99,7 +105,8 @@ function browserFixture(context, {
             else delete globalThis[key];
         }
     });
-    return {window, display, installedDisplay, stored, storage};
+    return {window, display, installedDisplay, stored, storage,
+        unloadHandler: globals.onbeforeunload, get reloads() { return reloads; }};
 }
 
 function captureStorageWarnings(context) {
@@ -125,6 +132,178 @@ function offerInstall(window, prompt) {
     window.dispatchEvent(event);
     return event;
 }
+
+test('A late install prompt reads update state from a live registration owner', async function lateUpdatePrompt(context) {
+    browserFixture(context);
+    const container = new EventTarget();
+    const worker = new EventTarget();
+    worker.state = 'installing';
+    const registration = new EventTarget();
+    Object.assign(registration, {
+        scope: 'https://example.test/', installing: worker, waiting: null, active: null
+    });
+    container.register = async function registerWorker() { return registration; };
+    globalThis.navigator.serviceWorker = container;
+    const page = registerPwa({workerUrl: 'https://example.test/arcane-sw.js'});
+    try {
+        await page.ready;
+        const refreshed = new Event('message');
+        refreshed.source = worker;
+        refreshed.data = {type: 'arcane.pwa.refreshed', updateAvailable: true, error: null};
+        container.dispatchEvent(refreshed);
+        assert.equal(page.state.updateAvailable, true);
+        const prompt = getPwaInstall();
+        assert.equal(prompt.state.updateAvailable, true);
+        await prompt.ready;
+        prompt.dispose();
+        page.dispose();
+        const next = getPwaInstall();
+        await next.ready;
+        assert.equal(next.state.updateAvailable, false);
+    } finally {
+        page.dispose();
+    }
+});
+
+for (const presentation of ['installed', 'running', 'installation dismissed']) {
+    test(`PWA update controls remain independent when ${presentation}`, async function independentUpdateAvailability(context) {
+        const stored = new Map([['app-draft', 'complete draft\n  続き\n']]);
+        if (presentation === 'installation dismissed') {
+            stored.set('arcane.pwa.install.dismissed:https://example.test/arcane.webmanifest', 'true');
+        }
+        const fixture = browserFixture(context, {
+            stored,
+            running: presentation === 'running',
+            storage: installStorageFixture({records: new Map(presentation === 'installed'
+                ? [['pwa/installed.json', {installed: true}]] : [])})
+        });
+        const owner = getPwaInstall();
+        await owner.ready;
+        const source = createArcaneEventSource({}, {source: 'arcane.pwa', eventTypes: ['arcane.pwa.state']});
+        try {
+            assert.equal(owner.state.updateAvailable, false);
+            assert.equal(owner.update(), false);
+            source.dispatch('arcane.pwa.state', {status: 'active', scope: 'https://another.test/', updateAvailable: true});
+            assert.equal(owner.state.updateAvailable, false);
+            source.dispatch('arcane.pwa.state', {status: 'active', scope: 'https://example.test/', updateAvailable: false});
+            assert.equal(owner.state.updateAvailable, false);
+            source.dispatch('arcane.pwa.state', {status: 'active', scope: 'https://example.test/', updateAvailable: true});
+            assert.equal(owner.state.updateAvailable, true);
+            assert.equal(owner.state.updateDismissed, false);
+            assert.equal(fixture.reloads, 0);
+            const installDismissed = owner.state.dismissed;
+            owner.dismissUpdate();
+            assert.equal(owner.state.updateDismissed, true);
+            assert.equal(owner.state.dismissed, installDismissed);
+            assert.equal(owner.update(), true);
+            assert.equal(fixture.reloads, 1);
+            assert.equal(globalThis.onbeforeunload, fixture.unloadHandler);
+            assert.equal(stored.get('app-draft'), 'complete draft\n  続き\n');
+            assert.equal(owner.state.updateAvailable, true);
+            let replay;
+            const unsubscribe = owner.subscribe(function replayUpdate(state) { replay = state; });
+            assert.equal(replay.updateAvailable, true);
+            assert.equal(replay.updateDismissed, true);
+            unsubscribe();
+            owner.dispose();
+            assert.equal(owner.update(), false);
+            const next = getPwaInstall();
+            await next.ready;
+            assert.equal(next.state.updateAvailable, false);
+            assert.equal(next.state.updateDismissed, false);
+        } finally {
+            source.dispose();
+        }
+    });
+}
+
+async function installComponentFixture() {
+    const html = await readFile(new URL('../runtime/arcane/components/pwa-install.html', import.meta.url), 'utf8');
+    const source = html.match(/<script type="module">([\s\S]*?)<\/script>/u)[1];
+    const elements = new Map();
+    for (const id of ['installTitle', 'description', 'install', 'close', 'status']) {
+        const element = new EventTarget();
+        element.dataset = {};
+        element.setAttribute = function setAttribute(name, value) { element[name] = value; };
+        elements.set(`#${id}`, element);
+    }
+    const host = new EventTarget();
+    host.dataset = {};
+    host.shadowRoot = {querySelector(selector) { return elements.get(selector); }};
+    const diagnostics = [];
+    const AsyncFunction = Object.getPrototypeOf(async function componentBody() {}).constructor;
+    const execute = new AsyncFunction('loadModule', source.replaceAll('import(', 'loadModule('));
+    await execute.call(host, async function loadComponentModule(specifier) {
+        if (specifier === 'strong-type') return {default: Is};
+        if (specifier === 'arcane-os/pwa') return {getPwaInstall};
+        if (specifier === 'arcane-os/event-manager') return {createArcaneEventSource, projectArcaneDOMEvent};
+        if (specifier === 'arcane-os/logging') return {arcaneLogging: {error(...values) { diagnostics.push(values); }}};
+        throw new Error(`Unexpected component import: ${specifier}`);
+    });
+    return {host, elements, diagnostics};
+}
+
+test('PWA shared component displays Update for an installed app and reloads only on its explicit click', async function installedUpdateComponent(context) {
+    const fixture = browserFixture(context, {running: true});
+    const owner = getPwaInstall();
+    await owner.ready;
+    const {host, elements, diagnostics} = await installComponentFixture();
+    const source = createArcaneEventSource({}, {source: 'arcane.pwa', eventTypes: ['arcane.pwa.state']});
+    try {
+        assert.equal(host.hidden, true);
+        source.dispatch('arcane.pwa.state', {status: 'active', scope: 'https://example.test/', updateAvailable: true});
+        assert.equal(host.hidden, false);
+        assert.equal(elements.get('#installTitle').textContent, 'Update available');
+        assert.equal(elements.get('#install').textContent, 'Update');
+        assert.equal(elements.get('#install').disabled, false);
+        assert.equal(elements.get('#close')['aria-label'], 'Close update suggestion');
+        assert.equal(fixture.reloads, 0);
+        elements.get('#install').dispatchEvent(new Event('click'));
+        assert.equal(fixture.reloads, 1);
+        assert.equal(host.hidden, false);
+        elements.get('#close').dispatchEvent(new Event('click'));
+        assert.equal(host.hidden, true);
+        assert.equal(owner.state.updateDismissed, true);
+        assert.equal(owner.state.dismissed, false);
+        assert.deepEqual(diagnostics, []);
+        host.destroy();
+        assert.equal(host.update(), false);
+        assert.equal(host.dismissUpdate(), false);
+    } finally {
+        host.destroy();
+        source.dispose();
+    }
+});
+
+test('PWA component update visibility ignores installation dismissal and preserves explicit installation', async function dismissedInstallUpdateComponent(context) {
+    const fixture = browserFixture(context);
+    const owner = getPwaInstall();
+    await owner.ready;
+    let prompts = 0;
+    offerInstall(fixture.window, function browserPrompt() { prompts += 1; return {outcome: 'accepted'}; });
+    const {host, elements} = await installComponentFixture();
+    const source = createArcaneEventSource({}, {source: 'arcane.pwa', eventTypes: ['arcane.pwa.state']});
+    try {
+        assert.equal(host.hidden, false);
+        assert.equal(elements.get('#install').textContent, 'Install');
+        host.dismiss();
+        assert.equal(host.hidden, true);
+        source.dispatch('arcane.pwa.state', {status: 'active', scope: 'https://example.test/', updateAvailable: true});
+        assert.equal(host.hidden, false);
+        host.configure({updateTitle: 'Complete update title\n続き', updateLabel: 'Reload now'});
+        assert.equal(elements.get('#installTitle').textContent, 'Complete update title\n続き');
+        assert.equal(elements.get('#install').textContent, 'Reload now');
+        host.dismissUpdate();
+        assert.equal(host.hidden, true);
+        assert.equal(owner.state.available, true);
+        assert.deepEqual(await host.install(), {outcome: 'accepted'});
+        assert.equal(prompts, 1);
+        assert.equal(fixture.reloads, 0);
+    } finally {
+        host.destroy();
+        source.dispose();
+    }
+});
 
 test('Installation state replays availability and calls each native prompt once in the click stack',
     async function nativeInstallLifecycle(context) {
@@ -542,7 +721,7 @@ test('Removing a loading component or disposing its owner settles mounting and p
         };
         document.body = {append(host) { host.isConnected = true; appended(host); }};
         const source = await readFile(new URL('../browser-runtime/pwa-install.mjs', import.meta.url), 'utf8');
-        const execute = new Function('Is', 'createArcaneEventSource', 'loadModule', 'resolveModule', source
+        const execute = new Function('Is', 'arcaneEvents', 'createArcaneEventSource', 'loadModule', 'resolveModule', source
             .replace(/^import .+;\r?$/gmu, '')
             .replace(/^export /gmu, '')
             .replaceAll('import.meta.url', "'https://example.test/arcane/sdk/pwa-install.mjs'")
@@ -550,7 +729,7 @@ test('Removing a loading component or disposing its owner settles mounting and p
             .replaceAll('import(', 'loadModule(')
             + '\nreturn {getPwaInstall, mountPwaInstallPrompt};');
         const imported = [];
-        const module = execute(Is, createArcaneEventSource, function loadManagedModule(specifier) {
+        const module = execute(Is, arcaneEvents, createArcaneEventSource, function loadManagedModule(specifier) {
             imported.push(specifier);
             return Promise.resolve({});
         }, function resolveManagedModule(specifier) {

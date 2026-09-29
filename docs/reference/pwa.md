@@ -266,6 +266,27 @@ Browser storage eviction can remove an offline cache. A missing release cache
 entry falls back to the network, so offline availability still depends on the
 browser retaining the selected resources.
 
+After a complete successful refresh, `updateAvailable` becomes true for an
+already-open page when at least one cached replacement has different parseable
+old and new `Last-Modified` dates, or a successfully checked resource was absent
+from the prior durable offline inventory. Different modification dates are the
+server's declaration of modification, not a comparison of response content.
+Initial cache population, eviction repair of a previously selected URL, `304`,
+and `200` responses with equal, missing or unreadable modification dates do not
+establish an update. Such successful responses still follow the existing cache
+replacement behavior. A host without meaningful modification dates cannot
+announce same-URL changes through this contract.
+
+The resource cache privately retains the pre-refresh inventory membership and
+a pending-change flag while a refresh is incomplete. This lifecycle record is
+outside the resource inventory and is never fetched from the server. Evidence
+is recorded only after the resource's cache write succeeds, survives worker
+termination and partial refresh failure, and is cleared after complete success.
+Partial failure never announces a newly available update. The completed worker
+reply and a scoped message to existing window clients carry the result; each
+page owner keeps its own sticky availability state. A new page does not replay
+an old completed notification.
+
 ## Updates and stored data
 
 An updated worker installs alongside the current worker, then waits for the
@@ -273,7 +294,7 @@ browser's normal activation boundary. Existing controlled pages retain their
 worker while they are open. Closing those pages allows activation; a refresh
 can leave overlapping document clients and keep the update waiting.
 
-The SDK does not call `skipWaiting`, claim the initial page, reload a page,
+The SDK does not call `skipWaiting`, claim the initial page, automatically reload a page,
 restart a model or poll for updates. Worker activation preserves cached
 resources and the DBOPFS check history for the same app and registration scope.
 Saved application data and caches owned by other capabilities are untouched.
@@ -283,6 +304,15 @@ SDK-owned registration bootstrap and PWA client once so the page can use the
 current cache-check protocol. Other cached resource bodies retain the normal
 check cadence. This transition follows native worker installation and
 activation without forcing a page reload.
+
+When a complete resource refresh establishes an update, the shared prompt shows
+**Update available** and **Update**, including in an installed or running app
+and after an earlier installation suggestion was dismissed. Update dismissal
+is separate and lasts for this page owner's lifetime. Clicking Update calls
+ordinary `location.reload()` for the current page, with no extra SDK
+confirmation or cache reset. Native `beforeunload` handling and application-owned
+draft/session persistence retain their normal ownership. This is a page reload,
+not a promise to preserve transient application state or an active chat.
 
 Switching a server from a packaged release to live development does not replace
 an already active release worker inside an open document. The same native
@@ -308,7 +338,8 @@ configuration, methods and events.
 
 The browser controls the URL-bar installation indicator and native prompt.
 The SDK cannot force either to appear. Without a captured
-`beforeinstallprompt`, the component remains hidden; that waiting state does
+`beforeinstallprompt`, installation remains hidden; an available update can
+still show. That waiting installation state does
 not establish that installation is unsupported. The browser may still be
 evaluating the app, may already have it installed, or may only support a
 manual browser-menu installation path.
@@ -354,12 +385,13 @@ does not infer installation support from the user-agent string. See
 
 Import `getPwaInstall` and `PWA_INSTALL_STATE_EVENT` from `arcane-os/pwa`.
 `getPwaInstall()` synchronously returns the shared page owner with `state`, `ready`,
-`subscribe`, `prompt`, `dismiss` and `dispose`. Call it early when owning a
+`subscribe`, `prompt`, `dismiss`, `update`, `dismissUpdate` and `dispose`. Call it early when owning a
 separate install entry point so it can capture `beforeinstallprompt` before
 loading the UI. The generated bootstrap already does this through
 `mountPwaInstallPrompt()`.
 
-`state` contains `status`, `available`, `installed`, `dismissed`, `outcome`,
+`state` contains `status`, `available`, `installed`, `dismissed`, `updateAvailable`,
+`updateDismissed`, `outcome`,
 `error` and `storageError`.
 Status is `waiting`, `available`, `prompting`, `accepted`, `dismissed`,
 `installed`, `running`, `error` or `disposed`. `available` means a native event
@@ -370,6 +402,15 @@ or restoration of that app's saved installation record.
 `outcome` is the browser's `accepted` or `dismissed` choice, or `null` before a
 choice. `error` carries the complete prompt error, or `null`; `storageError`
 carries the complete DBOPFS read or write error, or `null`.
+
+`updateAvailable` starts false and remains true after this owner observes a
+completed changed refresh for the current page's worker scope through
+`arcane.pwa.state`. `updateDismissed` starts false and is independent of
+installation dismissal and saved installation status. Neither field changes
+native installation `status` or `available`. A late-created prompt reads the
+current state of live registration owners before returning; earlier creation
+is still needed to capture a browser installation event that has not yet fired.
+The generated bootstrap establishes observation before registering the worker.
 
 `ready` resolves to the state after the initial DBOPFS read settles. Native
 events are captured synchronously while this read runs. Only installation
@@ -424,6 +465,15 @@ resource-check history and other application data. A pending read cannot undo
 newly observed installation, and a confirmed installation's pending write is
 retained through owner disposal. A write failure remains observable without
 making the current installed session eligible again.
+
+`update()` synchronously calls the current page's ordinary `location.reload()`
+and returns `true` when an update is available, including after dismissal.
+It returns `false` when unavailable or disposed. A native reload error propagates
+to the caller. It leaves availability unchanged so a cancelled native unload
+does not discard the update. `dismissUpdate()` hides the update suggestion for
+this page owner and returns the current state, without changing installation
+dismissal or writing a durable record. A disposed owner returns its current
+state unchanged. Call `update()` only from the user's explicit Update action.
 
 Running in an app display mode publishes `running`. These states
 do not establish offline readiness. On Android, `appinstalled` can arrive
@@ -494,14 +544,20 @@ workers are unavailable. A registration failure rejects it and publishes error
 state. Do not await it before rendering or confuse it with a controlled page.
 
 `state` reports `status`, `workerUrl`, `scope`, `controller`, `installing`,
-`waiting`, `active` and the complete `error` when present. Status is one of
+`waiting`, `active`, `updateAvailable` and the complete `error` when present. Status is one of
 `registering`, `unsupported`, `registered`, `installing`, `waiting`, `active`,
 `error` or `disposed`. Native worker state fields are strings or `null`.
+`updateAvailable` starts false and latches true after a successful full refresh
+with known change evidence; later native lifecycle/error events preserve it,
+and subscriptions replay it. Duplicate worker replies and broadcasts do not
+produce another availability transition. It is page-local, not persisted in
+DBOPFS, and remains separate from native worker activation.
 
 `subscribe(listener, {emitCurrent: true, signal} = {})` immediately replays the
 current state by default and returns an unsubscribe function. Subsequent state
 uses the existing Arcane event owner and `PWA_STATE_EVENT` (`arcane.pwa.state`).
-`update()` requests the browser's normal update check on demand; failure is
+`update()` requests the browser's normal worker update check on demand, not a
+page reload or a forced resource refresh; failure is
 observable in state and through its returned promise. `dispose()` removes
 page-owned listeners and subscriptions without unregistering the persistent
 worker or deleting stored data.

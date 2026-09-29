@@ -6407,8 +6407,8 @@ console.log(deviceClass); // mobile or desktop
 
 ### Overview
 
-The event name `arcane.pwa.state` identifies PWA registration and native worker
-lifecycle state published through the existing Arcane event owner.
+The event name `arcane.pwa.state` identifies PWA registration, native worker
+lifecycle and page-local update availability published through the existing Arcane event owner.
 
 ### Example
 
@@ -6434,7 +6434,15 @@ It stores one `lastChecked` timestamp per app/cache in DBOPFS, advancing it only
 after the full resource check succeeds, and revalidates on page load after
 120 seconds in development or 15 minutes in packaged delivery. Complete
 responses remain cached without SDK expiration; `304` retains the response
-and a successful replacement updates it. See the [PWA guide](pwa.md).
+and a successful replacement updates it. A complete successful refresh latches
+`state.updateAvailable` when parseable old/new `Last-Modified` dates differ or
+a successfully checked resource was absent from the prior durable inventory.
+Initial population, eviction repair, `304`, and unknown/equal modification
+dates do not announce updates. Partial-change evidence survives worker restart
+until complete success; existing scoped window clients receive the completed
+signal. The state replays to subscribers and remains true for this page owner.
+The registration owner's `update()` only requests a native worker update check;
+it does not reload the page. See the [PWA guide](pwa.md).
 
 ### Example
 
@@ -6456,7 +6464,7 @@ entry point and must observe its `ready` rejection.
 ### Overview
 
 The exact event name `arcane.pwa.install.state` identifies native installation
-availability and choice state through the existing Arcane event owner. It is
+availability, choice and shared update-prompt state through the existing Arcane event owner. It is
 separate from service-worker registration state. Importing it starts no
 observation or installation.
 
@@ -6475,16 +6483,17 @@ payload and current-state subscription behavior.
 ### Overview
 
 `getPwaInstall()` returns one synchronous page owner exposing `state`, `ready`,
-`subscribe`, `prompt`, `dismiss` and `dispose`. It captures the browser's
+`subscribe`, `prompt`, `dismiss`, `update`, `dismissUpdate` and `dispose`. It captures the browser's
 `beforeinstallprompt` event and observes `appinstalled` and app display-mode
 changes. A missing event leaves installation availability unknown and the owner
 waiting; it does not prove browser incompatibility.
 
-State contains `status`, `available`, `installed`, `dismissed`, `outcome`,
+State contains `status`, `available`, `installed`, `dismissed`, `updateAvailable`,
+`updateDismissed`, `outcome`,
 `error` and `storageError`. The owner restores `pwa/installed.json` through the
 app-scoped DBOPFS singleton and saves `{installed: true}` after `appinstalled`
 or an installed-app launch. Remembered installation suppresses both floating
-and inline controls on later visits. Acceptance alone and ordinary fullscreen
+and inline installation controls on later visits. Acceptance alone and ordinary fullscreen
 do not record installation.
 
 `ready` resolves to the state once the initial read settles. Native events are
@@ -6497,6 +6506,18 @@ directly within the install click to preserve native user activation. It
 consumes the event once and returns the browser choice, resolves to `null` when
 unavailable, or rejects with the actual error. `dismiss()` remembers the
 session's floating-suggestion dismissal without consuming a retained event.
+
+The generated bootstrap starts this owner before worker registration, so it
+observes the current page scope's `arcane.pwa.state` update signal while the
+component loads. A late-created prompt also reads current state from live
+registration owners. `updateAvailable` remains true for the page owner;
+`updateDismissed` is a separate page-local choice. An explicit `update()` calls
+ordinary `location.reload()` synchronously and returns true, or false when
+unavailable/disposed; native errors propagate. It preserves native unload
+handling and application draft ownership without promising transient-state
+survival. `dismissUpdate()` returns the current state and writes no durable
+record. Installed/running state or installation dismissal does not suppress
+the update suggestion. A fresh page does not replay an old completed update.
 
 ### Example
 
@@ -6537,7 +6558,9 @@ supplies the initial app name.
 The generated PWA bootstrap calls this automatically with the manifest name.
 Component mounting and worker registration run independently, and application
 rendering must not await them. The floating component offers Install and a
-manual close control; an application can also place the same component inline.
+manual close control, or Update available with an explicit Update action after
+a completed changed refresh. Update dismissal is separate from installation
+dismissal. An application can also place the same component inline.
 
 ### Example
 

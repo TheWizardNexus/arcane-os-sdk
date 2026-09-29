@@ -82,7 +82,7 @@ appropriate.
 | [`modal.html`](#modalhtml) | Generic modal with population, configurable user dismissal, actions, and concurrent task execution. | `configure()`<br>`populate()`<br>`open()`<br>`close()`<br>`runTasks()`<br>`destroy()`<br>`running`<br>`opened` | `modal-ready`<br>`modal-opened`<br>`modal-closed`<br>`modal-action` | Modal state normalized; injected task results mixed |
 | [`output-panel.html`](#output-panelhtml) | Presents status, output, body, coverage, actions, pending, error, and cleared states. | `configure()`<br>`setOutput()`<br>`setBody()`<br>`setCoverage()`<br>`setActions()`<br>`setPending()`<br>`setStatus()`<br>`setError()`<br>`clear()`<br>`destroy()` | `output-panel-ready`<br>`output-panel-state`<br>`output-panel-change`<br>`output-panel-action`<br>`output-panel-error`<br>`output-panel-cleared` | DOM-normalized |
 | [`preferences-form.html`](#preferences-formhtml) | Builds a schema-driven preferences form with submit, reset, busy, and status behavior. | `configure()`<br>`getValues()`<br>`setValues()`<br>`setBusy()`<br>`setStatus()`<br>`destroy()` | `preferences-form-ready`<br>`preferences-change`<br>`preferences-submit`<br>`preferences-reset` | Normalized form values |
-| [`pwa-install.html`](#pwa-installhtml) | Presents a dismissible browser installation action with floating or inline placement. | `configure()`<br>`install()`<br>`dismiss()`<br>`destroy()`<br>`state`<br>`ready` | `pwa-install-ready`<br>`pwa-install-change`<br>`pwa-install-dismissed` | Browser install availability and outcome supplied by the shared PWA owner |
+| [`pwa-install.html`](#pwa-installhtml) | Presents independent installation and explicit update/reload actions with floating or inline placement. | `configure()`<br>`install()`<br>`dismiss()`<br>`update()`<br>`dismissUpdate()`<br>`destroy()`<br>`state`<br>`ready` | `pwa-install-ready`<br>`pwa-install-change`<br>`pwa-install-dismissed` | Complete labels and independent installation/update state; native unload cancellation leaves Update available |
 | [`record-timeline.html`](#record-timelinehtml) | Displays complete chronological records/evidence and emits open actions. | `setItems()`<br>`populate()`<br>`destroy()` | `record-timeline-ready`<br>`record-timeline-open` | Complete item fields and inventories preserved |
 | [`relationship-board.html`](#relationship-boardhtml) | Displays complete normalized relationship nodes/edges in graph and list forms. | `setGraph()`<br>`populate()`<br>`destroy()` | `relationship-board-ready`<br>`relationship-node-open`<br>`relationship-edge-open` | Complete graph inventories and fields preserved |
 | [`screen-capture.html`](#screen-capturehtml) | Presents image, video, or GIF display-capture workflow. | `capture` (`ScreenCapture` instance)<br>`destroy()` | `screen-capture-ready`<br>`screen-capture-result` | State/result normalized; media permission/codec failures mixed |
@@ -1266,9 +1266,10 @@ Events: `preferences-form-ready`, `preferences-change`, `preferences-submit`, `p
 
 ### Overview
 
-A compact installation suggestion using the shared [PWA installation owner](pwa.md).
-The default floating panel appears near the top right only when the browser offers
-installation. It has an Install action and an explicit close button, takes no
+A compact installation and update suggestion using the shared [PWA owner](pwa.md).
+The default floating panel appears near the top right when the browser offers
+installation or a completed resource refresh establishes an update. It has an
+Install or Update action and an explicit close button, takes no
 focus automatically, and has no dismissal timer. It uses the Arcane theme and
 primitives, wraps complete labels and errors, and scrolls its own content when
 the available height is limited. The parent page loads `ThemeBootstrap.js` to
@@ -1277,7 +1278,8 @@ apply the user's appearance preferences.
 ### Public surface
 
 `configure({appName, installLabel, closeLabel, promptingLabel, description,
-presentation})` updates display configuration and returns its current record.
+updateTitle, updateLabel, updateDescription, updateCloseLabel, presentation})`
+updates display configuration and returns its current record.
 Labels remain complete strings. `appName` initially uses `data-app-name` or
 `this app`; the default button label is `Install`. `presentation` is `floating`
 by default or `inline`, initially read from `data-presentation`. Inline placement
@@ -1291,6 +1293,20 @@ An explicit request's complete failure message remains visible until dismissed;
 the method rejects with the same error. The browser controls actual installation.
 Acceptance hides the suggestion without claiming installation has completed.
 
+When an update is available, the same panel shows `Update available`, `Update`,
+`Reload this page to use the updated app.`, and the close label `Close update
+suggestion`. Each string has its matching configuration key. This presentation
+takes precedence over installation, including for installed/running apps and
+previously dismissed installation suggestions.
+
+`update()` calls the shared owner's ordinary `location.reload()` synchronously,
+returning true when available and false when unavailable or destroyed. It leaves
+availability intact if a native unload handler cancels navigation. Native reload
+errors propagate; the button observes them through developer diagnostics. There
+is no automatic reload, extra SDK confirmation, cache reset, or guarantee of
+preserving transient application state. `dismissUpdate()` hides only the update
+suggestion for this page owner and returns true, or false after destruction.
+
 `dismiss()` closes the component. Floating dismissal also uses the owner's
 session dismissal; an explicit inline component ignores that shared dismissal
 and closes only its own instance. Closing retains any unused native prompt at
@@ -1299,22 +1315,28 @@ disposes its event source, hides its host, and marks `ready` false; it does not
 dispose the shared owner or change browser installation state. Both methods
 return true while active and false after destruction; `destroy()` is idempotent.
 
-The readonly `state` property returns the shared owner's current install-state
+The readonly `state` property returns the shared owner's current install/update-state
 record; `ready` becomes true after methods and the state subscription are attached.
 `pwa-install-ready` carries `{ready, state}`; `pwa-install-change` carries
 `{state, visible}` for each observed owner update; `pwa-install-dismissed` carries
-`{presentation, state}`. These follow the canonical event projection contract.
+`{presentation, state}`, with `kind: 'update'` for update dismissal. These follow
+the canonical event projection contract.
 
 ### Availability and normalization
 
 The component requires HTMLImport and a DOM renderer. Native installation
 availability comes from the browser's `beforeinstallprompt` event through
-`getPwaInstall()`. Without an available event, the suggestion stays hidden;
+`getPwaInstall()`. Without an available event, the installation suggestion stays hidden;
 absence does not identify why installation is unavailable. Installed-app events,
 accepted prompts, and an already running installed display mode hide it.
 The shared SDK owner persists browser-reported installation in app-scoped
 DBOPFS. Both floating and inline controls stay hidden while that record is
 loading and remain hidden on later visits when installation is remembered.
+Those installation conditions do not hide an available update. Update state
+comes from the existing page-scoped registration owner, including a current-state
+read when the prompt is created after the refresh. A new page does not replay a
+completed update from an earlier page. Update dismissal is independent of saved
+installation state and performs no durable write.
 Acceptance alone does not save installation. The component's `ready` means
 its methods and subscription are attached; storage completion belongs to the
 shared owner's `ready` promise and does not delay page rendering.

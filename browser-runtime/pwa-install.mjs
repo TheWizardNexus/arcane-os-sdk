@@ -1,10 +1,19 @@
 import Is from './dependencies/strong-type/index.js';
-import {createArcaneEventSource} from './event-manager.mjs';
+import {arcaneEvents, createArcaneEventSource} from './event-manager.mjs';
 
 const is = new Is(false);
 export const PWA_INSTALL_STATE_EVENT = 'arcane.pwa.install.state';
 let sharedOwner = null;
 let mountedPrompt = null;
+const registrationOwners = new Set();
+
+// Internal connection to the registration owner, not a second copy of its state.
+export function observePwaRegistration(owner) {
+    registrationOwners.add(owner);
+    return function releasePwaRegistration() {
+        registrationOwners.delete(owner);
+    };
+}
 
 /** Capture native installation availability once per page, before loading UI. */
 export function getPwaInstall() {
@@ -14,7 +23,7 @@ export function getPwaInstall() {
     const owner = {
         get state() { return snapshot(); },
         get ready() { return ready; },
-        subscribe, prompt, dismiss, dispose
+        subscribe, prompt, dismiss, update, dismissUpdate, dispose
     };
     const source = createArcaneEventSource(owner, {
         source: 'arcane.pwa.install', eventTypes: [PWA_INSTALL_STATE_EVENT]
@@ -32,6 +41,8 @@ export function getPwaInstall() {
     let deferredPrompt = null;
     let disposed = false;
     let dismissed = false;
+    let updateAvailable = false;
+    let updateDismissed = false;
     let status = isRunningAsApp() ? 'running' : 'waiting';
     let outcome = null;
     let error = null;
@@ -59,7 +70,7 @@ export function getPwaInstall() {
         return {
             status,
             available: storageReady && deferredPrompt !== null && !installed && !isRunningAsApp() && !disposed,
-            installed, dismissed, outcome, error, storageError
+            installed, dismissed, updateAvailable, updateDismissed, outcome, error, storageError
         };
     }
 
@@ -237,6 +248,32 @@ export function getPwaInstall() {
         return snapshot();
     }
 
+    function onPwaState(event) {
+        if (event.source === 'arcane.pwa') receivePwaState(event.detail);
+    }
+
+    function receivePwaState(state) {
+        const pageUrl = globalThis.location?.href ?? globalThis.document?.baseURI ?? manifestUrl;
+        if (state.status === 'disposed' || state.updateAvailable !== true
+            || !state.scope || !pageUrl?.startsWith(state.scope) || updateAvailable) return;
+        updateAvailable = true;
+        publish(status, error);
+    }
+
+    function update() {
+        if (disposed || !updateAvailable) return false;
+        // Ordinary reload leaves native unload handlers and application draft ownership intact.
+        globalThis.location.reload();
+        return true;
+    }
+
+    function dismissUpdate() {
+        if (disposed) return snapshot();
+        updateDismissed = true;
+        publish(status, error);
+        return snapshot();
+    }
+
     function dispose() {
         if (disposed) return;
         deferredPrompt = null;
@@ -252,9 +289,11 @@ export function getPwaInstall() {
     observe(displayMode, 'change', onDisplayModeChange);
     observe(installedDisplayMode, 'change', onDisplayModeChange);
     observe(globalThis, 'pagehide', onPageHide);
+    listeners.push(arcaneEvents.subscribe('arcane.pwa.state', onPwaState));
     sharedOwner = owner;
     const storageTask = loadInstallStorage();
     const ready = restoreInstallation();
+    for (const registration of registrationOwners) receivePwaState(registration.state);
     if (installed) rememberInstallation();
     return owner;
 }

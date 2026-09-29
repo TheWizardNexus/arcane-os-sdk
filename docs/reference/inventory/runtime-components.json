@@ -650,11 +650,13 @@
     {
       "file": "runtime/arcane/components/pwa-install.html",
       "name": "pwa-install.html",
-      "purpose": "Presents a dismissible browser installation action with floating or inline placement.",
+      "purpose": "Presents independent installation and explicit update/reload actions with floating or inline placement.",
       "methods": [
         "configure()",
         "install()",
         "dismiss()",
+        "update()",
+        "dismissUpdate()",
         "destroy()",
         "state",
         "ready"
@@ -671,9 +673,9 @@
         "arcane-os/event-manager",
         "arcane-os/logging"
       ],
-      "availability": "Browser installation requires a browser-provided beforeinstallprompt event; otherwise hidden",
-      "transport": "HTMLImport + DOM; shared PWA installation owner and browser-native prompt",
-      "normalization": "Browser install availability and outcome supplied by the shared PWA owner"
+      "availability": "Installation requires beforeinstallprompt; a completed changed refresh independently enables the Update action",
+      "transport": "HTMLImport + DOM; shared PWA owner, browser-native install prompt and explicit ordinary page reload",
+      "normalization": "Complete labels and independent installation/update state; update dismissal is page-local, and native unload cancellation leaves Update available"
     },
     {
       "file": "runtime/arcane/components/record-timeline.html",

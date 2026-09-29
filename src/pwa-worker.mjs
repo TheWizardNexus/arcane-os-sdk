@@ -8,6 +8,7 @@ function installPwaWorker(manifest, clientUrl) {
     const cachePrefix = `arcane-pwa|${JSON.stringify([manifest.appId, scope])}|`;
     const cacheName = `${cachePrefix}resources`;
     const manifestUrl = cacheUrl('arcane-offline.json');
+    const refreshStateUrl = cacheUrl('.arcane-pwa/refresh-state');
     const protocolUrls = new Set([cacheUrl('arcane-pwa.mjs'), cacheUrl(clientUrl)]);
     const installationAssets = [...new Set(manifest.assets.map(cacheUrl))];
     const resourceJobs = new Map();
@@ -20,6 +21,9 @@ function installPwaWorker(manifest, clientUrl) {
     let previousCaches = null;
     let manifestRestored = false;
     let lastChecked = null;
+    let refreshState = null;
+    let priorUrls = null;
+    let changeSaved = null;
 
     function cacheUrl(value) {
         const url = new URL(value, scope);
@@ -80,6 +84,15 @@ function installPwaWorker(manifest, clientUrl) {
         for (const client of clients) {
             if (client.url.startsWith(scope)) {
                 client.postMessage(message);
+            }
+        }
+    }
+
+    async function reportUpdate(result) {
+        const clients = await self.clients.matchAll({type: 'window', includeUncontrolled: true});
+        for (const client of clients) {
+            if (client.url.startsWith(scope)) {
+                client.postMessage({type: 'arcane.pwa.refreshed', ...result});
             }
         }
     }
@@ -197,10 +210,14 @@ function installPwaWorker(manifest, clientUrl) {
                 // Parse the control document before replacing the last usable inventory.
                 await readManifest(response.clone());
             }
+            const previousModified = Date.parse(cached.response?.headers.get('last-modified'));
+            const nextModified = Date.parse(response.headers.get('last-modified'));
             return {
                 response,
                 saved: cached.cache.put(url, response.clone()),
                 checked: true,
+                modified: Number.isFinite(previousModified) && Number.isFinite(nextModified)
+                    && previousModified !== nextModified,
                 error: null
             };
         } catch (cause) {
@@ -226,6 +243,13 @@ function installPwaWorker(manifest, clientUrl) {
                 job.checked = result.checked;
                 try {
                     await result.saved;
+                    if (!result.error && result.checked && priorUrls
+                        && (result.modified || (url !== manifestUrl && !priorUrls.has(url)))) {
+                        // Record only completed cache writes; a partial cycle may outlive this worker.
+                        refreshState.changed = true;
+                        changeSaved ??= saveRefreshState();
+                        await changeSaved;
+                    }
                     return result.error;
                 } catch (cause) {
                     return resourceError(url, cause);
@@ -305,11 +329,41 @@ function installPwaWorker(manifest, clientUrl) {
         return lastChecked === null || Date.now() - lastChecked > interval;
     }
 
+    async function saveRefreshState() {
+        const cache = await caches.open(cacheName);
+        await cache.put(refreshStateUrl, new Response(JSON.stringify(refreshState)));
+    }
+
+    async function beginRefresh() {
+        const cache = await caches.open(cacheName);
+        const pending = await cache.match(refreshStateUrl);
+        if (pending) {
+            refreshState = await pending.json();
+        } else {
+            const cached = await findCachedResource(manifestUrl);
+            let prior = null;
+            if (cached.response) {
+                try {
+                    prior = await readManifest(cached.response);
+                } catch (error) {
+                    // An unreadable prior inventory cannot establish additions; normal refresh can replace it.
+                    console.error('PWA update detection could not read the prior inventory.', error);
+                }
+            }
+            refreshState = {assets: prior?.assets ?? null, changed: false};
+            // Preserve the pre-refresh inventory before its cached response is replaced.
+            await saveRefreshState();
+        }
+        priorUrls = refreshState.assets === null ? null : new Set(refreshState.assets);
+        changeSaved = null;
+    }
+
     async function refreshResources() {
         await restored;
         if (!checkDue()) {
-            return {lastChecked, error: null};
+            return {lastChecked, updateAvailable: false, error: null};
         }
+        await beginRefresh();
         const failures = [];
         let inventory = resourceJob(new Request(manifestUrl), manifestUrl, true);
         let error = await inventory.done;
@@ -337,11 +391,16 @@ function installPwaWorker(manifest, clientUrl) {
         }
         const checked = await populateResources(urls, true);
         failures.push(...checked.failures);
+        let updateAvailable = false;
         if (failures.length === 0) {
+            const cache = await caches.open(cacheName);
+            await cache.delete(refreshStateUrl);
+            updateAvailable = refreshState.changed;
             lastChecked = Date.now();
         }
         return {
             lastChecked,
+            updateAvailable,
             error: failures.length > 0
                 ? errorDetails(new AggregateError(failures, 'PWA resources could not all be updated.'))
                 : null
@@ -357,6 +416,9 @@ function installPwaWorker(manifest, clientUrl) {
                 function releaseRefresh() {
                     refreshTask = null;
                     refreshJobs.clear();
+                    refreshState = null;
+                    priorUrls = null;
+                    changeSaved = null;
                 }
             );
         }
@@ -383,10 +445,12 @@ function installPwaWorker(manifest, clientUrl) {
                     port?.close();
                     if (result.error) {
                         await reportFailure(result.error);
+                    } else if (result.updateAvailable) {
+                        await reportUpdate(result);
                     }
                 },
                 async function failRefresh(error) {
-                    port?.postMessage({type: 'arcane.pwa.refreshed', lastChecked, error: errorDetails(error)});
+                    port?.postMessage({type: 'arcane.pwa.refreshed', lastChecked, updateAvailable: false, error: errorDetails(error)});
                     port?.close();
                     await reportFailure(error);
                 }

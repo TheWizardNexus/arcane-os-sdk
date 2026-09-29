@@ -3013,7 +3013,7 @@
       "entrypoints": ["arcane-os/pwa"],
       "primaryImport": "arcane-os/pwa",
       "group": "Progressive web applications",
-      "summary": "Names the shared PWA lifecycle state event.",
+      "summary": "Names the shared PWA lifecycle and page-local update availability state event.",
       "availability": "Browser lifecycle; importable without registration",
       "protocol": "Existing Arcane event owner and native service worker lifecycle",
       "normalization": "The exact event name is arcane.pwa.state."
@@ -3030,7 +3030,7 @@
       "summary": "Starts PWA registration and DBOPFS-backed page-load resource checks without blocking rendering, returning an observable lifecycle owner.",
       "availability": "Browser service workers; explicit unsupported state elsewhere",
       "protocol": "Native registration, updatefound, statechange and controllerchange events",
-      "normalization": "Synchronous owner exposes ready, state, subscribe, update and dispose; current state replays by default, failures remain observable, disposal does not unregister the worker or delete saved data."
+      "normalization": "Synchronous owner exposes ready, state, subscribe, update and dispose; current state replays by default. updateAvailable latches after a complete successful refresh with different parseable modification dates or a successfully checked addition to the prior durable inventory; initial fill, eviction repair, unchanged or unknown responses and partial failure do not announce updates. Pending evidence survives worker termination. update only checks the native worker, without reloading the page. Failures remain observable; disposal does not unregister the worker or delete saved data."
     },
     {
       "id": "pwa:PWA_INSTALL_STATE_EVENT",
@@ -3041,7 +3041,7 @@
       "entrypoints": ["arcane-os/pwa"],
       "primaryImport": "arcane-os/pwa",
       "group": "Progressive web applications",
-      "summary": "Names the shared native installation availability and choice state event.",
+      "summary": "Names the shared native installation availability, choice and update-prompt state event.",
       "availability": "Browser installation lifecycle; importable without starting observation",
       "protocol": "Existing Arcane event owner and native browser installation events",
       "normalization": "The exact event name is arcane.pwa.install.state."
@@ -3055,10 +3055,10 @@
       "entrypoints": ["arcane-os/pwa"],
       "primaryImport": "arcane-os/pwa",
       "group": "Progressive web applications",
-      "summary": "Returns one shared page owner for native installation availability, prompt choices and session dismissal.",
+      "summary": "Returns one shared page owner for native installation, prompt choices, independent update availability and explicit page reload.",
       "availability": "Browser native installation events; waiting state while no prompt is available",
       "protocol": "Native beforeinstallprompt, appinstalled and display-mode change events",
-      "normalization": "Synchronous owner exposes state, subscribe, prompt, dismiss and dispose; subscriptions replay current state, prompt invokes the native event directly in the user click and consumes it once, and session dismissal preserves a retained event for explicit inline installation."
+      "normalization": "Synchronous owner exposes ready, state, subscribe, prompt, dismiss, update, dismissUpdate and dispose; subscriptions replay current state. prompt invokes the native event directly in the user click and consumes it once; installation dismissal preserves that event. updateAvailable and updateDismissed are independent page-local fields. A late prompt reads current state from live registration owners; the generated bootstrap observes before registration. Explicit update synchronously calls ordinary location.reload and returns true, returns false when unavailable/disposed, and propagates native errors. Native unload cancellation leaves Update available. dismissUpdate returns state without a durable write. Installed/running status and earlier installation dismissal do not suppress updates. Native unload handling and application draft ownership remain unchanged."
     },
     {
       "id": "pwa:mountPwaInstallPrompt",
@@ -3069,7 +3069,7 @@
       "entrypoints": ["arcane-os/pwa"],
       "primaryImport": "arcane-os/pwa",
       "group": "Progressive web applications",
-      "summary": "Starts shared installation observation and mounts one initially hidden, themed installation suggestion without delaying application rendering.",
+      "summary": "Starts shared installation/update observation and mounts one initially hidden, themed suggestion without delaying application rendering.",
       "availability": "Browser document and managed HTML import; resolves to null without a document",
       "protocol": "Shared native install owner and pwa-install.html component lifecycle",
       "normalization": "Repeated calls return the same mounting promise; the first appName initializes the component, success resolves to its ready html-import host, absence of a document or disposal before mounting resolves to null, and component loading failures reject. Removal or disposal during loading rejects with AbortError. A rejected mount permits another explicit attempt. Generated PWA bootstraps invoke it automatically."

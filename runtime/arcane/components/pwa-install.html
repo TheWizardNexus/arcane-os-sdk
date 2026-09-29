@@ -90,6 +90,10 @@
         closeLabel:'Close installation suggestion',
         promptingLabel:'Choose an option in the browser installation prompt.',
         description:'Open this app directly from your device.',
+        updateTitle:'Update available',
+        updateLabel:'Update',
+        updateDescription:'Reload this page to use the updated app.',
+        updateCloseLabel:'Close update suggestion',
         presentation:host.dataset.presentation||'floating'
     };
     let currentState=owner.state;
@@ -101,6 +105,8 @@
     host.configure=configure;
     host.install=install;
     host.dismiss=dismiss;
+    host.update=update;
+    host.dismissUpdate=dismissUpdate;
     host.destroy=destroy;
     Object.defineProperty(host,'state',{configurable:true,get:getState});
 
@@ -120,7 +126,8 @@
             throw new TypeError('PWA install configuration must be an object.');
         }
         const next={...options,...input};
-        for(const key of ['appName','installLabel','closeLabel','promptingLabel','description']){
+        for(const key of ['appName','installLabel','closeLabel','promptingLabel','description',
+            'updateTitle','updateLabel','updateDescription','updateCloseLabel']){
             if(!is.string(next[key]))throw new TypeError(`PWA install ${key} must be a string.`);
         }
         if(next.presentation!=='floating'&&next.presentation!=='inline'){
@@ -128,22 +135,24 @@
         }
         options=next;
         host.dataset.presentation=options.presentation;
-        title.textContent=`Install ${options.appName}`;
-        description.textContent=options.description;
-        installButton.textContent=options.installLabel;
-        closeButton.setAttribute('aria-label',options.closeLabel);
         render();
         return {...options};
     }
 
     function render(){
         if(destroyed)return;
+        const updating=currentState.updateAvailable&&!currentState.updateDismissed;
         const terminal=['accepted','installed','running','disposed'].includes(currentState.status);
         if(terminal)requestError=null;
         const dismissed=locallyDismissed
             ||(options.presentation==='floating'&&currentState.dismissed);
-        host.hidden=terminal||dismissed||(!currentState.available&&!pending&&!requestError);
-        installButton.disabled=pending||!currentState.available;
+        host.hidden=currentState.status==='disposed'
+            ||(!updating&&(terminal||dismissed||(!currentState.available&&!pending&&!requestError)));
+        title.textContent=updating?options.updateTitle:`Install ${options.appName}`;
+        description.textContent=updating?options.updateDescription:options.description;
+        installButton.textContent=updating?options.updateLabel:options.installLabel;
+        closeButton.setAttribute('aria-label',updating?options.updateCloseLabel:options.closeLabel);
+        installButton.disabled=updating?false:pending||!currentState.available;
         const message=requestError
             ?is.string(requestError.message)?requestError.message:String(requestError)
             :pending?options.promptingLabel:'';
@@ -192,6 +201,19 @@
         return true;
     }
 
+    function update(){
+        if(destroyed)return false;
+        return owner.update();
+    }
+
+    function dismissUpdate(){
+        if(destroyed)return false;
+        owner.dismissUpdate();
+        render();
+        emit('pwa-install-dismissed',{presentation:options.presentation,kind:'update',state:getState()});
+        return true;
+    }
+
     function destroy(){
         if(destroyed)return false;
         destroyed=true;
@@ -203,11 +225,22 @@
     }
 
     installButton.addEventListener('click',function requestInstallation(){
+        if(currentState.updateAvailable&&!currentState.updateDismissed){
+            try{
+                update();
+            }catch(error){
+                arcaneLogging.error('Unable to reload the updated app:',error);
+            }
+            return;
+        }
         install().catch(function reportInstallationFailure(error){
             arcaneLogging.error('Unable to open the browser installation prompt:',error);
         });
     },{signal:lifecycleController.signal});
-    closeButton.addEventListener('click',dismiss,{signal:lifecycleController.signal});
+    closeButton.addEventListener('click',function dismissSuggestion(){
+        if(currentState.updateAvailable&&!currentState.updateDismissed)dismissUpdate();
+        else dismiss();
+    },{signal:lifecycleController.signal});
 
     configure();
     owner.subscribe(observeInstallState,{signal:lifecycleController.signal});

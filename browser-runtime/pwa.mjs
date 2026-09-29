@@ -1,4 +1,5 @@
 import {createArcaneEventSource} from './event-manager.mjs';
+import {observePwaRegistration} from './pwa-install.mjs';
 
 export {PWA_INSTALL_STATE_EVENT, getPwaInstall, mountPwaInstallPrompt} from './pwa-install.mjs';
 
@@ -41,6 +42,7 @@ export function registerPwa({workerUrl = './arcane-sw.js', scope} = {}) {
         installing: null,
         waiting: null,
         active: null,
+        updateAvailable: false,
         error: null
     };
 
@@ -60,6 +62,7 @@ export function registerPwa({workerUrl = './arcane-sw.js', scope} = {}) {
             installing: registration?.installing?.state ?? null,
             waiting: registration?.waiting?.state ?? null,
             active: registration?.active?.state ?? null,
+            updateAvailable: current.updateAvailable,
             error
         };
         source.dispatch(
@@ -220,6 +223,7 @@ export function registerPwa({workerUrl = './arcane-sw.js', scope} = {}) {
                 return;
             }
             const result = await requestResourceRefresh(worker, record?.lastChecked ?? null);
+            receiveRefresh(result);
             if (!result.error && Number.isFinite(result.lastChecked) && result.lastChecked !== record?.lastChecked) {
                 await storage.set('pwa', key, {lastChecked: result.lastChecked});
             }
@@ -239,7 +243,18 @@ export function registerPwa({workerUrl = './arcane-sw.js', scope} = {}) {
         refreshRegistration();
     }
 
+    function receiveRefresh(result) {
+        if (disposed || result.error || result.updateAvailable !== true || current.updateAvailable) {
+            return;
+        }
+        current.updateAvailable = true;
+        publish(current.status, current.error);
+    }
+
     function onWorkerMessage(event) {
+        if (event.data?.type === 'arcane.pwa.refreshed' && workers.has(event.source)) {
+            receiveRefresh(event.data);
+        }
         if (event.data?.type === 'arcane.pwa.capabilities' && event.data.refresh === true && workers.has(event.source)) {
             startResourceRefresh(event.source, event.data.cacheName);
         }
@@ -341,6 +356,7 @@ export function registerPwa({workerUrl = './arcane-sw.js', scope} = {}) {
         source.dispose();
     }
 
+    listeners.push(observePwaRegistration(owner));
     const ready = startRegistration();
     return owner;
 }
