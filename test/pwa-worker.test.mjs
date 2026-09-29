@@ -205,7 +205,7 @@ function workerFixture({
                     }
                 }
             );
-            return {response, background: Promise.allSettled(pending)};
+            return {request, response, background: Promise.allSettled(pending)};
         }
     };
 }
@@ -513,6 +513,213 @@ test(
         assert.equal(fixture.requests.length, 2);
     }
 );
+
+for (const workerScope of ['https://example.test/', 'https://example.test/releases/current/']) {
+    test(`PWA query navigation reuses selected static HTML at ${workerScope} without redirect or per-user cache entries`, async function staticDocumentQueryNavigation() {
+        let offline = false;
+        const manifest = workerManifest({assets: ['index.html', 'pages/notes.htm']});
+        const fixture = workerFixture({
+            manifest,
+            workerScope,
+            fetchResource(request) {
+                if (offline) throw new Error('Static navigation must use the cached document.');
+                return new Response(`Complete document:${request.url}\n  続き\n`);
+            }
+        });
+        await fixture.lifecycle('install');
+        offline = true;
+        const cache = fixture.storage.stores.get(`arcane-pwa|${JSON.stringify([manifest.appId, workerScope])}|resources`);
+        const installedEntries = [...cache.keys()].sort();
+        const installedRequests = fixture.requests.length;
+        for (const document of manifest.assets) {
+            for (const query of ['?user=first&view=complete%20content&tag=a&tag=b', '?user=second']) {
+                const url = `${workerScope}${document}${query}`;
+                const navigation = fixture.request(url, {mode: 'navigate'});
+                const response = await navigation.response;
+                assert.equal(navigation.request.url, url);
+                assert.equal(response.status, 200);
+                assert.equal(response.headers.get('location'), null);
+                assert.equal(await response.text(), `Complete document:${workerScope}${document}\n  続き\n`);
+                assert.deepEqual(await navigation.background, [{status: 'fulfilled', value: undefined}]);
+            }
+        }
+        assert.equal(fixture.requests.length, installedRequests);
+        assert.deepEqual([...cache.keys()].sort(), installedEntries);
+        assert.deepEqual(fixture.messages, []);
+        assert.deepEqual(fixture.diagnostics, []);
+    });
+}
+
+test('PWA exact selected query variant takes precedence over its plain static document', async function exactNavigationVariant() {
+    const variant = 'index.html?view=selected&tag=first&tag=second';
+    const manifest = workerManifest({assets: ['index.html', variant]});
+    const fixture = workerFixture({manifest});
+    await fixture.lifecycle('install');
+    const cache = fixture.storage.stores.get(`arcane-pwa|${JSON.stringify([manifest.appId, scope])}|resources`);
+    const installedEntries = [...cache.keys()].sort();
+    const selected = fixture.request(`${scope}${variant}`, {mode: 'navigate'});
+    assert.equal(await (await selected.response).text(), `original:${scope}${variant}`);
+    await selected.background;
+    const ordinary = fixture.request(`${scope}index.html?view=other`, {mode: 'navigate'});
+    assert.equal(await (await ordinary.response).text(), `original:${scope}index.html`);
+    await ordinary.background;
+    assert.equal(fixture.requests.length, 2);
+    cache.delete(`${scope}${variant}`);
+    const evicted = fixture.request(`${scope}${variant}`, {mode: 'navigate'});
+    assert.equal(await (await evicted.response).text(), `original:${scope}${variant}`);
+    await evicted.background;
+    assert.equal(fixture.requests.at(-1).url, `${scope}${variant}`);
+    assert.equal(await cache.get(`${scope}index.html`).clone().text(), `original:${scope}index.html`);
+    assert.deepEqual([...cache.keys()].sort(), installedEntries);
+});
+
+test('PWA exact selected query variant precedes a plain navigation alias while other alias redirects remain', async function selectedQueryAliasPrecedence() {
+    const manifest = workerManifest({
+        assets: ['dashboard.html?view=detail', 'alternate.html'],
+        navigationAliases: {'dashboard.html': 'alternate.html'}
+    });
+    const fixture = workerFixture({manifest});
+    await fixture.lifecycle('install');
+    const exact = fixture.request(`${scope}dashboard.html?view=detail`, {mode: 'navigate'});
+    const selected = await exact.response;
+    assert.equal(selected.status, 200);
+    assert.equal(selected.headers.get('location'), null);
+    assert.equal(await selected.text(), `original:${scope}dashboard.html?view=detail`);
+    await exact.background;
+    for (const query of ['', '?view=other']) {
+        const alias = fixture.request(`${scope}dashboard.html${query}`, {mode: 'navigate'});
+        const redirected = await alias.response;
+        assert.equal(redirected.status, 302);
+        assert.equal(redirected.headers.get('location'), `${scope}alternate.html${query}`);
+        await alias.background;
+        const followed = fixture.request(redirected.headers.get('location'), {mode: 'navigate'});
+        assert.equal(await (await followed.response).text(), `original:${scope}alternate.html`);
+        await followed.background;
+    }
+    assert.equal(fixture.requests.length, 2);
+    const cache = fixture.storage.stores.get(`arcane-pwa|${JSON.stringify([manifest.appId, scope])}|resources`);
+    assert.deepEqual([...cache.keys()].sort(), manifest.assets.map(function selectedAsset(asset) {
+        return new URL(asset, scope).href;
+    }).sort());
+});
+
+test('PWA static query reuse leaves non-navigation, API, unselected and cross-origin requests unchanged', async function staticNavigationBoundaries() {
+    const manifest = workerManifest({
+        assets: ['index.html', 'api/records', 'app.mjs', 'https://provider.test/page.html']
+    });
+    const fixture = workerFixture({manifest});
+    await fixture.lifecycle('install');
+    const requests = fixture.requests.length;
+    for (const [url, options] of [
+        [`${scope}index.html?user=first`, {}],
+        [`${scope}index.html?user=first`, {mode: 'navigate', method: 'POST'}],
+        [`${scope}index.html?user=first`, {mode: 'navigate', headers: {range: 'bytes=0-20'}}],
+        [`${scope}api/records?user=first`, {mode: 'navigate'}],
+        [`${scope}app.mjs?user=first`, {mode: 'navigate'}],
+        [`${scope}unselected.html?user=first`, {mode: 'navigate'}],
+        ['https://provider.test/page.html?user=first', {mode: 'navigate'}],
+        ['https://unselected.test/page.html?user=first', {mode: 'navigate'}]
+    ]) {
+        const untouched = fixture.request(url, options);
+        assert.equal(untouched.response, undefined);
+        assert.deepEqual(await untouched.background, []);
+    }
+    assert.equal(await (await fixture.request(`${scope}api/records`).response).text(), `original:${scope}api/records`);
+    assert.equal(await (await fixture.request('https://provider.test/page.html').response).text(), 'original:https://provider.test/page.html');
+    assert.equal(fixture.requests.length, requests);
+});
+
+test('PWA static query cache miss fetches the original request without caching its response or replacing the plain document', async function queryNavigationCacheMiss() {
+    const manifest = workerManifest({assets: ['index.html']});
+    let cache;
+    let restorePlainDuringFetch = false;
+    const fixture = workerFixture({
+        manifest,
+        fetchResource(request) {
+            if (new URL(request.url).search) {
+                if (restorePlainDuringFetch) {
+                    cache.set(`${scope}index.html`, new Response('Complete independently restored static document.'));
+                }
+                return new Response(`Complete query response:${request.url}`);
+            }
+            return new Response('Complete original static document.');
+        }
+    });
+    await fixture.lifecycle('install');
+    cache = fixture.storage.stores.get(`arcane-pwa|${JSON.stringify([manifest.appId, scope])}|resources`);
+    cache.delete(`${scope}index.html`);
+    for (const query of ['?user=first', '?user=second']) {
+        const url = `${scope}index.html${query}`;
+        const navigation = fixture.request(url, {mode: 'navigate', headers: {'x-app-selection': 'complete value'}});
+        const response = await navigation.response;
+        await navigation.background;
+        assert.equal(fixture.requests.at(-1), navigation.request);
+        assert.equal(navigation.request.url, url);
+        assert.equal(navigation.request.headers.get('x-app-selection'), 'complete value');
+        assert.equal(navigation.request.cache, 'default');
+        assert.equal(response.status, 200);
+        assert.equal(response.headers.get('location'), null);
+        assert.equal(await response.text(), `Complete query response:${url}`);
+        assert.equal(cache.has(url), false);
+        if (restorePlainDuringFetch) {
+            assert.equal(await cache.get(`${scope}index.html`).clone().text(), 'Complete independently restored static document.');
+        } else {
+            assert.equal(cache.has(`${scope}index.html`), false);
+        }
+        restorePlainDuringFetch = true;
+    }
+    assert.equal(fixture.requests.length, 3);
+});
+
+for (const [mode, interval] of [['development', 120000], ['release', 900000]]) {
+    test(`PWA ${mode} static query navigation preserves refresh cadence and update notification`, async function staticNavigationRefreshLifecycle() {
+        let now = 1000000;
+        let changed = false;
+        const manifest = workerManifest({mode, assets: ['index.html', 'arcane-offline.json']});
+        const fixture = workerFixture({
+            manifest,
+            now() { return now; },
+            fetchResource(request) {
+                const inventory = request.url === `${scope}arcane-offline.json`;
+                const modified = changed && !inventory ? 'Mon, 07 Sep 2026 00:02:01 GMT' : 'Mon, 07 Sep 2026 00:00:00 GMT';
+                if (request.headers.get('if-modified-since') === modified) return new Response(null, {status: 304});
+                return new Response(inventory ? JSON.stringify(manifest) : changed ? 'Complete updated page.' : 'Complete original page.', {
+                    headers: {'last-modified': modified}
+                });
+            }
+        });
+        await fixture.lifecycle('install');
+        const installed = await fixture.refresh();
+        assert.equal(installed.updateAvailable, false);
+        changed = true;
+        now += interval;
+        const beforeCheck = fixture.request(`${scope}index.html?user=first`, {mode: 'navigate'});
+        assert.equal(await (await beforeCheck.response).text(), 'Complete original page.');
+        await beforeCheck.background;
+        assert.equal((await fixture.refresh(installed.lastChecked)).updateAvailable, false);
+        assert.equal(fixture.requests.length, 2);
+        assert.deepEqual(fixture.messages, []);
+        now += 1;
+        const dueNavigation = fixture.request(`${scope}index.html?user=second`, {mode: 'navigate'});
+        assert.equal(await (await dueNavigation.response).text(), 'Complete original page.');
+        await dueNavigation.background;
+        assert.equal(fixture.requests.length, 2);
+        const refreshed = await fixture.refresh(installed.lastChecked);
+        assert.equal(refreshed.error, null);
+        assert.equal(refreshed.lastChecked, now);
+        assert.equal(refreshed.updateAvailable, true);
+        assert.equal(fixture.requests.length, 4);
+        assert.equal(fixture.messages.length, 1);
+        assert.equal(fixture.messages[0].type, 'arcane.pwa.refreshed');
+        assert.equal(fixture.messages[0].updateAvailable, true);
+        const updated = fixture.request(`${scope}index.html?user=third`, {mode: 'navigate'});
+        assert.equal(await (await updated.response).text(), 'Complete updated page.');
+        await updated.background;
+        assert.equal(fixture.requests.length, 4);
+        const cache = fixture.storage.stores.get(`arcane-pwa|${JSON.stringify([manifest.appId, scope])}|resources`);
+        assert.deepEqual([...cache.keys()].sort(), [`${scope}arcane-offline.json`, `${scope}index.html`].sort());
+    });
+}
 
 for (const [name, prior, next, status, changed] of [
     ['304', 'Mon, 07 Sep 2026 00:00:00 GMT', null, 304, false],
@@ -891,6 +1098,14 @@ test('generated root worker uses portable npm resources and retains navigation q
     const navigation = await fixture.request(`${packageRoot}${query}#position`, {mode: 'navigate'}).response;
     assert.equal(navigation.status, 302);
     assert.equal(navigation.headers.get('location'), `${packageRoot}index.html${query}#last-turn`);
+    const requestsBeforeFollow = fixture.requests.length;
+    const followed = fixture.request(navigation.headers.get('location'), {mode: 'navigate'});
+    const target = await followed.response;
+    assert.equal(target.status, 200);
+    assert.equal(target.headers.get('location'), null);
+    assert.equal(await target.text(), `Complete content:${packageRoot}index.html`);
+    await followed.background;
+    assert.equal(fixture.requests.length, requestsBeforeFollow);
     assert.ok(fixture.requests.some(function fetchedRootModule(request) {
         return request.url === `${packageRoot}node_modules/arcane-sdk/browser-runtime/pwa.mjs`;
     }));

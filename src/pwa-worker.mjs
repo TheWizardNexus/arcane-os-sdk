@@ -494,13 +494,39 @@ function installPwaWorker(manifest, clientUrl) {
         return {location: destination.href, resource: cacheUrl(selected)};
     }
 
+    function staticNavigationResource(url) {
+        const document = new URL(url);
+        if (document.origin !== scopeOrigin || !document.search
+            || !/\.html?$/iu.test(document.pathname)) {
+            return null;
+        }
+        document.search = '';
+        return ownedUrls.has(document.href) ? document.href : null;
+    }
+
     async function requestedResource(request, url) {
         await restored;
-        const redirect = request.mode === 'navigate' ? navigationRedirect(url) : null;
+        const selectedQuery = ownedUrls.has(url) && new URL(url).search;
+        const redirect = request.mode === 'navigate' && !selectedQuery ? navigationRedirect(url) : null;
         if (redirect && cacheUrl(redirect.location) !== url && ownedUrls.has(redirect.resource)) {
             return {response: Response.redirect(redirect.location, 302), done: Promise.resolve(null)};
         }
         if (!ownedUrls.has(url)) {
+            const document = request.mode === 'navigate' ? staticNavigationResource(url) : null;
+            if (document) {
+                // Reuse only the selected static document body. Keep the navigation URL
+                // intact; a query-specific response must never replace this shared entry.
+                const cached = await findCachedResource(document);
+                if (cached.response) {
+                    return {
+                        response: cached.response,
+                        done: cached.current ? Promise.resolve(null)
+                            : cached.cache.put(document, cached.response.clone()).then(function retainedDocument() {
+                                return null;
+                            })
+                    };
+                }
+            }
             return {response: await fetch(request), done: Promise.resolve(null)};
         }
         const cache = await caches.open(cacheName);
@@ -522,7 +548,7 @@ function installPwaWorker(manifest, clientUrl) {
             return;
         }
         if (manifestRestored && !ownedUrls.has(url)
-            && !(request.mode === 'navigate' && navigationRedirect(url))) {
+            && !(request.mode === 'navigate' && (navigationRedirect(url) || staticNavigationResource(url)))) {
             return;
         }
         const resource = requestedResource(request, url);

@@ -262,6 +262,18 @@ consistent deployment of the selected output.
 An offline navigation alias redirects to its selected entry page, preserving the
 document URL used to resolve relative modules and styles.
 
+For a same-origin navigation to a selected static `.html` or `.htm` document,
+the worker can reuse that document's cached body while leaving the complete
+query and fragment in the browser's navigation URL. Pages such as
+`dashboard.html?id=person` therefore retain their application-owned parameters
+without enumerating people or saving a cache entry for every query. An exact
+query-specific resource already selected in the inventory takes precedence.
+When the plain document has no retained cached body, the original navigation
+request goes to the network unchanged; its response is not saved over the plain
+document. This does not change query matching for assets, API calls, ordinary
+fetch requests, unselected documents or other origins. Cache refresh and the
+Update prompt keep their existing lifecycle.
+
 Browser storage eviction can remove an offline cache. A missing release cache
 entry falls back to the network, so offline availability still depends on the
 browser retaining the selected resources.
