@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.42.1
+
+- Keep Enter as native newline input on phones and tablets using the shared
+  browser-device classification. The visible Send button still submits.
+- Submit desktop Enter before native newline insertion while preserving
+  Shift+Enter, input-method composition, complete draft text, and existing
+  Send, speech and programmatic submission routes. Held Enter does not submit
+  repeatedly; input changes resize the composer through its existing lifecycle.
+
 ## 0.42.0
 
 - Accept the optional boolean `responseToUsersPromptComplete` in conversation
