@@ -927,8 +927,11 @@ was produced. Closed, destroyed, or unavailable previews return `false`;
 preparation failures reject and the visible control reports a concise failure.
 
 `await close()` cancels pending presentation work and closes delete, file, and
-directory dialogs in that order. It releases preview resources and returns
-`false` on refused/failed closure or after destruction. The manager stays
+directory dialogs in that order. A settled preview keeps its rendered content,
+media, and printing available until the file dialog actually closes; refusing
+or failing to close leaves the still-visible preview usable. Actual file-dialog
+closure releases its preview resources. The method returns `false` on
+refused/failed closure or after destruction. The manager stays
 reusable; a later opening can use it again. Already accepted upload/deletion
 writes complete through the storage owner without reopening closed dialogs.
 

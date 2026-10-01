@@ -2447,10 +2447,14 @@
         presentationController = new AbortController();
         treeOpenGeneration += 1;
         directoryOpenGeneration += 1;
-        fileOpenGeneration += 1;
         deleteGeneration += 1;
         selectionGeneration += 1;
-        releasePreview(activePreview, 'file-manager-closed');
+        // Cancel unfinished opens now; a settled preview remains usable until
+        // its modal actually closes, including when a child refuses to close.
+        if (!activePreview?.rendered) {
+            fileOpenGeneration += 1;
+            releasePreview(activePreview, 'file-manager-closed');
+        }
         if (closingTask) {
             return closingTask;
         }

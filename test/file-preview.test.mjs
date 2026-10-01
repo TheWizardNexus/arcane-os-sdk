@@ -895,13 +895,14 @@ test('close awaits child modal completion before parents and leaves the manager 
         assert.equal(fixture.directoryModal.opened, true);
 
         const closing = fixture.host.close();
-        assert.equal(fixture.printViews[0].configuration.signal.aborted, true);
+        assert.equal(fixture.printViews[0].configuration.signal.aborted, false);
         await fixture.settle();
         assert.deepEqual(fixture.modalCloseEvents, [['delete', 'start']]);
         assert.equal(fixture.fileModal.opened, true);
         assert.equal(fixture.directoryModal.opened, true);
         childClose.resolve(true);
         assert.equal(await closing, true);
+        assert.equal(fixture.printViews[0].configuration.signal.aborted, true);
         assert.deepEqual(fixture.modalCloseEvents, [
             ['delete', 'start'], ['delete', 'finish'],
             ['file', 'start'], ['file', 'finish'],
@@ -977,33 +978,78 @@ test('close invalidates late readiness, storage reads, and descriptor completion
     }
 });
 
-test('close reports a child refusal and permits a later successful close', async function failedManagerCloseContract() {
-    let refuseClose = true;
-    const fixture = await fileManagerFixture({
-        layout: 'grid',
-        closeModal: function refuseFirstPreviewClose(modal) {
-            if (modal.name === 'file' && refuseClose) {
-                refuseClose = false;
-                return false;
+test('failed close preserves the rendered preview until its modal actually closes', async function failedManagerCloseContract() {
+    const html = '<!doctype html><html><body>Complete moon-whale log</body></html>';
+    for (const modalName of ['delete', 'file']) {
+        for (const failure of ['refusal', 'throw', 'still-open']) {
+            const fixture = await fileManagerFixture({
+                layout: 'grid',
+                previewDescriptor: function describePreservedPreview() {
+                    return {kind: 'collection', items: [
+                        {kind: 'html', content: html},
+                        {kind: 'image', content: new Blob(['complete image'], {type: 'image/png'})},
+                        {kind: 'audio', content: new Blob(['complete audio'], {type: 'audio/wav'})}
+                    ]};
+                }
+            });
+            const blockedModal = modalName === 'delete' ? fixture.deleteModal : fixture.fileModal;
+            const closeModal = blockedModal.close.bind(blockedModal);
+            const error = new Error('Fixture modal close failed');
+            let firstClose = true;
+            blockedModal.close = async function failInitialModalClose() {
+                if (!firstClose) return closeModal();
+                firstClose = false;
+                fixture.modalCloseEvents.push([modalName, 'start']);
+                if (failure === 'throw') throw error;
+                return failure === 'still-open';
+            };
+            try {
+                await fixture.openDirectory();
+                await fixture.open();
+                if (modalName === 'delete') {
+                    const remove = fixture.descendants(fixture.fileModal, function isDelete(element) {return element.className === 'file-view-delete';})[0];
+                    await remove.fire('click');
+                    assert.equal(fixture.deleteModal.opened, true);
+                }
+                const rendered = fixture.fileModal.children[0].children.at(-1);
+                const frame = fixture.descendants(rendered, function isHTML(element) {return element.localName === 'iframe';})[0];
+                const image = fixture.descendants(rendered, function isImage(element) {return element.localName === 'img';})[0];
+                const audio = fixture.descendants(rendered, function isAudio(element) {return element.localName === 'audio';})[0];
+                const urls = fixture.createdURLs.map(function createdURL(entry) {return entry.url;});
+
+                assert.equal(await fixture.host.close(), false);
+                assert.equal(fixture.fileModal.opened, true);
+                assert.equal(fixture.directoryModal.opened, true);
+                assert.equal(fixture.fileModal.children[0].children.at(-1), rendered);
+                assert.equal(frame.srcdoc, html);
+                assert.equal(image.src, urls[0]);
+                assert.equal(audio.src, urls[1]);
+                assert.equal(audio.paused, false);
+                assert.equal(audio.loads, 0);
+                assert.deepEqual(fixture.revokedURLs, []);
+                assert.equal(fixture.printViews[0].configuration.signal.aborted, false);
+                assert.equal(await fixture.host.printPreview(), true);
+                assert.equal(fixture.printRequests[0].content, rendered);
+                fixture.afterPrint();
+                assert.deepEqual(fixture.revokedURLs, []);
+
+                assert.equal(await fixture.host.close(), true);
+                assert.equal(fixture.fileModal.opened, false);
+                assert.equal(fixture.directoryModal.opened, false);
+                assert.equal(fixture.printViews[0].configuration.signal.aborted, true);
+                assert.equal(frame.srcdoc, '');
+                assert.equal(image.src, '');
+                assert.equal(audio.src, '');
+                assert.equal(audio.paused, true);
+                assert.equal(audio.loads, 1);
+                assert.deepEqual(fixture.revokedURLs, urls);
+                assert.equal(await fixture.host.printPreview(), false);
+                assert.equal(fixture.host.ready, true);
+                assert.deepEqual(fixture.errors, failure === 'throw' ? [['Unable to close file manager:', error]] : []);
+            } finally {
+                fixture.afterPrint();
+                fixture.host.destroy();
             }
         }
-    });
-    try {
-        await fixture.openDirectory();
-        await fixture.open();
-        assert.equal(await fixture.host.close(), false);
-        assert.equal(fixture.fileModal.opened, true);
-        assert.equal(fixture.directoryModal.opened, true);
-        assert.deepEqual(fixture.modalCloseEvents, [
-            ['delete', 'start'], ['delete', 'finish'], ['file', 'start']
-        ]);
-        assert.equal(await fixture.host.printPreview(), false);
-        assert.equal(await fixture.host.close(), true);
-        assert.equal(fixture.fileModal.opened, false);
-        assert.equal(fixture.directoryModal.opened, false);
-        assert.equal(fixture.host.ready, true);
-        assert.deepEqual(fixture.errors, []);
-    } finally {
-        fixture.host.destroy();
     }
 });
