@@ -105,6 +105,240 @@ export function normalizeAIRequestAbort(error){
     return normalized;
 }
 
+/** Stateless image generation; model selection and provider parameters belong to the caller. */
+export async function generateImages({
+    model,
+    prompt,
+    parameters = {},
+    twinKey,
+    getApiKey,
+    signal = null,
+    id = Date.now(),
+    onRequest = function observeImageRequest(){},
+    onResponse = function observeImageResponse(){},
+    onProgress = function observeImageProgress(){}
+} = {}) {
+    if (signal?.aborted) throw normalizeAIRequestAbort(signal.reason);
+    const asynchronous = model === 'fal-ai/flux/schnell';
+    if (!asynchronous && model !== 'stable-diffusion-3.5-large') {
+        const error = new TypeError('TWiN generateImages requires a supported explicit image model.');
+        error.code = 'ARCANE_AI_IMAGE_MODEL_UNSUPPORTED';
+        throw error;
+    }
+    if (!is.string(prompt)) throw new TypeError('TWiN generateImages requires a prompt string.');
+    if (!parameters || !is.object(parameters) || is.array(parameters)) {
+        throw new TypeError('Image parameters must be an object of additional provider fields.');
+    }
+    if (Object.hasOwn(parameters, 'prompt') || (!asynchronous && Object.hasOwn(parameters, 'model'))) {
+        throw new TypeError('Supply the image prompt and model through their named arguments.');
+    }
+    const destination = asynchronous
+        ? 'https://inference.do-ai.run/v1/async-invoke'
+        : 'https://inference.do-ai.run/v1/images/generations';
+    const request = asynchronous
+        ? {model_id: model, input: {...parameters, prompt}}
+        : {...parameters, model, prompt};
+    // Observe the complete request without allowing a later callback to rewrite its payload.
+    const body = JSON.stringify(request);
+    const outputFormat = parameters.output_format;
+    const controller = new AbortController();
+    const operationSignal = controller.signal;
+    function cancelImageRequest() {controller.abort(signal.reason);}
+    signal?.addEventListener('abort', cancelImageRequest, {once: true});
+    if (signal?.aborted) cancelImageRequest();
+
+    function progress(stage, requestId) {
+        return settleImageOperation(
+            function publishImageProgress() {
+                return onProgress({stage, model, id, ...(requestId === undefined ? {} : {requestId})});
+            },
+            operationSignal
+        );
+    }
+
+    async function inference(url, options) {
+        const response = await settleImageOperation(
+            function requestImageInference() {return fetch(url, {...options, credentials: 'omit', signal: operationSignal});},
+            operationSignal
+        );
+        const result = await settleImageOperation(
+            function readImageInference() {
+                if (response.ok || response.headers.get('content-type')?.includes('application/json')) {
+                    return response.json();
+                }
+                return response.text();
+            },
+            operationSignal
+        );
+        if (!response.ok) throw result;
+        const retryAfter = response.headers.get('retry-after');
+        const seconds = retryAfter?.trim() ? Number(retryAfter) : NaN;
+        const date = retryAfter?.trim() ? Date.parse(retryAfter) : NaN;
+        const delay = is.finite(seconds) && seconds >= 0 ? seconds * 1000
+            : is.finite(date) ? Math.max(0, date - Date.now()) : 1000;
+        return {result, delay};
+    }
+
+    try {
+        await progress('credentials');
+        const key = twinKey === undefined && is.function(getApiKey)
+            ? await settleImageOperation(getApiKey, operationSignal) : twinKey;
+        if (!is.string(key) || !key) {
+            const error = new Error('AI provider is not configured.');
+            error.code = 'AI_PROVIDER_NOT_CONFIGURED';
+            throw error;
+        }
+        const headers = {'Content-Type': 'application/json', Authorization: `Bearer ${key}`};
+        await settleImageOperation(
+            function observeImageSubmission() {
+                return onRequest(request, id, {operation: 'images', transport: 'http', destination});
+            },
+            operationSignal
+        );
+        await progress('requesting');
+        // A lost POST response can represent an accepted paid job. Never replay it.
+        let response = await inference(destination, {method: 'POST', headers, body});
+        let result = response.result;
+        if (asynchronous) {
+            const requestId = result?.request_id;
+            while (result?.status === 'QUEUED' || result?.status === 'IN_PROGRESS') {
+                if (!is.string(requestId) || !requestId) {
+                    throw imageResultError('Image generation returned a pending job without a request_id.', result);
+                }
+                await progress(result.status === 'QUEUED' ? 'queued' : 'generating', requestId);
+                await waitForImageStatus(response.delay, operationSignal);
+                response = await inference(
+                    `${destination}/${encodeURIComponent(requestId)}/status`,
+                    {method: 'GET', headers}
+                );
+                result = response.result;
+            }
+            if (result?.status === 'FAILED') {
+                throw imageResultError('TWiN Cloud image generation failed.', result);
+            }
+            if (result?.status !== 'COMPLETED' && result?.status !== 'COMPLETE') {
+                throw imageResultError('TWiN Cloud returned an unsupported image job status.', result);
+            }
+            if (!is.array(result.output?.images)) {
+                if (!is.string(requestId) || !requestId) {
+                    throw imageResultError('Image generation returned no result or request_id.', result);
+                }
+                response = await inference(`${destination}/${encodeURIComponent(requestId)}`, {method: 'GET', headers});
+                result = response.result;
+                if (result?.status !== 'COMPLETED' && result?.status !== 'COMPLETE') {
+                    throw imageResultError('TWiN Cloud image generation did not return a completed result.', result);
+                }
+            }
+        }
+        const returnedImages = asynchronous ? result?.output?.images : result?.data;
+        if (!is.array(returnedImages)) {
+            throw imageResultError('TWiN Cloud returned no image collection.', result);
+        }
+        const images = returnedImages.map(function retainImageDescriptor(image) {return {...image};});
+        const format = result.output_format ?? outputFormat;
+        const requestId = asynchronous ? result.request_id : undefined;
+        await settleImageOperation(
+            function observeImageResult() {return onResponse(result, id, false);},
+            operationSignal
+        );
+        await progress('downloading', requestId);
+        const completed = await Promise.all(images.map(async function materializeImage(image) {
+            let blob;
+            const mediaType = image.content_type
+                ?? ({png: 'image/png', jpeg: 'image/jpeg', jpg: 'image/jpeg', webp: 'image/webp'}[format])
+                ?? 'application/octet-stream';
+            if (is.string(image.b64_json)) {
+                blob = await settleImageOperation(function decodeImageBase64() {
+                    return new Blob([Uint8Array.from(atob(image.b64_json), function imageCode(character) {
+                        return character.charCodeAt(0);
+                    })], {type: mediaType});
+                }, operationSignal);
+            } else if (is.string(image.url) && image.url) {
+                // Media URLs have their own delivery authority. Never forward the inference key.
+                const download = await settleImageOperation(function downloadGeneratedImage() {
+                    return fetch(image.url, {credentials: 'omit', signal: operationSignal});
+                }, operationSignal);
+                if (!download.ok) {
+                    throw await settleImageOperation(function readImageDownloadError() {
+                        return download.headers.get('content-type')?.includes('application/json')
+                            ? download.json() : download.text();
+                    }, operationSignal);
+                }
+                blob = await settleImageOperation(function readGeneratedImage() {return download.blob();}, operationSignal);
+                if (!blob.type) blob = new Blob([blob], {type: mediaType});
+            } else {
+                throw imageResultError('TWiN Cloud returned an image without data or a URL.', image);
+            }
+            return {
+                blob,
+                mediaType: blob.type || mediaType,
+                ...(image.width === undefined ? {} : {width: image.width}),
+                ...(image.height === undefined ? {} : {height: image.height})
+            };
+        }));
+        await progress('complete', requestId);
+        if (operationSignal.aborted) throw normalizeAIRequestAbort(operationSignal.reason);
+        return {images: completed};
+    } catch (error) {
+        if (isAIRequestAbort(error, operationSignal)) throw normalizeAIRequestAbort(error);
+        throw error;
+    } finally {
+        signal?.removeEventListener('abort', cancelImageRequest);
+        controller.abort('Image operation settled.');
+    }
+}
+
+function imageResultError(message, result) {
+    const error = new Error(message, {cause: result});
+    error.code = 'ARCANE_AI_INVALID_PROVIDER_RESULT';
+    return error;
+}
+
+/** Abort a wait even when a credential, callback, or host Fetch ignores the signal. */
+function settleImageOperation(operation, signal) {
+    return new Promise(function settleCloudImageOperation(resolve, reject) {
+        let settled = false;
+        function finish(error, value, failed) {
+            if (settled) return;
+            settled = true;
+            signal.removeEventListener('abort', cancelled);
+            if (failed) reject(error);
+            else resolve(value);
+        }
+        function cancelled() {finish(normalizeAIRequestAbort(signal.reason), undefined, true);}
+        signal.addEventListener('abort', cancelled, {once: true});
+        if (signal.aborted) {
+            cancelled();
+            return;
+        }
+        try {
+            Promise.resolve(operation()).then(
+                function accepted(value) {finish(undefined, value, false);},
+                function rejected(error) {finish(error, undefined, true);}
+            );
+        } catch (error) {
+            finish(error, undefined, true);
+        }
+    });
+}
+
+async function waitForImageStatus(delay, signal) {
+    let remaining = delay;
+    do {
+        // Split only at the host timer range; retain the provider's entire delay.
+        const milliseconds = Math.min(remaining, 2147483647);
+        let timer;
+        try {
+            await settleImageOperation(function waitForImagePoll() {
+                return new Promise(function scheduleImagePoll(finish) {timer = setTimeout(finish, milliseconds);});
+            }, signal);
+        } finally {
+            clearTimeout(timer);
+        }
+        remaining -= milliseconds;
+    } while (remaining > 0);
+}
+
 export function structuredOutputFormat(value = false){
     if(value === false || value === null || value === undefined){
         return null;

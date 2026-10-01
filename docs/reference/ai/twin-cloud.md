@@ -136,6 +136,130 @@ options; they do not add a key, model, browser state, or retained conversation.
 Retry warnings and observer failures use the shared console logger and preserve
 the complete original error.
 
+## Generate images with an application-selected model
+
+`generateImages` is a separate stateless operation on the same public import.
+The application owns the selected model, labels, prompt, provider parameters,
+credential source, display, and any saved image. It does not instantiate the
+browser AI singleton or change chat, speech, model preferences, or history.
+
+```javascript
+import {generateImages} from 'arcane-os/ai/twin-cloud';
+
+const controller = new AbortController();
+const {images} = await generateImages({
+    model: 'stable-diffusion-3.5-large',
+    prompt: 'A moon-powered toaster launches croissants over purple craters.',
+    parameters: {n: 2, size: '1024x1024', output_format: 'png'},
+    getApiKey: applicationRuntime.getTwinKey,
+    signal: controller.signal,
+    onProgress({stage}) {
+        console.log(stage);
+    }
+});
+
+for (const image of images) {
+    await applicationRuntime.saveGeneratedImage(image.blob, image.mediaType);
+}
+```
+
+`applicationRuntime.getTwinKey` and `saveGeneratedImage` are caller-owned
+functions in this example, not SDK APIs. Pass the credential function with any
+required receiver already bound. Use `twinKey` instead when the application
+already has its key. `getApiKey()` may return a key or a promise and is called
+only when `twinKey` is `undefined`. An explicitly supplied empty key fails with
+`AI_PROVIDER_NOT_CONFIGURED`; it does not select another credential source.
+The example's model and parameters are application choices, not SDK defaults.
+
+```javascript
+generateImages({
+    model,
+    prompt,
+    parameters,
+    twinKey,
+    getApiKey,
+    signal,
+    id,
+    onRequest,
+    onResponse,
+    onProgress
+})
+// Promise<{images: [{blob, mediaType, width?, height?}]}>
+```
+
+`parameters` defaults to `{}`, `signal` to `null`, and `id` to `Date.now()`.
+All diagnostic and progress callbacks are optional.
+
+The SDK owns the route for these exact supported identifiers:
+
+| Explicit model | Submission and result |
+| --- | --- |
+| `fal-ai/flux/schnell` | POST `/v1/async-invoke` with `{model_id:model,input:{...parameters,prompt}}`; pending jobs use GET `/v1/async-invoke/{request_id}/status`, then GET `/v1/async-invoke/{request_id}` when the completed status lacks `output.images`. |
+| `stable-diffusion-3.5-large` | POST `/v1/images/generations` with `{...parameters,model,prompt}`; images come from the completed response's `data` array. |
+
+Both routes use `https://inference.do-ai.run`. Missing or unsupported model
+identifiers reject with `ARCANE_AI_IMAGE_MODEL_UNSUPPORTED`; there is no SDK
+image model default. The prompt must be a string and is sent unchanged,
+including whitespace. `parameters` is an object of additional provider fields;
+the SDK neither supplies nor changes image counts, dimensions, quality, seeds,
+or output limits. Supply the prompt only through `prompt`, and the synchronous
+model only through `model`; duplicate reserved fields in `parameters` throw
+`TypeError` instead of silently replacing one input. Provider-supported
+parameter names and values remain that selected model's contract.
+
+Every returned image is materialized in provider order. Base64 image data
+becomes a `Blob`; returned URLs are fetched concurrently without an inference
+Authorization header or browser credentials. The output's `mediaType` uses the
+downloaded Blob's declared type, provider `content_type`, or a declared
+`output_format` of `png`, `jpeg`/`jpg`, or `webp`. With no declared type or known
+format, it is `application/octet-stream`; the SDK does not guess dimensions or
+image metadata. `width` and `height` are included only when the provider supplies
+them. The SDK saves nothing and creates no object URLs; the caller owns any
+storage and the lifetime of display URLs it creates.
+
+`onRequest(request,id,metadata)` runs once before submission with the complete
+provider request. Metadata is `{operation:'images',transport:'http',destination}`.
+`onResponse(response,id,false)` runs once with the complete final provider JSON
+after successful generation and before image materialization. Intermediate
+poll replies do not call it. These are explicit diagnostic callbacks: keep raw
+protocol outside ordinary user status and durable chat history. Credentials are
+transport-only and are absent from these payloads. The request and image
+descriptors are captured before their diagnostic callbacks so observer edits do
+not rewrite the operation's content.
+
+`onProgress({stage,model,id,requestId?})` reports semantic stages: `credentials`,
+`requesting`, `queued`, `generating`, `downloading`, and `complete`. Pending
+stages can repeat; immediately completed jobs skip them. Async job stages
+include `requestId` when present. Progress contains no image data or protocol
+body. All three callbacks may return a promise; their settlement is awaited
+and their failure rejects the operation. `onResponse` means generation returned
+a final result, not that media downloads have finished. The resolved promise
+delivers all materialized images; a failed download rejects instead of returning
+an incomplete collection.
+
+The image operation submits once and performs no automatic retry, including
+after a network loss, HTTP `429`, body-read failure, or callback failure. A lost
+POST response may correspond to an accepted paid job. This image-specific rule
+does not alter chat or speech retry behavior. While a FAL job is `QUEUED` or
+`IN_PROGRESS`, polling uses the provider's `Retry-After` delay when supplied,
+otherwise one second. Completed jobs accept `COMPLETED` and the guide's
+`COMPLETE` spelling. Failed or unusable job results reject with
+`ARCANE_AI_INVALID_PROVIDER_RESULT` and the complete result in `error.cause`.
+HTTP failures throw their complete parsed JSON or text body; transport,
+decoding, and callback failures remain their original errors.
+
+Calling `controller.abort()` cancels local credential/callback waits, requests,
+body reads, polling timers, and downloads. It rejects with
+`ARCANE_AI_REQUEST_ABORTED` and ignores later settlement from an operation that
+does not honor the signal. A callback already running remains caller-owned;
+the SDK invokes no subsequent callbacks after cancellation. Local cancellation
+does not claim to cancel a remote paid job. Dispose the controller with the
+owning page or operation; no global startup wait is required.
+
+The route and response contracts follow DigitalOcean's official
+[FAL inference guide](https://docs.digitalocean.com/products/inference/how-to/use-fal-models/)
+and [multimodal inference guide](https://docs.digitalocean.com/products/inference/how-to/use-multimodal-inference/).
+
 ## Existing browser AI interface
 
 The following browser example uses the same managed imports as the
