@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.43.0
+
+- Add reusable rendered printing through `createPrintView`, preserving the
+  complete rendered content, title, styles and prepared image/font resources.
+  Explicit print requests await preparation; native printing uses the active
+  view. Resources remain owned through `afterprint`.
+- Add Markdown editor `print()` and `insertMarkdown(text)` and file-manager
+  `printPreview()`. Insertion replaces the current selection through the
+  ordinary full-content change lifecycle; printing does not save the document.
+- Add reusable history/file-manager `close()` with child-first closure and
+  pending-open cancellation. Refused or failed closure preserves the settled
+  visible preview, media and printing until its dialog actually closes.
+  Preserve modal focus restoration and existing saved records without migration.
+
 ## 0.42.2
 
 - Stop generating SDK cache suffixes in import maps, materialized runtime,
