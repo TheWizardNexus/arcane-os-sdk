@@ -2081,8 +2081,10 @@ class AI {
     #assertDeviceSpeechConfiguration(configuration){
         for(const routeName of ['default','localOnly']){
             const selection=configuration?.stt?.[routeName];
-            if(selection&&selection.localOnly!==true){
-                const error=new TypeError('Speech recognition supports on-device providers only.');
+            const liveCapture=selection
+                &&this.#providerRuntime.supportsTranscriptionCapture(selection.providerId);
+            if(selection&&selection.localOnly!==true&&!liveCapture){
+                const error=new TypeError('Speech recognition requires an on-device or explicitly selected live-capture provider.');
                 error.code='AI_STT_DEVICE_ONLY';
                 throw error;
             }
@@ -3430,8 +3432,9 @@ class AI {
         if(provider!==null&&provider?.role!==role){
             throw new TypeError('The speech provider must implement the selected role.');
         }
-        if(role==='stt'&&provider&&provider.localOnly!==true){
-            const error=new TypeError('Speech recognition supports on-device providers only.');
+        if(role==='stt'&&provider&&provider.localOnly!==true
+            &&!is.function(provider.createCapture)){
+            const error=new TypeError('Speech recognition requires an on-device or explicitly selected live-capture provider.');
             error.code='AI_STT_DEVICE_ONLY';
             throw error;
         }
@@ -6873,6 +6876,14 @@ class AI {
             this.#traceSpeech('fetchTTS.error',{callId,error});
             throw error;
         }
+    }
+
+    supportsTranscriptionCapture(){
+        return this.#providerRuntime.supportsTranscriptionCapture();
+    }
+
+    createTranscriptionCapture(options={}){
+        return this.#providerRuntime.createTranscriptionCapture(options);
     }
 
     async fetchSTT(audioFile,signal=null){

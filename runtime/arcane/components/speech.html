@@ -191,6 +191,7 @@
         }
     );
     const aiModuleImport = import('../modules/AI.js');
+    const providerRuntimeImport = import('../modules/AIProviderRuntime.js');
     const {
         requestAIRuntimeIntent,
         subscribeAIRuntimeState
@@ -200,6 +201,8 @@
         formatAIRuntimeProgress
     } = await import('../modules/ComponentContracts.js');
     const {getBrowserDeviceClass} = await browserDeviceImport;
+    const {getAIProviderRuntime} = await providerRuntimeImport;
+    const providerRuntime = getAIProviderRuntime();
 
     const host = this;
     const deviceClass = getBrowserDeviceClass();
@@ -237,6 +240,7 @@
     let microphonePermissionStatus = null;
     let microphonePermissionListener = null;
     let captureSession = null;
+    let nativeCaptureSession = null;
     let recordingRequested = false;
     let recordingGeneration = 0;
     let transcriptionGeneration = 0;
@@ -362,8 +366,8 @@
     host.setMuted = setMuted;
     host.availability = {
         microphone: transcriptionEnabled && Boolean(
-            navigator.mediaDevices?.getUserMedia
-            && globalThis.MediaRecorder
+            (navigator.mediaDevices?.getUserMedia && globalThis.MediaRecorder)
+            || globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition
         ),
         stt: false,
         tts: false
@@ -626,24 +630,25 @@
         }
         const transcriptionReady = sttRole.state === 'ready';
         const microphoneReady = host.availability.microphone
-            && is.function(globalThis.MediaRecorder)
-            && is.function(navigator.mediaDevices?.getUserMedia);
+            && (providerRuntime.supportsTranscriptionCapture()
+                || (is.function(globalThis.MediaRecorder)
+                    && is.function(navigator.mediaDevices?.getUserMedia)));
         const activationVisible = sttActivationController.visible;
         recordButton.hidden = activationVisible;
         recordButton.disabled = !transcriptionReady
             || !microphoneReady
-            || sttRole.busy
+            || (sttRole.busy && !nativeCaptureSession)
             || transcriptionActive
             || destroyed;
         stopButton.disabled = destroyed
             || !transcriptionReady
-            || sttRole.busy
-            || captureSession?.recorder.state !== 'recording';
+            || (sttRole.busy && !nativeCaptureSession)
+            || (!nativeCaptureSession && captureSession?.recorder.state !== 'recording');
         recordButton.title = transcriptionButtonTitle();
         recordButton.setAttribute('aria-label', recordButton.title);
         recordButton.setAttribute(
             'aria-pressed',
-            String(recordingRequested || Boolean(captureSession))
+            String(recordingRequested || Boolean(captureSession) || Boolean(nativeCaptureSession))
         );
         sttActivationButton.hidden = !activationVisible;
         sttActivationButton.disabled = destroyed
@@ -1288,21 +1293,23 @@
                 }
             }
         );
-        transcriptionOperationId = null;
+        if (transcriptionOperationId === operationId) transcriptionOperationId = null;
         return accepted;
     }
 
     async function record() {
+        const liveCapture = providerRuntime.supportsTranscriptionCapture();
         if (
             !transcriptionEnabled
             || destroyed
             || sttRole.state !== 'ready'
             || sttRole.busy
             || !host.availability.microphone
-            || !is.function(globalThis.MediaRecorder)
-            || !is.function(navigator.mediaDevices?.getUserMedia)
+            || (!liveCapture && (!is.function(globalThis.MediaRecorder)
+                || !is.function(navigator.mediaDevices?.getUserMedia)))
             || recordingRequested
             || captureSession
+            || nativeCaptureSession
             || transcriptionActive
         ) {
             resetRecordPress();
@@ -1321,6 +1328,8 @@
         };
         renderControls();
         renderStatus();
+
+        if (liveCapture) return startNativeRecognition(generation, operationId);
 
         let stream;
         try {
@@ -1461,6 +1470,111 @@
         }
     }
 
+    function startNativeRecognition(generation, operationId) {
+        const session = {
+            generation,
+            operationId,
+            controller: new AbortController(),
+            capture: null,
+            text: [],
+            interim: '',
+            cancelled: false,
+            error: null
+        };
+        nativeCaptureSession = session;
+        function currentNativeCapture() {
+            return !destroyed && !session.cancelled
+                && nativeCaptureSession === session
+                && generation === recordingGeneration;
+        }
+        function displayNativeRecognitionText() {
+            if (!currentNativeCapture()) return;
+            localStatus = {
+                message: session.text.join('') + session.interim || 'Listening. Release to finish.',
+                tone: '',
+                owner: 'recording',
+                generation
+            };
+            renderStatus();
+        }
+        async function finishNativeRecognition(error = null) {
+            if (!currentNativeCapture()) return;
+            nativeCaptureSession = null;
+            recordingRequested = false;
+            resetRecordPress();
+            clearRecordingStatus(generation);
+            if (error && error !== session.error) {
+                session.error = error;
+                reportTranscriptionError(error);
+            }
+            // Keep confirmed final words after a service/cleanup failure. Only
+            // explicit cancellation or supersession abandons this submission.
+            if (session.text.length && !destroyed && !session.cancelled
+                && generation === recordingGeneration) {
+                transcriptionOperationId = operationId;
+                await transcribe(session.text.join(''));
+            } else if (transcriptionOperationId === operationId) {
+                transcriptionOperationId = null;
+            }
+            renderControls();
+            renderStatus();
+        }
+        try {
+            session.capture = providerRuntime.createTranscriptionCapture(
+                {
+                    continuous: true,
+                    onSegment: function retainFinalRecognition(segment) {
+                        if (!currentNativeCapture()) return;
+                        session.text.push(segment.text);
+                        displayNativeRecognitionText();
+                    },
+                    onInterim: function displayInterimRecognition(result) {
+                        if (!currentNativeCapture()) return;
+                        session.interim = result.text;
+                        displayNativeRecognitionText();
+                    },
+                    onError: function reportNativeRecognitionFailure(error) {
+                        if (!currentNativeCapture()) return;
+                        session.error = error;
+                        reportTranscriptionError(error);
+                    }
+                }
+            );
+            if (!session.capture) throw new Error('The selected live transcription service is unavailable.');
+            session.capture.done.then(
+                function nativeRecognitionCompleted() {
+                    return finishNativeRecognition();
+                },
+                finishNativeRecognition
+            ).catch(
+                function reportNativeRecognitionSettlementFailure(error) {
+                    if (destroyed || generation !== recordingGeneration) return;
+                    reportTranscriptionError(error);
+                }
+            );
+            // No awaited preparation precedes the browser's gesture-bound start.
+            const starting = session.capture.start({signal: session.controller.signal});
+            return Promise.resolve(starting).catch(
+                function reportNativeRecognitionStartupFailure(error) {
+                    if (!currentNativeCapture()) return false;
+                    session.capture.cancel();
+                    nativeCaptureSession = null;
+                    recordingRequested = false;
+                    resetRecordPress();
+                    if (error !== session.error) reportTranscriptionError(error);
+                    return false;
+                }
+            );
+        } catch (error) {
+            session.capture?.cancel();
+            nativeCaptureSession = null;
+            recordingRequested = false;
+            resetRecordPress();
+            if (error !== session.error) reportTranscriptionError(error);
+            return false;
+        }
+    }
+
     function stopAfterSilence() {
         clearSilenceTimer();
         stop();
@@ -1483,6 +1597,12 @@
     }
 
     function stop() {
+        if (nativeCaptureSession) {
+            recordingRequested = false;
+            nativeCaptureSession.capture.stop();
+            renderControls();
+            return true;
+        }
         const pendingCaptureStart = recordingRequested && !captureSession;
         const generation = recordingGeneration;
         const operationId = transcriptionOperationId;
@@ -1703,6 +1823,7 @@
     function cancelSTTOperation(reason) {
         const hadActiveOperation = recordingRequested
             || Boolean(captureSession)
+            || Boolean(nativeCaptureSession)
             || transcriptionActive;
         recordingGeneration += 1;
         transcriptionGeneration += 1;
@@ -1712,6 +1833,14 @@
         transcriptionActive = false;
         clearSilenceTimer();
         resetRecordPress();
+
+        if (nativeCaptureSession) {
+            const session = nativeCaptureSession;
+            nativeCaptureSession = null;
+            session.cancelled = true;
+            session.controller.abort();
+            session.capture?.cancel();
+        }
 
         if (captureSession) {
             captureSession.cancelled = true;
@@ -1769,6 +1898,7 @@
 
     function handlePageHide(event) {
         if (event.persisted === true) {
+            if (nativeCaptureSession) stop();
             return;
         }
         destroy();

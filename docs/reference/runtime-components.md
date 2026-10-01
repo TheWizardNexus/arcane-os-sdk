@@ -1629,6 +1629,16 @@ Events: `source-explanation-ready`, `source-explanation-save`, `source-explanati
 
 ## speech.html
 
+An explicitly selected native Web Speech provider uses gesture-started live
+capture instead of MediaRecorder. The shared control retains every final
+result and emits its existing completion event once with the exact combined
+text when native capture ends. The live display retains final words alongside
+interim hypotheses while speaking; interim hypotheses stay transient. Release/Stop
+finishes native recognition; cancellation, replacement and destruction abort
+it and suppress late submission. A persisted page hide stops live native capture
+without restarting it when the page returns. Existing Whisper and TTS paths
+remain unchanged.
+
 ### Overview
 
 Coordinates explicit speech-to-text activation, speech controls, transcription
@@ -2082,6 +2092,19 @@ injected Arcane/provider modules where listed.
 Native methods remain subject to the bound app's capabilities. [Deep protocol details](protocols.md).
 
 ### Continuous capture and controls
+
+An explicitly selected native Web Speech provider uses the same ordered
+transcript/save queue in either capture mode. Each complete final text segment
+skips file transcription and enters the existing append/save stages; interim
+text stays in the transient `interim` part and never reaches a save or success
+event. Final segments waiting behind a save stay visible there until appended
+to the main transcript. Native `stopRecording()` returns the drain promise, including final
+results emitted during native stop. Browser `end` stops capture without an
+automatic restart. Provider replacement stops native capture while already
+accepted final segments retain their ordered saves. Explicit Cancel, transcript
+replacement and destruction retain the existing supersession behavior.
+This path does not require AudioWorklet or MediaRecorder. A supplied custom
+`transcribe(file,context)` callback keeps the existing audio-clip route.
 
 `configure({capture:{mode:'continuous'}})` opts into the SDK's
 [`ContinuousVoiceCapture`](runtime-modules.md#continuousvoicecapturejs) owner.

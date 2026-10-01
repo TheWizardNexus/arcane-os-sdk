@@ -1366,6 +1366,9 @@ function validateProvider(provider) {
     for (const method of PROVIDER_METHODS) {
         record[method] = provider[method].bind(provider);
     }
+    if (provider.role === 'stt' && is.function(provider.createCapture)) {
+        record.createCapture = provider.createCapture.bind(provider);
+    }
     const admitted = completeValue(record);
     PROVIDER_RECORDS.set(provider, admitted);
     return admitted;
@@ -4101,6 +4104,121 @@ export class AIProviderRuntime {
 
     stream(payload, options = {}) {
         return this.#roleRequestAlias('llm', 'stream', payload, options);
+    }
+
+    supportsTranscriptionCapture(providerId = null) {
+        const slot = this.#slots.stt;
+        const provider = providerId === null
+            ? this.#providerFor(slot)
+            : this.#providers.get(providerKey('stt', providerId));
+        return is.function(provider?.createCapture);
+    }
+
+    createTranscriptionCapture(options = {}) {
+        this.#assertOpen();
+        this.#assertNotConfiguring();
+        const slot = this.#slots.stt;
+        const provider = this.#providerFor(slot);
+        if (!is.function(provider?.createCapture)) return null;
+
+        const runtime = this;
+        const generation = slot.generation;
+        const capture = provider.createCapture(options);
+        const controller = new AbortController();
+        let requestRecord = null;
+        let detachSignal = null;
+        let started = false;
+        let closed = false;
+        const done = Promise.resolve(capture.done).finally(
+            function releaseTranscriptionCapture() {
+                closed = true;
+                detachSignal?.();
+                if (!requestRecord) return;
+                slot.activeRequests.delete(requestRecord.requestSequence);
+                runtime.#drainRoleRequestQueue(slot);
+                if (slot.generation !== generation || slot.unloadPromise) return;
+                if (slot.activeRequests.size || slot.requestQueue.length) {
+                    runtime.#publishRoleRequestState(slot);
+                    return;
+                }
+                const status = validateProviderStatus(provider.status());
+                slot.ready = status.state === 'ready' && status.loaded && !status.busy;
+                publishAIRuntimeRoleState(
+                    'stt',
+                    roleRecord(
+                        'stt',
+                        slot.selection,
+                        {state: slot.ready ? 'ready' : 'unloaded', loaded: status.loaded}
+                    )
+                );
+            }
+        );
+        done.catch(
+            function observeTranscriptionCaptureCleanupFailure(error) {
+                arcaneLogging.error('Transcription capture cleanup failed.', error);
+            }
+        );
+        // Capture has its own synchronous start boundary so native microphone
+        // permission retains the originating user gesture. It is never queued.
+        return {
+            done,
+            start({signal} = {}) {
+                if (started || closed) return Promise.resolve(false);
+                try {
+                    runtime.#assertOpen();
+                    runtime.#assertNotConfiguring();
+                    const status = validateProviderStatus(provider.status());
+                    if (slot.generation !== generation || !slot.ready
+                        || slot.unloadPromise || slot.disposePromise
+                        || slot.activeRequests.size || slot.requestQueue.length
+                        || status.state !== 'ready' || !status.loaded || status.busy) {
+                        throw operationError(
+                            'The selected transcription capture provider is not ready.',
+                            'ARCANE_AI_ROLE_NOT_READY'
+                        );
+                    }
+                    assertAbortSignal(signal);
+                    started = true;
+                    detachSignal = runtime.#forwardAbort(signal, controller);
+                    const requestSequence = runtime.#nextRequestSequence(slot);
+                    requestRecord = {
+                        controller,
+                        requestSequence,
+                        operationId: runtime.#nextOperationId(slot, 'capture'),
+                        promise: done,
+                        cancel: function cancelOwnedTranscriptionCapture(reason) {
+                            controller.abort(reason);
+                            capture.cancel();
+                            return done;
+                        }
+                    };
+                    slot.activeRequests.set(requestSequence, requestRecord);
+                    runtime.#publishRoleRequestState(slot);
+                    const starting = capture.start({signal: controller.signal});
+                    return Promise.resolve(starting).catch(
+                        function releaseFailedTranscriptionCaptureStart(error) {
+                            capture.cancel();
+                            throw error;
+                        }
+                    );
+                } catch (error) {
+                    capture.cancel();
+                    throw error;
+                }
+            },
+            stop() {
+                capture.stop();
+                return done;
+            },
+            cancel() {
+                controller.abort();
+                capture.cancel();
+            },
+            destroy() {
+                controller.abort();
+                capture.destroy();
+            }
+        };
     }
 
     transcribe(payload, options = {}) {

@@ -3135,6 +3135,20 @@
       "normalization": "Construction and activation make no adapter network requests. SDK initial POSTs bypass the provider-local js-queue; follow-up status/result/audio GETs use followUpQueue capacity and cadence through complete body consumption. Retry-After affects only its job. Whole-job maxConcurrentRequests remains independent. Local Kokoro and Whisper paths are unchanged. Applications own model, voice, credentials, activation, and queue settings."
     },
     {
+      "id": "browser-speech:createBrowserSpeechRecognitionProvider",
+      "name": "createBrowserSpeechRecognitionProvider",
+      "displayName": "createBrowserSpeechRecognitionProvider()",
+      "kind": "function",
+      "signature": "createBrowserSpeechRecognitionProvider({id,model,language}={})",
+      "entrypoints": ["arcane-os/ai/browser-speech"],
+      "primaryImport": "arcane-os/ai/browser-speech",
+      "group": "Browser speech providers",
+      "summary": "Creates an explicitly selected native browser speech recognition provider with gesture-started live capture.",
+      "availability": "Browser or WebView exposing SpeechRecognition or webkitSpeechRecognition; construction remains available on unsupported hosts",
+      "protocol": "arcane-ai-provider/2 stt with optional createCapture",
+      "normalization": "Non-local service declaration, independent STT lifecycle, exact final segments, transient interim results, graceful stop/drain and native abort. No model download, storage, microphone on activation, file-transcription emulation, or automatic fallback."
+    },
+    {
       "id": "browser-speech:createBrowserKokoroProvider",
       "name": "createBrowserKokoroProvider",
       "displayName": "createBrowserKokoroProvider()",

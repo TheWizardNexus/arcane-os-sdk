@@ -1,10 +1,86 @@
 # Browser speech providers
 
-`arcane-os/ai/browser-speech` supplies caller-selected Whisper speech-to-text,
-Kokoro text-to-speech, and TWiN Cloud text-to-speech providers. Its local path
+`arcane-os/ai/browser-speech` supplies caller-selected Whisper or native Web
+Speech recognition, Kokoro text-to-speech, and TWiN Cloud text-to-speech providers. Its local path
 provides artifact storage, live module routing, role Workers, provider/2
 adapters, bounded parallel TTS synthesis, audio normalization, cancellation,
 and cleanup.
+
+## Native browser speech recognition
+
+Select the browser's `SpeechRecognition` or `webkitSpeechRecognition` service
+explicitly. It may use a remote browser service, so this provider declares
+`localOnly:false`; it is never substituted for Whisper automatically. The
+application owns the provider/model identifiers and saved Profile selection.
+
+```javascript
+import {createBrowserSpeechRecognitionProvider} from 'arcane-os/ai/browser-speech';
+
+async function selectBrowserRecognition(ai, signal) {
+    const provider = createBrowserSpeechRecognitionProvider(
+        {id: 'WEB_SPEECH', model: {id: 'WEB_SPEECH'}}
+    );
+    await ai.configureSpeechProvider('stt', provider, {modelId: 'WEB_SPEECH', signal});
+}
+```
+
+Configuration and activation use the existing independent STT lifecycle.
+Construction and `catalog()` succeed when the native API is absent;
+`inspect()` reports unavailable and `load()` reports an unsupported error.
+Neither factory, configuration nor load opens a microphone, downloads a
+model, accesses storage, or changes TTS, typing, existing defaults, or saved
+data. Browser/OS availability, microphone permission, language support and
+service connectivity remain native platform requirements across Windows,
+Linux, macOS and Android hosts.
+
+After STT activation, the existing `speech.html` and `voice-transcription.html`
+recording controls select live capture automatically. `speech.html` retains
+every final result and emits one complete `speech-transcription-complete`
+message when capture ends. Its live display retains finalized words alongside
+the current interim text while speaking. The voice component appends each final result
+through its existing ordered save queue. Interim text appears only in a
+transient surface and never enters a save or completion event. A custom voice
+component `transcribe(file,context)` callback retains the existing clip path.
+Final segments waiting behind an application save remain visible in that
+transient surface until the ordered queue appends them to the main transcript.
+
+For direct use, `ai.supportsTranscriptionCapture()` detects the selected
+provider's capture capability. `ai.createTranscriptionCapture(options)` returns
+`null` for a file-only provider or a single-use capture handle with
+`start({signal})`, `stop()`, `cancel()`, `destroy()` and `done`.
+Options are `{language,continuous,onSegment,onInterim,onState,onError}`;
+`onSegment({text,sequence})` receives each complete final result once, and
+`onInterim({text})` receives the current mutable hypothesis. Callbacks are
+observational and never delay native capture. The voice component, rather than
+the capture callback, owns asynchronous ordered application saves.
+
+Call `start()` directly from the initiating user gesture. Its promise resolves
+to whether native capture actually started. `stop()` asks the browser to stop
+listening and finish recognition, retaining final results through native `end`;
+`stop()` and `done` resolve `true` for normal native completion and `false` for
+cancellation or failure after capture settlement. Runtime cleanup failure
+rejects the runtime handle's promises. `cancel()`, an aborted signal,
+provider replacement, unload, and disposal request native `abort()` and suppress
+late text. Capture is an owned busy STT operation; it is never delayed into a
+request queue that would lose the gesture. Natural native `end` stops the
+session without automatic restart. The user can start another session.
+If native `abort()` itself throws, the complete failure remains observable and
+the capture stays owned until native `end`; requesting abort is not evidence
+that the browser microphone has disconnected.
+
+Missing API reports `ARCANE_AI_SPEECH_RECOGNITION_UNAVAILABLE`; file input
+reports `ARCANE_AI_SPEECH_INPUT_UNSUPPORTED`. Native service errors use
+`ARCANE_AI_SPEECH_RECOGNITION_FAILED`, retain the browser reason and complete
+event as their cause, and remain available in developer diagnostics. Shared
+ordinary controls show concise failure status. Confirmed final words received
+before a service failure remain deliverable; explicit cancellation or
+supersession suppresses the pending chat submission.
+
+This API captures live microphone speech. `AI.fetchSTT(file)` remains the
+Whisper/file-provider contract; native recognition rejects file transcription
+honestly rather than recording again or silently switching providers. See the
+[Web Speech specification](https://webaudio.github.io/web-speech-api/#speechreco-methods)
+for native stop/abort behavior.
 
 <a id="digitalocean-fal-text-to-speech"></a>
 
@@ -971,6 +1047,7 @@ records; this contract does not freeze them or shorten their content.
 | Native WebView | Conditional | Available when the WebView exposes the browser APIs above. It does not invoke Core speech. |
 | Node | Remote adapter available; local execution unavailable | TWiN Cloud uses Fetch and Blob. The local providers have no SDK Node speech-storage, Worker, or audio-decoder host. |
 | Remote TTS | Explicitly selected | TWiN Cloud uses standard Fetch and Blob with an application-owned key; no Worker, OPFS, or local model is needed for this adapter. |
+| Native browser STT | Explicitly selected, conditional | Requires `SpeechRecognition` or `webkitSpeechRecognition` and native microphone/service availability. No Worker, OPFS, or SDK model download; locality is not promised. |
 
 STT and TTS own independent provider lifecycles. A failure or cancellation in
 one role does not disable the other role or authorize a fallback provider.
@@ -982,6 +1059,7 @@ import {
   BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL,
   BROWSER_SPEECH_ARTIFACT_PROTOCOL,
   createBrowserKokoroProvider,
+  createBrowserSpeechRecognitionProvider,
   createBrowserSpeechArtifactGraph,
   createBrowserSpeechAuthority,
   createBrowserWhisperProvider,

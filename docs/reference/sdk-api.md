@@ -169,6 +169,7 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | `createBrowserSpeechAuthority()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser descriptor construction; use requires the selected storage and provider Web APIs |
 | `createBrowserWasmLlmProvider()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser context with WebAssembly and OPFS/DBOPFS; WebGPU by default or explicit CPU with gpuLayers:0 |
 | `createBrowserWhisperProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser with Workers, object URLs, caller-selected Whisper runtime/model artifacts, and an SDK DBOPFS speech store |
+| `createBrowserSpeechRecognitionProvider()` | function | `arcane-os/ai/browser-speech` | Browser speech providers | Browser or WebView with native SpeechRecognition; construction and catalog remain available on unsupported hosts |
 | `createCanonicalUstarHeader()` | function | `arcane-os` | Packaging and release bundles | Node |
 | `createDbopfsModelStore()` | function | `arcane-os/ai/browser-wasm` | Browser-WASM local AI | Browser with a ready DBOPFS instance and OPFS |
 | `getBrowserDeviceClass()` | function | `arcane-os/browser-device` | Browser device settings | Node and Browser; synchronous identity hint with no model, storage, or GPU operation |
@@ -7182,6 +7183,62 @@ async function transcribeAfterUserChoice(audioBlob) {
         }
     });
     console.log(transcript.text);
+}
+```
+
+## createBrowserSpeechRecognitionProvider()
+
+### Overview
+
+Creates an explicitly selected provider/2 STT adapter for the browser's native
+`SpeechRecognition` or `webkitSpeechRecognition` service. It declares
+`localOnly:false` because recognition may use a remote browser service. It does
+not change Whisper, TTS, typing, stored preferences, or any default selection.
+
+### Signature and result
+
+```text
+createBrowserSpeechRecognitionProvider({id,model,language}={})
+```
+
+The application supplies its provider `id` and `model:{id}`; optional `language`
+is passed to native recognition without changing transcript text. The provider
+implements the required `catalog`, `inspect`, `status`, `load`, `request`,
+`unload`, and `dispose` methods plus `createCapture(options)`. There is no SDK
+model download or storage. Construction/catalog do not require native support;
+inspect/load report actual browser availability without opening a microphone.
+File transcription requests are unsupported for this provider.
+
+`createCapture({language,continuous,onSegment,onInterim,onState,onError})`
+returns a single-use `{start,stop,cancel,destroy,done}` handle. Start must be
+called directly from a user gesture and returns a promise for startup success.
+Final callbacks carry exact `{text,sequence}` values once per final result;
+interim `{text}` stays transient. Stop preserves pending native final results
+through `end`; cancellation aborts recognition and suppresses late text.
+`done` resolves `true` for normal native end and `false` for cancellation or
+failure. Unload/dispose cancel owned capture.
+The shared runtime's `createTranscriptionCapture()` additionally owns STT busy
+state and lifecycle replacement. See the
+[complete native capture contract](ai/browser-speech.md#native-browser-speech-recognition).
+
+### Availability and normalization
+
+Conditional browser/native-WebView support on Windows, Linux, macOS and
+Android, determined by the actual browser API and permission/service outcome,
+not by operating-system name. Missing API, denied microphone permission and
+service errors remain honest STT failures without disabling TTS or typing.
+No Core, Whisper, or cloud-provider fallback is inferred.
+
+### Example
+
+```javascript
+import {createBrowserSpeechRecognitionProvider} from 'arcane-os/ai/browser-speech';
+
+async function selectNativeRecognition(ai, signal) {
+    const provider = createBrowserSpeechRecognitionProvider(
+        {id: 'WEB_SPEECH', model: {id: 'WEB_SPEECH'}}
+    );
+    return ai.configureSpeechProvider('stt', provider, {modelId: 'WEB_SPEECH', signal});
 }
 ```
 

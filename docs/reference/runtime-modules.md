@@ -275,8 +275,9 @@ tool declarations, emitted tool calls, or callback ordering.
 `configureSpeechProviders({stt,tts})` commits only the two speech routes and
 leaves the current LLM route and sticky lifecycle record unchanged. Both speech
 roles must be unloaded and own no request, load, unload, or dispose operation.
-STT remains local-only (`AI_STT_DEVICE_ONLY` for a remote selection); an
-explicit TTS provider may declare `localOnly:false`.
+File-based STT remains local-only (`AI_STT_DEVICE_ONLY` for an unsupported
+remote file selection). An explicitly selected native live-capture STT provider
+or TTS provider may declare `localOnly:false`.
 `transitionSpeechProviders({stt,tts})` stops queued audio, explicitly unloads
 only STT and TTS, then commits that same closed speech route record. Neither
 method loads a model, selects a fallback, or changes caller-owned model or voice
@@ -301,6 +302,13 @@ configuration before activating the committed TTS selection; a later mute
 cancels that pending unmute. The application keeps model, voice, and credential
 selection. See [DigitalOcean FAL speech](ai/browser-speech.md#digitalocean-fal-text-to-speech)
 for the public remote adapter and completed-job audio transport.
+
+`supportsTranscriptionCapture()` reports whether the selected STT provider
+offers native live capture. `createTranscriptionCapture(options={})` delegates
+to the provider runtime's owned capture boundary below and returns `null` for
+file-only providers. Shared speech controls select it automatically; apps keep
+using their existing controls and completion/save callbacks. See
+[native browser recognition](ai/browser-speech.md#native-browser-speech-recognition).
 
 `startProviders({startLanguageModel=true,startMuted=true,startTranscription=false,signal=null}={})`
 starts provider-owned text chat without requesting an STT load by default.
@@ -961,6 +969,8 @@ The singleton exposes read-only `protocol`, `configured`, and `speechMuted`;
 `request(role,options={},preparation={})`;
 `chat(payload,options={})`; `stream(payload,options={})`;
 `transcribe(payload,options={})`;
+`supportsTranscriptionCapture(providerId=null)`;
+`createTranscriptionCapture(options={})`;
 `synthesize(payload,options={},preparation={})`; and
 `setSpeechMuted(muted)`. Provider payloads must be data-only; callbacks,
 accessors, symbols, and cycles are rejected at the provider boundary.
@@ -1098,6 +1108,24 @@ request selection with `AI_LOCAL_MODEL_REQUIRED`. Role lifecycle and stream
 cleanup are normalized, while the
 selected provider retains its own capability, permission, download, and model
 requirements. [Deep protocol details](protocols.md#portable-ai-provider-runtime).
+
+STT providers may additionally implement `createCapture(options)`. Registration
+retains that optional method without changing the required provider/2 methods.
+`supportsTranscriptionCapture(providerId=null)` checks the current selection by
+default or a specified registered STT provider without starting it.
+`createTranscriptionCapture({language,continuous,onSegment,onInterim,onState,onError})`
+returns `null` for a provider without that method; otherwise it returns
+`{start,stop,cancel,destroy,done}`. Creation has no microphone side effect.
+`start({signal})` requires the same selected ready provider with an idle STT
+lane and invokes its capture start synchronously in the caller's gesture.
+Capture occupies one active STT request until its `done` promise settles;
+ordinary file requests remain queued, and unload/dispose/cancel use the same
+owned request cancellation lifecycle. Stop drains native final recognition;
+cancel suppresses late callbacks. Provider callbacks carry exact final
+`{text,sequence}` segments, transient `{text}` interim results, capture state,
+or complete errors. The browser provider's `done` resolves a success boolean;
+runtime cleanup errors remain observable as rejection. No callback is inserted
+into a data-only transcription request payload.
 
 ### Example
 
