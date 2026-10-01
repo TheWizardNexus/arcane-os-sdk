@@ -3261,7 +3261,8 @@
         if(!sessionRequestMessages.length){
             throw new TypeError('A chat session request must contain at least one message.');
         }
-        const retainTurn=sessionRequestMessages.every(message=>message.persist!==false);
+        let retainTurn=sessionRequestMessages.every(message=>message.persist!==false)
+            &&session.chatEntity?.persist!==false;
         const request={
             ...(sessionRequestMessages.length===1
                 ?{message:sessionRequestMessages[0]}
@@ -3276,9 +3277,18 @@
             ?session.aiName
             :host.aiName;
         const sessionMessageToken=Symbol(messageId);
-        const transientCards=retainTurn?[]:[...requestMessages];
+        const transientCards=[...requestMessages];
+        let retentionSettled=false;
+        function settleTurnRetention(result){
+            if(retentionSettled) return;
+            // The session reports the decision made at its actual commit boundary.
+            retainTurn=retainTurn&&(is.boolean(result?.retained)
+                ?result.retained
+                :session.chatEntity?.persist!==false);
+            retentionSettled=true;
+        }
         function removeTransientSessionCards(){
-            if(!transientCards.length) return;
+            if(retainTurn||!transientCards.length) return;
             // The submitter supplies only nodes created for this submission.
             for(const card of transientCards) card.remove();
             transientCards.length=0;
@@ -3290,7 +3300,7 @@
         setSessionStatus('sending','AI is responding…');
         try{
             const responseCard=receivedMessage(responseName, '', messageId);
-            if(!retainTurn) transientCards.push(responseCard);
+            transientCards.push(responseCard);
             await streamMessage('',messageId,true);
             setMessageProgress(
                 messageId,
@@ -3344,6 +3354,7 @@
                     }
                 )
                 :await session.send(request);
+            settleTurnRetention(result);
             if(
                 destroyed
                 ||bindingGeneration!==sessionBindingGeneration
@@ -3441,6 +3452,7 @@
             );
             return result;
         }catch(error){
+            settleTurnRetention();
             if(!destroyed&&bindingGeneration===sessionBindingGeneration){
                 setPendingStructuralToolCalls(previousPendingToolCalls);
             }
@@ -3501,6 +3513,7 @@
             }
             throw error;
         }finally{
+            settleTurnRetention();
             removeTransientSessionCards();
             if(activeSessionMessageToken===sessionMessageToken){
                 activeSessionMessageToken=null;

@@ -3071,6 +3071,9 @@ assistant content in configured model context and ChatEntity/DBOPFS history.
 That assistant-only opening survives reload and empty-chat maintenance without
 a fabricated user turn. A second opening rejects as `AI_CHAT_OPENING_EXISTS`;
 an unavailable durable ChatEntity rejects as `AI_CHAT_PERSISTENCE_UNAVAILABLE`.
+If retention is disabled while the opening is being prepared, that same error
+rolls back the opening before its append; it does not leave hidden model context.
+An opening write already accepted by DBOPFS still completes normally.
 
 `send()` accepts either
 `{message:{content,role:'user'|'tool',tool_call_id?,message?,name?,status?,persist},...}`
@@ -3086,6 +3089,17 @@ the retained transcript, memory extraction, or DBOPFS. A nonpersistent response
 therefore does not open a retained structural-tool continuation. A retained
 structural tool result must use the persistence choice captured by its matching
 assistant tool call.
+
+The entity-wide `session.chatEntity.persist=false` applies the same no-retention
+rule to new turns and direct entity additions; it is not a disk-only switch.
+The session captures that setting when it accepts a request and observes it
+again before accepting a durable append. Changing it later cannot bring back
+discarded inputs or responses. A write already accepted by DBOPFS finishes
+normally; toggling the setting does not undo that write or rewrite saved data.
+Completed `send()` and `stream()` responses include a session-owned `retained`
+boolean outside `message` and the provider payload, identifying whether the
+turn entered recurring history. Existing retained and stored records remain
+untouched: this boundary applies to new additions and performs no migration.
 
 `history()` returns provider-safe configured model context, including the
 system prompt and every complete ordinary visible committed turn. Only a

@@ -391,10 +391,12 @@ class ChatEntity{
     fileName='';
 
     /**
-     * Controls automatic persistence.
+     * Controls retention of new message additions.
      *
      * When true, any message addition automatically writes
-     * the updated message list to OPFS.
+     * the updated message list to OPFS. When false, new additions are excluded
+     * from the transcript, recurring context, storage, and memory extraction.
+     * Existing retained and saved messages remain unchanged.
      *
      * @type {boolean}
      */
@@ -1080,7 +1082,7 @@ ${JSON.stringify(transcript)}`
         if(!records.length){
             return false;
         }
-        if(!persist) return false;
+        if(!persist||!this.persist) return false;
 
         this.#messages.push(...records);
         const durableRecords=storedChatRecords(records);
@@ -1088,7 +1090,7 @@ ${JSON.stringify(transcript)}`
             this.#saved=false;
         }
 
-        if(!this.persist||!durableRecords.length){
+        if(!durableRecords.length){
             return;
         }
 

@@ -268,6 +268,112 @@ test('persistent chat stores only a model-authored opening and reloads it withou
     ));
 });
 
+test('opening rejects an initially disabled entity before any context or provider work',async()=>{
+    let providerCalls=0;
+    let contextCalls=0;
+    const session=await PersistentAIChatSession.create({
+        memory:false,
+        chat:async()=>{
+            providerCalls++;
+            return {message:{role:'assistant',content:'Must not be requested.'}};
+        },
+        contextBuilder:async()=>{
+            contextCalls++;
+            return 'Must not be retrieved.';
+        },
+    });
+    session.chatEntity.persist=false;
+    const pending=session.open({message:{content:'Excluded initial bootstrap.',persist:false}});
+    session.chatEntity.persist=true;
+    await assert.rejects(pending,error=>error.code==='AI_CHAT_PERSISTENCE_UNAVAILABLE');
+    assert.equal(providerCalls,0);
+    assert.equal(contextCalls,0);
+    assert.deepEqual(await session.history(),[]);
+    assert.deepEqual(await session.transcript(),[]);
+    assert.equal(db.raw('chats',session.fileName),null);
+});
+
+test('opening rolls back when entity persistence is disabled during provider preparation',async()=>{
+    const requests=[];
+    let releaseResponse;
+    let reportRequest;
+    const response=new Promise(resolve=>{releaseResponse=resolve;});
+    const requested=new Promise(resolve=>{reportRequest=resolve;});
+    const providerResponse={
+        message:{role:'assistant',content:'Complete excluded opening.\nSecond line.'},
+        diagnostics:{providerDetail:'Complete provider diagnostic.'},
+    };
+    const session=await PersistentAIChatSession.create({
+        memory:false,
+        chat:async request=>{
+            requests.push(structuredClone(request));
+            if(requests.length===1){
+                reportRequest();
+                return response;
+            }
+            return {message:{role:'assistant',content:'Durable retried opening.'}};
+        },
+    });
+    const pending=session.open({message:{content:'Excluded internal bootstrap.',persist:false}});
+    await requested;
+    session.chatEntity.persist=false;
+    releaseResponse(providerResponse);
+    await assert.rejects(pending,error=>{
+        assert.equal(error.code,'AI_CHAT_PERSISTENCE_UNAVAILABLE');
+        assert.equal(error.cause.providerResponse,providerResponse);
+        assert.equal(error.cause.message.content,providerResponse.message.content);
+        return true;
+    });
+    assert.deepEqual(await session.history(),[]);
+    assert.deepEqual(await session.transcript(),[]);
+    assert.equal(db.raw('chats',session.fileName),null);
+    session.chatEntity.persist=true;
+    const retried=await session.open({message:{content:'Retry internal bootstrap.',persist:false}});
+    assert.equal(retried.message.content,'Durable retried opening.');
+    assert.equal(Object.hasOwn(retried,'retained'),false);
+    assert.deepEqual(requests[1].messages,[{role:'user',content:'Retry internal bootstrap.'}]);
+    assert.deepEqual(await session.history(),[{role:'assistant',content:'Durable retried opening.'}]);
+    assert.doesNotMatch(String(db.raw('chats',session.fileName)),/Excluded|excluded|bootstrap/u);
+});
+
+test('an accepted opening write commits when entity persistence changes before completion',async()=>{
+    const chatFileName='opening-retention-accepted-write.jsonl';
+    const originalSet=db.set;
+    let releaseWrite;
+    let reportWrite;
+    const finishWrite=new Promise(resolve=>{releaseWrite=resolve;});
+    const writeAccepted=new Promise(resolve=>{reportWrite=resolve;});
+    db.set=async function delayedAcceptedOpeningWrite(tableName,key,...args){
+        const result=await originalSet.call(this,tableName,key,...args);
+        if(tableName==='chats'&&key===chatFileName){
+            reportWrite();
+            await finishWrite;
+        }
+        return result;
+    };
+    try{
+        const session=await PersistentAIChatSession.create({
+            chatFileName,loadExisting:false,memory:false,
+            chat:async()=>({message:{role:'assistant',content:'Accepted durable opening.'}}),
+        });
+        const pending=session.open({message:{content:'Accepted internal bootstrap.',persist:false}});
+        await writeAccepted;
+        session.chatEntity.persist=false;
+        releaseWrite();
+        const result=await pending;
+        assert.equal(result.message.content,'Accepted durable opening.');
+        assert.equal(Object.hasOwn(result,'retained'),false);
+        assert.deepEqual(await session.history(),[{role:'assistant',content:'Accepted durable opening.'}]);
+        assert.deepEqual(await session.transcript(),[{
+            role:'assistant',content:'Accepted durable opening.',timestamp:result.message.timestamp,
+        }]);
+        assert.deepEqual(await db.get('chats',chatFileName),await session.transcript());
+    }finally{
+        releaseWrite();
+        db.set=originalSet;
+    }
+});
+
 test('assistant entity names belong to new records and never rename saved history',async()=>{
     const entity=new ChatEntity();
     entity.fileName='application-assistant-entity-name.jsonl';
@@ -467,6 +573,7 @@ test('persistent streaming accepts terminal-only calls and compares complete str
         displayId:'M-stream-lookup',
     }]);
     assert.deepEqual(result.message.tool_calls,[structuralCall]);
+    assert.equal(result.retained,false);
     assert.equal(
         JSON.parse(result.message.tool_calls[0].function.arguments).message,
         'Looking up Alpha in the local library.'
@@ -528,15 +635,17 @@ test('persistent chat uses nonpersistent turns once without retaining context or
         systemPrompt:'system',
     });
 
-    await session.send({
+    const transient=await session.send({
         message:{content:'transient analysis',persist:false},
         response:{persist:false},
     });
+    assert.equal(transient.retained,false);
     assert.equal(db.raw('chats',session.fileName),null);
     assert.deepEqual(await session.transcript(),[]);
     assert.deepEqual(await session.history(),[{role:'system',content:'system'}]);
 
-    await session.send({message:{content:'durable question'}});
+    const retained=await session.send({message:{content:'durable question'}});
+    assert.equal(retained.retained,true);
     const secondMessages=requests[1].messages;
     assert.ok(!secondMessages.some(message=>message.content==='transient analysis'));
     assert.ok(!secondMessages.some(message=>message.content==='reply-1'));
@@ -744,11 +853,258 @@ test('disabled ChatEntity persistence suppresses automatic memory extraction',as
         memory:true,
     });
     session.chatEntity.persist=false;
-    await session.send({message:{content:'session-only request'}});
+    const result=await session.send({message:{content:'session-only request'}});
     await Promise.resolve();
+    assert.equal(result.message.content,'session-only response');
+    assert.equal(result.retained,false);
+    assert.deepEqual(await session.history(),[]);
+    assert.deepEqual(await session.transcript(),[]);
     assert.equal(memoryFetchCount,before);
     assert.equal(db.raw('chats',session.fileName),null);
     assert.deepEqual(await db.getAllKeys('memories'),[]);
+});
+
+test('disabled entity retention excludes direct additions and preserves existing saved rows',async()=>{
+    const entity=new ChatEntity();
+    entity.fileName='entity-no-retention-existing.jsonl';
+    const existing=[
+        {role:'user',content:'Existing user turn.',timestamp:1,existing_field:'preserved'},
+        {role:'assistant',content:'Existing assistant turn.',timestamp:2},
+    ];
+    const saved=existing.map(record=>JSON.stringify(record)).join('\n')+'\n';
+    await db.set('chats',entity.fileName,saved);
+    await entity.load();
+    const history=entity.messages;
+    const transcript=entity.transcript;
+    const before=memoryFetchCount;
+    entity.persist=false;
+    for(let index=0;index<3;index++){
+        assert.equal(await entity.addUserMessage(`excluded user ${index}`),false);
+        assert.equal(await entity.addAIMessage(`excluded assistant ${index}`),false);
+        assert.equal(await entity.addTurn({
+            requestMessage:{role:'user',content:`excluded request ${index}`},
+            assistantMessage:{role:'assistant',content:`excluded response ${index}`},
+        }),false);
+        assert.equal(await entity.addToolExchange({
+            id:`excluded-call-${index}`,
+            name:'lookup',
+            arguments:{message:`excluded lookup ${index}`},
+            result:`excluded result ${index}`,
+        }),false);
+    }
+    await entity.settleMemory();
+    assert.equal(memoryFetchCount,before);
+    assert.deepEqual(entity.messages,history);
+    assert.deepEqual(entity.transcript,transcript);
+    assert.equal(db.raw('chats',entity.fileName),saved);
+
+    entity.persist=true;
+    await entity.save();
+    const memoryRequests=[];
+    await entity.getMemoriesAboutUser({request:async messages=>{
+        memoryRequests.push(messages);
+        return {message:{content:''}};
+    }});
+    assert.equal(db.raw('chats',entity.fileName),saved);
+    assert.deepEqual(entity.messages,history);
+    assert.deepEqual(entity.transcript,transcript);
+    assert.equal(memoryRequests.length,1);
+    assert.match(memoryRequests[0][0].content,/Existing user turn\./u);
+    assert.doesNotMatch(memoryRequests[0][0].content,/excluded/u);
+});
+
+test('entity-disabled repeated requests never enter later context, saves, or memory',async()=>{
+    const requests=[];
+    const memoryRequests=[];
+    const session=await PersistentAIChatSession.create({
+        chatFileName:'entity-no-retention-batches.jsonl',
+        loadExisting:false,
+        memory:true,
+        chat:async request=>{
+            if(String(request.messages[0]?.content).startsWith('Create a concise memory note')){
+                memoryRequests.push(structuredClone(request));
+                return {message:{role:'assistant',content:''}};
+            }
+            requests.push(structuredClone(request));
+            return {message:{role:'assistant',content:`Response to ${request.messages.at(-1).content}`}};
+        },
+    });
+    assert.equal((await session.send({message:{content:'Retained before.'}})).retained,true);
+    await session.settleMemory();
+    const history=await session.history();
+    const transcript=await session.transcript();
+    const saved=db.raw('chats',session.fileName);
+    const priorMemoryRequests=memoryRequests.length;
+    session.chatEntity.persist=false;
+    for(let index=0;index<3;index++){
+        const content=`Temporary batch ${index}\nComplete document body ${index}.`;
+        const result=await session.send({message:{content}});
+        assert.equal(result.message.content,`Response to ${content}`);
+        assert.equal(result.retained,false);
+        assert.deepEqual(requests.at(-1).messages,[...history,{role:'user',content}]);
+        assert.deepEqual(await session.history(),history);
+        assert.deepEqual(await session.transcript(),transcript);
+        assert.equal(db.raw('chats',session.fileName),saved);
+    }
+    await session.settleMemory();
+    assert.equal(memoryRequests.length,priorMemoryRequests);
+    session.chatEntity.persist=true;
+    const next=await session.send({message:{content:'Retained after.'}});
+    assert.equal(next.retained,true);
+    assert.deepEqual(requests.at(-1).messages,[...history,{role:'user',content:'Retained after.'}]);
+    await session.settleMemory();
+    await session.chatEntity.save();
+    assert.doesNotMatch(String(db.raw('chats',session.fileName)),/Temporary batch/u);
+    assert.doesNotMatch(JSON.stringify(memoryRequests),/Temporary batch/u);
+    assert.match(JSON.stringify(memoryRequests),/Retained after\./u);
+    assert.equal(Object.hasOwn(next.message,'retained'),false);
+    assert.doesNotMatch(JSON.stringify(requests),/"retained"/u);
+});
+
+test('entity retention is captured before awaits and rechecked before accepting a turn',async()=>{
+    for(const initialPersist of [false,null,undefined,0,'',true]){
+        let releaseResponse;
+        let reportRequest;
+        const response=new Promise(resolve=>{releaseResponse=resolve;});
+        const requested=new Promise(resolve=>{reportRequest=resolve;});
+        const session=await PersistentAIChatSession.create({
+            memory:false,
+            chat:async()=>{
+                reportRequest();
+                return response;
+            },
+        });
+        session.chatEntity.persist=initialPersist;
+        const pending=session.send({message:{content:'Excluded across flag changes.'}});
+        if(!initialPersist) session.chatEntity.persist=true;
+        await requested;
+        if(initialPersist) session.chatEntity.persist=false;
+        releaseResponse({message:{role:'assistant',content:'Complete operation response.'}});
+        const result=await pending;
+        assert.equal(result.retained,false);
+        assert.equal(result.message.content,'Complete operation response.');
+        assert.deepEqual(await session.history(),[]);
+        assert.deepEqual(await session.transcript(),[]);
+        assert.equal(db.raw('chats',session.fileName),null);
+        session.chatEntity.persist=true;
+        assert.equal(await session.chatEntity.save(),false);
+        assert.equal(db.raw('chats',session.fileName),null);
+    }
+});
+
+test('an already accepted entity write retains its settled decision when the flag changes',async()=>{
+    const chatFileName='entity-retention-accepted-write.jsonl';
+    const originalSet=db.set;
+    let releaseWrite;
+    let reportWrite;
+    const finishWrite=new Promise(resolve=>{releaseWrite=resolve;});
+    const writeAccepted=new Promise(resolve=>{reportWrite=resolve;});
+    db.set=async function delayedAcceptedWrite(tableName,key,...args){
+        const result=await originalSet.call(this,tableName,key,...args);
+        if(tableName==='chats'&&key===chatFileName){
+            reportWrite();
+            await finishWrite;
+        }
+        return result;
+    };
+    try{
+        const session=await PersistentAIChatSession.create({
+            chatFileName,loadExisting:false,memory:false,
+            chat:async()=>({message:{role:'assistant',content:'Accepted reply.'}}),
+        });
+        const pending=session.send({message:{content:'Accepted request.'}});
+        await writeAccepted;
+        session.chatEntity.persist=false;
+        releaseWrite();
+        const result=await pending;
+        assert.equal(result.retained,true);
+        assert.deepEqual(await session.history(),[
+            {role:'user',content:'Accepted request.'},
+            {role:'assistant',content:'Accepted reply.'},
+        ]);
+        assert.match(String(db.raw('chats',chatFileName)),/Accepted request\./u);
+        assert.match(String(db.raw('chats',chatFileName)),/Accepted reply\./u);
+    }finally{
+        releaseWrite();
+        db.set=originalSet;
+    }
+});
+
+test('entity-disabled streaming preserves live output and clears failed and tool-call turns',async()=>{
+    const call={
+        id:'excluded-stream-call',type:'function',
+        function:{name:'lookup',arguments:'{"message":"Looking up the temporary document."}'},
+    };
+    let streamCount=0;
+    const chunks=[];
+    const visibleCalls=[];
+    const session=await PersistentAIChatSession.create({
+        memory:false,
+        ai:{
+            async fetchRequest(){return {message:{role:'assistant',content:'Ordinary next reply.'}};},
+            async streamRequest(request){
+                streamCount++;
+                await request.onChunk(`Complete chunk ${streamCount}.`);
+                if(streamCount===1) throw new Error('synthetic excluded stream failure');
+                request.onToolCall(call,'excluded-display-id');
+                await request.onResponse({message:{role:'assistant',content:'',tool_calls:[call]}});
+                return [call];
+            },
+        },
+    });
+    session.chatEntity.persist=false;
+    await assert.rejects(
+        session.stream({message:{content:'Failed temporary stream.'}},{onChunk:chunk=>chunks.push(chunk)}),
+        /synthetic excluded stream failure/u,
+    );
+    assert.deepEqual(await session.history(),[]);
+    const result=await session.stream({message:{content:'Temporary structural stream.'}},{
+        onChunk:chunk=>chunks.push(chunk),
+        onToolCall:value=>visibleCalls.push(value),
+    });
+    assert.deepEqual(chunks,['Complete chunk 1.','Complete chunk 2.']);
+    assert.deepEqual(visibleCalls,[call]);
+    assert.deepEqual(result.message.tool_calls,[call]);
+    assert.equal(result.retained,false);
+    assert.deepEqual(await session.history(),[]);
+    assert.deepEqual(await session.transcript(),[]);
+    assert.equal(db.raw('chats',session.fileName),null);
+    session.chatEntity.persist=true;
+    assert.equal((await session.send({message:{content:'Ordinary next request.'}})).retained,true);
+    assert.deepEqual(await session.history(),[
+        {role:'user',content:'Ordinary next request.'},
+        {role:'assistant',content:'Ordinary next reply.'},
+    ]);
+});
+
+test('an excluded tool continuation leaves the original retained tool call available',async()=>{
+    const call={
+        id:'retained-pending-call',type:'function',
+        function:{name:'lookup',arguments:'{"message":"Looking up the retained document."}'},
+    };
+    let requestCount=0;
+    const session=await PersistentAIChatSession.create({
+        memory:false,
+        chat:async()=>++requestCount===1
+            ?{message:{role:'assistant',content:'',tool_calls:[call]}}
+            :{message:{role:'assistant',content:`Continuation ${requestCount}.`}},
+    });
+    await session.send({message:{content:'Retained lookup request.'}});
+    const history=await session.history();
+    const transcript=await session.transcript();
+    const saved=db.raw('chats',session.fileName);
+    const continuation={message:{
+        role:'tool',tool_call_id:call.id,content:'Complete lookup result.',
+        message:'The document lookup completed.',name:'lookup',status:'completed',
+    }};
+    session.chatEntity.persist=false;
+    assert.equal((await session.send(continuation)).retained,false);
+    assert.deepEqual(await session.history(),history);
+    assert.deepEqual(await session.transcript(),transcript);
+    assert.equal(db.raw('chats',session.fileName),saved);
+    session.chatEntity.persist=true;
+    assert.equal((await session.send(continuation)).retained,true);
+    assert.equal((await session.send({message:{content:'After the settled lookup.'}})).retained,true);
 });
 
 test('persistent chat uses its configured provider for automatic memory',async()=>{

@@ -426,7 +426,8 @@ history stores each tool's required user-facing message as an ordinary
 call envelope or ID and therefore does not recreate a pending executable call
 after reload. `submitToolResult()` and `submitToolResults()` accept `status` as
 the public result term; `disposition` remains an accepted input spelling.
-When a submitted turn uses `persist:false`, Chat may show its cards while that
+When a submitted turn uses `persist:false`, or its session's Chat entity has
+`persist=false`, Chat may show its cards while that
 one operation is active, then removes them when the operation settles; neither
 the input nor response remains in the retained transcript or model context.
 This cleanup also applies to failed, cancelled, detached, or replaced-session
@@ -437,6 +438,10 @@ operation's nodes so a completion listener can start another turn safely.
 Submission code passes those card references directly when it creates them;
 reusing an operation identifier never selects earlier conversation cards for
 cleanup or timestamp updates.
+The session's terminal `retained` boolean reports its actual commit decision;
+Chat uses that decision instead of retroactively interpreting a flag changed
+for a later request. A completion listener cannot erase an earlier settled
+turn by changing the next operation's retention setting.
 Persistent-turn recovery and existing saved history remain unchanged.
 
 For streaming sessions, every provisional structural card and the terminal

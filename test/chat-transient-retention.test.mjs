@@ -77,6 +77,7 @@ function createFixture(session) {
         host: {aiName: 'Assistant', aiAvailability: {llm: true}},
         is: {
             array: Array.isArray,
+            boolean(value) { return typeof value === 'boolean'; },
             function(value) { return typeof value === 'function'; },
             object(value) { return typeof value === 'object'; },
             string(value) { return typeof value === 'string'; }
@@ -328,6 +329,78 @@ test(
         }
     }
 );
+
+test('entity-wide no-retention also removes ordinary default-submission cards', async function entityNonpersistentTurns() {
+    for(const mode of ['success', 'provider', 'structural', 'abort', 'reenabled']) {
+        const failure = new Error(`Entity-disabled ${mode} failure.`);
+        if(mode === 'structural') failure.code = 'AI_CHAT_INVALID_TOOL_CALL';
+        if(mode === 'abort') failure.name = 'AbortError';
+        const session = {
+            chatEntity: {persist: false},
+            async send(request) {
+                assert.equal(Object.hasOwn(request.message, 'persist'), false);
+                if(mode === 'reenabled') session.chatEntity.persist = true;
+                if(['provider', 'structural', 'abort'].includes(mode)) throw failure;
+                return {...response(), retained: false};
+            }
+        };
+        const fixture = createFixture(session);
+        const content = 'The complete temporary batch.';
+        const card = fixture.appendCard('user', content);
+        const pending = fixture.send(content, {}, undefined, null, [card]);
+        if(['success', 'reenabled'].includes(mode)) await pending;
+        else await assert.rejects(pending, function originalFailure(error) { return error === failure; });
+        assert.deepEqual(fixture.ui.chatOutput.children, [fixture.retained], mode);
+        assert.equal(fixture.textArea.value, 'A newer unsent draft.', mode);
+        assert.deepEqual(fixture.pendingCalls(), [], mode);
+    }
+});
+
+test('Chat follows the session commit decision rather than a later entity toggle', async function settledRetention() {
+    for(const retained of [false, true]) {
+        const session = {
+            chatEntity: {persist: true},
+            async send() {
+                // The session can finish an already accepted durable write even
+                // when the flag is changed for the next operation.
+                session.chatEntity.persist = false;
+                return {...response(), retained};
+            }
+        };
+        const fixture = createFixture(session);
+        await submit(fixture, true);
+        assert.equal(fixture.ui.chatOutput.children.length, retained ? 3 : 1);
+    }
+});
+
+test('entity disable during a failed turn does not retain partial cards or restore the batch', async function disabledDuringFailure() {
+    const failure = new Error('Provider failed after retention was disabled.');
+    const session = {
+        chatEntity: {persist: true},
+        async stream(request, handlers) {
+            await handlers.onChunk('Partial temporary response.', 'request', false);
+            session.chatEntity.persist = false;
+            throw failure;
+        }
+    };
+    const fixture = createFixture(session);
+    await assert.rejects(submit(fixture, true), function originalFailure(error) { return error === failure; });
+    assert.deepEqual(fixture.ui.chatOutput.children, [fixture.retained]);
+    assert.equal(fixture.textArea.value, 'A newer unsent draft.');
+});
+
+test('completion listeners cannot retroactively remove the settled previous turn', async function reentrantRetentionToggle() {
+    const session = {
+        chatEntity: {persist: true},
+        async send() { return {...response(), retained: true}; }
+    };
+    const fixture = createFixture(session);
+    fixture.ui.onEvent = function disableLaterRetention(type) {
+        if(type === 'chat-session-message') session.chatEntity.persist = false;
+    };
+    await submit(fixture, true);
+    assert.equal(fixture.ui.chatOutput.children.length, 3);
+});
 
 test('persistent success and rejection retain their existing transcript and draft behavior', async function preservePersistentTurns() {
     for(const mode of ['success', 'provider', 'structural']) {

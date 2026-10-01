@@ -556,6 +556,7 @@ class PersistentAIChatSession{
     /** Persists one model-authored opening while retaining none of its bootstrap request. */
     async open(input){
         const settings=normalizeOpening(input);
+        const retainOpening=this.#entity.persist===true;
         const name=this.aiName;
         if(this.#pending){
             throw coded(new Error('A chat request is already active for this session.'),'AI_CHAT_BUSY');
@@ -565,7 +566,7 @@ class PersistentAIChatSession{
         try{
             await this.ready();
             if(this.#historyError)throw this.#historyError;
-            if(this.#entity.persist!==true){
+            if(!retainOpening||this.#entity.persist!==true){
                 throw coded(
                     new Error('The model-authored chat opening requires durable chat persistence.'),
                     'AI_CHAT_PERSISTENCE_UNAVAILABLE',
@@ -576,6 +577,15 @@ class PersistentAIChatSession{
                 settings.message,
                 {request:settings.request,signal:settings.signal},
             );
+            if(this.#entity.persist!==true){
+                throw coded(
+                    new Error(
+                        'The model-authored chat opening requires durable chat persistence.',
+                        {cause:prepared.response},
+                    ),
+                    'AI_CHAT_PERSISTENCE_UNAVAILABLE',
+                );
+            }
             await this.#entity.addAIMessage(
                 prepared.response.message.content,
                 {extractMemory:false,persist:true,name},
@@ -597,6 +607,7 @@ class PersistentAIChatSession{
 
     async #requestTurn(input,streamHandlers=null){
         const settings=normalizeSend(input);
+        const retainTurn=settings.messagePersist&&Boolean(this.#entity.persist);
         const name=this.aiName;
         if(this.#pending){
             throw coded(new Error('A chat request is already active for this session.'),'AI_CHAT_BUSY');
@@ -674,10 +685,10 @@ class PersistentAIChatSession{
                     );
                 }
             }
-            if(!settings.messagePersist){
+            if(!retainTurn||!this.#entity.persist){
                 prepared.rollback();
                 prepared=null;
-                return assistantDisplayResponse(result,name);
+                return {...assistantDisplayResponse(result,name),retained:false};
             }
             await this.#entity.addTurn({
                 assistantMessage:result.message,
@@ -706,10 +717,13 @@ class PersistentAIChatSession{
             }
             const transcript=this.#entity.transcript;
             const assistantRecord=transcript.at(-1);
-            return assistantDisplayResponse(
-                committed,name,
-                assistantRecord?.role==='assistant'?assistantRecord.timestamp:undefined,
-            );
+            return {
+                ...assistantDisplayResponse(
+                    committed,name,
+                    assistantRecord?.role==='assistant'?assistantRecord.timestamp:undefined,
+                ),
+                retained:true,
+            };
         }catch(error){
             prepared?.rollback();
             throw error;
