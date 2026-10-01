@@ -96,7 +96,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`Mail.js`](#mailjs) | esm | Builds complete reports and prefers the native mail capability with an explicit HTTP transport fallback. | Browser/native hybrid + cloud | Mail inputs/results normalized; transport failures mixed. |
 | [`MailOutbox.mjs`](#mailoutboxmjs) | esm | Persists complete mail reports before delivery and normalizes idempotent enqueue, retry, reconciliation, and invalid-record maintenance. | Browser/native WebView or compatible injected host | Complete records, full work, cancellation, and lifecycle states normalized; storage, lock, and delivery failures coded. |
 | [`MailTransport.mjs`](#mailtransportmjs) | esm | Sends one complete mail report to a normalized HTTP(S) endpoint. | Browser/server with fetch + cloud | Normalized endpoint and transport errors; remote detail preserved. |
-| [`MarkdownMedia.js`](#markdownmediajs) | esm | Saves local Markdown images separately and resolves their stable references in rendered views. | Browser / supported native WebView | Complete image records, concurrent display reads, cancellation, and print-owned URL lifetime. |
+| [`MarkdownMedia.js`](#markdownmediajs) | esm | Saves local Markdown images separately, decodes complete stored records, and resolves stable references in rendered views. | Browser / supported native WebView | Complete image records, concurrent display reads, cancellation, and print-owned URL lifetime. |
 | [`MarkdownSpeech.js`](#markdownspeechjs) | esm | Removes repeated Markdown formatting marks from streamed narration. | Cross-host | Speech-only filtering; single marks and ordinary punctuation remain literal. |
 | [`Marked.min.js`](#markedminjs) | esm | Vendored Marked 18.0.5 Markdown lexer, parser, renderer, extension, and walk-token API. | Cross-host vendor module | Vendor-native Marked contract. |
 | [`MD.js`](#mdjs) | esm | Renders complete Markdown with Marked and optionally maps source blocks to rendered comment anchors. | Browser / native WebView | Complete raw and rendered Marked values; opt-in original-source offsets; parse errors vendor-native. |
@@ -2816,9 +2816,18 @@ Public package import: `arcane-os/modules/MarkdownMedia.js`.
 - `parseMarkdownMediaReference(reference)` returns `{tableName,fileName}` for
   a local reference, or `null` for an ordinary URL. Malformed local addresses
   report their actual parsing error.
+- `decodeMarkdownMediaRecord(value)` synchronously decodes a complete
+  `{dataUrl,mediaType?}` record or its JSON text into a `Blob`, without storage
+  or network access. Nested single-record arrays are unwrapped; arrays with
+  multiple records are never reduced to one image. Unrecognized content,
+  including text that is not complete JSON, returns `null`. A recognized
+  record with unreadable base64 data-URL content throws its decoding error.
+  Omitted `mediaType` preserves the Blob's empty type. Input remains unchanged.
 - `await readMarkdownMedia(reference)` returns the complete `Blob`, using
   only local storage and data-URL decoding; stored strings are never fetched
-  as network addresses.
+  as network addresses. It uses the same record decoder after loading, while
+  preserving JSON parse errors for unreadable stored JSON strings and reporting
+  an unreadable record as an error rather than `null`.
 - `hydrateMarkdownMedia(root,{signal}={})` returns `{ready,destroy,retain}`
   immediately. It includes an IMG root and descendant IMG elements, removes
   local-reference `src` values synchronously, starts independent reads
@@ -2840,6 +2849,9 @@ Applications own record names, entry association, cleanup policy, and which
 records their existing JSON backup/export includes. Reusing the same filename
 supports an application-selected save-only retry without another generation
 request. The helper performs no existing-data migration.
+
+Exact exports: `saveMarkdownMedia`, `parseMarkdownMediaReference`,
+`decodeMarkdownMediaRecord`, `readMarkdownMedia`, `hydrateMarkdownMedia`.
 
 ### Availability and normalization
 
@@ -2896,16 +2908,29 @@ mapping, not exact rendered glyph or caret geometry.
 
 Assigning `raw` or calling `append(string)` rebuilds both the complete rendered
 result and its current mapping. Without `sourceMap:true`, `sourceMap` is empty
-and the ordinary rendered output is unchanged. Existing raw content, link
+and the same parsing runs without comment anchors. Existing raw content, link
 behavior, no-op `rendered` setter, and complete `append()` result remain.
+
+Both rendering paths first use Marked's native HTML block tokenizer. When it
+does not recognize a complete standalone `<img>` tag with a newline inside a
+quoted attribute value, MD keeps that complete tag together as one HTML block.
+This includes blank lines in an image's full `alt` description. The tag must
+start at an existing Markdown block boundary with at most three leading spaces
+and end on its own line or at the end of the source. Separate inserted image
+blocks from surrounding Markdown with blank lines. Native HTML handling,
+inline prose, fenced/indented/inline code, escaped examples, and incomplete
+tags retain their existing parsing behavior. No source is rewritten or saved
+data migrated. Marked's existing rendered line-ending normalization remains;
+mapped offsets still address the exact original source, including CRLF or CR.
 
 Exact exports: `default`.
 
 ### Availability and normalization
 
-**Browser / native WebView.** Raw Marked behavior is preserved; parse errors are
-vendor-native. Rendering and the getters are DOM-independent. DOM lookup and
-scrolling belong to the consuming component;
+**Browser / native WebView.** Marked parsing, including the shared standalone
+image-token correction above; parse errors remain vendor-native. Rendering and
+the getters are DOM-independent. DOM lookup and scrolling belong to the
+consuming component;
 mapping performs no persistence or viewport movement. Transport: Marked.
 [Deep protocol details](protocols.md).
 
@@ -3345,6 +3370,13 @@ Shared rendered-print owner used by Markdown Editor and File Manager. It
 captures the current DOM and computed styles, including accessible rendered
 HTML frames, complete text, selected images, and the current title. A temporary
 print-only surface expands scrollable content without editing the live screen.
+That surface uses the shared Arcane light-theme text, paper, and border colors,
+with `15mm` page margins. It retains rendered fonts, emphasis, and complete
+content while removing screen-theme text/shadow paint from ordinary HTML and
+pseudo-elements. Links are underlined and table cells receive visible borders.
+Image pixels, canvas snapshots, and SVG artwork keep their own colors. These
+print rules leave the live screen theme unchanged; browser print settings still
+control the eventual page output.
 
 ### Public surface
 
@@ -4022,11 +4054,19 @@ is applied once the body is available.
 
 The shared `theme.css` owns the default, warm, curious, hopeful, harmony, and
 warrior palettes. Each works with explicit light/dark or system appearance.
-`layout.css` imports that same owner. Explicit custom themes retain precedence
-through `data-arcane-skin="custom"` and their inline tokens.
+`layout.css` imports that same owner. On screen, explicit custom themes retain
+precedence through `data-arcane-skin="custom"` and their inline tokens.
 The bare root retains the generic neutral light/dark baseline; the prior
 layout default palette is selected explicitly through `data-user-skin="default"`,
 `body.default` compatibility, or the default swatch.
+
+During printing, `theme.css` applies the existing base light palette, with a
+white paper surface and `15mm` page margins, to the root, body, and scoped
+`data-arcane-palette` elements. These print-only tokens override screen/custom
+palette tokens. It resets the root/body margin without changing saved
+preferences, screen presentation, scrolling, media, or other layout rules.
+The separate [`PrintView.js`](#printviewjs) owner uses the same light palette
+and margins for its expanded rendered-content snapshot.
 
 A scoped `data-arcane-palette="warm"` element exposes the same palette variables
 for a chooser preview without changing the page's selection. Use any of the

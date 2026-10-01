@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import test from '../src/testing.mjs';
 import {createPrintView} from '../runtime/arcane/modules/PrintView.js';
+import {arcaneLightThemeTokens} from '../runtime/arcane/entities/Theme.js';
 
 // These DOM, layout, image, font and print-dialog doubles exercise ownership and
 // snapshot construction. They do not establish browser pagination or dialog UI.
@@ -20,6 +21,7 @@ class FixtureNode extends EventTarget{
         super();
         this.ownerDocument=document;
         this.localName=name;
+        this.namespaceURI='http://www.w3.org/1999/xhtml';
         this.nodeType=nodeType;
         this.childNodes=[];
         this.parentNode=null;
@@ -104,6 +106,7 @@ class FixtureNode extends EventTarget{
     }
     cloneNode(){
         const copy=new FixtureNode(this.ownerDocument,this.localName,this.nodeType);
+        copy.namespaceURI=this.namespaceURI;
         copy.attributes=this.attributes.map(function copyAttribute(attribute){return {...attribute};});
         copy.data=this.data;
         copy.decodeResult=this.decodeResult;
@@ -146,6 +149,11 @@ function fixtureDocument(url='https://print.example.test/app/'){
     document.decodeCalls=[];
     document.fontCopies=[];
     document.createElement=function createElement(name){return new FixtureNode(document,name);};
+    document.createElementNS=function createElementNS(namespace,name){
+        const node=new FixtureNode(document,name);
+        node.namespaceURI=namespace;
+        return node;
+    };
     document.createDocumentFragment=function createDocumentFragment(){return new FixtureNode(document,'',11);};
     document.createTextNode=function createTextNode(text){
         const node=new FixtureNode(document,'',3);
@@ -275,6 +283,125 @@ test('rendered print preserves complete DOM, title, image selection and styles w
     assert.equal(printStage(document),undefined);
     assert.equal(document.title,'Original application title');
     assert.equal(fixture.resources.released,1);
+});
+
+test('explicit and native snapshots share the existing light palette and page margins without changing the screen',async function lightPrintPresentation(context){
+    const presentations=[];
+    for(const mode of ['explicit','native']){
+        const document=fixtureDocument();
+        document.documentElement.setAttribute('data-color-scheme','dark');
+        document.documentElement.setAttribute('data-user-skin','warm');
+        document.body.style.setProperty('background-color','rgb(20, 20, 20)');
+        const screenSheet=document.createElement('style');
+        screenSheet.textContent=':root{color-scheme:dark}';
+        document.head.append(screenSheet);
+        const fixture=addView(context,document);
+        fixture.content.scrollTop=420;
+        fixture.content.scrollLeft=18;
+        const paragraph=document.createElement('p');
+        paragraph.textContent='Every word survives the theme change.\n第二行 — 🦉';
+        paragraph.appearance={...paragraph.appearance,
+            color:'rgb(240, 240, 240)',
+            'background-color':'rgb(20, 20, 20)',
+            'background-image':'url("https://print.example.test/illustration.png")',
+            'font-family':'Moon Serif, serif',
+            'font-weight':'700',
+            'font-style':'italic',
+            opacity:'.4',
+            filter:'drop-shadow(0 1px 1px black)',
+            '-webkit-text-fill-color':'rgb(240, 240, 240)'
+        };
+        paragraph.pseudo['::before']={content:'"Full ledger:"',color:'white',opacity:'.5'};
+        fixture.content.append(paragraph);
+        if(mode==='explicit'){
+            assert.equal(await fixture.view.print(),true);
+        }else{
+            document.defaultView.dispatchEvent(new Event('beforeprint'));
+        }
+        const snapshot=printStage(document).shadowRoot;
+        const palette=snapshot.querySelectorAll('style')[0].textContent;
+        const pageSheet=document.head.childNodes.find(function printSheet(node){return node!==screenSheet;});
+        assert.ok(palette.includes(`color:${arcaneLightThemeTokens.text}!important`));
+        assert.ok(palette.includes(`background:${arcaneLightThemeTokens.surface}!important`));
+        assert.ok(palette.includes(`border:1px solid ${arcaneLightThemeTokens.border}!important`));
+        assert.ok(palette.includes('[data-arcane-print-node]:not(svg,svg *,img,video,audio)::before'));
+        assert.ok(palette.includes('[data-arcane-print-node]:not(svg,svg *,img,video,audio)::after'));
+        assert.match(palette,/background-color:transparent!important/u);
+        assert.match(palette,/-webkit-text-fill-color:currentColor!important/u);
+        assert.doesNotMatch(palette,/(?:opacity|filter|mix-blend-mode):[^;\n}]*!important/u);
+        assert.match(palette,/Full ledger:/u);
+        assert.doesNotMatch(palette,/background-image:none/u);
+        assert.match(pageSheet.textContent,/@media print\s*\{\s*@page\{margin:15mm\}/u);
+        assert.ok(pageSheet.textContent.includes(`background:${arcaneLightThemeTokens.surface}!important`));
+        const printed=snapshot.querySelectorAll('p')[0];
+        assert.equal(printed.textContent,paragraph.textContent);
+        for(const property of ['font-family','font-weight','font-style','background-image','opacity','filter']){
+            assert.equal(printed.style.getPropertyValue(property),paragraph.appearance[property]);
+        }
+        // The double inspects authored CSS, not browser cascade or pagination.
+        // !important paper rules supersede the copied screen paint in the browser.
+        assert.equal(printed.style.getPropertyValue('color'),paragraph.appearance.color);
+        assert.equal(document.documentElement.getAttribute('data-color-scheme'),'dark');
+        assert.equal(document.documentElement.getAttribute('data-user-skin'),'warm');
+        assert.equal(document.body.style.getPropertyValue('background-color'),'rgb(20, 20, 20)');
+        assert.equal(fixture.content.scrollTop,420);
+        assert.equal(fixture.content.scrollLeft,18);
+        assert.equal(paragraph.style.size,0);
+        assert.equal(fixture.resources.released,0);
+        presentations.push({palette,page:pageSheet.textContent});
+        document.defaultView.dispatchEvent(new Event('afterprint'));
+        assert.deepEqual(document.head.childNodes,[screenSheet]);
+        assert.equal(printStage(document),undefined);
+        assert.equal(fixture.resources.released,1);
+    }
+    assert.deepEqual(presentations[0],presentations[1]);
+});
+
+test('light print presentation preserves SVG paint, selected image and canvas pixels, and live form values',async function preservedPrintArtwork(context){
+    const document=fixtureDocument();
+    const fixture=addView(context,document);
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('viewBox','0 0 200 100');
+    svg.appearance={...svg.appearance,color:'rgb(200, 40, 30)',fill:'currentColor',filter:'url("#artwork-shadow")'};
+    const shape=document.createElementNS(svg.namespaceURI,'path');
+    shape.setAttribute('d','M 0 0 L 200 100');
+    shape.appearance={...shape.appearance,fill:'rgb(30, 120, 200)',stroke:'rgb(200, 80, 30)'};
+    svg.append(shape);
+    const image=document.createElement('img');
+    image.src='original.png';
+    image.currentSrc='https://print.example.test/selected-artwork.png';
+    image.appearance={...image.appearance,filter:'contrast(1.2)',opacity:'.8'};
+    const canvas=document.createElement('canvas');
+    const pixels='data:image/png;base64,c3ludGhldGljLWNhbnZhcy1maXh0dXJl';
+    canvas.toDataURL=function renderedPixels(){return pixels;};
+    const input=document.createElement('input');
+    input.value='Complete current value';
+    input.checked=true;
+    const select=document.createElement('select');
+    const option=document.createElement('option');
+    option.textContent='Current selection';
+    option.selected=true;
+    select.value='current';
+    select.append(option);
+    fixture.content.append(svg,image,canvas,input,select);
+    assert.equal(await fixture.view.print(),true);
+    const snapshot=printStage(document).shadowRoot;
+    const printedSVG=snapshot.querySelectorAll('svg')[0];
+    assert.equal(printedSVG.namespaceURI,svg.namespaceURI);
+    assert.equal(printedSVG.getAttribute('viewBox'),'0 0 200 100');
+    assert.equal(printedSVG.style.getPropertyValue('color'),svg.appearance.color);
+    assert.equal(printedSVG.style.getPropertyValue('filter'),svg.appearance.filter);
+    const printedShape=snapshot.querySelectorAll('path')[0];
+    assert.equal(printedShape.getAttribute('d'),shape.getAttribute('d'));
+    assert.equal(printedShape.style.getPropertyValue('fill'),shape.appearance.fill);
+    assert.equal(printedShape.style.getPropertyValue('stroke'),shape.appearance.stroke);
+    assert.equal(snapshot.querySelectorAll('img')[0].src,image.currentSrc);
+    assert.equal(snapshot.querySelectorAll('img')[0].style.getPropertyValue('filter'),image.appearance.filter);
+    assert.equal(snapshot.querySelectorAll('img')[1].src,pixels);
+    assert.equal(snapshot.querySelectorAll('input')[0].value,input.value);
+    assert.equal(snapshot.querySelectorAll('input')[0].checked,true);
+    assert.equal(snapshot.querySelectorAll('select')[0].value,select.value);
+    assert.equal(snapshot.querySelectorAll('option')[0].selected,true);
 });
 
 test('one native-print registry chooses the active preview and explicit Print still selects its own view',async function nativeSelection(context){

@@ -2142,8 +2142,9 @@
         const rendered=document.createElement('div');
         rendered.className='file-preview';
         let value=fileRef.parsed;
-        const transformed=['json','jsonl','ndjson'].includes(fileRef.ext)
-            &&is.function(host.previewTransform);
+        const jsonFile=['json','jsonl','ndjson'].includes(fileRef.ext);
+        const transformed=jsonFile&&is.function(host.previewTransform);
+        let completeJSON;
 
         if(transformed){
             value=await host.previewTransform(
@@ -2155,6 +2156,22 @@
                 }
             );
             preview.controller.signal.throwIfAborted();
+        }else if(jsonFile){
+            // Recognition needs the complete file: FileEntity's parsed JSONL
+            // rows do not include every unparseable line in the original.
+            const [{decodeMarkdownMediaRecord},text]=await Promise.all([
+                import('../modules/MarkdownMedia.js'),
+                fileRef.text()
+            ]);
+            preview.controller.signal.throwIfAborted();
+            completeJSON=text;
+            const image=decodeMarkdownMediaRecord(completeJSON);
+            if(image?.type.startsWith('image/')){
+                return renderDescriptor(
+                    {kind:'image',content:image,alt:fileRef.name},
+                    preview
+                );
+            }
         }
 
         switch(fileRef.ext){
@@ -2168,7 +2185,7 @@
             case 'jsonl':
             case 'ndjson':{
                 if(!transformed){
-                    rendered.append(createPreformatted(await fileRef.text()));
+                    rendered.append(createPreformatted(completeJSON));
                     break;
                 }
                 const records=is.array(value)?value:[];

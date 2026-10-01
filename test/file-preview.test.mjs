@@ -285,8 +285,8 @@ async function fileManagerFixture(options = {}) {
         .replace("import Is from 'strong-type';", '')
         .replaceAll('export ', '')
         .replaceAll("import('./DBOPFS.js')", 'loadDatabase()')
-        + '\nreturn hydrateMarkdownMedia;');
-    const hydrateMarkdownMedia = loadMediaHelper(Is, async function mediaDatabase() {
+        + '\nreturn {decodeMarkdownMediaRecord, hydrateMarkdownMedia};');
+    const {decodeMarkdownMediaRecord, hydrateMarkdownMedia} = loadMediaHelper(Is, async function mediaDatabase() {
         class FixtureMediaDBOPFS {
             async get(tableName, fileName) {
                 markdownReads.push({tableName, fileName});
@@ -347,7 +347,7 @@ async function fileManagerFixture(options = {}) {
         if (specifier === '../entities/File.js') return {default: FileEntity};
         if (specifier === '../modules/MD.js') return {default: FakeMarkdown};
         if (specifier === '../modules/MarkdownMedia.js') {
-            return {hydrateMarkdownMedia: function hydratePreview(root, configuration) {
+            return {decodeMarkdownMediaRecord, hydrateMarkdownMedia: function hydratePreview(root, configuration) {
                 assert.equal(root.localName, '#document-fragment');
                 assert.equal(root.parentElement, null);
                 const images = root.querySelectorAll('img');
@@ -542,6 +542,191 @@ test('null descriptors preserve the old JSON transform and complete context', as
         assert.equal(fixture.descendants(fixture.fileModal, function isPre(element) {return element.localName === 'pre';})[0].innerText, JSON.stringify({text: 'Explicitly transformed'}, null, 4));
     } finally {
         fixture.host.destroy();
+    }
+});
+
+test('JSON-family image records render through real FileEntity while original files and app folders stay unchanged', async function encodedImagePreview() {
+    const content = '<svg><text>Complete moon-dragon portrait: 月 🐉</text></svg>';
+    const record = markdownImageRecord(content);
+    for (const tableName of ['images', 'journal_media']) {
+        const files = {[tableName]: {}};
+        for (const fileName of ['portrait.json', 'portrait.JSON', 'portrait.jsonl', 'portrait.NDJSON', 'restored.ndjson']) {
+            const text = fileName === 'restored.ndjson' ? JSON.stringify([[record]]) : JSON.stringify(record);
+            files[tableName][fileName] = {file: new File([text], fileName), text};
+        }
+        const fixture = await fileManagerFixture({realFileEntity: true, files});
+        try {
+            assert.equal(fixture.dependencyImports.includes('../modules/MarkdownMedia.js'), false);
+            for (const [fileName, source] of Object.entries(files[tableName])) {
+                await fixture.open(fileName);
+                const image = fixture.descendants(fixture.fileModal, function isImage(element) {
+                    return element.localName === 'img' && element.src.startsWith('blob:');
+                })[0];
+                const rendered = fixture.createdURLs.at(-1);
+                assert.ok(image, fileName);
+                assert.equal(image.src, rendered.url);
+                assert.equal(image.alt, fileName);
+                assert.equal(rendered.content.type, record.mediaType);
+                assert.equal(await rendered.content.text(), content);
+                assert.equal(await source.file.text(), source.text);
+                assert.equal(source.file.type, '');
+                assert.equal(source.file.mime, fileName.toLowerCase().endsWith('.json') ? 'application/json' : 'application/x-ndjson');
+            }
+            assert.deepEqual(fixture.markdownReads, []);
+            assert.deepEqual(fixture.errors, []);
+        } finally {
+            fixture.host.destroy();
+        }
+        assert.deepEqual(fixture.revokedURLs, fixture.createdURLs.map(function ownedURL(entry) {return entry.url;}));
+    }
+});
+
+test('image recognition preserves complete generic JSON and every mixed or multiple JSONL row', async function completeRecordFallback() {
+    const record = markdownImageRecord('The complete first image');
+    const serialized = JSON.stringify(record);
+    const texts = {
+        'ordinary.json': JSON.stringify({content: 'The complete ordinary journal record'}),
+        'text-data.json': JSON.stringify({mediaType: 'text/plain', dataUrl: 'data:text/plain;base64,Q29tcGxldGUgdGV4dA=='}),
+        'untyped.json': JSON.stringify({dataUrl: record.dataUrl}),
+        'multiple.json': JSON.stringify([record, record]),
+        'multiple.jsonl': `${serialized}\n${serialized}\n`,
+        'mixed.jsonl': `${serialized}\nThe complete unparseable original row.\n`,
+        'nested.ndjson': `${JSON.stringify([[record, record]])}\n`,
+        'ordinary.ndjson': '{"content":"Complete first row"}\n{"content":"Complete second row"}\n'
+    };
+    const files = {visible: {}};
+    for (const [fileName, text] of Object.entries(texts)) files.visible[fileName] = {file: new File([text], fileName)};
+    const fixture = await fileManagerFixture({realFileEntity: true, files});
+    try {
+        for (const [fileName, text] of Object.entries(texts)) {
+            await fixture.open(fileName);
+            const pre = fixture.descendants(fixture.fileModal, function isPre(element) {return element.localName === 'pre';})[0];
+            assert.equal(pre.textContent, fileName.endsWith('.json') ? JSON.stringify(JSON.parse(text), null, 4) : text);
+            assert.equal(await files.visible[fileName].file.text(), text);
+        }
+        assert.deepEqual(fixture.createdURLs, []);
+        assert.deepEqual(fixture.markdownReads, []);
+        assert.deepEqual(fixture.errors, []);
+    } finally {
+        fixture.host.destroy();
+    }
+});
+
+test('application descriptors and JSON transforms keep precedence over encoded image previews', async function imageCallbackPrecedence() {
+    const record = markdownImageRecord('Complete application-owned drawing');
+    for (const descriptorOwnsPreview of [true, false]) {
+        const file = new File([JSON.stringify(record)], 'drawing.json');
+        const observed = [];
+        const fixture = await fileManagerFixture({
+            realFileEntity: true,
+            files: {visible: {'drawing.json': {file}}},
+            previewDescriptor(opened, context) {
+                assert.equal(opened, file);
+                assert.equal(context.mimeType, 'application/json');
+                observed.push('descriptor');
+                return descriptorOwnsPreview ? {kind: 'text', content: 'Application descriptor'} : null;
+            },
+            previewTransform(parsed, context) {
+                assert.deepEqual(parsed, record);
+                assert.equal(context.fileName, 'drawing.json');
+                observed.push('transform');
+                return {content: 'Application transform'};
+            }
+        });
+        try {
+            await fixture.open('drawing.json');
+            const pre = fixture.descendants(fixture.fileModal, function isPre(element) {return element.localName === 'pre';})[0];
+            assert.equal(pre.textContent, descriptorOwnsPreview ? 'Application descriptor' : JSON.stringify({content: 'Application transform'}, null, 4));
+            assert.deepEqual(observed, descriptorOwnsPreview ? ['descriptor'] : ['descriptor', 'transform']);
+            assert.equal(fixture.dependencyImports.includes('../modules/MarkdownMedia.js'), false);
+            assert.deepEqual(fixture.createdURLs, []);
+            assert.equal(await file.text(), JSON.stringify(record));
+        } finally {
+            fixture.host.destroy();
+        }
+    }
+});
+
+test('recognized image-record encoding failures stay visible through the existing preview error owner', async function encodedImageFailure() {
+    for (const [fileName, dataUrl, errorName] of [
+        ['remote.json', 'https://example.test/not-a-local-image.png', 'TypeError'],
+        ['broken.jsonl', 'data:image/png;base64,%%%', 'InvalidCharacterError']
+    ]) {
+        const text = JSON.stringify({mediaType: 'image/png', dataUrl});
+        const file = new File([text], fileName);
+        const fixture = await fileManagerFixture({realFileEntity: true, files: {visible: {[fileName]: {file}}}});
+        try {
+            await fixture.open(fileName);
+            assert.ok(fixture.fileModal.textContent.includes('Unable to open this file.'));
+            assert.equal(fixture.errors[0][0], 'Unable to open file:');
+            assert.equal(fixture.errors[0][1].name, errorName);
+            assert.deepEqual(fixture.createdURLs, []);
+            assert.deepEqual(fixture.markdownReads, []);
+            assert.equal(await fixture.host.printPreview(), false);
+            assert.equal(await file.text(), text);
+        } finally {
+            fixture.host.destroy();
+        }
+    }
+});
+
+test('encoded image previews retain only their owned display URL through print closeout', async function encodedImagePrintLifetime() {
+    const text = JSON.stringify(markdownImageRecord('Complete printable portrait'));
+    const file = new File([text], 'portrait.json');
+    const fixture = await fileManagerFixture({realFileEntity: true, files: {images: {'portrait.json': {file}}}});
+    try {
+        await fixture.open('portrait.json');
+        const image = fixture.descendants(fixture.fileModal, function isImage(element) {
+            return element.localName === 'img' && element.src.startsWith('blob:');
+        })[0];
+        assert.equal(await fixture.host.printPreview(), true);
+        assert.equal(fixture.printRequests[0].content.contains(image), true);
+        assert.equal(fixture.printRequests[0].title, 'images/portrait.json');
+        assert.equal(await fixture.host.close(), true);
+        assert.equal(image.src, '');
+        assert.deepEqual(fixture.revokedURLs, []);
+        fixture.afterPrint();
+        assert.deepEqual(fixture.revokedURLs, ['blob:fixture-1']);
+        fixture.afterPrint();
+        assert.deepEqual(fixture.revokedURLs, ['blob:fixture-1']);
+        assert.equal(await file.text(), text);
+    } finally {
+        fixture.afterPrint();
+        fixture.host.destroy();
+    }
+});
+
+test('closed, replaced, and destroyed previews ignore encoded images after a pending decoder import', async function cancelledImageRecognition() {
+    for (const action of ['close', 'replace', 'destroy']) {
+        const moduleReady = Promise.withResolvers();
+        const importEntered = Promise.withResolvers();
+        const file = new File([JSON.stringify(markdownImageRecord('Complete pending image'))], 'portrait.json');
+        const fixture = await fileManagerFixture({
+            realFileEntity: true,
+            files: {visible: {'portrait.json': {file}, 'replacement.txt': {file: new File(['Complete replacement'], 'replacement.txt')}}},
+            loadDependency(specifier) {
+                if (specifier === '../modules/MarkdownMedia.js') {
+                    importEntered.resolve();
+                    return moduleReady.promise;
+                }
+            }
+        });
+        try {
+            const opening = fixture.open('portrait.json');
+            await importEntered.promise;
+            if (action === 'close') await fixture.host.close();
+            if (action === 'replace') await fixture.open('replacement.txt');
+            if (action === 'destroy') fixture.host.destroy();
+            moduleReady.resolve();
+            await opening;
+            assert.deepEqual(fixture.createdURLs, [], action);
+            assert.deepEqual(fixture.markdownReads, [], action);
+            assert.deepEqual(fixture.errors, [], action);
+            if (action === 'replace') assert.ok(fixture.fileModal.textContent.includes('Complete replacement'));
+        } finally {
+            moduleReady.resolve();
+            fixture.host.destroy();
+        }
     }
 });
 

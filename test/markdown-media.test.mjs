@@ -167,7 +167,7 @@ function createFixture(options = {}) {
         source.replace("import Is from 'strong-type';", '')
             .replaceAll('export ', '')
             .replaceAll("import('./DBOPFS.js')", "loadDatabase('./DBOPFS.js')")
-            + '\nreturn {parseMarkdownMediaReference, saveMarkdownMedia, readMarkdownMedia, hydrateMarkdownMedia};'
+            + '\nreturn {parseMarkdownMediaReference, saveMarkdownMedia, decodeMarkdownMediaRecord, readMarkdownMedia, hydrateMarkdownMedia};'
     );
     const api = initialize(Is, loadDatabase, FixtureFileReader, Blob, {
         randomUUID() { return 'fixture-image'; }
@@ -190,6 +190,58 @@ test('Markdown media import and reference parsing do not start storage', functio
         fixture.api.parseMarkdownMediaReference('arcane-media:%/image.json');
     }, URIError);
     assert.deepEqual(fixture.imports, []);
+});
+
+test('Markdown media synchronously decodes complete records and JSON without storage or mutation', async function decodeCompleteRecord() {
+    const fixture = createFixture();
+    const content = '<svg><text>Complete moon library: 月 🐉</text></svg>';
+    const record = imageRecord(content);
+    const before = JSON.stringify(record);
+    for (const value of [record, [record], [[record]], before, `\n ${before}\n`, JSON.stringify([[record]])]) {
+        const blob = fixture.api.decodeMarkdownMediaRecord(value);
+        assert.ok(blob instanceof Blob);
+        assert.equal(blob.type, record.mediaType);
+        assert.equal(await blob.text(), content);
+    }
+    assert.equal(JSON.stringify(record), before);
+    const untyped = fixture.api.decodeMarkdownMediaRecord({dataUrl: record.dataUrl});
+    assert.equal(untyped.type, '');
+    assert.equal(await untyped.text(), content);
+    assert.deepEqual(fixture.imports, []);
+    assert.deepEqual(fixture.reads, []);
+    assert.deepEqual(fixture.writes, []);
+    assert.deepEqual(fixture.created, []);
+});
+
+test('Markdown media decoder leaves unrecognized, multiple, and mixed records to their existing owner', function unrecognizedRecords() {
+    const fixture = createFixture();
+    const record = imageRecord('Complete drawing');
+    const serialized = JSON.stringify(record);
+    for (const value of [
+        null, undefined, 42, {}, [], {content: 'Ordinary complete JSON'},
+        {mediaType: 'image/png'},
+        [record, record], [[record, record]], [record, 'Unparseable row'],
+        'null', '\n  \n', 'Unparseable complete text',
+        `${serialized}\n${serialized}\n`, `${serialized}\nUnparseable original row\n`
+    ]) {
+        assert.equal(fixture.api.decodeMarkdownMediaRecord(value), null);
+    }
+    assert.deepEqual(fixture.imports, []);
+    assert.deepEqual(fixture.reads, []);
+    assert.deepEqual(fixture.writes, []);
+});
+
+test('Markdown media decoder exposes recognized encoding errors without interpreting remote URLs', function decodeErrors() {
+    const fixture = createFixture();
+    assert.throws(function remoteRecord() {
+        fixture.api.decodeMarkdownMediaRecord({mediaType: 'image/png', dataUrl: 'https://example.test/drawing.png'});
+    }, {name: 'TypeError', message: 'Markdown image has an unreadable data URL.'});
+    assert.throws(function malformedEncoding() {
+        fixture.api.decodeMarkdownMediaRecord(JSON.stringify({mediaType: 'image/png', dataUrl: 'data:image/png;base64,%%%'}));
+    }, {name: 'InvalidCharacterError'});
+    assert.deepEqual(fixture.imports, []);
+    assert.deepEqual(fixture.reads, []);
+    assert.deepEqual(fixture.writes, []);
 });
 
 test('Markdown media preserves complete image content in a JSON backup record', async function saveAndRead() {
@@ -341,6 +393,10 @@ test('Markdown media reads local records without network interpretation', async 
     await assert.rejects(fixture.api.readMarkdownMedia('arcane-media:images/remote.json'), TypeError);
     fixture.setRecord('images', 'broken.json', {mediaType: 'image/png', dataUrl: 'data:image/png;base64,%%%'});
     await assert.rejects(fixture.api.readMarkdownMedia('arcane-media:images/broken.json'), {name: 'InvalidCharacterError'});
+    fixture.setRecord('images', 'untyped.json', {dataUrl: imageRecord('Complete untyped drawing').dataUrl});
+    const untyped = await fixture.api.readMarkdownMedia('arcane-media:images/untyped.json');
+    assert.equal(untyped.type, '');
+    assert.equal(await untyped.text(), 'Complete untyped drawing');
     assert.deepEqual(fixture.writes, []);
 });
 

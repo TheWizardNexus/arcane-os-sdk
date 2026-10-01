@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from '../src/testing.mjs';
 import MD from '../runtime/arcane/modules/MD.js';
-import {marked} from '../runtime/arcane/modules/Marked.min.js';
+import {Marked,marked} from '../runtime/arcane/modules/Marked.min.js';
 
 function withoutSourceMarkers(markdown){
     let html=markdown.rendered;
@@ -29,6 +29,87 @@ test('source mapping is opt-in and preserves the complete ordinary render',funct
         assert.deepEqual(Object.keys(block),['start','end','marker','type']);
         assert.ok(mapped.rendered.includes(`<!--${block.marker}-->`));
     }
+});
+
+test('standalone images preserve complete quoted multiline values in both render paths',function multilineImageBlocks(){
+    const images=[
+        '<img alt="First paragraph.\n\nSecond paragraph.\n\n" src="arcane-media:images/example.json">',
+        '<img src="https://example.test/dragon.png" alt="First line.\nSecond line.">',
+        '  <IMG data-caption="A > B &quot;quoted&quot; &amp; complete" alt=\'Dragon "Moss"\n\n# Keep **every** [word].\n\n\' src="arcane-media:images/dragon.json" />',
+    ];
+    const before='# Image pantry 🦄\n\n';
+    const after='\n\nThe **complete** ending.';
+    for(const image of images){
+        const raw=before+image+after;
+        const ordinary=new MD(raw);
+        const mapped=new MD(raw,{sourceMap:true});
+        assert.equal(ordinary.raw,raw);
+        assert.equal(mapped.raw,raw);
+        assert.equal(withoutSourceMarkers(mapped),ordinary.rendered);
+        assert.ok(ordinary.rendered.includes(image));
+        assert.ok(ordinary.rendered.includes('<strong>complete</strong>'));
+        assert.deepEqual(mapped.sourceMap.map(function blockType(block){
+            return block.type;
+        }),['heading','html','paragraph']);
+        const block=mapped.sourceMap[1];
+        assert.equal(block.start,before.length);
+        assert.equal(block.end,before.length+image.length);
+        assert.equal(raw.substring(block.start,block.end),image);
+    }
+});
+
+test('multiline image source ranges preserve original newline positions and adjacent images',function multilineImageOffsets(){
+    for(const newline of ['\n','\r\n','\r']){
+        const first=`<img alt="First paragraph.${newline}${newline}Second paragraph.${newline}${newline}" src="arcane-media:images/first.json">`;
+        const second=`<img src="arcane-media:images/second.json" alt="Moon dragon 🐉${newline}Complete second line.">`;
+        const before='# Before'+newline+newline;
+        const separator=newline+newline;
+        const raw=before+first+separator+second+separator+'# After';
+        const mapped=new MD(raw,{sourceMap:true});
+        const ordinary=new MD(raw);
+        assert.equal(mapped.raw,raw);
+        assert.equal(ordinary.raw,raw);
+        assert.equal(withoutSourceMarkers(mapped),ordinary.rendered);
+        assert.ok(ordinary.rendered.includes(first.replace(/\r\n?/g,'\n')));
+        assert.ok(ordinary.rendered.includes(second.replace(/\r\n?/g,'\n')));
+        assert.deepEqual(mapped.sourceMap.map(function blockRange(block){
+            return {start:block.start,end:block.end,type:block.type};
+        }),[
+            {start:0,end:'# Before'.length,type:'heading'},
+            {start:before.length,end:before.length+first.length,type:'html'},
+            {
+                start:before.length+first.length+separator.length,
+                end:before.length+first.length+separator.length+second.length,
+                type:'html'
+            },
+            {start:raw.indexOf('# After'),end:raw.length,type:'heading'}
+        ]);
+    }
+});
+
+test('multiline image support preserves native HTML and literal Markdown examples',function nativeImageParsingParity(){
+    const image='<img alt="First paragraph.\n\nSecond paragraph.\n\n" src="arcane-media:images/example.json">';
+    const examples=[
+        '```html\n'+image+'\n```',
+        image.split('\n').map(function indentExample(line){return '    '+line;}).join('\n'),
+        '`<img alt="First line.\nSecond line." src="arcane-media:images/example.json">`',
+        '\\'+image,
+        '<img alt="Unclosed quoted value.\n\nComplete trailing text.',
+    ];
+    for(const raw of examples){
+        const native=new Marked().parse(raw);
+        const ordinary=new MD(raw);
+        const mapped=new MD(raw,{sourceMap:true});
+        assert.equal(ordinary.raw,raw);
+        assert.equal(mapped.raw,raw);
+        assert.equal(ordinary.rendered,native);
+        assert.equal(withoutSourceMarkers(mapped),native);
+        assert.ok(!ordinary.rendered.includes('<img'));
+    }
+    const nativeHTML='<img alt="Ordinary image." src="arcane-media:images/ordinary.json">\n**This remains native HTML block text.**\n\nAfter.';
+    const expected=new Marked().parse(nativeHTML);
+    assert.equal(new MD(nativeHTML).rendered,expected);
+    assert.equal(withoutSourceMarkers(new MD(nativeHTML,{sourceMap:true})),expected);
 });
 
 test('source offsets follow original UTF-16 positions across LF, CRLF, and CR',function originalSourceOffsets(){

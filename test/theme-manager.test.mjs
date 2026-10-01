@@ -364,6 +364,28 @@ test('all named palettes share root and scoped swatch declarations for explicit 
     assert.match(theme, /prefers-reduced-motion/u);
 });
 
+test('direct printing uses the existing base light palette and page margins only in print media', async function lightPrintTheme() {
+    const theme = await readFile(new URL('css/theme.css', runtime), 'utf8');
+    const printStart = theme.indexOf('@media print {');
+    assert.ok(printStart > 0);
+    const screen = theme.substring(0, printStart);
+    const print = theme.substring(printStart);
+    const base = screen.substring(0, screen.indexOf(':root[data-user-skin="default"]'));
+    assert.doesNotMatch(screen, /@page/u);
+    assert.match(print, /@page\s*\{\s*margin: 15mm;/u);
+    assert.match(print, /:root,\s*body,\s*\[data-arcane-palette\]/u);
+    assert.match(print, /color-scheme: light !important/u);
+    for (const match of print.matchAll(/--([\w-]+): ([^;]+) !important;/gu)) {
+        const [, name, value] = match;
+        const sourceName = name === 'background' ? 'modal-background' : name;
+        assert.ok(base.includes(`--arcane-palette-light-${sourceName}:${value};`), name);
+    }
+    assert.match(print, /html,\s*body\s*\{\s*margin: 0;/u);
+    assert.doesNotMatch(print, /(?:^|\n)\s*(?:display|position|overflow|height|opacity|filter|background-image)\s*:/u);
+    assert.match(screen, /\[data-color-scheme="dark"\]/u);
+    assert.match(screen, /prefers-reduced-motion/u);
+});
+
 test('theme public extraction includes the classic owner and named module skin entry', async function themePublicContract() {
     const [presentationSource, managerSource] = await Promise.all([
         readFile(new URL('modules/ThemePresentation.js', runtime), 'utf8'),

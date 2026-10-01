@@ -1,4 +1,5 @@
 import Is from 'strong-type';
+import {arcaneLightThemeTokens} from '../entities/Theme.js';
 
 const is=new Is(false);
 const registries=new WeakMap();
@@ -400,17 +401,36 @@ function capture(registry,session){
     const heading=document.createElement('h1');
     heading.textContent=session.title;
     const rendered=copyRendered(session.content,state,true);
-    styles.textContent=state.rules.join('\n');
+    // Screen layout and fonts describe the rendered content; screen-theme paint
+    // does not describe a readable paper surface. Keep this palette in the
+    // snapshot, including its pseudo-elements, without recoloring SVG artwork.
+    styles.textContent=`
+        :host{color-scheme:light!important;color:${arcaneLightThemeTokens.text}!important;background:${arcaneLightThemeTokens.surface}!important;font:12pt/1.5 serif}
+        :host>h1{margin:0 0 .75em;font-size:1.5em;line-height:1.2}
+        [data-arcane-print-node]:not(svg,svg *,img,video,audio),
+        [data-arcane-print-node]:not(svg,svg *,img,video,audio)::before,
+        [data-arcane-print-node]:not(svg,svg *,img,video,audio)::after{
+            color:${arcaneLightThemeTokens.text}!important;background-color:transparent!important;
+            border-color:${arcaneLightThemeTokens.border}!important;color-scheme:light!important;
+            -webkit-text-fill-color:currentColor!important;-webkit-text-stroke:0!important;
+            text-decoration-color:currentColor!important;text-shadow:none!important;box-shadow:none!important
+        }
+        a[data-arcane-print-node]:not(svg *){text-decoration:underline!important}
+        table[data-arcane-print-node]:not(svg *){border-collapse:collapse!important}
+        th[data-arcane-print-node]:not(svg *),td[data-arcane-print-node]:not(svg *){border:1px solid ${arcaneLightThemeTokens.border}!important;padding:.35em .5em!important}
+        ${state.rules.join('\n')}
+    `;
     root.append(styles,heading,rendered);
     const sheet=document.createElement('style');
     session.sheet=sheet;
     sheet.textContent=`
         [data-arcane-print-stage]{display:none!important}
         @media print{
-            html:root,html:root>body{display:block!important;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;contain:none!important}
+            @page{margin:15mm}
+            html:root,html:root>body{display:block!important;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;contain:none!important;margin:0!important;padding:0!important;border:0!important;background:${arcaneLightThemeTokens.surface}!important;color:${arcaneLightThemeTokens.text}!important;color-scheme:light!important}
             html:root>body>*:not([data-arcane-print-stage]){display:none!important}
             html:root>body::before,html:root>body::after{display:none!important}
-            html:root>body>[data-arcane-print-stage]{display:block!important;position:static!important;width:auto!important;height:auto!important;overflow:visible!important}
+            html:root>body>[data-arcane-print-stage]{display:block!important;position:static!important;width:auto!important;height:auto!important;overflow:visible!important;margin:0!important;padding:0!important;border:0!important}
         }
     `;
     document.head.append(sheet);

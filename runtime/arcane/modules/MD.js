@@ -6,6 +6,20 @@ const markdownOptions = {
     async: false,
     pedantic: false,
     gfm: true,
+    tokenizer: {
+        html(src) {
+            const native = marked.Tokenizer.prototype.html.call(this, src);
+            if (native) return native;
+            // Quoted image values can contain blank lines that would otherwise
+            // split the tag into Markdown paragraphs before inline HTML parsing.
+            const image = /^ {0,3}<img(?:\s+[a-zA-Z:_][\w.:-]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*\s*\/?>(?=[ \t]*(?:\n|$))/i;
+            const match = image.exec(src);
+            if (!match) return;
+            const quotedValues = match[0].match(/"[^"]*"|'[^']*'/g) || [];
+            if (!quotedValues.some(function containsNewline(value) {return value.includes('\n');})) return;
+            return {type:'html', block:true, raw:match[0], text:match[0]};
+        }
+    },
     renderer: {
         link(href, title, text) {
             const link = marked.Renderer.prototype.link.call(this, href, title, text);

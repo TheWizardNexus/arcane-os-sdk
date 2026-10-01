@@ -327,3 +327,44 @@ body{
     scroll-behavior:auto !important;
     transition-duration:.01ms !important;
 }
+
+/* Paper uses the existing base light palette regardless of the screen skin.
+ * Print-only importance also overrides custom-theme inline tokens; no saved
+ * preference, screen layout, media paint, or scrolling state changes here.
+ */
+@media print {
+    @page {
+        margin: 15mm;
+    }
+
+    :root,
+    body,
+    [data-arcane-palette] {
+        color-scheme: light !important;
+        --background: rgb(255, 255, 255) !important;
+        --modal-background: rgb(255, 255, 255) !important;
+        --text-color: rgb(23, 34, 56) !important;
+        --primary-color: rgb(23, 34, 56) !important;
+        --secondary-color: rgb(229, 233, 243) !important;
+        --accent-color: var(--focus-color) !important;
+        --button-text-color: rgb(255, 255, 255) !important;
+        --border-color: rgb(203, 211, 226) !important;
+        --focus-color: rgb(118, 87, 213) !important;
+        --muted-text-color: rgb(95, 107, 130) !important;
+        --success-color: rgb(39, 122, 75) !important;
+        --warning-color: rgb(154, 101, 0) !important;
+        --danger-color: rgb(165, 56, 56) !important;
+        --review-color: rgb(133, 85, 165) !important;
+        --shadow-color: rgba(23, 34, 56, .16) !important;
+        --platinum: rgb(102, 112, 133) !important;
+        --icon-filter: none !important;
+        --file-icon-filter: hue-rotate(8deg) saturate(.62) brightness(.86) !important;
+    }
+
+    html,
+    body {
+        margin: 0;
+        background-color: var(--modal-background);
+        color: var(--text-color);
+    }
+}

@@ -59,6 +59,37 @@ export async function saveMarkdownMedia({
     };
 }
 
+/**
+ * Decode a complete local media record or its JSON text without storage or
+ * network access. Unrecognized content returns null; recognized records with
+ * unreadable encoding throw. Records carry dataUrl and an optional mediaType;
+ * omitting mediaType preserves Blob's empty type. No source content is changed.
+ */
+export function decodeMarkdownMediaRecord(value) {
+    let record = value;
+    if (is.string(record)) {
+        try {
+            record = JSON.parse(record);
+        } catch {
+            return null;
+        }
+    }
+    // DBOPFS parses JSONL/NDJSON as record arrays; restoring a parsed backup can
+    // wrap its one record again. Never choose one image from multiple records.
+    while (is.array(record) && record.length === 1) record = record[0];
+    if (!record || !is.object(record) || is.array(record) || !('dataUrl' in record)) return null;
+    const encoded = /^data:[^,]*;base64,([\s\S]*)$/u.exec(record.dataUrl);
+    if (!encoded) {
+        throw new TypeError('Markdown image has an unreadable data URL.');
+    }
+    // Decode locally; a stored string is never passed to Fetch or a network API.
+    const decoded = atob(encoded[1]);
+    const content = Uint8Array.from(decoded, function imageCharacter(character) {
+        return character.charCodeAt(0);
+    });
+    return new Blob([content], {type: record.mediaType});
+}
+
 /** Read the complete local image for display or application-owned export. */
 export async function readMarkdownMedia(reference) {
     const address = parseMarkdownMediaReference(reference);
@@ -70,20 +101,17 @@ export async function readMarkdownMedia(reference) {
     if (stored === null || stored === undefined) {
         throw new DOMException(`Markdown image was not found: ${reference}`, 'NotFoundError');
     }
-    // DBOPFS parses JSONL/NDJSON as record arrays; restoring a parsed backup can
-    // wrap its one record again. Never choose one image from multiple records.
-    let record = is.string(stored) ? JSON.parse(stored) : stored;
-    while (is.array(record) && record.length === 1) record = record[0];
-    const encoded = /^data:[^,]*;base64,([\s\S]*)$/u.exec(record?.dataUrl);
-    if (!encoded) {
-        throw new TypeError(`Markdown image has an unreadable data URL: ${reference}`);
+    // Preserve the strict stored-JSON parser boundary for explicit reads.
+    const record = is.string(stored) ? JSON.parse(stored) : stored;
+    const unreadable = `Markdown image has an unreadable data URL: ${reference}`;
+    try {
+        const blob = decodeMarkdownMediaRecord(record);
+        if (blob) return blob;
+    } catch (error) {
+        if (!(error instanceof TypeError)) throw error;
+        throw new TypeError(unreadable, {cause: error});
     }
-    // Decode locally; a stored string is never passed to Fetch or a network API.
-    const decoded = atob(encoded[1]);
-    const content = Uint8Array.from(decoded, function imageCharacter(character) {
-        return character.charCodeAt(0);
-    });
-    return new Blob([content], {type: record.mediaType});
+    throw new TypeError(unreadable);
 }
 
 /**

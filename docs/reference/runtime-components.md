@@ -54,6 +54,16 @@ imported component's `destroy()` through `HTMLImport`; callers that invoke
 `destroy()` directly retain responsibility for removing the element when
 appropriate.
 
+## Shared print presentation
+
+Applications loading the shared `theme.css` receive a print-only base light
+palette with a white paper surface and `15mm` page margins. Root, body, and
+scoped `data-arcane-palette` tokens override screen/custom colors during print;
+root/body margins are reset. Saved preferences, screen presentation, scrolling,
+media, and other layout rules remain unchanged. Registered rendered-print
+views use the separate [`PrintView.js`](runtime-modules.md#printviewjs) snapshot
+owner described with the editor and file preview below.
+
 ## Canonical inventory
 
 | Component | Capability | Principal methods | Events | Normalization |
@@ -919,7 +929,16 @@ extension. Routing compares the lowercase MIME essence without its parameters;
 the callback's `mimeType` and the file content remain unchanged.
 HTML uses its complete original string in `srcdoc` without an
 added sandbox policy; Markdown reads the complete original text before
-rendering. Untransformed JSONL/NDJSON shows its complete original text,
+rendering. With no descriptor or `previewTransform`, JSON, JSONL, and NDJSON
+files are read in full and recognized through
+[`decodeMarkdownMediaRecord()`](runtime-modules.md#markdownmediajs). A complete
+stored image record, including nested single-record arrays, opens as an image
+when its decoded Blob has an `image/` media type. Untyped/non-image records,
+multiple records, and unrecognized content keep their ordinary JSON-family
+presentation; malformed recognized image encoding follows the existing
+file-open failure path.
+This recognition leaves saved content unchanged and performs no migration.
+Untransformed JSONL/NDJSON shows its complete original text,
 including lines that are not JSON records. Other binary files offer a download
 of the original `File`.
 The larger file-preview dialog reuses `--modal-width`, `--modal-max-height`,
@@ -931,6 +950,8 @@ preview ahead of the editor. Printing uses the shared
 [`PrintView.js`](runtime-modules.md#printviewjs) owner; accessible HTML frames
 are copied from their current rendered document, never substituted with source
 text. Explicit printing waits for images/fonts and HTML frame readiness.
+The shared print surface uses a light paper palette and `15mm` page margins
+while preserving image/SVG colors and leaving the screen theme unchanged.
 Native PDF and inaccessible embedded viewers require their own print command.
 `true` means the browser print dialog was requested, not that paper or a PDF
 was produced. Closed, destroyed, or unavailable previews return `false`;
@@ -945,6 +966,9 @@ pending media because it cannot await them. Closing or replacing a preview
 cancels display readiness without waiting for storage; URLs already retained
 by a requested print remain until `afterprint`. Original Markdown and ordinary
 external image URLs remain unchanged.
+Standalone IMG blocks with multiline quoted descriptions use the shared
+[`MD.js`](runtime-modules.md#mdjs) tokenizer in both ordinary and source-mapped
+rendering; the complete description and stored Markdown remain intact.
 
 `await close()` cancels pending presentation work and closes delete, file, and
 directory dialogs in that order. A settled preview keeps its rendered content,
@@ -957,7 +981,7 @@ writes complete through the storage owner without reopening closed dialogs.
 
 Events: `file-manager-ready`, `file-manager-select`, `file-manager-open`, `file-manager-action`.
 
-Shared dependencies: [`DBOPFS.js`](runtime-modules.md#dbopfsjs), [`File.js`](runtime-entities.md#filejs), [`MD.js`](runtime-modules.md#mdjs), [`WaitForComponent.js`](runtime-modules.md#waitforcomponentjs).
+Shared dependencies: [`DBOPFS.js`](runtime-modules.md#dbopfsjs), [`File.js`](runtime-entities.md#filejs), [`MD.js`](runtime-modules.md#mdjs), [`MarkdownMedia.js`](runtime-modules.md#markdownmediajs), [`PrintView.js`](runtime-modules.md#printviewjs), [`WaitForComponent.js`](runtime-modules.md#waitforcomponentjs).
 
 ### Availability and normalization
 
@@ -1082,6 +1106,9 @@ diagnostics remain in the developer console; successful images and document
 text remain visible. Replacing, clearing, failing, or destroying the document
 releases its display resources without deleting stored media. Markdown source
 and ordinary external image URLs remain unchanged.
+Complete standalone IMG blocks with quoted multiline descriptions render
+through the shared [`MD.js`](runtime-modules.md#mdjs) tokenizer without
+rewriting saved Markdown.
 
 Shared dependencies: [`MD.js`](runtime-modules.md#mdjs), [`MarkdownMedia.js`](runtime-modules.md#markdownmediajs).
 
@@ -1125,8 +1152,10 @@ The visible **Print** control and `await print()` print the complete rendered
 Markdown with `entryTitle`, independently of saving. Native browser Print uses
 that same registered view unless an open file preview takes precedence.
 The SDK copies current rendered DOM/styles into a temporary print-only view,
-leaving the editor's source, controls, and screen layout in place. Explicit
-printing waits for resource readiness; native `beforeprint` is synchronous
+leaving the editor's source, controls, and screen layout in place. Both explicit
+and native print use the shared light paper palette and `15mm` page margins;
+image pixels and SVG artwork keep their colors. Explicit printing waits for
+resource readiness; native `beforeprint` is synchronous
 and uses the currently rendered content. `print()` returns `false` when the
 view is unavailable, rejects preparation failures, and returns `true` only
 when the browser dialog was requested. Completion of physical printing or PDF
@@ -1142,6 +1171,9 @@ waits for the current image reads/decoding, follows a replacement preview, and
 rechecks readiness before capture. Native Print reports still-pending media
 synchronously; it cannot wait or cancel the native dialog. Print-owned URLs
 outlive a changed or destroyed editor until `afterprint`.
+The shared [`MD.js`](runtime-modules.md#mdjs) tokenizer preserves complete
+standalone IMG blocks with quoted multiline descriptions in ordinary and
+source-mapped rendering. Existing saved markup needs no rewriting.
 
 `configure({fit:true,followPreview:true})` opts into the two independent
 behaviors. Both options default to `false`; omitted options retain their
