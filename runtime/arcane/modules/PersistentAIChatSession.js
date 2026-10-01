@@ -632,7 +632,7 @@ class PersistentAIChatSession{
                     if(persistence===undefined||submittedIds.has(message.tool_call_id)){
                         throw coded(new TypeError('A tool message has no unique pending structural tool call.'),'AI_CHAT_INVALID_TOOL_MESSAGE');
                     }
-                    if(persistence!==settings.messagePersist){
+                    if(retainTurn&&persistence!==settings.messagePersist){
                         throw coded(
                             new TypeError('A tool result must use the persistence of its assistant tool call.'),
                             'AI_CHAT_INCOHERENT_PERSISTENCE',

@@ -3255,14 +3255,22 @@
             );
         }
 
-        const sessionRequestMessages=is.array(sessionRequest)
+        const submittedMessages=is.array(sessionRequest)
             ?sessionRequest
             :[sessionRequest];
-        if(!sessionRequestMessages.length){
+        if(!submittedMessages.length){
             throw new TypeError('A chat session request must contain at least one message.');
         }
-        let retainTurn=sessionRequestMessages.every(message=>message.persist!==false)
-            &&session.chatEntity?.persist!==false;
+        function entityRetainsMessages(){
+            return !session.chatEntity||Boolean(session.chatEntity.persist);
+        }
+        let retainTurn=submittedMessages.every(message=>message.persist!==false)
+            &&entityRetainsMessages();
+        // Preserve this submission's choice across the rendering await before
+        // dispatch; a later entity setting belongs to a later submission.
+        const sessionRequestMessages=retainTurn
+            ?submittedMessages
+            :submittedMessages.map(message=>({...message,persist:false}));
         const request={
             ...(sessionRequestMessages.length===1
                 ?{message:sessionRequestMessages[0]}
@@ -3284,7 +3292,7 @@
             // The session reports the decision made at its actual commit boundary.
             retainTurn=retainTurn&&(is.boolean(result?.retained)
                 ?result.retained
-                :session.chatEntity?.persist!==false);
+                :entityRetainsMessages());
             retentionSettled=true;
         }
         function removeTransientSessionCards(){

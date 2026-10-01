@@ -442,6 +442,11 @@ The session's terminal `retained` boolean reports its actual commit decision;
 Chat uses that decision instead of retroactively interpreting a flag changed
 for a later request. A completion listener cannot erase an earlier settled
 turn by changing the next operation's retention setting.
+Chat carries a submission's no-retention choice into its copied session request
+before any rendering wait, so re-enabling the entity before dispatch cannot
+retain that temporary input. Existing falsy entity settings retain their
+no-retention meaning; a compatible custom session without a Chat entity keeps
+its existing default behavior.
 Persistent-turn recovery and existing saved history remain unchanged.
 
 For streaming sessions, every provisional structural card and the terminal

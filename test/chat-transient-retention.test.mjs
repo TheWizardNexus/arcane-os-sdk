@@ -338,7 +338,7 @@ test('entity-wide no-retention also removes ordinary default-submission cards', 
         const session = {
             chatEntity: {persist: false},
             async send(request) {
-                assert.equal(Object.hasOwn(request.message, 'persist'), false);
+                assert.equal(request.message.persist, false);
                 if(mode === 'reenabled') session.chatEntity.persist = true;
                 if(['provider', 'structural', 'abort'].includes(mode)) throw failure;
                 return {...response(), retained: false};
@@ -353,6 +353,48 @@ test('entity-wide no-retention also removes ordinary default-submission cards', 
         assert.deepEqual(fixture.ui.chatOutput.children, [fixture.retained], mode);
         assert.equal(fixture.textArea.value, 'A newer unsent draft.', mode);
         assert.deepEqual(fixture.pendingCalls(), [], mode);
+    }
+});
+
+test('submission no-retention survives an entity change before session dispatch', async function acceptedTransientSubmission() {
+    for(const mode of ['send', 'stream']) {
+        const session = {
+            chatEntity: {persist: false},
+            async [mode](request) {
+                assert.equal(session.chatEntity.persist, true);
+                assert.equal(request.message.persist, false);
+                assert.equal(request.message.content, 'Complete temporary input.');
+                return {...response(), retained: request.message.persist !== false};
+            }
+        };
+        const fixture = createFixture(session);
+        const original = {role: 'user', content: 'Complete temporary input.'};
+        const card = fixture.appendCard('user', original.content);
+        const pending = fixture.send(original.content, {}, original, null, [card]);
+        session.chatEntity.persist = true;
+        const result = await pending;
+        assert.equal(result.retained, false);
+        assert.equal(Object.hasOwn(original, 'persist'), false);
+        assert.deepEqual(fixture.ui.chatOutput.children, [fixture.retained]);
+        assert.deepEqual(fixture.pendingCalls(), []);
+    }
+});
+
+test('every accepted falsy entity setting excludes rejected partial cards', async function falsyEntityRetention() {
+    for(const persist of [false, null, undefined, 0, '']) {
+        const failure = new Error('The temporary request failed.');
+        const session = {
+            chatEntity: {persist},
+            async stream(request, handlers) {
+                assert.equal(request.message.persist, false);
+                await handlers.onChunk('Complete partial response.', 'request', false);
+                throw failure;
+            }
+        };
+        const fixture = createFixture(session);
+        await assert.rejects(submit(fixture, true), function originalError(error) {return error === failure;});
+        assert.deepEqual(fixture.ui.chatOutput.children, [fixture.retained]);
+        assert.equal(fixture.textArea.value, 'A newer unsent draft.');
     }
 });
 

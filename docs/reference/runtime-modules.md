@@ -3157,6 +3157,9 @@ the retained transcript, memory extraction, or DBOPFS. A nonpersistent response
 therefore does not open a retained structural-tool continuation. A retained
 structural tool result must use the persistence choice captured by its matching
 assistant tool call.
+An explicitly nonretained tool-result continuation uses its matching pending
+call only for that operation, then rolls back without settling or changing the
+retained call. A later retained continuation can still settle it normally.
 
 The entity-wide `session.chatEntity.persist=false` applies the same no-retention
 rule to new turns and direct entity additions; it is not a disk-only switch.

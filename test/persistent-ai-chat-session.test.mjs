@@ -1374,24 +1374,34 @@ test('persistent chat rolls back recurring context on durable failure and retain
         ()=>session.chatEntity.addUserMessage('skip the pending tool'),
         /pending structural tool result/u,
     );
+    const pendingHistory=await session.history();
+    const pendingTranscript=await session.transcript();
+    const pendingStored=db.raw('chats',session.fileName);
+    const temporary=await session.send({
+        message:{
+            content:'{"title":"Alpha"}',
+            persist:false,
+            role:'tool',
+            tool_call_id:'lookup-1',
+        },
+        response:{persist:false},
+    });
+    assert.equal(temporary.retained,false);
+    assert.equal(temporary.message.content,'reply-2');
+    assert.deepEqual(await session.history(),pendingHistory);
+    assert.deepEqual(await session.transcript(),pendingTranscript);
+    assert.equal(db.raw('chats',session.fileName),pendingStored);
     await assert.rejects(
-        session.send({
-            message:{
-                content:'{"title":"Alpha"}',
-                persist:false,
-                role:'tool',
-                tool_call_id:'lookup-1',
-            },
-            response:{persist:false},
-        }),
-        error=>error?.code==='AI_CHAT_INCOHERENT_PERSISTENCE',
+        session.send({message:{content:'The original tool call remains pending.'}}),
+        error=>error?.code==='AI_CHAT_TOOL_RESULT_REQUIRED',
     );
-    await session.send({message:{
+    const settled=await session.send({message:{
         content:'{"title":"Alpha"}',
         role:'tool',
         tool_call_id:'lookup-1',
     }});
-    assert.deepEqual(requests[1].messages.at(-2).tool_calls[0],{
+    assert.equal(settled.retained,true);
+    assert.deepEqual(requests[2].messages.at(-2).tool_calls[0],{
         id:'lookup-1',
         type:'function',
         function:{
@@ -1399,7 +1409,7 @@ test('persistent chat rolls back recurring context on durable failure and retain
             arguments:'{"id":"alpha","message":"Looking up Alpha."}'
         },
     });
-    assert.equal(requests[1].messages.at(-1).role,'tool');
+    assert.equal(requests[2].messages.at(-1).role,'tool');
 
     await assert.rejects(
         session.send({
