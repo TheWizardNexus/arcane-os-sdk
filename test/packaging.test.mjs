@@ -71,14 +71,14 @@ test('selected static package carries one release through entry, modules, Worker
         +'<style>p{background:url(original.svg)}</style><p>Complete supplied HTML</p>';
     await writeFile(path.join(selected.appRoot,'content','document.html'),corpus);
     await writeFile(path.join(selected.appRoot,'index.html'),
-        '<!doctype html><base href="../../"><script type="module" src="./arcane/modules/entry.js?v=6"></script>'
+        '<!doctype html><base href="../../"><script type="module" src="./arcane/modules/entry.js?v=6&arcaneVersion=old"></script>'
         +'<link rel="stylesheet" href="./arcane/modules/theme.css?theme=day#palette">'
         +'<p>./arcane/modules/entry.js?v=6</p>');
     await writeFile(path.join(sourceRoot,'entry.js'),
-        "import './child.js?v=2';\nnew Worker(new URL('./worker.js',import.meta.url),{type:'module'});\n");
+        "import './child.js?v=2&arcaneVersion=old';\nnew Worker(new URL('./worker.js?arcaneVersion=old',import.meta.url),{type:'module'});\n");
     await writeFile(path.join(sourceRoot,'child.js'),'export const content="keep all text";\n');
-    await writeFile(path.join(sourceRoot,'worker.js'),"import './child.js?v=2';\n");
-    await writeFile(path.join(sourceRoot,'theme.css'),'body{background:url(./icon.svg?color=blue#mark)}\n');
+    await writeFile(path.join(sourceRoot,'worker.js'),"import './child.js?v=2&arcaneVersion=old';\n");
+    await writeFile(path.join(sourceRoot,'theme.css'),'body{background:url(./icon.svg?color=blue&arcaneVersion=old#mark)}\n');
     await writeFile(path.join(sourceRoot,'icon.svg'),'<svg xmlns="http://www.w3.org/2000/svg"/>');
     await writeFile(path.join(selected.appRoot,'content','App.js'),"new Worker('./apps/complete-app/content/root-worker.js',{type:'module'});\n");
     await writeFile(path.join(selected.appRoot,'content','root-worker.js'),"import './worker-child.js';\n");
@@ -88,19 +88,22 @@ test('selected static package carries one release through entry, modules, Worker
         +'<script type="module" src="./apps/complete-app/content/App.js"></script>');
     const packaged=await packageApp({workspaceRoot:selected.workspaceRoot,appId:'complete-app'});
     const entry=await readFile(path.join(packaged.outputRoot,'apps/complete-app/index.html'),'utf8');
-    assert.ok(entry.includes(`entry.js?v=6&amp;arcaneVersion=${version}`),entry);
-    assert.ok(entry.includes(`theme.css?theme=day&amp;arcaneVersion=${version}#palette`));
+    assert.ok(entry.includes('entry.js?v=6'),entry);
+    assert.equal(entry.includes('arcaneVersion='),false);
+    assert.ok(entry.includes('theme.css?theme=day#palette'));
     assert.ok(entry.includes('<p>./arcane/modules/entry.js?v=6</p>'));
     const module=await readFile(path.join(packaged.outputRoot,'arcane/modules/entry.js'),'utf8');
-    assert.ok(module.includes(`child.js?v=2&arcaneVersion=${version}`),module);
-    assert.ok(module.includes(`worker.js?arcaneVersion=${version}`));
+    assert.ok(module.includes('child.js?v=2'),module);
+    assert.ok(module.includes('worker.js'));
+    assert.equal(module.includes('arcaneVersion='),false);
     const worker=await readFile(path.join(packaged.outputRoot,'arcane/modules/worker.js'),'utf8');
-    assert.ok(worker.includes(`child.js?v=2&arcaneVersion=${version}`),worker);
+    assert.ok(worker.includes('child.js?v=2'),worker);
+    assert.equal(worker.includes('arcaneVersion='),false);
     const style=await readFile(path.join(packaged.outputRoot,'arcane/modules/theme.css'),'utf8');
-    assert.ok(style.includes(`icon.svg?color=blue&arcaneVersion=${version}#mark`));
+    assert.ok(style.includes('icon.svg?color=blue#mark'));
     assert.equal(await readFile(path.join(packaged.outputRoot,'apps/complete-app/content/document.html'),'utf8'),corpus);
     assert.ok((await readFile(path.join(packaged.outputRoot,'apps/complete-app/content/root-worker.js'),'utf8'))
-        .includes(`worker-child.js?arcaneVersion=${version}`));
+        .includes('worker-child.js'));
     assert.equal(await readFile(path.join(packaged.outputRoot,'apps/complete-app/content/document.txt'),'utf8'),selected.document);
 });
 

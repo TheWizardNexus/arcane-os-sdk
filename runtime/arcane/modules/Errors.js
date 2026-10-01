@@ -11,7 +11,7 @@ import {
 const DEFAULT_DELAY_MS=2_000;
 const LEDGER_STORAGE_KEY='arcane-global-errors-v1';
 const HANDLER_MARKER=Symbol.for('arcane.global-errors.handler');
-const DEVELOPER_MODAL_HREF=new URL('../components/modal.html?v=13',import.meta.url).href;
+const DEVELOPER_MODAL_HREF=new URL('../components/modal.html',import.meta.url).href;
 const ERROR_EVENT_TYPES={
     browserErrorCaptured:'arcane-error-captured',
     unhandledRejectionCaptured:'arcane-unhandled-rejection-captured'

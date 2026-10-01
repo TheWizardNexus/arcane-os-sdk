@@ -1,7 +1,7 @@
 import Is from 'strong-type';
 const is=new Is(false);
 
-import * as ArcaneNetworkPolicy from './ArcaneNetworkPolicy.js?v=3';
+import * as ArcaneNetworkPolicy from './ArcaneNetworkPolicy.js';
 
 function completeText(value,fallback){
     return is.string(value)&&value.length>0?value:fallback;

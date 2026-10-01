@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="./arcane/css/layout.css?v=3">
+<link rel="stylesheet" href="./arcane/css/layout.css">
 <style>
     :host{
         display:block;
@@ -10,7 +10,7 @@
 </style>
 
 <button id="openMaintenance" type="button" aria-haspopup="dialog">Maintenance</button>
-<html-import id="maintenanceModal" class="modal" href="./arcane/components/modal.html?v=13"></html-import>
+<html-import id="maintenanceModal" class="modal" href="./arcane/components/modal.html"></html-import>
 
 <script type="module">
     const {arcaneLogging}=await import('arcane-os/logging');
@@ -19,7 +19,7 @@
     const openButton=host.shadowRoot.querySelector('#openMaintenance');
     const maintenanceModal=host.shadowRoot.querySelector('#maintenanceModal');
     const {default:waitForComponent}=await import('../modules/WaitForComponent.js');
-    const {clearEmptyChatsAndMemories}=await import('../modules/DataMaintenance.js?v=3');
+    const {clearEmptyChatsAndMemories}=await import('../modules/DataMaintenance.js');
     const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
     const events=createArcaneEventSource(host,{source:'arcane.component.data-maintenance',eventTypes:['data-maintenance-complete','data-maintenance-ready']});
     const lifecycleController=new AbortController();

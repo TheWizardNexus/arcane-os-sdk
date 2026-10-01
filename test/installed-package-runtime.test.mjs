@@ -97,18 +97,18 @@ for(const dependencyName of ['arcane-os','arcane-sdk']){
 
             const mapped=await generateImportMap({workspaceRoot,appId});
             const expected={
-                'arcane/ThemeBootstrap':`./arcane/modules/ThemeBootstrap.js?arcaneVersion=${version}`,
-                'arcane-os/event-manager':`./arcane/sdk/event-manager.mjs?arcaneVersion=${version}`,
-                'strong-type':`./arcane/dependencies/strong-type/index.js?arcaneVersion=${version}`
+                'arcane/ThemeBootstrap':'./arcane/modules/ThemeBootstrap.js',
+                'arcane-os/event-manager':'./arcane/sdk/event-manager.mjs',
+                'strong-type':'./arcane/dependencies/strong-type/index.js'
             };
             for(const [specifier,target] of Object.entries(expected)){
                 assert.equal(mapped.imports[specifier],target);
             }
             const testMap=await readApplicationTestImportMapContext({workspaceRoot,applicationRoot:appRoot});
             assert.equal(testMap.imports['arcane/ThemeBootstrap'],
-                `./${fixture.packageSource}/runtime/arcane/modules/ThemeBootstrap.js?arcaneVersion=${version}`);
+                `./${fixture.packageSource}/runtime/arcane/modules/ThemeBootstrap.js`);
             assert.equal(testMap.imports['arcane-os/event-manager'],
-                `./${fixture.packageSource}/browser-runtime/event-manager.mjs?arcaneVersion=${version}`);
+                `./${fixture.packageSource}/browser-runtime/event-manager.mjs`);
             await writeJson(workspaceRoot,'arcane.lock.json',{sdk:{version:'0.0.1'}});
             assert.equal(await readWorkspaceAssetVersion(workspaceRoot),version);
             const remapped=await generateImportMap({workspaceRoot,appId});

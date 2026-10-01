@@ -271,7 +271,7 @@ test(
         assert.equal(imported.shadowRoot.content.html, html);
         assert.equal(requests.length, 1);
         assert.equal(requests[0].url, new URL(
-            './component.html?mode=a%20b&arcaneVersion=0.7.3#part',
+            './component.html?v=6&mode=a%20b#part',
             document.baseURI
         ).href);
         assert.equal(requests[0].options.method, 'GET');
@@ -301,7 +301,7 @@ test(
         imported.isConnected = true;
         await imported.connectedCallback();
         assert.equal(requests.at(-1).url, new URL(
-            './component.html?mode=a%20b#part',
+            './component.html?v=6&mode=a%20b#part',
             document.baseURI
         ).href);
         assert.equal(imported.ready, true);
@@ -313,9 +313,25 @@ test(
         imported.isConnected = true;
         await imported.connectedCallback();
         assert.equal(requests.at(-1).url, new URL(
-            './component.html?mode=a%20b&arcaneVersion=0.7.3#part',
+            './component.html?v=6&mode=a%20b#part',
             document.baseURI
         ).href);
+        for (const [href, expected] of [
+            ['./component.html?arcaneVersion=old#part', './component.html#part'],
+            ['./component.html?%61rcaneVersion=old&v=4&mode=a+b&&flag=#part',
+                './component.html?v=4&mode=a+b&&flag=#part'],
+            ['./component.html?arcaneVersion=old&', './component.html?'],
+            ['https://example.test/component.html?arcaneVersion=remote&v=4',
+                'https://example.test/component.html?arcaneVersion=remote&v=4']
+        ]) {
+            imported.isConnected = false;
+            await imported.disconnectedCallback();
+            imported.setAttribute('href', href);
+            imported.isConnected = true;
+            await imported.connectedCallback();
+            assert.equal(requests.at(-1).url, new URL(expected, document.baseURI).href);
+            assert.equal(imported.ready, true);
+        }
         assert.deepEqual(errorEvents, []);
     }
 );

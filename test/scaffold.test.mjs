@@ -120,6 +120,7 @@ test('explicit multi-app scaffold creates a private external app using the exact
     assert.ok(theme>=0&&primitives>theme&&appStyle>primitives);
     assert.ok(managedImportMap>0&&managedImportMap<appModule);
     assert.ok(appModule>appStyle);
+    assert.doesNotMatch(html,/[?&](?:amp;)?(?:v|arcaneVersion)=/u);
     assert.doesNotMatch(html,/<script\b[^>]*\bsrc=["'][^"']*ThemeBootstrap[.]js[?]/u);
     const appSource=await readFile(path.join(appRoot,'modules','App.js'),'utf8');
     assert.match(appSource,/from 'arcane\/ThemeBootstrap'/u);
@@ -131,7 +132,7 @@ test('explicit multi-app scaffold creates a private external app using the exact
     assert.deepEqual(Object.keys(importMap),['imports']);
     assert.equal(
         importMap.imports['./node_modules/strong-type/index.js'],
-        `./arcane/dependencies/strong-type/index.js?arcaneVersion=${SDK_VERSION}`
+        './arcane/dependencies/strong-type/index.js'
     );
     assert.equal(
         await readFile(path.join(targetPath,'arcane','dependencies','strong-type','index.js'),'utf8'),

@@ -2444,9 +2444,10 @@ module URLs reuse and export the registered constructor, including overlapping
 application startup and developer error-dialog imports. Existing component
 instances, loading, readiness events, and teardown keep that same constructor.
 
-Local component resources use the loader's `arcaneVersion` as their sole version
-field. Existing `v` fields are removed; unrelated query fields and fragments
-remain intact.
+Local component resources use stable URLs. The loader removes retired SDK-owned
+`arcaneVersion` fields and adds no cache suffix. Functional query fields,
+including caller-owned `v` fields, and fragments remain intact. External resource
+URLs retain their complete query. Ordinary HTTP conditional caching is unchanged.
 
 Exact exports: `default`.
 

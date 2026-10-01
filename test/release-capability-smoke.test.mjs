@@ -441,13 +441,13 @@ test('installed npm sources own maps, development serving and portable output',{
     console.log('[installed-package] Nested application import-map.');
     await toolchain.importMap();
     const mapPath=path.join(appRoot,'modules','arcane.importmap.json');
-    const versionedMap=JSON.parse(await readFile(mapPath,'utf8'));
-    assert.equal(versionedMap.imports['arcane/ThemeBootstrap'],
-        './arcane/modules/ThemeBootstrap.js?arcaneVersion='+version);
-    assert.equal(versionedMap.imports['arcane-os/model-definition'],
-        './arcane/modules/ModelDefinition.js?arcaneVersion='+version);
-    assert.equal(versionedMap.imports['arcane-os/mail'],
-        './arcane/modules/MailApi.mjs?arcaneVersion='+version);
+    const generatedMap=JSON.parse(await readFile(mapPath,'utf8'));
+    assert.equal(generatedMap.imports['arcane/ThemeBootstrap'],
+        './arcane/modules/ThemeBootstrap.js');
+    assert.equal(generatedMap.imports['arcane-os/model-definition'],
+        './arcane/modules/ModelDefinition.js');
+    assert.equal(generatedMap.imports['arcane-os/mail'],
+        './arcane/modules/MailApi.mjs');
     assert.deepEqual(JSON.parse(await readFile(lockPath,'utf8')),{sdk:{version:'0.0.1'}});
     await rm(lockPath);
     assert.equal(await readFile(path.join(appRoot,'components','status.html'),'utf8'),${JSON.stringify(fragmentSource)});

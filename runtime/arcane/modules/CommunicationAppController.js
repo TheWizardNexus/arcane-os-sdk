@@ -3,13 +3,13 @@ const is=new Is(false);
 
 import { arcaneLogging } from 'arcane-os/logging';
 import ArcaneCommunicationBridge from './ArcaneCommunicationBridge.js';
-import CommunicationHub from './CommunicationHub.js?v=2';
+import CommunicationHub from './CommunicationHub.js';
 import CommunicationPreferences from './CommunicationPreferences.js';
 import {loadAndApplyTheme} from './ThemeManager.js';
 import {
     inspectMessageRecords,
     unavailableMessageInspection
-} from './MessageAdvisory.js?v=3';
+} from './MessageAdvisory.js';
 
 export const COMMUNICATION_APP_CONTROLLER_ERROR_CODES={
     destroyed:'ARCANE_COMMUNICATION_APP_CONTROLLER_DESTROYED'

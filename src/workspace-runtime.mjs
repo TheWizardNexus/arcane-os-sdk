@@ -52,14 +52,14 @@ async function realDirectory(location,label){
     return canonical;
 }
 
-async function copyCompleteEntry(source,destination,label,signal,version){
+async function copyCompleteEntry(source,destination,label,signal){
     throwIfAborted(signal);
     const info=await lstat(source);
     if(info.isSymbolicLink())fail(`${label} must not contain a symbolic link or junction.`);
     if(info.isFile()){
         if(/\.(?:m?js|html?|css)$/iu.test(source)){
             const original=await readFile(source,'utf8');
-            const content=rewriteAssetReferences(original,{filePath:source,version});
+            const content=rewriteAssetReferences(original,{filePath:source,version:null});
             await writeFile(destination,content,'utf8');
         }else{
             await copyFile(source,destination);
@@ -76,8 +76,7 @@ async function copyCompleteEntry(source,destination,label,signal,version){
             path.join(source,entry.name),
             path.join(destination,entry.name),
             `${label}/${entry.name}`,
-            signal,
-            version
+            signal
         );
     }
 }
@@ -113,14 +112,13 @@ export async function materializeWorkspaceRuntimeContent({
 
     await mkdir(stagingRoot);
     try{
-        await copyCompleteEntry(runtimeArcane,stagingRoot,'SDK Arcane runtime',signal,sdkVersion);
+        await copyCompleteEntry(runtimeArcane,stagingRoot,'SDK Arcane runtime',signal);
         await mkdir(path.join(stagingRoot,'dependencies'),{recursive:true});
         await copyCompleteEntry(
             runtimeStrongType,
             path.join(stagingRoot,'dependencies','strong-type'),
             'SDK strong-type runtime',
-            signal,
-            sdkVersion
+            signal
         );
         const sdkDestination=path.join(stagingRoot,'sdk');
         await mkdir(sdkDestination,{recursive:true});
@@ -132,8 +130,7 @@ export async function materializeWorkspaceRuntimeContent({
                 path.join(browserRuntime,entry.name),
                 path.join(sdkDestination,entry.name),
                 `SDK browser runtime/${entry.name}`,
-                signal,
-                sdkVersion
+                signal
             );
         }
 

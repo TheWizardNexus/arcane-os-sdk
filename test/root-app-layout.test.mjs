@@ -93,16 +93,15 @@ for(const dependencyName of ['arcane-os','arcane-sdk']){
         await writeJson(workspaceRoot,'arcane-package.json',{
             ...fixture.manifest,pwa:{...fixture.manifest.pwa,enabled:false}
         });
-        const versioned=await toolchain.importMap({});
-        const versionedTheme=`${themeUrl}?arcaneVersion=${fixture.sdkVersion}`;
-        for(const specifier of ['arcane-os/modules/ThemeBootstrap.js',themeUrl,versionedTheme]){
-            assert.equal(versioned.importMap.imports[specifier],versionedTheme,specifier);
+        const ordinary=await toolchain.importMap({});
+        for(const specifier of ['arcane-os/modules/ThemeBootstrap.js',themeUrl]){
+            assert.equal(ordinary.importMap.imports[specifier],themeUrl,specifier);
         }
-        assert.equal(Object.keys(versioned.importMap.imports).some(function obsoleteRootSpecifier(specifier){
+        assert.equal(Object.keys(ordinary.importMap.imports).some(function obsoleteRootSpecifier(specifier){
             return specifier.startsWith('arcane/')||specifier.startsWith('./arcane/');
         }),false);
-        assert.equal(versioned.importMap.imports['arcane-os/entities/Record.js'],
-            `./${packageSource}/runtime/arcane/entities/Record.js?arcaneVersion=${fixture.sdkVersion}`);
+        assert.equal(ordinary.importMap.imports['arcane-os/entities/Record.js'],
+            `./${packageSource}/runtime/arcane/entities/Record.js`);
         await writeJson(workspaceRoot,'arcane-package.json',fixture.manifest);
         const result=await toolchain.importMap({});
         assert.equal(result.importMap.committed,true);
@@ -297,11 +296,10 @@ test('nested direct-installed apps retain established aliases alongside package 
     ]);
     const result=await createToolchain({workspaceRoot,appId}).importMap({});
     const themeUrl=`./${packageSource}/runtime/arcane/modules/ThemeBootstrap.js`;
-    const versionedTheme=`${themeUrl}?arcaneVersion=${sdkVersion}`;
     for(const specifier of [
         'arcane/ThemeBootstrap','./arcane/modules/ThemeBootstrap.js',
-        'arcane-os/modules/ThemeBootstrap.js',themeUrl,versionedTheme
+        'arcane-os/modules/ThemeBootstrap.js',themeUrl
     ]){
-        assert.equal(result.importMap.imports[specifier],versionedTheme,specifier);
+        assert.equal(result.importMap.imports[specifier],themeUrl,specifier);
     }
 });

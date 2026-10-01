@@ -820,12 +820,13 @@ function moduleImportsFromTokens(tokens,importer){
 }
 
 export function versionAssetUrl(value,version=SDK_VERSION){
+    // Keep the version argument accepted; SDK versions no longer identify resource URLs.
     if(!is.string(value))return value;
     return applyReferenceEdits(value,assetUrlVersionEdits(value,version));
 }
 
 function assetUrlVersionEdits(value,version){
-    if(!is.string(value)||!value||(!version&&version!==null)||value.startsWith('#')
+    if(!is.string(value)||!value||value.startsWith('#')
         ||value.startsWith('//')||/^[A-Za-z][A-Za-z0-9+.-]*:/u.test(value)
         ||/^\s/u.test(value))return [];
     const fragmentStart=value.indexOf('#');
@@ -833,14 +834,10 @@ function assetUrlVersionEdits(value,version){
     const queryStart=address.indexOf('?');
     const pathname=queryStart<0?address:address.slice(0,queryStart);
     if(!pathname)return [];
-    const clean=version===null;
-    if(clean&&queryStart<0)return [];
-    const versionValue=clean?'':encodeURIComponent(String(version));
-    if(queryStart<0)return [{start:address.length,end:address.length,value:`?arcaneVersion=${versionValue}`}];
+    if(queryStart<0)return [];
     const query=address.slice(queryStart+1);
     const edits=[];
     const parameters=[];
-    let versionFound=false;
     let offset=queryStart+1;
     for(const parameter of query.split('&')){
         const equals=parameter.indexOf('=');
@@ -848,19 +845,11 @@ function assetUrlVersionEdits(value,version){
         let decodedKey=key;
         try{decodedKey=decodeURIComponent(key.replaceAll('+',' '));}
         catch{decodedKey=key;}
-        const remove=decodedKey==='arcaneVersion'&&(clean||versionFound);
+        const remove=decodedKey==='arcaneVersion';
         parameters.push({start:offset,end:offset+parameter.length,remove});
-        if(decodedKey==='arcaneVersion'&&!versionFound&&!clean){
-            versionFound=true;
-            edits.push({
-                start:offset+(equals<0?parameter.length:equals+1),
-                end:offset+parameter.length,
-                value:`${equals<0?'=':''}${versionValue}`
-            });
-        }
         offset+=parameter.length+1;
     }
-    if(clean&&parameters.every(function removesSdkField(parameter){
+    if(parameters.every(function removesSdkField(parameter){
         return parameter.remove;
     }))return [{start:queryStart,end:address.length,value:''}];
     // Remove adjacent SDK version fields together, including only their separator.
@@ -875,11 +864,6 @@ function assetUrlVersionEdits(value,version){
             value:''
         });
     }
-    if(!clean&&!versionFound)edits.push({
-        start:address.length,
-        end:address.length,
-        value:`&arcaneVersion=${versionValue}`
-    });
     return edits;
 }
 
@@ -1126,7 +1110,7 @@ function cssReferenceEdits(source,version,onReference,versionReference=versionAs
     return edits;
 }
 
-function importMapReferenceEdits(source,version,onReference){
+function importMapReferenceEdits(source,version,onReference,rewrite=true){
     const tokens=tokenize(source);
     const edits=[];
     function objectProperties(start){
@@ -1151,115 +1135,62 @@ function importMapReferenceEdits(source,version,onReference){
         }
         return properties;
     }
-    function addAlias(property,keys,value,aliases,alias=versionImportMapSpecifier(property.key,version)){
-        if(alias===property.key||keys.has(alias))return;
-        const keyEdit=stringReferenceEdit(source,property.keyToken,version,importMapUrlVersionEdits(property.key,version));
-        if(!keyEdit)return;
-        keys.add(alias);
-        aliases.push(`${keyEdit.value}: ${value}`);
-    }
-    function prependAliases(start,aliases,selectedEdits){
-        if(aliases.length===0)return;
-        // Authored keys retain priority even when different spellings normalize to one URL.
-        const offset=tokens[start].end;
-        selectedEdits.push({start:offset,end:offset,value:`${aliases.join(', ')}, `});
-    }
-    function addImports(start){
-        const selectedEdits=[];
-        const aliases=[];
-        const properties=objectProperties(start);
-        const keys=new Set(properties.map(function importKey(property){return property.key;}));
+    function cleanProperties(properties,{scopes=false}={}){
+        if(!rewrite)return properties;
+        const groups=new Map();
+        const removed=new Set();
         for(const property of properties){
-            if(property.value.value==='null'&&property.value.type==='identifier'){
-                addAlias(property,keys,'null',aliases);
-                continue;
-            }
-            if(property.value.type!=='string')continue;
-            if(property.key.endsWith('/'))continue;
-            reportAssetReference(onReference,property.value.value,'import');
-            const edit=property.value.value.split(/[?#]/u)[0].endsWith('/')
-                ?null:stringReferenceEdit(source,property.value,version);
-            if(edit)selectedEdits.push(edit);
-            addAlias(property,keys,edit?.value??source.slice(property.value.start,property.value.end),aliases);
+            const key=scopes
+                ?versionImportMapUrl(property.key,null)
+                :versionImportMapSpecifier(property.key,null);
+            if(!groups.has(key))groups.set(key,[]);
+            groups.get(key).push(property);
         }
-        prependAliases(start,aliases,selectedEdits);
-        return selectedEdits;
+        for(const [key,group] of groups){
+            if(group.every(function unchangedKey(property){return property.key===key;}))continue;
+            // An authored clean key owns the target when old generated aliases converge.
+            const selected=group.findLast(function existingCleanKey(property){
+                return property.key===key;
+            })??group.at(-1);
+            for(const property of group){
+                if(property!==selected)removed.add(property);
+            }
+            const edit=stringReferenceEdit(
+                source,
+                selected.keyToken,
+                null,
+                importMapUrlVersionEdits(selected.key,null)
+            );
+            if(edit)edits.push(edit);
+        }
+        for(let index=0;index<properties.length;index+=1){
+            if(!removed.has(properties[index]))continue;
+            const first=index;
+            while(removed.has(properties[index+1]))index+=1;
+            edits.push({
+                start:first===0?properties[first].keyToken.start:properties[first-1].end,
+                end:first===0&&index<properties.length-1
+                    ?properties[index+1].keyToken.start:properties[index].end,
+                value:''
+            });
+        }
+        return properties.filter(function retainedProperty(property){return !removed.has(property);});
     }
-    if(version===null){
-        function cleanProperties(properties,{scopes=false}={}){
-            const groups=new Map();
-            const removed=new Set();
-            for(const property of properties){
-                const key=scopes
-                    ?versionImportMapUrl(property.key,null)
-                    :versionImportMapSpecifier(property.key,null);
-                if(!groups.has(key))groups.set(key,[]);
-                groups.get(key).push(property);
-            }
-            for(const [key,group] of groups){
-                if(group.every(function unchangedKey(property){return property.key===key;}))continue;
-                // An authored clean key owns the target when old generated aliases converge.
-                const selected=group.findLast(function existingCleanKey(property){
-                    return property.key===key;
-                })??group.at(-1);
-                for(const property of group){
-                    if(property!==selected)removed.add(property);
-                }
-                const edit=stringReferenceEdit(
-                    source,
-                    selected.keyToken,
-                    null,
-                    importMapUrlVersionEdits(selected.key,null)
-                );
-                if(edit)edits.push(edit);
-            }
-            for(let index=0;index<properties.length;index+=1){
-                if(!removed.has(properties[index]))continue;
-                const first=index;
-                while(removed.has(properties[index+1]))index+=1;
-                edits.push({
-                    start:first===0?properties[first].keyToken.start:properties[first-1].end,
-                    end:first===0&&index<properties.length-1
-                        ?properties[index+1].keyToken.start:properties[index].end,
-                    value:''
-                });
-            }
-            return properties.filter(function retainedProperty(property){return !removed.has(property);});
+    function cleanImports(start){
+        const properties=cleanProperties(objectProperties(start));
+        for(const property of properties){
+            if(property.value.type!=='string'||property.key.endsWith('/'))continue;
+            reportAssetReference(onReference,property.value.value,'import');
+            if(!rewrite||property.value.value.split(/[?#]/u)[0].endsWith('/'))continue;
+            const edit=stringReferenceEdit(source,property.value,null);
+            if(edit)edits.push(edit);
         }
-        function cleanImports(start){
-            const properties=cleanProperties(objectProperties(start));
-            for(const property of properties){
-                if(property.value.type!=='string'||property.key.endsWith('/'))continue;
-                reportAssetReference(onReference,property.value.value,'import');
-                if(property.value.value.split(/[?#]/u)[0].endsWith('/'))continue;
-                const edit=stringReferenceEdit(source,property.value,null);
-                if(edit)edits.push(edit);
-            }
-        }
-        for(const property of objectProperties(0)){
-            if(property.key==='imports')cleanImports(property.valueIndex);
-            if(property.key==='scopes'){
-                const scopes=cleanProperties(objectProperties(property.valueIndex),{scopes:true});
-                for(const scope of scopes)cleanImports(scope.valueIndex);
-            }
-        }
-        return edits;
     }
     for(const property of objectProperties(0)){
-        if(property.key==='imports')edits.push(...addImports(property.valueIndex));
+        if(property.key==='imports')cleanImports(property.valueIndex);
         if(property.key==='scopes'){
-            const scopes=objectProperties(property.valueIndex);
-            const aliases=[];
-            const keys=new Set(scopes.map(function scopeKey(scope){return scope.key;}));
-            for(const scope of scopes){
-                const scopeEdits=addImports(scope.valueIndex);
-                edits.push(...scopeEdits);
-                const value=applyReferenceEdits(source.slice(scope.value.start,scope.end),scopeEdits.map(function scopeRelativeEdit(edit){
-                    return {...edit,start:edit.start-scope.value.start,end:edit.end-scope.value.start};
-                }));
-                if(!scope.key.endsWith('/'))addAlias(scope,keys,value,aliases,versionImportMapUrl(scope.key,version));
-            }
-            prependAliases(property.valueIndex,aliases,edits);
+            const scopes=cleanProperties(objectProperties(property.valueIndex),{scopes:true});
+            for(const scope of scopes)cleanImports(scope.valueIndex);
         }
     }
     return edits;
@@ -1312,12 +1243,7 @@ function versionImportMapUrl(value,version){
 }
 
 function importMapUrlVersionEdits(value,version){
-    // Absolute map keys can match a relative import resolved against the document.
-    const authority=/^(?:[A-Za-z][A-Za-z0-9+.-]*:)?\/\/[^/?#]*/u.exec(value)?.[0];
-    const offset=authority?.length??0;
-    return assetUrlVersionEdits(value.slice(offset),version).map(function absoluteKeyEdit(edit){
-        return {...edit,start:edit.start+offset,end:edit.end+offset};
-    });
+    return assetUrlVersionEdits(value,version);
 }
 
 function validateInventory(files){
@@ -1471,12 +1397,12 @@ async function physicalRuntime(workspaceRoot,signal){
     return {files};
 }
 
-async function managedImportMapBuild(resolvedWorkspace,resolvedApp,signal,pwaEnabled=false){
+async function managedImportMapBuild(resolvedWorkspace,resolvedApp,signal){
     const installed=await readInstalledSdkLayout(resolvedWorkspace);
-    const [runtime,version]=await Promise.all([
-        installed?installedRuntimeFiles(resolvedWorkspace,installed,signal):physicalRuntime(resolvedWorkspace,signal),
-        pwaEnabled?null:installed?.version??readWorkspaceAssetVersion(resolvedWorkspace)
-    ]);
+    const runtime=await (installed
+        ?installedRuntimeFiles(resolvedWorkspace,installed,signal)
+        :physicalRuntime(resolvedWorkspace,signal));
+    const version=null;
     const built=await buildImportMap({files:runtime.files,signal,version});
     if(installed?.direct){
         const imports={};
@@ -2055,11 +1981,12 @@ function htmlReferenceEdits(source,version,onReference){
     const linkResources=new Set(['stylesheet','modulepreload','preload','icon','manifest']);
     const base=structure.bases[0];
     const baseHref=base?structuralAttribute(parseTagAttributes(base.open),'href','base'):null;
-    if(baseHref&&(/^[A-Za-z][A-Za-z0-9+.-]*:/u.test(baseHref)||baseHref.startsWith('//')))version='';
+    const externalBase=baseHref&&(/^[A-Za-z][A-Za-z0-9+.-]*:/u.test(baseHref)||baseHref.startsWith('//'));
     function reportHtmlReference(reference){
         if(is.function(onReference))onReference({...reference,baseHref});
     }
     function addNestedEdits(offset,nested){
+        if(externalBase)return;
         for(const edit of nested)edits.push({...edit,start:offset+edit.start,end:offset+edit.end});
     }
     for(const element of structure.elements){
@@ -2091,6 +2018,7 @@ function htmlReferenceEdits(source,version,onReference){
             if(view)reportAssetReference(reportHtmlReference,view.decoded,kind,
                 (name==='href'||name==='src')&&view.decoded.startsWith('./arcane/')
                     ?'component-runtime':undefined);
+            if(externalBase)continue;
             const value=versionHtmlAttribute(original,version);
             if(value===original)continue;
             const position=attributes.positions.get(name);
@@ -2110,7 +2038,7 @@ function htmlReferenceEdits(source,version,onReference){
         if(attributes.has('src'))continue;
         const type=scriptType(attributes);
         const body=source.slice(script.openEnd,script.contentEnd);
-        if(type==='importmap')addNestedEdits(script.openEnd,importMapReferenceEdits(body,version,reportHtmlReference));
+        if(type==='importmap')addNestedEdits(script.openEnd,importMapReferenceEdits(body,version,reportHtmlReference,!externalBase));
         else if(['','module','text/javascript','application/javascript'].includes(type)){
             addNestedEdits(script.openEnd,javascriptReferenceEdits(body,version,reportHtmlReference));
         }
@@ -2868,14 +2796,7 @@ async function generateImportMapUnlocked({
         renderManagedHtml(html,'{"imports":{}}\n',baseHref);
         documentStates.push({filePath:documentPath,html,label,baseHref});
     }
-    let pwaEnabled=false;
-    try{
-        const packageSource=await readFileFromDisk(path.join(resolvedApp,'arcane-package.json'),'utf8');
-        pwaEnabled=JSON.parse(packageSource)?.pwa?.enabled===true;
-    }catch(error){
-        if(error?.code!=='ENOENT')throw error;
-    }
-    const {built,json,version}=await managedImportMapBuild(resolvedWorkspace,resolvedApp,signal,pwaEnabled);
+    const {built,json,version}=await managedImportMapBuild(resolvedWorkspace,resolvedApp,signal);
     const renderedDocuments=documentStates.map(item=>({
         ...item,
         content:rewriteAssetReferences(renderManagedHtml(item.html,json,item.baseHref),{

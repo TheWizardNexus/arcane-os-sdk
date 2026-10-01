@@ -20,7 +20,6 @@ import {
     scanModuleImports
 } from '../src/import-map.mjs';
 import {temporaryDirectory} from './helpers.mjs';
-import {SDK_VERSION} from '../src/constants.mjs';
 import {generateDocumentImportMaps} from '../src/index.mjs';
 
 function assertDocumentImportMap(html, prefix, suffix) {
@@ -193,10 +192,6 @@ test('complete runtime inventory produces a mutable named import map without rea
         'strong-type':'./arcane/dependencies/strong-type/index.js'
     };
     for(const target of Object.values(expected))expected[target]=target;
-    for(const specifier of Object.keys(expected)){
-        expected[specifier]+=`?arcaneVersion=${SDK_VERSION}`;
-        if(specifier.startsWith('./'))expected[`${specifier}?arcaneVersion=${SDK_VERSION}`]=expected[specifier];
-    }
     assert.deepEqual(result.imports,expected);
     assert.deepEqual(result.excludedModules,[]);
     result.imports['fixture/mutable']='./fixture.js';
@@ -439,7 +434,7 @@ test('application tests read the existing managed browser map from the workspace
     assert.deepEqual(context.imports,generated.imports);
     assert.equal(
         context.imports['arcane/ThemeBootstrap'],
-        `./arcane/modules/ThemeBootstrap.js?arcaneVersion=${SDK_VERSION}`
+        './arcane/modules/ThemeBootstrap.js'
     );
 });
 
@@ -508,18 +503,18 @@ test(
             const html = await readFile(filePath, 'utf8');
             const imports = assertDocumentImportMap(html, document.prefix, document.suffix);
             firstDocuments.set(document.path, html);
-            const target = '../arcane/modules/ThemeBootstrap.js?arcaneVersion=7.8.9';
+            const target = '../arcane/modules/ThemeBootstrap.js';
             assert.equal(imports['arcane/ThemeBootstrap'], target);
             assert.equal(imports['../arcane/modules/ThemeBootstrap.js'], target);
-            assert.equal(imports['../arcane/modules/ThemeBootstrap.js?arcaneVersion=7.8.9'], target);
+            assert.equal(imports['../arcane/modules/ThemeBootstrap.js?arcaneVersion=7.8.9'], undefined);
             assert.equal(
                 imports['../node_modules/strong-type/index.js'],
-                '../arcane/dependencies/strong-type/index.js?arcaneVersion=7.8.9'
+                '../arcane/dependencies/strong-type/index.js'
             );
             const documentUrl = new URL(document.path, mount);
             assert.equal(
                 new URL(imports['arcane/ThemeBootstrap'], documentUrl).href,
-                new URL('arcane/modules/ThemeBootstrap.js?arcaneVersion=7.8.9', mount).href
+                new URL('arcane/modules/ThemeBootstrap.js', mount).href
             );
             const reported = result.documents.find(
                 function matchingHostDocument(record) {
@@ -630,16 +625,14 @@ test(
         const html = await readFile(filePath, 'utf8');
         const imports = assertDocumentImportMap(html, prefix, suffix);
         const targetPath = '../payload%23%25%20library/arcane/modules/Panel%23100%25%20ready.js';
-        const target = `${targetPath}?arcaneVersion=7.8.9`;
-        assert.equal(imports['arcane/Panel#100% ready'], target);
-        assert.equal(imports[targetPath], target);
-        assert.equal(imports[target], target);
+        assert.equal(imports['arcane/Panel#100% ready'], targetPath);
+        assert.equal(imports[targetPath], targetPath);
         assert.equal(result.documents[0].path, documentPath);
         assert.equal(result.documents[0].filePath, filePath);
         const documentUrl = new URL('https://example.test/releases/deep/host/shell%23%25%20space/index%23%25%20page.html');
         assert.equal(
             new URL(imports['arcane/Panel#100% ready'], documentUrl).href,
-            'https://example.test/releases/deep/host/payload%23%25%20library/arcane/modules/Panel%23100%25%20ready.js?arcaneVersion=7.8.9'
+            'https://example.test/releases/deep/host/payload%23%25%20library/arcane/modules/Panel%23100%25%20ready.js'
         );
     }
 );

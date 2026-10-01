@@ -883,7 +883,6 @@ async function packageWithContext(context,options={}){
         // Traverse actual browser resources after the adapter finishes. Files
         // included only as application documents retain their original content.
         const assetVersion=await readWorkspaceAssetVersion(context.workspaceRoot);
-        const version=pwaEnabled?null:assetVersion;
         const inventory=new Set(files);
         const offlineInventory=pwaEnabled?new Set(selectPwaFiles(files,context.config.pwa,appPath)):null;
         const offlineReferences=new Set();
@@ -929,7 +928,7 @@ async function packageWithContext(context,options={}){
         for(const file of files){
             if((sharedFiles.has(file)||/^arcane\/(?:modules|entities|components|css|sdk|dependencies)\//u.test(file))
                 &&/\.(?:m?js|html?|css)$/iu.test(file))pending.push({file,documentUrl});
-            if(pwaEnabled&&path.posix.basename(file)==='arcane.importmap.json'){
+            if(path.posix.basename(file)==='arcane.importmap.json'){
                 pending.push({file,documentUrl});
             }
         }
@@ -954,7 +953,7 @@ async function packageWithContext(context,options={}){
             const contextKey=`${relative}\n${current.documentUrl.href}`;
             if(visited.has(contextKey)||!inventory.has(relative)
                 ||(!/\.(?:m?js|html?|css)$/iu.test(relative)
-                    &&!(pwaEnabled&&path.posix.basename(relative)==='arcane.importmap.json')))continue;
+                    &&path.posix.basename(relative)!=='arcane.importmap.json'))continue;
             visited.add(contextKey);
             const filePath=path.join(stagingRoot,...relative.split('/'));
             let resource=resources.get(relative);
@@ -962,7 +961,7 @@ async function packageWithContext(context,options={}){
                 const original=pwaDocumentSources.get(relative)?.source??await readFile(filePath,'utf8');
                 const references=[];
                 const content=rewriteAssetReferences(original,{
-                    filePath:relative,version,onReference:reference=>references.push(reference)
+                    filePath:relative,version:null,onReference:reference=>references.push(reference)
                 });
                 if(content!==original)await writeFile(filePath,content,'utf8');
                 resource={references,...(pwaDocumentSources.has(relative)?{content}:{})};

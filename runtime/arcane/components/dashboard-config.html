@@ -1,5 +1,5 @@
-<link rel="stylesheet" href="./arcane/css/layout.css?v=3">
-<link rel="stylesheet" href="./arcane/css/dashboard-config.css?v=2">
+<link rel="stylesheet" href="./arcane/css/layout.css">
+<link rel="stylesheet" href="./arcane/css/dashboard-config.css">
 <style>
     :host{
         display:block;
@@ -7,7 +7,7 @@
 </style>
 
 <button id="openConfig" type="button" aria-haspopup="dialog" disabled></button>
-<html-import id="configModal" class="modal" href="./arcane/components/modal.html?v=13"></html-import>
+<html-import id="configModal" class="modal" href="./arcane/components/modal.html"></html-import>
 
 <script type="module">
     const {default:Is}=await import('strong-type');
@@ -233,7 +233,7 @@
         const items=document.createElement('section');
 
         styles.rel='stylesheet';
-        styles.href=new URL('../css/dashboard-config.css?v=2',componentHref).href;
+        styles.href=new URL('../css/dashboard-config.css',componentHref).href;
         heading.dataset.dashboardConfigHeading='';
         message.dataset.dashboardConfigDescription='';
         empty.className='dashboard-config-empty';

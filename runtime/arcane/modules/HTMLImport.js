@@ -17,15 +17,9 @@ globalThis[htmlImportHostRegistryKey]=htmlImportHostRegistry;
 let htmlImportScriptId=0;
 
 const htmlImportModuleURL=new URL(import.meta.url);
-const htmlImportAssetVersion=htmlImportModuleURL.searchParams.get('arcaneVersion');
 
-function pwaResourceUrlsEnabled(){
-  return Boolean(document.querySelector?.('script[data-arcane-pwa]'));
-}
-
-function versionComponentResource(value,baseHref){
-  const clean=pwaResourceUrlsEnabled();
-  if((!htmlImportAssetVersion&&!clean)||!is.string(value)||!value||value.startsWith('#')){
+function cleanComponentResource(value,baseHref){
+  if(!is.string(value)||!value||value.startsWith('#')){
     return value;
   }
   let resolvedURL;
@@ -43,32 +37,20 @@ function versionComponentResource(value,baseHref){
   const fragment=fragmentIndex<0?'':value.slice(fragmentIndex);
   const resource=fragmentIndex<0?value:value.slice(0,fragmentIndex);
   const queryIndex=resource.indexOf('?');
-  const pathname=queryIndex<0?resource:resource.slice(0,queryIndex);
-  const query=queryIndex<0?'':resource.slice(queryIndex+1);
-  const versionField=`arcaneVersion=${encodeURIComponent(htmlImportAssetVersion)}`;
-  let replaced=false;
-  const fields=query?query.split('&').map(function versionQueryField(field){
-    const parameter=new URLSearchParams(field);
-    if(parameter.has('v'))return null;
-    if(!parameter.has('arcaneVersion'))return field;
-    if(clean||replaced)return null;
-    replaced=true;
+  if(queryIndex<0)return value;
+  const pathname=resource.slice(0,queryIndex);
+  const query=resource.slice(queryIndex+1);
+  const fields=query.split('&').filter(function retainQueryField(field){
     const equals=field.indexOf('=');
     const key=equals<0?field:field.slice(0,equals);
-    return `${key}=${encodeURIComponent(htmlImportAssetVersion)}`;
-  }).filter(function retainQueryField(field){
-    return field!==null;
-  }):[];
-  if(clean){
-    return fields.some(function hasRemainingField(field){return field!=='';})
-      ?`${pathname}?${fields.join('&')}${fragment}`
-      :`${pathname}${fragment}`;
-  }
-  if(!replaced){
-    if(fields.at(-1)==='')fields[fields.length-1]=versionField;
-    else fields.push(versionField);
-  }
-  return `${pathname}?${fields.join('&')}${fragment}`;
+    let decodedKey=key;
+    try{decodedKey=decodeURIComponent(key.replaceAll('+',' '));}
+    catch{decodedKey=key;}
+    return decodedKey!=='arcaneVersion';
+  });
+  return fields.length>0
+    ?`${pathname}?${fields.join('&')}${fragment}`
+    :`${pathname}${fragment}`;
 }
 
 function componentRuntimeRoot(resolvedHref){
@@ -91,7 +73,6 @@ function resolveComponentResource(value,runtimeRoot){
 }
 
 function resolveComponentStyleResources(styleText,runtimeRoot){
-  if(!runtimeRoot&&!htmlImportAssetVersion&&!pwaResourceUrlsEnabled())return styleText;
   const parts=[];
   let copiedThrough=0;
   let index=0;
@@ -149,7 +130,7 @@ function resolveComponentStyleResources(styleText,runtimeRoot){
     const resourcePath=styleText.slice(start,end);
     // CSS escapes retain their original spelling until their URL syntax is decoded.
     if(resourcePath.includes('\\'))return;
-    const resolved=versionComponentResource(
+    const resolved=cleanComponentResource(
       resolveComponentResource(resourcePath,runtimeRoot),
       document.baseURI
     );
@@ -237,7 +218,7 @@ function createComponentFragment(html,resolvedHref){
       const resolved=resolveComponentResource(value,runtimeRoot);
       const navigation=attribute==='href'
         &&['a','area','base'].includes(element.localName);
-      const versioned=navigation?resolved:versionComponentResource(
+      const versioned=navigation?resolved:cleanComponentResource(
         resolved,
         element.localName==='script'?resolvedHref:document.baseURI
       );
@@ -257,7 +238,7 @@ function resolveRelativeDynamicImports(source,baseHref){
   return source.replace(
     /\bimport\s*\(\s*(['"])(\.{1,2}\/[^'"]+)\1\s*\)/gu,
     function resolveDynamicImport(_match,_quote,specifier){
-      const resolved=versionComponentResource(new URL(specifier,baseHref).href,baseHref);
+      const resolved=cleanComponentResource(new URL(specifier,baseHref).href,baseHref);
       return `import(${JSON.stringify(resolved)})`;
     }
   );
@@ -327,7 +308,7 @@ class HTMLImport extends HTMLElement {
 
     try{
       const resolvedURL=new URL(href,document.baseURI);
-      resolvedHref=versionComponentResource(resolvedURL.href,document.baseURI);
+      resolvedHref=cleanComponentResource(resolvedURL.href,document.baseURI);
       const response=await fetch(resolvedHref,{
         cache:'default',
         method:'GET',
@@ -497,7 +478,7 @@ class HTMLImport extends HTMLElement {
         let sourceBaseHref=contentBaseHref;
         const scriptSource=script.getAttribute('src');
         if(scriptSource!==null){
-          const requestedScriptHref=versionComponentResource(
+          const requestedScriptHref=cleanComponentResource(
             new URL(scriptSource,contentBaseHref).href,
             contentBaseHref
           );

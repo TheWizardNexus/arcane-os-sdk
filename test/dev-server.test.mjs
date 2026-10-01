@@ -209,7 +209,7 @@ test(
             assert.equal(response.headers.get('x-content-type-options'), null);
             const body = await response.text();
             if (resource === resources[0]) assert.equal(body, firstDocument);
-            if (resource === resources[1]) assert.ok(body.includes('child.js?v=4&arcaneVersion=9.8.7'));
+            if (resource === resources[1]) assert.equal(body, "import './child.js?v=4'; export const state = 'first';");
             modified.set(resource, lastModified);
             const unchanged = await request(
                 instance.origin,
@@ -245,7 +245,7 @@ test(
             {headers: {'If-Modified-Since': modified.get(resources[2])}}
         );
         assert.equal(entry.status, 200);
-        assert.ok((await entry.text()).includes('arcaneVersion=9.8.8'));
+        assert.equal((await entry.text()).includes('arcaneVersion='), false);
         for (const resource of [resources[0], resources[1]]) {
             const response = await request(
                 instance.origin,
@@ -259,7 +259,7 @@ test(
                 body,
                 resource === resources[0]
                     ? updatedDocument
-                    : "import './child.js?v=4&arcaneVersion=9.8.8'; export const state = 'updated';"
+                    : "import './child.js?v=4'; export const state = 'updated';"
             );
         }
         assert.equal(await readFile(documentPath, 'utf8'), updatedDocument);
@@ -267,7 +267,7 @@ test(
     }
 );
 
-test('source server versions local references from selected SDK metadata and revalidates entry HTML',async t=>{
+test('source server keeps stable resource URLs across SDK metadata changes and revalidates entry HTML',async t=>{
     useSyntheticTls(t);
     const parent=await temporaryDirectory(t,{prefix:'arcane-versioned-source-'});
     const workspaceRoot=path.join(parent,'workspace');
@@ -285,16 +285,17 @@ test('source server versions local references from selected SDK metadata and rev
     const entry=await request(instance.origin,'/apps/served-app/index.html');
     assert.equal(entry.status,200);
     assert.equal(entry.headers.get('cache-control'),'no-cache');
-    assert.ok((await entry.text()).includes('arcaneVersion=9.8.7'));
-    const module=await request(instance.origin,'/arcane/modules/AI.js?arcaneVersion=9.8.7');
+    assert.equal((await entry.text()).includes('arcaneVersion='),false);
+    const module=await request(instance.origin,'/arcane/modules/AI.js');
     assert.equal(module.status,200);
     assert.equal(module.headers.get('cache-control'),null);
     const source=await module.text();
-    assert.ok(source.includes('child.js?v=2&arcaneVersion=9.8.7'));
-    assert.ok(source.includes('worker.js?arcaneVersion=9.8.7'));
-    const worker=await request(instance.origin,'/arcane/modules/worker.js?arcaneVersion=9.8.7');
+    assert.ok(source.includes("import './child.js?v=2';"));
+    assert.ok(source.includes("new URL('./worker.js',import.meta.url)"));
+    assert.equal(source.includes('arcaneVersion='),false);
+    const worker=await request(instance.origin,'/arcane/modules/worker.js');
     assert.equal(worker.status,200);
-    assert.ok((await worker.text()).includes('child.js?v=2&arcaneVersion=9.8.7'));
+    assert.equal(await worker.text(),"import './child.js?v=2';\n");
     assert.equal(await readFile(path.join(sourceRoot,'runtime/arcane/modules/worker.js'),'utf8'),
         "import './child.js?v=2';\n");
     const document=await request(instance.origin,'/apps/served-app/modules/document.html');
@@ -309,9 +310,11 @@ test('source server versions local references from selected SDK metadata and rev
     assert.equal(await malformedDocument.text(),malformedCorpus);
     await writeFile(path.join(sourceRoot,'package.json'),JSON.stringify({name:SDK_NAME,version:'9.8.8'}));
     const refreshedEntry=await request(instance.origin,'/apps/served-app/index.html');
-    assert.ok((await refreshedEntry.text()).includes('arcaneVersion=9.8.8'));
-    const refreshedWorker=await request(instance.origin,'/arcane/modules/worker.js?arcaneVersion=9.8.8');
-    assert.ok((await refreshedWorker.text()).includes('child.js?v=2&arcaneVersion=9.8.8'));
+    assert.equal((await refreshedEntry.text()).includes('arcaneVersion='),false);
+    const refreshedWorker=await request(instance.origin,'/arcane/modules/worker.js');
+    assert.equal(await refreshedWorker.text(),"import './child.js?v=2';\n");
+    const previousUrl=await request(instance.origin,'/arcane/modules/worker.js?arcaneVersion=9.8.7');
+    assert.equal(await previousUrl.text(),"import './child.js?v=2';\n");
 });
 
 test('source server exposes the selected app and installed SDK browser routes',async t=>{
@@ -513,15 +516,14 @@ for (const liveSource of [false, true]) {
                 'utf8'
             ));
             const browserSettings = `./${packageSource}/browser-runtime/ai/browser-device-settings.mjs`;
-            const versionedBrowserSettings = `${browserSettings}?arcaneVersion=${SDK_VERSION}`;
             assert.equal(
                 importMap.imports[`./${packageSource}/runtime/arcane/sdk/ai/browser-device-settings.mjs`],
-                versionedBrowserSettings
+                browserSettings
             );
-            assert.equal(importMap.imports[browserSettings], versionedBrowserSettings);
+            assert.equal(importMap.imports[browserSettings], browserSettings);
             assert.equal(
                 importMap.imports[`./${packageSource}/runtime/arcane/dependencies/strong-type/index.js`],
-                `./${packageSource}/runtime/strong-type/index.js?arcaneVersion=${SDK_VERSION}`
+                `./${packageSource}/runtime/strong-type/index.js`
             );
             const runtime = await globalThis.fetch(`${instance.origin}/${packageSource}/runtime/arcane/modules/AI.js`);
             assert.equal(runtime.status, 200);

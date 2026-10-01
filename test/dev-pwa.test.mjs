@@ -531,18 +531,18 @@ test('source offline inventory closes unvisited page references before worker ca
     assert.equal(await (await fetch(`${instance.origin}/apps/fixture/documents/payload.js`)).text(), documentJavaScript);
 });
 
-test('ordinary source serving keeps versioned URLs and does not add PWA routes', async function ordinarySourceMode(context) {
+test('ordinary source serving keeps stable URLs and does not add PWA routes', async function ordinarySourceMode(context) {
     const {instance, documentHtml} = await sourceFixture(context, {enabled: false});
     const response = await fetch(`${instance.origin}/apps/fixture/index.html`);
     const html = await response.text();
-    assert.ok(html.includes('src="./apps/fixture/modules/entry.js?v=4&amp;arcaneVersion=9.8.7"'));
+    assert.ok(html.includes('src="./apps/fixture/modules/entry.js?v=4"'));
     assert.equal(html.includes('data-arcane-pwa'), false);
     for (const route of ['/arcane.webmanifest', '/arcane-offline.json', '/arcane-sw.js', '/arcane-pwa.mjs']) {
         assert.equal((await fetch(`${instance.origin}${route}`)).status, 404, route);
     }
     const runtime = await fetch(`${instance.origin}/arcane/modules/State.js`);
     assert.equal(runtime.headers.get('cache-control'), null);
-    assert.equal(await runtime.text(), "export {child} from './child.js?v=4&arcaneVersion=9.8.7';");
+    assert.equal(await runtime.text(), "export {child} from './child.js?v=4';");
     assert.equal(await (await fetch(`${instance.origin}/apps/fixture/documents/payload.html`)).text(), documentHtml);
 });
 
@@ -692,7 +692,7 @@ test(
         assert.equal((await fetch(`${instance.origin}/arcane.webmanifest`)).status, 404);
         const ordinaryEntry = await (await fetch(`${instance.origin}/apps/fixture/current.html`)).text();
         assert.equal(ordinaryEntry.includes('data-arcane-pwa'), false);
-        assert.ok(ordinaryEntry.includes('arcaneVersion=9.8.7'));
+        assert.equal(ordinaryEntry.includes('arcaneVersion='), false);
         await assert.rejects(lstat(path.join(workspaceRoot, 'dist')), {code: 'ENOENT'});
     }
 );

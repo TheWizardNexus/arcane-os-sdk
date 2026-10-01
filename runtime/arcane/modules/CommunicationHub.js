@@ -4,7 +4,7 @@ const is=new Is(false);
 import {createArcaneEventSource} from 'arcane-os/event-manager';
 import CommunicationMessage from '../entities/CommunicationMessage.js';
 import CommunicationThread from '../entities/CommunicationThread.js';
-import CommunicationProviderRegistry from './CommunicationProviderRegistry.js?v=2';
+import CommunicationProviderRegistry from './CommunicationProviderRegistry.js';
 
 const communicationHubEvents={
     refreshCancelled:'communications-refresh-cancelled',

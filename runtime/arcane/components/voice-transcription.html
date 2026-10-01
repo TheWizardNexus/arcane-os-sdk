@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="./arcane/css/layout.css?v=3">
+<link rel="stylesheet" href="./arcane/css/layout.css">
 <style>
     :host{
         display:block;
@@ -138,7 +138,7 @@
         {requestAIRuntimeIntent,subscribeAIRuntimeState},
         {default:ContinuousVoiceCapture}
     ]=await Promise.all([
-        import('../modules/MD.js?v=2'),
+        import('../modules/MD.js'),
         import('../modules/ComponentContracts.js'),
         import('../modules/AIRuntimeState.js'),
         import('../modules/ContinuousVoiceCapture.js')

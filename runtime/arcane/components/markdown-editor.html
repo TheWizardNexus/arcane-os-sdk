@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="./arcane/css/layout.css?v=3">
+<link rel="stylesheet" href="./arcane/css/layout.css">
 <style>
     :host{
         display:block;
@@ -129,7 +129,7 @@
     const {arcaneLogging}=await import('arcane-os/logging');
 
     const host=this;
-    const {default:MD}=await import('../modules/MD.js?v=2');
+    const {default:MD}=await import('../modules/MD.js');
     const {
         applyMarkdownFormat,
         normalizeMarkdownOptions

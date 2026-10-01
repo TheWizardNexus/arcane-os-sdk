@@ -1270,7 +1270,7 @@ async function startOwnedDevServer({
                         }
                     }catch{ /* Non-URL values remain under their existing owner. */ }
                 };
-                const selectedVersion = rewrite && mode === 'source' ? (pwaEnabled ? null : assetVersion) : undefined;
+                const selectedVersion = rewrite && mode === 'source' ? null : undefined;
                 const pwaEntry = mode === 'source' && pwaEnabled && entryDocument;
                 const transformed = pwaEntry || (selectedVersion !== undefined
                     && /\.(?:m?js|html?|css|json)$/iu.test(extension));
@@ -1285,7 +1285,7 @@ async function startOwnedDevServer({
                         pwaEntry,
                         onReference,
                         lastModified: transformed
-                            ? sourceRepresentationModifiedAt(opened, selectedVersion, pwaEntry)
+                            ? sourceRepresentationModifiedAt(opened, assetVersion, pwaEntry)
                             : undefined
                     }
                 );

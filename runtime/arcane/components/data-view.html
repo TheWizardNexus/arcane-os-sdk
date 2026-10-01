@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="./arcane/css/layout.css?v=3">
+<link rel="stylesheet" href="./arcane/css/layout.css">
 <style>
     :host{
         display:flex;
@@ -11,7 +11,7 @@
 </style>
 
 <button id="openData" type="button" aria-haspopup="dialog"></button>
-<html-import id="dataModal" class="modal" href="./arcane/components/modal.html?v=13"></html-import>
+<html-import id="dataModal" class="modal" href="./arcane/components/modal.html"></html-import>
 
 <script type="module">
     const {default:Is}=await import('strong-type');
@@ -90,7 +90,7 @@
             fileManager.dataset.layout=host.dataset.layout||'files';
             fileManager.setAttribute(
                 'href',
-                new URL('./file-manager.html?v=19',componentHref).href
+                new URL('./file-manager.html',componentHref).href
             );
 
             content.append(heading,fileManager);

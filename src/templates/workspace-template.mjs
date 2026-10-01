@@ -133,7 +133,7 @@ appropriate.
     </script>
 `:'';
     const bootstrapMarkup=namedImports?'':
-        `    <script type="module" src="${runtimePrefix}/modules/ThemeBootstrap.js?v=1"></script>\n`;
+        `    <script type="module" src="${runtimePrefix}/modules/ThemeBootstrap.js"></script>\n`;
     const files=new Map();
     files.set('.gitignore',[
         'node_modules/',
@@ -322,9 +322,9 @@ ${importMapMarkup}    <meta name="viewport" content="width=device-width, initial
     <meta name="theme-color" content="rgb(23, 34, 56)">
     <title>${html(name)}</title>
     <link rel="manifest" href="./${html(appPrefix)}manifest.json">
-    <link rel="stylesheet" href="${runtimePrefix}/css/theme.css?v=1">
-    <link rel="stylesheet" href="${runtimePrefix}/css/primitives.css?v=1">
-    <link rel="stylesheet" href="./${html(appPrefix)}${html(appId)}.css?v=1">
+    <link rel="stylesheet" href="${runtimePrefix}/css/theme.css">
+    <link rel="stylesheet" href="${runtimePrefix}/css/primitives.css">
+    <link rel="stylesheet" href="./${html(appPrefix)}${html(appId)}.css">
 ${bootstrapMarkup}</head>
 <body>
     <main class="app-shell">
@@ -341,7 +341,7 @@ ${bootstrapMarkup}</head>
             </div>
         </section>
     </main>
-    <script type="module" src="./${html(appPrefix)}modules/App.js?v=1"></script>
+    <script type="module" src="./${html(appPrefix)}modules/App.js"></script>
 </body>
 </html>
 `);

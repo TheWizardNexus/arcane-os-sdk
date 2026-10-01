@@ -609,7 +609,7 @@ test(
 );
 
 test(
-    'native package selection and disabled PWA retain ordinary versioned output',
+    'native package selection and disabled PWA retain stable resource URLs',
     async function inactivePwaPackages(context) {
         const native = await workspaceFixture(context);
         const nativeResult = await packageApp(
@@ -639,9 +639,12 @@ test(
                 html.includes('data-arcane-pwa'),
                 false
             );
-            assert.ok(
-                html.includes('arcaneVersion=9.8.7')
-            );
+            assert.equal(html.includes('arcaneVersion='), false);
+            const importMap = JSON.parse(await readFile(
+                path.join(result.outputRoot, 'apps/pwa-app/modules/arcane.importmap.json'),
+                'utf8'
+            ));
+            assert.equal(importMap.imports['arcane/Shared'], './arcane/modules/Shared.js?v=old&mode=full');
         }
     }
 );

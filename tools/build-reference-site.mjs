@@ -1425,9 +1425,9 @@ function renderPage({
     const siteHome=relativeOutputHref(output,'site/index.html');
     const referenceHome=relativeOutputHref(output,'site/reference/index.html');
     const canonical=canonicalUrl(route);
-    const stylesheet=`${relativeOutputHref(output,'site/styles.css')}?v=back-to-top`;
-    const referenceStylesheet=`${relativeOutputHref(output,referenceCssOutput)}?v=visible-toolbar`;
-    const script=`${relativeOutputHref(output,'site/app.js')}?v=back-to-top`;
+    const stylesheet=relativeOutputHref(output,'site/styles.css');
+    const referenceStylesheet=relativeOutputHref(output,referenceCssOutput);
+    const script=relativeOutputHref(output,'site/app.js');
     const referenceScriptHref=relativeOutputHref(output,referenceScriptOutput);
     const icon=relativeOutputHref(output,'site/assets/arcane-sigil-512.png');
     const headerImage=`${canonicalRoot}assets/arcane-os-sdk-readme-header.png`;

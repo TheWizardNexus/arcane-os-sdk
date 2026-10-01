@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="./arcane/css/layout.css?v=3" />
+<link rel="stylesheet" href="./arcane/css/layout.css" />
 <style>
     :host {
         display: block;
@@ -842,7 +842,7 @@
     speechImport.id='speech';
     speechImport.setAttribute(
         'href',
-        new URL('./speech.html?v=3',componentURL).href
+        new URL('./speech.html',componentURL).href
     );
     speechMount.replaceWith(speechImport);
     const events=createArcaneEventSource(
