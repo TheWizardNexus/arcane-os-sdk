@@ -1933,6 +1933,35 @@ replaces `&`, `<`, and `>` with `&amp;`, `&lt;`, and `&gt;` respectively. It
 preserves all other text and does not trim, validate a report, render, or persist
 anything. Use the same operation for live text chunks and complete final text.
 
+An application may opt into completion metadata when creating the tool:
+
+```javascript
+import {createConversationClosingReportTool} from 'arcane-os/conversation-closing-report';
+
+const tool=createConversationClosingReportTool({
+    responseToUsersPromptComplete:{
+        required:true,
+        description:"Use true only when this response's messages and successful tool actions complete the whole current user request. Use false if any answer or action still needs a model response, whether or not this tool returns data."
+    }
+});
+```
+
+The option declares a boolean `responseToUsersPromptComplete` argument. Its
+`description` must be a nonblank string and is preserved completely;
+`required` defaults to `false`. Omitting the option preserves the existing
+schema, including its required fields. This changes only the declaration, not
+the closeout instruction or sole-call classifier.
+
+`normalizeConversationClosingReport()` accepts that optional boolean in an
+object or JSON string and preserves `true` or `false` in the returned record
+under the same key. Omission leaves the key absent; other supplied types raise
+`CONVERSATION_CLOSING_REPORT_INVALID` without coercion. The normalizer does not
+consume factory options or enforce an application's required setting. The
+application owns completion decisions, sibling-call handling, and continuation.
+The flag is transient control metadata, not conversation content or a saved
+history field. These helpers perform no persistence or orchestration, and the
+formatter still returns only the formatted `finalMessage`.
+
 Exact exports: `CONVERSATION_CLOSING_REPORT_TOOL_NAME`, `classifyConversationClosingReportCalls`, `conversationClosingReportInstruction`, `createConversationClosingReportTool`, `formatConversationClosingReport`, `formatConversationClosingReportText`, `normalizeConversationClosingReport`.
 
 ### Availability and normalization

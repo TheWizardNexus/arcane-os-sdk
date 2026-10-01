@@ -489,8 +489,8 @@
       "summary": "Defines the closing-report tool, instruction, result normalizer, call classifier, and formatter.",
       "availability": "Cross-host",
       "protocol": "In-process only",
-      "normalization": "Required user-facing message remains distinct from the complete final_message; normalized results expose message, finalMessage, and rememberedActions.",
-      "surface": "Seven constants/helpers for closing reports; the sole-call schema requires message and final_message. formatConversationClosingReportText(value) exposes the existing &, <, and > escaping for any string, including whitespace-only chunks, and the complete report formatter reuses it."
+      "normalization": "Required user-facing message remains distinct from the complete final_message; normalized results expose message, finalMessage, and rememberedActions. Optional responseToUsersPromptComplete is preserved only when supplied as a boolean, with no coercion or default; it is transient app-owned control metadata outside saved history.",
+      "surface": "Seven constants/helpers for closing reports; the sole-call schema requires message and final_message. createConversationClosingReportTool optionally accepts responseToUsersPromptComplete:{required:false,description:<nonblank app-owned string>} to declare the boolean, or required:true to require it; omission preserves the existing schema. The normalizer remains independent of factory options and orchestration remains app-owned. formatConversationClosingReportText(value) exposes the existing &, <, and > escaping for any string, including whitespace-only chunks, and the complete report formatter reuses it."
     },
     {
       "file": "runtime/arcane/modules/ConversationTimebox.js",

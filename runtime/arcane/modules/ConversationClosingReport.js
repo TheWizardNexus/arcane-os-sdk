@@ -11,7 +11,8 @@ const TOOL_NAME_PATTERN=/^[a-z][a-z0-9_]*$/;
 const REPORT_FIELDS=new Set([
     'message',
     'final_message',
-    'remembered_actions'
+    'remembered_actions',
+    'responseToUsersPromptComplete'
 ]);
 
 function invalid(message){
@@ -88,11 +89,14 @@ function completeValue(value){
 /**
  * Creates a provider-neutral terminal tool for one user-facing conversation
  * closeout. The tool performs no inference, persistence, rendering, task
- * execution, navigation, or external delivery.
+ * execution, navigation, or external delivery. An optional
+ * responseToUsersPromptComplete declaration adds app-owned completion metadata;
+ * its description is required and its required setting defaults to false.
  */
 export function createConversationClosingReportTool({
     name=DEFAULT_TOOL_NAME,
-    description='Prepare a complete closing report when the user clearly ends a conversation.'
+    description='Prepare a complete closing report when the user clearly ends a conversation.',
+    responseToUsersPromptComplete
 }={}){
     if(!is.string(name)||!TOOL_NAME_PATTERN.test(name)){
         throw invalid('The closing-report tool name is invalid.');
@@ -101,7 +105,7 @@ export function createConversationClosingReportTool({
         throw invalid('The closing-report tool description is invalid.');
     }
 
-    return completeValue({
+    const tool={
         type:'function',
         function:{
             name,
@@ -145,7 +149,33 @@ export function createConversationClosingReportTool({
                 required:['message','final_message']
             }
         }
-    });
+    };
+
+    if(responseToUsersPromptComplete!==undefined){
+        if(!isPlainRecord(responseToUsersPromptComplete)){
+            throw invalid('responseToUsersPromptComplete options must be an object.');
+        }
+        const {
+            required=false,
+            description:completionDescription
+        }=responseToUsersPromptComplete;
+        if(!is.boolean(required)){
+            throw invalid('responseToUsersPromptComplete.required must be a boolean.');
+        }
+        tool.function.parameters.properties.responseToUsersPromptComplete={
+            type:'boolean',
+            description:normalizedText(
+                completionDescription,
+                'responseToUsersPromptComplete.description',
+                {required:true}
+            )
+        };
+        if(required){
+            tool.function.parameters.required.push('responseToUsersPromptComplete');
+        }
+    }
+
+    return completeValue(tool);
 }
 
 /**
@@ -181,13 +211,22 @@ export function normalizeConversationClosingReport(value){
         throw invalid(`Unexpected closing-report field: ${unexpectedField}.`);
     }
 
-    return completeValue({
+    const report={
         message:normalizedText(source.message,'message',{required:true}),
         finalMessage:normalizedFinalMessage(source.final_message),
         rememberedActions:normalizeRememberedConversationActions(
             source.remembered_actions||[]
         )
-    });
+    };
+
+    if(Object.hasOwn(source,'responseToUsersPromptComplete')){
+        if(!is.boolean(source.responseToUsersPromptComplete)){
+            throw invalid('responseToUsersPromptComplete must be a boolean.');
+        }
+        report.responseToUsersPromptComplete=source.responseToUsersPromptComplete;
+    }
+
+    return completeValue(report);
 }
 
 /**
@@ -233,13 +272,17 @@ export function classifyConversationClosingReportCalls(calls={}, {
 }
 
 export function formatConversationClosingReport(value){
-    const normalizedInput=isPlainRecord(value)&&value.finalMessage!==undefined
-        ?{
+    let normalizedInput=value;
+    if(isPlainRecord(value)&&value.finalMessage!==undefined){
+        normalizedInput={
             message:value.message,
             final_message:value.finalMessage,
             remembered_actions:value.rememberedActions,
+        };
+        if(Object.hasOwn(value,'responseToUsersPromptComplete')){
+            normalizedInput.responseToUsersPromptComplete=value.responseToUsersPromptComplete;
         }
-        :value;
+    }
     return formatConversationClosingReportText(
         normalizeConversationClosingReport(normalizedInput).finalMessage
     );
