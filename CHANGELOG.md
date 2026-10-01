@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.47.0
+
+- Add explicitly selected native browser speech recognition through
+  `createBrowserSpeechRecognitionProvider` in `arcane-os/ai/browser-speech`.
+  The provider uses the browser's SpeechRecognition capability without an SDK
+  model download or storage. It declares non-local behavior because the browser
+  may use its own remote recognition service. Applications own Profile selection
+  and language; Whisper, TTS, typing and existing defaults remain unchanged.
+- Own live capture through the existing independent STT runtime. Start stays in
+  the initiating user gesture; Stop drains final recognition, while cancellation,
+  provider replacement and cleanup suppress late results. Unsupported browsers
+  retain provider construction/catalog and report unavailability on activation.
+- Display native interim recognition immediately in transient shared controls.
+  Chat receives one complete combined final transcription at capture end;
+  continuous voice appends and saves confirmed segments in order through its
+  existing retryable save queue. Interim hypotheses are neither saved nor
+  submitted, and existing saved data is unchanged.
+
 ## 0.46.0
 
 - Add public `decodeMarkdownMediaRecord` for complete stored image records or
