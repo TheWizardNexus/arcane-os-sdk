@@ -314,6 +314,13 @@ extension callbacks. The component installs warning-only defaults when the host
 does not supply them; applications may instead consume the corresponding
 `chat-send-message` and `chat-language-changed` events.
 
+The composer uses the shared browser-device classification: Enter inserts a
+newline on mobile devices and tablets; desktop Enter submits before the native
+newline is inserted. Shift+Enter and input-method composition retain native
+editing. The visible Send button remains available on every device. Input
+changes resize the composer without submitting; held desktop Enter does not
+submit repeatedly. All input listeners follow the component's existing cleanup.
+
 Before any session binding begins, callback-mode `sessionStatus` follows the
 selected sticky LLM role and the existing application-owned `modelName` label
 (or the selected model ID). Assigning `modelName` refreshes that status even

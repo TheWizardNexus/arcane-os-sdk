@@ -889,14 +889,17 @@
         {default:FileEntity},
         {ConversationSubmissionBarrier,requireConversationTimeboxDelivery},
         {requestAIRuntimeIntent,subscribeAIRuntimeState},
-        {createPersistentAIChatSession}
+        {createPersistentAIChatSession},
+        {getBrowserDeviceClass}
     ]=await Promise.all([
         import('../modules/MD.js'),
         import('../entities/File.js'),
         import('../modules/ConversationTimebox.js'),
         import('../modules/AIRuntimeState.js'),
-        import('../modules/PersistentAIChatSession.js')
+        import('../modules/PersistentAIChatSession.js'),
+        import('arcane-os/browser-device')
     ]);
+    const browserDeviceClass = getBrowserDeviceClass();
 
     host.language=host.language||'English';
     host.name = host.name||'User';
@@ -2997,7 +3000,13 @@
     }
 
     textArea.addEventListener(
-        'keyup',
+        'keydown',
+        handleChatKeyDown,
+        {signal:aiRuntimeStateAbortController.signal}
+    );
+
+    textArea.addEventListener(
+        'input',
         resizeTextArea,
         {signal:aiRuntimeStateAbortController.signal}
     );
@@ -3140,12 +3149,28 @@
         {signal:aiRuntimeStateAbortController.signal}
     );
 
-    async function resizeTextArea(e={}) {
-        if(e.key && e.key == 'Enter' && !e.shiftKey && !send.disabled){
-            e.preventDefault();
-            void submitMessage('',{source:'keyboard'});
+    function handleChatKeyDown(event) {
+        if(browserDeviceClass === 'mobile'
+            || event.key !== 'Enter'
+            || event.shiftKey
+            || event.isComposing
+            || event.keyCode === 229
+            || send.disabled) {
+            return;
         }
 
+        event.preventDefault();
+        if(event.repeat) {
+            return;
+        }
+        void submitMessage(
+            '',
+            {source: 'keyboard'}
+        );
+        resizeTextArea();
+    }
+
+    async function resizeTextArea() {
         // Reset height to shrink to content size
         trackTranscriptScrollPosition();
         textArea.style.height = 'auto';
