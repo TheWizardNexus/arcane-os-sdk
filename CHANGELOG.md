@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.42.0
+
+- Accept the optional boolean `responseToUsersPromptComplete` in conversation
+  closing-report arguments, preserving both `true` and `false` and leaving the
+  normalized record unchanged when the field is omitted.
+- Add `createConversationClosingReportTool({responseToUsersPromptComplete:
+  {required:true,description}})` so applications can require the completion
+  flag and supply its complete description. Omitting the option preserves the
+  existing schema; an optional declaration defaults `required` to `false`.
+  Applications continue to own tool execution,
+  continuation, terminal closeout and storage; the SDK adds no runner or
+  automatic follow-up behavior and performs no saved-history migration.
+
 ## 0.41.0
 
 - Add `createTwinCloudTTSProvider` through `arcane-os/ai/browser-speech`,
