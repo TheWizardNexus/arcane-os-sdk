@@ -1184,6 +1184,7 @@ class AI {
     #ttsSegmentation={...DEFAULT_TTS_SEGMENTATION};
     #preparedSpeechReadiness = null;
     #preparedSpeechPlaybacks = new Set();
+    #nativeSpeechPlaybacks = new Set();
     #speechUnlockContext = null;
 
     #traceSpeech(phase,detail={}){
@@ -5940,6 +5941,11 @@ class AI {
     }
 
     prepareTTS({parts, storage = null, identity = null, signal = null, onState = null} = {}) {
+        if(this.#providerSpeechModel()?.speech?.playback==='native'){
+            const error=new Error('Native browser speech has no audio file to prepare or store; use prepareTTSPlayback.');
+            error.code='ARCANE_AI_TTS_AUDIO_EXPORT_UNAVAILABLE';
+            throw error;
+        }
         if(!is.array(parts)) {
             throw new TypeError('AI.prepareTTS parts must be an array.');
         }
@@ -6460,6 +6466,8 @@ class AI {
             scheduledStart:null,
             sourceNode:null,
             state:'queued',
+            nativePlayback:null,
+            nativeControl:null,
             text,
             voice:options.voice,
             speed:options.speed,
@@ -6530,6 +6538,13 @@ class AI {
             return this.#cancelSpeechJob(job);
         }
 
+        if(audio?.kind==='native-speech'){
+            job.nativePlayback=audio;
+            job.state='ready';
+            this.#requestSpeechPlayback();
+            return true;
+        }
+
         job.state='decoding';
         const audioContext=this.#getSpeechAudioContext();
         return this.playAudio(
@@ -6544,6 +6559,7 @@ class AI {
     async #requestSpeechAudio(job){
         job.abortController??=new AbortController();
         const selection=this.#providerRuntime.selection('tts');
+        const native=this.#providerSpeechModel()?.speech?.playback==='native';
         const voice=job.voice===undefined
             ?(selection?this.#providerSpeechVoice():null)
             :job.voice;
@@ -6551,21 +6567,23 @@ class AI {
             model:selection?.modelId||this.modelTTS,
             input:job.text,
             ...(job.voice!==undefined||voice?{voice}:{}),
-            responseFormat:selection
+            ...(!native?{responseFormat:selection
                 ?this.#providerSpeechResponseFormat()
-                :this.audioFormat,
+                :this.audioFormat}:{}),
             speed:job.speed===undefined?this.voiceSpeed:job.speed
         };
         this.#traceSpeechJob('generation.request',job,{payload,selection});
-        const response=await this.fetchTTS(
+        const response=await this.prepareTTSPlayback(
             payload,
             job.abortController.signal,
             {speechInputPrepared:true}
         );
-        return this.#normalizeProviderSpeechAudio(response);
+        return response?.kind==='native-speech'
+            ?response
+            :this.#normalizeProviderSpeechAudio(response);
     }
 
-    #providerSpeechVoice(){
+    #providerSpeechModel(){
         const selection=this.#providerRuntime.selection('tts');
         if(!selection){
             return null;
@@ -6573,9 +6591,13 @@ class AI {
         const provider=this.#providerRuntime.catalog('tts').find(
             entry=>entry.providerId===selection.providerId
         );
-        const model=provider?.models.find(entry=>entry?.id===selection.modelId);
+        return provider?.models.find(entry=>entry?.id===selection.modelId)??null;
+    }
+
+    #providerSpeechVoice(){
+        const model=this.#providerSpeechModel();
         return is.string(model?.defaultVoice)&&model.defaultVoice.trim()
-            ?model.defaultVoice.trim()
+            ?model.speech?.playback==='native'?model.defaultVoice:model.defaultVoice.trim()
             :null;
     }
 
@@ -6709,7 +6731,38 @@ class AI {
         return this.audioContext;
     }
 
+    async prepareTTSPlayback(payload={},signal=null,preparation={}){
+        const model=this.#providerSpeechModel();
+        if(model?.speech?.playback!=='native'){
+            return this.fetchTTS(payload,signal,preparation);
+        }
+        this.#assertServiceConfigured(this.ttsService,'tts');
+        if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
+        const selection=this.#providerRuntime.selection('tts');
+        const request={
+            ...payload,
+            model:payload.model??selection.modelId,
+            voice:payload.voice??this.#providerSpeechVoice(),
+            speed:payload.speed??this.voiceSpeed
+        };
+        const playback=await this.#providerRuntime.request('tts',{
+            operation:'synthesize',payload:request,localOnly:false,signal
+        },{speechInputPrepared:true});
+        if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
+        return {
+            ...playback,
+            play(options={}){
+                return playback.play({...options,signal:options.signal??signal});
+            }
+        };
+    }
+
     async fetchTTS(payload={},signal=null,{speechInputPrepared=false}={}){
+        if(this.#providerSpeechModel()?.speech?.playback==='native'){
+            const error=new Error('Native browser speech plays through prepareTTSPlayback and does not export audio.');
+            error.code='ARCANE_AI_TTS_AUDIO_EXPORT_UNAVAILABLE';
+            throw error;
+        }
         const callId=this.#traceSpeech('fetchTTS.call',{payload,aborted:signal?.aborted});
         try{
             this.#assertServiceConfigured(this.ttsService,'tts');
@@ -6958,6 +7011,7 @@ class AI {
             remainder:this.audioMessageChunks,queuedJobs:this.speechJobs.length
         });
         for(const playback of this.#preparedSpeechPlaybacks) playback.stop();
+        for(const playback of this.#nativeSpeechPlaybacks) playback.stop();
         this.speechGeneration+=1;
         this.speechResumeAttempt+=1;
         this.speechResumePending=false;
@@ -6970,6 +7024,7 @@ class AI {
 
         for(const job of this.speechJobs){
             job.abortController?.abort();
+            job.nativeControl?.stop();
             job.state='cancelled';
             this.#traceSpeechJob('queue.cancelled',job,{reason:'stopAudio',callId});
             job.resolvePlayback?.(false);
@@ -6997,7 +7052,7 @@ class AI {
         this.speechJobs.splice(0);
         this.sourceNodes.splice(0);
         this.currentSpeechJob=null;
-        this.isSpeaking=false;
+        this.isSpeaking=this.#nativeSpeechPlaybacks.size>0;
         this.#traceSpeech('stopAudio.result',{callId,result:true});
         return true;
     }
@@ -7009,6 +7064,13 @@ class AI {
         if(this.muted){
             this.#traceSpeech('resumeAudio.result',{callId,result:false,reason:'muted'});
             return false;
+        }
+
+        if(!audioContext&&this.#providerSpeechModel()?.speech?.playback==='native'){
+            const control=this.currentSpeechJob?.nativeControl;
+            if(control&&control.resume()===false)return false;
+            this.#requestSpeechPlayback();
+            return true;
         }
 
         if(fromUserGesture){
@@ -7207,8 +7269,77 @@ class AI {
         );
     }
 
+    async #completeNativeSpeechJob(job,played){
+        if(job.generation!==this.speechGeneration||job.state!=='scheduled')return;
+        if(!played){
+            this.#cancelSpeechJob(job);
+            this.#requestSpeechPlayback();
+            return;
+        }
+        // Playback completion excludes the trailing gap, just as it does for buffers.
+        job.resolvePlayback?.(true);
+        job.resolvePlayback=null;
+        if(job.pauseAfterMs>0){
+            const signal=job.abortController.signal;
+            await new Promise(function waitForNativeSpeechPause(resolve){
+                let timer=null;
+                function finish(){
+                    globalThis.clearTimeout(timer);
+                    signal.removeEventListener('abort',finish);
+                    resolve();
+                }
+                signal.addEventListener('abort',finish,{once:true});
+                if(signal.aborted){finish();return;}
+                timer=globalThis.setTimeout(finish,job.pauseAfterMs);
+            });
+        }
+        if(job.generation!==this.speechGeneration||job.state!=='scheduled')return;
+        this.nextSentance(job);
+    }
+
+    #waitForPrecedingSpeechClock(job){
+        const context=this.speechScheduleContext;
+        const deadline=this.speechScheduleTime;
+        if(!context||deadline<=context.currentTime)return Promise.resolve(true);
+        const signal=job.abortController.signal;
+        return new Promise(function waitForScheduledSpeechGap(resolve,reject){
+            let timer=null;
+            function finish(value,error=null){
+                globalThis.clearTimeout(timer);
+                signal.removeEventListener('abort',cancel);
+                context.removeEventListener('statechange',schedule);
+                if(error)reject(error);
+                else resolve(value);
+            }
+            function cancel(){finish(false);}
+            function schedule(){
+                globalThis.clearTimeout(timer);
+                if(signal.aborted){cancel();return;}
+                const remaining=deadline-context.currentTime;
+                if(remaining<=0){finish(true);return;}
+                if(context.state==='closed'){
+                    finish(false,new Error('The preceding speech audio context closed before its queued pause ended.'));
+                    return;
+                }
+                // A suspended audio clock resumes through its owning state event.
+                if(context.state==='running')timer=globalThis.setTimeout(schedule,remaining*1000);
+            }
+            signal.addEventListener('abort',cancel,{once:true});
+            context.addEventListener('statechange',schedule);
+            schedule();
+        });
+    }
+
+    #releaseNativeSpeechPlayback(control){
+        this.#nativeSpeechPlaybacks.delete(control);
+        this.isSpeaking=this.#nativeSpeechPlaybacks.size>0||this.speechJobs.some(
+            function hasPlayingSpeech(job){return job.state==='scheduled';}
+        );
+        this.#requestSpeechPlayback();
+    }
+
     async #pumpSpeechPlayback(){
-        if(this.speechPlaybackStarting||this.muted){
+        if(this.speechPlaybackStarting||this.muted||this.#nativeSpeechPlaybacks.size){
             return false;
         }
 
@@ -7236,6 +7367,32 @@ class AI {
                 if(job.generation!==this.speechGeneration||['cancelled','failed'].includes(job.state)){
                     this.#removeSpeechJob(job);
                     continue;
+                }
+
+                if(job.nativePlayback){
+                    // Native speech has no buffer duration: actual completion owns
+                    // the next turn, including when it follows buffered audio.
+                    if(index!==0||job.state!=='ready')break;
+                    if(!await this.#waitForPrecedingSpeechClock(job)
+                        ||job.generation!==this.speechGeneration||this.muted){
+                        return this.#cancelSpeechJob(job);
+                    }
+                    job.state='scheduled';
+                    this.currentSpeechJob=job;
+                    this.isSpeaking=true;
+                    job.nativeControl=job.nativePlayback.play({signal:job.abortController.signal});
+                    const control=job.nativeControl;
+                    this.#nativeSpeechPlaybacks.add(control);
+                    // A reported native control error need not mean the browser
+                    // released its utterance. Keep Stop ownership until it does.
+                    Promise.resolve(control.released??control.finished).then(
+                        ()=>this.#releaseNativeSpeechPlayback(control),
+                        ()=>this.#releaseNativeSpeechPlayback(control)
+                    );
+                    job.nativeControl.finished.then(
+                        played=>this.#completeNativeSpeechJob(job,played)
+                    ).catch(error=>this.#failSpeechJob(job,error,'playback-start'));
+                    return true;
                 }
 
                 if(!['ready','scheduled'].includes(job.state)||!job.sourceNode?.buffer){
@@ -7333,6 +7490,9 @@ class AI {
             return false;
         }finally{
             this.speechPlaybackStarting=false;
+            const nextJob=this.speechJobs.find(function findFirstUnscheduledSpeechJob(job){
+                return job.state!=='scheduled';
+            });
 
             if(
                 !this.muted
@@ -7347,11 +7507,8 @@ class AI {
                             &&job.scheduledEnd===null;
                     }
                 )
-                &&this.speechJobs.find(
-                    function findFirstUnscheduledSpeechJob(job){
-                        return job.state!=='scheduled';
-                    }
-                )?.state==='ready'
+                &&nextJob?.state==='ready'
+                &&(!nextJob.nativePlayback||this.speechJobs[0]===nextJob)
             ){
                 this.#requestSpeechPlayback();
             }
@@ -7370,7 +7527,7 @@ class AI {
             job.sourceNode.onended=null;
         }
 
-        if(job.scheduledEnd===null&&job.pauseAfterMs>0){
+        if(!job.nativePlayback&&job.scheduledEnd===null&&job.pauseAfterMs>0){
             this.speechScheduleContext=job.audioContext;
             this.speechScheduleTime=
                 (Number(job.audioContext?.currentTime)||0)+job.pauseAfterMs/1000;
@@ -7386,7 +7543,7 @@ class AI {
                 }
             )||null;
         }
-        this.isSpeaking=this.speechJobs.some(
+        this.isSpeaking=this.#nativeSpeechPlaybacks.size>0||this.speechJobs.some(
             function hasScheduledSpeechJob(candidate){
                 return candidate.state==='scheduled';
             }
@@ -7398,9 +7555,14 @@ class AI {
 
     #cancelSpeechJob(job){
         job.abortController?.abort();
+        job.nativeControl?.stop();
         job.state='cancelled';
         this.#traceSpeechJob('queue.cancelled',job);
         this.#removeSpeechJob(job);
+        if(this.currentSpeechJob===job)this.currentSpeechJob=null;
+        this.isSpeaking=this.#nativeSpeechPlaybacks.size>0||this.speechJobs.some(function hasActiveSpeech(candidate){
+            return candidate.state==='scheduled';
+        });
         return false;
     }
 
@@ -7489,7 +7651,7 @@ class AI {
                 }
             )||null;
         }
-        this.isSpeaking=this.speechJobs.some(
+        this.isSpeaking=this.#nativeSpeechPlaybacks.size>0||this.speechJobs.some(
             function hasRemainingScheduledSpeechJob(candidate){
                 return candidate.state==='scheduled';
             }

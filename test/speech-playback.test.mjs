@@ -95,6 +95,434 @@ async function waitForContract(condition,message) {
     assert.fail(message);
 }
 
+function nativeSpeechFixture(input,controls,exposeRelease=true) {
+    return {
+        kind:'native-speech',
+        input,
+        play({signal,onState}) {
+            const completion=deferredRequest();
+            const release=deferredRequest();
+            const control={
+                input,
+                signal,
+                onState,
+                finished:completion.promise,
+                ...(exposeRelease?{released:release.promise}:{}),
+                state:'playing',
+                error:null,
+                stops:0,
+                pause() {
+                    control.state='paused';
+                    onState({state:'paused',error:null});
+                    return true;
+                },
+                resume() {
+                    control.state='playing';
+                    onState({state:'playing',error:null});
+                    return true;
+                },
+                stop() {
+                    control.stops+=1;
+                    if(control.stopFailure) {
+                        control.fail(control.stopFailure);
+                        return false;
+                    }
+                    control.state=control.error?'error':'stopped';
+                    signal.removeEventListener('abort',stopForAbort);
+                    onState({state:control.state,error:control.error});
+                    if(control.error)completion.reject(control.error);
+                    else completion.resolve(false);
+                    release.resolve();
+                    return true;
+                },
+                finish() {
+                    control.state=control.error?'error':'complete';
+                    signal.removeEventListener('abort',stopForAbort);
+                    onState({state:control.state,error:control.error});
+                    if(control.error)completion.reject(control.error);
+                    else completion.resolve(true);
+                    release.resolve();
+                },
+                fail(error) {
+                    control.error=error;
+                    control.state='error';
+                    onState({state:'error',error});
+                    completion.reject(error);
+                }
+            };
+            function stopForAbort() {
+                control.stop();
+            }
+            signal.addEventListener('abort',stopForAbort,{once:true});
+            controls.push(control);
+            onState({state:'playing',error:null});
+            return control;
+        }
+    };
+}
+
+test(
+    'SpeechPlayback prepares native parts silently and advances only after native completion',
+    async function testNativePlaybackOrderAndControls() {
+        const requests=[];
+        const controls=[];
+        const audio=new ContractAudio();
+        const playback=new SpeechPlayback({
+            audio,
+            speech:{
+                providerRuntime:{
+                    status() {
+                        return {execution:{maxConcurrentRequests:4}};
+                    }
+                },
+                prepareTTSPlayback(payload,signal,preparation) {
+                    requests.push({payload,signal,preparation});
+                    return nativeSpeechFixture(payload.input,controls);
+                },
+                fetchTTS() {
+                    assert.fail('Native preparation must use the playback union.');
+                }
+            },
+            createObjectURL() {
+                assert.fail('Native speech does not produce an audio URL.');
+            },
+            revokeObjectURL() {
+                assert.fail('Native speech has no audio URL to revoke.');
+            }
+        });
+        try {
+            assert.deepEqual(await playback.prepare({
+                parts:['**First.**','Second.','Third.'],
+                voice:'native-voice-uri',
+                autoplay:false
+            }),{ready:true,played:false});
+            await waitForContract(
+                () => playback.nativeSegments.size===3,
+                'Every native descriptor should be prepared without starting speech.'
+            );
+            assert.equal(controls.length,0);
+            assert.deepEqual(playback.urls,[]);
+            assert.equal(audio.src,'');
+            assert.equal(audio.hidden,true);
+            assert.equal(playback.hasAudio(),true);
+            assert.deepEqual(requests.map(function requestedInput(request) {
+                return request.payload.input;
+            }),['First.','Second.','Third.']);
+            assert.equal(requests.every(function preparationIsMarked(request) {
+                return request.signal instanceof AbortSignal
+                    &&request.preparation.speechInputPrepared===true
+                    &&request.payload.voice==='native-voice-uri';
+            }),true);
+
+            assert.equal(await playback.play(),true);
+            assert.equal(controls.length,1);
+            assert.equal(playback.state,'playing');
+            assert.equal(await playback.togglePause(),true);
+            assert.equal(controls[0].state,'paused');
+            assert.equal(playback.state,'paused');
+            assert.equal(await playback.togglePause(),true);
+            assert.equal(controls[0].state,'playing');
+            assert.equal(controls.length,1);
+
+            controls[0].onState({state:'complete',error:null});
+            audio.dispatchEvent(new Event('ended'));
+            await Promise.resolve();
+            assert.equal(controls.length,1);
+            assert.equal(playback.index,0);
+            controls[0].finish();
+            await waitForContract(
+                () => controls.length===2,
+                'The second part should start after the first native end.'
+            );
+            assert.equal(controls[1].input,'Second.');
+            controls[1].finish();
+            await waitForContract(
+                () => controls.length===3,
+                'The third part should retain narration order.'
+            );
+            assert.equal(controls[2].input,'Third.');
+            const completion=playback.nativePlayback.completion;
+            controls[2].finish();
+            assert.equal(await completion,true);
+            assert.equal(playback.state,'ended');
+            assert.equal(playback.nativePlayback,null);
+        } finally {
+            playback.destroy();
+        }
+    }
+);
+
+test(
+    'SpeechPlayback native replay and disposal suppress superseded completion',
+    async function testNativeReplayCancellation() {
+        const controls=[];
+        const requests=[];
+        const playback=new SpeechPlayback({
+            audio:new ContractAudio(),
+            speech:{
+                prepare(payload,{signal}) {
+                    requests.push({payload,signal});
+                    return nativeSpeechFixture(payload.input,controls,false);
+                }
+            },
+            createObjectURL() {
+                assert.fail('Native preview must not create an audio URL.');
+            },
+            revokeObjectURL() {
+                assert.fail('Native preview must not revoke an audio URL.');
+            }
+        });
+        try {
+            await playback.prepare({parts:['First.','Second.'],autoplay:false});
+            await waitForContract(
+                () => playback.nativeSegments.has(1),
+                'Direct native preparation should keep one silent lookahead.'
+            );
+            assert.equal(requests.length,2);
+            assert.equal(controls.length,0);
+            await playback.play();
+            const originalCompletion=playback.nativePlayback.completion;
+            controls[0].finish();
+            assert.equal(await playback.replay(),true);
+            assert.equal(await originalCompletion,false);
+            assert.equal(controls[0].signal.aborted,true);
+            assert.equal(controls.length,2);
+            assert.equal(controls[1].input,'First.');
+            assert.equal(playback.index,0);
+            controls[0].onState({state:'paused',error:null});
+            assert.equal(playback.state,'playing');
+
+            const stopped=controls[1];
+            const stoppedCompletion=playback.nativePlayback.completion;
+            playback.stop();
+            assert.equal(stopped.signal.aborted,true);
+            assert.ok(stopped.stops>0);
+            assert.equal(await stoppedCompletion,false);
+            assert.equal(playback.hasAudio(),false);
+            assert.equal(playback.nativeSegments.size,0);
+            assert.equal(controls.length,2);
+
+            await playback.prepare({parts:['New narration.'],autoplay:true});
+            const disposed=controls[2];
+            const disposedCompletion=playback.nativePlayback.completion;
+            assert.equal(playback.destroy(),true);
+            assert.equal(disposed.signal.aborted,true);
+            assert.ok(disposed.stops>0);
+            assert.equal(await disposedCompletion,false);
+            assert.equal(playback.nativePlayback,null);
+            assert.equal(playback.state,'idle');
+        } finally {
+            playback.destroy();
+        }
+    }
+);
+
+test(
+    'SpeechPlayback observes native failures without advancing narration',
+    async function testNativePlaybackFailure() {
+        const controls=[];
+        const playback=new SpeechPlayback({
+            audio:new ContractAudio(),
+            speech:{
+                prepare(payload) {
+                    return nativeSpeechFixture(payload.input,controls);
+                }
+            }
+        });
+        try {
+            await playback.prepare({parts:['First.','Second.'],autoplay:true});
+            const completion=playback.nativePlayback.completion;
+            const failure=new Error('The native speech service failed.');
+            failure.code='ARCANE_AI_SPEECH_SYNTHESIS_FAILED';
+            controls[0].fail(failure);
+            assert.equal(await completion,false);
+            assert.equal(playback.state,'error');
+            assert.equal(playback.index,0);
+            assert.equal(controls.length,1);
+            assert.equal(playback.nativePlayback.control,controls[0]);
+            assert.equal(playback.nativePlayback.failed,true);
+            const release=playback.nativePlayback.releaseCompletion;
+            controls[0].finish();
+            await release;
+            assert.equal(playback.nativePlayback,null);
+            assert.equal(playback.state,'error');
+            assert.equal(controls.length,1);
+        } finally {
+            playback.destroy();
+        }
+    }
+);
+
+test(
+    'SpeechPlayback retains native ownership when stopping fails until actual release',
+    async function testNativeStopFailureLifetime() {
+        const controls=[];
+        const playback=new SpeechPlayback({
+            audio:new ContractAudio(),
+            speech:{
+                prepare(payload) {
+                    return nativeSpeechFixture(payload.input,controls);
+                }
+            }
+        });
+        try {
+            await playback.prepare({parts:['One active utterance.'],autoplay:true});
+            const active=playback.nativePlayback;
+            const failure=new Error('The browser could not cancel the utterance.');
+            failure.code='ARCANE_AI_SPEECH_SYNTHESIS_FAILED';
+            controls[0].stopFailure=failure;
+            playback.stop();
+            assert.equal(await active.completion,false);
+            assert.equal(playback.nativePlayback,active);
+            assert.equal(active.failed,true);
+            assert.equal(active.cancelled,true);
+            assert.equal(playback.state,'error');
+            assert.equal(playback.hasAudio(),false);
+            assert.equal(controls.length,1);
+
+            controls[0].finish();
+            await active.releaseCompletion;
+            assert.equal(playback.nativePlayback,null);
+            assert.equal(playback.state,'error');
+            assert.equal(controls.length,1);
+        } finally {
+            playback.destroy();
+        }
+    }
+);
+
+test(
+    'SpeechPlayback waits for retained native release before loading or playing a Blob replacement',
+    async function testNativeStopFailureBeforeBlobReplacement() {
+        const controls=[];
+        const audio=new ContractAudio();
+        let source='';
+        let sourceAutoplayAttempts=0;
+        let playCalls=0;
+        audio.autoplay=true;
+        Object.defineProperty(audio,'src',{
+            configurable:true,
+            get() {
+                return source;
+            },
+            set(value) {
+                source=value;
+                if(value&&audio.autoplay)sourceAutoplayAttempts+=1;
+            }
+        });
+        audio.play=function recordAudioPlay() {
+            playCalls+=1;
+            return ContractAudio.prototype.play.call(audio);
+        };
+        const playback=new SpeechPlayback({
+            audio,
+            speech:{
+                prepareTTSPlayback(payload) {
+                    return payload.input==='Recorded replacement.'
+                        ?minimalWavBlob()
+                        :nativeSpeechFixture(payload.input,controls);
+                }
+            },
+            createObjectURL() {
+                return 'blob:recorded-replacement';
+            },
+            revokeObjectURL() {}
+        });
+        try {
+            await playback.prepare({parts:['Native utterance.'],autoplay:true});
+            const active=playback.nativePlayback;
+            const failure=new Error('The browser could not stop the previous utterance.');
+            failure.code='ARCANE_AI_SPEECH_SYNTHESIS_FAILED';
+            controls[0].stopFailure=failure;
+
+            assert.deepEqual(await playback.prepare({
+                parts:['Recorded replacement.'],
+                autoplay:true
+            }),{ready:true,played:false});
+            assert.equal(await active.completion,false);
+            assert.equal(playback.nativePlayback,active);
+            assert.equal(playback.state,'error');
+            assert.equal(playback.urls[0],'blob:recorded-replacement');
+            assert.equal(audio.src,'');
+            assert.equal(audio.hidden,true);
+            assert.equal(sourceAutoplayAttempts,0);
+            assert.equal(playCalls,0);
+            assert.equal(await playback.play(),false);
+            assert.equal(sourceAutoplayAttempts,0);
+            assert.equal(playCalls,0);
+
+            controls[0].finish();
+            await active.releaseCompletion;
+            assert.equal(playback.nativePlayback,null);
+            assert.equal(audio.src,'');
+            assert.equal(playCalls,0);
+            assert.equal(await playback.play(),true);
+            assert.equal(audio.src,'blob:recorded-replacement');
+            assert.equal(sourceAutoplayAttempts,1);
+            assert.equal(playCalls,1);
+            assert.equal(playback.state,'playing');
+        } finally {
+            playback.destroy();
+        }
+    }
+);
+
+test(
+    'SpeechPlayback keeps Blob URLs distinct across native and recorded parts',
+    async function testMixedNativeAndBlobPlayback() {
+        const controls=[];
+        const blobs=[];
+        const revoked=[];
+        const audio=new ContractAudio();
+        const playback=new SpeechPlayback({
+            audio,
+            speech:{
+                prepareTTSPlayback(payload) {
+                    return payload.input==='Recorded.'
+                        ?minimalWavBlob()
+                        :nativeSpeechFixture(payload.input,controls);
+                }
+            },
+            createObjectURL(blob) {
+                assert.ok(blob instanceof Blob);
+                blobs.push(blob);
+                return 'blob:recorded-part';
+            },
+            revokeObjectURL(url) {
+                revoked.push(url);
+            }
+        });
+        try {
+            await playback.prepare({parts:['Native first.','Recorded.','Native last.']});
+            await waitForContract(
+                () => playback.urls[1],
+                'The recorded lookahead should retain its Blob URL.'
+            );
+            controls[0].finish();
+            await waitForContract(
+                () => playback.index===1&&audio.paused===false,
+                'The recorded part should play after native completion.'
+            );
+            assert.equal(audio.src,'blob:recorded-part');
+            assert.equal(audio.hidden,false);
+            assert.equal(blobs.length,1);
+            audio.dispatchEvent(new Event('ended'));
+            await waitForContract(
+                () => controls.length===2,
+                'The native final part should follow the recorded audio end.'
+            );
+            assert.equal(controls[1].input,'Native last.');
+            assert.equal(audio.src,'');
+            assert.equal(audio.hidden,true);
+            assert.equal(playback.urls[0],undefined);
+            assert.equal(playback.urls[2],undefined);
+        } finally {
+            playback.destroy();
+        }
+        assert.deepEqual(revoked,['blob:recorded-part']);
+    }
+);
+
 test(
     'SpeechPlayback uses caller policy, owned cancellation, and canonical state',
     async function testProviderNeutralSpeechPlayback() {

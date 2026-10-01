@@ -160,7 +160,7 @@ read-only `ttsSegmentation`, `configureTTSSegmentation()`,
 `streamTTS(text='',end=false,options={})`,
 `prepareTTS({parts,storage,identity,signal,onState})`,
 `playPreparedTTS(prepared,{signal,onState})`,
-`finishTTS()`, `fetchTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`,
+`finishTTS()`, `prepareTTSPlayback()`, `fetchTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`,
 `playAudio()`; consumes `user-entity-loaded` and `arcane-ollama-ready`,
 installs `window.ai`, and emits `ai-ready` and `ai-tts-failure`.
 
@@ -374,7 +374,7 @@ marks from a cloned outbound input before delegation; the caller's payload stays
 unchanged. The third `preparation` argument is reserved for SDK-internal
 delegation, where `{speechInputPrepared:true}` prevents a second cleanup pass;
 applications omit it. `streamTTS(text='',end=false,options={})` and
-`finishTTS()` use this same request boundary. The third-argument options below
+`finishTTS()` use the selected playback boundary. The third-argument options below
 are available in SDK `0.5.12`. The `textFormat` compatibility extra added in
 SDK `0.5.16` is ignored beginning in `0.5.17`:
 
@@ -386,7 +386,7 @@ SDK `0.5.16` is ignored beginning in `0.5.17`:
 | `waitForPlayback` | `false` | Omission retains the preparation promise. With `true`, the promise resolves after every extracted segment reaches a terminal playback state: `true` when all naturally end, or `false` after terminal cancellation or failure. |
 | `textFormat` | Ignored compatibility extra | Repeated same formatting marks are removed automatically from every TTS call. This value no longer selects or disables cleanup. |
 
-The voice and speed use the existing `fetchTTS()` validation and error path.
+Audio-file voice and speed use the existing `fetchTTS()` validation and error path.
 The automatic cleanup changes only the outbound speech-input copy; displayed,
 stored, model, and caller-owned content remains exact. It is a narrow
 formatting-mark filter, not a full Markdown parser: links, code contents, list
@@ -404,6 +404,24 @@ while flushing any pending formatting mark. Use `end:true`
 for a complete passage. A call extracting no segments resolves
 `true` without waiting for earlier jobs; `finishTTS()` remains a preparation
 flush, not a queue-wide playback barrier. A muted call resolves `false`.
+
+`prepareTTSPlayback(payload,signal,preparation={})` is the silent playback-oriented
+request. Audio-file providers retain the `fetchTTS()` Blob contract; a selected
+model with `speech.playback:'native'` returns an inert `native-speech` descriptor.
+Its `play({signal,onState})` returns native completion and lifecycle controls.
+The preparation signal remains its default playback signal. Native input stays
+complete; per-request voice/language/speed and the configured model default own
+selection, without reading global user voice or conversation-language fields.
+Native streaming jobs wait for actual end in order and allocate no AudioContext.
+When native speech follows recorded audio, the preceding audio clock still owns
+its requested inter-part pause. Native trailing silence delays the next part,
+not the completed playback promise; cancellation retires either pending gap.
+Failed native control remains owned through its `released` promise, so Stop can
+still reach it and subsequent buffered audio cannot overlap it. Explicit saved
+Blob playback continues to use its own AudioContext even when native speech is
+the currently selected provider. `fetchTTS()` and durable `prepareTTS()` report
+`ARCANE_AI_TTS_AUDIO_EXPORT_UNAVAILABLE` for native selection; no audio file is
+fabricated. See [native voice catalogs and previews](ai/browser-speech.md#native-browser-text-to-speech-and-voice-previews).
 
 Playback completion stays pending while the browser waits for an audio-unlock
 gesture or a recoverable resume attempt. If resuming a closed `AudioContext`
@@ -3731,8 +3749,10 @@ new SpeechPlayback({
 })
 ```
 
-`speech` must expose either `fetchTTS(payload, signal)` or
-`synthesize(payload, {signal})`. `SpeechPlayback` also supplies a third
+`speech` may expose `prepareTTSPlayback(payload,signal)` returning a Blob or
+native descriptor, a native provider's silent `prepare(payload,{signal})`,
+`fetchTTS(payload, signal)`, or `synthesize(payload, {signal})`.
+The playback-oriented method is preferred. `SpeechPlayback` also supplies a third
 SDK-internal preparation object; existing two-argument clients may ignore it.
 `prepare({key,parts,model,voice,responseFormat,
 speed,autoplay=true})` uses only caller-supplied model, voice, and response-format
@@ -3774,6 +3794,15 @@ the same supplied `audio` element. Stop aborts every owned synthesis signal and
 releases prepared URLs. Replay keeps completed URLs and still-pending provider
 work, then re-submits only failed missing provider segments before starting
 again from index zero.
+
+Native descriptors are retained separately from Blob URLs and never assigned to
+an audio element. `autoplay:false` remains silent. Play, Pause, Resume, Stop and
+Replay use the native control; only a successful current native `finished`
+advances the next part. Native errors remain observable, and a failed native
+control stays owned until its optional `released` promise confirms cleanup.
+Stale completion after stop/restart/disposal cannot advance replacement content.
+Selecting a native part hides and clears the HTML audio source while preserving
+the same shared playback state events and complete original parts.
 
 Every preparation owns an operation ID and one AbortController for each active
 synthesis segment or playback delay. Replacement,

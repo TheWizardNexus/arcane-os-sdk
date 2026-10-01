@@ -1,7 +1,7 @@
 # Browser speech providers
 
 `arcane-os/ai/browser-speech` supplies caller-selected Whisper or native Web
-Speech recognition, Kokoro text-to-speech, and TWiN Cloud text-to-speech providers. Its local path
+Speech recognition and synthesis, Kokoro text-to-speech, and TWiN Cloud text-to-speech providers. Its local path
 provides artifact storage, live module routing, role Workers, provider/2
 adapters, bounded parallel TTS synthesis, audio normalization, cancellation,
 and cleanup.
@@ -81,6 +81,78 @@ Whisper/file-provider contract; native recognition rejects file transcription
 honestly rather than recording again or silently switching providers. See the
 [Web Speech specification](https://webaudio.github.io/web-speech-api/#speechreco-methods)
 for native stop/abort behavior.
+
+## Native browser text-to-speech and voice previews
+
+`createBrowserSpeechSynthesisProvider({id,model:{id,name?,defaultVoice?},language?})`
+uses the host browser's `speechSynthesis` and `SpeechSynthesisUtterance`.
+The application selects this provider as its default when desired; constructing
+it does not change global preferences, activate Chat speech, or play audio.
+The provider declares `localOnly:false` because a browser voice may use a remote
+service. Individual catalog records expose the browser's `localService` value.
+
+```javascript
+import {createBrowserSpeechSynthesisProvider} from 'arcane-os/ai/browser-speech';
+
+const voicePreview = createBrowserSpeechSynthesisProvider({
+  id: 'browser-preview',
+  model: {id: 'browser-voices', name: 'Browser voices'}
+});
+const unsubscribe = voicePreview.subscribeCatalog(function showVoices(models) {
+  // Pass these real records to the application's language/voice selector.
+  console.log(models[0].voices);
+});
+
+// Call only from the application's explicit Play action.
+function playIntroduction(input, voice) {
+  return voicePreview.play({input, voice});
+}
+// The owning view unsubscribes and disposes voicePreview when it closes.
+```
+
+`catalog()` synchronously returns an array of model records. Each model has
+`speech:{playback:'native'}` and `voices:[{id,name,lang,default,localService}]`;
+`id` is the exact native `voiceURI`. `subscribeCatalog(callback)` immediately
+replays that same shape and updates it on `voiceschanged`, returning an
+unsubscribe function. An initially empty inventory is ordinary pending browser
+state. There is no polling, discovery utterance, model download, or page-load
+barrier. Language selectors derive their choices from this actual inventory.
+
+`prepare({input,voice?,language?,speed?},{signal?})` returns an inert
+`{kind:'native-speech',input,voice,language,speed,play(options)}` descriptor.
+`play(payload,{signal,onState})` is the explicit-preview convenience. Both
+preserve complete input. Omitted voice uses the configured `model.defaultVoice`
+or the actual browser default; a supplied voice is never replaced with a named
+SDK alias. Language comes from that voice unless explicitly provided. Neither
+API reads the conversation's language preference. A saved voice waits for
+`voiceschanged` if the inventory is empty; a nonempty inventory missing it
+reports `ARCANE_AI_SPEECH_VOICE_UNAVAILABLE`.
+
+Playback returns `{finished,released,state,error,pause(),resume(),stop()}`.
+`finished` resolves `true` on actual native end, `false` on stop/abort, and
+rejects genuine native failures. `released` resolves when native resource
+ownership actually ends: a failed pause/resume/cancel can report an error before
+the utterance terminates. `onState({state,error})` observes queued,
+waiting-for-voices, playing, paused, complete, stopped, or error. Keep complete
+errors in diagnostics and ordinary status in the interface.
+
+Preview does not depend on AI mute or model activation. Use a separate provider
+instance when the preview should have a lifetime independent of Chat's selected
+provider. Provider unload/dispose stop their own playback, invalidate prepared
+descriptors, and disposal removes catalog listeners. Web Speech pause/resume/cancel
+operate on the native synthesis object globally; the SDK serializes its own
+utterances and does not claim control isolation from unrelated direct native
+callers. See the [native synthesis contract](https://webaudio.github.io/web-speech-api/#tts-section).
+
+For Chat, configure this provider with `ai.configureSpeechProvider('tts',provider)`
+and retain the existing explicit mute/unmute lifecycle. `AI.streamTTS()` and
+`SpeechPlayback` use actual utterance completion and cancellation in original
+order. `AI.prepareTTSPlayback(payload,signal)` returns either real Blob audio or
+the native descriptor without speaking; its signal remains attached by default
+when the returned descriptor is played. `AI.fetchTTS()` and durable
+`AI.prepareTTS()` remain audio-file APIs and report
+`ARCANE_AI_TTS_AUDIO_EXPORT_UNAVAILABLE` for native synthesis, which exposes no
+downloadable audio file.
 
 <a id="digitalocean-fal-text-to-speech"></a>
 

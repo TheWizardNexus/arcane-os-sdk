@@ -239,6 +239,10 @@ async function playableSpeechBlob(response){
     throw synthesizedAudioContractError();
 }
 
+function isNativeSpeechPlayback(value){
+    return value?.kind==='native-speech'&&is.function(value.play);
+}
+
 function speechPlaybackFailureReason(error){
     if(error?.name==='AbortError')return 'speech-synthesis-cancelled';
     if(is.string(error?.code)
@@ -310,7 +314,7 @@ function queueFor(speech){
 }
 
 function providerSpeechCapacity(speech){
-    if(!is.function(speech?.fetchTTS))return null;
+    if(!is.function(speech?.prepareTTSPlayback)&&!is.function(speech?.fetchTTS))return null;
     try{
         const providerRuntime=speech.providerRuntime;
         if(!providerRuntime||!is.function(providerRuntime.status))return null;
@@ -330,7 +334,7 @@ function startProviderSegment(playback,index,providerSynthesisBatch){
         providerSynthesisBatch!==playback.providerSynthesisBatch
         ||index<0
         ||index>=playback.parts.length
-        ||playback.urls[index]
+        ||playback.hasSegment(index)
     )return null;
     const existing=playback.segmentRequests.get(index);
     if(existing?.providerSynthesisBatch===providerSynthesisBatch){
@@ -348,10 +352,10 @@ function startProviderSegment(playback,index,providerSynthesisBatch){
         function storeProviderSynthesizedSegment(outcome){
             if(outcome===SUPERSEDED)return {ready:false,superseded:true};
             if(providerSynthesisBatch!==playback.providerSynthesisBatch){
-                playback.revokeObjectURL(outcome.url);
+                playback.discardSegment(outcome);
                 return {ready:false,superseded:true};
             }
-            playback.urls[index]=outcome.url;
+            playback.retainSegment(index,outcome);
             return {ready:true};
         },
         function handleProviderSegmentFailure(error){
@@ -401,6 +405,7 @@ const DEFAULT_MESSAGES={
     autoplayBlocked:'Speech is ready. Browser autoplay was blocked; press Play.',
     playing:'Reading the visible content aloud.',
     buffering:'Preparing the next speech segment.',
+    waitingForVoices:'Waiting for the browser voice list.',
     paused:'Narration paused.',
     pausing:'Pausing between narration sections.',
     stopped:'Speech stopped. Start narration again to replay.',
@@ -464,6 +469,8 @@ class SpeechPlayback{
         };
         this.messages={...DEFAULT_MESSAGES,...messages};
         this.urls=[];
+        this.nativeSegments=new Map();
+        this.nativePlayback=null;
         this.parts=[];
         this.index=0;
         this.generation=0;
@@ -519,9 +526,9 @@ class SpeechPlayback{
             message,
             key,
             index:this.index,
-            total:this.parts.length||this.urls.filter(Boolean).length,
+            total:this.parts.length||this.urls.filter(Boolean).length+this.nativeSegments.size,
             producing:this.synthesisInFlight,
-            buffered:this.urls.filter(Boolean).length,
+            buffered:this.urls.filter(Boolean).length+this.nativeSegments.size,
             hasAudio:this.hasAudio(),
             operationId:this.operationId,
             code,
@@ -551,6 +558,8 @@ class SpeechPlayback{
             this.speech
             &&(
                 is.function(this.speech.fetchTTS)
+                ||is.function(this.speech.prepareTTSPlayback)
+                ||is.function(this.speech.prepare)
                 ||is.function(this.speech.synthesize)
             )
         );
@@ -558,22 +567,38 @@ class SpeechPlayback{
 
     hasAudio(key=this.key){
         const playable=this.providerSynthesisBatch
-            ?Boolean(this.urls[0])
-            :this.urls.some(Boolean);
+            ?this.hasSegment(0)
+            :this.urls.some(Boolean)||this.nativeSegments.size>0;
         return Boolean(playable&&(!key||key===this.key));
     }
 
+    hasSegment(index){
+        return Boolean(this.urls[index])||this.nativeSegments.has(index);
+    }
+
+    retainSegment(index,outcome){
+        if(outcome.nativeSpeech)this.nativeSegments.set(index,outcome.nativeSpeech);
+        else this.urls[index]=outcome.url;
+    }
+
+    discardSegment(outcome){
+        if(outcome?.url)this.revokeObjectURL(outcome.url);
+    }
+
     releaseURLs(){
+        const stopped=this.stopNativePlayback();
         for(const url of this.urls){
             if(url)this.revokeObjectURL(url);
         }
         this.urls=[];
+        this.nativeSegments.clear();
         this.parts=[];
         this.lookahead=null;
         this.lookaheadError=null;
         this.providerSynthesisBatch=null;
         this.segmentRequests.clear();
         this.segmentErrors.clear();
+        return stopped;
     }
 
     releaseUrls(){this.releaseURLs();}
@@ -590,10 +615,10 @@ class SpeechPlayback{
         this.audio.removeAttribute?.('src');
         this.audio.load?.();
         this.audio.hidden=true;
-        this.releaseURLs();
+        const stopped=this.releaseURLs();
         this.index=0;
         this.key='';
-        this.emit('idle',message,cancelledKey,{reason});
+        if(stopped)this.emit('idle',message,cancelledKey,{reason});
     }
 
     async requestSpeech(part,signal){
@@ -606,10 +631,18 @@ class SpeechPlayback{
             ...(part.voice?{voice:part.voice}:{}),
             ...(this.responseFormat?{responseFormat:this.responseFormat}:{})
         };
+        if(is.function(this.speech?.prepareTTSPlayback)){
+            const prepared=await this.speech.prepareTTSPlayback(payload,signal,preparation);
+            return isNativeSpeechPlayback(prepared)?prepared:playableSpeechBlob(prepared);
+        }
         if(is.function(this.speech?.fetchTTS)){
             return playableSpeechBlob(
                 await this.speech.fetchTTS(payload,signal,preparation)
             );
+        }
+        if(is.function(this.speech?.prepare)){
+            const prepared=await this.speech.prepare(payload,{signal},preparation);
+            return isNativeSpeechPlayback(prepared)?prepared:playableSpeechBlob(prepared);
         }
         if(is.function(this.speech?.synthesize)){
             return playableSpeechBlob(
@@ -647,7 +680,7 @@ class SpeechPlayback{
             if(announce){
                 playback.emit('synthesizing',playback.message('preparing',{count:playback.parts.length}));
             }
-            const audio=await playback.requestSpeech(
+            const prepared=await playback.requestSpeech(
                 part,
                 controller.signal
             );
@@ -655,7 +688,8 @@ class SpeechPlayback{
                 controller.abort();
                 return SUPERSEDED;
             }
-            const url=playback.createObjectURL(audio);
+            if(isNativeSpeechPlayback(prepared))return {nativeSpeech:prepared};
+            const url=playback.createObjectURL(prepared);
             if(!segmentRequestIsCurrent()){
                 playback.revokeObjectURL(url);
                 controller.abort();
@@ -681,7 +715,7 @@ class SpeechPlayback{
             generation!==this.generation
             ||index<0
             ||index>=this.parts.length
-            ||this.urls[index]
+            ||this.hasSegment(index)
         )return null;
         if(
             this.lookahead
@@ -695,10 +729,10 @@ class SpeechPlayback{
             function storeSynthesizedSegment(outcome){
                 if(outcome===SUPERSEDED)return {ready:false,superseded:true};
                 if(generation!==playback.generation){
-                    playback.revokeObjectURL(outcome.url);
+                    playback.discardSegment(outcome);
                     return {ready:false,superseded:true};
                 }
-                playback.urls[index]=outcome.url;
+                playback.retainSegment(index,outcome);
                 return {ready:true};
             },
             function handleLookaheadFailure(error){
@@ -716,19 +750,19 @@ class SpeechPlayback{
 
     async waitForSegment(index,generation){
         if(generation!==this.generation)return false;
-        if(this.urls[index])return true;
+        if(this.hasSegment(index))return true;
         if(this.providerSynthesisBatch){
             const segmentError=this.segmentErrors.get(index);
             if(segmentError?.providerSynthesisBatch===this.providerSynthesisBatch){
                 return false;
             }
             const record=this.segmentRequests.get(index);
-            if(!record)return Boolean(this.urls[index]);
+            if(!record)return this.hasSegment(index);
             const result=await record.promise;
             return generation===this.generation
                 &&record.providerSynthesisBatch===this.providerSynthesisBatch
                 &&result.ready===true
-                &&Boolean(this.urls[index]);
+                &&this.hasSegment(index);
         }
         if(
             this.lookaheadError
@@ -740,9 +774,9 @@ class SpeechPlayback{
             &&this.lookahead.generation===generation
             &&this.lookahead.index===index
         )?this.lookahead:this.startLookahead(index,generation);
-        if(!record)return Boolean(this.urls[index]);
+        if(!record)return this.hasSegment(index);
         const result=await record.promise;
-        return generation===this.generation&&result.ready===true&&Boolean(this.urls[index]);
+        return generation===this.generation&&result.ready===true&&this.hasSegment(index);
     }
 
     async waitForPause(duration,generation){
@@ -836,7 +870,11 @@ class SpeechPlayback{
                 );
                 const result=await first.promise;
                 if(Object.hasOwn(result,'error'))throw result.error;
-                outcome=result.ready?{url:this.urls[0]}:SUPERSEDED;
+                outcome=result.ready
+                    ?this.nativeSegments.has(0)
+                        ?{nativeSpeech:this.nativeSegments.get(0)}
+                        :{url:this.urls[0]}
+                    :SUPERSEDED;
             }
         }catch(error){
             if(generation!==this.generation)return {ready:false,played:false};
@@ -847,7 +885,7 @@ class SpeechPlayback{
             throw error;
         }
         if(outcome===SUPERSEDED||generation!==this.generation){
-            if(outcome?.url)this.revokeObjectURL(outcome.url);
+            this.discardSegment(outcome);
             if(generation===this.generation){
                 this.releaseURLs();
                 this.key='';
@@ -856,12 +894,11 @@ class SpeechPlayback{
             return {ready:false,played:false};
         }
 
-        this.urls[0]=outcome.url;
+        this.retainSegment(0,outcome);
         this.index=0;
-        this.audio.hidden=false;
-        this.loadCurrent();
-        this.emit('ready',this.message('ready'));
-        const played=autoplay?await this.play():false;
+        const loaded=this.loadCurrent();
+        if(loaded)this.emit('ready',this.message('ready'));
+        const played=autoplay&&loaded?await this.play():false;
         if(generation===this.generation&&!this.providerSynthesisBatch){
             this.startLookahead(1,generation);
         }
@@ -869,13 +906,26 @@ class SpeechPlayback{
     }
 
     loadCurrent(){
-        if(!this.urls[this.index])return;
+        if(!this.hasSegment(this.index))return false;
+        if(this.nativePlayback&&!this.stopNativePlayback())return false;
+        if(this.nativeSegments.has(this.index)){
+            this.audio.pause();
+            this.audio.removeAttribute?.('src');
+            this.audio.load?.();
+            this.audio.hidden=true;
+            return true;
+        }
+        this.audio.hidden=false;
         this.audio.src=this.urls[this.index];
         this.audio.load?.();
+        return true;
     }
 
     async play(){
         if(!this.hasAudio())return false;
+        if(this.nativeSegments.has(this.index))return this.playNative();
+        if(this.nativePlayback&&!this.stopNativePlayback())return false;
+        if(this.audio.src!==this.urls[this.index]&&!this.loadCurrent())return false;
         try{
             await this.audio.play();
             return true;
@@ -890,17 +940,156 @@ class SpeechPlayback{
         }
     }
 
+    stopNativePlayback(){
+        const active=this.nativePlayback;
+        if(!active)return true;
+        active.cancelled=true;
+        let stopped=false;
+        let failure=null;
+        try{
+            stopped=active.control?.stop()===true;
+        }catch(error){
+            failure=error;
+        }finally{
+            active.controller.abort();
+        }
+        const released=active.released||!active.control||stopped
+            ||active.control.state==='complete'||active.control.state==='stopped';
+        if(!released){
+            failure=failure??active.control.error;
+            if(failure){
+                active.failed=true;
+                console.error('[Arcane speech playback] Native speech stop failed.',failure);
+                this.fail(failure);
+            }
+            return false;
+        }
+        if(this.nativePlayback===active)this.nativePlayback=null;
+        this.abortControllers.delete(active.controller);
+        return true;
+    }
+
+    playNative(){
+        const prepared=this.nativeSegments.get(this.index);
+        if(!prepared)return false;
+        const previous=this.nativePlayback;
+        if(previous&&previous.generation===this.generation&&previous.index===this.index){
+            try{
+                if(previous.failed)return false;
+                return previous.control?.state==='paused'
+                    ?previous.control.resume()
+                    :true;
+            }catch(error){
+                this.stopNativePlayback();
+                this.fail(error);
+                return false;
+            }
+        }
+        if(!this.stopNativePlayback())return false;
+        const playback=this;
+        const active={
+            generation:this.generation,
+            index:this.index,
+            controller:new AbortController(),
+            control:null,
+            completion:null,
+            releaseCompletion:null,
+            failed:false,
+            cancelled:false,
+            released:false
+        };
+        this.nativePlayback=active;
+        this.abortControllers.add(active.controller);
+        function currentNativePlayback(){
+            return playback.nativePlayback===active
+                &&playback.generation===active.generation
+                &&playback.index===active.index
+                &&!active.cancelled;
+        }
+        function releaseNativePlayback(){
+            active.released=true;
+            playback.abortControllers.delete(active.controller);
+            if((active.failed||active.cancelled)&&playback.nativePlayback===active){
+                playback.nativePlayback=null;
+            }
+        }
+        function observeNativeState(detail){
+            if(playback.nativePlayback===active
+                &&(active.failed||active.cancelled)
+                &&(detail.state==='complete'||detail.state==='stopped')){
+                releaseNativePlayback();
+                return;
+            }
+            if(!currentNativePlayback())return;
+            if(active.failed)return;
+            if(detail.state==='playing')playback.emit('playing',playback.message('playing'));
+            else if(detail.state==='paused')playback.emit('paused',playback.message('paused'));
+            else if(detail.state==='waiting-for-voices'){
+                playback.emit('buffering',playback.message('waitingForVoices'));
+            }
+        }
+        async function observeNativeCompletion(){
+            try{
+                const completed=await active.control.finished;
+                if(!currentNativePlayback())return false;
+                playback.nativePlayback=null;
+                playback.abortControllers.delete(active.controller);
+                if(completed===true)return await playback.advance();
+                if(active.control.error)playback.fail(active.control.error);
+                else playback.emit('ready',playback.message('stopped'));
+                return false;
+            }catch(error){
+                console.error('[Arcane speech playback] Native speech failed.',error);
+                // A native control failure may leave the utterance running until stop or end.
+                active.failed=true;
+                if(playback.generation===active.generation
+                    &&(playback.nativePlayback===active||playback.nativePlayback===null)){
+                    playback.fail(error);
+                }
+                if(active.released)releaseNativePlayback();
+                return false;
+            }
+        }
+        async function observeNativeRelease(){
+            try{
+                await active.control.released;
+                releaseNativePlayback();
+            }catch(error){
+                console.error('[Arcane speech playback] Native speech release failed.',error);
+                if(currentNativePlayback())playback.fail(error);
+            }
+        }
+        try{
+            active.control=prepared.play({
+                signal:active.controller.signal,
+                onState:observeNativeState
+            });
+            active.completion=observeNativeCompletion();
+            if(is.function(active.control.released?.then)){
+                active.releaseCompletion=observeNativeRelease();
+            }
+            return currentNativePlayback()
+                &&active.control.state!=='error'
+                &&active.control.state!=='stopped';
+        }catch(error){
+            this.stopNativePlayback();
+            this.fail(error);
+            return false;
+        }
+    }
+
     async restart(){
         if(!this.hasAudio())return false;
         this.generation+=1;
         const generation=this.generation;
+        if(!this.stopNativePlayback())return false;
         if(this.providerSynthesisBatch){
             const providerSynthesisBatch=this.providerSynthesisBatch;
             for(const [index,segmentError] of this.segmentErrors){
                 if(
                     segmentError?.providerSynthesisBatch
                         ===providerSynthesisBatch
-                    &&!this.urls[index]
+                    &&!this.hasSegment(index)
                     &&!this.segmentRequests.has(index)
                 ){
                     startProviderSegment(
@@ -916,9 +1105,9 @@ class SpeechPlayback{
         }
         this.audio.pause();
         this.index=0;
-        this.loadCurrent();
+        const loaded=this.loadCurrent();
         this.audio.currentTime=0;
-        const played=await this.play();
+        const played=loaded?await this.play():false;
         if(generation===this.generation&&!this.providerSynthesisBatch){
             this.startLookahead(1,generation);
         }
@@ -929,6 +1118,18 @@ class SpeechPlayback{
 
     async togglePause(){
         if(!this.hasAudio())return false;
+        if(this.nativeSegments.has(this.index)){
+            if(this.nativePlayback?.failed)return false;
+            const control=this.nativePlayback?.control;
+            if(!control||control.state==='paused')return this.play();
+            try{
+                return control.pause();
+            }catch(error){
+                this.stopNativePlayback();
+                this.fail(error);
+                return false;
+            }
+        }
         if(this.audio.paused)return this.play();
         this.audio.pause();
         return true;
@@ -936,7 +1137,7 @@ class SpeechPlayback{
 
     stop(){
         const hasAudio=this.hasAudio();
-        if(!this.synthesisInFlight&&!hasAudio)return;
+        if(!this.synthesisInFlight&&!hasAudio&&!this.nativePlayback)return;
         this.cancel(
             this.message(hasAudio?'stopped':'preparationStopped'),
             'playback-stopped'
@@ -958,7 +1159,7 @@ class SpeechPlayback{
             }
         }
         const nextIndex=this.index+1;
-        if(!this.urls[nextIndex]){
+        if(!this.hasSegment(nextIndex)){
             this.emit('buffering',this.message('buffering'));
             const ready=await this.waitForSegment(nextIndex,generation);
             if(!ready||generation!==this.generation){
@@ -978,8 +1179,8 @@ class SpeechPlayback{
             }
         }
         this.index=nextIndex;
-        this.loadCurrent();
-        const played=await this.play();
+        const loaded=this.loadCurrent();
+        const played=loaded?await this.play():false;
         if(generation===this.generation&&!this.providerSynthesisBatch){
             this.startLookahead(nextIndex+1,generation);
         }
@@ -987,6 +1188,7 @@ class SpeechPlayback{
     }
 
     async handleEnded(){
+        if(this.nativeSegments.has(this.index))return;
         try{
             await this.advance();
         }catch(error){
@@ -994,15 +1196,19 @@ class SpeechPlayback{
         }
     }
 
-    handlePlay(){this.emit('playing',this.message('playing'));}
+    handlePlay(){
+        if(!this.nativeSegments.has(this.index))this.emit('playing',this.message('playing'));
+    }
 
     handlePause(){
+        if(this.nativeSegments.has(this.index))return;
         if(this.hasAudio()&&this.audio.currentTime>0&&!this.audio.ended){
             this.emit('paused',this.message('paused'));
         }
     }
 
     handleError(){
+        if(this.nativeSegments.has(this.index))return;
         const error=new Error(this.message('playbackError'));
         error.code='ARCANE_SPEECH_PLAYBACK_AUDIO_PLAYBACK_REJECTED';
         this.fail(error);
