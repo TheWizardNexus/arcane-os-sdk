@@ -817,7 +817,7 @@ test('lazy media loads only on selection, retries locally, and ignores late comp
         await fixture.open();
         assert.equal(attempts, 0);
         assert.equal(fixture.createdURLs.length, 0);
-        const load = fixture.descendants(fixture.fileModal, function isLoad(element) {return element.textContent === 'Load Selected recording';})[0];
+        const load = fixture.descendants(fixture.fileModal, function isLoad(element) {return element.localName === 'button' && element.textContent === 'Load Selected recording';})[0];
         await load.fire('click');
         assert.equal(attempts, 1);
         assert.equal(load.disabled, false);
