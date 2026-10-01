@@ -80,9 +80,8 @@
 
 <section class="voice-transcription">
     <p id="description" class="description" part="description"></p>
-    <section id="transcript" class="transcript" part="transcript"></section>
+    <section id="transcript" class="transcript" part="transcript" aria-live="polite"></section>
     <div class="transcription-feedback">
-        <p id="interim" class="status" part="interim" aria-live="polite" hidden></p>
         <p id="status" class="status" part="status" role="status" aria-live="polite"></p>
         <progress
             id="sttActivationProgress"
@@ -150,7 +149,6 @@
     const description=host.shadowRoot.querySelector('#description');
     const transcriptElement=host.shadowRoot.querySelector('#transcript');
     const status=host.shadowRoot.querySelector('#status');
-    const interimElement=host.shadowRoot.querySelector('#interim');
     const startButton=host.shadowRoot.querySelector('#start');
     const sttActivationButton=host.shadowRoot.querySelector('#sttActivation');
     const sttActivationProgress = host.shadowRoot.querySelector('#sttActivationProgress');
@@ -413,13 +411,14 @@
                         stage:is.string(clip.text)?'append':'transcribe',
                         segment:is.string(clip.text)?clip.text:null
                     });
-                    renderInterimRecognition(session);
+                    if(is.string(clip.text)) session.interim='';
+                    renderTranscript();
                     processContinuousQueue(session);
                 },
                 onInterim:function displayInterimRecognition(result){
                     if(!isCurrentContinuousSession(session)) return;
                     session.interim=result.text;
-                    renderInterimRecognition(session);
+                    renderTranscript();
                 },
                 onState:function captureStateChanged(nextState){
                     if(!isCurrentContinuousSession(session)){
@@ -429,7 +428,7 @@
                     if(nextState==='stopped'||nextState==='interrupted'){
                         session.listening=false;
                         session.interim='';
-                        renderInterimRecognition(session);
+                        renderTranscript();
                     }
                     renderContinuousState(session);
                     settleContinuousDrain(session);
@@ -455,7 +454,7 @@
                     if(!isCurrentContinuousSession(session)) return;
                     session.listening=false;
                     session.interim='';
-                    renderInterimRecognition(session);
+                    renderTranscript();
                     if(!session.captureError) session.captureState='stopped';
                     renderContinuousState(session);
                     settleContinuousDrain(session);
@@ -506,17 +505,6 @@
             errorPhase:session.failure?.phase||(session.captureError?'capture':null),
             error:session.failure?.error||session.captureError||null
         };
-    }
-
-    function renderInterimRecognition(session){
-        if(!isCurrentContinuousSession(session)) return;
-        const pending=[];
-        for(const clip of session.queue){
-            if(clip.stage==='append') pending.push(clip.segment);
-        }
-        const text=pending.join(options.separator)+session.interim;
-        interimElement.textContent=text;
-        interimElement.hidden=text.length===0;
     }
 
     function renderContinuousState(session){
@@ -665,7 +653,6 @@
                     clip.stage='save';
                     transcript=clip.transcript;
                     renderTranscript();
-                    renderInterimRecognition(session);
                 }
                 if(options.persist){
                     const save=options.onSave||(is.function(host.save)?host.save.bind(host):null);
@@ -796,8 +783,7 @@
             return false;
         }
         continuousSession=null;
-        interimElement.textContent='';
-        interimElement.hidden=true;
+        renderTranscript();
         session.controller.abort();
         session.requestController?.abort();
         session.capture?.cancel();
@@ -1349,7 +1335,19 @@
     }
 
     function renderTranscript(){
-        transcriptElement.innerHTML=new MD(transcript).safeRendered;
+        // Display live recognition in the output without committing hypotheses
+        // or letting an earlier save delay later finalized text.
+        let output=transcript;
+        const session=continuousSession;
+        if(session&&isCurrentContinuousSession(session)){
+            for(const clip of session.queue){
+                if(clip.stage==='append'){
+                    output=appendTranscription(output,clip.segment,options.separator);
+                }
+            }
+            output=appendTranscription(output,session.interim,options.separator);
+        }
+        transcriptElement.innerHTML=new MD(output).safeRendered;
         transcriptElement.querySelectorAll('a').forEach(
             link=>{
                 link.target='_blank';
@@ -1433,7 +1431,7 @@
                 session.listening=false;
                 session.captureState='interrupted';
                 session.interim='';
-                renderInterimRecognition(session);
+                renderTranscript();
             }
             if(['completing','complete'].includes(state)){
                 renderState();

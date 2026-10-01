@@ -140,6 +140,7 @@ const initializeScrolling = Function(
     };
     const chatArea = {dataset: {}};
     function setSessionStatus() {}
+    function finishRecognitionDraft() {}
     function setAIAvailability() {}
     function nextChatOperationId(kind) {
         submissionSequence += 1;

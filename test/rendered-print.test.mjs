@@ -1,8 +1,24 @@
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 
 import test from '../src/testing.mjs';
-import {createPrintView} from '../runtime/arcane/modules/PrintView.js';
 import {arcaneLightThemeTokens} from '../runtime/arcane/entities/Theme.js';
+
+const printStyleURL=new URL('../runtime/arcane/css/print.css',import.meta.url);
+const sharedPrintStyles=await readFile(printStyleURL,'utf8');
+const originalFetch=globalThis.fetch;
+let printStyleFetches=0;
+let createPrintView;
+try{
+    globalThis.fetch=async function sharedPrintStylesFetchDouble(url){
+        assert.equal(String(url),printStyleURL.href);
+        printStyleFetches++;
+        return {ok:true,status:200,text:async function completeStyleText(){return sharedPrintStyles;}};
+    };
+    ({createPrintView}=await import('../runtime/arcane/modules/PrintView.js'));
+}finally{
+    globalThis.fetch=originalFetch;
+}
 
 // These DOM, layout, image, font and print-dialog doubles exercise ownership and
 // snapshot construction. They do not establish browser pagination or dialog UI.
@@ -266,14 +282,20 @@ test('rendered print preserves complete DOM, title, image selection and styles w
     const snapshot=stage.shadowRoot;
     assert.equal(snapshot.querySelectorAll('h1')[0].textContent,'Moon-library receipt');
     assert.equal(snapshot.querySelectorAll('pre')[0].textContent,message);
-    assert.equal(snapshot.querySelectorAll('pre')[0].style.getPropertyValue('white-space'),'pre-wrap');
-    assert.equal(snapshot.querySelectorAll('pre')[0].style.getPropertyValue('overflow'),'visible');
+    assert.equal(snapshot.querySelectorAll('pre')[0].style.getPropertyValue('white-space'),'pre');
+    assert.equal(snapshot.querySelectorAll('pre')[0].style.getPropertyValue('overflow'),'auto');
+    assert.equal(snapshot.querySelectorAll('pre')[0].hasAttribute('data-arcane-print-expand'),true);
+    assert.match(sharedPrintStyles,/pre\[data-arcane-print-node\]\{white-space:pre-wrap!important;overflow-wrap:anywhere!important;/u);
+    assert.match(sharedPrintStyles,/\[data-arcane-print-expand\]\{[^}]*overflow:visible!important;/u);
     assert.equal(snapshot.querySelectorAll('pre')[0].style.getPropertyValue('color'),'rgb(20, 30, 40)');
     assert.match(snapshot.querySelectorAll('style')[0].textContent,/Ledger:/u);
     assert.equal(snapshot.querySelectorAll('img')[0].src,image.currentSrc);
     assert.equal(snapshot.querySelectorAll('img')[0].hasAttribute('srcset'),false);
     assert.equal(snapshot.querySelectorAll('td')[0].textContent,cell.textContent);
-    assert.equal(snapshot.querySelectorAll('section')[0].style.getPropertyValue('display'),'block');
+    assert.equal(snapshot.querySelectorAll('section')[0].style.getPropertyValue('display'),'none');
+    assert.equal(snapshot.querySelectorAll('section')[0].hasAttribute('data-arcane-print-block'),true);
+    assert.equal(snapshot.querySelectorAll('section')[0].hasAttribute('data-arcane-print-root'),true);
+    assert.match(sharedPrintStyles,/\[data-arcane-print-block\]\{display:block!important;/u);
     assert.equal(document.title,'Moon-library receipt');
     assert.equal(fixture.content.hidden,true);
     assert.equal(pre.appearance['max-height'],'240px');
@@ -285,7 +307,7 @@ test('rendered print preserves complete DOM, title, image selection and styles w
     assert.equal(fixture.resources.released,1);
 });
 
-test('explicit and native snapshots share the existing light palette and page margins without changing the screen',async function lightPrintPresentation(context){
+test('explicit and native snapshots use the same ready stylesheet and one-inch margins without changing the screen',async function lightPrintPresentation(context){
     const presentations=[];
     for(const mode of ['explicit','native']){
         const document=fixtureDocument();
@@ -305,8 +327,12 @@ test('explicit and native snapshots share the existing light palette and page ma
             'background-color':'rgb(20, 20, 20)',
             'background-image':'url("https://print.example.test/illustration.png")',
             'font-family':'Moon Serif, serif',
+            'font-size':'19px',
+            'line-height':'31px',
             'font-weight':'700',
             'font-style':'italic',
+            margin:'12px 8px',
+            padding:'6px',
             opacity:'.4',
             filter:'drop-shadow(0 1px 1px black)',
             '-webkit-text-fill-color':'rgb(240, 240, 240)'
@@ -321,21 +347,25 @@ test('explicit and native snapshots share the existing light palette and page ma
         const snapshot=printStage(document).shadowRoot;
         const palette=snapshot.querySelectorAll('style')[0].textContent;
         const pageSheet=document.head.childNodes.find(function printSheet(node){return node!==screenSheet;});
-        assert.ok(palette.includes(`color:${arcaneLightThemeTokens.text}!important`));
-        assert.ok(palette.includes(`background:${arcaneLightThemeTokens.surface}!important`));
-        assert.ok(palette.includes(`border:1px solid ${arcaneLightThemeTokens.border}!important`));
+        assert.ok(palette.startsWith(sharedPrintStyles));
+        assert.equal(pageSheet.textContent,sharedPrintStyles);
+        assert.ok(palette.includes(`--arcane-print-text:${arcaneLightThemeTokens.text};`));
+        assert.ok(palette.includes(`--arcane-print-paper:${arcaneLightThemeTokens.surface};`));
+        assert.ok(palette.includes(`--arcane-print-border:${arcaneLightThemeTokens.border};`));
+        assert.ok(palette.includes('border:1px solid var(--arcane-print-border)!important'));
         assert.ok(palette.includes('[data-arcane-print-node]:not(svg,svg *,img,video,audio)::before'));
         assert.ok(palette.includes('[data-arcane-print-node]:not(svg,svg *,img,video,audio)::after'));
         assert.match(palette,/background-color:transparent!important/u);
         assert.match(palette,/-webkit-text-fill-color:currentColor!important/u);
-        assert.doesNotMatch(palette,/(?:opacity|filter|mix-blend-mode):[^;\n}]*!important/u);
+        assert.doesNotMatch(palette,/(?:^|[;{\n])\s*(?:opacity|filter|mix-blend-mode):[^;\n}]*!important/u);
         assert.match(palette,/Full ledger:/u);
         assert.doesNotMatch(palette,/background-image:none/u);
-        assert.match(pageSheet.textContent,/@media print\s*\{\s*@page\{margin:15mm\}/u);
-        assert.ok(pageSheet.textContent.includes(`background:${arcaneLightThemeTokens.surface}!important`));
+        assert.match(pageSheet.textContent,/@media print\s*\{\s*@page\{margin:1in;\}/u);
+        assert.equal(printStyleFetches,1,'Native and explicit printing reuse the stylesheet loaded before registration.');
+        assert.ok(pageSheet.textContent.includes('background:var(--arcane-print-paper)!important'));
         const printed=snapshot.querySelectorAll('p')[0];
         assert.equal(printed.textContent,paragraph.textContent);
-        for(const property of ['font-family','font-weight','font-style','background-image','opacity','filter']){
+        for(const property of ['font-family','font-size','line-height','font-weight','font-style','margin','padding','background-image','opacity','filter']){
             assert.equal(printed.style.getPropertyValue(property),paragraph.appearance[property]);
         }
         // The double inspects authored CSS, not browser cascade or pagination.
@@ -355,6 +385,51 @@ test('explicit and native snapshots share the existing light palette and page ma
         assert.equal(fixture.resources.released,1);
     }
     assert.deepEqual(presentations[0],presentations[1]);
+});
+
+test('chat snapshot selectors exclude inspection and transient status without editing conversation markup',async function chatPrintPresentation(context){
+    const document=fixtureDocument();
+    const fixture=addView(context,document);
+    fixture.content.setAttribute('class','chat_output');
+    const item=document.createElement('li');
+    const content=document.createElement('div');
+    content.setAttribute('class','markdown');
+    content.textContent='The complete human-visible conversation remains.\n第二行 — 🦉';
+    const thinking=document.createElement('span');
+    thinking.setAttribute('class','thinking');
+    thinking.textContent='Working';
+    const tools=document.createElement('section');
+    tools.setAttribute('class','message_tool_calls');
+    const tool=document.createElement('article');
+    tool.setAttribute('class','message_tool_call');
+    const message=document.createElement('p');
+    message.setAttribute('class','message_tool_message');
+    message.textContent='The telescope is ready.';
+    const details=document.createElement('details');
+    details.setAttribute('class','message_tool_details');
+    details.textContent='Complete diagnostic inspection';
+    tool.append(message,details);
+    tools.append(tool);
+    item.append(content,thinking,tools);
+    fixture.content.append(item);
+
+    assert.equal(await fixture.view.print(),true);
+    const snapshot=printStage(document).shadowRoot;
+    assert.ok(snapshot.querySelectorAll('div').some(node=>node.textContent===content.textContent));
+    assert.equal(snapshot.querySelectorAll('p')[0].textContent,message.textContent);
+    assert.equal(snapshot.querySelectorAll('section')[0].getAttribute('class'),'chat_output');
+    // This double checks scoped authored selectors and preserved DOM; it does
+    // not claim to evaluate :has(), the CSS cascade, or browser pagination.
+    assert.match(sharedPrintStyles,/\.chat_output\[data-arcane-print-node\]>li\{[^}]*float:none!important;[^}]*text-align:start!important;/u);
+    assert.ok(sharedPrintStyles.includes('.chat_output[data-arcane-print-node]>li [data-arcane-print-node]:not(.message_timestamp)'));
+    assert.ok(sharedPrintStyles.includes('thead[data-arcane-print-node]{display:table-header-group!important;}'));
+    assert.ok(sharedPrintStyles.includes('.chat_output[data-arcane-print-node]>li>.thinking,'));
+    assert.ok(sharedPrintStyles.includes('.chat_output[data-arcane-print-node]>li>.message_tool_details,'));
+    assert.ok(sharedPrintStyles.includes('.chat_output[data-arcane-print-node]>li>.message_tool_calls>.message_tool_call>.message_tool_details,'));
+    assert.ok(sharedPrintStyles.includes('>li:has(>.thinking):has(>.markdown:empty):not(:has(.message_tool_message))'));
+    assert.equal(fixture.content.hasAttribute('data-arcane-print-node'),false);
+    assert.equal(details.parentNode,tool);
+    assert.equal(thinking.parentNode,item);
 });
 
 test('light print presentation preserves SVG paint, selected image and canvas pixels, and live form values',async function preservedPrintArtwork(context){

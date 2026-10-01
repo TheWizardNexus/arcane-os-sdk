@@ -902,6 +902,30 @@
     const browserDeviceClass = getBrowserDeviceClass();
 
     host.language=host.language||'English';
+    let transcriptionMode=host.transcriptionMode??'submit';
+    speech.displayTranscription=transcriptionMode!=='draft';
+    Object.defineProperty(host,'transcriptionMode',{
+        configurable:true,
+        enumerable:true,
+        get:function getTranscriptionMode(){return transcriptionMode;},
+        set:function setTranscriptionMode(mode){
+            transcriptionMode=mode;
+            speech.displayTranscription=mode!=='draft';
+        }
+    });
+    if(host.recognitionLanguage!==undefined){
+        speech.recognitionLanguage=host.recognitionLanguage;
+    }
+    Object.defineProperty(host,'recognitionLanguage',{
+        configurable:true,
+        enumerable:true,
+        get:function getRecognitionLanguage(){
+            return speech.recognitionLanguage;
+        },
+        set:function setRecognitionLanguage(language){
+            speech.recognitionLanguage=language;
+        }
+    });
     host.name = host.name||'User';
     host.aiName='AI';
     let requestedInitialSpeechMuted=is.boolean(speech.initialMuted)
@@ -920,6 +944,22 @@
     let hostSubmissionGeneration=0;
     let eventOperationSequence=0;
     let destroyed=false;
+    let recognitionDraft=null;
+    let writingRecognitionDraft=false;
+    const printViewPromise=import('../modules/PrintView.js').then(
+        function registerChatPrint({createPrintView}){
+            if(destroyed) return null;
+            return createPrintView({
+                host,
+                content:function chatPrintContent(){return chatOutput;},
+                title:function chatPrintTitle(){return host.printTitle||'Conversation';},
+                active:function chatPrintActive(){return !destroyed&&chatOutput.children.length>0;},
+                signal:aiRuntimeStateAbortController.signal,
+                onError:reportChatPrintFailure
+            });
+        }
+    );
+    void printViewPromise.catch(reportChatPrintFailure);
     let boundChatSession=null;
     let boundChatAI=null;
     let sessionBindingPending=false;
@@ -1852,6 +1892,8 @@
     host.bindConversationTimebox=bindConversationTimebox;
     host.bindSession=bindSession;
     host.submitMessage=submitMessage;
+    host.appendDraft=appendDraft;
+    host.print=print;
     host.submitToolResult=submitToolResult;
     host.submitToolResults=submitToolResults;
     Object.defineProperty(host,'pendingTool',{
@@ -3007,6 +3049,12 @@
 
     textArea.addEventListener(
         'input',
+        trackRecognitionDraftEdit,
+        {signal:aiRuntimeStateAbortController.signal}
+    );
+
+    textArea.addEventListener(
+        'input',
         resizeTextArea,
         {signal:aiRuntimeStateAbortController.signal}
     );
@@ -3085,8 +3133,28 @@
     );
 
     speech.addEventListener(
+        'speech-transcription-progress',
+        receiveRecognitionDraft,
+        {signal:aiRuntimeStateAbortController.signal}
+    );
+    speech.addEventListener(
+        'speech-transcription-cancelled',
+        finishRecognitionDraft,
+        {signal:aiRuntimeStateAbortController.signal}
+    );
+    speech.addEventListener(
         'speech-transcription-complete',
-        function submitTranscribedChatMessage(event){
+        function receiveTranscribedChatMessage(event){
+            if(recognitionDraft&&recognitionDraft.operationId===event.detail?.operationId){
+                const completedDraft=recognitionDraft;
+                receiveRecognitionDraft(event);
+                if(recognitionDraft===completedDraft) recognitionDraft=null;
+                return;
+            }
+            if(host.transcriptionMode==='draft'){
+                appendDraft(event.detail?.text??'');
+                return;
+            }
             void submitMessage(
                 event.detail?.text||'',
                 {source:'speech'}
@@ -3168,6 +3236,140 @@
             {source: 'keyboard'}
         );
         resizeTextArea();
+    }
+
+    function trackRecognitionDraftEdit(){
+        if(!recognitionDraft||writingRecognitionDraft){
+            return;
+        }
+        const state=recognitionDraft;
+        const before=state.value;
+        const after=textArea.value;
+        let start=0;
+        while(start<before.length&&start<after.length&&before[start]===after[start]) start++;
+        let oldEnd=before.length;
+        let newEnd=after.length;
+        while(oldEnd>start&&newEnd>start&&before[oldEnd-1]===after[newEnd-1]){
+            oldEnd--;
+            newEnd--;
+        }
+        if(state.range&&before!==after){
+            const range=state.range;
+            if(oldEnd<=range.start){
+                const shift=newEnd-oldEnd;
+                range.start+=shift;
+                range.end+=shift;
+            }else if(start<range.end){
+                // An intentional edit promotes the hypothesis to user text.
+                // Later recognition must not overwrite that edit.
+                state.range=null;
+                state.editedInterim=true;
+            }
+        }
+        state.value=after;
+    }
+
+    function replaceRecognitionDraft(text,finalLength,state=recognitionDraft){
+        const existing=textArea.value;
+        const range=state.range??{start:existing.length,end:existing.length};
+        const selectionStart=textArea.selectionStart;
+        const selectionEnd=textArea.selectionEnd;
+        const direction=textArea.selectionDirection;
+        const editing=shadowRoot.activeElement===textArea;
+        const wasWriting=writingRecognitionDraft;
+        writingRecognitionDraft=true;
+        try{
+            textArea.value=existing.slice(0,range.start)+text+existing.slice(range.end);
+            if(editing){
+                function moveSelection(position){
+                    if(position<=range.start) return position;
+                    if(position>=range.end) return position+text.length-(range.end-range.start);
+                    return range.start+text.length;
+                }
+                textArea.setSelectionRange(moveSelection(selectionStart),moveSelection(selectionEnd),direction);
+            }
+            state.range={start:range.start+finalLength,end:range.start+text.length};
+            state.value=textArea.value;
+            textArea.dispatchEvent(new Event('input',{bubbles:true,composed:true}));
+        }finally{
+            writingRecognitionDraft=wasWriting;
+        }
+    }
+
+    function receiveRecognitionDraft(event){
+        if(destroyed||(!recognitionDraft&&host.transcriptionMode!=='draft')) return;
+        const {text='',interim='',operationId=null}=event.detail??{};
+        if(recognitionDraft&&recognitionDraft.operationId!==operationId){
+            finishRecognitionDraft();
+            // A synchronous input observer may already own a newer capture.
+            if(recognitionDraft) return;
+        }
+        if(!recognitionDraft){
+            recognitionDraft={
+                operationId,
+                finalText:'',
+                value:textArea.value,
+                range:null,
+                separator:'',
+                started:false,
+                editedInterim:false
+            };
+        }
+        trackRecognitionDraftEdit();
+        const state=recognitionDraft;
+        const finalText=text.startsWith(state.finalText)?text.slice(state.finalText.length):text;
+        state.finalText=text;
+        if(state.editedInterim){
+            if(!finalText) return;
+            // The edited words stand in place of this finalized hypothesis.
+            state.editedInterim=false;
+            state.started=false;
+            state.separator='';
+            if(!interim) return;
+            receiveRecognitionDraft({detail:{text,interim,operationId}});
+            return;
+        }
+        if(!state.started&&(finalText||interim)){
+            const incoming=finalText||interim;
+            state.separator=textArea.value&&!/\s$/.test(textArea.value)&&!/^\s/.test(incoming)?'\n':'';
+            state.started=true;
+        }
+        const separator=state.separator;
+        const replacement=finalText||interim?separator+finalText+interim:'';
+        if(finalText) state.separator='';
+        replaceRecognitionDraft(replacement,finalText?separator.length+finalText.length:0,state);
+    }
+
+    function finishRecognitionDraft(event){
+        if(!recognitionDraft||(event&&recognitionDraft.operationId!==event.detail?.operationId)) return;
+        trackRecognitionDraftEdit();
+        const completedDraft=recognitionDraft;
+        recognitionDraft=null;
+        if(completedDraft.range){
+            replaceRecognitionDraft('',0,completedDraft);
+        }
+    }
+
+    function appendDraft(text){
+        if(!is.string(text)){
+            throw new TypeError('Chat draft text must be a string.');
+        }
+        if(destroyed||text===''){
+            return false;
+        }
+        const existing=textArea.value;
+        const selectionStart=textArea.selectionStart;
+        const selectionEnd=textArea.selectionEnd;
+        const selectionDirection=textArea.selectionDirection;
+        const editing=shadowRoot.activeElement===textArea;
+        // Join distinct entries without changing either entry's authored text.
+        const separator=existing&&!/\s$/.test(existing)&&!/^\s/.test(text)?'\n':'';
+        textArea.value=existing+separator+text;
+        if(editing){
+            textArea.setSelectionRange(selectionStart,selectionEnd,selectionDirection);
+        }
+        textArea.dispatchEvent(new Event('input',{bubbles:true,composed:true}));
+        return true;
     }
 
     async function resizeTextArea() {
@@ -3934,6 +4136,24 @@
         return message;
     }
 
+    async function print(){
+        if(destroyed) return false;
+        try{
+            const view=await printViewPromise;
+            return destroyed||!view?false:await view.print();
+        }catch(error){
+            reportChatPrintFailure(error);
+            throw error;
+        }
+    }
+
+    function reportChatPrintFailure(error){
+        arcaneLogging.error('Unable to print the conversation.',error);
+        if(!destroyed){
+            setSessionStatus('error','Unable to open print preview. Please try again.');
+        }
+    }
+
     function reportTTSError(error,boundary='synthesis'){
         if(destroyed){
             return false;
@@ -4001,9 +4221,10 @@
         if(destroyed){
             return false;
         }
+        destroyed=true;
+        finishRecognitionDraft();
         sessionBindingGeneration+=1;
         setSessionStatus('destroyed','Chat closed.');
-        destroyed=true;
         transcriptResizeObserver?.disconnect();
         transcriptMutationObserver?.disconnect();
         const destroyReason=createChatSubmissionAbort(

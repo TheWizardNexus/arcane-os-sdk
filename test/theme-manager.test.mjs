@@ -364,26 +364,42 @@ test('all named palettes share root and scoped swatch declarations for explicit 
     assert.match(theme, /prefers-reduced-motion/u);
 });
 
-test('direct printing uses the existing base light palette and page margins only in print media', async function lightPrintTheme() {
-    const theme = await readFile(new URL('css/theme.css', runtime), 'utf8');
-    const printStart = theme.indexOf('@media print {');
+test('direct pages and document sites import one shared light print owner with one-inch margins', async function lightPrintTheme() {
+    const [theme, styles, documentStyles] = await Promise.all([
+        readFile(new URL('css/theme.css', runtime), 'utf8'),
+        readFile(new URL('css/print.css', runtime), 'utf8'),
+        readFile(new URL('css/document-site.css', runtime), 'utf8')
+    ]);
+    const printStart = styles.indexOf('@media print{');
     assert.ok(printStart > 0);
-    const screen = theme.substring(0, printStart);
-    const print = theme.substring(printStart);
-    const base = screen.substring(0, screen.indexOf(':root[data-user-skin="default"]'));
-    assert.doesNotMatch(screen, /@page/u);
-    assert.match(print, /@page\s*\{\s*margin: 15mm;/u);
+    const print = styles.substring(printStart);
+    const baseline = print.substring(0, print.indexOf('/* The shared screen shell'));
+    const base = theme.substring(0, theme.indexOf(':root[data-user-skin="default"]'));
+    assert.match(theme, /^@import url\('\.\/print\.css'\);/u);
+    assert.match(documentStyles, /^@import url\('\.\/print\.css'\);/u);
+    assert.doesNotMatch(theme, /@page|@media print/u);
+    assert.doesNotMatch(documentStyles, /@page|@media print/u);
+    assert.match(print, /@page\{margin:1in;\}/u);
     assert.match(print, /:root,\s*body,\s*\[data-arcane-palette\]/u);
-    assert.match(print, /color-scheme: light !important/u);
-    for (const match of print.matchAll(/--([\w-]+): ([^;]+) !important;/gu)) {
-        const [, name, value] = match;
+    assert.match(print, /color-scheme:light!important/u);
+    for (const match of baseline.matchAll(/--([\w-]+):var\(--arcane-print-([\w-]+)\)!important;/gu)) {
+        const [, name, token] = match;
+        const declaration = styles.match(new RegExp(`--arcane-print-${token}:([^;]+);`, 'u'));
+        assert.ok(declaration, token);
+        const value = declaration[1];
         const sourceName = name === 'background' ? 'modal-background' : name;
         assert.ok(base.includes(`--arcane-palette-light-${sourceName}:${value};`), name);
     }
-    assert.match(print, /html,\s*body\s*\{\s*margin: 0;/u);
-    assert.doesNotMatch(print, /(?:^|\n)\s*(?:display|position|overflow|height|opacity|filter|background-image)\s*:/u);
-    assert.match(screen, /\[data-color-scheme="dark"\]/u);
-    assert.match(screen, /prefers-reduced-motion/u);
+    assert.match(print, /html,\s*body\s*\{\s*margin:0;/u);
+    assert.doesNotMatch(baseline, /(?:^|\n)\s*(?:display|position|overflow|height|opacity|filter|background-image)\s*:/u);
+    assert.match(print, /body\.static-doc-site :is\([^)]*\.skip-link\)/u);
+    assert.match(print, /body\.static-doc-site \.static-document__content table\{display:table!important;overflow:visible!important;\}/u);
+    const shell = print.substring(print.indexOf('/* The shared screen shell'), print.indexOf('/* Expand only'));
+    assert.match(shell, /body>main \.data-workspace\{[^}]*height:auto!important;[^}]*overflow:visible!important;/u);
+    assert.match(shell, /grid-template-columns:none!important;/u);
+    assert.match(shell, /body:has\(>main\)>\.nav\{\s*display:none!important;/u);
+    assert.match(theme, /\[data-color-scheme="dark"\]/u);
+    assert.match(theme, /prefers-reduced-motion/u);
 });
 
 test('theme public extraction includes the classic owner and named module skin entry', async function themePublicContract() {

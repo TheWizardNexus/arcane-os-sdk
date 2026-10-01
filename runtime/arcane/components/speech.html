@@ -34,7 +34,8 @@
         user-select: none;
     }
 
-    button:focus-visible {
+    button:focus-visible,
+    #recognitionLanguage:focus-visible {
         outline: .2rem solid var(--arcane-focus, var(--focus-color));
         outline-offset: .18rem;
     }
@@ -83,6 +84,32 @@
     .speech_feedback {
         grid-column: 2;
         min-width: 0;
+    }
+
+    .recognition_language {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: .35rem .6rem;
+        margin-block-end: .35rem;
+        font-size: .86rem;
+    }
+
+    .recognition_language[hidden] {
+        display: none;
+    }
+
+    #recognitionLanguage {
+        box-sizing: border-box;
+        width: 10rem;
+        max-width: 100%;
+        min-height: 2.25rem;
+        padding: .35rem .5rem;
+        border: 1px solid var(--arcane-border, var(--border-color));
+        border-radius: var(--arcane-radius-small, .4rem);
+        background: var(--arcane-surface, var(--background-color));
+        color: var(--arcane-text, var(--text-color));
+        font: inherit;
     }
 
     .speech_status {
@@ -162,6 +189,25 @@
 <button id="sttActivationButton" type="button" hidden disabled>Start transcription</button>
 <button id="stopButton" type="button" class="hidden" disabled>Send</button>
 <div class="speech_feedback">
+    <label id="recognitionLanguageControl" class="recognition_language" hidden>
+        Recognition language
+        <input id="recognitionLanguage" type="text" list="recognitionLanguages" placeholder="Browser default" title="Recognition language tag, such as en-US or es-MX" autocomplete="off" spellcheck="false">
+        <datalist id="recognitionLanguages">
+            <option value="en-US">English (United States)</option>
+            <option value="en-GB">English (United Kingdom)</option>
+            <option value="es-MX">Spanish (Mexico)</option>
+            <option value="es-ES">Spanish (Spain)</option>
+            <option value="fr-FR">French</option>
+            <option value="de-DE">German</option>
+            <option value="it-IT">Italian</option>
+            <option value="pt-BR">Portuguese (Brazil)</option>
+            <option value="ja-JP">Japanese</option>
+            <option value="ko-KR">Korean</option>
+            <option value="zh-CN">Chinese (Mandarin, mainland China)</option>
+            <option value="hi-IN">Hindi</option>
+            <option value="ar-SA">Arabic (Saudi Arabia)</option>
+        </datalist>
+    </label>
     <p id="speechStatus" class="speech_status" role="status" aria-live="polite"></p>
     <progress
         id="sttActivationProgress"
@@ -214,6 +260,7 @@
             source: 'arcane.component.speech',
             eventTypes: [
                 'speech-ready',
+                'speech-transcription-progress',
                 'speech-transcription-complete',
                 'speech-transcription-error',
                 'speech-transcription-cancelled',
@@ -232,6 +279,8 @@
     const stopButton = shadowRoot.querySelector('#stopButton');
     const muteButton = shadowRoot.querySelector('#muteButton');
     const speechStatus = shadowRoot.querySelector('#speechStatus');
+    const recognitionLanguageControl = shadowRoot.querySelector('#recognitionLanguageControl');
+    const recognitionLanguageInput = shadowRoot.querySelector('#recognitionLanguage');
     const silenceDuration = 0;
     const runtimeStateAbortController = new AbortController();
 
@@ -258,6 +307,18 @@
     let transcriptionOperationId = null;
     let ttsOperationId = null;
     let destroyed = false;
+    let recognitionLanguage = is.string(host.recognitionLanguage)
+        ? host.recognitionLanguage
+        : navigator.language || '';
+    Object.defineProperty(host, 'recognitionLanguage', {
+        configurable: true,
+        enumerable: true,
+        get: function getRecognitionLanguage() {
+            return recognitionLanguage;
+        },
+        set: setRecognitionLanguage
+    });
+    recognitionLanguageInput.value = recognitionLanguage;
 
     function nextSpeechOperationId(kind) {
         eventOperationSequence += 1;
@@ -349,6 +410,7 @@
 
     const initialMutedWasHydrated = is.boolean(host.initialMuted);
     host.initialMuted = initialMutedWasHydrated ? host.initialMuted : true;
+    host.displayTranscription = host.displayTranscription !== false;
     host.muted = true;
     host.configure = configure;
     host.destroy = destroy;
@@ -396,6 +458,7 @@
     recordButton.addEventListener('blur', handleRecordBlur, lifecycleListenerOptions);
     stopButton.addEventListener('click', stop, lifecycleListenerOptions);
     muteButton.addEventListener('click', muteToggle, lifecycleListenerOptions);
+    recognitionLanguageInput.addEventListener('input', updateRecognitionLanguage, lifecycleListenerOptions);
     window.addEventListener('ai-ready', synchronizeAIReadiness, lifecycleListenerOptions);
     window.addEventListener(
         'pagehide',
@@ -477,8 +540,26 @@
             host.initialMuted = configuredMuted;
             applyConfiguredMutedState(configuredMuted);
         }
+        if (Object.prototype.hasOwnProperty.call(options, 'recognitionLanguage')) {
+            host.recognitionLanguage = options.recognitionLanguage;
+        }
+        if (Object.prototype.hasOwnProperty.call(options, 'displayTranscription')) {
+            host.displayTranscription = options.displayTranscription !== false;
+        }
 
         return host;
+    }
+
+    function setRecognitionLanguage(language) {
+        if (!is.string(language)) {
+            throw new TypeError('Recognition language must be a BCP47 language tag string.');
+        }
+        recognitionLanguage = language;
+        recognitionLanguageInput.value = language;
+    }
+
+    function updateRecognitionLanguage() {
+        host.recognitionLanguage = recognitionLanguageInput.value;
     }
 
     function updateMicrophoneAvailability(available) {
@@ -617,6 +698,12 @@
     }
 
     function renderControls() {
+        recognitionLanguageControl.hidden = !transcriptionEnabled
+            || !providerRuntime.supportsTranscriptionCapture();
+        recognitionLanguageInput.disabled = destroyed
+            || recordingRequested
+            || Boolean(nativeCaptureSession)
+            || transcriptionActive;
         if (!transcriptionEnabled) {
             recordButton.hidden = true;
             recordButton.disabled = true;
@@ -764,10 +851,21 @@
                     describeSTTRole()
                 );
             }
-        } else if (transcriptionEnabled) {
+        } else if (transcriptionEnabled
+            && (recognitionLanguageControl.hidden
+                || sttRole.state !== 'ready'
+                || !host.availability.microphone
+                || sttRole.busy
+                || sttActivationController.pending)) {
             messages.push(describeSTTRole());
         }
-        messages.push(describeTTSRole());
+        if (recognitionLanguageControl.hidden
+            || pendingTTSIntent
+            || pendingUnmute
+            || ['loading', 'unloading', 'error'].includes(ttsRole.state)
+            || ttsRole.busy) {
+            messages.push(describeTTSRole());
+        }
         if ((transcriptionEnabled && sttRole.state === 'error')
             || ttsRole.state === 'error') {
             tone = 'error';
@@ -1490,15 +1588,34 @@
         function displayNativeRecognitionText() {
             if (!currentNativeCapture()) return;
             localStatus = {
-                message: session.text.join('') + session.interim || 'Listening. Release to finish.',
+                message: (host.displayTranscription
+                    ? session.text.join('') + session.interim
+                    : '') || 'Listening. Release to finish.',
                 tone: '',
                 owner: 'recording',
                 generation
             };
             renderStatus();
+            publishNativeRecognitionProgress();
+        }
+        function publishNativeRecognitionProgress() {
+            const text = session.text.join('');
+            dispatchSpeechEvent(
+                'speech-transcription-progress',
+                {text, interim: session.interim},
+                {
+                    operationId,
+                    publicDetail: {text, interim: session.interim}
+                }
+            );
         }
         async function finishNativeRecognition(error = null) {
             if (!currentNativeCapture()) return;
+            if (session.interim) {
+                session.interim = '';
+                publishNativeRecognitionProgress();
+                if (!currentNativeCapture()) return;
+            }
             nativeCaptureSession = null;
             recordingRequested = false;
             resetRecordPress();
@@ -1523,9 +1640,11 @@
             session.capture = providerRuntime.createTranscriptionCapture(
                 {
                     continuous: true,
+                    language: recognitionLanguage || undefined,
                     onSegment: function retainFinalRecognition(segment) {
                         if (!currentNativeCapture()) return;
                         session.text.push(segment.text);
+                        session.interim = '';
                         displayNativeRecognitionText();
                     },
                     onInterim: function displayInterimRecognition(result) {

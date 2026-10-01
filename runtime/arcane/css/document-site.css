@@ -1,3 +1,5 @@
+@import url('./print.css');
+
 /* Reusable, progressively enhanced documentation-site layout.
  * Load after Arcane theme.css and primitives.css.
  */
@@ -944,38 +946,3 @@ body.static-doc-site{
     }
 }
 
-@media print{
-    .static-site-header,
-    .static-site-footer,
-    .static-section-nav,
-    .static-previous-next,
-    .static-related,
-    .static-document__source,
-    .skip-link{
-        display:none;
-    }
-
-    .static-site-main,
-    .static-site-main--document{
-        max-inline-size:none;
-        padding:0;
-    }
-
-    .static-document-layout{
-        display:block;
-    }
-
-    .static-document{
-        inline-size:100%;
-    }
-
-    .static-document__content table{
-        display:table;
-        overflow:visible;
-    }
-
-    .static-document__content table :where(code,kbd){
-        overflow-wrap:anywhere;
-        word-break:break-word;
-    }
-}

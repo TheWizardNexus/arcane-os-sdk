@@ -56,13 +56,14 @@ appropriate.
 
 ## Shared print presentation
 
-Applications loading the shared `theme.css` receive a print-only base light
-palette with a white paper surface and `15mm` page margins. Root, body, and
-scoped `data-arcane-palette` tokens override screen/custom colors during print;
-root/body margins are reset. Saved preferences, screen presentation, scrolling,
-media, and other layout rules remain unchanged. Registered rendered-print
-views use the separate [`PrintView.js`](runtime-modules.md#printviewjs) snapshot
-owner described with the editor and file preview below.
+The shared `theme.css` and `document-site.css` import `print.css`, the single
+print-style owner. It provides a light paper palette and `1in` (`25.4mm`) page
+margins. During print, root/body/scoped palette tokens override screen colors;
+the shared header/sidebar shell is hidden and its main scroller expands into
+document flow. Screen layout, preferences, fonts, and media remain unchanged.
+[`PrintView.js`](runtime-modules.md#printviewjs) loads the same stylesheet for
+rendered snapshots of Chat, the editor, and file previews. Its temporary
+snapshot remains owned until the browser's `afterprint` event.
 
 ## Canonical inventory
 
@@ -73,7 +74,7 @@ owner described with the editor and file preview below.
 | [`browser-ai-setup.html`](#browser-ai-setuphtml) | Browser API availability, reported GPU class, and copyable NPU/GPU settings addresses. | `refresh()`<br>`checkGpu()`<br>`open()`<br>`destroy()`<br>`ready` | `browser-ai-setup-ready` | Browser-reported adapter class; browser flag state and model execution remain browser-owned |
 | [`calculator.html`](#calculatorhtml) | Calculator keypad and result/error event surface backed by CalculatorEngine. | `calculate()`<br>`destroy()` | `calculator-ready`<br>`calculation-complete`<br>`calculation-error` | Normalized Calculation/error events |
 | [`chart.html`](#charthtml) | Accessible uPlot line, area, or point chart with normalized options and rows. | `configure()`<br>`populate()`<br>`setData()`<br>`addData()`<br>`update()`<br>`destroy()` | `chart-ready`<br>`chart-remove` | Options/rows normalized; uPlot rendering is vendor-native |
-| [`chat.html`](#chathtml) | Shared chat, visible selected-model activation request, file upload, streaming, structural tool settlement, speech, language, availability, and conversation-timebox surface. | `streamMessage()`<br>`setMessageProgress()`<br>`setAIAvailability()`<br>`setInitialSpeechMuted()`<br>`setConversationComplete()`<br>`bindConversationTimebox()`<br>`bindSession()`<br>`submitMessage()`<br>`submitToolResult()`<br>`submitToolResults()`<br>`sendMessage()`<br>`languageChanged()`<br>`requestAIActivation()`<br>`destroy()` | `chat-ready`<br>`chat-session-bound`<br>`chat-session-message`<br>`chat-session-error`<br>`chat-send-message`<br>`chat-send-error`<br>`chat-file-uploaded`<br>`chat-file-upload-error`<br>`chat-language-changed`<br>`chat-language-change-error`<br>`chat-ai-activation-request`<br>`chat-ai-activation-error`<br>`chat-speech-synthesis-error`<br>`conversation-timebox-error` | UI/runtime state, explicit user activation intent, and honest structural-call settlement normalized; AI/storage/media behavior mixed |
+| [`chat.html`](#chathtml) | Shared chat, visible selected-model activation request, file upload, streaming, structural tool settlement, speech, language, availability, and conversation-timebox surface. | `streamMessage()`<br>`setMessageProgress()`<br>`setAIAvailability()`<br>`setInitialSpeechMuted()`<br>`setConversationComplete()`<br>`bindConversationTimebox()`<br>`bindSession()`<br>`submitMessage()`<br>`submitToolResult()`<br>`submitToolResults()`<br>`sendMessage()`<br>`appendDraft()`<br>`print()`<br>`languageChanged()`<br>`requestAIActivation()`<br>`destroy()` | `chat-ready`<br>`chat-session-bound`<br>`chat-session-message`<br>`chat-session-error`<br>`chat-send-message`<br>`chat-send-error`<br>`chat-file-uploaded`<br>`chat-file-upload-error`<br>`chat-language-changed`<br>`chat-language-change-error`<br>`chat-ai-activation-request`<br>`chat-ai-activation-error`<br>`chat-speech-synthesis-error`<br>`conversation-timebox-error` | UI/runtime state, explicit user activation intent, and honest structural-call settlement normalized; AI/storage/media behavior mixed |
 | [`conversation-view.html`](#conversation-viewhtml) | Provider-neutral conversation display, advisory actions, composer, busy state, and status. | `setConversation()`<br>`setBusy()`<br>`setStatus()`<br>`clearComposer()`<br>`destroy()` | `conversation-view-ready`<br>`communication-send`<br>`communication-advisory-action` | DOM-normalized |
 | [`dashboard-config.html`](#dashboard-confightml) | Selects which normalized chart definitions are visible on a dashboard. | `configure()`<br>`setDefinitions()`<br>`setVisibility()`<br>`getChartOptions()`<br>`getEffectiveVisibility()`<br>`open()`<br>`close()`<br>`destroy()` | `dashboard-config-ready`<br>`dashboard-config-opened`<br>`dashboard-config-closed`<br>`dashboard-config-change` | Fully normalized definitions and visibility |
 | [`data-maintenance.html`](#data-maintenancehtml) | Runs destructive cleanup of empty chats and memories inside the current app data scope. | `open()`<br>`destroy()` | `data-maintenance-ready`<br>`data-maintenance-complete` | Normalized counts; DBOPFS failures mixed |
@@ -98,7 +99,7 @@ owner described with the editor and file preview below.
 | [`screen-capture.html`](#screen-capturehtml) | Presents image, video, or GIF display-capture workflow. | `capture` (`ScreenCapture` instance)<br>`destroy()` | `screen-capture-ready`<br>`screen-capture-result` | State/result normalized; media permission/codec failures mixed |
 | [`source-code-viewer.html`](#source-code-viewerhtml) | Renders complete line-addressable source code with load, error, focus, and state behavior. | `configure()`<br>`load()`<br>`render()`<br>`clear()`<br>`fail()`<br>`focus()`<br>`focusLine()`<br>`destroy()` | `source-code-viewer-ready`<br>`source-code-viewer-state`<br>`source-code-viewer-state-loading`<br>`source-code-viewer-state-ready`<br>`source-code-viewer-state-empty`<br>`source-code-viewer-state-error` | Complete mutable source/state |
 | [`source-explanation.html`](#source-explanationhtml) | Presents an evidence finding, source selection, explanation, and save state. | `showFinding()`<br>`populate()`<br>`selectSource()`<br>`markSaved()`<br>`destroy()` | `source-explanation-ready`<br>`source-explanation-save`<br>`source-explanation-source-selected` | DOM-normalized |
-| [`speech.html`](#speechhtml) | Coordinates explicit STT activation, speech controls, transcription completion, mute state, and microphone availability. | `configure()`<br>`setMuted()`<br>`reportTTSError()`<br>`requestSTTActivation()`<br>`destroy()`<br>`availability`<br>`muted`<br>`initialMuted`<br>`componentReady` | `speech-ready`<br>`speech-transcription-complete`<br>`speech-transcription-error`<br>`speech-transcription-cancelled`<br>`speech-microphone-unavailable`<br>`speech-stt-activation-request`<br>`speech-stt-activation-error`<br>`speech-tts-lifecycle-error`<br>`speech-synthesis-error` | Sticky runtime speech readiness, explicit STT activation, request cancellation, TTS mute lifecycle intent, and exact TTS operation failures normalized; provider/model authority remains external |
+| [`speech.html`](#speechhtml) | Coordinates explicit STT activation, speech controls, transcription completion, mute state, and microphone availability. | `configure()`<br>`setMuted()`<br>`reportTTSError()`<br>`requestSTTActivation()`<br>`destroy()`<br>`availability`<br>`muted`<br>`initialMuted`<br>`recognitionLanguage`<br>`displayTranscription`<br>`componentReady` | `speech-ready`<br>`speech-transcription-progress`<br>`speech-transcription-complete`<br>`speech-transcription-error`<br>`speech-transcription-cancelled`<br>`speech-microphone-unavailable`<br>`speech-stt-activation-request`<br>`speech-stt-activation-error`<br>`speech-tts-lifecycle-error`<br>`speech-synthesis-error` | Sticky runtime speech readiness, explicit STT activation, request cancellation, TTS mute lifecycle intent, and exact TTS operation failures normalized; provider/model authority remains external |
 | [`summary-strip.html`](#summary-striphtml) | Displays compact selectable KPI or summary items. | `configure()`<br>`setItems()`<br>`updateItem()`<br>`clear()`<br>`destroy()` | `summary-strip-ready`<br>`summary-strip-change`<br>`summary-strip-select` | DOM-normalized |
 | [`table.html`](#tablehtml) | Builds and updates a simple header/body table. | `buildHeader()`<br>`buildTable()`<br>`destroy()` | `table-ready`<br>`header-update`<br>`body-update` | DOM-normalized |
 | [`task-progress.html`](#task-progresshtml) | Runs and displays a task list with started/change/complete/error state. | `configure()`<br>`setTasks()`<br>`updateTask()`<br>`runTasks()`<br>`clear()`<br>`destroy()` | `task-progress-ready`<br>`task-progress-started`<br>`task-progress-change`<br>`task-progress-complete`<br>`task-progress-error` | Task state normalized; injected task results mixed |
@@ -317,7 +318,8 @@ Methods/properties: `streamMessage()`, `setMessageProgress()`,
 `submitMessage()`, `submitToolResult()`, `submitToolResults()`, `sendMessage()`,
 `languageChanged()`, `requestAIActivation()`, `session`, `sessionStatus`,
 `pendingTool`, `pendingTools`, `pendingToolCall`, `pendingToolCalls`, `modelName`,
-and `destroy()`.
+`transcriptionMode`, `recognitionLanguage`, `appendDraft()`, `print()`,
+`printTitle`, and `destroy()`.
 
 `sendMessage(text)` and `languageChanged(text)` are host-overridable async
 extension callbacks. The component installs warning-only defaults when the host
@@ -330,6 +332,38 @@ newline is inserted. Shift+Enter and input-method composition retain native
 editing. The visible Send button remains available on every device. Input
 changes resize the composer without submitting; held desktop Enter does not
 submit repeatedly. All input listeners follow the component's existing cleanup.
+
+`transcriptionMode` defaults to `'submit'`, preserving completed-transcription
+submission. Set it to `'draft'` for editable voice input with manual Send.
+Native final words and interim hypotheses appear immediately in the existing
+composer; later hypotheses replace only the recognition-owned interim range.
+Typing elsewhere is preserved, and editing that range makes its text user-owned.
+Completion does not append the same final text twice. Cancellation removes only
+an unedited interim hypothesis; final words and user edits remain in the draft.
+The shared Speech status stops repeating transcript text in draft mode.
+`appendDraft(text)` appends complete text without submitting, preserves existing
+draft text and selection, and emits the normal input event. It adds a newline
+between entries only when neither boundary already has whitespace. It returns
+`false` for empty input or a destroyed component.
+
+`recognitionLanguage` forwards the Speech component's native BCP47 language
+selection. If omitted, Speech uses the browser language. It is independent of
+the existing conversation-language label and is latched when capture starts.
+
+`await print()` delegates the current rendered transcript to shared PrintView;
+`printTitle` optionally supplies the title (default `Conversation`). Controls,
+status, transient thinking, and tool-inspection details are outside the printed
+conversation; complete human-facing tool messages remain. Print uses
+a document-flow transcript layout instead of left/right screen bubbles;
+timestamps keep their own alignment and table headings can repeat across pages.
+Native Print uses
+the same registered view while it is visible and has transcript content. The
+method resolves `true` when the browser print dialog is requested, not when a
+PDF or paper output is produced; it resolves `false` when unavailable or
+cancelled during preparation and rejects preparation failures. Complete errors
+reach developer diagnostics and a concise recovery status stays outside the
+transcript. Destruction cancels pending preparation, while an already requested
+print retains its snapshot through `afterprint`.
 
 Before any session binding begins, callback-mode `sessionStatus` follows the
 selected sticky LLM role and the existing application-owned `modelName` label
@@ -950,7 +984,7 @@ preview ahead of the editor. Printing uses the shared
 [`PrintView.js`](runtime-modules.md#printviewjs) owner; accessible HTML frames
 are copied from their current rendered document, never substituted with source
 text. Explicit printing waits for images/fonts and HTML frame readiness.
-The shared print surface uses a light paper palette and `15mm` page margins
+The shared print surface uses a light paper palette and `1in` (`25.4mm`) page margins
 while preserving image/SVG colors and leaving the screen theme unchanged.
 Native PDF and inaccessible embedded viewers require their own print command.
 `true` means the browser print dialog was requested, not that paper or a PDF
@@ -1153,7 +1187,7 @@ Markdown with `entryTitle`, independently of saving. Native browser Print uses
 that same registered view unless an open file preview takes precedence.
 The SDK copies current rendered DOM/styles into a temporary print-only view,
 leaving the editor's source, controls, and screen layout in place. Both explicit
-and native print use the shared light paper palette and `15mm` page margins;
+and native print use the shared light paper palette and `1in` (`25.4mm`) page margins;
 image pixels and SVG artwork keep their colors. Explicit printing waits for
 resource readiness; native `beforeprint` is synchronous
 and uses the currently rendered content. `print()` returns `false` when the
@@ -1632,12 +1666,26 @@ Events: `source-explanation-ready`, `source-explanation-save`, `source-explanati
 An explicitly selected native Web Speech provider uses gesture-started live
 capture instead of MediaRecorder. The shared control retains every final
 result and emits its existing completion event once with the exact combined
-text when native capture ends. The live display retains final words alongside
-interim hypotheses while speaking; interim hypotheses stay transient. Release/Stop
+text when native capture ends. The `speech-transcription-progress` event carries
+cumulative complete final `text` and the current `interim` hypothesis, with the
+capture's `operationId`. Final segments replace their interim hypothesis before
+publishing; capture completion clears remaining interim text. The live display
+retains both while `displayTranscription` is true (the default). Set it false
+when a containing Chat owns the editable draft; status still reports listening,
+loading, and errors. Interim hypotheses stay transient. Release/Stop
 finishes native recognition; cancellation, replacement and destruction abort
 it and suppress late submission. A persisted page hide stops live native capture
 without restarting it when the page returns. Existing Whisper and TTS paths
 remain unchanged.
+
+On desktop native capture, an accessible editable BCP47 language control occupies
+the feedback area instead of idle transcription/voice readiness boilerplate.
+`recognitionLanguage` defaults to `navigator.language`, accepts an explicit
+language tag without restricting it to the suggested choices, and is passed to
+the capture owner at start. The control is disabled during active capture so
+changes affect the next capture. Native voice loading, errors, and speaking
+remain visible. Model-based transcription retains its existing status, and
+mobile speech retains its existing voice-output-only presentation.
 
 ### Overview
 
@@ -1648,9 +1696,11 @@ completion, mute state, and microphone availability.
 
 Methods/properties: `configure()`, `setMuted()`,
 `reportTTSError(error,boundary='synthesis')`, `requestSTTActivation()`,
-`destroy()`, `availability`, `muted`, `initialMuted`, and `componentReady`.
+`destroy()`, `availability`, `muted`, `initialMuted`, `recognitionLanguage`,
+`displayTranscription`, and `componentReady`. The two new properties may also
+be supplied through `configure()`.
 
-Events: `speech-ready`, `speech-transcription-complete`,
+Events: `speech-ready`, `speech-transcription-progress`, `speech-transcription-complete`,
 `speech-transcription-error`, `speech-transcription-cancelled`,
 `speech-microphone-unavailable`, `speech-stt-activation-request`,
 `speech-stt-activation-error`, `speech-tts-lifecycle-error`, and
@@ -2095,10 +2145,12 @@ Native methods remain subject to the bound app's capabilities. [Deep protocol de
 
 An explicitly selected native Web Speech provider uses the same ordered
 transcript/save queue in either capture mode. Each complete final text segment
-skips file transcription and enters the existing append/save stages; interim
-text stays in the transient `interim` part and never reaches a save or success
-event. Final segments waiting behind a save stay visible there until appended
-to the main transcript. Native `stopRecording()` returns the drain promise, including final
+skips file transcription and enters the existing append/save stages. The existing
+transcript output immediately displays canonical text, queued final segments,
+and the current interim hypothesis in order. There is no separate interim pane.
+Interim text never reaches `value`, a save, or a success event. Moving an accepted
+final segment into canonical text does not display it twice; saved text and
+retry payloads remain owned by the ordered queue. Native `stopRecording()` returns the drain promise, including final
 results emitted during native stop. Browser `end` stops capture without an
 automatic restart. Provider replacement stops native capture while already
 accepted final segments retain their ordered saves. Explicit Cancel, transcript

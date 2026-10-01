@@ -3394,12 +3394,14 @@ console.log(typeof prepareSpeech); // function
 
 ### Overview
 
-Shared rendered-print owner used by Markdown Editor and File Manager. It
+Shared rendered-print owner used by Chat, Markdown Editor, and File Manager. It
 captures the current DOM and computed styles, including accessible rendered
 HTML frames, complete text, selected images, and the current title. A temporary
 print-only surface expands scrollable content without editing the live screen.
-That surface uses the shared Arcane light-theme text, paper, and border colors,
-with `15mm` page margins. It retains rendered fonts, emphasis, and complete
+The shared `/arcane/css/print.css` owns print presentation for this snapshot,
+direct themed pages, and documentation sites. It supplies the existing Arcane
+light palette and `1in` (`25.4mm`) page margins. The snapshot retains rendered
+fonts, font sizing, line height, emphasis, and complete
 content while removing screen-theme text/shadow paint from ordinary HTML and
 pseudo-elements. Links are underlined and table cells receive visible borders.
 Image pixels, canvas snapshots, and SVG artwork keep their own colors. These
@@ -3434,6 +3436,13 @@ the developer console receives complete preparation failures.
 Native printing never invokes the asynchronous `prepare` callback; prepared
 views still receive the synchronous content/title read at capture.
 
+Import fetches the complete shared stylesheet through a module-relative URL
+and resolves after that text is available. The editor, file preview, and chat
+load this module independently of rendering; stylesheet readiness delays only
+print availability. Every registered view can therefore capture synchronously
+during native `beforeprint`, with no new stylesheet request at print time.
+Loading failures reject the module import and remain observable to its caller.
+
 `destroy()` unregisters the view and cancels pending preparation. Once the
 dialog has been requested, its snapshot and retained media remain until
 `afterprint`. Import alone creates no listener, provider, storage, or print job.
@@ -3443,7 +3452,8 @@ Exact exports: `createPrintView`.
 ### Availability and normalization
 
 **Browser and native WebViews with a print implementation.** Requires DOM,
-CSSOM, FontFace/Image readiness, and browser print events. No Core capability.
+CSSOM, Fetch for initial stylesheet loading, FontFace/Image readiness, and
+browser print events. No Core capability.
 Cross-origin/inaccessible frames, native PDF frames, and object/embed viewers
 must use their owning viewer's print command; the helper does not replace their
 content with raw source or claim an unrendered document was printed. Font
@@ -4088,13 +4098,18 @@ The bare root retains the generic neutral light/dark baseline; the prior
 layout default palette is selected explicitly through `data-user-skin="default"`,
 `body.default` compatibility, or the default swatch.
 
-During printing, `theme.css` applies the existing base light palette, with a
-white paper surface and `15mm` page margins, to the root, body, and scoped
+`theme.css` and `document-site.css` import the shared `/arcane/css/print.css`.
+During printing, that owner applies the existing base light palette, with a
+white paper surface and `1in` (`25.4mm`) page margins, to the root, body, and scoped
 `data-arcane-palette` elements. These print-only tokens override screen/custom
-palette tokens. It resets the root/body margin without changing saved
-preferences, screen presentation, scrolling, media, or other layout rules.
-The separate [`PrintView.js`](#printviewjs) owner uses the same light palette
-and margins for its expanded rendered-content snapshot.
+palette tokens. During print, it resets root/body margins, hides the shared
+header/sidebar shell, and expands main-content scrolling into document flow.
+Saved preferences, screen presentation, fonts, and media remain unchanged.
+[`PrintView.js`](#printviewjs) loads that same stylesheet before registering
+views and applies it to its expanded rendered-content snapshot. Snapshot rules
+are scoped to owned print nodes; documentation-site print rules remain scoped
+to that site's surface. Screen styles and saved theme preferences remain with
+their existing owners.
 
 A scoped `data-arcane-palette="warm"` element exposes the same palette variables
 for a chooser preview without changing the page's selection. Use any of the

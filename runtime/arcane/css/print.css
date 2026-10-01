@@ -1,0 +1,235 @@
+/* Shared paper presentation for direct pages and rendered PrintView snapshots.
+ * Theme/document styles import this file. PrintView loads the same complete
+ * text before registration so native beforeprint performs no asynchronous I/O.
+ */
+:root,
+:host{
+    --arcane-print-paper:rgb(255, 255, 255);
+    --arcane-print-text:rgb(23, 34, 56);
+    --arcane-print-secondary:rgb(229, 233, 243);
+    --arcane-print-border:rgb(203, 211, 226);
+    --arcane-print-focus:rgb(118, 87, 213);
+    --arcane-print-muted:rgb(95, 107, 130);
+    --arcane-print-success:rgb(39, 122, 75);
+    --arcane-print-warning:rgb(154, 101, 0);
+    --arcane-print-danger:rgb(165, 56, 56);
+    --arcane-print-review:rgb(133, 85, 165);
+    --arcane-print-shadow:rgba(23, 34, 56, .16);
+    --arcane-print-platinum:rgb(102, 112, 133);
+    --arcane-print-icon-filter:none;
+    --arcane-print-file-icon-filter:hue-rotate(8deg) saturate(.62) brightness(.86);
+}
+
+/* Snapshot rules are scoped to PrintView-owned nodes, including its shadow
+ * host. The source document's typography and artwork remain on the clones.
+ */
+:host([data-arcane-print-stage]){
+    color-scheme:light!important;
+    color:var(--arcane-print-text)!important;
+    background:var(--arcane-print-paper)!important;
+    font:12pt/1.5 serif;
+}
+
+:host([data-arcane-print-stage])>h1{
+    margin:0 0 .75em;
+    font-size:1.5em;
+    line-height:1.2;
+}
+
+[data-arcane-print-node]:not(svg,svg *,img,video,audio),
+[data-arcane-print-node]:not(svg,svg *,img,video,audio)::before,
+[data-arcane-print-node]:not(svg,svg *,img,video,audio)::after{
+    color:var(--arcane-print-text)!important;
+    background-color:transparent!important;
+    border-color:var(--arcane-print-border)!important;
+    color-scheme:light!important;
+    -webkit-text-fill-color:currentColor!important;
+    -webkit-text-stroke:0!important;
+    text-decoration-color:currentColor!important;
+    text-shadow:none!important;
+    box-shadow:none!important;
+}
+
+a[data-arcane-print-node]:not(svg *){text-decoration:underline!important;}
+table[data-arcane-print-node]:not(svg *){border-collapse:collapse!important;}
+th[data-arcane-print-node]:not(svg *),
+td[data-arcane-print-node]:not(svg *){
+    border:1px solid var(--arcane-print-border)!important;
+    padding:.35em .5em!important;
+}
+
+[data-arcane-print-expand]{
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    width:auto!important;
+    min-width:0!important;
+    max-width:100%!important;
+    overflow:visible!important;
+    contain:none!important;
+    content-visibility:visible!important;
+    grid-template-rows:none!important;
+    break-inside:auto!important;
+}
+
+img[data-arcane-print-node]{max-width:100%!important;height:auto!important;}
+[data-arcane-print-static]{position:static!important;}
+[data-arcane-print-root]{visibility:visible!important;}
+[data-arcane-print-block]{display:block!important;}
+pre[data-arcane-print-node]{white-space:pre-wrap!important;overflow-wrap:anywhere!important;}
+table[data-arcane-print-node]{table-layout:auto!important;}
+thead[data-arcane-print-node]{display:table-header-group!important;}
+tfoot[data-arcane-print-node]{display:table-footer-group!important;}
+td[data-arcane-print-node],
+th[data-arcane-print-node]{overflow-wrap:anywhere!important;white-space:normal!important;}
+
+/* Chat supplies the rendered transcript, not controls or session status.
+ * Keep public tool messages; inspection details and thinking are transient.
+ */
+.chat_output[data-arcane-print-node]{
+    display:block!important;
+    margin:0!important;
+    padding:0!important;
+    border:0!important;
+    border-radius:0!important;
+}
+
+.chat_output[data-arcane-print-node]>li{
+    display:block!important;
+    float:none!important;
+    clear:both!important;
+    max-inline-size:100%!important;
+    text-align:start!important;
+    margin:0 0 1em!important;
+    padding:0!important;
+    border:0!important;
+    border-radius:0!important;
+}
+
+.chat_output[data-arcane-print-node]>li [data-arcane-print-node]:not(.message_timestamp){
+    text-align:start!important;
+}
+
+.chat_output[data-arcane-print-node]>li>.thinking,
+.chat_output[data-arcane-print-node]>li>.message_tool_details,
+.chat_output[data-arcane-print-node]>li>.message_tool_calls>.message_tool_call>.message_tool_details,
+.chat_output[data-arcane-print-node]>li:has(>.thinking):has(>.markdown:empty):not(:has(.message_tool_message)){
+    display:none!important;
+}
+
+[data-arcane-print-stage]{display:none!important;}
+
+@media print{
+    @page{margin:1in;}
+
+    :root,
+    body,
+    [data-arcane-palette]{
+        color-scheme:light!important;
+        --background:var(--arcane-print-paper)!important;
+        --modal-background:var(--arcane-print-paper)!important;
+        --text-color:var(--arcane-print-text)!important;
+        --primary-color:var(--arcane-print-text)!important;
+        --secondary-color:var(--arcane-print-secondary)!important;
+        --accent-color:var(--focus-color)!important;
+        --button-text-color:var(--arcane-print-paper)!important;
+        --border-color:var(--arcane-print-border)!important;
+        --focus-color:var(--arcane-print-focus)!important;
+        --muted-text-color:var(--arcane-print-muted)!important;
+        --success-color:var(--arcane-print-success)!important;
+        --warning-color:var(--arcane-print-warning)!important;
+        --danger-color:var(--arcane-print-danger)!important;
+        --review-color:var(--arcane-print-review)!important;
+        --shadow-color:var(--arcane-print-shadow)!important;
+        --platinum:var(--arcane-print-platinum)!important;
+        --icon-filter:var(--arcane-print-icon-filter)!important;
+        --file-icon-filter:var(--arcane-print-file-icon-filter)!important;
+    }
+
+    html,
+    body{
+        margin:0;
+        background-color:var(--modal-background);
+        color:var(--text-color);
+    }
+
+    /* The shared screen shell has a sidebar grid and a viewport-height main
+     * scroller. Paper uses the same main content in ordinary document flow.
+     */
+    html:has(>body>main),
+    body:has(>main),
+    body>main,
+    body>main .data-workspace{
+        display:block!important;
+        position:static!important;
+        width:auto!important;
+        height:auto!important;
+        min-height:0!important;
+        max-height:none!important;
+        overflow:visible!important;
+        contain:none!important;
+        grid-template-columns:none!important;
+        grid-template-rows:none!important;
+        margin:0!important;
+        padding:0!important;
+        border:0!important;
+        border-radius:0!important;
+        box-shadow:none!important;
+    }
+
+    body:has(>main)>.header,
+    body:has(>main)>.nav{
+        display:none!important;
+    }
+
+    /* Expand only when an owned rendered snapshot is actually present. */
+    html:root:has(>body>[data-arcane-print-stage]),
+    html:root>body:has(>[data-arcane-print-stage]){
+        display:block!important;
+        height:auto!important;
+        min-height:0!important;
+        max-height:none!important;
+        overflow:visible!important;
+        contain:none!important;
+        margin:0!important;
+        padding:0!important;
+        border:0!important;
+        background:var(--arcane-print-paper)!important;
+        color:var(--arcane-print-text)!important;
+        color-scheme:light!important;
+    }
+
+    html:root>body:has(>[data-arcane-print-stage])>*:not([data-arcane-print-stage]),
+    html:root>body:has(>[data-arcane-print-stage])::before,
+    html:root>body:has(>[data-arcane-print-stage])::after{
+        display:none!important;
+    }
+
+    html:root>body>[data-arcane-print-stage]{
+        display:block!important;
+        position:static!important;
+        width:auto!important;
+        height:auto!important;
+        overflow:visible!important;
+        margin:0!important;
+        padding:0!important;
+        border:0!important;
+    }
+
+    body.static-doc-site :is(.static-site-header,.static-site-footer,.static-section-nav,.static-previous-next,.static-related,.static-document__source,.skip-link){
+        display:none!important;
+    }
+
+    body.static-doc-site :is(.static-site-main,.static-site-main--document){
+        max-inline-size:none!important;
+        padding:0!important;
+    }
+
+    body.static-doc-site .static-document-layout{display:block!important;}
+    body.static-doc-site .static-document{inline-size:100%!important;}
+    body.static-doc-site .static-document__content table{display:table!important;overflow:visible!important;}
+    body.static-doc-site .static-document__content table :where(code,kbd){
+        overflow-wrap:anywhere!important;
+        word-break:break-word!important;
+    }
+}
