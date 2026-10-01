@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.42.2
+
+- Stop generating SDK cache suffixes in import maps, materialized runtime,
+  source serving, packaged resources, scaffold references and shared components.
+  Remove retired local `arcaneVersion` fields while preserving complete
+  functional queries, including caller-owned `v`, URL spelling and fragments.
+- Preserve external URLs and resources under an external document base,
+  public method signatures, semantic version metadata, conditional HTTP caching
+  and stable application caches. Regenerate managed references through the
+  public package workflow after updating the SDK.
+
 ## 0.42.1
 
 - Keep Enter as native newline input on phones and tablets using the shared
