@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.45.0
+
+- Add public MarkdownMedia save, read, reference parsing and hydration helpers.
+  Store complete image records in application-owned DBOPFS tables outside raw
+  Markdown, with stable references and application-selected filenames. Preserve
+  JSONL/NDJSON singleton records across cold reads and backup restoration.
+- Hydrate local images independently in shared Markdown views while preserving
+  raw Markdown, external URLs, source maps and saving. Observe cancellation and
+  individual failures without removing successful sibling images. Retain print
+  resources through afterprint; explicit PrintView preparation awaits local
+  media while native beforeprint remains synchronous.
+- Apply no-retention semantics to entity-wide persistence choices as well as
+  request persist:false: complete input and response remain available to the
+  active operation, then stay outside retained transcript, recurring model
+  context, DBOPFS and memory extraction. Capture the accepted choice before
+  rendering waits and preserve original pending calls after temporary tool
+  continuations. Existing retained turns and saved history remain untouched;
+  structural sanitization applies to new durable writes only, without migration.
+- Keep image model selection, credentials, storage selection and app orchestration
+  application-owned. No model/provider/default changes are introduced.
+
 ## 0.44.0
 
 - Add stateless `generateImages` through `arcane-os/ai/twin-cloud` with
