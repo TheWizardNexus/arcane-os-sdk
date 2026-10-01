@@ -550,8 +550,11 @@ test('JSON-family image records render through real FileEntity while original fi
     const record = markdownImageRecord(content);
     for (const tableName of ['images', 'journal_media']) {
         const files = {[tableName]: {}};
-        for (const fileName of ['portrait.json', 'portrait.JSON', 'portrait.jsonl', 'portrait.NDJSON', 'restored.ndjson']) {
-            const text = fileName === 'restored.ndjson' ? JSON.stringify([[record]]) : JSON.stringify(record);
+        for (const fileName of ['portrait.json', 'portrait.JSON', 'portrait.jsonl', 'portrait.NDJSON', 'restored.ndjson', 'formatted.jsonl', 'uppercase.json']) {
+            let text = JSON.stringify(record);
+            if (fileName === 'restored.ndjson') text = JSON.stringify([[record]]);
+            if (fileName === 'formatted.jsonl') text = JSON.stringify(record, null, 4);
+            if (fileName === 'uppercase.json') text = JSON.stringify({...record, mediaType: record.mediaType.toUpperCase()});
             files[tableName][fileName] = {file: new File([text], fileName), text};
         }
         const fixture = await fileManagerFixture({realFileEntity: true, files});
@@ -586,6 +589,13 @@ test('image recognition preserves complete generic JSON and every mixed or multi
     const serialized = JSON.stringify(record);
     const texts = {
         'ordinary.json': JSON.stringify({content: 'The complete ordinary journal record'}),
+        'ordinary-url.json': JSON.stringify({dataUrl: 'https://example.test/source'}),
+        'ordinary-text.json': JSON.stringify({mediaType: 'text/plain', dataUrl: 'plain text'}),
+        'ordinary-broken.json': JSON.stringify({mediaType: 'text/plain', dataUrl: 'data:text/plain;base64,%%%'}),
+        'untyped-broken.json': JSON.stringify({dataUrl: 'data:image/png;base64,%%%'}),
+        'ordinary-url.jsonl': '{"dataUrl":"https://example.test/source"}\n',
+        'ordinary-text.ndjson': '{"mediaType":"text/plain","dataUrl":"plain text"}\n',
+        'wrapped-url.json': JSON.stringify([[{dataUrl: 'https://example.test/source'}]]),
         'text-data.json': JSON.stringify({mediaType: 'text/plain', dataUrl: 'data:text/plain;base64,Q29tcGxldGUgdGV4dA=='}),
         'untyped.json': JSON.stringify({dataUrl: record.dataUrl}),
         'multiple.json': JSON.stringify([record, record]),

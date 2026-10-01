@@ -2165,12 +2165,27 @@
             ]);
             preview.controller.signal.throwIfAborted();
             completeJSON=text;
-            const image=decodeMarkdownMediaRecord(completeJSON);
-            if(image?.type.startsWith('image/')){
-                return renderDescriptor(
-                    {kind:'image',content:image,alt:fileRef.name},
-                    preview
-                );
+            let imageRecord;
+            try {
+                imageRecord = JSON.parse(completeJSON);
+            } catch {
+                // Mixed JSONL and ordinary text keep their complete presentation.
+                imageRecord = null;
+            }
+            while (is.array(imageRecord) && imageRecord.length === 1) {
+                imageRecord = imageRecord[0];
+            }
+            // A dataUrl property alone does not identify an image record.
+            // Recognize its declared media type before attempting any decoding.
+            if (is.string(imageRecord?.mediaType)
+                && imageRecord.mediaType.toLowerCase().startsWith('image/')) {
+                const image = decodeMarkdownMediaRecord(imageRecord);
+                if (image?.type.startsWith('image/')) {
+                    return renderDescriptor(
+                        {kind: 'image', content: image, alt: fileRef.name},
+                        preview
+                    );
+                }
             }
         }
 
