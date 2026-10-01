@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.50.0
+
+- Add `createBrowserSpeechSynthesisProvider` through `arcane-os/ai/browser-speech`.
+  Expose actual browser voices and language metadata through the ordinary model
+  catalog and replaying `voiceschanged` subscription. Construction, catalog
+  discovery and preparation remain silent; explicit playback owns native
+  completion, pause, resume, stop and resource release. Applications select
+  defaults and personalize previews. Browser voices may use remote services.
+- Add silent `AI.prepareTTSPlayback` for native descriptors or real Blob audio.
+  Shared AI streaming and SpeechPlayback preserve original order, mixed-audio
+  pauses, cancellation and ownership through actual native release. Native
+  descriptors never become fake audio files; `fetchTTS` and durable `prepareTTS`
+  remain real-audio APIs and report native export unavailability explicitly.
+  Existing saved audio, provider selections and defaults stay supported.
+- Preserve the original STT capture operation ID when cancellation follows a
+  recognition error, so the existing Chat composer can retire its unedited
+  interim range while retaining confirmed text and user edits. No app-local
+  repair, saved-data migration, new dependency or automatic provider switch.
+
 ## 0.49.0
 
 - Queue complete TWiN Cloud/FAL synthesis jobs through credential readiness,
