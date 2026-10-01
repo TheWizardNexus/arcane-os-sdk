@@ -1555,6 +1555,8 @@
             generation,
             urls:new Set(),
             media:new Set(),
+            markdownMedia:new Set(),
+            markdownStatus:false,
             title:`${directory}/${fileName}`,
             rendered:null,
             printPreparation:null,
@@ -1660,6 +1662,7 @@
             status.remove();
             content.append(rendered);
             preview.rendered=rendered;
+            updateMarkdownPreviewStatus(preview);
             void preparePreviewPrint(preview).catch(function reportPrintPreparation(error){
                 reportPreviewPrintFailure(error,preview);
             });
@@ -1683,11 +1686,12 @@
                 }
                 const view=createPrintView({
                     host,
-                    content:()=>preview.rendered,
+                    content:()=>previewPrintContent(preview),
                     title:()=>preview.title,
                     active:()=>isCurrentPreview(preview)&&fileModal.opened===true,
                     priority:1,
                     signal:preview.controller.signal,
+                    prepare:function preparePreviewMedia(signal){return waitForPreviewMarkdown(preview,signal);},
                     retain:()=>retainPreviewPrintResources(preview),
                     onError:error=>reportPreviewPrintFailure(error,preview)
                 });
@@ -1703,20 +1707,93 @@
         if(!preview?.rendered||!isCurrentPreview(preview)||fileModal.opened!==true){
             return false;
         }
+        if(!await waitForPreviewMarkdown(preview)){
+            return false;
+        }
         const view=await preparePreviewPrint(preview);
         return view&&isCurrentPreview(preview)?view.print():false;
+    }
+
+    async function waitForPreviewMarkdown(preview,signal){
+        signal?.throwIfAborted();
+        const results=await Promise.allSettled(
+            [...preview.markdownMedia].map(function markdownReadiness(media){
+                return media.owner.ready;
+            })
+        );
+        signal?.throwIfAborted();
+        if(!isCurrentPreview(preview)||fileModal.opened!==true){
+            return false;
+        }
+        const failures=results.filter(function failedMarkdown(result){
+            return result.status==='rejected';
+        }).map(function markdownFailure(result){
+            return result.reason;
+        });
+        if(failures.length){
+            throw new AggregateError(failures,'Local images could not be prepared for printing.');
+        }
+        return true;
+    }
+
+    function previewPrintContent(preview){
+        const failures=[];
+        for(const media of preview.markdownMedia){
+            if(!media.settled){
+                throw new Error('Local images are still loading. Use Print after they finish.');
+            }
+            if(media.error){
+                failures.push(media.error);
+            }
+        }
+        if(failures.length){
+            throw new AggregateError(failures,'Local images could not be prepared for printing.');
+        }
+        return preview.rendered;
+    }
+
+    function updateMarkdownPreviewStatus(preview){
+        if(!isCurrentPreview(preview)||!preview.rendered){
+            return;
+        }
+        if([...preview.markdownMedia].some(function failedMarkdown(media){return media.error;})){
+            preview.markdownStatus=true;
+            preview.printStatus.textContent='Some images could not be loaded. Reopen this file to try again.';
+            preview.printStatus.setAttribute('role','alert');
+            preview.container.append(preview.printStatus);
+        }else if(preview.markdownStatus&&[...preview.markdownMedia].every(function settledMarkdown(media){return media.settled;})){
+            preview.markdownStatus=false;
+            preview.printStatus.remove();
+        }
     }
 
     function reportPreviewPrintFailure(error,preview){
         arcaneLogging.error('Unable to print file preview:',error);
         if(isCurrentPreview(preview)){
-            preview.printStatus.textContent='Unable to open print preview. Please try again.';
+            const media=[...preview.markdownMedia];
+            preview.markdownStatus=media.some(function unavailableImage(item){return !item.settled||item.error;});
+            preview.printStatus.textContent=media.some(function pendingImage(item){return !item.settled;})
+                ?'Images are still loading. Close this print dialog and use Print after they finish.'
+                :media.some(function failedImage(item){return item.error;})
+                    ?'Some images could not be loaded. Close any print dialog and reopen this file to try again.'
+                    :'Unable to open print preview. Please try again.';
             preview.printStatus.setAttribute('role','alert');
             preview.container.append(preview.printStatus);
         }
     }
 
     function retainPreviewPrintResources(preview){
+        const markdownReleases=[];
+        try{
+            for(const media of preview.markdownMedia){
+                markdownReleases.push(media.owner.retain());
+            }
+        }catch(error){
+            for(const release of markdownReleases){
+                release();
+            }
+            throw error;
+        }
         preview.printRetains+=1;
         let retained=true;
         return function releasePrintedPreviewResources(){
@@ -1724,6 +1801,9 @@
                 return;
             }
             retained=false;
+            for(const release of markdownReleases){
+                release();
+            }
             preview.printRetains-=1;
             if(preview.released&&preview.printRetains===0){
                 releasePreviewURLs(preview);
@@ -1760,6 +1840,10 @@
         }
         preview.released=true;
         preview.controller.abort(reason);
+        for(const media of preview.markdownMedia){
+            media.owner.destroy();
+        }
+        preview.markdownMedia.clear();
         for(const element of preview.media){
             if(element.localName==='audio'){
                 element.pause();
@@ -1817,10 +1901,32 @@
                 }
                 const body=document.createElement(descriptor.kind==='html'?'iframe':'div');
                 if(descriptor.kind==='markdown'){
-                    markdownModulePromise=markdownModulePromise||import('../modules/MD.js');
-                    const {default:MD}=await markdownModulePromise;
+                    markdownModulePromise=markdownModulePromise||Promise.all([
+                        import('../modules/MD.js'),
+                        import('../modules/MarkdownMedia.js')
+                    ]);
+                    const [{default:MD},{hydrateMarkdownMedia}]=await markdownModulePromise;
                     preview.controller.signal.throwIfAborted();
-                    body.innerHTML=new MD(descriptor.content).safeRendered;
+                    const template=document.createElement('template');
+                    template.innerHTML=new MD(descriptor.content).safeRendered;
+                    const owner=hydrateMarkdownMedia(template.content,{signal:preview.controller.signal});
+                    const media={owner,settled:false,error:null};
+                    preview.markdownMedia.add(media);
+                    void owner.ready.then(
+                        function markdownImagesReady(){
+                            media.settled=true;
+                            updateMarkdownPreviewStatus(preview);
+                        },
+                        function markdownImagesFailed(error){
+                            media.settled=true;
+                            media.error=error;
+                            if(isCurrentPreview(preview)){
+                                arcaneLogging.error('Unable to load local Markdown images:',error);
+                                updateMarkdownPreviewStatus(preview);
+                            }
+                        }
+                    );
+                    body.append(template.content);
                 }else{
                     body.title=descriptor.title||'HTML preview';
                     body.srcdoc=descriptor.content;

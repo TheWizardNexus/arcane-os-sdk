@@ -119,6 +119,23 @@ await outbox.start();`
 console.log(normalizeMailEndpoint('/v1/mail', 'https://mail.example.com/'));`
     },
     {
+        name:'MarkdownMedia.js',
+        classification:'public-first-party',
+        lifecycleSideEffects:'Import starts no storage or rendering work. Saving lazily opens the existing app DBOPFS database and completes one JSON-compatible image write. Hydration reads independent local references concurrently, owns temporary display URLs, and retains print resources through the returned release callbacks. Destruction cancels display readiness without deleting records or claiming to cancel an already-started storage read.',
+        paramsResults:'saveMarkdownMedia({blob,tableName="markdown-media",fileName=UUID+".json"}) resolves {reference,tableName,fileName,mediaType} after saving the complete {mediaType,dataUrl} record. parseMarkdownMediaReference(reference) returns {tableName,fileName} or null for ordinary URLs. readMarkdownMedia(reference) returns the complete local Blob without network fetching. hydrateMarkdownMedia(root,{signal}={}) returns {ready,destroy,retain}; local IMG sources are removed synchronously before asynchronous reads and decode, and ordinary URLs/source content remain unchanged. Use a detached root before insertion. retain returns an idempotent print-resource release callback; destroyed owners preserve URLs until every holder releases.',
+        events:[],
+        errors:['Complete encoding, DBOPFS, reference parsing, and image decoding errors propagate. Missing local records reject with NotFoundError.','Hydration ready rejects AggregateError with complete failures [{image,reference,reason}] while preserving successfully displayed siblings. Abort or destroy settles display readiness promptly and prevents late assignment.'],
+        capabilitiesCore:'Browser/native WebView app-scoped DBOPFS, Blob, FileReader, object URLs, and IMG decoding; no Core capability or provider execution. Applications own filenames, entry associations, save-only retry, cleanup and backup/export selection. No migration.',
+        example:String.raw`import {saveMarkdownMedia} from 'arcane-os/modules/MarkdownMedia.js';
+
+const mural = new Blob([
+    '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="80"><text x="10" y="45">Octopus parking only</text></svg>'
+], {type:'image/svg+xml'});
+const {reference} = await saveMarkdownMedia({blob:mural});
+// editor is the ready shared Markdown Editor; its usual save flow remains in charge.
+editor.insertMarkdown('![Octopus parking only](' + reference + ')');`
+    },
+    {
         name:'MarkdownSpeech.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Import re-exports the shared MarkdownSpeech class from arcane-os/speech-text and performs no work. Each instance retains only a trailing candidate formatting mark between append() calls; terminal append and reset clear that instance state.',
@@ -331,7 +348,7 @@ console.log(typeof prepareSpeech);`
         name:'PrintView.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Import starts no work. createPrintView registers one shared beforeprint/afterprint owner per document. A selected print request captures the current rendered DOM/styles into a temporary print-only surface; afterprint removes it and releases retained resources. Destruction cancels preparation, while an already requested print keeps its snapshot until afterprint.',
-        paramsResults:'createPrintView({host,content,title,active,priority=0,signal,onError,retain}) returns {print,destroy}. content/title/active callbacks are synchronous. retain may return a release function for owned media. print() resolves false when unavailable or cancelled during preparation, true when the browser dialog is requested, and rejects preparation failures. Native Print selects the highest-priority visible active view, latest registration on ties; explicit print selects its own view. Accessible HTML frames are flattened from their current DOM. Complete text, resolved images, styles and title are retained while print layout expands scrolling content.',
+        paramsResults:'createPrintView({host,content,title,active,priority=0,signal,onError,retain,prepare}) returns {print,destroy}. content/title/active callbacks are synchronous. retain may return a release function for owned media. Optional prepare(signal) awaits view-owned explicit-print readiness; current content/title are reread synchronously before capture. Native printing never invokes prepare. print() resolves false when unavailable or cancelled during preparation, true when the browser dialog is requested, and rejects preparation failures. Native Print selects the highest-priority visible active view, latest registration on ties; explicit print selects its own view. Accessible HTML frames are flattened from their current DOM. Complete text, resolved images, styles and title are retained while print layout expands scrolling content.',
         events:['Owns native beforeprint and afterprint listeners; no new application event bus. Native beforeprint is synchronous and cannot await new resource readiness or cancel the browser dialog.'],
         errors:['TypeError for unusable host/callback inputs.','Explicit preparation rejects image/font/frame failures and overlapping print requests; native preparation failures reach onError or complete console diagnostics.','Inaccessible HTML frames and native object/embed/PDF viewers require their owning print surface.'],
         capabilitiesCore:'No Core capability. Browser DOM, CSSOM, fonts, image decoding and the host print-dialog implementation are required. A successful request is not evidence of saved PDF or physical output.',

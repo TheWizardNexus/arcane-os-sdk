@@ -96,6 +96,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`Mail.js`](#mailjs) | esm | Builds complete reports and prefers the native mail capability with an explicit HTTP transport fallback. | Browser/native hybrid + cloud | Mail inputs/results normalized; transport failures mixed. |
 | [`MailOutbox.mjs`](#mailoutboxmjs) | esm | Persists complete mail reports before delivery and normalizes idempotent enqueue, retry, reconciliation, and invalid-record maintenance. | Browser/native WebView or compatible injected host | Complete records, full work, cancellation, and lifecycle states normalized; storage, lock, and delivery failures coded. |
 | [`MailTransport.mjs`](#mailtransportmjs) | esm | Sends one complete mail report to a normalized HTTP(S) endpoint. | Browser/server with fetch + cloud | Normalized endpoint and transport errors; remote detail preserved. |
+| [`MarkdownMedia.js`](#markdownmediajs) | esm | Saves local Markdown images separately and resolves their stable references in rendered views. | Browser / supported native WebView | Complete image records, concurrent display reads, cancellation, and print-owned URL lifetime. |
 | [`MarkdownSpeech.js`](#markdownspeechjs) | esm | Removes repeated Markdown formatting marks from streamed narration. | Cross-host | Speech-only filtering; single marks and ordinary punctuation remain literal. |
 | [`Marked.min.js`](#markedminjs) | esm | Vendored Marked 18.0.5 Markdown lexer, parser, renderer, extension, and walk-token API. | Cross-host vendor module | Vendor-native Marked contract. |
 | [`MD.js`](#mdjs) | esm | Renders complete Markdown with Marked and optionally maps source blocks to rendered comment anchors. | Browser / native WebView | Complete raw and rendered Marked values; opt-in original-source offsets; parse errors vendor-native. |
@@ -2794,6 +2795,73 @@ import * as module from '/arcane/modules/Marked.min.js';
 console.log(Object.keys(module));
 ```
 
+## MarkdownMedia.js
+
+### Overview
+
+Stores complete images in the application's existing DBOPFS database while
+Markdown contains only a short, stable `arcane-media:` reference. Rendering
+resolves those local references into temporary display URLs. Importing the
+module starts no storage, network, provider, or rendering operation.
+
+### Public surface
+
+Public package import: `arcane-os/modules/MarkdownMedia.js`.
+
+- `await saveMarkdownMedia({blob,tableName='markdown-media',fileName})` writes
+  `{mediaType,dataUrl}` as a JSON-compatible record and returns
+  `{reference,tableName,fileName,mediaType}` only after the write completes.
+  The default filename is a new UUID followed by `.json`. There is no abort
+  option: accepted storage writes settle through the storage owner.
+- `parseMarkdownMediaReference(reference)` returns `{tableName,fileName}` for
+  a local reference, or `null` for an ordinary URL. Malformed local addresses
+  report their actual parsing error.
+- `await readMarkdownMedia(reference)` returns the complete `Blob`, using
+  only local storage and data-URL decoding; stored strings are never fetched
+  as network addresses.
+- `hydrateMarkdownMedia(root,{signal}={})` returns `{ready,destroy,retain}`
+  immediately. It includes an IMG root and descendant IMG elements, removes
+  local-reference `src` values synchronously, starts independent reads
+  together, and assigns owned object URLs. `ready` includes image decoding.
+  Use a detached fragment before connecting those images to the document.
+
+Hydration preserves Markdown source, image descriptions, ordinary URLs, and
+surrounding content. Failed reads or decodes reject `ready` with an
+`AggregateError` whose complete `failures` array contains
+`{image,reference,reason}`; successful sibling images remain visible.
+
+`destroy()` or abort settles display readiness promptly, prevents late display,
+and releases owned URLs. An already-started storage read remains observed and
+settles independently. `retain()` returns an idempotent release callback for
+printing; retained URLs survive destruction of the original view until every
+print owner releases them. Destruction never deletes stored images.
+
+Applications own record names, entry association, cleanup policy, and which
+records their existing JSON backup/export includes. Reusing the same filename
+supports an application-selected save-only retry without another generation
+request. The helper performs no existing-data migration.
+
+### Availability and normalization
+
+Browser or native WebView with the existing app-scoped DBOPFS owner, Blob,
+FileReader, object URLs, and IMG decoding. Encoding, storage, missing-record,
+parsing, and decoding errors remain observable. No Core capability is selected.
+
+### Example
+
+```javascript
+import {saveMarkdownMedia} from 'arcane-os/modules/MarkdownMedia.js';
+
+const mural = new Blob([
+    '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="80"><text x="10" y="45">Octopus parking only</text></svg>'
+], {type:'image/svg+xml'});
+const {reference} = await saveMarkdownMedia({blob:mural});
+editor.insertMarkdown(`![Octopus parking only](${reference})`);
+```
+
+Here `editor` is the ready shared Markdown Editor. Its normal change/save flow
+still owns saving the Markdown; this operation saves the image record.
+
 ## MD.js
 
 ### Overview
@@ -3277,11 +3345,16 @@ print-only surface expands scrollable content without editing the live screen.
 
 ### Public surface
 
-Named `createPrintView({host,content,title,active,priority=0,signal,onError,retain})`
+Named `createPrintView({host,content,title,active,priority=0,signal,onError,retain,prepare})`
 returns `{print,destroy}`. `host` is a connected element; synchronous callbacks
 return the rendered content node, string title, and whether the view is active.
 Optional `retain()` returns a resource-release callback. It keeps owned media
 available until preparation is cancelled or the browser emits `afterprint`.
+Optional `prepare(signal)` may await view-owned readiness during an explicit
+print request. After it settles, current content and title are read again
+synchronously immediately before capture. A view whose content changes during
+preparation must keep its owned media retained and reject a still-pending
+snapshot through its synchronous `content()` callback.
 
 `await print()` selects that view, waits for accessible HTML frame, image, and
 font readiness, and requests the browser print dialog. It returns `false` when
@@ -3295,6 +3368,8 @@ on ties. File preview uses priority `1`; editor uses `0`. Native `beforeprint`
 is synchronous: it snapshots currently rendered content, cannot await a newly
 loading resource, and cannot cancel the browser's dialog. `onError(error)` or
 the developer console receives complete preparation failures.
+Native printing never invokes the asynchronous `prepare` callback; prepared
+views still receive the synchronous content/title read at capture.
 
 `destroy()` unregisters the view and cancels pending preparation. Once the
 dialog has been requested, its snapshot and retained media remain until

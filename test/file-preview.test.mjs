@@ -3,8 +3,8 @@ import {readFile} from 'node:fs/promises';
 import test from '../src/testing.mjs';
 import Is from '../browser-runtime/dependencies/strong-type/index.js';
 
-// The complete component script runs against named DOM, storage, Markdown, and
-// PrintView callback doubles. These cases cover preview ownership and public
+// The complete component script and MarkdownMedia helper run against named DOM,
+// storage, Markdown, image-decode, and PrintView callback doubles. These cases cover preview ownership and public
 // callback contracts; the PrintView double does not clone DOM or invoke printing.
 // Native media decoding, Markdown parsing, and browser layout are separate seams.
 async function fileManagerFixture(options = {}) {
@@ -18,15 +18,23 @@ async function fileManagerFixture(options = {}) {
     const printRequests = [];
     const modalWaits = [];
     const modalCloseEvents = [];
+    const dependencyImports = [];
+    const markdownReads = [];
+    const markdownHandles = [];
     const ready = Promise.withResolvers();
     const files = options.files || {
         visible: {'entry.txt': {text: 'Complete document', mime: 'text/plain'}}
     };
 
+    class FakeText {
+        constructor(content) {this.textContent = content;}
+        get outerHTML() {return this.textContent;}
+    }
+
     class FakeElement {
         constructor(localName = 'div') {
             this.localName = localName;
-            this.children = [];
+            this.childNodes = [];
             this.attributes = new Map();
             this.listeners = new Map();
             this.dataset = {};
@@ -34,12 +42,57 @@ async function fileManagerFixture(options = {}) {
             this.parentElement = null;
             this.paused = false;
             this.loads = 0;
+            if (localName === 'template') this.content = new FakeElement('#document-fragment');
             const properties = new Map();
             this.style = {
                 getPropertyValue(name) {return properties.get(name) || '';},
                 setProperty(name, value) {properties.set(name, value);}
             };
         }
+
+        get children() {return this.childNodes.filter(function elementChild(child) {return child instanceof FakeElement;});}
+        get src() {return this.getAttribute('src') ?? '';}
+        set src(value) {this.setAttribute('src', value);}
+        get href() {return this.getAttribute('href') ?? '';}
+        set href(value) {this.setAttribute('href', value);}
+        get textContent() {return this.childNodes.map(function nodeText(child) {return child.textContent;}).join('');}
+        set textContent(value) {this.replaceChildren(new FakeText(String(value)));}
+        get innerText() {return this.textContent;}
+        set innerText(value) {this.textContent = value;}
+        get innerHTML() {
+            return (this.content || this).childNodes.map(function nodeHTML(child) {return child.outerHTML;}).join('');
+        }
+        set innerHTML(html) {
+            const target = this.content || this;
+            target.replaceChildren();
+            const stack = [target];
+            // The Markdown double emits this explicit wrapper/IMG HTML subset;
+            // template content is inert and fragment insertion moves its nodes.
+            for (const [token] of html.matchAll(/<\/?[\w-]+(?:\s+[^<>]*?)?\/?>|[^<]+|</gu)) {
+                if (token.startsWith('</')) {
+                    stack.pop();
+                } else if (token.startsWith('<') && token !== '<') {
+                    const tag = /^<([\w-]+)/u.exec(token)[1];
+                    const child = new FakeElement(tag);
+                    for (const [, name, value] of token.matchAll(/([\w-]+)="([^"]*)"/gu)) {
+                        child.setAttribute(name, value.replaceAll('&quot;', '"').replaceAll('&amp;', '&'));
+                    }
+                    stack.at(-1).append(child);
+                    if (!['img', 'br', 'hr', 'input'].includes(tag) && !token.endsWith('/>')) stack.push(child);
+                } else {
+                    stack.at(-1).append(new FakeText(token));
+                }
+            }
+        }
+        get outerHTML() {
+            const attributes = [...this.attributes].map(function htmlAttribute([name, value]) {
+                return ` ${name}="${value.replaceAll('&', '&amp;').replaceAll('"', '&quot;')}"`;
+            }).join('');
+            return ['img', 'br', 'hr', 'input'].includes(this.localName)
+                ?`<${this.localName}${attributes}>`
+                :`<${this.localName}${attributes}>${this.innerHTML}</${this.localName}>`;
+        }
+        decode() {return options.decodeMarkdown?.(this) ?? Promise.resolve();}
 
         addEventListener(type, listener, configuration = {}) {
             const listeners = this.listeners.get(type) || new Set();
@@ -64,7 +117,7 @@ async function fileManagerFixture(options = {}) {
         hasAttribute(name) {return this.attributes.has(name);}
         removeAttribute(name) {
             this.attributes.delete(name);
-            if (name === 'src' || name === 'href' || name === 'srcdoc') this[name] = '';
+            if (name === 'srcdoc') this.srcdoc = '';
         }
         toggleAttribute(name, enabled) {
             if (enabled) this.setAttribute(name, '');
@@ -72,22 +125,28 @@ async function fileManagerFixture(options = {}) {
         }
         append(...children) {
             for (const child of children) {
+                if (child.localName === '#document-fragment') {
+                    this.append(...child.childNodes);
+                    child.childNodes = [];
+                    continue;
+                }
+                child.remove?.();
                 child.parentElement = this;
-                this.children.push(child);
+                this.childNodes.push(child);
             }
         }
         prepend(child) {
             child.parentElement = this;
-            this.children.unshift(child);
+            this.childNodes.unshift(child);
         }
         replaceChildren(...children) {
             for (const child of this.children) child.parentElement = null;
-            this.children = [];
+            this.childNodes = [];
             this.append(...children);
         }
         remove() {
             const parent = this.parentElement;
-            if (parent) parent.children = parent.children.filter(function retainSibling(child) {return child !== this;}, this);
+            if (parent) parent.childNodes = parent.childNodes.filter(function retainSibling(child) {return child !== this;}, this);
             this.parentElement = null;
         }
         cloneNode() {return new FakeElement(this.localName);}
@@ -108,6 +167,7 @@ async function fileManagerFixture(options = {}) {
             function visit(element) {
                 for (const child of element.children) {
                     if (selector === '[data-file-path]' && child.dataset.filePath !== undefined) result.push(child);
+                    if (selector === 'img' && child.localName === 'img') result.push(child);
                     visit(child);
                 }
             }
@@ -141,7 +201,11 @@ async function fileManagerFixture(options = {}) {
     }
 
     class FakeMarkdown {
-        constructor(content) {this.safeRendered = `<fixture-markdown>${content}</fixture-markdown>`;}
+        constructor(content) {
+            this.safeRendered = `<fixture-markdown>${content.replace(/!\[([^\]]*)\]\(([^)]+)\)/gu, function renderedImage(_match, alt, reference) {
+                return `<img src="${reference}" alt="${alt}">`;
+            })}</fixture-markdown>`;
+        }
     }
 
     class FixtureFileEntity {
@@ -216,15 +280,43 @@ async function fileManagerFixture(options = {}) {
     const window = new EventTarget();
     window.dbopfs = dbopfs;
 
+    const mediaSource = await readFile(new URL('../runtime/arcane/modules/MarkdownMedia.js', import.meta.url), 'utf8');
+    const loadMediaHelper = new Function('Is', 'loadDatabase', 'URL', mediaSource
+        .replace("import Is from 'strong-type';", '')
+        .replaceAll('export ', '')
+        .replaceAll("import('./DBOPFS.js')", 'loadDatabase()')
+        + '\nreturn hydrateMarkdownMedia;');
+    const hydrateMarkdownMedia = loadMediaHelper(Is, async function mediaDatabase() {
+        class FixtureMediaDBOPFS {
+            async get(tableName, fileName) {
+                markdownReads.push({tableName, fileName});
+                if (options.readMarkdown) return options.readMarkdown(tableName, fileName);
+                return options.markdownRecords?.[`${tableName}/${fileName}`] ?? null;
+            }
+        }
+        return {default: FixtureMediaDBOPFS};
+    }, FixtureURL);
+
     function createPrintViewCallbackDouble(configuration) {
-        const view = {configuration, destroyed: false};
+        const view = {configuration, destroyed: false, preparations: 0};
         printViews.push(view);
         configuration.signal.addEventListener('abort', function destroyPrintViewDouble() {view.destroyed = true;}, {once: true});
         return {
             async print() {
                 if (view.destroyed || !configuration.active() || options.printAvailable === false) return false;
                 const release = configuration.retain();
-                const request = {content: configuration.content(), title: configuration.title(), released: false};
+                let request;
+                try {
+                    request = {content: configuration.content(), title: configuration.title(), released: false};
+                    if (configuration.prepare) {
+                        view.preparations += 1;
+                        await configuration.prepare(configuration.signal);
+                        request.content = configuration.content();
+                    }
+                } catch (error) {
+                    release();
+                    throw error;
+                }
                 printRequests.push(request);
                 window.addEventListener('afterprint', function finishPrintViewDouble() {
                     request.released = true;
@@ -248,10 +340,22 @@ async function fileManagerFixture(options = {}) {
     }
 
     async function loadDependency(specifier) {
+        dependencyImports.push(specifier);
+        await options.loadDependency?.(specifier);
         if (specifier === 'strong-type') return {default: Is};
         if (specifier === '../modules/DBOPFS.js') return {};
         if (specifier === '../entities/File.js') return {default: FileEntity};
         if (specifier === '../modules/MD.js') return {default: FakeMarkdown};
+        if (specifier === '../modules/MarkdownMedia.js') {
+            return {hydrateMarkdownMedia: function hydratePreview(root, configuration) {
+                assert.equal(root.localName, '#document-fragment');
+                assert.equal(root.parentElement, null);
+                const images = root.querySelectorAll('img');
+                const owner = hydrateMarkdownMedia(root, configuration);
+                markdownHandles.push({root, images, owner, signal: configuration.signal});
+                return owner;
+            }};
+        }
         if (specifier === '../modules/PrintView.js') return {createPrintView: createPrintViewCallbackDouble};
         if (specifier === '../modules/WaitForComponent.js') {
             return {default: async function readyComponent(component, configuration) {
@@ -319,7 +423,20 @@ async function fileManagerFixture(options = {}) {
 
     function afterPrint() {window.dispatchEvent(new Event('afterprint'));}
 
-    return {host, manager, fileModal, directoryModal, deleteModal, keysRead, metadataRead, fileReads, createdURLs, revokedURLs, errors, printViews, printRequests, modalWaits, modalCloseEvents, descendants, open, openDirectory, afterPrint, settle, source};
+    function nativePrint() {
+        const view = printViews.at(-1);
+        const release = view.configuration.retain();
+        try {
+            return view.configuration.content();
+        } catch (error) {
+            view.configuration.onError(error);
+            return null;
+        } finally {
+            release();
+        }
+    }
+
+    return {host, manager, fileModal, directoryModal, deleteModal, keysRead, metadataRead, fileReads, createdURLs, revokedURLs, errors, printViews, printRequests, modalWaits, modalCloseEvents, dependencyImports, markdownReads, markdownHandles, descendants, open, openDirectory, afterPrint, nativePrint, settle, source};
 }
 
 test('file preview filters directories before keys and preserves file-predicate input', async function directoryFilteringContract() {
@@ -1050,6 +1167,215 @@ test('failed close preserves the rendered preview until its modal actually close
                 fixture.afterPrint();
                 fixture.host.destroy();
             }
+        }
+    }
+});
+
+function markdownImageRecord(content) {
+    return {mediaType: 'image/svg+xml', dataUrl: `data:image/svg+xml;base64,${Buffer.from(content).toString('base64')}`};
+}
+
+test('Markdown preview starts both lazy imports together and hydrates detached nodes without delaying text', async function detachedMarkdownHydration() {
+    const moduleReady = Promise.withResolvers();
+    const recordReady = Promise.withResolvers();
+    const fixture = await fileManagerFixture({
+        files: {visible: {'drawing.md': {text: 'Complete scene ![Moon dragon](arcane-media:journal/moon.json) ![Outside](https://example.test/outside.png)'}}},
+        loadDependency(specifier) {
+            if (specifier === '../modules/MD.js') return moduleReady.promise;
+        },
+        readMarkdown() {return recordReady.promise;}
+    });
+    try {
+        assert.equal(fixture.dependencyImports.includes('../modules/MD.js'), false);
+        assert.equal(fixture.dependencyImports.includes('../modules/MarkdownMedia.js'), false);
+        await fixture.open('drawing.md');
+        assert.equal(fixture.dependencyImports.includes('../modules/MD.js'), true);
+        assert.equal(fixture.dependencyImports.includes('../modules/MarkdownMedia.js'), true);
+        moduleReady.resolve();
+        await fixture.settle();
+        const handle = fixture.markdownHandles[0];
+        assert.deepEqual(handle.root.children, [], 'Inserting the fragment moves its actual nodes.');
+        assert.equal(handle.images[0].getAttribute('src'), null);
+        assert.equal(handle.images[1].src, 'https://example.test/outside.png');
+        assert.equal(fixture.fileModal.contains(handle.images[0]), true);
+        assert.ok(fixture.fileModal.textContent.includes('Complete scene'));
+        assert.equal(fixture.printViews.length, 1);
+        assert.deepEqual(fixture.markdownReads, [{tableName: 'journal', fileName: 'moon.json'}]);
+        recordReady.resolve(markdownImageRecord('<svg><text>Complete moon dragon</text></svg>'));
+        await handle.owner.ready;
+        assert.equal(handle.images[0].src, 'blob:fixture-1');
+        assert.equal(handle.images[0].getAttribute('alt'), 'Moon dragon');
+        assert.equal(await fixture.createdURLs[0].content.text(), '<svg><text>Complete moon dragon</text></svg>');
+    } finally {
+        moduleReady.resolve();
+        recordReady.resolve(markdownImageRecord('complete fixture'));
+        fixture.host.destroy();
+    }
+});
+
+test('explicit Markdown printing awaits read and decode while native printing reports pending media', async function markdownPrintReadiness() {
+    const record = Promise.withResolvers();
+    const decode = Promise.withResolvers();
+    const decodeEntered = Promise.withResolvers();
+    const fixture = await fileManagerFixture({
+        previewDescriptor() {return {kind: 'markdown', content: '![Scene](arcane-media:journal/scene.json)'};},
+        readMarkdown() {return record.promise;},
+        decodeMarkdown() {decodeEntered.resolve(); return decode.promise;}
+    });
+    try {
+        await fixture.open();
+        assert.equal(fixture.nativePrint(), null);
+        assert.ok(fixture.fileModal.textContent.includes('Images are still loading. Close this print dialog'));
+        const printing = fixture.host.printPreview();
+        await fixture.settle();
+        assert.deepEqual(fixture.printRequests, []);
+        record.resolve(markdownImageRecord('complete scene'));
+        await decodeEntered.promise;
+        assert.deepEqual(fixture.printRequests, []);
+        decode.resolve();
+        assert.equal(await printing, true);
+        assert.equal(fixture.printRequests.length, 1);
+        assert.equal(fixture.printViews[0].preparations, 1);
+        assert.equal(fixture.fileModal.textContent.includes('Images are still loading.'), false);
+        assert.equal(fixture.printRequests[0].content.contains(fixture.markdownHandles[0].images[0]), true);
+        assert.equal(fixture.errors.length, 1);
+        assert.equal(fixture.errors[0][0], 'Unable to print file preview:');
+    } finally {
+        record.resolve(markdownImageRecord('complete scene'));
+        decode.resolve();
+        fixture.afterPrint();
+        fixture.host.destroy();
+    }
+});
+
+test('failed Markdown images remain observable without hiding text or successful siblings', async function partialMarkdownMediaFailure() {
+    const fixture = await fileManagerFixture({
+        previewDescriptor() {return {kind: 'collection', items: [
+            {kind: 'markdown', content: 'First complete account ![Good](arcane-media:journal/good.json)'},
+            {kind: 'markdown', content: 'Second complete account ![Missing](arcane-media:journal/missing.json)'}
+        ]};},
+        markdownRecords: {'journal/good.json': markdownImageRecord('good complete scene')}
+    });
+    try {
+        await fixture.open();
+        await Promise.allSettled(fixture.markdownHandles.map(function mediaReadiness(handle) {return handle.owner.ready;}));
+        assert.ok(fixture.fileModal.textContent.includes('First complete account'));
+        assert.ok(fixture.fileModal.textContent.includes('Second complete account'));
+        assert.ok(fixture.fileModal.textContent.includes('Some images could not be loaded.'));
+        assert.equal(fixture.markdownHandles[0].images[0].src, 'blob:fixture-1');
+        assert.deepEqual(fixture.revokedURLs, []);
+        await assert.rejects(fixture.host.printPreview(), AggregateError);
+        assert.equal(fixture.nativePrint(), null);
+        assert.deepEqual(fixture.printRequests, []);
+        assert.equal(fixture.errors[0][0], 'Unable to load local Markdown images:');
+        assert.equal(fixture.errors[0][1].failures[0].reason.name, 'NotFoundError');
+    } finally {
+        fixture.host.destroy();
+    }
+});
+
+test('closed, replaced, and destroyed previews prevent late Markdown images or print requests', async function cancelledMarkdownHydration() {
+    for (const action of ['close', 'replace', 'destroy']) {
+        const record = Promise.withResolvers();
+        let descriptions = 0;
+        const fixture = await fileManagerFixture({
+            previewDescriptor() {
+                descriptions += 1;
+                return descriptions === 1
+                    ?{kind: 'markdown', content: '![Late](arcane-media:journal/late.json)'}
+                    :{kind: 'text', content: 'The replacement stays current.'};
+            },
+            readMarkdown() {return record.promise;}
+        });
+        try {
+            await fixture.open();
+            const handle = fixture.markdownHandles[0];
+            const printing = fixture.host.printPreview();
+            if (action === 'close') assert.equal(await fixture.host.close(), true);
+            if (action === 'replace') await fixture.open();
+            if (action === 'destroy') fixture.host.destroy();
+            assert.equal(handle.signal.aborted, true, action);
+            assert.equal(await printing, false, action);
+            record.resolve(markdownImageRecord('late complete scene'));
+            await fixture.settle();
+            assert.equal(handle.images[0].getAttribute('src'), null, action);
+            assert.deepEqual(fixture.createdURLs, [], action);
+            assert.deepEqual(fixture.printRequests, [], action);
+            assert.deepEqual(fixture.errors, [], action);
+            if (action === 'replace') assert.ok(fixture.fileModal.textContent.includes('The replacement stays current.'));
+        } finally {
+            record.resolve(markdownImageRecord('late complete scene'));
+            fixture.host.destroy();
+        }
+    }
+});
+
+test('Markdown and ordinary preview URL leases both survive close until afterprint', async function mixedPrintMediaLifetime() {
+    for (const closeFirst of [true, false]) {
+        const fixture = await fileManagerFixture({
+            previewDescriptor() {return {kind: 'collection', items: [
+                {kind: 'markdown', content: '![Saved](arcane-media:journal/saved.json)'},
+                {kind: 'image', content: new Blob(['ordinary complete image'], {type: 'image/png'})}
+            ]};},
+            markdownRecords: {'journal/saved.json': markdownImageRecord('saved complete drawing')}
+        });
+        try {
+            await fixture.open();
+            assert.equal(await fixture.host.printPreview(), true);
+            const expected = new Set(fixture.createdURLs.map(function createdURL(entry) {return entry.url;}));
+            assert.equal(expected.size, 2);
+            if (closeFirst) {
+                assert.equal(await fixture.host.close(), true);
+                assert.deepEqual(fixture.revokedURLs, []);
+                fixture.afterPrint();
+            } else {
+                fixture.afterPrint();
+                assert.deepEqual(fixture.revokedURLs, []);
+                assert.equal(await fixture.host.close(), true);
+            }
+            assert.deepEqual(new Set(fixture.revokedURLs), expected);
+            assert.equal(fixture.revokedURLs.length, 2);
+            fixture.afterPrint();
+            fixture.host.destroy();
+            assert.equal(fixture.revokedURLs.length, 2);
+        } finally {
+            fixture.afterPrint();
+            fixture.host.destroy();
+        }
+    }
+});
+
+test('refused, throwing, and still-open closes preserve settled Markdown media until actual closure', async function refusedMarkdownClose() {
+    for (const failure of ['refusal', 'throw', 'still-open']) {
+        const fixture = await fileManagerFixture({
+            previewDescriptor() {return {kind: 'markdown', content: '![Keep](arcane-media:journal/keep.json)'};},
+            markdownRecords: {'journal/keep.json': markdownImageRecord('complete retained scene')}
+        });
+        const closeModal = fixture.fileModal.close.bind(fixture.fileModal);
+        let firstClose = true;
+        fixture.fileModal.close = async function refuseFirstClose() {
+            if (!firstClose) return closeModal();
+            firstClose = false;
+            if (failure === 'throw') throw new Error('Fixture close failed.');
+            return failure === 'still-open';
+        };
+        try {
+            await fixture.open();
+            const handle = fixture.markdownHandles[0];
+            await handle.owner.ready;
+            assert.equal(await fixture.host.close(), false, failure);
+            assert.equal(handle.signal.aborted, false, failure);
+            assert.equal(handle.images[0].src, 'blob:fixture-1', failure);
+            assert.deepEqual(fixture.revokedURLs, [], failure);
+            assert.equal(await fixture.host.printPreview(), true, failure);
+            fixture.afterPrint();
+            assert.deepEqual(fixture.revokedURLs, [], failure);
+            assert.equal(await fixture.host.close(), true, failure);
+            assert.equal(handle.signal.aborted, true, failure);
+            assert.deepEqual(fixture.revokedURLs, ['blob:fixture-1'], failure);
+        } finally {
+            fixture.afterPrint();
+            fixture.host.destroy();
         }
     }
 });

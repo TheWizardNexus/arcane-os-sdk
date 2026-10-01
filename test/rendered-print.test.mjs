@@ -430,6 +430,147 @@ test('pending iframe readiness precedes the explicit browser request',async func
     assert.match(printStage(document).shadowRoot.textContent,/Current frame body/u);
 });
 
+test('optional print preparation follows document readiness and captures a fresh synchronous content read',async function currentPreparedContent(context){
+    const document=fixtureDocument();
+    const fonts=deferred();
+    document.fonts.ready=fonts.promise;
+    const entered=deferred();
+    const prepared=deferred();
+    const first=document.createElement('section');
+    first.textContent='Earlier rendered entry';
+    const latest=document.createElement('section');
+    latest.textContent='Complete latest rendered entry';
+    latest.appearance.color='rgb(70, 80, 90)';
+    let current=first;
+    let preparationCalls=0;
+    const reads=[];
+    const fixture=addView(context,document,{
+        content(){reads.push(current);return current;},
+        title(){return current===first?'Earlier title':'Complete latest title';},
+        prepare(signal){
+            preparationCalls++;
+            assert.equal(signal.aborted,false);
+            entered.resolve();
+            return prepared.promise;
+        }
+    });
+    fixture.host.append(first);
+    const printing=fixture.view.print();
+    assert.equal(preparationCalls,0);
+    assert.deepEqual(reads,[first]);
+    fonts.resolve();
+    await entered.promise;
+    first.remove();
+    fixture.host.append(latest);
+    current=latest;
+    prepared.resolve();
+    assert.equal(await printing,true);
+    assert.deepEqual(reads,[first,latest]);
+    assert.equal(preparationCalls,1);
+    const snapshot=printStage(document).shadowRoot;
+    assert.equal(snapshot.querySelectorAll('h1')[0].textContent,'Complete latest title');
+    assert.equal(document.title,'Complete latest title');
+    assert.match(snapshot.textContent,/Complete latest rendered entry/u);
+    assert.doesNotMatch(snapshot.textContent,/Earlier rendered entry/u);
+    assert.equal(snapshot.querySelectorAll('section')[0].style.getPropertyValue('color'),'rgb(70, 80, 90)');
+    assert.equal(fixture.resources.released,0);
+    document.defaultView.dispatchEvent(new Event('afterprint'));
+    assert.equal(fixture.resources.released,1);
+});
+
+test('optional print preparation cancellation settles without waiting for an uncooperative callback',async function cancelledViewPreparation(context){
+    const document=fixtureDocument();
+    const controller=new AbortController();
+    const entered=deferred();
+    const pending=deferred();
+    let preparationSignal;
+    const fixture=addView(context,document,{
+        signal:controller.signal,
+        prepare(signal){preparationSignal=signal;entered.resolve();return pending.promise;}
+    });
+    const printing=fixture.view.print();
+    await entered.promise;
+    controller.abort();
+    assert.equal(await printing,false);
+    assert.equal(preparationSignal.aborted,true);
+    assert.equal(fixture.resources.released,1);
+    assert.equal(document.defaultView.printCalls,0);
+    assert.equal(printStage(document),undefined);
+    pending.resolve();
+    await Promise.resolve();
+    assert.equal(document.defaultView.printCalls,0);
+});
+
+test('an iframe inserted during print preparation must expose a ready rendered document',async function latePendingFrame(context){
+    const document=fixtureDocument();
+    const fixture=addView(context,document,{
+        prepare(){
+            const frame=document.createElement('iframe');
+            frame.setAttribute('srcdoc','The complete document is still being loaded.');
+            frame.contentDocument=fixtureDocument('about:blank');
+            frame.contentDocument.readyState='complete';
+            fixture.content.append(frame);
+        }
+    });
+    await assert.rejects(fixture.view.print(),/embedded HTML preview is still loading/u);
+    assert.equal(fixture.resources.released,1);
+    assert.equal(printStage(document),undefined);
+    assert.equal(document.defaultView.printCalls,0);
+});
+
+test('a final synchronous content guard rejects changes arriving during async preparation',async function changedAfterPreparation(context){
+    const document=fixtureDocument();
+    const failure=new Error('The latest image is still loading.');
+    let pending=false;
+    const fixture=addView(context,document,{
+        content(){if(pending)throw failure;return fixture.content;},
+        async prepare(){pending=true;}
+    });
+    await assert.rejects(fixture.view.print(),function originalFailure(error){return error===failure;});
+    assert.equal(fixture.resources.released,1);
+    assert.equal(printStage(document),undefined);
+    assert.equal(document.defaultView.printCalls,0);
+});
+
+test('native printing rechecks prepared views synchronously without invoking async preparation',async function nativePreparedContent(context){
+    const document=fixtureDocument();
+    const failure=new Error('Local media is still pending.');
+    const pending=deferred();
+    const entered=deferred();
+    let blocked=false;
+    let preparations=0;
+    const fixture=addView(context,document,{
+        content(){if(blocked)throw failure;return fixture.content;},
+        prepare(){preparations++;entered.resolve();return pending.promise;}
+    });
+    const printing=fixture.view.print();
+    const rejected=assert.rejects(printing,function nativeFailure(error){return error===failure;});
+    await entered.promise;
+    blocked=true;
+    document.defaultView.dispatchEvent(new Event('beforeprint'));
+    await rejected;
+    assert.deepEqual(fixture.errors,[failure]);
+    assert.equal(preparations,1);
+    assert.equal(fixture.resources.released,1);
+    assert.equal(printStage(document),undefined);
+    assert.equal(document.defaultView.printCalls,0);
+    pending.resolve();
+    blocked=false;
+    document.defaultView.dispatchEvent(new Event('beforeprint'));
+    assert.equal(preparations,1,'Native beforeprint must not await or invoke prepare.');
+    assert.ok(printStage(document));
+});
+
+test('optional print preparation failures preserve the complete error and release resources',async function rejectedViewPreparation(context){
+    const document=fixtureDocument();
+    const failure=new AggregateError([new Error('Complete local media failure.')],'Media preparation failed.');
+    const fixture=addView(context,document,{prepare(){throw failure;}});
+    await assert.rejects(fixture.view.print(),function completeFailure(error){return error===failure;});
+    assert.equal(fixture.resources.released,1);
+    assert.equal(printStage(document),undefined);
+    assert.equal(document.defaultView.printCalls,0);
+});
+
 test('real image preparation errors reject and release without opening the print dialog',async function failedImage(context){
     const document=fixtureDocument();
     const fixture=addView(context,document);

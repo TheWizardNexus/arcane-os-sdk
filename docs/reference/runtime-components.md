@@ -931,6 +931,16 @@ Native PDF and inaccessible embedded viewers require their own print command.
 was produced. Closed, destroyed, or unavailable previews return `false`;
 preparation failures reject and the visible control reports a concise failure.
 
+Markdown previews resolve saved `arcane-media:` images through
+[`MarkdownMedia.js`](runtime-modules.md#markdownmediajs) before connecting IMG
+nodes. Text appears while independent image reads finish; failures leave the
+complete text and successful images visible with a concise recovery status.
+Explicit printing waits for local reads and decoding. Native Print reports
+pending media because it cannot await them. Closing or replacing a preview
+cancels display readiness without waiting for storage; URLs already retained
+by a requested print remain until `afterprint`. Original Markdown and ordinary
+external image URLs remain unchanged.
+
 `await close()` cancels pending presentation work and closes delete, file, and
 directory dialogs in that order. A settled preview keeps its rendered content,
 media, and printing available until the file dialog actually closes; refusing
@@ -1059,7 +1069,16 @@ Events: `markdown-document-ready`, `markdown-document-state`,
 `markdown-document-empty`, `markdown-document-error`, and
 `markdown-document-navigate`.
 
-Shared dependencies: [`MD.js`](runtime-modules.md#mdjs).
+Saved local image references use
+[`MarkdownMedia.js`](runtime-modules.md#markdownmediajs). Text rendering and
+the existing rendered event do not wait for image reads. The optional
+`labels.mediaError` supplies concise visible failure text while complete
+diagnostics remain in the developer console; successful images and document
+text remain visible. Replacing, clearing, failing, or destroying the document
+releases its display resources without deleting stored media. Markdown source
+and ordinary external image URLs remain unchanged.
+
+Shared dependencies: [`MD.js`](runtime-modules.md#mdjs), [`MarkdownMedia.js`](runtime-modules.md#markdownmediajs).
 
 ### Availability and normalization
 
@@ -1109,6 +1128,16 @@ when the browser dialog was requested. Completion of physical printing or PDF
 saving is not observable through this method. See
 [`PrintView.js`](runtime-modules.md#printviewjs).
 
+Saved `arcane-media:` image references are hydrated through
+[`MarkdownMedia.js`](runtime-modules.md#markdownmediajs) in detached rendered
+nodes. Source text, edit selection, source-map comments, ordinary image URLs,
+and the existing save flow remain unchanged. Image status has its own
+idle-hidden `media-status` part, separate from save status. Explicit printing
+waits for the current image reads/decoding, follows a replacement preview, and
+rechecks readiness before capture. Native Print reports still-pending media
+synchronously; it cannot wait or cancel the native dialog. Print-owned URLs
+outlive a changed or destroyed editor until `afterprint`.
+
 `configure({fit:true,followPreview:true})` opts into the two independent
 behaviors. Both options default to `false`; omitted options retain their
 previous values during reconfiguration, and explicit `false` disables either.
@@ -1145,7 +1174,7 @@ lists, quotes, and tables follow their block, while invisible source positions
 use a nearby available rendered block rather than exact glyph geometry.
 
 Public CSS parts are `editor`, `title`, `toolbar`, `input`, `preview`,
-`actions`, `status`, `print-action`, and `save-action`. Applications can make the title
+`actions`, `status`, `media-status`, `print-action`, and `save-action`. Applications can make the title
 borderless and compact through `::part(title)` while retaining its native
 editing behavior and visible keyboard focus. These parts are styling hooks,
 not slots or replacement controls.

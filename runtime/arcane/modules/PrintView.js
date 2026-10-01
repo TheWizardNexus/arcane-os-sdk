@@ -5,8 +5,9 @@ const registries=new WeakMap();
 let fontSequence=0;
 
 /**
- * Print current rendered DOM. Callbacks are synchronous; retain() may return a
- * resource release function. print() reports a browser request, never an output.
+ * Print current rendered DOM. prepare(signal) may await explicit-print readiness;
+ * other callbacks are synchronous. retain() may return a resource release function.
+ * print() reports a browser request, never an output.
  * Native beforeprint cannot await readiness or cancel the browser's dialog.
  */
 export function createPrintView({
@@ -17,7 +18,8 @@ export function createPrintView({
     priority=0,
     signal,
     onError,
-    retain
+    retain,
+    prepare
 }){
     if(!host?.ownerDocument||!is.function(content)||!is.function(title)
         ||!is.function(active)||!is.finite(priority)){
@@ -27,8 +29,11 @@ export function createPrintView({
         ||(retain!==undefined&&!is.function(retain))){
         throw new TypeError('Print error and resource-retention callbacks must be functions.');
     }
+    if(prepare!==undefined&&!is.function(prepare)){
+        throw new TypeError('A print preparation callback must be a function.');
+    }
     const registry=documentRegistry(host.ownerDocument);
-    const view={host,content,title,active,priority,onError,retain,destroyed:false,pending:null};
+    const view={host,content,title,active,priority,onError,retain,prepare,destroyed:false,pending:null};
     registry.views.add(view);
     signal?.addEventListener('abort',destroy,{once:true});
     if(signal?.aborted){
@@ -98,6 +103,10 @@ function documentRegistry(document){
             }
             const session=registry.session||startSession(registry,view);
             if(!session.stage){
+                if(view.prepare){
+                    session.content=readContent(view);
+                    session.title=readTitle(view);
+                }
                 capture(registry,session);
             }
             session.requested=true;
@@ -153,19 +162,29 @@ function startSession(registry,view){
         if(session.release&&!is.function(session.release)){
             throw new TypeError('A print resource-retention callback must return a release function.');
         }
-        session.content=view.content();
-        if(!session.content||!is.function(session.content.cloneNode)){
-            throw new TypeError('Print content must be a rendered DOM Node.');
-        }
-        session.title=view.title();
-        if(!is.string(session.title)){
-            throw new TypeError('A print title must be a string.');
-        }
+        session.content=readContent(view);
+        session.title=readTitle(view);
         return session;
     }catch(error){
         finishSession(registry,session);
         throw error;
     }
+}
+
+function readContent(view){
+    const content=view.content();
+    if(!content||!is.function(content.cloneNode)){
+        throw new TypeError('Print content must be a rendered DOM Node.');
+    }
+    return content;
+}
+
+function readTitle(view){
+    const title=view.title();
+    if(!is.string(title)){
+        throw new TypeError('A print title must be a string.');
+    }
+    return title;
 }
 
 async function printRendered(registry,view){
@@ -185,6 +204,23 @@ async function printRendered(registry,view){
         if(signal.aborted||!available(view)){
             finishSession(registry,session);
             return false;
+        }
+        if(view.prepare){
+            await abortable(view.prepare(signal),signal);
+            if(session.error){
+                throw session.error;
+            }
+            if(session.requested){
+                return true;
+            }
+            if(signal.aborted||!available(view)){
+                finishSession(registry,session);
+                return false;
+            }
+            // Read and capture together: a changing view can reject pending
+            // content synchronously without an unobserved readiness gap.
+            session.content=readContent(view);
+            session.title=readTitle(view);
         }
         capture(registry,session);
         const images=Array.from(session.stage.shadowRoot.querySelectorAll('img'));
@@ -223,6 +259,9 @@ async function printRendered(registry,view){
         finishSession(registry,session);
         if(cancelled){
             return false;
+        }
+        if(view.prepare&&session.error){
+            throw session.error;
         }
         throw error;
     }

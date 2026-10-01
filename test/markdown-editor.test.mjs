@@ -19,7 +19,7 @@ const initialize = new AsyncFunction(
 // Run the complete component script with controlled DOM geometry. Markdown
 // parsing and native browser layout have their own owners; this fixture supplies
 // explicit source-map records and rendered blocks without implementing a parser.
-async function editorFixture(context, {dataset = {}, layout = [], viewportEffects = false} = {}) {
+async function editorFixture(context, {dataset = {}, layout = [], images = [], manualMedia = false, beforePrintCapture, viewportEffects = false} = {}) {
     const publications = [];
     const errors = [];
     const renders = [];
@@ -27,16 +27,22 @@ async function editorFixture(context, {dataset = {}, layout = [], viewportEffect
     const cancelledFrames = [];
     const treeMoves = [];
     const printCalls = [];
+    const printSessions = [];
+    const mediaHandles = [];
+    const dependencies = [];
     const document = {activeElement: null};
     let frameSequence = 0;
     let eventSourceDisposed = false;
     let renderedEntries = [];
+    let renderedImages = [];
     let preview;
+    let printOptions;
 
     class Element extends EventTarget {
         constructor(tagName = 'section') {
             super();
             this.tagName = tagName.toUpperCase();
+            this.localName = tagName.toLowerCase();
             this.nodeType = 1;
             this.dataset = {};
             this.attributes = new Map();
@@ -67,20 +73,34 @@ async function editorFixture(context, {dataset = {}, layout = [], viewportEffect
         append(...nodes) {
             for (const node of nodes) {
                 if (node.nodeType === 11) {
-                    this.append(...node.children);
+                    this.append(...node.childNodes);
                     continue;
                 }
-                node.parentElement = this;
+                if (node.parentNode) {
+                    node.parentNode.childNodes = node.parentNode.childNodes.filter(function other(child) {return child !== node;});
+                    node.parentNode.children = node.parentNode.children.filter(function other(child) {return child !== node;});
+                }
+                node.parentElement = this.nodeType === 1 ? this : null;
                 node.parentNode = this;
-                this.children.push(node);
+                if (node.nodeType === 1) this.children.push(node);
+                this.childNodes.push(node);
             }
-            this.childNodes = [...this.children];
         }
 
         replaceChildren(...nodes) {
+            for (const child of this.childNodes) {
+                child.parentNode = null;
+                child.parentElement = null;
+            }
             this.children = [];
             this.childNodes = [];
             this.append(...nodes);
+            // A live preview replacement may affect layout; detached template
+            // parsing alone does not change either editor viewport.
+            if (viewportEffects && this === preview) {
+                input.scrollTop = 0;
+                input.scrollLeft = 0;
+            }
         }
 
         insertBefore(node, reference) {
@@ -103,9 +123,17 @@ async function editorFixture(context, {dataset = {}, layout = [], viewportEffect
         }
 
         get nextSibling() {
-            const siblings = this.parentElement?.childNodes ?? [];
+            const siblings = this.parentNode?.childNodes ?? [];
             return siblings[siblings.indexOf(this) + 1] ?? null;
         }
+
+        get isConnected() {return this.connected === true || Boolean(this.parentNode?.isConnected);}
+        get comments() {
+            return this.childNodes.flatMap(function comments(node) {
+                return node.nodeType === 8 ? [node] : node.comments ?? [];
+            });
+        }
+        get links() {return this.querySelectorAll('a');}
 
         setAttribute(name, value) {this.attributes.set(name, String(value));}
         getAttribute(name) {return this.attributes.get(name) ?? null;}
@@ -144,7 +172,11 @@ async function editorFixture(context, {dataset = {}, layout = [], viewportEffect
             }
         }
         closest(selector) {return selector === '[data-format]' && this.dataset.format ? this : null;}
-        querySelectorAll(selector) {return selector === 'a' ? this.links ?? [] : [];}
+        querySelectorAll(selector) {
+            return this.childNodes.flatMap(function matching(child) {
+                return [...(child.localName === selector ? [child] : []), ...(child.querySelectorAll?.(selector) ?? [])];
+            });
+        }
 
         getBoundingClientRect() {
             const top = this === preview ? 100 : 100 + (this.contentTop ?? 0) - preview.scrollTop;
@@ -155,39 +187,35 @@ async function editorFixture(context, {dataset = {}, layout = [], viewportEffect
         get innerHTML() {return this.html ?? '';}
         set innerHTML(value) {
             this.html = value;
-            // Model layout adjustment at the replaced preview boundary. The
-            // controller must preserve the source pane without a scroll lock.
-            if (viewportEffects && this === preview) {
-                input.scrollTop = 0;
-                input.scrollLeft = 0;
-            }
-            this.replaceChildren();
-            this.comments = [];
+            const target = this.localName === 'template' ? this.content : this;
+            target.replaceChildren();
             for (const entry of renderedEntries) {
                 const block = new Element('p');
                 block.contentTop = entry.top;
                 block.contentHeight = entry.height;
-                block.parentElement = this;
-                block.parentNode = this;
                 const marker = {
                     nodeType: 8,
                     data: entry.marker,
                     nodeValue: entry.marker,
-                    parentNode: this,
-                    parentElement: this,
-                    nextSibling: block,
-                    nextElementSibling: block
+                    get nextSibling() {
+                        const siblings = this.parentNode?.childNodes ?? [];
+                        return siblings[siblings.indexOf(this) + 1] ?? null;
+                    }
                 };
-                this.children.push(block);
                 if (!entry.absorbed) {
-                    this.childNodes.push(marker);
-                    this.comments.push(marker);
+                    target.append(marker);
                 }
-                this.childNodes.push(block);
+                target.append(block);
             }
+            if (!target.children.length) target.append(new Element('p'));
             const link = new Element('a');
             link.setAttribute('rel', 'fixture-link-relation');
-            this.links = [link];
+            target.children[0].append(link);
+            for (const descriptor of renderedImages) {
+                const image = new Element('img');
+                for (const [name, value] of Object.entries(descriptor)) image.setAttribute(name, value);
+                target.children[0].append(image);
+            }
         }
     }
 
@@ -198,18 +226,25 @@ async function editorFixture(context, {dataset = {}, layout = [], viewportEffect
     const input = new Element('textarea');
     const actions = new Element();
     const status = new Element('span');
+    const mediaStatus = new Element('span');
     const save = new Element('button');
     const print = new Element('button');
-    actions.append(status, print, save);
+    actions.append(status, mediaStatus, print, save);
     editor.append(title, preview, toolbar, input, actions);
     const elements = new Map([
         ['.markdown-editor', editor], ['#entryTitle', title], ['#preview', preview],
-        ['#toolbar', toolbar], ['#entryMarkdown', input], ['#save', save], ['#print', print], ['#status', status]
+        ['#toolbar', toolbar], ['#entryMarkdown', input], ['#save', save], ['#print', print], ['#status', status], ['#mediaStatus', mediaStatus]
     ]);
     const host = new Element('html-import');
     host.dataset = {...dataset};
+    host.connected = true;
+    editor.parentNode = host;
     host.shadowRoot = {querySelector(selector) {return elements.get(selector);}};
-    document.createElement = function createElement(tagName) {return new Element(tagName);};
+    document.createElement = function createElement(tagName) {
+        const element = new Element(tagName);
+        if (tagName === 'template') element.content = document.createDocumentFragment();
+        return element;
+    };
     document.createDocumentFragment = function createDocumentFragment() {
         const fragment = new Element();
         fragment.nodeType = 11;
@@ -260,6 +295,7 @@ async function editorFixture(context, {dataset = {}, layout = [], viewportEffect
         constructor(raw, options) {
             renders.push({raw, options});
             renderedEntries = options?.sourceMap && raw ? layout : [];
+            renderedImages = raw ? images : [];
             this.sourceMap = renderedEntries.map(
                 function sourceEntry({start, end, marker, type}) {return {start, end, marker, type};}
             );
@@ -268,17 +304,102 @@ async function editorFixture(context, {dataset = {}, layout = [], viewportEffect
     }
 
     async function loadDependency(specifier) {
+        dependencies.push(specifier);
         if (specifier === 'strong-type') return {default: Is};
         if (specifier.startsWith('../modules/MD.js')) return {default: Markdown};
+        if (specifier === '../modules/MarkdownMedia.js') {
+            return {hydrateMarkdownMedia(root, {signal}) {
+                assert.equal(root.nodeType, 11);
+                assert.equal(root.isConnected, false);
+                const localImages = root.querySelectorAll('img').filter(function localImage(image) {
+                    return image.getAttribute('src')?.startsWith('arcane-media:');
+                });
+                const references = localImages.map(function reference(image) {return image.getAttribute('src');});
+                for (const image of localImages) image.removeAttribute('src');
+                let resolve;
+                let reject;
+                const ready = new Promise(function pendingMedia(accept, fail) {resolve = accept; reject = fail;});
+                const handle = {
+                    root, localImages, references, signal, ready,
+                    destroyed: false, retained: 0, released: 0, retainers: 0, urls: [], revoked: [],
+                    resolve() {
+                        if (handle.destroyed) {
+                            reject(new DOMException('Media display was destroyed.', 'AbortError'));
+                            return;
+                        }
+                        for (const [index, image] of localImages.entries()) {
+                            const url = `blob:fixture-media-${mediaHandles.indexOf(handle)}-${index}`;
+                            handle.urls.push({image, url});
+                            image.setAttribute('src', url);
+                        }
+                        resolve();
+                    },
+                    reject,
+                    destroy() {
+                        if (handle.destroyed) return;
+                        handle.destroyed = true;
+                        signal.removeEventListener('abort', handle.destroy);
+                        const reason = new DOMException('Media display was destroyed.', 'AbortError');
+                        const failure = new AggregateError(localImages.map(function cancelledImage() {return reason;}), 'Local image display was cancelled.');
+                        failure.failures = localImages.map(function cancelledImage(image, index) {
+                            return {image, reference: references[index], reason};
+                        });
+                        reject(localImages.length ? failure : reason);
+                        releaseURLs();
+                    },
+                    retain() {
+                        assert.equal(handle.destroyed, false);
+                        handle.retained += 1;
+                        handle.retainers += 1;
+                        let released = false;
+                        return function releaseMedia() {
+                            if (released) return;
+                            released = true;
+                            handle.released += 1;
+                            handle.retainers -= 1;
+                            releaseURLs();
+                        };
+                    }
+                };
+                function releaseURLs() {
+                    if (!handle.destroyed || handle.retainers) return;
+                    for (const {image, url} of handle.urls) {
+                        if (image.getAttribute('src') === url) image.removeAttribute('src');
+                        handle.revoked.push(url);
+                    }
+                    handle.urls = [];
+                }
+                signal.addEventListener('abort', handle.destroy, {once: true});
+                mediaHandles.push(handle);
+                if (!manualMedia || !localImages.length) handle.resolve();
+                return handle;
+            }};
+        }
         if (specifier === '../modules/ComponentContracts.js') return contracts;
         if (specifier === '../modules/PrintView.js') {
             return {
                 createPrintView(options) {
+                    printOptions = options;
                     return {
                         async print() {
                             if (options.signal.aborted) return false;
-                            printCalls.push({content: options.content(), title: options.title()});
-                            return true;
+                            const session = {release: options.retain?.(), requested: false};
+                            printSessions.push(session);
+                            try {
+                                options.content();
+                                await beforePrintCapture?.();
+                                await options.prepare?.(options.signal);
+                                if (options.signal.aborted) {
+                                    session.release?.();
+                                    return false;
+                                }
+                                printCalls.push({content: options.content(), title: options.title()});
+                                session.requested = true;
+                                return true;
+                            } catch (error) {
+                                session.release?.();
+                                throw error;
+                            }
                         }
                     };
                 }
@@ -312,11 +433,29 @@ async function editorFixture(context, {dataset = {}, layout = [], viewportEffect
         frames.delete(id);
     }
     await initialize.call(host, loadDependency, document, {SHOW_COMMENT: 128}, requestFrame, cancelFrame);
-    context.after(function destroyEditorFixture() {host.destroy();});
+    context.after(function destroyEditorFixture() {afterPrint(); host.destroy();});
+
+    function afterPrint() {
+        for (const session of printSessions) session.release?.();
+        printSessions.length = 0;
+    }
 
     return {
-        host, editor, title, preview, toolbar, input, actions, status, save, print, document,
-        publications, errors, renders, frames, cancelledFrames, treeMoves, printCalls,
+        host, editor, title, preview, toolbar, input, actions, status, mediaStatus, save, print, document,
+        publications, errors, renders, frames, cancelledFrames, treeMoves, printCalls, mediaHandles, dependencies, afterPrint,
+        nativePrint() {
+            let release;
+            try {
+                release = printOptions.retain?.();
+                printCalls.push({content: printOptions.content(), title: printOptions.title()});
+                printSessions.push({release, requested: true});
+                return true;
+            } catch (error) {
+                release?.();
+                printOptions.onError(error);
+                return false;
+            }
+        },
         get eventSourceDisposed() {return eventSourceDisposed;},
         flushFrames() {
             for (const [id, callback] of [...frames]) {
@@ -767,6 +906,168 @@ test('Markdown printing uses the current rendered body and complete title withou
     host.destroy();
     assert.equal(await host.print(), false);
     assert.equal(fixture.printCalls.length, 1);
+});
+
+test('Markdown editor hydrates detached image nodes while preserving source, comments and ordinary image URLs', async function localPreviewMedia(context) {
+    const reference = 'arcane-media:journal-media/octopus.json';
+    const markdown = `  # Octopus mural\n\n![Every arm](${reference})\n  `;
+    const fixture = await editorFixture(context, {
+        dataset: {fit: 'true', followPreview: 'true'},
+        viewportEffects: true,
+        manualMedia: true,
+        images: [{src: reference, alt: 'Every arm'}, {src: 'https://images.example.test/moon.png', alt: 'Moon'}],
+        layout: [{start: 0, end: markdown.length, marker: 'media-source-anchor', type: 'paragraph', top: 0, height: 80}]
+    });
+    const {host, input, preview} = fixture;
+    host.value = markdown;
+    input.focus({preventScroll: true});
+    input.setSelectionRange(3, 11, 'backward');
+    input.scrollTop = 480;
+    input.scrollLeft = 17;
+    preview.scrollTop = 260;
+    host.configure({clearOnSave: false});
+    const handle = fixture.mediaHandles.at(-1);
+    const rendered = preview.querySelectorAll('img');
+    assert.deepEqual(handle.references, [reference]);
+    assert.equal(handle.root.childNodes.length, 0, 'Connecting a DocumentFragment moves every child, including comments.');
+    assert.equal(rendered[0].getAttribute('src'), null, 'The custom scheme was removed before connection.');
+    assert.equal(rendered[0].isConnected, true);
+    assert.equal(rendered[1].getAttribute('src'), 'https://images.example.test/moon.png');
+    assert.deepEqual(preview.comments.map(function marker(comment) {return comment.data;}), ['media-source-anchor']);
+    assert.equal(preview.comments[0].parentNode, preview);
+    assert.equal(preview.comments[0].nextSibling, preview.children[0]);
+    handle.resolve();
+    await handle.ready;
+    assert.match(rendered[0].getAttribute('src'), /^blob:fixture-media-/u);
+    assert.equal(host.value, markdown);
+    assert.equal(fixture.renders.at(-1).raw, markdown);
+    assert.deepEqual([input.selectionStart, input.selectionEnd, input.selectionDirection], [3, 11, 'backward']);
+    assert.deepEqual([input.scrollTop, input.scrollLeft, preview.scrollTop], [480, 17, 260]);
+    assert.equal(fixture.document.activeElement, input);
+    assert.equal(fixture.mediaStatus.innerText, '');
+    const mdImport = fixture.dependencies.indexOf('../modules/MD.js');
+    assert.equal(fixture.dependencies[mdImport + 1], '../modules/MarkdownMedia.js');
+    assert.equal(fixture.dependencies.includes('../modules/DBOPFS.js'), false);
+});
+
+test('explicit Markdown print follows replacement hydration without waiting for a retired storage read', async function printLatestMedia(context) {
+    const images = [{src: 'arcane-media:journal-media/first.json'}];
+    const fixture = await editorFixture(context, {images, manualMedia: true});
+    fixture.host.value = '![First](arcane-media:journal-media/first.json)';
+    const first = fixture.mediaHandles.at(-1);
+    const printing = fixture.host.print();
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(fixture.printCalls.length, 0);
+    images[0] = {src: 'arcane-media:journal-media/second.json'};
+    const replacement = '![Second](arcane-media:journal-media/second.json)\nComplete replacement.';
+    fixture.host.value = replacement;
+    const second = fixture.mediaHandles.at(-1);
+    assert.equal(first.destroyed, true);
+    second.resolve();
+    assert.equal(await printing, true);
+    assert.equal(fixture.renders.at(-1).raw, replacement);
+    assert.equal(fixture.printCalls.length, 1);
+    first.resolve();
+    await first.ready.catch(function expectedRetiredRead() {});
+    assert.equal(fixture.mediaStatus.innerText, '');
+    assert.equal(fixture.errors.length, 0);
+});
+
+test('Markdown printing rechecks hydration during preparation and retains replacement media until afterprint', async function mediaPrintRetention(context) {
+    let finishPreparation;
+    let enteredPreparation;
+    const pendingPreparation = new Promise(function waitForPreparation(resolve) {finishPreparation = resolve;});
+    const startedPreparation = new Promise(function watchPreparation(resolve) {enteredPreparation = resolve;});
+    const fixture = await editorFixture(context, {
+        images: [{src: 'arcane-media:journal-media/mural.json'}],
+        manualMedia: true,
+        beforePrintCapture() {enteredPreparation(); return pendingPreparation;}
+    });
+    fixture.host.value = '![Mural](arcane-media:journal-media/mural.json)';
+    const first = fixture.mediaHandles.at(-1);
+    first.resolve();
+    await first.ready;
+    const printing = fixture.host.print();
+    await startedPreparation;
+    fixture.host.value = 'Updated caption.\n![Mural](arcane-media:journal-media/mural.json)';
+    const second = fixture.mediaHandles.at(-1);
+    assert.equal(first.retained, 1);
+    assert.equal(first.destroyed, true);
+    assert.equal(first.revoked.length, 0);
+    assert.equal(second.retained, 1);
+    finishPreparation();
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(fixture.printCalls.length, 0);
+    second.resolve();
+    assert.equal(await printing, true);
+    fixture.host.destroy();
+    assert.equal(first.revoked.length, 0);
+    assert.equal(second.revoked.length, 0);
+    fixture.afterPrint();
+    assert.equal(first.revoked.length, 1);
+    assert.equal(second.revoked.length, 1);
+    assert.equal(first.released, 1);
+    assert.equal(second.released, 1);
+    fixture.afterPrint();
+    assert.equal(first.released, 1);
+});
+
+test('native Markdown print reports pending media while independent save status and full content remain intact', async function nativeMediaReadiness(context) {
+    const reference = 'arcane-media:journal-media/mural.json';
+    const fixture = await editorFixture(context, {images: [{src: reference}], manualMedia: true});
+    const markdown = `  Complete draft.\n![Mural](${reference})\n`;
+    fixture.host.value = markdown;
+    fixture.status.innerText = 'Saved draft';
+    assert.equal(fixture.nativePrint(), false);
+    assert.equal(fixture.printCalls.length, 0);
+    assert.match(fixture.mediaStatus.innerText, /still loading/u);
+    assert.equal(fixture.status.innerText, 'Saved draft');
+    assert.equal(fixture.errors.at(-1)[1].code, 'ARCANE_MARKDOWN_MEDIA_PENDING');
+    const handle = fixture.mediaHandles.at(-1);
+    handle.resolve();
+    await handle.ready;
+    assert.equal(fixture.nativePrint(), true);
+    assert.equal(fixture.host.value, markdown);
+    assert.equal(fixture.status.innerText, 'Saved draft');
+});
+
+test('Markdown media failures preserve every diagnostic reason and do not replace Markdown or save state', async function failedPreviewMedia(context) {
+    const reference = 'arcane-media:journal-media/missing.json';
+    const fixture = await editorFixture(context, {images: [{src: reference}], manualMedia: true});
+    const saves = [];
+    const markdown = `  Complete draft with ![Missing](${reference})\n`;
+    fixture.host.configure({initialValue: markdown, clearOnSave: false, onSave(value) {saves.push(value);}});
+    const handle = fixture.mediaHandles.at(-1);
+    const failure = new AggregateError([new Error('The complete storage diagnostic.')], 'Image hydration failed.');
+    failure.failures = [{image: handle.localImages[0], reference, reason: failure.errors[0]}];
+    handle.reject(failure);
+    await handle.ready.catch(function observedFixtureFailure() {});
+    assert.equal(fixture.errors[0][1], failure);
+    assert.equal(fixture.mediaStatus.innerText, 'Some saved images could not be displayed.');
+    assert.equal(fixture.host.value, markdown);
+    await assert.rejects(fixture.host.print(), function originalMediaFailure(error) {return error === failure;});
+    assert.equal(fixture.printCalls.length, 0);
+    assert.equal(await fixture.host.saveEntry(), true);
+    assert.deepEqual(saves, [{title: '', markdown}]);
+    assert.equal(fixture.status.innerText, fixture.host.options.labels.saved);
+    assert.equal(fixture.mediaStatus.innerText, 'Some saved images could not be displayed.');
+});
+
+test('destroying the Markdown editor settles a print waiting on uncooperative media', async function destroyedMediaPrint(context) {
+    const fixture = await editorFixture(context, {images: [{src: 'arcane-media:journal-media/pending.json'}], manualMedia: true});
+    fixture.host.value = '![Pending](arcane-media:journal-media/pending.json)';
+    const handle = fixture.mediaHandles.at(-1);
+    const printing = fixture.host.print();
+    await Promise.resolve();
+    fixture.host.destroy();
+    assert.equal(await printing, false);
+    assert.equal(handle.destroyed, true);
+    assert.equal(fixture.printCalls.length, 0);
+    handle.resolve();
+    await handle.ready.catch(function expectedDestroyedRead() {});
+    assert.equal(fixture.errors.length, 0);
 });
 
 test('Markdown edits cancel pending saves and destruction releases queued preview work', async function editorCleanup(context) {

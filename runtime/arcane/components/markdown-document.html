@@ -219,7 +219,10 @@
     const host=this;
     host.ready=false;
 
-    const {default:MD}=await import('../modules/MD.js');
+    const [{default:MD},{hydrateMarkdownMedia}]=await Promise.all([
+        import('../modules/MD.js'),
+        import('../modules/MarkdownMedia.js')
+    ]);
     const {createArcaneEventSource,projectArcaneDOMEvent}=await import('arcane-os/event-manager');
     const events=createArcaneEventSource(host,{source:'arcane.component.markdown-document',eventTypes:['markdown-document-state','markdown-document-empty','markdown-document-error','markdown-document-loading','markdown-document-rendered','markdown-document-navigate','markdown-document-ready']});
     const lifecycleController=new AbortController();
@@ -331,6 +334,7 @@
             content:'Document content',
             empty:'No document content is available.',
             error:'Unable to display this document.',
+            mediaError:'Some images could not be displayed.',
             loading:'Loading document…',
             tableOfContents:'On this page'
         },
@@ -348,6 +352,8 @@
     let operationSequence=0;
     let loadController=null;
     let destroyed=false;
+    let renderedMedia=null;
+    let mediaError=false;
 
     host.clear=clear;
     host.configure=configure;
@@ -393,7 +399,7 @@
         }
 
         const labels={...previous.labels};
-        for(const name of ['content','empty','error','loading','tableOfContents']){
+        for(const name of ['content','empty','error','mediaError','loading','tableOfContents']){
             if(labelInput[name]!==undefined){
                 if(!is.string(labelInput[name])||!labelInput[name].trim()){
                     throw new TypeError(`Markdown document labels.${name} must be a nonempty string.`);
@@ -607,6 +613,7 @@
 
         currentMarkdown=markdown;
         currentSourceURL=sourceURL;
+        releaseRenderedMedia();
         contentElement.replaceChildren();
         tableOfContents=[];
         tableOfContentsList.replaceChildren();
@@ -631,6 +638,16 @@
 
         tableOfContents=decorateHeadings(fragment);
         decorateTables(fragment);
+        // Resolve local references before connecting their IMG elements. The
+        // complete Markdown and ordinary external URLs remain unchanged.
+        const media=hydrateMarkdownMedia(fragment,{signal:lifecycleController.signal});
+        renderedMedia=media;
+        media.ready.catch(function reportMarkdownMediaFailure(error){
+            if(destroyed||renderedMedia!==media) return;
+            mediaError=true;
+            arcaneLogging.error('Markdown document image display failed.',error);
+            updateStateDOM();
+        });
         contentElement.replaceChildren(fragment);
         buildTableOfContents(tableOfContents);
         transition(
@@ -642,6 +659,13 @@
             operationId
         );
         return true;
+    }
+
+    function releaseRenderedMedia(){
+        const previous=renderedMedia;
+        renderedMedia=null;
+        mediaError=false;
+        previous?.destroy();
     }
 
     function renderedMarkdownFragment(html='',sourceURL=options.sourceURL){
@@ -764,6 +788,7 @@
         const operationId=`${events.descriptor.instanceId}:clear:${++operationSequence}`;
         currentMarkdown='';
         currentSourceURL=options.sourceURL;
+        releaseRenderedMedia();
         contentElement.replaceChildren();
         tableOfContents=[];
         tableOfContentsList.replaceChildren();
@@ -781,6 +806,7 @@
 
     function showError(error,operationId=null){
         currentMarkdown='';
+        releaseRenderedMedia();
         contentElement.replaceChildren();
         tableOfContents=[];
         tableOfContentsList.replaceChildren();
@@ -839,7 +865,7 @@
         host.setAttribute('aria-busy',String(loadingState));
         host.dataset.state=state;
         statusElement.dataset.state=state;
-        statusElement.hidden=readyState;
+        statusElement.hidden=readyState&&!mediaError;
         contentElement.hidden=!readyState;
         tableOfContentsElement.hidden=(
             !readyState
@@ -851,7 +877,7 @@
             empty:options.labels.empty,
             error:options.labels.error,
             loading:options.labels.loading,
-            ready:''
+            ready:mediaError?options.labels.mediaError:''
         }[state]||'';
     }
 
@@ -948,6 +974,7 @@
         lifecycleController.abort('markdown-document-destroyed');
         currentMarkdown='';
         tableOfContents=[];
+        releaseRenderedMedia();
         contentElement.replaceChildren();
         tableOfContentsList.replaceChildren();
         events.dispose();

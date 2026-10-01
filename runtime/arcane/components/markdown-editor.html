@@ -63,6 +63,10 @@
         margin-right:auto;
     }
 
+    .media-status:empty{
+        display:none;
+    }
+
     .markdown-editor.fit{
         height:100%;
         min-height:0;
@@ -118,6 +122,7 @@
     <textarea id="entryMarkdown" class="entry-markdown" part="input"></textarea>
     <section class="actions" part="actions">
         <span id="status" class="status" part="status" aria-live="polite"></span>
+        <span id="mediaStatus" class="media-status" part="media-status" aria-live="polite"></span>
         <button id="print" part="print-action" type="button">Print</button>
         <button id="save" part="save-action" type="button" disabled></button>
     </section>
@@ -130,7 +135,10 @@
     const {arcaneLogging}=await import('arcane-os/logging');
 
     const host=this;
-    const {default:MD}=await import('../modules/MD.js');
+    const [{default:MD},{hydrateMarkdownMedia}]=await Promise.all([
+        import('../modules/MD.js'),
+        import('../modules/MarkdownMedia.js')
+    ]);
     const {
         applyMarkdownFormat,
         normalizeMarkdownOptions
@@ -146,9 +154,12 @@
     const saveButton=host.shadowRoot.querySelector('#save');
     const printButton=host.shadowRoot.querySelector('#print');
     const status=host.shadowRoot.querySelector('#status');
+    const mediaStatus=host.shadowRoot.querySelector('#mediaStatus');
 
     let previewFrame=0;
     let previewFollowPending=false;
+    let previewMedia=null;
+    let printMediaRetains=null;
     let operationSequence=0;
     let saveGeneration=0;
     let saveController=null;
@@ -166,6 +177,8 @@
                 title:()=>titleInput.value,
                 active:()=>!destroyed&&host.isConnected&&host.getClientRects().length>0,
                 signal:lifecycleController.signal,
+                retain:retainPrintMedia,
+                prepare:preparePrintMedia,
                 onError:reportPrintFailure
             });
         }
@@ -401,7 +414,41 @@
         const scrollTop=preview.scrollTop;
         const scrollLeft=preview.scrollLeft;
         const markdown=new MD(textarea.value,{sourceMap:options.followPreview});
-        preview.innerHTML=markdown.safeRendered;
+        const template=document.createElement('template');
+        template.innerHTML=markdown.safeRendered;
+        const pending=[...template.content.querySelectorAll('img')].some(
+            image=>image.getAttribute('src')?.startsWith('arcane-media:')
+        );
+        // Hydration removes custom src values before these nodes join the live DOM.
+        const handle=hydrateMarkdownMedia(template.content,{signal:lifecycleController.signal});
+        const media={handle,pending,error:null};
+        const previous=previewMedia;
+        previewMedia=media;
+        if(printMediaRetains){
+            // The print owner may still be awaiting its final current snapshot.
+            printMediaRetains.add(handle.retain());
+        }
+        previous?.handle.destroy();
+        mediaStatus.innerText=pending?'Loading saved images…':'';
+        media.ready=handle.ready.then(function mediaReady(){
+            media.pending=false;
+            if(!destroyed&&previewMedia===media){
+                mediaStatus.innerText='';
+            }
+        },function mediaFailed(error){
+            media.pending=false;
+            media.error=error;
+            const cancelled=error?.name==='AbortError'||error?.failures?.every(
+                failure=>failure.reason?.name==='AbortError'
+            );
+            if(!cancelled){
+                arcaneLogging.error('Unable to display saved Markdown images:',error);
+            }
+            if(!destroyed&&previewMedia===media&&!cancelled){
+                mediaStatus.innerText='Some saved images could not be displayed.';
+            }
+        });
+        preview.replaceChildren(template.content);
         preview.querySelectorAll('a').forEach(
             link=>{
                 link.target='_blank';
@@ -589,7 +636,36 @@
     }
 
     function renderedPrintContent(){
+        if(previewFrame){
+            updatePreview(false);
+        }
+        if(previewMedia?.pending){
+            const error=new Error('Images are still loading. Print again when they finish.');
+            error.code='ARCANE_MARKDOWN_MEDIA_PENDING';
+            throw error;
+        }
+        if(previewMedia?.error){
+            throw previewMedia.error;
+        }
         return preview;
+    }
+
+    function retainPrintMedia(){
+        renderedPrintContent();
+        const releases=new Set();
+        if(previewMedia){
+            releases.add(previewMedia.handle.retain());
+        }
+        printMediaRetains=releases;
+        return function releasePrintMedia(){
+            if(printMediaRetains===releases){
+                printMediaRetains=null;
+            }
+            for(const release of releases){
+                release();
+            }
+            releases.clear();
+        };
     }
 
     async function print(){
@@ -600,10 +676,38 @@
         if(destroyed||!printView){
             return false;
         }
-        if(previewFrame){
-            updatePreview(false);
+        if(!await preparePrintMedia()){
+            return false;
         }
         return printView.print();
+    }
+
+    async function preparePrintMedia(signal){
+        let cancel;
+        const cancelled=new Promise(function waitForCancellation(resolve){cancel=resolve;});
+        signal?.addEventListener('abort',cancel,{once:true});
+        try{
+            while(!destroyed&&!signal?.aborted){
+                if(previewFrame){
+                    updatePreview(false);
+                }
+                const media=previewMedia;
+                await Promise.race([media.ready,cancelled]);
+                if(destroyed||signal?.aborted){
+                    return false;
+                }
+                if(previewFrame||previewMedia!==media){
+                    continue;
+                }
+                if(media.error){
+                    throw media.error;
+                }
+                return true;
+            }
+            return false;
+        }finally{
+            signal?.removeEventListener('abort',cancel);
+        }
     }
 
     function printFromControl(){
@@ -615,6 +719,10 @@
             return;
         }
         arcaneLogging.error('Unable to print rendered Markdown:',error);
+        if(error?.code==='ARCANE_MARKDOWN_MEDIA_PENDING'){
+            mediaStatus.innerText=error.message;
+            return;
+        }
         status.innerText='Unable to open print preview. Please try again.';
     }
 
@@ -686,6 +794,7 @@
         }
         destroyed=true;
         supersedeSave('markdown-editor-destroyed');
+        previewMedia?.handle.destroy();
         lifecycleController.abort('markdown-editor-destroyed');
         previewFollowPending=false;
         if(previewFrame){
