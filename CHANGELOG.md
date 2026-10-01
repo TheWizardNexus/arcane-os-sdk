@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.44.0
+
+- Add stateless `generateImages` through `arcane-os/ai/twin-cloud` with
+  caller-selected FAL Flux Schnell or Stable Diffusion 3.5 Large. Preserve
+  complete prompts and provider parameters, and return every image as a Blob
+  in provider order with declared media metadata.
+- Expose semantic progress and complete diagnostic callbacks, asynchronous
+  job polling, and cancellation across credentials, callbacks, requests,
+  response bodies and media downloads. Submit a paid generation request once;
+  never automatically replay an ambiguous submission.
+- Keep image model selection, credentials, display and storage with the
+  application. No global model default, saved-history migration, durable media
+  storage or change to existing chat and speech behavior is introduced.
+
 ## 0.43.0
 
 - Add reusable rendered printing through `createPrintView`, preserving the
