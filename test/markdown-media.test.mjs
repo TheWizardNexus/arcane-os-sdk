@@ -3,6 +3,8 @@ import {readFile} from 'node:fs/promises';
 import Is from '../browser-runtime/dependencies/strong-type/index.js';
 import test from '../src/testing.mjs';
 
+const is = new Is(false);
+
 // Explicit in-memory DBOPFS, FileReader, IMG decode, and object-URL doubles
 // exercise the helper contract, not durable OPFS or real browser image decoding.
 const source = await readFile(
@@ -61,6 +63,7 @@ function fixtureRoot(...images) {
 }
 
 function createFixture(options = {}) {
+    const files = new Map();
     const records = new Map();
     const reads = [];
     const writes = [];
@@ -68,8 +71,32 @@ function createFixture(options = {}) {
     const revoked = [];
     const imports = [];
 
+    function parseStoredValue(fileName, text) {
+        const extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
+        if (extension === 'json') {
+            try {return JSON.parse(text.trim());} catch {return text;}
+        }
+        if (extension === 'jsonl' || extension === 'ndjson') {
+            const values = [];
+            for (const row of text.split('\n')) {
+                if (!row.trim()) continue;
+                try {values.push(JSON.parse(row.trim()));} catch {values.push(row);}
+            }
+            return values;
+        }
+        return text;
+    }
+
+    function setStoredFile(tableName, fileName, text) {
+        const key = JSON.stringify([tableName, fileName]);
+        files.set(key, text);
+        records.delete(key);
+    }
+
     function setRecord(tableName, fileName, value) {
-        records.set(JSON.stringify([tableName, fileName]), JSON.parse(JSON.stringify(value)));
+        const text = is.string(value) ? value : JSON.stringify(value);
+        setStoredFile(tableName, fileName, text);
+        records.set(JSON.stringify([tableName, fileName]), parseStoredValue(fileName, text));
     }
 
     const database = {
@@ -77,13 +104,17 @@ function createFixture(options = {}) {
             writes.push({tableName, fileName, value});
             await options.write?.(tableName, fileName, value);
             setRecord(tableName, fileName, value);
-            return value;
+            return records.get(JSON.stringify([tableName, fileName]));
         },
         async get(tableName, fileName) {
             reads.push({tableName, fileName});
             if (options.read) return options.read(tableName, fileName);
-            const record = records.get(JSON.stringify([tableName, fileName])) ?? null;
-            return record === null || fileName.endsWith('.json') ? record : JSON.stringify(record);
+            const key = JSON.stringify([tableName, fileName]);
+            if (!records.get(key)) {
+                if (!files.has(key)) return null;
+                records.set(key, parseStoredValue(fileName, files.get(key)));
+            }
+            return records.get(key);
         }
     };
 
@@ -141,7 +172,7 @@ function createFixture(options = {}) {
     const api = initialize(Is, loadDatabase, FixtureFileReader, Blob, {
         randomUUID() { return 'fixture-image'; }
     }, atob, objectURLs, DOMException);
-    return {api, records, setRecord, reads, writes, created, revoked, imports};
+    return {api, files, records, setRecord, setStoredFile, reads, writes, created, revoked, imports};
 }
 
 test('Markdown media import and reference parsing do not start storage', function lazyStorage() {
@@ -171,7 +202,8 @@ test('Markdown media preserves complete image content in a JSON backup record', 
     });
     assert.deepEqual(fixture.writes[0].value, imageRecord(content));
     const restored = createFixture();
-    restored.setRecord(saved.tableName, saved.fileName, JSON.parse(JSON.stringify(fixture.writes[0].value)));
+    restored.setStoredFile(saved.tableName, saved.fileName, JSON.stringify(fixture.writes[0].value));
+    assert.deepEqual([...restored.records], []);
     const blob = await restored.api.readMarkdownMedia(saved.reference);
     assert.equal(blob.type, 'image/svg+xml');
     assert.equal(await blob.text(), content);
@@ -187,6 +219,89 @@ test('Markdown media preserves application names and filenames without a JSON ex
     });
     assert.equal(saved.mediaType, 'application/octet-stream');
     assert.equal(await (await fixture.api.readMarkdownMedia(saved.reference)).text(), 'complete drawing');
+});
+
+test('Markdown media reads warm and cold records with DBOPFS case-insensitive filename parsing', async function recordFileNames() {
+    const content = '<svg><text>Complete lunar library: 月 🐉</text></svg>';
+    const expected = imageRecord(content);
+    for (const fileName of ['drawing.json', 'drawing.JSON', 'drawing.jsonl', 'drawing.JsOnL', 'drawing.ndjson', 'drawing.NDJSON', 'drawing.media', 'drawing']) {
+        const fixture = createFixture();
+        const saved = await fixture.api.saveMarkdownMedia({
+            blob: new Blob([content], {type: expected.mediaType}), tableName: 'journal images', fileName
+        });
+        const key = JSON.stringify([saved.tableName, fileName]);
+        const extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
+        const parsed = extension === 'json' ? expected
+            :['jsonl', 'ndjson'].includes(extension) ? [expected] : JSON.stringify(expected);
+        assert.equal(saved.fileName, fileName);
+        assert.equal(fixture.writes[0].fileName, fileName);
+        assert.equal(fixture.files.get(key), JSON.stringify(expected));
+        assert.deepEqual(fixture.records.get(key), parsed);
+        assert.equal(await (await fixture.api.readMarkdownMedia(saved.reference)).text(), content);
+
+        const cold = createFixture();
+        cold.setStoredFile(saved.tableName, fileName, fixture.files.get(key));
+        assert.deepEqual([...cold.records], []);
+        const blob = await cold.api.readMarkdownMedia(saved.reference);
+        assert.equal(blob.type, expected.mediaType);
+        assert.equal(await blob.text(), content);
+        assert.deepEqual(cold.records.get(key), parsed);
+        assert.deepEqual(cold.writes, []);
+        assert.equal(cold.files.get(key), fixture.files.get(key));
+    }
+});
+
+test('Markdown media reads singleton record layers after cold JSONL backup restoration', async function restoredRecordArrays() {
+    const content = '<svg><text>The complete restored moon atlas.</text></svg>';
+    for (const fileName of ['atlas.jsonl', 'atlas.NDJSON']) {
+        let fixture = createFixture();
+        const saved = await fixture.api.saveMarkdownMedia({blob: new Blob([content], {type: 'image/svg+xml'}), fileName});
+        const key = JSON.stringify([saved.tableName, fileName]);
+        for (let restoration = 0; restoration < 2; restoration += 1) {
+            // DBOPFS backup serializes get()'s parsed value; restore passes that
+            // complete value to setMany/set, which serializes it as one row.
+            const backupValue = JSON.parse(JSON.stringify(fixture.records.get(key)));
+            const restored = createFixture();
+            restored.setRecord(saved.tableName, fileName, backupValue);
+            const restoredText = restored.files.get(key);
+            assert.equal(restoredText, JSON.stringify(backupValue));
+            restored.records.clear();
+            const blob = await restored.api.readMarkdownMedia(saved.reference);
+            assert.equal(blob.type, 'image/svg+xml');
+            assert.equal(await blob.text(), content);
+            assert.equal(restored.files.get(key), restoredText);
+            assert.deepEqual(restored.writes, []);
+            fixture = restored;
+        }
+    }
+});
+
+test('Markdown media never selects an image from multiple records or unreadable JSONL rows', async function unreadableRecordArrays() {
+    const first = imageRecord('First complete drawing');
+    const second = imageRecord('Second complete drawing');
+    const cases = [
+        ['multiple.jsonl', `${JSON.stringify(first)}\n${JSON.stringify(second)}\n`],
+        ['nested.NDJSON', `${JSON.stringify([[first, second]])}\n`],
+        ['mixed.JsOnL', `${JSON.stringify(first)}\nComplete unparseable row.\n`],
+        ['unreadable.ndjson', 'Complete unparseable row.\n'],
+        ['empty.jsonl', '\n  \n'],
+        ['null.ndjson', 'null\n'],
+        ['multiple.JSON', JSON.stringify([first, second])]
+    ];
+    for (const [fileName, content] of cases) {
+        const fixture = createFixture();
+        fixture.setStoredFile('images', fileName, content);
+        const reference = `arcane-media:images/${encodeURIComponent(fileName)}`;
+        await assert.rejects(fixture.api.readMarkdownMedia(reference), {
+            name: 'TypeError', message: `Markdown image has an unreadable data URL: ${reference}`
+        });
+        assert.equal(fixture.files.get(JSON.stringify(['images', fileName])), content);
+        assert.deepEqual(fixture.writes, []);
+    }
+    const malformed = createFixture();
+    malformed.setStoredFile('images', 'unreadable.json', 'Complete unparseable record.');
+    await assert.rejects(malformed.api.readMarkdownMedia('arcane-media:images/unreadable.json'), SyntaxError);
+    assert.deepEqual(malformed.writes, []);
 });
 
 test('Markdown media save waits for its durable write and exposes encoding and write failures', async function writeSettlement() {

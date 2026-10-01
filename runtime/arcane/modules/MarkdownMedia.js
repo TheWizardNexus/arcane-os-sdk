@@ -70,10 +70,11 @@ export async function readMarkdownMedia(reference) {
     if (stored === null || stored === undefined) {
         throw new DOMException(`Markdown image was not found: ${reference}`, 'NotFoundError');
     }
-    // DBOPFS parses .json names automatically. Explicit application filenames
-    // with another extension still contain the same complete JSON record.
-    const record = is.string(stored) ? JSON.parse(stored) : stored;
-    const encoded = /^data:[^,]*;base64,([\s\S]*)$/u.exec(record.dataUrl);
+    // DBOPFS parses JSONL/NDJSON as record arrays; restoring a parsed backup can
+    // wrap its one record again. Never choose one image from multiple records.
+    let record = is.string(stored) ? JSON.parse(stored) : stored;
+    while (is.array(record) && record.length === 1) record = record[0];
+    const encoded = /^data:[^,]*;base64,([\s\S]*)$/u.exec(record?.dataUrl);
     if (!encoded) {
         throw new TypeError(`Markdown image has an unreadable data URL: ${reference}`);
     }
