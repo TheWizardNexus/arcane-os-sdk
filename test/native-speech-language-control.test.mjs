@@ -131,12 +131,9 @@ const createSpeechFixture = Function(
     function applyConfiguredMutedState(value) { mutedConfiguration.push(value); }
     function formatAIRuntimeProgress(progress, fallback) { return fallback; }
     function canonicalSTTCancellationReason(reason) { return reason; }
-    function reportTranscriptionError(error) {
-        errors.push(error);
-        localStatus = {message: 'Transcription failed. Try again.', tone: 'error'};
-        renderControls();
-        renderStatus();
-    }
+    const arcaneLogging = {error(message, error) { errors.push(error); }};
+    function visibleErrorMessage() { return 'Try again.'; }
+    function publicSpeechErrorFields(error) { return {code: error.code}; }
     ${sourceBetween('let recognitionLanguage =', 'function nextSpeechOperationId')}
     ${sourceBetween('function nextSpeechOperationId', 'function publicSpeechErrorFields')}
     ${sourceBetween('host.displayTranscription = host.displayTranscription !== false;', 'host.muted = true;')}
@@ -144,6 +141,7 @@ const createSpeechFixture = Function(
     ${sourceBetween('function renderControls()', 'async function observeMicrophonePermission()')}
     ${sourceBetween('async function transcribe(transcription =', 'function stopAfterSilence()')}
     ${sourceBetween('function stopAfterSilence()', 'async function finalizeCapture(session)')}
+    ${sourceBetween('function reportTranscriptionError(', 'function isTranscriptionCancellation(')}
     ${sourceBetween('function reportTranscriptionCancellation(', 'function releaseCaptureSession(session)')}
     renderControls();
     renderStatus();
@@ -339,7 +337,7 @@ test('draft presentation emits live snapshots without duplicate status words and
     next.fail(failure);
     await setImmediate();
     assert.deepEqual(fixture.errors, [failure]);
-    assert.match(fixture.status.textContent, /^Transcription failed\. Try again\./u);
+    assert.match(fixture.status.textContent, /^Transcription failed: Try again\./u);
     assert.equal(eventsOf(fixture, 'speech-transcription-complete')[0].detail.text, 'Visible words');
 });
 
@@ -360,4 +358,27 @@ test('cancelled native capture preserves cancellation identity and ignores all l
     await setImmediate();
     assert.equal(eventsOf(fixture, 'speech-transcription-progress').length, 1);
     assert.equal(eventsOf(fixture, 'speech-transcription-complete').length, 0);
+});
+
+test('native error before cancellation retains the original draft operation identity', async function errorThenCancelledProgress() {
+    const fixture = speechFixture();
+    await fixture.record();
+    const capture = fixture.captures[0];
+    capture.options.onSegment({text: 'Confirmed words. ', sequence: 1});
+    capture.options.onInterim({text: 'Unfinished hypothesis'});
+    const progress = eventsOf(fixture, 'speech-transcription-progress').at(-1);
+    const failure = new Error('Synthetic native failure before onend.');
+    capture.options.onError(failure);
+    assert.equal(eventsOf(fixture, 'speech-transcription-error')[0].operationId, progress.operationId);
+    fixture.cancel('runtime-unready');
+    const cancellation = eventsOf(fixture, 'speech-transcription-cancelled')[0];
+    assert.equal(cancellation.operationId, progress.operationId);
+    assert.equal(capture.signal.aborted, true);
+    capture.options.onInterim({text: 'Late hypothesis'});
+    await setImmediate();
+    assert.deepEqual(eventsOf(fixture, 'speech-transcription-progress').at(-1).detail, {
+        text: 'Confirmed words. ', interim: 'Unfinished hypothesis'
+    });
+    assert.equal(eventsOf(fixture, 'speech-transcription-complete').length, 0);
+    assert.deepEqual(fixture.errors, [failure]);
 });

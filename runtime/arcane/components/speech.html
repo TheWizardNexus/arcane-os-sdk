@@ -1912,9 +1912,11 @@
             ].includes(error?.code);
     }
 
-    function reportTranscriptionCancellation(reason, message) {
-        const operationId = transcriptionOperationId
-            || nextSpeechOperationId('transcription');
+    function reportTranscriptionCancellation(
+        reason,
+        message,
+        operationId = transcriptionOperationId || nextSpeechOperationId('transcription')
+    ) {
         localStatus = {
             message,
             tone: ''
@@ -1940,6 +1942,10 @@
     }
 
     function cancelSTTOperation(reason) {
+        // A native error can clear the ambient ID before its capture actually ends.
+        const operationId = nativeCaptureSession?.operationId
+            || captureSession?.operationId
+            || transcriptionOperationId;
         const hadActiveOperation = recordingRequested
             || Boolean(captureSession)
             || Boolean(nativeCaptureSession)
@@ -1976,7 +1982,8 @@
                 String(reason || 'stt-transcription-cancelled'),
                 reason === 'component-destroyed'
                     ? 'Transcription stopped because the speech component was destroyed.'
-                    : 'Transcription stopped because the selected service became unavailable.'
+                    : 'Transcription stopped because the selected service became unavailable.',
+                operationId || undefined
             );
         }
         transcriptionOperationId = null;
