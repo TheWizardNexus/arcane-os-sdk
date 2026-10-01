@@ -138,11 +138,13 @@ playback remain the only owners. Use
 punctuation boundary should submit promptly. This is incremental playback of
 completed synthesis jobs, not a live audio stream from TWiN Cloud.
 
-The SDK submits `POST https://inference.do-ai.run/v1/async-invoke` immediately
-after credential readiness, outside the follow-up queue. It then reads that job
-until its completed `output.audio.url` is available. The provider's
-`maxConcurrentRequests` retains its whole-synthesis-job meaning; it is separate
-from `followUpQueue.maxConcurrentRequests`.
+The provider queues each complete synthesis job, including initial
+`POST https://inference.do-ai.run/v1/async-invoke` and any eligible submission
+retry. `maxConcurrentRequests` defaults to four whole jobs. Each slot remains
+occupied through credential readiness, submission, queued/running status, and
+the complete final audio response. Additional requests wait in order; cancelling
+a waiting job removes it before credential reading or submission. This capacity
+is separate from `followUpQueue.maxConcurrentRequests`.
 
 One provider-local `js-queue` owns only follow-up status/result GETs and the final
 audio GET. `followUpQueue` defaults to `{maxConcurrentRequests:4,intervalMs:250}`;
@@ -153,19 +155,30 @@ job awaits its current response and body before immediately enqueueing another
 request only when incomplete or eligible for a retry. There is no additional
 per-job polling delay.
 
-A readable `Retry-After` changes only the affected job's next eligibility, not
-sibling requests or initial submissions. A readable `429` permits one retry of
-that submission or status read; submission retries retain a one-second minimum, while
-follow-up retries use the queue cadence and any longer readable `Retry-After`.
+A successful pending response's `Retry-After` changes that job's next eligibility.
+A `429` applies a shared cooldown to all queued submission and follow-up starts,
+using a one-second minimum and any longer readable `Retry-After`. A completely
+readable `429` permits one retry of that submission or status read, within the
+same whole-job slot. Already dispatched operations retain their response ownership.
 An accepted job's status Fetch network failure may retry once for the same job;
-JSON parsing failures are not network retries. Repeated failures surface their
+Ambiguous POST network, JSON parsing, and error-body read failures never replay
+the submission. Repeated failures surface their
 complete diagnostics without an endless retry loop; a failed job does not cancel
 siblings. Retry diagnostics remain in the developer console, outside conversation
 history.
 
-The queue is created when this cloud factory is called, not when the browser
+The provider-local queues are created when this cloud factory is called, not when the browser
 speech entrypoint is imported. Local Kokoro and Whisper do not use this queue;
 their setup, Workers, synthesis/transcription, and lifecycle remain independent.
+
+Ordinary Kokoro descriptors may supply `model.voices` as complete display records,
+for example `{id:'af_heart',name:'Heart',lang:'en-US'}`. The synchronous
+`provider.catalog()[0].voices` preserves that array and its metadata without
+loading the model or fetching a catalog. The application supplies the inventory
+for its selected runtime; these records neither create a synthesis allow-list
+nor establish that a voice has loaded or played. Ordinary Worker configuration
+does not receive this display inventory. Existing artifact-graph voice paths
+retain their separate meaning.
 
 The SDK pins published `js-queue` through npm. Its browser Queue entry, original
 package metadata, and license are projected unchanged by

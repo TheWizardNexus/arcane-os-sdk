@@ -1151,7 +1151,7 @@ function createBrowserSpeechProvider({
     ...(authority.dtype ? { dtype: authority.dtype } : {}),
     runtime: authority.runtime,
     files: authority.files,
-    ...(authority.graph ? {
+    ...(authority.graph || authority.voices !== undefined ? {
       voices: authority.voices,
     } : {}),
     speech,

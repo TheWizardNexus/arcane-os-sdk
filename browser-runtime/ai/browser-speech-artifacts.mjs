@@ -899,6 +899,9 @@ export function createBrowserSpeechAuthority({
   const dtype = model.dtype === undefined
     ? null
     : identifier(model.dtype, "Browser speech model dtype");
+  if (role === "tts" && model.voices !== undefined && !is.array(model.voices)) {
+    throw new TypeError("Browser Kokoro model voices must be an array.");
+  }
   const modelFiles = uniqueFiles(
     model.files ?? [],
     "Browser speech model",
@@ -967,6 +970,7 @@ export function createBrowserSpeechAuthority({
     revision: modelRevision,
     ...(dtype === null ? {} : { dtype }),
     defaultVoice: normalizedModel.defaultVoice,
+    ...(role === "tts" && model.voices !== undefined ? { voices: model.voices } : {}),
     runtime: completeValue({
       adapter: normalizedRuntime.adapter,
       version: normalizedRuntime.version,

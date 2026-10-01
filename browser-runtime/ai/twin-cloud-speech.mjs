@@ -3,7 +3,7 @@ import Queue from '../dependencies/js-queue/queue.js';
 
 const is = new Is(false);
 const INVOKE_URL = 'https://inference.do-ai.run/v1/async-invoke';
-const SUBMISSION_RETRY_DELAY_MS = 1000;
+const RATE_LIMIT_RETRY_DELAY_MS = 1000;
 
 function speechError(message, code, cause) {
     const error = cause === undefined
@@ -36,30 +36,6 @@ function assertIdentifier(value, label) {
     }
 }
 
-function waitForStatus(delay, signal) {
-    assertNotAborted(signal);
-    return new Promise(
-        function waitForCloudSpeechStatus(resolve, reject) {
-            const timer = setTimeout(finishStatusWait, delay);
-            function finishStatusWait() {
-                signal.removeEventListener('abort', cancelStatusWait);
-                resolve();
-            }
-            function cancelStatusWait() {
-                clearTimeout(timer);
-                signal.removeEventListener('abort', cancelStatusWait);
-                reject(abortedSpeech(signal));
-            }
-            signal.addEventListener(
-                'abort',
-                cancelStatusWait,
-                {once: true}
-            );
-            if (signal.aborted) cancelStatusWait();
-        }
-    );
-}
-
 function retryAfterDelay(response) {
     const value = response.headers?.get?.('Retry-After');
     if (!value?.trim()) return null;
@@ -69,11 +45,11 @@ function retryAfterDelay(response) {
     return is.finite(date) ? Math.max(0, date - Date.now()) : null;
 }
 
-async function requireSuccessfulResponse(response, signal, operation) {
-    if (response.ok) return response;
+async function readResponseError(response, signal, operation) {
+    if (response.ok) return null;
     const detail = await response.text();
     assertNotAborted(signal);
-    throw speechError(
+    return speechError(
         `TWiN Cloud speech ${operation} failed with HTTP ${response.status}${detail ? `: ${detail}` : '.'}`,
         'ARCANE_AI_CLOUD_SPEECH_HTTP_ERROR'
     );
@@ -83,8 +59,8 @@ async function requireSuccessfulResponse(response, signal, operation) {
  * A remote provider/2 TTS adapter. The application selects the model and voice,
  * and getApiKey returns its current credential or the application's existing
  * refresh promise. Credentials never enter status or configuration. The runtime
- * owns whole-job admission and playback order. This provider owns immediate
- * submissions and one configurable queue for follow-up HTTP/body operations.
+ * owns playback order. This provider queues whole synthesis jobs, submission
+ * attempts, and follow-up HTTP/body operations under one shared 429 cooldown.
  */
 export function createTwinCloudTTSProvider({
     id,
@@ -115,17 +91,131 @@ export function createTwinCloudTTSProvider({
 
     const modelId = model.id;
     const defaultVoice = model.defaultVoice;
+    const requests = new Set();
     const activeRequests = new Set();
     const credentialWaits = new Set();
     let state = 'unloaded';
     let generation = 0;
     let unloadOperation = null;
     let disposeOperation = null;
+    const jobs = new Queue();
+    jobs.autoRun = false;
+    const submissions = new Queue();
+    submissions.autoRun = false;
     const followUps = new Queue();
     followUps.autoRun = false;
+    let cooldownUntil = 0;
+    let submissionTimer = null;
     let activeFollowUps = 0;
     let nextFollowUpStart = 0;
     let followUpTimer = null;
+
+    function dispatchJobs() {
+        while (state === 'ready' && activeRequests.size < maxConcurrentRequests && jobs.size) {
+            jobs.next();
+        }
+    }
+
+    function queueSynthesis(request, payload, requestGeneration) {
+        const signal = request.controller.signal;
+        assertNotAborted(signal);
+        return new Promise(
+            function enqueueCloudSpeechJob(resolve, reject) {
+                function cancelQueuedJob() {
+                    jobs.contents = jobs.contents.filter(
+                        function keepOtherJob(task) {return task !== startJob;}
+                    );
+                    signal.removeEventListener('abort', cancelQueuedJob);
+                    reject(abortedSpeech(signal));
+                    dispatchJobs();
+                }
+                function finishJob() {
+                    activeRequests.delete(request);
+                    dispatchJobs();
+                }
+                function startJob() {
+                    signal.removeEventListener('abort', cancelQueuedJob);
+                    activeRequests.add(request);
+                    // A slot belongs to the entire synthesis, including its
+                    // accepted remote job, every read, and the complete audio.
+                    synthesize(payload, request.controller, requestGeneration).then(
+                        function acceptCloudSpeechJob(audio) {
+                            finishJob();
+                            resolve(audio);
+                        },
+                        function rejectCloudSpeechJob(error) {
+                            finishJob();
+                            reject(error);
+                        }
+                    );
+                }
+                jobs.add(startJob);
+                signal.addEventListener(
+                    'abort',
+                    cancelQueuedJob,
+                    {once: true}
+                );
+                if (signal.aborted) cancelQueuedJob();
+                else dispatchJobs();
+            }
+        );
+    }
+
+    function dispatchSubmissions() {
+        clearTimeout(submissionTimer);
+        submissionTimer = null;
+        if (state !== 'ready' || !submissions.size) return;
+        const delay = cooldownUntil - Date.now();
+        if (delay > 0) {
+            submissionTimer = setTimeout(dispatchSubmissions, Math.min(2147483647, delay));
+            return;
+        }
+        // Each admitted job awaits its current attempt before requeueing, so
+        // whole-job capacity also bounds concurrent submission attempts.
+        while (state === 'ready' && submissions.size) submissions.next();
+    }
+
+    function queueSubmission(readResponse, signal) {
+        assertNotAborted(signal);
+        return new Promise(
+            function enqueueCloudSpeechSubmission(resolve, reject) {
+                function cancelQueuedSubmission() {
+                    submissions.contents = submissions.contents.filter(
+                        function keepOtherSubmission(task) {return task !== startSubmission;}
+                    );
+                    signal.removeEventListener('abort', cancelQueuedSubmission);
+                    reject(abortedSpeech(signal));
+                    dispatchSubmissions();
+                }
+                async function consumeSubmission() {
+                    assertNotAborted(signal);
+                    return await readResponse();
+                }
+                function startSubmission() {
+                    signal.removeEventListener('abort', cancelQueuedSubmission);
+                    consumeSubmission().then(resolve, reject);
+                }
+                submissions.add(startSubmission);
+                signal.addEventListener(
+                    'abort',
+                    cancelQueuedSubmission,
+                    {once: true}
+                );
+                if (signal.aborted) cancelQueuedSubmission();
+                else dispatchSubmissions();
+            }
+        );
+    }
+
+    function observeRateLimit(response) {
+        if (response.status !== 429) return;
+        cooldownUntil = Math.max(
+            cooldownUntil,
+            Date.now() + Math.max(RATE_LIMIT_RETRY_DELAY_MS, retryAfterDelay(response) ?? 0)
+        );
+        dispatchSubmissions();
+        dispatchFollowUps();
+    }
 
     function dispatchFollowUps() {
         clearTimeout(followUpTimer);
@@ -136,18 +226,20 @@ export function createTwinCloudTTSProvider({
         const eligibleIndex = followUps.contents.findIndex(
             function eligibleFollowUp(task) {return task.eligibleAt <= now;}
         );
-        if (now < nextFollowUpStart || eligibleIndex === -1) {
+        const nextStart = Math.max(nextFollowUpStart, cooldownUntil);
+        if (now < nextStart || eligibleIndex === -1) {
             const firstEligibility = followUps.contents.reduce(
                 function earliestFollowUp(time, task) {return Math.min(time, task.eligibleAt);},
                 Infinity
             );
             // Long Retry-After dates may exceed the platform timer's range.
             // Revisit at that boundary without shortening the job's eligibility.
-            followUpTimer = setTimeout(dispatchFollowUps, Math.min(2147483647, Math.max(nextFollowUpStart, firstEligibility) - now));
+            followUpTimer = setTimeout(dispatchFollowUps, Math.min(2147483647, Math.max(nextStart, firstEligibility) - now));
             return;
         }
-        // A job's Retry-After does not hold up eligible siblings. Queue remains
-        // the sole pending-task owner, with FIFO order among eligible entries.
+        // Successful pending responses retain job-local Retry-After timing.
+        // HTTP 429 also applies the shared cooldown before any queued start.
+        // Queue owns pending tasks in FIFO order among eligible entries.
         if (eligibleIndex > 0) {
             const [eligibleTask] = followUps.contents.splice(eligibleIndex, 1);
             followUps.contents.unshift(eligibleTask);
@@ -287,7 +379,7 @@ export function createTwinCloudTTSProvider({
             localOnly: false,
             state,
             loaded,
-            busy: activeRequests.size > 0,
+            busy: requests.size > 0,
             execution: {
                 requestedDevice: 'remote',
                 selectedDevice: loaded ? 'remote' : null,
@@ -310,11 +402,12 @@ export function createTwinCloudTTSProvider({
                 // an identified job's status read can retry a network failure.
                 return {error, retryable: options.method === 'GET' && error instanceof TypeError};
             }
+            assertNotAborted(signal);
+            observeRateLimit(response);
             const nextEligibility = Date.now() + (retryAfterDelay(response) ?? 0);
-            try {
-                await requireSuccessfulResponse(response, signal, operation);
-            } catch (error) {
-                assertNotAborted(signal);
+            const error = await readResponseError(response, signal, operation);
+            assertNotAborted(signal);
+            if (error) {
                 return {error, retryable: response.status === 429, eligibleAt: nextEligibility};
             }
             // Parsing errors are not Fetch failures and must not replay a job.
@@ -325,7 +418,7 @@ export function createTwinCloudTTSProvider({
         while (true) {
             assertNotAborted(signal);
             const outcome = options.method === 'POST'
-                ? await readInferenceResponse()
+                ? await queueSubmission(readInferenceResponse, signal)
                 : await queueFollowUp(readInferenceResponse, signal, eligibleAt);
             assertNotAborted(signal);
             if (!outcome.error) return outcome;
@@ -333,11 +426,6 @@ export function createTwinCloudTTSProvider({
             retryError = outcome.error;
             console.warn(`Retrying the cloud speech ${operation} once.`, retryError);
             eligibleAt = outcome.eligibleAt ?? 0;
-            if (options.method === 'POST') {
-                // A readable submission rejection retains its own bounded retry
-                // delay. It never delays another job or enters the GET queue.
-                await waitForStatus(Math.max(SUBMISSION_RETRY_DELAY_MS, eligibleAt - Date.now()), signal);
-            }
         }
     }
 
@@ -402,7 +490,11 @@ export function createTwinCloudTTSProvider({
         const audio = await queueFollowUp(
             async function downloadCloudSpeechAudio() {
                 const audioResponse = await fetchImpl(result.output.audio.url, {signal});
-                await requireSuccessfulResponse(audioResponse, signal, 'audio download');
+                assertNotAborted(signal);
+                observeRateLimit(audioResponse);
+                const error = await readResponseError(audioResponse, signal, 'audio download');
+                assertNotAborted(signal);
+                if (error) throw error;
                 return await audioResponse.blob();
             },
             signal,
@@ -491,9 +583,6 @@ export function createTwinCloudTTSProvider({
             if (state !== 'ready' || unloadOperation || disposeOperation) {
                 throw speechError('The cloud speech provider is not ready.', 'ARCANE_AI_NOT_READY');
             }
-            if (activeRequests.size >= maxConcurrentRequests) {
-                throw speechError('The cloud speech provider is at capacity.', 'ARCANE_AI_PROVIDER_BUSY');
-            }
             const payload = context.payload;
             if (!is.string(payload?.input) || !payload.input.trim()) {
                 throw new TypeError('Cloud speech input must be a nonempty string.');
@@ -523,16 +612,16 @@ export function createTwinCloudTTSProvider({
             );
             if (context.signal?.aborted) cancelCloudSpeechRequest();
             const request = {controller, promise: null};
-            activeRequests.add(request);
-            request.promise = synthesize(payload, controller, generation);
+            requests.add(request);
             try {
+                request.promise = queueSynthesis(request, payload, generation);
                 return await request.promise;
             } catch (error) {
                 if (controller.signal.aborted) throw abortedSpeech(controller.signal);
                 throw error;
             } finally {
                 context.signal?.removeEventListener('abort', cancelCloudSpeechRequest);
-                activeRequests.delete(request);
+                requests.delete(request);
             }
         },
 
@@ -546,11 +635,15 @@ export function createTwinCloudTTSProvider({
             if (unloadOperation) return unloadOperation;
             state = 'unloading';
             generation += 1;
+            clearTimeout(submissionTimer);
+            submissionTimer = null;
+            clearTimeout(followUpTimer);
+            followUpTimer = null;
             for (const cancelCredentialWait of [...credentialWaits]) cancelCredentialWait();
-            const requests = [...activeRequests];
-            for (const request of requests) request.controller.abort('Cloud speech provider unloaded.');
+            const pendingRequests = [...requests];
+            for (const request of pendingRequests) request.controller.abort('Cloud speech provider unloaded.');
             unloadOperation = Promise.allSettled(
-                requests.map(
+                pendingRequests.map(
                     function pendingCloudSpeechRequest(request) {
                         return request.promise;
                     }
