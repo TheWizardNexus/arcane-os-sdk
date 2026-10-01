@@ -31,12 +31,16 @@
     let content=null;
     let fileManager=null;
     let operationGeneration=0;
+    let openController = null;
+    let closingTask = null;
     let destroyed=false;
 
     host.beforeOpen=is.function(host.beforeOpen)
         ?host.beforeOpen
         :async function beforeOpen(){};
     host.open=openData;
+    host.close = closeData;
+    host.printPreview=printPreview;
     host.destroy=destroy;
 
     openButton.innerText=host.dataset.button||'View Data';
@@ -52,80 +56,159 @@
         {signal:lifecycleController.signal}
     );
 
-    async function openData(){
-        if(destroyed){
-            return false;
-        }
-        const generation=++operationGeneration;
-        await host.beforeOpen();
-        if(destroyed||generation!==operationGeneration){
-            return false;
-        }
-
-        const reload=Boolean(content);
-
-        const modal=await waitForComponent(
-            dataModal,
-            {
-                methods:['populate','open'],
-                property:'ready',
-                event:'modal-ready',
-                signal:lifecycleController.signal
+    dataModal.addEventListener(
+        'modal-closed',
+        function closeDataFromModal(event) {
+            if (event.target === dataModal && !closingTask) {
+                closeData();
             }
-        );
-        if(destroyed||generation!==operationGeneration){
+        },
+        {signal: lifecycleController.signal}
+    );
+
+    async function openData() {
+        if (destroyed) {
             return false;
         }
+        const requestedGeneration=operationGeneration;
+        if (closingTask && !await closingTask) {
+            return false;
+        }
+        if (destroyed||requestedGeneration!==operationGeneration) {
+            return false;
+        }
+        const generation = ++operationGeneration;
+        openController?.abort('data-view-open-replaced');
+        const controller = new AbortController();
+        openController = controller;
 
-        if(!content){
-            content=document.createElement('section');
-            fileManager=document.createElement('html-import');
+        try {
+            await host.beforeOpen();
+            if (destroyed || generation !== operationGeneration) {
+                return false;
+            }
 
-            const heading=document.createElement('h1');
-
-            heading.innerText=host.dataset.title||'Data';
-            fileManager.className='file-manager';
-            forwardPreviewOptions();
-            fileManager.dataset.dirs=host.dataset.dirs||'';
-            fileManager.dataset.layout=host.dataset.layout||'files';
-            fileManager.setAttribute(
-                'href',
-                new URL('./file-manager.html',componentHref).href
+            const reload = Boolean(content);
+            const modal = await waitForComponent(
+                dataModal,
+                {
+                    methods: ['populate', 'open'],
+                    property: 'ready',
+                    event: 'modal-ready',
+                    signal: controller.signal
+                }
             );
-
-            content.append(heading,fileManager);
-            await modal.populate(content,false);
-            if(destroyed||generation!==operationGeneration){
+            if (destroyed || generation !== operationGeneration) {
                 return false;
             }
-        }
 
-        if(reload){
-            forwardPreviewOptions();
-        }
+            if (!content) {
+                content = document.createElement('section');
+                fileManager = document.createElement('html-import');
 
-        const manager=await waitForComponent(
-            fileManager,
-            {
-                methods:['loadAll'],
-                property:'ready',
-                event:'file-manager-ready',
-                signal:lifecycleController.signal
+                const heading = document.createElement('h1');
+
+                heading.innerText = host.dataset.title || 'Data';
+                fileManager.className = 'file-manager';
+                forwardPreviewOptions();
+                fileManager.dataset.dirs = host.dataset.dirs || '';
+                fileManager.dataset.layout = host.dataset.layout || 'files';
+                fileManager.setAttribute(
+                    'href',
+                    new URL('./file-manager.html', componentHref).href
+                );
+
+                content.append(heading, fileManager);
+                await modal.populate(content, false);
+                if (destroyed || generation !== operationGeneration) {
+                    return false;
+                }
             }
-        );
-        if(destroyed||generation!==operationGeneration){
+
+            if (reload) {
+                forwardPreviewOptions();
+            }
+
+            const manager = await waitForComponent(
+                fileManager,
+                {
+                    methods: ['loadAll'],
+                    property: 'ready',
+                    event: 'file-manager-ready',
+                    signal: controller.signal
+                }
+            );
+            if (destroyed || generation !== operationGeneration) {
+                return false;
+            }
+
+            if (reload) {
+                await manager.loadAll();
+                if (destroyed || generation !== operationGeneration) {
+                    return false;
+                }
+            }
+
+            return await modal.open();
+        } catch (error) {
+            if (controller.signal.aborted) {
+                return false;
+            }
+            throw error;
+        } finally {
+            if (openController === controller) {
+                openController = null;
+            }
+        }
+    }
+
+    async function closeData() {
+        if (destroyed) {
             return false;
         }
+        operationGeneration += 1;
+        openController?.abort('data-view-closed');
+        openController = null;
+        if (closingTask) {
+            return closingTask;
+        }
 
-        if(reload){
-            await manager.loadAll();
-            if(destroyed||generation!==operationGeneration){
+        const childClosing = is.function(fileManager?.close)
+            ? fileManager.close()
+            : Promise.resolve(true);
+        closingTask = Promise.resolve(childClosing)
+            .then(closeDataAfterChildren)
+            .catch(
+                function reportDataCloseFailure(error) {
+                    arcaneLogging.error('Unable to close data view:', error);
+                    return false;
+                }
+            );
+        try {
+            return await closingTask;
+        } finally {
+            closingTask = null;
+        }
+    }
+
+    async function closeDataAfterChildren(childrenClosed) {
+        if (childrenClosed === false || destroyed) {
+            return false;
+        }
+        if (is.function(dataModal.close)) {
+            const closed = await dataModal.close();
+            if (closed === false) {
                 return false;
             }
         }
+        return !destroyed && dataModal.opened !== true;
+    }
 
-        modal.open();
-        return true;
+    async function printPreview(){
+        if(destroyed||dataModal.opened!==true||!is.function(fileManager?.printPreview)){
+            return false;
+        }
+        return fileManager.printPreview();
     }
 
     function forwardPreviewOptions(){
@@ -146,6 +229,8 @@
         }
         destroyed=true;
         operationGeneration+=1;
+        openController?.abort('data-view-destroyed');
+        openController = null;
         lifecycleController.abort('data-view-destroyed');
         fileManager?.destroy?.();
         dataModal.destroy?.();

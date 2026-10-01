@@ -469,8 +469,15 @@
         directory=>directory.trim()
     ).filter(Boolean);
     const fileEntityPromise=import('../entities/File.js');
+    const printModulePromise=import('../modules/PrintView.js');
+    void printModulePromise.catch(function reportPrintModuleFailure(error){
+        arcaneLogging.error('Unable to load rendered printing:',error);
+    });
 
     let activePreview=null;
+    let presentationController = new AbortController();
+    let uploadPresentationController = null;
+    let closingTask = null;
     let markdownModulePromise=null;
     let uploadDirectory='';
     let initialized=false;
@@ -497,6 +504,8 @@
     host.setDirectoryFilter=setDirectoryFilter;
     host.select=select;
     host.clearSelection=clearSelection;
+    host.close = closeFileManager;
+    host.printPreview=printPreview;
     host.destroy=destroy;
 
     Object.defineProperty(
@@ -1457,22 +1466,20 @@
         }
     }
 
-    async function openDirectory(directory=''){
-        if(destroyed||!isVisibleDirectory(directory)){
+    async function openDirectory(directory = '', signal = presentationController.signal) {
+        if (closingTask && !await closingTask) {
+            return false;
+        }
+        if(destroyed||signal.aborted||!isVisibleDirectory(directory)){
             return false;
         }
         const generation=++directoryOpenGeneration;
-        const modal=await waitForComponent(
+        const modal = await waitForModal(
             directoryModal,
-            {
-                methods:['populate','open'],
-                property:'ready',
-                event:'modal-ready',
-                signal:lifecycleController.signal
-            },
-            {signal:lifecycleController.signal}
+            ['populate', 'open'],
+            signal
         );
-        if(destroyed||generation!==directoryOpenGeneration||!isVisibleDirectory(directory)){
+        if(!modal||destroyed||generation!==directoryOpenGeneration||!isVisibleDirectory(directory)){
             return false;
         }
         const keys=await dbopfs.getAllKeys(directory);
@@ -1534,7 +1541,11 @@
     }
 
     async function openFile(directory='',fileName=''){
-        if(destroyed){
+        const signal = presentationController.signal;
+        if (closingTask && !await closingTask) {
+            return false;
+        }
+        if(destroyed||signal.aborted){
             return false;
         }
         releasePreview(activePreview,'file-preview-replaced');
@@ -1543,7 +1554,12 @@
             controller:new AbortController(),
             generation,
             urls:new Set(),
-            media:new Set()
+            media:new Set(),
+            title:`${directory}/${fileName}`,
+            rendered:null,
+            printPreparation:null,
+            printRetains:0,
+            released:false
         };
         activePreview=preview;
         let modal;
@@ -1577,8 +1593,20 @@
         const deleteButton=document.createElement('button');
         const deleteIcon=document.createElement('img');
         const status=document.createElement('p');
+        const printButton=document.createElement('button');
 
         heading.innerText=`${directory}/${fileName}`;
+        printButton.type='button';
+        printButton.textContent='Print';
+        printButton.disabled=true;
+        preview.printButton=printButton;
+        preview.printStatus=status;
+        preview.container=content;
+        printButton.addEventListener('click',function printOpenPreview(){
+            void printPreview().catch(function reportPrintRejection(error){
+                reportPreviewPrintFailure(error,preview);
+            });
+        },{signal:preview.controller.signal});
         actions.className='file-view-actions';
         deleteButton.type='button';
         deleteButton.className='file-view-delete';
@@ -1598,7 +1626,7 @@
         };
         status.innerText='Opening file...';
         status.setAttribute('role','status');
-        actions.append(deleteButton);
+        actions.append(printButton,deleteButton);
         content.append(
             styles,
             heading,
@@ -1631,6 +1659,10 @@
             }
             status.remove();
             content.append(rendered);
+            preview.rendered=rendered;
+            void preparePreviewPrint(preview).catch(function reportPrintPreparation(error){
+                reportPreviewPrintFailure(error,preview);
+            });
             return true;
         }catch(error){
             if(isCurrentPreview(preview)){
@@ -1641,6 +1673,69 @@
             releasePreview(preview,'file-preview-failed');
             return false;
         }
+    }
+
+    function preparePreviewPrint(preview){
+        if(!preview.printPreparation){
+            preview.printPreparation=printModulePromise.then(function registerPreviewPrint({createPrintView}){
+                if(!isCurrentPreview(preview)||!preview.rendered){
+                    return null;
+                }
+                const view=createPrintView({
+                    host,
+                    content:()=>preview.rendered,
+                    title:()=>preview.title,
+                    active:()=>isCurrentPreview(preview)&&fileModal.opened===true,
+                    priority:1,
+                    signal:preview.controller.signal,
+                    retain:()=>retainPreviewPrintResources(preview),
+                    onError:error=>reportPreviewPrintFailure(error,preview)
+                });
+                preview.printButton.disabled=false;
+                return view;
+            });
+        }
+        return preview.printPreparation;
+    }
+
+    async function printPreview(){
+        const preview=activePreview;
+        if(!preview?.rendered||!isCurrentPreview(preview)||fileModal.opened!==true){
+            return false;
+        }
+        const view=await preparePreviewPrint(preview);
+        return view&&isCurrentPreview(preview)?view.print():false;
+    }
+
+    function reportPreviewPrintFailure(error,preview){
+        arcaneLogging.error('Unable to print file preview:',error);
+        if(isCurrentPreview(preview)){
+            preview.printStatus.textContent='Unable to open print preview. Please try again.';
+            preview.printStatus.setAttribute('role','alert');
+            preview.container.append(preview.printStatus);
+        }
+    }
+
+    function retainPreviewPrintResources(preview){
+        preview.printRetains+=1;
+        let retained=true;
+        return function releasePrintedPreviewResources(){
+            if(!retained){
+                return;
+            }
+            retained=false;
+            preview.printRetains-=1;
+            if(preview.released&&preview.printRetains===0){
+                releasePreviewURLs(preview);
+            }
+        };
+    }
+
+    function releasePreviewURLs(preview){
+        for(const url of preview.urls){
+            URL.revokeObjectURL(url);
+        }
+        preview.urls.clear();
     }
 
     function configureFileModal(modal){
@@ -1660,9 +1755,10 @@
     }
 
     function releasePreview(preview,reason){
-        if(!preview){
+        if(!preview||preview.released){
             return;
         }
+        preview.released=true;
         preview.controller.abort(reason);
         for(const element of preview.media){
             if(element.localName==='audio'){
@@ -1676,11 +1772,10 @@
                 element.load();
             }
         }
-        for(const url of preview.urls){
-            URL.revokeObjectURL(url);
+        if(preview.printRetains===0){
+            releasePreviewURLs(preview);
         }
         preview.media.clear();
-        preview.urls.clear();
         if(activePreview===preview){
             activePreview=null;
         }
@@ -2091,8 +2186,12 @@
 
         openButton.addEventListener(
             'click',
-            async()=>{
+            async function openSelectedFile() {
+                const signal = presentationController.signal;
                 await select(entry.path,{entry:entry});
+                if (destroyed || signal.aborted) {
+                    return;
+                }
                 const detail={path:entry.path,entry:entry,trigger:'click'};
                 const operationId=nextOperationId('open');
                 const openAllowed=emit('file-manager-open',detail,true,operationId);
@@ -2130,21 +2229,21 @@
     }
 
     async function confirmDelete(directory='',fileName='',closeFile=false){
-        if(destroyed||!directory||!fileName){
+        const signal = presentationController.signal;
+        if (closingTask && !await closingTask) {
+            return false;
+        }
+        if(destroyed||signal.aborted||!directory||!fileName){
             return false;
         }
         const generation=++deleteGeneration;
 
-        const modal=await waitForComponent(
+        const modal = await waitForModal(
             deleteModal,
-            {
-                methods:['populate','open','close'],
-                property:'ready',
-                event:'modal-ready',
-                signal:lifecycleController.signal
-            }
+            ['populate', 'open', 'close'],
+            signal
         );
-        if(destroyed||generation!==deleteGeneration){
+        if(!modal||destroyed||generation!==deleteGeneration){
             return false;
         }
         const content=document.createElement('section');
@@ -2168,12 +2267,19 @@
         deleteButton.addEventListener(
             'click',
             async function deleteSelectedFile(){
+                if (destroyed || signal.aborted || generation !== deleteGeneration) {
+                    return;
+                }
                 cancelButton.disabled=true;
                 deleteButton.disabled=true;
 
                 try{
                     await dbopfs.delete(directory,fileName);
-                    if(destroyed||generation!==deleteGeneration){
+                    if(destroyed){
+                        return;
+                    }
+                    if (generation !== deleteGeneration) {
+                        await loadAll();
                         return;
                     }
                     await modal.close(undefined,true);
@@ -2201,7 +2307,9 @@
                         message.innerText=`Unable to delete ${fileName}.`;
                         cancelButton.disabled=false;
                         deleteButton.disabled=false;
-                        arcaneLogging.error('Unable to delete file:',error);
+                    }
+                    if (!destroyed) {
+                        arcaneLogging.error('Unable to delete file:', error);
                     }
                 }
             },
@@ -2230,6 +2338,7 @@
         }
 
         uploadDirectory=directory;
+        uploadPresentationController = presentationController;
         fileUpload.click();
     }
 
@@ -2239,6 +2348,8 @@
         }
         const files=Array.from(fileUpload.files||[]);
         const directory=uploadDirectory;
+        const presentation = uploadPresentationController || presentationController;
+        uploadPresentationController = null;
         fileUpload.value='';
 
         if(!files.length||!directory){
@@ -2269,8 +2380,8 @@
             return false;
         }
 
-        if(layout==='grid'){
-            await openDirectory(directory);
+        if(layout==='grid' && !presentation.signal.aborted){
+            await openDirectory(directory, presentation.signal);
         }
 
         const failed=results.find(
@@ -2309,6 +2420,72 @@
         }
     }
 
+    async function waitForModal(modal, methods, signal) {
+        try {
+            return await waitForComponent(
+                modal,
+                {
+                    methods,
+                    property: 'ready',
+                    event: 'modal-ready',
+                    signal
+                }
+            );
+        } catch (error) {
+            if (signal.aborted) {
+                return null;
+            }
+            throw error;
+        }
+    }
+
+    async function closeFileManager() {
+        if (destroyed) {
+            return false;
+        }
+        presentationController.abort('file-manager-closed');
+        presentationController = new AbortController();
+        treeOpenGeneration += 1;
+        directoryOpenGeneration += 1;
+        fileOpenGeneration += 1;
+        deleteGeneration += 1;
+        selectionGeneration += 1;
+        releasePreview(activePreview, 'file-manager-closed');
+        if (closingTask) {
+            return closingTask;
+        }
+
+        closingTask = Promise.resolve().then(closeOwnedDialogs);
+        try {
+            return await closingTask;
+        } finally {
+            closingTask = null;
+        }
+    }
+
+    async function closeOwnedDialogs() {
+        try {
+            for (const modal of [deleteModal, fileModal, directoryModal]) {
+                if (destroyed) {
+                    return false;
+                }
+                if (is.function(modal.close)) {
+                    const closed = await modal.close();
+                    if (closed === false) {
+                        return false;
+                    }
+                }
+                if (modal.opened === true) {
+                    return false;
+                }
+            }
+            return !destroyed;
+        } catch (error) {
+            arcaneLogging.error('Unable to close file manager:', error);
+            return false;
+        }
+    }
+
     function destroy(){
         if(destroyed){
             return false;
@@ -2317,6 +2494,7 @@
         initialized=false;
         host.ready=false;
         lifecycleController.abort('file-manager-destroyed');
+        presentationController.abort('file-manager-destroyed');
         treeLoadSequence+=1;
         gridLoadSequence+=1;
         providerGeneration+=1;

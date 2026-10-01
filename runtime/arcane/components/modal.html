@@ -292,9 +292,13 @@
         modalStack.push(host);
 
         if(!wasOpen){
-            returnFocus=document.activeElement instanceof HTMLElement
-                ?document.activeElement
-                :null;
+            let focusedElement = document.activeElement;
+            while (focusedElement?.shadowRoot?.activeElement) {
+                focusedElement = focusedElement.shadowRoot.activeElement;
+            }
+            returnFocus = focusedElement instanceof HTMLElement
+                ? focusedElement
+                : null;
             dialog.showModal();
             queueMicrotask(focusOpenedModal);
             emit('modal-opened',{}, {opened:true});
@@ -326,7 +330,7 @@
             const target=returnFocus;
             returnFocus=null;
             queueMicrotask(function restoreModalReturnFocus(){
-                if(target?.isConnected){
+                if(target?.isConnected && !dialog.open){
                     target.focus({preventScroll:true});
                 }
             });

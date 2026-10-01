@@ -67,17 +67,17 @@ appropriate.
 | [`conversation-view.html`](#conversation-viewhtml) | Provider-neutral conversation display, advisory actions, composer, busy state, and status. | `setConversation()`<br>`setBusy()`<br>`setStatus()`<br>`clearComposer()`<br>`destroy()` | `conversation-view-ready`<br>`communication-send`<br>`communication-advisory-action` | DOM-normalized |
 | [`dashboard-config.html`](#dashboard-confightml) | Selects which normalized chart definitions are visible on a dashboard. | `configure()`<br>`setDefinitions()`<br>`setVisibility()`<br>`getChartOptions()`<br>`getEffectiveVisibility()`<br>`open()`<br>`close()`<br>`destroy()` | `dashboard-config-ready`<br>`dashboard-config-opened`<br>`dashboard-config-closed`<br>`dashboard-config-change` | Fully normalized definitions and visibility |
 | [`data-maintenance.html`](#data-maintenancehtml) | Runs destructive cleanup of empty chats and memories inside the current app data scope. | `open()`<br>`destroy()` | `data-maintenance-ready`<br>`data-maintenance-complete` | Normalized counts; DBOPFS failures mixed |
-| [`data-view.html`](#data-viewhtml) | Opens a modal file view and forwards application-owned preview and directory-filter callbacks. | `beforeOpen()`<br>`open()`<br>`destroy()` | `data-view-ready` | DOM-native result; preview/filter configuration reaches the child before loading |
+| [`data-view.html`](#data-viewhtml) | Opens a modal file view and forwards application-owned preview and directory-filter callbacks. | `beforeOpen()`<br>`open()`<br>`close()`<br>`printPreview()`<br>`destroy()` | `data-view-ready` | DOM-native result; preview/filter configuration reaches the child before loading |
 | [`directory-picker.html`](#directory-pickerhtml) | Presents the provider-owned OS directory chooser with change/cancel/error states. | `configure()`<br>`focus()`<br>`select()`<br>`destroy()` | `directory-picker-ready`<br>`directory-picker-change`<br>`directory-picker-cancel`<br>`directory-picker-error` | Complete plain-text paths and native selection/error |
 | [`document-inspector.html`](#document-inspectorhtml) | Inspects PDF, text, or source documents and records review state. | `loadDocument()`<br>`selectView()`<br>`markSaved()`<br>`destroy()` | `document-inspector-ready`<br>`document-review-change` | Document state normalized; browser document APIs mixed |
 | [`file-drop.html`](#file-drophtml) | Acquires complete file selections by drag/drop or picker and presents busy, progress, error, and cleared state. | `configure()`<br>`openPicker()`<br>`clear()`<br>`setBusy()`<br>`setError()`<br>`setProgress()`<br>`destroy()` | `file-drop-ready`<br>`file-drop-selected`<br>`file-drop-progress`<br>`file-drop-state`<br>`file-drop-error` | Complete selections preserved; browser File/drop errors mixed |
 | [`file-inspector.html`](#file-inspectorhtml) | Displays file metadata, preview, busy/error state, and caller-defined actions. | `configure()`<br>`show()`<br>`clear()`<br>`setActions()`<br>`setBusy()`<br>`setError()`<br>`setPreview()`<br>`destroy()` | `file-inspector-ready`<br>`file-inspector-action`<br>`file-inspector-change`<br>`file-inspector-cleared`<br>`file-inspector-error` | State normalized; preview/provider behavior mixed |
-| [`file-manager.html`](#file-managerhtml) | Browses app-scoped files, filters directories before reads, and renders application-described previews. | `setProvider()`<br>`loadAll()`<br>`setFilter()`<br>`setDirectoryFilter()`<br>`select()`<br>`clearSelection()`<br>`destroy()` | `file-manager-ready`<br>`file-manager-select`<br>`file-manager-open`<br>`file-manager-action` | Selection/filter state, neutral preview descriptors, cancellation, and media cleanup normalized; storage/provider behavior mixed |
+| [`file-manager.html`](#file-managerhtml) | Browses app-scoped files, filters directories before reads, and renders application-described previews. | `setProvider()`<br>`loadAll()`<br>`setFilter()`<br>`setDirectoryFilter()`<br>`select()`<br>`clearSelection()`<br>`close()`<br>`printPreview()`<br>`destroy()` | `file-manager-ready`<br>`file-manager-select`<br>`file-manager-open`<br>`file-manager-action` | Selection/filter state, neutral preview descriptors, cancellation, and media cleanup normalized; storage/provider behavior mixed |
 | [`header.html`](#headerhtml) | Shared title bar with history, reload, online marker, presentation labels, and 988 link. | None | No component-specific event | Browser/platform-native behavior; no component-ready contract |
 | [`integration-settings.html`](#integration-settingshtml) | Edits non-secret communication service configuration and service actions. | `configure()`<br>`getValues()`<br>`setStatus()`<br>`destroy()` | `integration-settings-ready`<br>`integration-settings-save`<br>`integration-settings-close`<br>`integration-action` | Normalized non-secret values |
 | [`local-ai-status.html`](#local-ai-statushtml) | Presents local-AI standby, failure, recovery, guidance, retry, and dismissal states. | `configure()`<br>`begin()`<br>`present()`<br>`destroy()`<br>`hidden` | `local-ai-status-ready`<br>`local-ai-status-dismissed`<br>`local-ai-retry` | Fully normalized LocalAIReadiness report |
 | [`markdown-document.html`](#markdown-documenthtml) | Renders and navigates a complete Markdown document with focusable fragments. | `configure()`<br>`load()`<br>`render()`<br>`clear()`<br>`fail()`<br>`focus()`<br>`focusFragment()`<br>`destroy()` | `markdown-document-ready`<br>`markdown-document-state`<br>`markdown-document-loading`<br>`markdown-document-rendered`<br>`markdown-document-empty`<br>`markdown-document-error`<br>`markdown-document-navigate` | Complete Markdown/state normalized; malformed input and Marked/DOM failures remain visible |
-| [`markdown-editor.html`](#markdown-editorhtml) | Configurable Markdown authoring with optional bounded input/preview panes and edit-position following. | `configure()`<br>`focus()`<br>`clear()`<br>`saveEntry()`<br>`destroy()` | `markdown-editor-ready`<br>`markdown-editor-change`<br>`markdown-editor-saved` | Editor values, opt-in fit layout, and preview following normalized; injected save result mixed |
+| [`markdown-editor.html`](#markdown-editorhtml) | Configurable Markdown authoring with optional bounded input/preview panes, edit-position following, and rendered printing. | `configure()`<br>`focus()`<br>`clear()`<br>`insertMarkdown()`<br>`saveEntry()`<br>`print()`<br>`destroy()` | `markdown-editor-ready`<br>`markdown-editor-change`<br>`markdown-editor-saved` | Editor values, opt-in fit layout, and preview following normalized; injected save result mixed |
 | [`media-embed.html`](#media-embedhtml) | Loads a parsed YouTube video or playlist embed with ordinary hosting by default, optional privacy enhancement, and an external-platform action. | `configure()`<br>`load()`<br>`destroy()` | `media-embed-ready`<br>`media-load`<br>`media-error`<br>`media-open-platform` | URL/error normalized; iframe/platform behavior native |
 | [`modal.html`](#modalhtml) | Generic modal with population, configurable user dismissal, actions, and concurrent task execution. | `configure()`<br>`populate()`<br>`open()`<br>`close()`<br>`runTasks()`<br>`destroy()`<br>`running`<br>`opened` | `modal-ready`<br>`modal-opened`<br>`modal-closed`<br>`modal-action` | Modal state normalized; injected task results mixed |
 | [`output-panel.html`](#output-panelhtml) | Presents status, output, body, coverage, actions, pending, error, and cleared states. | `configure()`<br>`setOutput()`<br>`setBody()`<br>`setCoverage()`<br>`setActions()`<br>`setPending()`<br>`setStatus()`<br>`setError()`<br>`clear()`<br>`destroy()` | `output-panel-ready`<br>`output-panel-state`<br>`output-panel-change`<br>`output-panel-action`<br>`output-panel-error`<br>`output-panel-cleared` | DOM-normalized |
@@ -663,7 +663,7 @@ own record mappings through the same preview callbacks as the standalone
 
 ### Public surface
 
-Methods/properties: `beforeOpen()`, `open()`, `destroy()`.
+Methods/properties: `beforeOpen()`, `open()`, `close()`, `printPreview()`, `destroy()`.
 
 Assign `previewDescriptor`, `previewTransform`, and `directoryFilter` on the
 host before opening. The component forwards those callbacks, comma-separated
@@ -672,6 +672,20 @@ before the child's first load. Reopening refreshes those values before
 `loadAll()`, so changed callbacks and hidden-directory choices take effect.
 `beforeOpen()` is awaited before this configuration is consumed. `data-dirs`
 selects the initial directories; `data-layout` defaults to `files`.
+
+`await close()` invalidates pending opens, closes the child's dialogs before the
+parent, and returns `true` only after closure. It returns `false` when destroyed
+or a child/parent cannot close; complete errors reach shared diagnostics. It is
+reusable: a later `open()` reloads the existing child. Repeated closes share the
+pending closure. `destroy()` remains terminal.
+
+An application that loads a history selection into an editor must synchronously
+call `preventDefault()` on the existing cancelable `file-manager-open` event
+before awaiting its own save/load work. That application owns record selection,
+autosave, title, and editor focus; call `close()` after loading and restore focus
+after it resolves `true`. No record-loading policy is added to the SDK.
+`printPreview()` forwards to the currently open child preview and returns
+`false` when no such preview is available.
 
 Events: `data-view-ready`.
 
@@ -821,7 +835,7 @@ and `destroy()` cleanup, without delaying unrelated component startup.
 ### Public surface
 
 Methods/properties: `setProvider()`, `loadAll()`, `setFilter()`,
-`setDirectoryFilter()`, `select()`, `clearSelection()`, `destroy()`,
+`setDirectoryFilter()`, `select()`, `clearSelection()`, `close()`, `printPreview()`, `destroy()`,
 `previewDescriptor`, `previewTransform`, `directoryFilter`.
 
 Assign `directoryFilter(entry, context)` before the first load, or call
@@ -879,8 +893,9 @@ component does not automatically read every related media variant.
 
 Closing the preview, opening another file, or destroying the manager aborts
 the preview signal, ignores late descriptor/loader results, stops owned audio,
-removes iframe `srcdoc`, and revokes every owned object URL, including those
-in nested collections.
+removes iframe `srcdoc`, and releases owned object URLs, including those in
+nested collections. An active print snapshot retains its URLs until the
+browser's `afterprint` event, even when the preview closes meanwhile.
 Applications should observe the supplied signal in their asynchronous reads.
 Descriptor and file-open failures show `Unable to open this file.` in the
 current modal and send the original error to the shared logger.
@@ -899,6 +914,23 @@ including lines that are not JSON records. Other binary files offer a download
 of the original `File`.
 The larger file-preview dialog reuses `--modal-width`, `--modal-max-height`,
 and `--modal-padding`; applications can override those existing modal values.
+
+The preview's **Print** button and `await printPreview()` print its current
+rendered content with the file title. Native browser Print selects the open
+preview ahead of the editor. Printing uses the shared
+[`PrintView.js`](runtime-modules.md#printviewjs) owner; accessible HTML frames
+are copied from their current rendered document, never substituted with source
+text. Explicit printing waits for images/fonts and HTML frame readiness.
+Native PDF and inaccessible embedded viewers require their own print command.
+`true` means the browser print dialog was requested, not that paper or a PDF
+was produced. Closed, destroyed, or unavailable previews return `false`;
+preparation failures reject and the visible control reports a concise failure.
+
+`await close()` cancels pending presentation work and closes delete, file, and
+directory dialogs in that order. It releases preview resources and returns
+`false` on refused/failed closure or after destruction. The manager stays
+reusable; a later opening can use it again. Already accepted upload/deletion
+writes complete through the storage owner without reopening closed dialogs.
 
 Events: `file-manager-ready`, `file-manager-select`, `file-manager-open`, `file-manager-action`.
 
@@ -1048,8 +1080,26 @@ inside an application-supplied bounded area.
 
 ### Public surface
 
-Methods/properties: `configure()`, `focus()`, `clear()`, `saveEntry()`,
-`destroy()`, `value`, `entryTitle`, `options`.
+Methods/properties: `configure()`, `focus()`, `clear()`, `insertMarkdown(text)`,
+`saveEntry()`, `print()`, `destroy()`, `value`, `entryTitle`, `options`.
+
+`insertMarkdown(text)` replaces the current source selection with the exact
+supplied string, places the caret after it, and emits the ordinary change
+event. It preserves the source viewport and normal preview/save lifecycle.
+It returns `false` when read-only or destroyed and throws `TypeError` for a
+non-string. The application owns the inserted Markdown and any related data.
+
+The visible **Print** control and `await print()` print the complete rendered
+Markdown with `entryTitle`, independently of saving. Native browser Print uses
+that same registered view unless an open file preview takes precedence.
+The SDK copies current rendered DOM/styles into a temporary print-only view,
+leaving the editor's source, controls, and screen layout in place. Explicit
+printing waits for resource readiness; native `beforeprint` is synchronous
+and uses the currently rendered content. `print()` returns `false` when the
+view is unavailable, rejects preparation failures, and returns `true` only
+when the browser dialog was requested. Completion of physical printing or PDF
+saving is not observable through this method. See
+[`PrintView.js`](runtime-modules.md#printviewjs).
 
 `configure({fit:true,followPreview:true})` opts into the two independent
 behaviors. Both options default to `false`; omitted options retain their
@@ -1087,7 +1137,7 @@ lists, quotes, and tables follow their block, while invisible source positions
 use a nearby available rendered block rather than exact glyph geometry.
 
 Public CSS parts are `editor`, `title`, `toolbar`, `input`, `preview`,
-`actions`, `status`, and `save-action`. Applications can make the title
+`actions`, `status`, `print-action`, and `save-action`. Applications can make the title
 borderless and compact through `::part(title)` while retaining its native
 editing behavior and visible keyboard focus. These parts are styling hooks,
 not slots or replacement controls.

@@ -3,9 +3,10 @@ import {readFile} from 'node:fs/promises';
 import test from '../src/testing.mjs';
 import Is from '../browser-runtime/dependencies/strong-type/index.js';
 
-// The complete component script runs against named DOM, storage, and Markdown
-// doubles. These cases cover preview ownership and public callback contracts;
-// native media decoding, Markdown parsing, and browser layout are separate seams.
+// The complete component script runs against named DOM, storage, Markdown, and
+// PrintView callback doubles. These cases cover preview ownership and public
+// callback contracts; the PrintView double does not clone DOM or invoke printing.
+// Native media decoding, Markdown parsing, and browser layout are separate seams.
 async function fileManagerFixture(options = {}) {
     const keysRead = [];
     const metadataRead = [];
@@ -13,6 +14,10 @@ async function fileManagerFixture(options = {}) {
     const createdURLs = [];
     const revokedURLs = [];
     const errors = [];
+    const printViews = [];
+    const printRequests = [];
+    const modalWaits = [];
+    const modalCloseEvents = [];
     const ready = Promise.withResolvers();
     const files = options.files || {
         visible: {'entry.txt': {text: 'Complete document', mime: 'text/plain'}}
@@ -89,6 +94,12 @@ async function fileManagerFixture(options = {}) {
         pause() {this.paused = true;}
         load() {this.loads += 1;}
         focus() {}
+        closest(selector) {
+            for (let element = this; element; element = element.parentElement) {
+                if (selector.startsWith('.') && element.className.split(' ').includes(selector.substring(1))) return element;
+            }
+            return null;
+        }
         contains(candidate) {
             return candidate === this || this.children.some(function containsChild(child) {return child.contains(candidate);});
         }
@@ -106,16 +117,25 @@ async function fileManagerFixture(options = {}) {
     }
 
     class FakeModal extends FakeElement {
-        constructor() {
+        constructor(name) {
             super('html-import');
+            this.name = name;
             this.ready = true;
             this.opened = false;
+            this.openCalls = 0;
         }
         async populate(content) {this.replaceChildren(content);}
-        open() {this.opened = true;}
+        open() {
+            this.opened = true;
+            this.openCalls += 1;
+        }
         async close() {
+            modalCloseEvents.push([this.name, 'start']);
+            if (await options.closeModal?.(this) === false) return false;
             this.opened = false;
             await this.fire('modal-closed');
+            modalCloseEvents.push([this.name, 'finish']);
+            return true;
         }
         destroy() {this.opened = false;}
     }
@@ -132,6 +152,7 @@ async function fileManagerFixture(options = {}) {
         async open() {
             fileReads.push([this.directory, this.fileName]);
             const source = files[this.directory][this.fileName];
+            await options.readFile?.(this.directory, this.fileName);
             if (source.error) throw source.error;
             const file = new File([source.text || ''], this.fileName, {type: source.mime || ''});
             file.ext = this.fileName.split('.').at(-1);
@@ -158,8 +179,9 @@ async function fileManagerFixture(options = {}) {
     host.directoryFilter = options.directoryFilter;
     host.setAttribute('href', './arcane/components/file-manager.html');
     const manager = new FakeElement();
-    const fileModal = new FakeModal();
-    const directoryModal = new FakeModal();
+    const fileModal = new FakeModal('file');
+    const directoryModal = new FakeModal('directory');
+    const deleteModal = new FakeModal('delete');
     const elements = new Map(
         [
             ['.file-manager', manager],
@@ -167,7 +189,7 @@ async function fileManagerFixture(options = {}) {
             ['#fileUpload', new FakeElement('input')],
             ['#fileModal', fileModal],
             ['#directoryModal', directoryModal],
-            ['#deleteModal', new FakeModal()]
+            ['#deleteModal', deleteModal]
         ]
     );
     host.shadowRoot = {querySelector: function selectComponentPart(selector) {return elements.get(selector);}};
@@ -194,6 +216,25 @@ async function fileManagerFixture(options = {}) {
     const window = new EventTarget();
     window.dbopfs = dbopfs;
 
+    function createPrintViewCallbackDouble(configuration) {
+        const view = {configuration, destroyed: false};
+        printViews.push(view);
+        configuration.signal.addEventListener('abort', function destroyPrintViewDouble() {view.destroyed = true;}, {once: true});
+        return {
+            async print() {
+                if (view.destroyed || !configuration.active() || options.printAvailable === false) return false;
+                const release = configuration.retain();
+                const request = {content: configuration.content(), title: configuration.title(), released: false};
+                printRequests.push(request);
+                window.addEventListener('afterprint', function finishPrintViewDouble() {
+                    request.released = true;
+                    release();
+                }, {once: true});
+                return true;
+            }
+        };
+    }
+
     let FileEntity = FixtureFileEntity;
     if (options.realFileEntity) {
         const entitySource = await readFile(new URL('../runtime/arcane/entities/File.js', import.meta.url), 'utf8');
@@ -211,8 +252,13 @@ async function fileManagerFixture(options = {}) {
         if (specifier === '../modules/DBOPFS.js') return {};
         if (specifier === '../entities/File.js') return {default: FileEntity};
         if (specifier === '../modules/MD.js') return {default: FakeMarkdown};
+        if (specifier === '../modules/PrintView.js') return {createPrintView: createPrintViewCallbackDouble};
         if (specifier === '../modules/WaitForComponent.js') {
-            return {default: async function readyComponent(component) {return component;}};
+            return {default: async function readyComponent(component, configuration) {
+                modalWaits.push({component, configuration});
+                await options.waitForComponent?.(component, configuration);
+                return component;
+            }};
         }
         if (specifier === 'arcane-os/logging') {
             return {arcaneLogging: {error: function recordError(...values) {errors.push(values);}}};
@@ -265,7 +311,15 @@ async function fileManagerFixture(options = {}) {
         await settle();
     }
 
-    return {host, manager, fileModal, directoryModal, keysRead, metadataRead, fileReads, createdURLs, revokedURLs, errors, descendants, open, settle, source};
+    async function openDirectory() {
+        const folder = descendants(manager, function isFolder(element) {return element.className === 'file folder';})[0];
+        await manager.fire('click', {target: folder});
+        await settle();
+    }
+
+    function afterPrint() {window.dispatchEvent(new Event('afterprint'));}
+
+    return {host, manager, fileModal, directoryModal, deleteModal, keysRead, metadataRead, fileReads, createdURLs, revokedURLs, errors, printViews, printRequests, modalWaits, modalCloseEvents, descendants, open, openDirectory, afterPrint, settle, source};
 }
 
 test('file preview filters directories before keys and preserves file-predicate input', async function directoryFilteringContract() {
@@ -699,6 +753,257 @@ test('superseded mappers cannot replace current content and descriptor failures 
         assert.ok(failure.parentElement, 'The failure must remain attached to the open modal.');
     } finally {
         late.resolve(null);
+        fixture.host.destroy();
+    }
+});
+
+test('printPreview supplies the current rendered body and file title to the PrintView callback double', async function renderedPreviewPrintContract() {
+    const text = Array.from({length: 120}, function completeParagraph(_value, index) {
+        return `Moon-whale journal paragraph ${index + 1}: the entire account remains available.`;
+    }).join('\n\n');
+    const html = '<!doctype html><html><body><article>Complete embedded journal</article></body></html>';
+    let descriptorCalls = 0;
+    const fixture = await fileManagerFixture({
+        previewDescriptor: function describePrintedCollection() {
+            descriptorCalls += 1;
+            return {kind: 'collection', title: 'Observed moon-whale migration', items: [
+                {kind: 'text', content: text},
+                {kind: 'markdown', content: '**The complete route**'},
+                {kind: 'html', content: html, title: 'Embedded route'},
+                {kind: 'image', content: new Blob(['image'], {type: 'image/png'}), alt: 'Observed route'}
+            ]};
+        }
+    });
+    try {
+        await fixture.open();
+        const rendered = fixture.fileModal.children[0].children.at(-1);
+        const pre = fixture.descendants(rendered, function isText(element) {return element.localName === 'pre';})[0];
+        const frame = fixture.descendants(rendered, function isHTML(element) {return element.localName === 'iframe';})[0];
+        const image = fixture.descendants(rendered, function isImage(element) {return element.localName === 'img';})[0];
+        assert.equal(pre.innerText, text);
+        assert.equal(frame.srcdoc, html);
+        assert.equal(image.src, fixture.createdURLs[0].url);
+        assert.ok(fixture.descendants(rendered, function isMarkdown(element) {
+            return element.innerHTML === '<fixture-markdown>**The complete route**</fixture-markdown>';
+        }).length);
+        pre.innerText = `${text}\n\nThe current rendered annotation stays with the print request.`;
+        const printButton = fixture.descendants(fixture.fileModal, function isPrintButton(element) {return element.textContent === 'Print';})[0];
+        assert.equal(printButton.disabled, false);
+
+        assert.equal(await fixture.host.printPreview(), true);
+        assert.equal(fixture.printRequests.length, 1);
+        assert.equal(fixture.printRequests[0].content, rendered);
+        assert.equal(fixture.printRequests[0].title, 'visible/entry.txt');
+        assert.equal(fixture.printViews[0].configuration.host, fixture.host);
+        assert.equal(fixture.printViews[0].configuration.priority, 1);
+        assert.equal(fixture.printViews[0].configuration.active(), true);
+        assert.equal(fixture.printRequests[0].content.contains(pre), true);
+        assert.equal(pre.innerText, `${text}\n\nThe current rendered annotation stays with the print request.`);
+        assert.equal(fixture.printRequests[0].content.contains(frame), true);
+        assert.equal(fixture.printRequests[0].content.contains(image), true);
+        assert.equal(fixture.printRequests[0].content.contains(printButton), false);
+        assert.equal(descriptorCalls, 1);
+        assert.deepEqual(fixture.fileReads, [['visible', 'entry.txt']]);
+        assert.deepEqual(fixture.errors, []);
+    } finally {
+        fixture.afterPrint();
+        fixture.host.destroy();
+    }
+});
+
+test('PrintView callback resource leases survive preview close and release after the fixture afterprint event', async function printResourceLifetimeContract() {
+    for (const closeFirst of [true, false]) {
+        const fixture = await fileManagerFixture({
+            previewDescriptor: function describeRetainedMedia() {
+                return {kind: 'collection', items: [
+                    {kind: 'image', content: new Blob(['image'], {type: 'image/png'})},
+                    {kind: 'audio', content: new Blob(['audio'], {type: 'audio/wav'})}
+                ]};
+            }
+        });
+        try {
+            await fixture.open();
+            const image = fixture.descendants(fixture.fileModal, function isImage(element) {return element.localName === 'img' && element.src?.startsWith('blob:');})[0];
+            const audio = fixture.descendants(fixture.fileModal, function isAudio(element) {return element.localName === 'audio';})[0];
+            assert.equal(await fixture.host.printPreview(), true);
+            if (closeFirst) {
+                assert.equal(await fixture.host.close(), true);
+                assert.equal(fixture.printViews[0].destroyed, true);
+                assert.equal(image.src, '');
+                assert.equal(audio.paused, true);
+                assert.equal(audio.loads, 1);
+                assert.deepEqual(fixture.revokedURLs, []);
+                fixture.afterPrint();
+            } else {
+                fixture.afterPrint();
+                assert.equal(fixture.printRequests[0].released, true);
+                assert.deepEqual(fixture.revokedURLs, []);
+                assert.equal(await fixture.host.close(), true);
+            }
+            assert.equal(fixture.printRequests[0].released, true);
+            assert.deepEqual(fixture.revokedURLs, fixture.createdURLs.map(function createdURL(entry) {return entry.url;}));
+            assert.equal(await fixture.host.printPreview(), false);
+            fixture.afterPrint();
+            assert.equal(await fixture.host.close(), true);
+            assert.deepEqual(fixture.revokedURLs, fixture.createdURLs.map(function createdURL(entry) {return entry.url;}));
+        } finally {
+            fixture.afterPrint();
+            fixture.host.destroy();
+        }
+    }
+});
+
+test('printPreview returns false for absent, helper-unavailable, closed, and destroyed previews', async function unavailablePreviewPrintContract() {
+    const fixture = await fileManagerFixture({printAvailable: false});
+    try {
+        assert.equal(await fixture.host.printPreview(), false);
+        assert.equal(fixture.printViews.length, 0);
+        await fixture.open();
+        assert.equal(await fixture.host.printPreview(), false);
+        assert.equal(fixture.printViews.length, 1);
+        assert.deepEqual(fixture.printRequests, []);
+        await fixture.fileModal.close();
+        assert.equal(await fixture.host.printPreview(), false);
+        fixture.host.destroy();
+        assert.equal(await fixture.host.printPreview(), false);
+        assert.equal(await fixture.host.close(), false);
+        assert.deepEqual(fixture.errors, []);
+    } finally {
+        fixture.host.destroy();
+    }
+});
+
+test('close awaits child modal completion before parents and leaves the manager reusable', async function reusableManagerCloseContract() {
+    const childClose = Promise.withResolvers();
+    let waitForChild = true;
+    const fixture = await fileManagerFixture({
+        layout: 'grid',
+        closeModal: function finishOwnedModal(modal) {
+            if (modal.name === 'delete' && waitForChild) {
+                waitForChild = false;
+                return childClose.promise;
+            }
+        }
+    });
+    try {
+        await fixture.openDirectory();
+        await fixture.open();
+        const remove = fixture.descendants(fixture.fileModal, function isDelete(element) {return element.className === 'file-view-delete';})[0];
+        await remove.fire('click');
+        assert.equal(fixture.deleteModal.opened, true);
+        assert.equal(fixture.fileModal.opened, true);
+        assert.equal(fixture.directoryModal.opened, true);
+
+        const closing = fixture.host.close();
+        assert.equal(fixture.printViews[0].configuration.signal.aborted, true);
+        await fixture.settle();
+        assert.deepEqual(fixture.modalCloseEvents, [['delete', 'start']]);
+        assert.equal(fixture.fileModal.opened, true);
+        assert.equal(fixture.directoryModal.opened, true);
+        childClose.resolve(true);
+        assert.equal(await closing, true);
+        assert.deepEqual(fixture.modalCloseEvents, [
+            ['delete', 'start'], ['delete', 'finish'],
+            ['file', 'start'], ['file', 'finish'],
+            ['directory', 'start'], ['directory', 'finish']
+        ]);
+        assert.equal(fixture.host.ready, true);
+        assert.equal(fixture.deleteModal.opened, false);
+        assert.equal(fixture.fileModal.opened, false);
+        assert.equal(fixture.directoryModal.opened, false);
+        assert.equal(await fixture.host.close(), true);
+
+        await fixture.openDirectory();
+        await fixture.open();
+        assert.equal(fixture.fileModal.opened, true);
+        assert.equal(fixture.directoryModal.opened, true);
+        assert.equal(await fixture.host.printPreview(), true);
+        assert.equal(fixture.printViews.at(-1).configuration.signal.aborted, false);
+        assert.deepEqual(fixture.errors, []);
+    } finally {
+        childClose.resolve(true);
+        fixture.afterPrint();
+        fixture.host.destroy();
+    }
+});
+
+test('close invalidates late readiness, storage reads, and descriptor completion without reopening', async function pendingPreviewCloseContract() {
+    for (const stage of ['readiness', 'storage', 'descriptor']) {
+        const late = Promise.withResolvers();
+        const entered = Promise.withResolvers();
+        let waiting = true;
+        function pauseSelectedStage(current) {
+            if (stage !== current || !waiting) return undefined;
+            waiting = false;
+            entered.resolve();
+            return late.promise;
+        }
+        const fixture = await fileManagerFixture({
+            waitForComponent: function waitForPreviewModal(component) {
+                return component.name === 'file' ? pauseSelectedStage('readiness') : undefined;
+            },
+            readFile: function readStoredPreview() {return pauseSelectedStage('storage');},
+            previewDescriptor: async function describePendingPreview() {
+                await pauseSelectedStage('descriptor');
+                return {kind: 'image', content: new Blob(['complete image'], {type: 'image/png'})};
+            }
+        });
+        try {
+            await fixture.open();
+            await entered.promise;
+            assert.equal(await fixture.host.printPreview(), false);
+            const openCalls = fixture.fileModal.openCalls;
+            const closing = fixture.host.close();
+            assert.equal(fixture.modalWaits[0].configuration.signal.aborted, true, stage);
+            assert.equal(await closing, true);
+            late.resolve();
+            await fixture.settle();
+            assert.equal(fixture.fileModal.opened, false, stage);
+            assert.equal(fixture.fileModal.openCalls, openCalls, stage);
+            assert.deepEqual(fixture.createdURLs, [], stage);
+            assert.deepEqual(fixture.printViews, [], stage);
+            assert.equal(await fixture.host.printPreview(), false);
+
+            await fixture.open();
+            assert.equal(fixture.fileModal.opened, true, stage);
+            assert.equal(fixture.createdURLs.length, 1, stage);
+            assert.equal(await fixture.host.printPreview(), true);
+            assert.deepEqual(fixture.errors, [], stage);
+        } finally {
+            late.resolve();
+            fixture.afterPrint();
+            fixture.host.destroy();
+        }
+    }
+});
+
+test('close reports a child refusal and permits a later successful close', async function failedManagerCloseContract() {
+    let refuseClose = true;
+    const fixture = await fileManagerFixture({
+        layout: 'grid',
+        closeModal: function refuseFirstPreviewClose(modal) {
+            if (modal.name === 'file' && refuseClose) {
+                refuseClose = false;
+                return false;
+            }
+        }
+    });
+    try {
+        await fixture.openDirectory();
+        await fixture.open();
+        assert.equal(await fixture.host.close(), false);
+        assert.equal(fixture.fileModal.opened, true);
+        assert.equal(fixture.directoryModal.opened, true);
+        assert.deepEqual(fixture.modalCloseEvents, [
+            ['delete', 'start'], ['delete', 'finish'], ['file', 'start']
+        ]);
+        assert.equal(await fixture.host.printPreview(), false);
+        assert.equal(await fixture.host.close(), true);
+        assert.equal(fixture.fileModal.opened, false);
+        assert.equal(fixture.directoryModal.opened, false);
+        assert.equal(fixture.host.ready, true);
+        assert.deepEqual(fixture.errors, []);
+    } finally {
         fixture.host.destroy();
     }
 });

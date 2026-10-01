@@ -118,6 +118,7 @@
     <textarea id="entryMarkdown" class="entry-markdown" part="input"></textarea>
     <section class="actions" part="actions">
         <span id="status" class="status" part="status" aria-live="polite"></span>
+        <button id="print" part="print-action" type="button">Print</button>
         <button id="save" part="save-action" type="button" disabled></button>
     </section>
 </section>
@@ -143,6 +144,7 @@
     const toolbar=host.shadowRoot.querySelector('#toolbar');
     const textarea=host.shadowRoot.querySelector('#entryMarkdown');
     const saveButton=host.shadowRoot.querySelector('#save');
+    const printButton=host.shadowRoot.querySelector('#print');
     const status=host.shadowRoot.querySelector('#status');
 
     let previewFrame=0;
@@ -152,6 +154,23 @@
     let saveController=null;
     let destroyed=false;
     let options=normalizeMarkdownOptions(optionsFromDataset());
+    // Printing loads independently of editor readiness and owns no saved state.
+    const printViewPromise=import('../modules/PrintView.js').then(
+        function prepareEditorPrint({createPrintView}){
+            if(destroyed){
+                return null;
+            }
+            return createPrintView({
+                host,
+                content:renderedPrintContent,
+                title:()=>titleInput.value,
+                active:()=>!destroyed&&host.isConnected&&host.getClientRects().length>0,
+                signal:lifecycleController.signal,
+                onError:reportPrintFailure
+            });
+        }
+    );
+    void printViewPromise.catch(reportPrintFailure);
 
     function emit(type,detail={},publicDetail={},operationId=null){
         if(destroyed){
@@ -166,6 +185,8 @@
     host.destroy=destroy;
     host.focus=()=>{if(destroyed)return false;textarea.focus();return true;};
     host.saveEntry=saveEntry;
+    host.print=print;
+    host.insertMarkdown=insertMarkdown;
 
     Object.defineProperties(
         host,
@@ -184,6 +205,7 @@
     titleInput.addEventListener('input',contentChanged,{signal:lifecycleController.signal});
     toolbar.addEventListener('click',formatMarkdown,{signal:lifecycleController.signal});
     saveButton.addEventListener('click',saveEntry,{signal:lifecycleController.signal});
+    printButton.addEventListener('click',printFromControl,{signal:lifecycleController.signal});
     for(const type of ['wheel','pointerdown','touchstart','keydown']){
         preview.addEventListener(type,retainPreviewReadingPosition,{signal:lifecycleController.signal,passive:true});
     }
@@ -488,6 +510,24 @@
         contentChanged();
     }
 
+    function insertMarkdown(markdown){
+        if(destroyed||options.readOnly){
+            return false;
+        }
+        if(!is.string(markdown)){
+            throw new TypeError('Markdown insertion requires a string.');
+        }
+        const sourceView=captureSourceView();
+        textarea.setRangeText(markdown,sourceView.selectionStart,sourceView.selectionEnd,'end');
+        sourceView.selectionStart+=markdown.length;
+        sourceView.selectionEnd=sourceView.selectionStart;
+        sourceView.selectionDirection='none';
+        textarea.focus({preventScroll:true});
+        restoreSourceView(sourceView);
+        contentChanged();
+        return true;
+    }
+
     async function saveEntry(){
         if(destroyed||options.readOnly||!options.showSave){
             return false;
@@ -546,6 +586,36 @@
 
     function clear(){
         return resetEditor(true);
+    }
+
+    function renderedPrintContent(){
+        return preview;
+    }
+
+    async function print(){
+        if(destroyed){
+            return false;
+        }
+        const printView=await printViewPromise;
+        if(destroyed||!printView){
+            return false;
+        }
+        if(previewFrame){
+            updatePreview(false);
+        }
+        return printView.print();
+    }
+
+    function printFromControl(){
+        void print().catch(reportPrintFailure);
+    }
+
+    function reportPrintFailure(error){
+        if(destroyed||lifecycleController.signal.aborted){
+            return;
+        }
+        arcaneLogging.error('Unable to print rendered Markdown:',error);
+        status.innerText='Unable to open print preview. Please try again.';
     }
 
     function resetEditor(supersede){

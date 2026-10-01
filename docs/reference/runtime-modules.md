@@ -109,6 +109,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`PersistentAIChatSession.js`](#persistentaichatsessionjs) | esm | Adds explicit retained-history/memory policy to complete configured chat without changing DBOPFS or ChatEntity semantics. | Browser / native WebView with DBOPFS and configured chat | Retained context commits atomically; `persist:false` turns are one-operation-only. |
 | [`PreferenceStore.js`](#preferencestorejs) | esm | Loads and updates schema-defined app preferences through native storage with a narrow browser fallback. | Browser/native hybrid | Complete ordinary values remain mutable; setAll uses one optional atomic adapter batch for every selected value when advertised, otherwise performs complete ordered serial writes, and only exact unsupported native capability changes future operations to the browser fallback. |
 | [`PreparedSpeech.js`](#preparedspeechjs) | esm | Owns detached ordered preparation, semantic audio reuse, and per-caller cancellation behind AI.prepareTTS. | Browser / native WebView with injected synthesis and optional DBOPFS | Complete original inputs, ordered audio metadata, durable reuse, and observable preparation results. |
+| [`PrintView.js`](#printviewjs) | esm | Prints current rendered content and title through one document-owned print lifecycle. | Browser / supported native WebView print implementation | Complete rendered snapshot, preparation cancellation, resource lifetime, and honest request result. |
 | [`QRCode.min.js`](#qrcodeminjs) | classic-script | Vendored QRCode generator for DOM, canvas, SVG, and image output. | Browser vendor script | Vendor-native. |
 | [`Questionnaire.js`](#questionnairejs) | esm | Evaluates whether a one-time questionnaire prompt is due without performing the prompt. | Cross-host | Normalized conservative boolean. |
 | [`RecordLinkIndex.js`](#recordlinkindexjs) | esm | Parses record links and builds their normalized index. | Cross-host | Fully normalized. |
@@ -3249,6 +3250,69 @@ import {prepareSpeech} from '/arcane/modules/PreparedSpeech.js';
 
 // Applications use AI.prepareTTS; this import only exposes the SDK mechanism.
 console.log(typeof prepareSpeech); // function
+```
+
+## PrintView.js
+
+### Overview
+
+Shared rendered-print owner used by Markdown Editor and File Manager. It
+captures the current DOM and computed styles, including accessible rendered
+HTML frames, complete text, selected images, and the current title. A temporary
+print-only surface expands scrollable content without editing the live screen.
+
+### Public surface
+
+Named `createPrintView({host,content,title,active,priority=0,signal,onError,retain})`
+returns `{print,destroy}`. `host` is a connected element; synchronous callbacks
+return the rendered content node, string title, and whether the view is active.
+Optional `retain()` returns a resource-release callback. It keeps owned media
+available until preparation is cancelled or the browser emits `afterprint`.
+
+`await print()` selects that view, waits for accessible HTML frame, image, and
+font readiness, and requests the browser print dialog. It returns `false` when
+the view is unavailable or preparation is cancelled, returns `true` for a dialog
+request, and rejects preparation errors. It cannot confirm physical printing
+or PDF saving. Overlapping print sessions on the same document reject.
+
+One native `beforeprint`/`afterprint` registration serves each document. Native
+Print chooses the highest-priority visible active view, most recently registered
+on ties. File preview uses priority `1`; editor uses `0`. Native `beforeprint`
+is synchronous: it snapshots currently rendered content, cannot await a newly
+loading resource, and cannot cancel the browser's dialog. `onError(error)` or
+the developer console receives complete preparation failures.
+
+`destroy()` unregisters the view and cancels pending preparation. Once the
+dialog has been requested, its snapshot and retained media remain until
+`afterprint`. Import alone creates no listener, provider, storage, or print job.
+
+Exact exports: `createPrintView`.
+
+### Availability and normalization
+
+**Browser and native WebViews with a print implementation.** Requires DOM,
+CSSOM, FontFace/Image readiness, and browser print events. No Core capability.
+Cross-origin/inaccessible frames, native PDF frames, and object/embed viewers
+must use their owning viewer's print command; the helper does not replace their
+content with raw source or claim an unrendered document was printed. Font
+sources in embedded documents must be accessible for snapshot preparation.
+
+### Example
+
+```javascript
+import {createPrintView} from '/arcane/modules/PrintView.js';
+
+const ledger = document.querySelector('#moon-library-ledger');
+const printing = createPrintView({
+    host:ledger,
+    content:() => ledger,
+    title:() => 'Books overdue on the Moon',
+    active:() => true
+});
+document.querySelector('#print-ledger').onclick = async function printLedger(){
+    try { await printing.print(); }
+    catch(error) { console.error('Unable to print the ledger:', error); }
+};
 ```
 
 ## QRCode.min.js

@@ -328,6 +328,28 @@ console.log(await store.load());`
 console.log(typeof prepareSpeech);`
     },
     {
+        name:'PrintView.js',
+        classification:'public-first-party',
+        lifecycleSideEffects:'Import starts no work. createPrintView registers one shared beforeprint/afterprint owner per document. A selected print request captures the current rendered DOM/styles into a temporary print-only surface; afterprint removes it and releases retained resources. Destruction cancels preparation, while an already requested print keeps its snapshot until afterprint.',
+        paramsResults:'createPrintView({host,content,title,active,priority=0,signal,onError,retain}) returns {print,destroy}. content/title/active callbacks are synchronous. retain may return a release function for owned media. print() resolves false when unavailable or cancelled during preparation, true when the browser dialog is requested, and rejects preparation failures. Native Print selects the highest-priority visible active view, latest registration on ties; explicit print selects its own view. Accessible HTML frames are flattened from their current DOM. Complete text, resolved images, styles and title are retained while print layout expands scrolling content.',
+        events:['Owns native beforeprint and afterprint listeners; no new application event bus. Native beforeprint is synchronous and cannot await new resource readiness or cancel the browser dialog.'],
+        errors:['TypeError for unusable host/callback inputs.','Explicit preparation rejects image/font/frame failures and overlapping print requests; native preparation failures reach onError or complete console diagnostics.','Inaccessible HTML frames and native object/embed/PDF viewers require their owning print surface.'],
+        capabilitiesCore:'No Core capability. Browser DOM, CSSOM, fonts, image decoding and the host print-dialog implementation are required. A successful request is not evidence of saved PDF or physical output.',
+        example:String.raw`import {createPrintView} from '/arcane/modules/PrintView.js';
+
+const ledger = document.querySelector('#moon-library-ledger');
+const printing = createPrintView({
+    host:ledger,
+    content:() => ledger,
+    title:() => 'Books overdue on the Moon',
+    active:() => true
+});
+document.querySelector('#print-ledger').onclick = async function printLedger(){
+    try { await printing.print(); }
+    catch(error) { console.error('Unable to print the ledger:', error); }
+};`
+    },
+    {
         name:'QRCode.min.js',
         classification:'vendor',
         lifecycleSideEffects:'Classic-script load defines global QRCode. Construction and makeCode() render canvas/SVG/table/image DOM under the target; clear() removes rendered output.',

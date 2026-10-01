@@ -13,7 +13,7 @@ const script = source.match(/<script type="module">([\s\S]*?)<\/script>/u)[1];
 const AsyncFunction = Object.getPrototypeOf(async function componentScript() {}).constructor;
 const initialize = new AsyncFunction(
     'loadDependency', 'document', 'NodeFilter', 'requestAnimationFrame', 'cancelAnimationFrame',
-    script.replaceAll('await import(', 'await loadDependency(')
+    script.replaceAll('import(', 'loadDependency(')
 );
 
 // Run the complete component script with controlled DOM geometry. Markdown
@@ -26,6 +26,7 @@ async function editorFixture(context, {dataset = {}, layout = [], viewportEffect
     const frames = new Map();
     const cancelledFrames = [];
     const treeMoves = [];
+    const printCalls = [];
     const document = {activeElement: null};
     let frameSequence = 0;
     let eventSourceDisposed = false;
@@ -126,6 +127,11 @@ async function editorFixture(context, {dataset = {}, layout = [], viewportEffect
                 this.scrollLeft = 0;
             }
         }
+        setRangeText(text, start, end, mode) {
+            assert.equal(mode, 'end');
+            this.value = this.value.slice(0, start) + text + this.value.slice(end);
+            this.setSelectionRange(start + text.length, start + text.length);
+        }
         get value() {return this.text ?? '';}
         set value(value) {
             this.text = value;
@@ -193,11 +199,12 @@ async function editorFixture(context, {dataset = {}, layout = [], viewportEffect
     const actions = new Element();
     const status = new Element('span');
     const save = new Element('button');
-    actions.append(status, save);
+    const print = new Element('button');
+    actions.append(status, print, save);
     editor.append(title, preview, toolbar, input, actions);
     const elements = new Map([
         ['.markdown-editor', editor], ['#entryTitle', title], ['#preview', preview],
-        ['#toolbar', toolbar], ['#entryMarkdown', input], ['#save', save], ['#status', status]
+        ['#toolbar', toolbar], ['#entryMarkdown', input], ['#save', save], ['#print', print], ['#status', status]
     ]);
     const host = new Element('html-import');
     host.dataset = {...dataset};
@@ -264,6 +271,19 @@ async function editorFixture(context, {dataset = {}, layout = [], viewportEffect
         if (specifier === 'strong-type') return {default: Is};
         if (specifier.startsWith('../modules/MD.js')) return {default: Markdown};
         if (specifier === '../modules/ComponentContracts.js') return contracts;
+        if (specifier === '../modules/PrintView.js') {
+            return {
+                createPrintView(options) {
+                    return {
+                        async print() {
+                            if (options.signal.aborted) return false;
+                            printCalls.push({content: options.content(), title: options.title()});
+                            return true;
+                        }
+                    };
+                }
+            };
+        }
         if (specifier === 'arcane-os/logging') {
             return {arcaneLogging: {error(...values) {errors.push(values);}}};
         }
@@ -295,8 +315,8 @@ async function editorFixture(context, {dataset = {}, layout = [], viewportEffect
     context.after(function destroyEditorFixture() {host.destroy();});
 
     return {
-        host, editor, title, preview, toolbar, input, actions, status, save, document,
-        publications, errors, renders, frames, cancelledFrames, treeMoves,
+        host, editor, title, preview, toolbar, input, actions, status, save, print, document,
+        publications, errors, renders, frames, cancelledFrames, treeMoves, printCalls,
         get eventSourceDisposed() {return eventSourceDisposed;},
         flushFrames() {
             for (const [id, callback] of [...frames]) {
@@ -692,6 +712,61 @@ test('Markdown preview uses a nearby visible block for invisible or absorbed sou
         assert.equal(fixture.input.scrollTop, 320);
         assert.equal(fixture.renders.at(-1).raw, markdown);
     }
+});
+
+test('Markdown insertion replaces the current selection and emits the ordinary full change', async function markdownInsertion(context) {
+    const fixture = await editorFixture(context, {dataset: {followPreview: 'true'}, viewportEffects: true});
+    const {host, input} = fixture;
+    host.entryTitle = 'Octopus mural';
+    host.value = 'Before\nREPLACE\nAfter  ';
+    input.setSelectionRange(7, 14, 'backward');
+    input.scrollTop = 517;
+    input.scrollLeft = 11;
+    const inserted = '![Eight arms](saved-image.png)\n';
+    const changes = [];
+    host.configure({onChange(detail) {changes.push(detail);}});
+    assert.equal(host.insertMarkdown(inserted), true);
+    const expected = 'Before\n' + inserted + '\nAfter  ';
+    assert.equal(host.value, expected);
+    assert.equal(input.selectionStart, 7 + inserted.length);
+    assert.equal(input.selectionEnd, input.selectionStart);
+    assert.equal(input.scrollTop, 517);
+    assert.equal(input.scrollLeft, 11);
+    assert.deepEqual(changes, [{markdown: expected, title: 'Octopus mural'}]);
+    assert.equal(fixture.frames.size, 1);
+    assert.deepEqual(input.focusOptions, {preventScroll: true});
+    fixture.flushFrames();
+    assert.equal(fixture.renders.at(-1).raw, expected);
+    host.configure({readOnly: true});
+    assert.equal(host.insertMarkdown('ignored'), false);
+    assert.equal(host.value, expected);
+    host.destroy();
+    assert.equal(host.insertMarkdown('ignored'), false);
+});
+
+test('Markdown printing uses the current rendered body and complete title without saving', async function renderedPrintContract(context) {
+    const fixture = await editorFixture(context, {viewportEffects: true});
+    const {host, input, preview} = fixture;
+    const title = '  Octopus minutes: every arm accounted for  ';
+    const markdown = '# Complete minutes\n\n![Eight signatures](signatures.png)\n\nFinal motion.\n';
+    host.entryTitle = title;
+    fixture.edit(markdown);
+    input.scrollTop = 731;
+    input.scrollLeft = 12;
+    const selection = [input.selectionStart, input.selectionEnd, input.selectionDirection];
+    assert.equal(fixture.frames.size, 1);
+    assert.equal(await host.print(), true);
+    assert.equal(fixture.frames.size, 0);
+    assert.equal(fixture.renders.at(-1).raw, markdown);
+    assert.deepEqual(fixture.printCalls, [{content: preview, title}]);
+    assert.equal(input.scrollTop, 731);
+    assert.equal(input.scrollLeft, 12);
+    assert.deepEqual([input.selectionStart, input.selectionEnd, input.selectionDirection], selection);
+    assert.equal(host.value, markdown);
+    assert.equal(fixture.publications.some(function saved(event) {return event.type === 'markdown-editor-saved';}), false);
+    host.destroy();
+    assert.equal(await host.print(), false);
+    assert.equal(fixture.printCalls.length, 1);
 });
 
 test('Markdown edits cancel pending saves and destruction releases queued preview work', async function editorCleanup(context) {
