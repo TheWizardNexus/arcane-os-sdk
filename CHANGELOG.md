@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.46.0
+
+- Add public `decodeMarkdownMediaRecord` for complete stored image records or
+  JSON text without storage or network access. Preserve singleton record layers,
+  original content and explicit decoding errors; never select from multiple
+  records. File previews recognize declared image records in JSON-family files
+  while ordinary untyped/non-image JSON and application preview hooks keep their
+  existing presentation and precedence.
+- Preserve complete standalone IMG tags with multiline quoted descriptions
+  through the shared Markdown renderer and its original-source mapping. Native
+  HTML handling and literal Markdown examples keep their existing parsing;
+  stored Markdown is unchanged and requires no migration.
+- Use the existing light paper palette and 15mm page margins for rendered print
+  snapshots and direct shared-theme printing. Preserve full content, rendered
+  fonts, image pixels, SVG artwork, live screen preferences, cancellation and
+  resource ownership through afterprint. A dialog request is not proof of
+  physical printing or PDF completion.
+- Keep image destinations, export selection, model and credentials application
+  owned. No saved-data migration, model/provider/default change or app layout
+  change is introduced.
+
 ## 0.45.0
 
 - Add public MarkdownMedia save, read, reference parsing and hydration helpers.
