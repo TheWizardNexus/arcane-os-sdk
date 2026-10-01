@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.49.0
+
+- Queue complete TWiN Cloud/FAL synthesis jobs through credential readiness,
+  submission, remote completion and the complete audio response. Excess jobs
+  wait in order; cancellation removes waiting work before submission. Preserve
+  independent follow-up HTTP concurrency and dispatch cadence, full input,
+  caller cancellation and original-order playback.
+- Queue initial POST attempts and eligible retries with a shared HTTP 429
+  cooldown. Preserve the bounded readable-rejection retry and never replay an
+  ambiguous POST network, JSON or error-body failure. Existing provider factory,
+  compatibility alias and configuration remain supported.
+- Expose optional ordinary Kokoro `model.voices` display records through the
+  synchronous provider catalog without loading or fetching a model. Applications
+  own their selected inventory and previews; metadata does not limit synthesis
+  voices or claim playback availability. Existing artifact-graph voice paths
+  retain their meaning. No new dependency, saved-data migration or default
+  provider change; native browser TTS is a separate subsequent increment.
+
 ## 0.48.0
 
 - Add opt-in Chat `transcriptionMode='draft'` and public `appendDraft(text)`.
