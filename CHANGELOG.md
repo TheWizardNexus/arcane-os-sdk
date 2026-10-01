@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.48.0
+
+- Add opt-in Chat `transcriptionMode='draft'` and public `appendDraft(text)`.
+  Native recognition appears immediately in the editable composer; interim
+  replacement preserves typed text and user edits, and completion leaves manual
+  Send to the user. Existing consumers retain default completed-transcription
+  submission. Conversation language remains separate from recognition language.
+- Add native BCP47 `recognitionLanguage` in the visible shared speech status
+  area and cumulative `speech-transcription-progress` events. Preserve model
+  transcription wording, TTS controls, gesture-bound capture, final draining,
+  cancellation and provider ownership. Continuous voice shows canonical text,
+  queued finals and transient interim text together in its existing output;
+  durable text and ordered save/retry payloads remain unchanged.
+- Centralize direct-page and rendered-snapshot print styles in `print.css`,
+  with a light paper palette and one-inch page margins. Shared screen shells
+  expand into document flow only for print. Preserve rendered fonts, complete
+  images and SVG artwork, resource readiness and snapshot ownership through
+  `afterprint`.
+- Add public Chat `print()` and `printTitle`, using shared PrintView for the
+  complete rendered conversation without composer controls, transient thinking
+  or tool-inspection details. Preserve human-facing tool messages. A successful
+  method result means the browser print request began, not that paper or PDF
+  output completed. No saved-data migration or model/provider/default change.
+
 ## 0.47.0
 
 - Add explicitly selected native browser speech recognition through
