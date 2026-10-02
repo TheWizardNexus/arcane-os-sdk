@@ -160,6 +160,156 @@ test('native inspect load and request prepare silently while explicit play prese
     });
 });
 
+test(
+    'an application can select its current default from a late catalog without stale observer replay',
+    async function currentDefaultCatalog() {
+        await withNativeSpeech(
+            [],
+            async function inspectCurrentDefault({synthesis, createProvider}) {
+                const provider = createProvider();
+                let selections = 0;
+                provider.subscribeCatalog(
+                    function selectApplicationDefault(models) {
+                        selections += 1;
+                        const preferred = models[0].voices.find(
+                            function preferFrenchVoice(voice) {
+                                return voice.id === frenchVoice.voiceURI;
+                            }
+                        );
+                        if (preferred) provider.setDefaultVoice(preferred.id);
+                    }
+                );
+                const observedDefaults = [];
+                provider.subscribeCatalog(
+                    function receiveCurrentDefault(models) {
+                        observedDefaults.push(models[0].defaultVoice);
+                    }
+                );
+
+                synthesis.changeVoices(
+                    [englishVoice, frenchVoice]
+                );
+                assert.deepEqual(
+                    observedDefaults,
+                    [null, frenchVoice.voiceURI]
+                );
+                assert.equal(selections, 3);
+                assert.equal(provider.setDefaultVoice(frenchVoice.voiceURI), frenchVoice.voiceURI);
+                assert.equal(selections, 3);
+                assert.equal(provider.catalog()[0].defaultVoice, frenchVoice.voiceURI);
+                const selected = provider.prepare(
+                    {input: 'Bonjour, dragon.'}
+                );
+                const explicit = provider.prepare(
+                    {input: 'Hello, dragon.', voice: englishVoice.voiceURI}
+                );
+                assert.equal(selected.voice, frenchVoice.voiceURI);
+                assert.equal(explicit.voice, englishVoice.voiceURI);
+                assert.equal(provider.status().state, 'unloaded');
+                assert.equal(synthesis.spoken.length, 0);
+                assert.equal(synthesis.cancelCalls, 0);
+            }
+        );
+    }
+);
+
+test(
+    'default changes preserve prepared queued and active speech and apply to future requests',
+    async function currentDefaultPlayback() {
+        await withNativeSpeech(
+            [englishVoice, frenchVoice],
+            async function inspectDefaultPlayback({synthesis, createProvider}) {
+                const provider = createProvider(
+                    {defaultVoice: englishVoice.voiceURI}
+                );
+                await provider.load();
+                const prepared = provider.prepare(
+                    {input: 'The waiting dragon.'}
+                );
+                const active = provider.play(
+                    {input: 'The speaking dragon.'}
+                );
+                const queued = provider.play(
+                    {input: 'The patient dragon.'}
+                );
+                const before = provider.status();
+
+                assert.equal(provider.setDefaultVoice(frenchVoice.voiceURI), frenchVoice.voiceURI);
+                assert.deepEqual(provider.status(), before);
+                assert.equal(synthesis.current.voice, englishVoice);
+                assert.equal(queued.state, 'queued');
+                assert.equal(synthesis.cancelCalls, 0);
+                assert.equal(synthesis.pauseCalls, 0);
+                assert.equal(synthesis.resumeCalls, 0);
+                const stillPrepared = prepared.play();
+                const next = provider.play(
+                    {input: 'Le prochain dragon.'}
+                );
+                const explicit = provider.play(
+                    {input: 'The chosen dragon.', voice: englishVoice.voiceURI}
+                );
+                for (const [playback, voice] of [
+                    [active, englishVoice],
+                    [queued, englishVoice],
+                    [stillPrepared, englishVoice],
+                    [next, frenchVoice],
+                    [explicit, englishVoice]
+                ]) {
+                    assert.equal(synthesis.current.voice, voice);
+                    synthesis.finish();
+                    assert.equal(await playback.finished, true);
+                }
+
+                assert.equal(provider.setDefaultVoice(null), null);
+                const cleared = provider.prepare(
+                    {input: 'The browser default dragon.'}
+                );
+                assert.equal(cleared.voice, englishVoice.voiceURI);
+                assert.equal(provider.setDefaultVoice(''), null);
+                assert.equal(provider.setDefaultVoice(), null);
+                provider.setDefaultVoice('native:missing');
+                assert.equal(provider.catalog()[0].defaultVoice, 'native:missing');
+                assert.throws(
+                    function useUnavailableDefault() {
+                        provider.prepare(
+                            {input: 'The missing dragon.'}
+                        );
+                    },
+                    {code: 'ARCANE_AI_SPEECH_VOICE_UNAVAILABLE'}
+                );
+                const explicitWithMissingDefault = provider.prepare(
+                    {input: 'The explicit dragon.', voice: englishVoice.voiceURI}
+                );
+                assert.equal(explicitWithMissingDefault.voice, englishVoice.voiceURI);
+                assert.throws(
+                    function setMalformedDefault() {
+                        provider.setDefaultVoice(
+                            {}
+                        );
+                    },
+                    TypeError
+                );
+                const unloading = provider.unload();
+                assert.throws(
+                    function changeUnloadingDefault() {
+                        provider.setDefaultVoice('native:missing');
+                    },
+                    {code: 'ARCANE_AI_OPERATION_SUPERSEDED'}
+                );
+                await unloading;
+                assert.equal(provider.setDefaultVoice(englishVoice.voiceURI), englishVoice.voiceURI);
+                await provider.dispose();
+                assert.throws(
+                    function changeDisposedDefault() {
+                        provider.setDefaultVoice(englishVoice.voiceURI);
+                    },
+                    {code: 'ARCANE_AI_PROVIDER_DISPOSED'}
+                );
+            }
+        );
+    }
+);
+
 test('explicit preview works without activating automatic provider speech', async function independentPreview() {
     await withNativeSpeech([englishVoice], async function inspectPreview({synthesis, createProvider}) {
         const provider = createProvider();

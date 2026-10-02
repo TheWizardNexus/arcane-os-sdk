@@ -101,10 +101,11 @@ export function createBrowserSpeechSynthesisProvider({id, model, language} = {})
 
     const modelId = model.id;
     const modelName = model.name;
-    const defaultVoice = model.defaultVoice || null;
+    let defaultVoice = model.defaultVoice || null;
     const playbacks = new Set();
     const catalogObservers = new Set();
     let catalogSource = null;
+    let catalogRevision = 0;
     let state = 'unloaded';
     let generation = 0;
     let unloadOperation = null;
@@ -165,8 +166,25 @@ export function createBrowserSpeechSynthesisProvider({id, model, language} = {})
     }
 
     function publishCatalog() {
+        const revision = ++catalogRevision;
         const current = catalog();
-        for (const observer of catalogObservers) observeCallback(observer, current);
+        for (const observer of catalogObservers) {
+            // A catalog observer can select a new default and publish its replacement.
+            if (revision !== catalogRevision) return;
+            observeCallback(observer, current);
+        }
+    }
+
+    function setDefaultVoice(voice = null) {
+        assertOpen();
+        if (voice !== null && !is.string(voice)) {
+            throw new TypeError('Browser speech synthesis default voice must be a string.');
+        }
+        const nextVoice = voice || null;
+        if (defaultVoice === nextVoice) return defaultVoice;
+        defaultVoice = nextVoice;
+        publishCatalog();
+        return defaultVoice;
     }
 
     function detachCatalog() {
@@ -485,6 +503,7 @@ export function createBrowserSpeechSynthesisProvider({id, model, language} = {})
         maxConcurrentRequests: 1,
         catalog,
         subscribeCatalog,
+        setDefaultVoice,
         status,
         prepare,
         play(payload, options = {}) {

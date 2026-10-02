@@ -28,7 +28,10 @@ test('AI native speech preserves real completion, cancellation and buffered audi
     const arrivals = new Map();
     const synthesis = new EventTarget();
     synthesis.getVoices = function getVoices() {
-        return [{voiceURI: 'lunar-squid', name: 'Lunar Squid', lang: 'en-GB', default: true, localService: true}];
+        return [
+            {voiceURI: 'lunar-squid', name: 'Lunar Squid', lang: 'en-GB', default: true, localService: true},
+            {voiceURI: 'cosmic-gecko', name: 'Cosmic Gecko', lang: 'fr-FR', default: false, localService: false}
+        ];
     };
     synthesis.speak = function speak(utterance) {
         const index = utterances.push(utterance) - 1;
@@ -174,6 +177,31 @@ test('AI native speech preserves real completion, cancellation and buffered audi
         ai.stopAudio();
         await Promise.resolve();
         assert.equal(ai.isSpeaking, false);
+
+        synthesis.resume = function resumeNativeSpeech() {};
+        const originalDefault = await ai.prepareTTSPlayback(
+            {input: 'Keep the prepared squid.'}
+        );
+        provider.setDefaultVoice('cosmic-gecko');
+        const changedDefault = await ai.prepareTTSPlayback(
+            {input: 'Use the current gecko.'}
+        );
+        const explicitChoice = await ai.prepareTTSPlayback(
+            {input: 'Keep the chosen squid.', voice: 'lunar-squid'}
+        );
+        assert.equal(originalDefault.voice, 'lunar-squid');
+        assert.equal(changedDefault.voice, 'cosmic-gecko');
+        assert.equal(changedDefault.language, 'fr-FR');
+        assert.equal(explicitChoice.voice, 'lunar-squid');
+        const changedSpeech = ai.streamTTS(
+            'A newly selected gecko.',
+            true,
+            {waitForPlayback: true}
+        );
+        const gecko = await nextUtterance(7);
+        assert.equal(gecko.voice.voiceURI, 'cosmic-gecko');
+        gecko.onend();
+        assert.equal(await changedSpeech, true);
     } finally {
         try {
             ai?.stopAudio();

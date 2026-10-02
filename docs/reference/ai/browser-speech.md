@@ -113,16 +113,35 @@ function playIntroduction(input, voice) {
 `catalog()` synchronously returns an array of model records. Each model has
 `speech:{playback:'native'}` and `voices:[{id,name,lang,default,localService}]`;
 `id` is the exact native `voiceURI`. `subscribeCatalog(callback)` immediately
-replays that same shape and updates it on `voiceschanged`, returning an
-unsubscribe function. An initially empty inventory is ordinary pending browser
+replays that same shape and updates it on `voiceschanged` or a changed default,
+returning an unsubscribe function. An initially empty inventory is ordinary pending browser
 state. There is no polling, discovery utterance, model download, or page-load
 barrier. Language selectors derive their choices from this actual inventory.
+
+`provider.setDefaultVoice(voiceURI)` updates the provider's current
+`catalog()[0].defaultVoice` synchronously and returns that current value.
+The application may call it from its catalog subscription after asynchronous
+voice discovery or when its saved selection changes. The SDK supplies no
+voice-name preference: preserve an explicit saved choice in the application
+and pass the exact native `voiceURI`. Repeating the current value is a no-op,
+so a catalog subscription can apply the same choice without notification loops.
+`null`, an empty string, or an omitted argument clears the configured default
+and restores the existing browser-default behavior. A non-string, non-null
+value throws `TypeError`; an unloading or disposed provider retains its
+existing lifecycle error. A voice need not be present when setting the default:
+the existing preparation/playback availability behavior below still applies.
+
+Only future preparations use the new default. Explicit request voices and
+already-prepared, queued, or active speech keep their selected voice. Updating
+the default does not load, unload, replace, cancel, pause, resume, or speak.
+AI's ordinary speech path reads this current catalog for new requests, so no
+provider reconfiguration is necessary.
 
 `prepare({input,voice?,language?,speed?},{signal?})` returns an inert
 `{kind:'native-speech',input,voice,language,speed,play(options)}` descriptor.
 `play(payload,{signal,onState})` is the explicit-preview convenience. Both
-preserve complete input. Omitted voice uses the configured `model.defaultVoice`
-or the actual browser default; a supplied voice is never replaced with a named
+preserve complete input. Omitted voice uses the current default, initially
+`model.defaultVoice`, or the actual browser default; a supplied voice is never replaced with a named
 SDK alias. Language comes from that voice unless explicitly provided. Neither
 API reads the conversation's language preference. A saved voice waits for
 `voiceschanged` if the inventory is empty; a nonempty inventory missing it
