@@ -99,10 +99,17 @@
         display: none;
     }
 
+    .recognition_language_picker {
+        position: relative;
+        display: flex;
+        width: 18rem;
+        max-width: 100%;
+    }
+
     #recognitionLanguage {
         box-sizing: border-box;
-        width: 10rem;
-        max-width: 100%;
+        width: 100%;
+        min-width: 0;
         min-height: 2.25rem;
         padding: .35rem .5rem;
         border: 1px solid var(--arcane-border, var(--border-color));
@@ -110,6 +117,52 @@
         background: var(--arcane-surface, var(--background-color));
         color: var(--arcane-text, var(--text-color));
         font: inherit;
+    }
+
+    #recognitionLanguageToggle {
+        min-height: 2.25rem;
+        padding: .35rem .6rem;
+        background: var(--arcane-surface, var(--background-color));
+        color: var(--arcane-text, var(--text-color));
+    }
+
+    #recognitionLanguages {
+        position: absolute;
+        z-index: 1;
+        inset-inline: 0;
+        bottom: 100%;
+        max-height: 18rem;
+        overflow: auto;
+        border: 1px solid var(--arcane-border, var(--border-color));
+        border-radius: var(--arcane-radius-small, .4rem);
+        background: var(--arcane-surface, var(--background-color));
+        box-shadow: var(--arcane-shadow-small, 0 .25rem .8rem var(--shadow-color));
+    }
+
+    #recognitionLanguages button {
+        display: block;
+        width: 100%;
+        border: 0;
+        border-radius: 0;
+        background: var(--arcane-surface, var(--background-color));
+        color: var(--arcane-text, var(--text-color));
+        font-weight: normal;
+        text-align: start;
+        overflow-wrap: anywhere;
+        touch-action: pan-y;
+    }
+
+    #recognitionLanguages button[hidden] {
+        display: none;
+    }
+
+    #recognitionLanguages button[data-active="true"] {
+        outline: .2rem solid var(--arcane-focus, var(--focus-color));
+        outline-offset: -.2rem;
+    }
+
+    #recognitionLanguages button[aria-selected="true"] {
+        font-weight: 700;
     }
 
     .speech_status {
@@ -189,25 +242,28 @@
 <button id="sttActivationButton" type="button" hidden disabled>Start transcription</button>
 <button id="stopButton" type="button" class="hidden" disabled>Send</button>
 <div class="speech_feedback">
-    <label id="recognitionLanguageControl" class="recognition_language" hidden>
-        Recognition language
-        <input id="recognitionLanguage" type="text" list="recognitionLanguages" placeholder="Browser default" title="Recognition language tag, such as en-US or es-MX" autocomplete="off" spellcheck="false">
-        <datalist id="recognitionLanguages">
-            <option value="en-US">English (United States)</option>
-            <option value="en-GB">English (United Kingdom)</option>
-            <option value="es-MX">Spanish (Mexico)</option>
-            <option value="es-ES">Spanish (Spain)</option>
-            <option value="fr-FR">French</option>
-            <option value="de-DE">German</option>
-            <option value="it-IT">Italian</option>
-            <option value="pt-BR">Portuguese (Brazil)</option>
-            <option value="ja-JP">Japanese</option>
-            <option value="ko-KR">Korean</option>
-            <option value="zh-CN">Chinese (Mandarin, mainland China)</option>
-            <option value="hi-IN">Hindi</option>
-            <option value="ar-SA">Arabic (Saudi Arabia)</option>
-        </datalist>
-    </label>
+    <div id="recognitionLanguageControl" class="recognition_language" hidden>
+        <label for="recognitionLanguage">Recognition language</label>
+        <div class="recognition_language_picker">
+            <input id="recognitionLanguage" type="text" role="combobox" aria-controls="recognitionLanguages" aria-expanded="false" aria-autocomplete="list" aria-haspopup="listbox" placeholder="Browser default" title="Recognition language tag; type to filter suggestions or enter another BCP47 tag" autocomplete="off" spellcheck="false">
+            <button id="recognitionLanguageToggle" type="button" tabindex="-1" aria-label="Show all suggested recognition languages" aria-controls="recognitionLanguages" aria-expanded="false">▾</button>
+            <div id="recognitionLanguages" role="listbox" aria-label="Suggested recognition languages" hidden>
+                <button id="recognitionLanguage-en-US" type="button" role="option" data-language="en-US" tabindex="-1" lang="en-US" dir="auto">English (United States) — en-US</button>
+                <button id="recognitionLanguage-en-GB" type="button" role="option" data-language="en-GB" tabindex="-1" lang="en-GB" dir="auto">English (United Kingdom) — en-GB</button>
+                <button id="recognitionLanguage-es-MX" type="button" role="option" data-language="es-MX" tabindex="-1" lang="es-MX" dir="auto">Español (México) — es-MX</button>
+                <button id="recognitionLanguage-es-ES" type="button" role="option" data-language="es-ES" tabindex="-1" lang="es-ES" dir="auto">Español (España) — es-ES</button>
+                <button id="recognitionLanguage-fr-FR" type="button" role="option" data-language="fr-FR" tabindex="-1" lang="fr-FR" dir="auto">Français (France) — fr-FR</button>
+                <button id="recognitionLanguage-de-DE" type="button" role="option" data-language="de-DE" tabindex="-1" lang="de-DE" dir="auto">Deutsch (Deutschland) — de-DE</button>
+                <button id="recognitionLanguage-it-IT" type="button" role="option" data-language="it-IT" tabindex="-1" lang="it-IT" dir="auto">Italiano (Italia) — it-IT</button>
+                <button id="recognitionLanguage-pt-BR" type="button" role="option" data-language="pt-BR" tabindex="-1" lang="pt-BR" dir="auto">Português (Brasil) — pt-BR</button>
+                <button id="recognitionLanguage-ja-JP" type="button" role="option" data-language="ja-JP" tabindex="-1" lang="ja-JP" dir="auto">日本語（日本） — ja-JP</button>
+                <button id="recognitionLanguage-ko-KR" type="button" role="option" data-language="ko-KR" tabindex="-1" lang="ko-KR" dir="auto">한국어 (대한민국) — ko-KR</button>
+                <button id="recognitionLanguage-zh-CN" type="button" role="option" data-language="zh-CN" tabindex="-1" lang="zh-CN" dir="auto">中文（中国大陆，普通话） — zh-CN</button>
+                <button id="recognitionLanguage-hi-IN" type="button" role="option" data-language="hi-IN" tabindex="-1" lang="hi-IN" dir="auto">हिन्दी (भारत) — hi-IN</button>
+                <button id="recognitionLanguage-ar-SA" type="button" role="option" data-language="ar-SA" tabindex="-1" lang="ar-SA" dir="auto">العربية (المملكة العربية السعودية) — ar-SA</button>
+            </div>
+        </div>
+    </div>
     <p id="speechStatus" class="speech_status" role="status" aria-live="polite"></p>
     <progress
         id="sttActivationProgress"
@@ -281,6 +337,11 @@
     const speechStatus = shadowRoot.querySelector('#speechStatus');
     const recognitionLanguageControl = shadowRoot.querySelector('#recognitionLanguageControl');
     const recognitionLanguageInput = shadowRoot.querySelector('#recognitionLanguage');
+    const recognitionLanguageToggle = shadowRoot.querySelector('#recognitionLanguageToggle');
+    const recognitionLanguages = shadowRoot.querySelector('#recognitionLanguages');
+    const recognitionLanguageOptions = Array.from(
+        recognitionLanguages.querySelectorAll('[data-language]')
+    );
     const silenceDuration = 0;
     const runtimeStateAbortController = new AbortController();
 
@@ -319,6 +380,9 @@
         set: setRecognitionLanguage
     });
     recognitionLanguageInput.value = recognitionLanguage;
+    let recognitionLanguageInputValue = recognitionLanguage;
+    let activeRecognitionLanguageOption = null;
+    renderRecognitionLanguageOptions();
 
     function nextSpeechOperationId(kind) {
         eventOperationSequence += 1;
@@ -459,6 +523,16 @@
     stopButton.addEventListener('click', stop, lifecycleListenerOptions);
     muteButton.addEventListener('click', muteToggle, lifecycleListenerOptions);
     recognitionLanguageInput.addEventListener('input', updateRecognitionLanguage, lifecycleListenerOptions);
+    recognitionLanguageInput.addEventListener('focus', openRecognitionLanguages, lifecycleListenerOptions);
+    recognitionLanguageInput.addEventListener('click', openRecognitionLanguages, lifecycleListenerOptions);
+    recognitionLanguageInput.addEventListener('blur', closeRecognitionLanguages, lifecycleListenerOptions);
+    recognitionLanguageInput.addEventListener('keydown', handleRecognitionLanguageKeyDown, lifecycleListenerOptions);
+    recognitionLanguageToggle.addEventListener('pointerdown', retainRecognitionLanguageFocus, lifecycleListenerOptions);
+    recognitionLanguageToggle.addEventListener('click', toggleRecognitionLanguages, lifecycleListenerOptions);
+    for (const option of recognitionLanguageOptions) {
+        option.addEventListener('pointerdown', retainRecognitionLanguageFocus, lifecycleListenerOptions);
+        option.addEventListener('click', selectRecognitionLanguage, lifecycleListenerOptions);
+    }
     window.addEventListener('ai-ready', synchronizeAIReadiness, lifecycleListenerOptions);
     window.addEventListener(
         'pagehide',
@@ -556,10 +630,121 @@
         }
         recognitionLanguage = language;
         recognitionLanguageInput.value = language;
+        recognitionLanguageInputValue = language;
+        renderRecognitionLanguageOptions();
     }
 
     function updateRecognitionLanguage() {
-        host.recognitionLanguage = recognitionLanguageInput.value;
+        if (recognitionLanguageInput.disabled
+            || recognitionLanguageInput.value === recognitionLanguageInputValue) {
+            return;
+        }
+        recognitionLanguage = recognitionLanguageInput.value;
+        recognitionLanguageInputValue = recognitionLanguage;
+        openRecognitionLanguages();
+        renderRecognitionLanguageOptions(recognitionLanguage);
+    }
+
+    function renderRecognitionLanguageOptions(search = '') {
+        const query = search.toLocaleLowerCase();
+        activeRecognitionLanguageOption = null;
+        recognitionLanguageInput.removeAttribute('aria-activedescendant');
+        for (const option of recognitionLanguageOptions) {
+            option.hidden = !option.textContent.toLocaleLowerCase().includes(query);
+            option.dataset.active = 'false';
+            option.setAttribute('aria-selected', String(option.dataset.language === recognitionLanguage));
+        }
+    }
+
+    function openRecognitionLanguages() {
+        if (recognitionLanguageControl.hidden || recognitionLanguageInput.disabled
+            || !recognitionLanguages.hidden) {
+            return;
+        }
+        renderRecognitionLanguageOptions();
+        recognitionLanguages.hidden = false;
+        recognitionLanguageInput.setAttribute('aria-expanded', 'true');
+        recognitionLanguageToggle.setAttribute('aria-expanded', 'true');
+    }
+
+    function closeRecognitionLanguages() {
+        recognitionLanguages.hidden = true;
+        recognitionLanguageInput.setAttribute('aria-expanded', 'false');
+        recognitionLanguageToggle.setAttribute('aria-expanded', 'false');
+        recognitionLanguageInput.removeAttribute('aria-activedescendant');
+        activeRecognitionLanguageOption = null;
+    }
+
+    function retainRecognitionLanguageFocus(event) {
+        event.preventDefault();
+    }
+
+    function toggleRecognitionLanguages() {
+        if (recognitionLanguageInput.disabled) {
+            return;
+        }
+        const wasOpen = !recognitionLanguages.hidden;
+        recognitionLanguageInput.focus();
+        if (wasOpen) {
+            closeRecognitionLanguages();
+        } else {
+            openRecognitionLanguages();
+        }
+    }
+
+    function selectRecognitionLanguage(event) {
+        if (recognitionLanguageInput.disabled) {
+            return;
+        }
+        host.recognitionLanguage = event.currentTarget.dataset.language;
+        recognitionLanguageInput.focus();
+        closeRecognitionLanguages();
+    }
+
+    function handleRecognitionLanguageKeyDown(event) {
+        if (recognitionLanguageInput.disabled || event.isComposing) {
+            return;
+        }
+        if (event.key === 'Escape' || event.key === 'Tab') {
+            if (event.key === 'Escape' && !recognitionLanguages.hidden) {
+                event.preventDefault();
+            }
+            closeRecognitionLanguages();
+            return;
+        }
+        if (event.key === 'Enter' && !recognitionLanguages.hidden) {
+            event.preventDefault();
+            if (activeRecognitionLanguageOption) {
+                host.recognitionLanguage = activeRecognitionLanguageOption.dataset.language;
+            }
+            closeRecognitionLanguages();
+            return;
+        }
+        if (!['ArrowDown', 'ArrowUp'].includes(event.key)) {
+            return;
+        }
+        event.preventDefault();
+        openRecognitionLanguages();
+        const visibleOptions = recognitionLanguageOptions.filter(
+            function visibleRecognitionLanguage(option) {
+                return !option.hidden;
+            }
+        );
+        if (!visibleOptions.length) {
+            return;
+        }
+        const previousIndex = visibleOptions.indexOf(activeRecognitionLanguageOption);
+        const nextIndex = previousIndex < 0
+            ? (event.key === 'ArrowDown' ? 0 : visibleOptions.length - 1)
+            : (previousIndex + (event.key === 'ArrowDown' ? 1 : -1) + visibleOptions.length)
+                % visibleOptions.length;
+        if (activeRecognitionLanguageOption) {
+            activeRecognitionLanguageOption.dataset.active = 'false';
+        }
+        activeRecognitionLanguageOption = visibleOptions[nextIndex];
+        activeRecognitionLanguageOption.dataset.active = 'true';
+        recognitionLanguageInput.setAttribute('aria-activedescendant', activeRecognitionLanguageOption.id);
+        activeRecognitionLanguageOption.scrollIntoView({block: 'nearest'});
     }
 
     function updateMicrophoneAvailability(available) {
@@ -701,9 +886,14 @@
         recognitionLanguageControl.hidden = !transcriptionEnabled
             || !providerRuntime.supportsTranscriptionCapture();
         recognitionLanguageInput.disabled = destroyed
+            || recognitionLanguageControl.hidden
             || recordingRequested
             || Boolean(nativeCaptureSession)
             || transcriptionActive;
+        recognitionLanguageToggle.disabled = recognitionLanguageInput.disabled;
+        if (recognitionLanguageInput.disabled) {
+            closeRecognitionLanguages();
+        }
         if (!transcriptionEnabled) {
             recordButton.hidden = true;
             recordButton.disabled = true;

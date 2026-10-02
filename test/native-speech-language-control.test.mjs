@@ -9,6 +9,12 @@ const source = await readFile(
     new URL('../runtime/arcane/components/speech.html', import.meta.url),
     'utf8'
 );
+const languageSuggestions = Array.from(
+    source.matchAll(/<button id="recognitionLanguage-[^"]+"[^>]*data-language="([^"]+)"[^>]*>([^<]+)<\/button>/gu),
+    function languageSuggestion(match) {
+        return {tag: match[1], label: match[2]};
+    }
+);
 
 function sourceBetween(startMarker, endMarker) {
     const start = source.indexOf(startMarker);
@@ -37,12 +43,15 @@ function element() {
         dataset: {},
         attributes: {},
         classList: {remove() {}},
-        setAttribute(name, value) { this.attributes[name] = value; }
+        setAttribute(name, value) { this.attributes[name] = value; },
+        removeAttribute(name) { delete this.attributes[name]; },
+        focus() {},
+        scrollIntoView(options) { this.scrollOptions = options; }
     };
 }
 
 const createSpeechFixture = Function(
-    'settings', 'deferred', 'element',
+    'settings', 'deferred', 'element', 'languageSuggestions',
     `'use strict';
     const is = {
         string(value) { return typeof value === 'string'; },
@@ -59,6 +68,21 @@ const createSpeechFixture = Function(
     const navigator = {language: settings.browserLanguage ?? 'en-US'};
     const recognitionLanguageControl = element();
     const recognitionLanguageInput = element();
+    const recognitionLanguageToggle = element();
+    const recognitionLanguages = {...element(), hidden: true};
+    const recognitionLanguageOptions = languageSuggestions.map(
+        function languageOption(suggestion) {
+            return {
+                ...element(),
+                id: 'recognitionLanguage-' + suggestion.tag,
+                textContent: suggestion.label,
+                dataset: {language: suggestion.tag}
+            };
+        }
+    );
+    recognitionLanguageInput.focus = function focusLanguageInput() {
+        openRecognitionLanguages();
+    };
     const speechStatus = element();
     const recordButton = element();
     const stopButton = element();
@@ -149,6 +173,26 @@ const createSpeechFixture = Function(
         host, captures, publications, errors, mutedConfiguration,
         input: recognitionLanguageInput,
         control: recognitionLanguageControl,
+        suggestions: recognitionLanguageOptions,
+        list: recognitionLanguages,
+        toggle: recognitionLanguageToggle,
+        openLanguages: openRecognitionLanguages,
+        closeLanguages: closeRecognitionLanguages,
+        toggleLanguages: toggleRecognitionLanguages,
+        selectLanguage(tag) {
+            const option = recognitionLanguageOptions.find(
+                function matchingLanguage(candidate) { return candidate.dataset.language === tag; }
+            );
+            selectRecognitionLanguage({currentTarget: option});
+        },
+        languageKey(key, isComposing = false) {
+            const event = {
+                key, isComposing, prevented: false,
+                preventDefault() { this.prevented = true; }
+            };
+            handleRecognitionLanguageKeyDown(event);
+            return event;
+        },
         status: speechStatus,
         muteButton,
         activationButton: sttActivationButton,
@@ -178,7 +222,15 @@ const createSpeechFixture = Function(
 );
 
 function speechFixture(settings = {}) {
-    return createSpeechFixture(settings, deferred, element);
+    return createSpeechFixture(settings, deferred, element, languageSuggestions);
+}
+
+function visibleLanguages(fixture) {
+    return fixture.suggestions.filter(function visibleLanguage(option) {
+        return !option.hidden;
+    }).map(function languageTag(option) {
+        return option.dataset.language;
+    });
 }
 
 function eventsOf(fixture, type) {
@@ -189,14 +241,108 @@ function eventsOf(fixture, type) {
 
 test('native recognition language is an editable suggested control inside speech feedback', function languageMarkup() {
     const feedback = sourceBetween('<div class="speech_feedback">', '<button id="muteButton"');
-    assert.match(feedback, /<label id="recognitionLanguageControl"[^>]*>\s*Recognition language/u);
-    assert.match(feedback, /<input id="recognitionLanguage" type="text" list="recognitionLanguages"/u);
-    assert.match(feedback, /<datalist id="recognitionLanguages">/u);
-    assert.match(feedback, /<option value="en-US">English/u);
-    assert.match(feedback, /<option value="es-MX">Spanish/u);
+    assert.match(feedback, /<label for="recognitionLanguage">Recognition language<\/label>/u);
+    assert.match(feedback, /<input id="recognitionLanguage" type="text" role="combobox"/u);
+    assert.match(feedback, /id="recognitionLanguages" role="listbox" aria-label="Suggested recognition languages"/u);
+    assert.deepEqual(languageSuggestions.map(function suggestionTag(option) { return option.tag; }), [
+        'en-US', 'en-GB', 'es-MX', 'es-ES', 'fr-FR', 'de-DE', 'it-IT',
+        'pt-BR', 'ja-JP', 'ko-KR', 'zh-CN', 'hi-IN', 'ar-SA'
+    ]);
+    assert.ok(languageSuggestions.some(function nativeSpanish(option) {
+        return option.tag === 'es-MX' && option.label === 'Español (México) — es-MX';
+    }));
+    assert.ok(languageSuggestions.some(function nativeJapanese(option) {
+        return option.tag === 'ja-JP' && option.label === '日本語（日本） — ja-JP';
+    }));
     assert.match(feedback, /<p id="speechStatus"[^>]*role="status"[^>]*aria-live="polite"/u);
     assert.match(feedback, /id="sttActivationProgress"/u);
     assert.match(source, /recognitionLanguageInput\.addEventListener\('input', updateRecognitionLanguage, lifecycleListenerOptions\)/u);
+    assert.match(source, /recognitionLanguageInput\.addEventListener\('blur', closeRecognitionLanguages, lifecycleListenerOptions\)/u);
+});
+
+test('saved values, unchanged input events, reopen and selection show the full suggestion list', function languageSuggestionOpening() {
+    const fixture = speechFixture({host: {recognitionLanguage: 'es-MX'}});
+    const all = languageSuggestions.map(function tag(option) { return option.tag; });
+    assert.equal(fixture.list.hidden, true);
+    fixture.openLanguages();
+    assert.deepEqual(visibleLanguages(fixture), all);
+    fixture.inputLanguage('es-MX');
+    assert.deepEqual(visibleLanguages(fixture), all);
+    fixture.inputLanguage('es');
+    assert.deepEqual(visibleLanguages(fixture), ['en-US', 'es-MX', 'es-ES']);
+    fixture.closeLanguages();
+    fixture.openLanguages();
+    assert.deepEqual(visibleLanguages(fixture), all);
+    assert.equal(fixture.input.value, 'es');
+    fixture.selectLanguage('ja-JP');
+    assert.equal(fixture.host.recognitionLanguage, 'ja-JP');
+    assert.equal(fixture.input.value, 'ja-JP');
+    assert.equal(fixture.list.hidden, true);
+    fixture.openLanguages();
+    assert.deepEqual(visibleLanguages(fixture), all);
+    fixture.inputLanguage('Español');
+    assert.deepEqual(visibleLanguages(fixture), ['es-MX', 'es-ES']);
+    fixture.configure({recognitionLanguage: 'pt-BR'});
+    assert.deepEqual(visibleLanguages(fixture), all);
+    assert.equal(fixture.input.attributes['aria-activedescendant'], undefined);
+    assert.equal(fixture.suggestions.find(function brazil(option) {
+        return option.dataset.language === 'pt-BR';
+    }).attributes['aria-selected'], 'true');
+});
+
+test('language keyboard navigation preserves custom text and exact tags', function languageKeyboard() {
+    const fixture = speechFixture();
+    assert.equal(fixture.languageKey('ArrowUp').prevented, true);
+    assert.equal(fixture.input.attributes['aria-expanded'], 'true');
+    assert.equal(fixture.input.attributes['aria-activedescendant'], 'recognitionLanguage-ar-SA');
+    assert.equal(fixture.languageKey('Enter').prevented, true);
+    assert.equal(fixture.host.recognitionLanguage, 'ar-SA');
+    assert.equal(fixture.list.hidden, true);
+    fixture.inputLanguage('Français');
+    fixture.languageKey('ArrowDown');
+    fixture.languageKey('Enter');
+    assert.equal(fixture.host.recognitionLanguage, 'fr-FR');
+    fixture.inputLanguage('  zh-Hant-TW  ');
+    assert.deepEqual(visibleLanguages(fixture), []);
+    fixture.languageKey('ArrowDown');
+    fixture.languageKey('Enter');
+    assert.equal(fixture.host.recognitionLanguage, '  zh-Hant-TW  ');
+    fixture.openLanguages();
+    assert.equal(fixture.languageKey('Escape').prevented, true);
+    assert.equal(fixture.list.hidden, true);
+    fixture.openLanguages();
+    assert.equal(fixture.languageKey('Tab').prevented, false);
+    assert.equal(fixture.list.hidden, true);
+    fixture.toggleLanguages();
+    assert.equal(fixture.list.hidden, false);
+    fixture.toggleLanguages();
+    assert.equal(fixture.list.hidden, true);
+    assert.equal(fixture.languageKey('ArrowDown', true).prevented, false);
+    assert.equal(fixture.list.hidden, true);
+});
+
+test('language picker closes and becomes inoperative outside desktop live transcription', function languageVisibility() {
+    const fixture = speechFixture();
+    fixture.openLanguages();
+    fixture.setPresentation({liveCapture: false});
+    assert.equal(fixture.control.hidden, true);
+    assert.equal(fixture.input.disabled, true);
+    assert.equal(fixture.toggle.disabled, true);
+    assert.equal(fixture.list.hidden, true);
+    fixture.openLanguages();
+    fixture.inputLanguage('fr-FR');
+    assert.equal(fixture.host.recognitionLanguage, 'en-US');
+    assert.equal(fixture.list.hidden, true);
+    fixture.setPresentation({liveCapture: true});
+    assert.equal(fixture.input.disabled, false);
+    fixture.setPresentation({destroyed: true});
+    assert.equal(fixture.input.disabled, true);
+    assert.equal(fixture.list.hidden, true);
+    const mobile = speechFixture({mobile: true});
+    assert.equal(mobile.control.hidden, true);
+    assert.equal(mobile.input.disabled, true);
+    mobile.toggleLanguages();
+    assert.equal(mobile.list.hidden, true);
 });
 
 test('recognition language preserves app hydration and stays separate from conversation language', function languageProperty() {

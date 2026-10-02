@@ -1682,8 +1682,19 @@ On desktop native capture, an accessible editable BCP47 language control occupie
 the feedback area instead of idle transcription/voice readiness boilerplate.
 `recognitionLanguage` defaults to `navigator.language`, accepts an explicit
 language tag without restricting it to the suggested choices, and is passed to
-the capture owner at start. The control is disabled during active capture so
-changes affect the next capture. Native voice loading, errors, and speaking
+the capture owner at start. Opening or reopening the editable picker shows all
+suggestions regardless of its saved/current value. Filtering begins only after
+the user changes the input text; initialization, programmatic configuration,
+and choosing a suggestion leave the full list available on the next opening.
+Suggestions display their native language and region names alongside the exact
+BCP47 tags; they are suggestions, not an exhaustive provider support inventory.
+The selected or freely typed tag remains unchanged. Arrow keys navigate the
+suggestions, Enter chooses the active suggestion, and Escape or Tab closes the
+list. The picker is visible and enabled only for desktop live-transcription
+mode, including before recording begins. It is disabled during active capture
+so changes affect the next capture; leaving live-transcription mode closes and
+disables it. File/model transcription and conversation-language configuration
+remain separate. Native voice loading, errors, and speaking
 remain visible. Model-based transcription retains its existing status, and
 mobile speech retains its existing voice-output-only presentation.
 
