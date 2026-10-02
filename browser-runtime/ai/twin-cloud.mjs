@@ -3,6 +3,7 @@ import {arcaneLogging} from '../logging.mjs';
 
 const is = new Is(false);
 const twinChatURL = 'https://inference.do-ai.run/v1/chat/completions';
+const twinSystemOneURL = 'https://inference.do-ai.run/v1/systemone';
 
 /** A stateless TWiN request; browser AI shares the HTTP and format owners below. */
 export async function fetchRequest({
@@ -67,6 +68,72 @@ export async function fetchRequest({
                     Authorization:`Bearer ${twinKey}`
                 },
                 body:JSON.stringify(request),
+                ...(signal ? {signal} : {})
+            },
+            {onRetry}
+        );
+        if(signal?.aborted){
+            throw normalizeAIRequestAbort(signal.reason);
+        }
+        await onResponse(response, id, false);
+        if(signal?.aborted){
+            throw normalizeAIRequestAbort(signal.reason);
+        }
+        return response;
+    }catch(error){
+        if(isAIRequestAbort(error, signal)){
+            throw normalizeAIRequestAbort(error);
+        }
+        throw error;
+    }
+}
+
+/** Submit caller-owned state and questions without interpreting the provider's answers. */
+export async function fetchSystemOneRequest({
+    twinKey,
+    model,
+    state,
+    questions,
+    signal = null,
+    id = Date.now(),
+    onRequest = function observeSystemOneRequest(){},
+    onResponse = function observeSystemOneResponse(){},
+    onRetry = null
+} = {}){
+    if(signal?.aborted){
+        throw normalizeAIRequestAbort(signal.reason);
+    }
+    if(!is.string(twinKey) || !twinKey){
+        const error = new Error('AI provider is not configured.');
+        error.code = 'AI_PROVIDER_NOT_CONFIGURED';
+        throw error;
+    }
+    if(!is.string(model) || !model){
+        throw new TypeError('TWiN fetchSystemOneRequest requires an explicit model.');
+    }
+
+    const request = {model, state, questions};
+    // Capture the caller's complete payload before a diagnostic observer runs.
+    const body = JSON.stringify(request);
+    try{
+        await onRequest(
+            request,
+            id,
+            {operation:'systemone', transport:'http', destination:twinSystemOneURL}
+        );
+        if(signal?.aborted){
+            throw normalizeAIRequestAbort(signal.reason);
+        }
+        const response = await fetchJSONResponse(
+            twinSystemOneURL,
+            {
+                method:'POST',
+                credentials:'omit',
+                headers:{
+                    'Content-Type':'application/json',
+                    Authorization:`Bearer ${twinKey}`
+                },
+                body,
                 ...(signal ? {signal} : {})
             },
             {onRetry}

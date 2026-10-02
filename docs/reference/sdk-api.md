@@ -123,6 +123,7 @@ browser map are cataloged separately in [Runtime modules](runtime-modules.md).
 | Member | Kind | Import | Group | Availability |
 | --- | --- | --- | --- | --- |
 | `fetchRequest()` | function | `arcane-os/ai/twin-cloud` | TWiN Cloud requests | Node and Browser; remote HTTPS provider |
+| `fetchSystemOneRequest()` | function | `arcane-os/ai/twin-cloud` | TWiN Cloud state-and-questions requests | Node and Browser; remote HTTPS provider |
 | `fetchHTTPResponse()` | function | `arcane-os/ai/twin-cloud` | Shared AI transport integration | Node and Browser |
 | `fetchJSONResponse()` | function | `arcane-os/ai/twin-cloud` | Shared AI transport integration | Node and Browser |
 | `structuredOutputFormat()` | function | `arcane-os/ai/twin-cloud` | Shared AI transport integration | Node and Browser |
@@ -7952,6 +7953,59 @@ console.log(response);
 
 `server-config.json` is an application-owned, ignored configuration file;
 never commit its key or print it in diagnostics. The SDK does not read it.
+
+## fetchSystemOneRequest()
+
+### Overview
+
+Sends one native TWiN System One request with caller-owned credentials, model,
+state, and questions. Question definitions, scales, model selection, and answer
+interpretation remain application responsibilities.
+
+### Signature and result
+
+```text
+async fetchSystemOneRequest({twinKey,model,state,questions,signal=null,id=Date.now(),onRequest,onResponse,onRetry=null}={})
+```
+
+Import the named function from `arcane-os/ai/twin-cloud`. It posts
+`{model,state,questions}` to `https://inference.do-ai.run/v1/systemone` and
+returns the entire parsed provider JSON. It adds no chat messages, tools,
+scoring rules, or output limit. Payload content is preserved within ordinary
+JSON transport encoding; serialization occurs before the diagnostic callback.
+
+`onRequest(request,id,metadata)` receives the complete payload before dispatch,
+with `{operation:'systemone',transport:'http',destination:'https://inference.do-ai.run/v1/systemone'}`
+as metadata. `onResponse(response,id,false)` receives the entire parsed result
+before return. Both callbacks are awaited and failures propagate. The key is
+used only for transport authentication, outside the diagnostic payloads.
+
+### Availability and normalization
+
+**Node and Browser; Cloud transport.** Uses the existing `fetchJSONResponse`
+owner for complete errors, retries, `onRetry`, and `signal` cancellation, with
+no browser singleton, profile, storage, or retained history. A missing key uses
+`AI_PROVIDER_NOT_CONFIGURED`; a missing explicit model throws `TypeError`.
+Cancellation prevents successful return and uses `ARCANE_AI_REQUEST_ABORTED`,
+including checks after callback settlement. Import starts no request.
+
+### Example
+
+```javascript
+import {fetchSystemOneRequest} from 'arcane-os/ai/twin-cloud';
+
+const response = await fetchSystemOneRequest({
+    twinKey: applicationRuntime.twinKey,
+    model: 'typesafe-jev-1.13.0',
+    state: applicationState,
+    questions: applicationQuestions
+});
+```
+
+The runtime configuration, state, and questions in this example belong to the
+application. The JEV identifier is an explicit caller choice, not a default.
+See [TWiN Cloud](ai/twin-cloud.md#evaluate-caller-owned-state-with-system-one)
+for the complete transport and callback contract.
 
 ## fetchHTTPResponse()
 

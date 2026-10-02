@@ -116,11 +116,72 @@ managed import map. Browser Fetch and CORS behavior still apply. Importing it
 does not instantiate `AI`, read saved preferences, configure speech, or change
 the existing `arcane-os/ai` browser entry.
 
+## Evaluate caller-owned state with System One
+
+Use the named `fetchSystemOneRequest` export for the provider's native
+state-and-questions operation. The application supplies the model and complete
+provider-compatible `state` and `questions`; the SDK selects no model or scoring
+policy and assigns no meaning to questions, answer keys, or scales.
+
+```javascript
+import {fetchSystemOneRequest} from 'arcane-os/ai/twin-cloud';
+
+const response = await fetchSystemOneRequest({
+    twinKey: applicationRuntime.twinKey,
+    model: 'typesafe-jev-1.13.0',
+    state: applicationState,
+    questions: applicationQuestions,
+    signal: controller.signal
+});
+```
+
+`applicationRuntime`, `applicationState`, `applicationQuestions`, and
+`controller` are supplied by the application. The example's JEV identifier is
+an explicit caller selection, not an SDK default. For OSS chat-completion models
+such as `openai-gpt-oss-120b` and `openai-gpt-oss-20b`, use `fetchRequest` with
+caller-owned messages and structured-output settings instead. The application
+chooses the operation matching its model's provider contract.
+
+```javascript
+fetchSystemOneRequest({
+    twinKey,
+    model,
+    state,
+    questions,
+    signal,
+    id,
+    onRequest,
+    onResponse,
+    onRetry
+})
+// Promise<complete parsed provider JSON>
+```
+
+The SDK posts exactly `{model,state,questions}` as JSON to
+`https://inference.do-ai.run/v1/systemone`, using `twinKey` only as bearer
+authentication. It adds no prompt, chat envelope, tool call, output limit, or
+answer conversion. Caller content stays unchanged within ordinary JSON
+transport encoding. The request is serialized before `onRequest`, so that
+diagnostic callback cannot rewrite the dispatched payload. The entire parsed
+provider JSON reaches `onResponse` and the returned promise without selecting
+or transforming answers.
+
+The explicit key/model requirements, optional `signal`, `id`, callbacks,
+retry observer, complete errors, and lack of retained history follow the shared
+request behavior above. `onRequest(request,id,metadata)` receives
+`{operation:'systemone',transport:'http',destination:'https://inference.do-ai.run/v1/systemone'}`
+as metadata. `onResponse(response,id,false)` receives the complete parsed
+response. Both callbacks are awaited; failures propagate and cancellation is
+checked again after they settle. The existing `fetchJSONResponse` owner
+provides the same HTTP retries and cancellation for this operation; no separate
+transport or retry loop is created.
+
 ### Shared low-level integration helpers
 
 The same module also exports the helpers used by browser `AI.js`. Ordinary
-callers use `fetchRequest`; these exports let SDK transport integration share
-the existing implementation rather than maintain another retry or body reader.
+callers use `fetchRequest` or `fetchSystemOneRequest`; these exports let SDK
+transport integration share the existing implementation rather than maintain
+another retry or body reader.
 
 | Export | Contract |
 | --- | --- |

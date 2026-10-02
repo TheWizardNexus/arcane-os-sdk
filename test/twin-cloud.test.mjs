@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from '../src/testing.mjs';
-import {fetchRequest} from '../browser-runtime/ai/twin-cloud.mjs';
+import {fetchRequest, fetchSystemOneRequest} from '../browser-runtime/ai/twin-cloud.mjs';
 
 const destination = 'https://inference.do-ai.run/v1/chat/completions';
 const twinKey = 'synthetic-twin-fixture-key';
@@ -84,6 +84,140 @@ function requestAborted(error) {
     assert.equal(error.name, 'AbortError');
     return true;
 }
+
+test(
+    'TWiN System One preserves caller state, questions and the complete native response',
+    async function completeSystemOneRequest(context) {
+        const state = {document: '  The moon-powered toaster launched every croissant.\n  '};
+        const questions = {launch: {description: '  Caller-owned question.\n', choices: {'0': 'Grounded', '4': 'In orbit'}}};
+        const selectedModel = 'typesafe-jev-1.13.0';
+        const payload = JSON.stringify({model: selectedModel, state, questions});
+        const parsed = {answers: {launch: '4'}, extension: {detail: '  Complete native result.\n'}};
+        const events = [];
+        const controller = new AbortController();
+        const fixture = runtimeFixture(
+            context,
+            async function answerSystemOne() {
+                events.push('fetch');
+                return response(200, parsed);
+            }
+        );
+        const result = await fetchSystemOneRequest(
+            {
+                twinKey,
+                model: selectedModel,
+                state,
+                questions,
+                signal: controller.signal,
+                id: 'caller-evaluation',
+                async onRequest(request, id, metadata) {
+                    assert.equal(request.state, state);
+                    assert.equal(request.questions, questions);
+                    assert.equal(id, 'caller-evaluation');
+                    assert.deepEqual(
+                        metadata,
+                        {operation: 'systemone', transport: 'http', destination: 'https://inference.do-ai.run/v1/systemone'}
+                    );
+                    assert.equal(Object.hasOwn(request, 'twinKey'), false);
+                    events.push('request');
+                    request.state = {document: 'An observer cannot rewrite the submitted content.'};
+                },
+                async onResponse(value, id, streaming) {
+                    assert.equal(value, parsed);
+                    assert.equal(id, 'caller-evaluation');
+                    assert.equal(streaming, false);
+                    events.push('response');
+                }
+            }
+        );
+        assert.equal(result, parsed);
+        assert.deepEqual(events, ['request', 'fetch', 'response']);
+        assert.equal(fixture.requests.length, 1);
+        const sent = fixture.requests[0];
+        assert.equal(sent.url, 'https://inference.do-ai.run/v1/systemone');
+        assert.equal(sent.options.method, 'POST');
+        assert.equal(sent.options.credentials, 'omit');
+        assert.equal(sent.options.signal, controller.signal);
+        assert.equal(sent.options.body, payload);
+        assert.equal(new Headers(sent.options.headers).get('Authorization'), `Bearer ${twinKey}`);
+        assert.equal(new Headers(sent.options.headers).get('Content-Type'), 'application/json');
+    }
+);
+
+test(
+    'TWiN System One shares transport retries and complete provider failures',
+    async function retrySystemOneRequest(context) {
+        const failure = {error: {message: 'Synthetic provider failure'}, details: ['Full original diagnostic.']};
+        const observations = [];
+        let attempts = 0;
+        const fixture = runtimeFixture(
+            context,
+            async function failSystemOne() {
+                attempts += 1;
+                return response(attempts === 1 ? 529 : 400, failure);
+            }
+        );
+        await assert.rejects(
+            fetchSystemOneRequest(
+                {
+                    twinKey,
+                    model: 'caller-selected-system-one-model',
+                    state: {source: '  Complete original source.\n'},
+                    questions: {caller: ['All', 'questions']},
+                    onRetry(observation) {
+                        observations.push(observation);
+                    }
+                }
+            ),
+            function originalSystemOneFailure(error) {
+                assert.equal(error, failure);
+                return true;
+            }
+        );
+        assert.equal(fixture.requests.length, 2);
+        assert.equal(fixture.requests[1].options, fixture.requests[0].options);
+        assert.deepEqual(fixture.delays, [3000]);
+        assert.deepEqual(
+            observations.map(function retryPhase(observation) {return observation.phase;}),
+            ['waiting', 'requesting']
+        );
+        for (const observation of observations) {
+            assert.equal(observation.error, failure);
+            assert.equal(observation.status, 529);
+        }
+    }
+);
+
+test(
+    'TWiN System One requires explicit credentials and model and respects callback cancellation',
+    async function cancelledSystemOneRequest(context) {
+        const fixture = runtimeFixture(
+            context,
+            async function unusedSystemOneFetch() {
+                throw new Error('Cancelled or unconfigured System One requests must not dispatch.');
+            }
+        );
+        await assert.rejects(fetchSystemOneRequest({model}), {code: 'AI_PROVIDER_NOT_CONFIGURED'});
+        await assert.rejects(fetchSystemOneRequest({twinKey}), TypeError);
+        const controller = new AbortController();
+        await assert.rejects(
+            fetchSystemOneRequest(
+                {
+                    twinKey,
+                    model,
+                    state: {},
+                    questions: {},
+                    signal: controller.signal,
+                    async onRequest() {
+                        controller.abort('Caller cancelled the evaluation.');
+                    }
+                }
+            ),
+            requestAborted
+        );
+        assert.equal(fixture.requests.length, 0);
+    }
+);
 
 test(
     'Node TWiN fetch preserves explicit model, complete request and structured multi-choice response',

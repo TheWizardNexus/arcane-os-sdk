@@ -6,7 +6,7 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 219,
+  "memberCount": 220,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
@@ -3451,6 +3451,20 @@
       "availability": "Node and Browser; remote HTTPS provider",
       "protocol": "TWiN Cloud complete-response chat",
       "normalization": "Preserves complete messages and parsed provider JSON; maps explicit structured-output, tool, and reasoning options; shares overload-only HTTP 429 retry after 3000 ms and cancellation; retains no browser profile, storage, or request history"
+    },
+    {
+      "id": "twin-cloud:fetchSystemOneRequest",
+      "name": "fetchSystemOneRequest",
+      "displayName": "fetchSystemOneRequest()",
+      "kind": "function",
+      "signature": "async fetchSystemOneRequest({twinKey,model,state,questions,signal=null,id=Date.now(),onRequest,onResponse,onRetry=null}={})",
+      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "primaryImport": "arcane-os/ai/twin-cloud",
+      "group": "TWiN Cloud state-and-questions requests",
+      "summary": "Sends caller-owned model, state, and questions to the native System One endpoint with explicit credentials.",
+      "availability": "Node and Browser; remote HTTPS provider",
+      "protocol": "TWiN Cloud native System One request",
+      "normalization": "Preserves complete state and questions within JSON transport and returns the full parsed provider result; shares existing JSON transport retry, diagnostics, and cancellation; leaves model choice, scales, and answer interpretation with the caller and retains no history"
     },
     {
       "id": "twin-cloud:fetchHTTPResponse",
