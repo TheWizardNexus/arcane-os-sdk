@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.51.0
+
+- Add synchronous native speech `provider.setDefaultVoice(voiceURI|null)`.
+  Update the live catalog and future preparations without replacing the
+  provider or altering explicit voices and prepared, queued or active speech.
+  Catalog subscriptions can apply an application-owned choice after voice
+  discovery; repeated values are silent and reentrant changes avoid stale
+  catalog delivery. Voice preference policy remains application-owned.
+- Add `fetchSystemOneRequest` through `arcane-os/ai/twin-cloud` for explicit
+  model, complete caller-owned state and questions, and the complete native
+  System One response. Reuse the existing JSON transport, retry observers,
+  diagnostics and cancellation. Applications retain question definitions,
+  scoring policy, model selection and answer interpretation; no history,
+  fabricated tool calls, prompt conversion or new dependency is introduced.
+- Keep all native recognition-language suggestions visible when the editable
+  picker opens or reopens. Filter only after text changes, show native language
+  and region labels, preserve exact custom BCP47 tags, and keep keyboard and
+  focus interaction in the shared speech control. The picker is available in
+  live-transcription mode before capture and disabled during capture or outside
+  that mode. Conversation language, Chat controls and capture payloads remain
+  unchanged.
+
 ## 0.50.0
 
 - Add `createBrowserSpeechSynthesisProvider` through `arcane-os/ai/browser-speech`.
