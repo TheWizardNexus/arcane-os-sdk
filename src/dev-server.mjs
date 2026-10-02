@@ -1,5 +1,6 @@
 import Is from 'strong-type';
 import {Server} from 'node-http-server';
+import contentTypes from 'node-http-server/mime-types';
 import {constants as FS_CONSTANTS} from 'node:fs';
 import {lstat,open,readFile,readdir,realpath} from 'node:fs/promises';
 import https from 'node:https';
@@ -19,26 +20,6 @@ import {createPwaArtifacts,selectPwaFiles} from './pwa.mjs';
 
 const is = new Is(false);
 
-const MIME_TYPES=new Map([
-    ['.css','text/css; charset=utf-8'],
-    ['.gif','image/gif'],
-    ['.html','text/html; charset=utf-8'],
-    ['.htm','text/html; charset=utf-8'],
-    ['.ico','image/x-icon'],
-    ['.jpeg','image/jpeg'],
-    ['.jpg','image/jpeg'],
-    ['.js','text/javascript; charset=utf-8'],
-    ['.json','application/json; charset=utf-8'],
-    ['.mjs','text/javascript; charset=utf-8'],
-    ['.png','image/png'],
-    ['.svg','image/svg+xml; charset=utf-8'],
-    ['.txt','text/plain; charset=utf-8'],
-    ['.wasm','application/wasm'],
-    ['.webmanifest','application/manifest+json; charset=utf-8'],
-    ['.webp','image/webp'],
-    ['.woff','font/woff'],
-    ['.woff2','font/woff2']
-]);
 const READ_ONLY_NO_FOLLOW=FS_CONSTANTS.O_RDONLY|(FS_CONSTANTS.O_NOFOLLOW??0);
 const PRIVATE_SOURCE_SEGMENTS=new Set([
     'arcane-app.json','arcane-package.json','test','tests','scripts','node_modules','dist','local'
@@ -366,7 +347,7 @@ async function serveSourceFile(fileServer, request, response, opened, {
         response,
         {
             lastModified,
-            contentType: MIME_TYPES.get(extension) || 'application/octet-stream',
+            contentType: contentTypes[extension.substring(1)] || 'application/octet-stream',
             body: async function createSourceRepresentation() {
                 let content = opened.content ?? await readFile(opened.candidate);
                 if (rewrite) {
@@ -1187,7 +1168,7 @@ async function startOwnedDevServer({
                         // An older in-flight snapshot may finish after a newer
                         // selection. Its body cannot validate that newer output.
                         lastModified: selectedRoutes === currentSourceRoutes ? generated.lastModified : undefined,
-                        contentType: MIME_TYPES.get(path.extname(generated.path)),
+                        contentType: contentTypes[path.extname(generated.path).substring(1).toLowerCase()],
                         body: function generatedPwaBody() {
                             return generated.content;
                         }
@@ -1313,13 +1294,6 @@ async function startOwnedDevServer({
         await task;
         return true;
     }
-    const contentType = Object.fromEntries(
-        [...MIME_TYPES].map(
-            function serverContentType([extension, value]) {
-                return [extension.substring(1), value];
-            }
-        )
-    );
     const fileServer = new Server(
         {
             root: mappings[0].root,
@@ -1338,7 +1312,6 @@ async function startOwnedDevServer({
             })
         }
     );
-    fileServer.config.contentType = contentType;
     fileServer.onRawRequest = serveDevelopmentRequest;
     // The module's public HTTPS configuration accepts PEM paths. Its HTTPS
     // guide leaves advanced TLS inputs to application code; preserve that

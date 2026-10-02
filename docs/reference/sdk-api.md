@@ -3732,6 +3732,12 @@ negotiate HTTP/2 or HTTP/1.1 on the same HTTPS port. Explicit raw `tls` options
 retain native HTTPS transport with the same module response and static-file
 operations.
 
+Static files retain the module's complete built-in MIME map, including PDF,
+Markdown, audio and video. Generated representations use the same published
+`node-http-server/mime-types` map. Existing text charsets and the
+`application/octet-stream` fallback for unknown extensions remain unchanged;
+supported document and media types need no application override.
+
 ### Signature, modes, and result
 
 ```text

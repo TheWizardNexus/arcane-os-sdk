@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.51.1
+
+- Restore the published `node-http-server` MIME map in development and packaged
+  preview serving. PDFs, Markdown and supported audio/video files retain their
+  declared content types; generated representations reuse the same public map.
+  Existing text charsets, unknown-extension binary fallback, complete file
+  contents, routing, conditional GET/HEAD and server lifecycle remain unchanged.
+  No new dependency, application setting or installed-file patch is required.
+
 ## 0.51.0
 
 - Add synchronous native speech `provider.setDefaultVoice(voiceURI|null)`.

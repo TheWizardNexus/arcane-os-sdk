@@ -169,6 +169,48 @@ async function assertPortCanBeReused(port){
 }
 
 test(
+    'HTTP source serving retains document and media MIME types from the public server map',
+    async function developmentDocumentMediaTypes(context) {
+        const parent = await temporaryDirectory(context, {prefix: 'arcane-mime-source-'});
+        const workspaceRoot = path.join(parent, 'workspace');
+        const appId = 'mime-app';
+        await scaffoldWorkspace({targetPath: workspaceRoot, appId});
+        const sourceRoot = await createSdkRuntimeSource(parent);
+        // Synthetic transport fixtures: no document rendering or media decoding.
+        const fixtures = [
+            ['record.pdf', 'application/pdf', '%PDF-1.7\nSynthetic document transport.\n%%EOF\n'],
+            ['UPPER.PDF', 'application/pdf', '%PDF-1.7\nUppercase extension.\n%%EOF\n'],
+            ['notes.md', 'text/markdown; charset=utf-8', '# Complete notes\nSecond line.\n'],
+            ['voice.mp3', 'audio/mpeg', 'Synthetic MP3 transport content.'],
+            ['clip.mp4', 'video/mp4', 'Synthetic MP4 transport content.'],
+            ['sound.wav', 'audio/wav', 'Synthetic WAV transport content.'],
+            ['rows.csv', 'text/csv; charset=utf-8', 'name,value\nexample,complete\n'],
+            ['opaque.arcane-unknown', 'application/octet-stream', 'Unknown extension stays opaque.']
+        ];
+        await Promise.all(fixtures.map(function writeMimeFixture([name, , content]) {
+            return writeFile(path.join(workspaceRoot, 'apps', appId, 'modules', name), content);
+        }));
+        const instance = await startDevServer({
+            workspaceRoot, appId, sdkRuntimeSourceRoot: sourceRoot, http: true
+        });
+        context.after(async function closeMimeServer() {
+            await instance.close();
+        });
+        for (const [name, contentType, content] of fixtures) {
+            const url = `${instance.origin}/apps/${appId}/modules/${name}`;
+            const response = await fetch(url);
+            assert.equal(response.status, 200, name);
+            assert.equal(response.headers.get('content-type'), contentType, name);
+            assert.equal(await response.text(), content, name);
+            const head = await fetch(url, {method: 'HEAD'});
+            assert.equal(head.status, 200, name);
+            assert.equal(head.headers.get('content-type'), contentType, name);
+            assert.equal(await head.text(), '', name);
+        }
+    }
+);
+
+test(
     'module serving reuses unchanged files and rewrites changed source through conditional GET',
     async function conditionalDevelopmentResources(context) {
         useSyntheticTls(context);
