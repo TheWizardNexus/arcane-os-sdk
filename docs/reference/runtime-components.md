@@ -4,14 +4,21 @@ Arcane components are reusable HTML fragments loaded through the shared `<html-i
 
 A component file does not register its own custom element. The `<html-import>` host fetches the fragment from the same origin, attaches an open shadow root, runs its inline scripts with `this` bound to the host, and publishes `html-import-ready` or `html-import-error`. Component methods and properties are attached to that host.
 
+Import the loader through `arcane-os/modules/HTMLImport.js` and the SDK-managed
+import map. Component `href` values are asset URLs, so use the application's
+configured runtime route. The default root npm layout serves components from
+`/node_modules/arcane-os/runtime/arcane/components/`. Other `/arcane/...`
+examples on this page describe an explicitly configured physical or virtual
+route; direct npm applications use their corresponding installed-package URLs.
+
 ## Basic loading pattern
 
 ```html
 <script type="module">
-  import '/arcane/modules/HTMLImport.js';
+  import 'arcane-os/modules/HTMLImport.js';
 </script>
 
-<html-import id="widget" href="/arcane/components/weather-widget.html"></html-import>
+<html-import id="widget" href="/node_modules/arcane-os/runtime/arcane/components/weather-widget.html"></html-import>
 
 <script type="module">
   const widget = document.querySelector('#widget');

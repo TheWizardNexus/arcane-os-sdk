@@ -1,10 +1,25 @@
 # Browser speech providers
 
-`arcane-os/ai/browser-speech` supplies caller-selected Whisper or native Web
-Speech recognition and synthesis, Kokoro text-to-speech, and TWiN Cloud text-to-speech providers. Its local path
+`arcane-os/ai/browser-speech` supplies caller-selected Whisper transcription,
+native browser recognition and synthesis, Kokoro text-to-speech, and TWiN Cloud
+text-to-speech providers. Its local model path
 provides artifact storage, live module routing, role Workers, provider/2
 adapters, bounded parallel TTS synthesis, audio normalization, cancellation,
 and cleanup.
+
+## Choose a speech provider
+
+| Need | Factory | Input or output | Runtime and locality |
+| --- | --- | --- | --- |
+| Transcribe a recorded clip | `createBrowserWhisperProvider` | Audio input, complete transcript output | Caller-selected local model and Worker runtime |
+| Recognize live microphone speech | `createBrowserSpeechRecognitionProvider` | Final segments and transient interim text | Native browser service; may use a remote service |
+| Speak with installed browser voices | `createBrowserSpeechSynthesisProvider` | Silent native playback descriptor, then explicit playback | Native voice inventory; individual voices may be remote |
+| Generate reusable audio locally | `createBrowserKokoroProvider` | Synthesized audio | Caller-selected local model, voice and Worker runtime |
+| Generate audio through TWiN Cloud | `createTwinCloudTTSProvider` | Completed remote synthesis returned as audio | Application-owned key reader and selected FAL model |
+
+STT and TTS have independent selections and lifecycles. Applications choose
+their defaults, recognition language, voice, and activation controls. Native
+browser providers need no SDK model download or DBOPFS artifact store.
 
 ## Native browser speech recognition
 
@@ -43,6 +58,36 @@ transient surface and never enters a save or completion event. A custom voice
 component `transcribe(file,context)` callback retains the existing clip path.
 Final segments waiting behind an application save remain visible in that
 transient surface until the ordered queue appends them to the main transcript.
+
+### Recognition language and editable Chat drafts
+
+The shared speech control exposes `recognitionLanguage` as an editable BCP47
+tag. Its visible picker is available before live capture, shows every suggested
+language when opened, and filters after the user changes its text. Suggestions
+retain native language and region labels; callers can also supply an exact
+custom tag. The picker is disabled during capture and outside live-recognition
+mode. Recognition language is independent of Chat's conversation language.
+
+For an initialized shared Chat component, choose whether the completed
+transcription submits immediately or remains editable:
+
+```javascript
+// chat is the application's ready shared Chat component.
+chat.transcriptionMode = 'draft';
+chat.recognitionLanguage = 'es-MX';
+chat.appendDraft('Captain, the moon-powered toaster reports: ');
+```
+
+`'submit'` is the existing default. In `'draft'` mode, final and interim native
+recognition appear immediately in the composer alongside typed text. Completion
+leaves Send to the user. Interim replacement preserves user edits; cancellation
+retires only the unedited interim range and retains confirmed text. The shared
+speech component emits cumulative `speech-transcription-progress` detail with
+`text`, `interim`, and `operationId`; confirmed completion keeps the existing
+`speech-transcription-complete` event. Interim text remains transient and never
+enters a completion payload or durable history.
+
+### Direct capture
 
 For direct use, `ai.supportsTranscriptionCapture()` detects the selected
 provider's capture capability. `ai.createTranscriptionCapture(options)` returns
@@ -106,6 +151,11 @@ const unsubscribe = voicePreview.subscribeCatalog(function showVoices(models) {
 // Call only from the application's explicit Play action.
 function playIntroduction(input, voice) {
   return voicePreview.play({input, voice});
+}
+
+// voiceURI comes from the real catalog or the application's saved selection.
+function selectDefaultVoice(voiceURI) {
+  return voicePreview.setDefaultVoice(voiceURI);
 }
 // The owning view unsubscribes and disposes voicePreview when it closes.
 ```
@@ -172,6 +222,16 @@ when the returned descriptor is played. `AI.fetchTTS()` and durable
 `AI.prepareTTS()` remain audio-file APIs and report
 `ARCANE_AI_TTS_AUDIO_EXPORT_UNAVAILABLE` for native synthesis, which exposes no
 downloadable audio file.
+
+Choose preparation according to the result the application needs:
+
+| API | Result | Playback and retention |
+| --- | --- | --- |
+| `provider.prepare(payload,{signal})` | Native speech descriptor | Silent until its explicit `play()` call; keeps the selected voice |
+| `ai.prepareTTSPlayback(payload,signal)` | Promise resolving a native descriptor or real audio Blob | Silent, provider-neutral preparation; no durable storage |
+| `ai.streamTTS(text,end,options)` | Promise resolving a preparation or playback boolean | Shared segmentation and playback in original order |
+| `ai.fetchTTS(payload,signal)` | Promise resolving a real audio Blob | Audio-file providers only; does not play |
+| `ai.prepareTTS(options)` | Preparation handle with `ready` and `getAudio(index)` | Audio-file providers only; optional caller-owned durable storage |
 
 <a id="digitalocean-fal-text-to-speech"></a>
 
@@ -314,18 +374,18 @@ and [multilingual-v2 model schema](https://fal.ai/models/fal-ai/elevenlabs/tts/m
 ## Quick start: say one sentence
 
 Use this in a browser application served by `arcane dev`, where the generated
-import map resolves `arcane/AI` and `arcane/DBOPFS`. These browser modules are
-not Node inference APIs. To create an application:
+import map resolves `arcane-os/ai` and `arcane-os/modules/DBOPFS.js`. These
+browser modules require a browser host. To create an application:
 
 ```bash
-npx arcane-os@0.5.18 new hello-speech --path ./hello-speech --target browser
+npx arcane-os@latest new hello-speech --path ./hello-speech --target browser
 cd hello-speech
 npm install
 npm run dev
 ```
 
 Keep the generated page's Arcane theme and import map. The examples below go in
-`apps/hello-speech/modules/App.js` and the adjacent `speech-selection.js`.
+`modules/App.js` at the application root and the adjacent `speech-selection.js`.
 Follow the development server's printed URL. Installing the SDK supplies its
 provider, storage, and Worker code; it does not install a speech model or choose
 an upstream speech runtime for your application.
@@ -374,9 +434,9 @@ instance. Configuration selects the provider without loading it; the button
 explicitly loads and unmutes TTS before requesting speech.
 
 ```javascript
-import arcaneThemeReady from 'arcane/ThemeBootstrap';
-import AI, { AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL } from 'arcane/AI';
-import DBOPFS from 'arcane/DBOPFS';
+import arcaneThemeReady from 'arcane-os/modules/ThemeBootstrap.js';
+import AI, { AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL } from 'arcane-os/ai';
+import DBOPFS from 'arcane-os/modules/DBOPFS.js';
 import { speechSelection } from './speech-selection.js';
 
 await arcaneThemeReady;
@@ -445,7 +505,7 @@ name. It does not load a model or create a GPU device or WebNN context:
 ```html
 <html-import
   id="browserAISetup"
-  href="/arcane/components/browser-ai-setup.html">
+  href="/node_modules/arcane-os/runtime/arcane/components/browser-ai-setup.html">
 </html-import>
 ```
 
@@ -491,13 +551,11 @@ runtime's evidence to determine actual accelerator execution.
 
 ## Developer diagnostics
 
-The shared logging API and speech traces are available in SDK `0.5.14`.
-
 Arcane uses the existing shared `user.developer` preference for diagnostic
 logging. Enable **developer mode** in the application's profile settings; the
 logger reads that preference on every emission after the shared user is ready.
-There is no separate speech verbosity or language setting. Ordinary warnings
-and errors remain visible with developer mode disabled.
+There is no separate speech verbosity setting. Ordinary warnings and errors
+remain visible with developer mode disabled.
 
 Applications can use the same owner for their complete AI requests and parsed
 responses:
@@ -534,10 +592,12 @@ that the buffer finished; use its `playback.ended` event.
 Diagnostics do not change text, voice, speed, language selection, segmentation,
 generation capacity, or playback scheduling. They stay outside chat history.
 
-## Four synthesis slots and exact-order playback
+<a id="four-synthesis-slots-and-exact-order-playback"></a>
 
-Capacity 4 means up to four segments synthesize at once. Segment 5 and later
-wait in the SDK's FIFO queue; they are not dropped. Synthesis may finish out of
+## Local synthesis capacity and exact-order playback
+
+The default Kokoro capacity of 4 means up to four segments synthesize at once.
+Segment 5 and later wait in the SDK's FIFO queue; they are not dropped. Synthesis may finish out of
 order, but playback waits for earlier segments and plays exact input order.
 Each slot owns a Worker/model session, so raising capacity trades memory for
 latency.
@@ -554,7 +614,7 @@ Use this when your application already has complete segments in an array. The
 configured `ai` below is the same instance created in the quick start.
 
 ```javascript
-import SpeechPlayback from 'arcane/SpeechPlayback';
+import SpeechPlayback from 'arcane-os/speech-playback';
 
 const audio = document.body.appendChild(document.createElement('audio'));
 audio.controls = true;
@@ -575,16 +635,23 @@ speakAll.addEventListener('click', async function speakAllSegments() {
 ```
 
 `prepare()` submits all three parts immediately because this `ai` exposes
-`fetchTTS` and advertises TTS execution capacity. With the default configuration,
-the provider admits up to four synthesis requests and keeps later requests in
+`prepareTTSPlayback` and advertises TTS execution capacity. With the Kokoro
+configuration above, the provider admits up to four synthesis requests and keeps later requests in
 its FIFO queue. Completed audio remains indexed, so playback is always first,
 second, third even if the third synthesis finishes first.
+
+`SpeechPlayback` prefers `prepareTTSPlayback()` when present and also supports
+existing audio-only `fetchTTS()` clients. Native browser descriptors and real
+audio Blobs remain in the same ordered sequence, including requested pauses.
+Native segments advance only after actual utterance completion and resource
+release; they are never converted into placeholder audio files.
 
 This eager path is capability-driven. A native `Arcane.speech.synthesize`
 client, or a custom client without a positive advertised TTS execution capacity,
 retains serialized synthesis with one lookahead segment. `togglePause()` pauses
-and resumes the same `audio` element. `stop()` cancels all requests owned by the
-playback. `replay()` keeps completed and pending provider segments and retries
+and resumes the active native utterance or the same `audio` element.
+`stop()` cancels all requests owned by the playback. `replay()` keeps completed
+and pending provider segments and retries
 only failed missing segments.
 
 The default `{device:'auto',maxConcurrentRequests:4}` attempts the full ONNX
@@ -596,8 +663,6 @@ keeps `fp32` throughout that sequence. Use the status example below to read
 selected execution device or assess the generated audio.
 
 ## Queue complete passages and wait for playback
-
-These options are available in SDK `0.5.12`.
 
 For a complete page or passage, call
 `ai.streamTTS(text, true, {voice, speed, pauseAfterMs, waitForPlayback:true})`.
@@ -911,8 +976,8 @@ speech method retain their existing behavior.
 
 ## Automatic speech-input formatting cleanup
 
-Every TTS entrypoint removes repeated same formatting marks from the outbound
-speech-input copy automatically. No application option is required:
+The shared streaming, audio-file, and `SpeechPlayback` paths remove repeated
+same formatting marks from the outbound speech-input copy automatically:
 
 ```javascript
 ai.streamTTS('## Heading\n**Hello');
@@ -937,6 +1002,12 @@ Applications omit that internal metadata. Displayed messages, saved history,
 model input, caller payload objects, language, voice, synthesis capacity, and
 playback timing are not changed by the filter.
 
+Direct native `provider.prepare()` and `provider.play()` preserve their complete
+`input` as supplied. The native route of `ai.prepareTTSPlayback()` also preserves
+that input; shared streaming and `SpeechPlayback` perform their existing cleanup
+before calling it. Choose the high-level narration path when that speech-only
+formatting cleanup is desired.
+
 The shared helper is public for code that needs the speech-only
 transformation directly:
 
@@ -954,8 +1025,9 @@ console.log(speechText.append('ing', true)); // ing
 
 ## Choose a device or reduce memory use
 
-Both speech roles accept `execution:{device,maxConcurrentRequests}`. Omitting
-`stt.execution` selects `{device:'auto',maxConcurrentRequests:1}`; omitting
+Local Whisper and Kokoro roles accept
+`execution:{device,maxConcurrentRequests}`. Omitting `stt.execution` selects
+`{device:'auto',maxConcurrentRequests:1}`; omitting
 `tts.execution` selects `{device:'auto',maxConcurrentRequests:4}`. Whisper keeps
 one transcription slot. Kokoro accepts capacities 1 through 4.
 
@@ -1147,11 +1219,12 @@ records; this contract does not freeze them or shorten their content.
 
 | Host | Availability | Notes |
 | --- | --- | --- |
-| Browser | Shipped | Requires Workers, Fetch, Blob/File, object URLs, DBOPFS/OPFS, and Web Locks. Blob/File STT requests also require the browser audio decoder. |
+| Local browser models | Shipped | Require Workers, Fetch, Blob/File, object URLs, DBOPFS/OPFS, and Web Locks. Blob/File STT requests also require the browser audio decoder. |
 | Native WebView | Conditional | Available when the WebView exposes the browser APIs above. It does not invoke Core speech. |
 | Node | Remote adapter available; local execution unavailable | TWiN Cloud uses Fetch and Blob. The local providers have no SDK Node speech-storage, Worker, or audio-decoder host. |
 | Remote TTS | Explicitly selected | TWiN Cloud uses standard Fetch and Blob with an application-owned key; no Worker, OPFS, or local model is needed for this adapter. |
 | Native browser STT | Explicitly selected, conditional | Requires `SpeechRecognition` or `webkitSpeechRecognition` and native microphone/service availability. No Worker, OPFS, or SDK model download; locality is not promised. |
+| Native browser TTS | Explicitly selected, conditional | Requires `speechSynthesis` and `SpeechSynthesisUtterance`. Uses the native voice catalog and playback lifecycle; no Worker, OPFS, or SDK model download. Native voices expose no audio export. |
 
 STT and TTS own independent provider lifecycles. A failure or cancellation in
 one role does not disable the other role or authorize a fallback provider.
@@ -1164,12 +1237,14 @@ import {
   BROWSER_SPEECH_ARTIFACT_PROTOCOL,
   createBrowserKokoroProvider,
   createBrowserSpeechRecognitionProvider,
+  createBrowserSpeechSynthesisProvider,
   createBrowserSpeechArtifactGraph,
   createBrowserSpeechAuthority,
   createBrowserWhisperProvider,
   createDbopfsSpeechArtifactStore,
   createDigitalOceanFalTTSProvider,
-  createTwinCloudTTSProvider
+  createTwinCloudTTSProvider,
+  removeBrowserSpeechModelCache
 } from 'arcane-os/ai/browser-speech';
 ```
 
@@ -1489,7 +1564,7 @@ materialized URLs. `dispose()` performs final teardown and prevents later use.
 
 `createBrowserSpeechAuthority({providerId,role,model,runtime,security})` creates
 the ordinary single-entrypoint authority. The model descriptor is
-`{id,repository,revision,dtype?,defaultVoice?,files?}`. The runtime descriptor is
+`{id,repository,revision,dtype?,defaultVoice?,voices?,files?}`. The runtime descriptor is
 `{adapter,version,revision,entry,wasmPaths?,files}`. A file is
 `{path,url,mediaType?}`. Model files may be omitted so the selected upstream
 provider performs its normal model and voice downloads after explicit use.

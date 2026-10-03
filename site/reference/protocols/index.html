@@ -4,19 +4,19 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
   <meta name="description" content="This is the deep reference behind the compact availability notes elsewhere. Application developers should start with the availability and normalization guide, call one documented API, and treat the protocols below as implementation detail.">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
-  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/protocols/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css?v=back-to-top"><link rel="stylesheet" href="../reference.css?v=visible-toolbar">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/protocols/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
   <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Protocol and host architecture · Arcane OS SDK"><meta property="og:description" content="This is the deep reference behind the compact availability notes elsewhere. Application developers should start with the availability and normalization guide, call one documented API, and treat the protocols below as implementation detail."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/protocols/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
   <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Protocol and host architecture · Arcane OS SDK"><meta name="twitter:description" content="This is the deep reference behind the compact availability notes elsewhere. Application developers should start with the availability and normalization guide, call one documented API, and treat the protocols below as implementation detail."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <title>Protocol and host architecture | Arcane OS SDK</title><script src="../../app.js?v=back-to-top" defer></script><script src="../reference.js" type="module"></script>
+  <title>Protocol and host architecture | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Protocol and host architecture</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="protocol-and-host-architecture">Protocol and host architecture</h1><p class="doc-lead">This is the deep reference behind the compact availability notes elsewhere. Application developers should start with the availability and normalization guide, call one documented API, and treat the protocols below as implementation detail.</p><div class="doc-meta"><span>SDK 0.5.18</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Protocol and host architecture</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="protocol-and-host-architecture">Protocol and host architecture</h1><p class="doc-lead">This is the deep reference behind the compact availability notes elsewhere. Application developers should start with the availability and normalization guide, call one documented API, and treat the protocols below as implementation detail.</p><div class="doc-meta"><span>SDK 0.51.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="./" aria-current="page">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/protocols.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#layer-map">Layer map</a><a href="#sdk-package-and-cli-protocols">SDK package and CLI protocols</a><a href="#installed-sdk-runtime-materialization">Installed SDK runtime materialization</a><a href="#central-events-and-time-travel-data">Central events and time-travel data</a><a href="#browser-runtime-delivery">Browser runtime delivery</a><a href="#portable-ai-provider-runtime">Portable AI provider runtime</a><a href="#arcane-application-protocol">Arcane application protocol</a><a href="#native-host-transports">Native host transports</a><a href="#development-and-remote-http-transport">Development and remote HTTP transport</a><a href="#core-dispatch-and-capability-admission">Core dispatch and capability admission</a><a href="#arcane-ollama-protocol-path">Arcane Ollama protocol path</a><a href="#explicit-cloud-provider-path">Explicit cloud provider path</a><a href="#events-streaming-and-cancellation">Events, streaming, and cancellation</a><a href="#cross-kernel-normalization-boundary">Cross-kernel normalization boundary</a><a href="#complete-content-boundary">Complete-content boundary</a></nav></details><p>This is the deep reference behind the compact availability notes elsewhere.
+      <article class="prose reference-prose" data-reference-source="docs/reference/protocols.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#layer-map">Layer map</a><a href="#sdk-package-and-cli-protocols">SDK package and CLI protocols</a><a href="#app-selected-package-output">App-selected package output</a><a href="#installed-package-browser-routes">Installed-package browser routes</a><a href="#installed-sdk-runtime-materialization">Installed SDK runtime materialization</a><a href="#central-events-and-time-travel-data">Central events and time-travel data</a><a href="#explicit-host-documents">Explicit host documents</a><a href="#browser-runtime-delivery">Browser runtime delivery</a><a href="#portable-ai-provider-runtime">Portable AI provider runtime</a><a href="#arcane-application-protocol">Arcane application protocol</a><a href="#native-host-transports">Native host transports</a><a href="#development-and-remote-http-transport">Development and remote HTTP transport</a><a href="#core-dispatch-and-capability-admission">Core dispatch and capability admission</a><a href="#arcane-ollama-protocol-path">Arcane Ollama protocol path</a><a href="#explicit-cloud-provider-path">Explicit cloud provider path</a><a href="#events-streaming-and-cancellation">Events, streaming, and cancellation</a><a href="#cross-kernel-normalization-boundary">Cross-kernel normalization boundary</a><a href="#complete-content-boundary">Complete-content boundary</a></nav></details><p>This is the deep reference behind the compact availability notes elsewhere.
 Application developers should start with the
 <a href="../availability-and-normalization/">availability and normalization guide</a>, call
 one documented API, and treat the protocols below as implementation detail.</p>
@@ -55,7 +55,7 @@ a nonzero CLI status.</p>
 <p>These protocols normalize orchestration and results. They do not normalize a
 Windows EXE, Linux DEB, Android APK, and portable directory into the same
 artifact kind.</p>
-<p>Managed browser imports have three supported control-plane entrypoints. The CLI
+<p>App-scoped managed browser imports have three supported control-plane entrypoints. The CLI
 uses <code>arcane import-map</code>; Node callers use
 <code>executeOperation(&#39;import-map&#39;, options)</code> or
 <code>createToolchain(defaults).importMap(options)</code>. These are three routes to the
@@ -69,15 +69,26 @@ explicit identity fails, and the selected page then must pass exact path-relativ
 base validation.
 Included HTML with neither signal is a component fragment and remains a
 complete package file.
-<code>arcane-os/preference-store</code> and <code>arcane-os/speech-playback</code> are the two
-portable subpaths that resolve directly to canonical runtime-module namespaces
-from both Node package exports and managed browser keys;
-<code>arcane/PreferenceStore</code> and <code>arcane/SpeechPlayback</code> remain their established
-browser import-map names. The additional portable <code>arcane-os/speech-text</code>
+Public lowercase runtime subpaths resolve directly to canonical runtime-module
+namespaces from both Node package exports and managed browser keys. These
+include <code>arcane-os/preference-store</code>, <code>arcane-os/speech-playback</code>,
+<code>arcane-os/ai-preference-tuple</code>, <code>arcane-os/ai-preference-runtime</code>,
+<code>arcane-os/ai-provider-runtime</code>, <code>arcane-os/ai-runtime-state</code>,
+<code>arcane-os/model-definition</code>, <code>arcane-os/conversation-timebox</code>,
+<code>arcane-os/conversation-action-items</code>, <code>arcane-os/conversation-closing-report</code>,
+and <code>arcane-os/chat-records</code>.
+Physical, nested and virtual layouts also retain the established
+<code>arcane/PreferenceStore</code> and <code>arcane/SpeechPlayback</code> browser names. Direct
+installed-package root apps use the package-namespaced imports. The additional
+portable <code>arcane-os/speech-text</code>
 subpath owns shared speech-input cleanup and has the same
-managed browser key. There is
+managed browser key. <code>arcane-os/mail</code> remains the existing Mail aggregation.
+There is
 no exported <code>importMapApplication()</code> function, <code>generateImportMap()</code> function, or
-<code>arcane-os/import-map</code> package subpath.</p>
+<code>arcane-os/import-map</code> package subpath.
+Explicit host document lists use the separate root-exported
+<a href="../sdk-api/#generatedocumentimportmaps"><code>generateDocumentImportMaps()</code></a> API
+described below; they do not enter app discovery.</p>
 <p>The application dependency boundary is conditional. Only an application that
 actually consumes Arcane declares one exact published <code>arcane-os</code> version in
 its own <code>package.json</code> and resolves it through that project&#39;s normal install
@@ -93,6 +104,133 @@ or <code>dist</code>. Distribution instead uses the app&#39;s installed package 
 materializes the complete required SDK runtime,
 browser-runtime, and managed-import-map closure inside that app&#39;s own artifact.
 No application polls for SDK changes.</p>
+<h2 id="app-selected-package-output">App-selected package output</h2>
+<p>An app may set <code>&quot;outputDirectory&quot;: &quot;ai&quot;</code> in its schema-1
+<code>arcane-package.json</code>. This selects the final directory relative to the
+workspace: <code>&lt;workspace&gt;/ai</code>, not <code>&lt;workspace&gt;/ai/&lt;app-id&gt;</code>. Omitting the
+field retains <code>dist/&lt;app-id&gt;</code>. The root <code>arcane-packager.json</code> configuration
+and simple scaffold defaults remain unchanged.
+The destination is local to <code>arcane-package.json</code>, including apps with a
+schema-2 <code>arcane-app.json</code>. Descriptor refresh preserves it; no matching
+descriptor property or identity change is required.</p>
+<p>This field controls the destination of the complete packaged release. It does
+not relocate application source, rename the app, change its identity or OPFS
+scope, or alter the package&#39;s internal file paths. Source development continues
+to serve the same source tree. There is no migration of existing source,
+saved data, or previously generated output.</p>
+<p>The selected directory is wholly replaced through the packager&#39;s staged
+replacement operation, so it must be dedicated to that release. The prior
+contents remain until the replacement is ready; this is not an in-place merge.
+Changing the configured destination leaves the former output directory and
+unrelated siblings untouched. Output that would replace the app&#39;s source root,
+selected inputs, or required control files fails with <code>ARCANE_PACKAGE_INVALID</code>
+before output writes rather than overwriting those inputs.
+If an included source directory contains the output directory, use the existing
+<code>exclude</code> selection to keep that generated subtree outside the package inputs.</p>
+<p>Inspection and dry runs report this selected destination. Packaging,
+verification, and <code>arcane run --target browser</code> use the same release root.
+The normal bundle destination is beside that release directory as
+<code>&lt;app-id&gt;-&lt;version&gt;.arcane-app.tar.gz</code>; an explicit artifact path retains its
+existing meaning. Native packaging supplies the selected release root to the
+native provider, while native executable <code>outputRoot</code> remains a separate
+target-output setting. Selected app package directories and native artifact
+output must remain separate; a conflicting native assembly fails before it
+packages any app. App launch paths, resource URLs, and enabled PWA
+representations retain their package-relative layout.</p>
+<h2 id="installed-package-browser-routes">Installed-package browser routes</h2>
+<p>An external application can serve and package its installed SDK directly,
+without creating a top-level <code>arcane/</code> directory or requiring
+<code>arcane.lock.json</code>. Select <code>installed-v1</code> through these four ordered routes in
+the existing schema-1 <code>arcane-packager.json</code>; no additional layout field is
+needed:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>json</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-json">{
+  &quot;schemaVersion&quot;: 1,
+  &quot;appsRoot&quot;: &quot;.&quot;,
+  &quot;distRoot&quot;: &quot;dist&quot;,
+  &quot;sharedPayloads&quot;: {
+    &quot;browser-runtime&quot;: [
+      {
+        &quot;source&quot;: &quot;node_modules/arcane-os/runtime/arcane&quot;,
+        &quot;destination&quot;: &quot;node_modules/arcane-os/runtime/arcane&quot;,
+        &quot;include&quot;: [&quot;components&quot;, &quot;css&quot;, &quot;entities&quot;, &quot;img&quot;, &quot;modules&quot;],
+        &quot;exclude&quot;: []
+      },
+      {
+        &quot;source&quot;: &quot;node_modules/arcane-os/browser-runtime&quot;,
+        &quot;destination&quot;: &quot;node_modules/arcane-os/browser-runtime&quot;,
+        &quot;include&quot;: [&quot;.&quot;],
+        &quot;exclude&quot;: []
+      },
+      {
+        &quot;source&quot;: &quot;node_modules/arcane-os/runtime/strong-type&quot;,
+        &quot;destination&quot;: &quot;node_modules/arcane-os/runtime/strong-type&quot;,
+        &quot;include&quot;: [&quot;.&quot;],
+        &quot;exclude&quot;: []
+      },
+      {
+        &quot;source&quot;: &quot;node_modules/arcane-os&quot;,
+        &quot;destination&quot;: &quot;node_modules/arcane-os&quot;,
+        &quot;include&quot;: [&quot;LICENSE&quot;, &quot;COMMERCIAL-LICENSE.md&quot;, &quot;NOTICE&quot;],
+        &quot;exclude&quot;: []
+      }
+    ]
+  }
+}
+</code></pre></div>
+<p>The first include list also accepts a final <code>security</code> entry. An npm alias such
+as <code>arcane-sdk</code> substitutes <code>node_modules/arcane-sdk</code> for the package prefix in
+all four source and destination paths. Package selection and SDK
+version come from the installed dependency, not a generated runtime lock.</p>
+<p><code>arcane import-map</code>, <code>arcane dev</code>, packaging, and generated PWA inventories use
+the same actual npm destinations. For example, <code>arcane-os/modules/HTMLImport.js</code> resolves to
+<code>./node_modules/arcane-os/runtime/arcane/modules/HTMLImport.js</code>, and
+<code>arcane-os/event-manager</code> resolves to
+<code>./node_modules/arcane-os/browser-runtime/event-manager.mjs</code>. A normal static
+server can serve those files directly. Source serving and map generation read installed
+files without materializing them into the workspace. A selected portable
+package copies its complete selected resources inside the artifact, preserving
+the same browser URLs and saved managed import maps.</p>
+<p>Existing <code>physical-v1</code> configurations whose first source is <code>arcane</code> remain
+supported. The explicit materializer below still refreshes those projections,
+and an explicitly selected multi-app scaffold retains its physical layout. The
+earlier installed routes with virtual <code>/arcane</code> destinations also remain
+supported. Selecting <code>installed-v1</code>
+does not delete any preexisting workspace files. The separate host-document
+<code>generateDocumentImportMaps()</code> API continues to accept an already materialized
+runtime; its input contract is unchanged.</p>
+<h3 id="standalone-root-application">Standalone root application</h3>
+<p>Each standalone app&#39;s root is its repository root. <code>appsRoot: &quot;.&quot;</code> selects
+that layout: <code>arcane-app.json</code>,
+<code>arcane-package.json</code>, entry, and app-owned files occupy the workspace root.
+The declared application ID remains unchanged. <code>appsRoot: &quot;apps&quot;</code> continues
+to discover <code>apps/&lt;id&gt;</code> and supports the existing integrated and multi-app
+layouts. Entries and include/exclude paths remain relative to the application.</p>
+<p>Root HTML uses <code>&lt;base href=&quot;./&quot;&gt;</code>; nested navigable documents use their actual
+depth back to the workspace. Managed bare imports remain the public interface;
+their targets follow the selected npm routes. <code>arcane import-map</code> generates
+enabled static PWA records at the app root, so normal static hosting needs no
+SDK request handler or runtime copy. Managed refresh, development serving,
+inspection, dry run and packaging add no nested <code>apps/&lt;id&gt;/</code> navigation pages,
+redirects, or duplicate PWA worker/inventory files. There is no output-retention
+switch for those retired records.</p>
+<p>Application identity, stored data, the existing default installation ID and an
+authored <code>pwa.manifest.id</code> remain unchanged. Authored resources continue to
+follow the app&#39;s include/exclude selection; generation does not delete existing
+files. Published SDK internals stay package-owned under <code>node_modules</code>.
+Generated and offline app files are committed, and GitHub Actions consume
+those committed files. See <a href="../pwa/#root-generated-output">root generated output</a>.</p>
+<p>Direct-installed root maps expose <code>arcane-os/modules/&lt;filename&gt;</code> and
+<code>arcane-os/entities/&lt;filename&gt;</code> (including extensions), plus the existing
+focused lowercase package exports. They omit the old <code>arcane/*</code> and
+<code>./arcane/*</code> keys. Real installed <code>runtime/arcane/</code> directories are unchanged.
+Physical, nested and virtual layouts retain their established aliases and also
+support the package-namespaced module/entity keys. Relative module and component
+URLs still resolve from the actual selected file, not a reexport wrapper.</p>
+<p>New root apps declare the SDK in <code>dependencies</code> because serving their npm
+resources requires the installed package at runtime. Root <code>init</code> promotes an
+existing SDK development declaration while preserving other dependencies.
+Existing runtime or optional declarations retain their classification across
+layouts; the default nested scaffold continues to use its development dependency.</p>
 <h2 id="installed-sdk-runtime-materialization">Installed SDK runtime materialization</h2>
 <p><code>materializeInstalledSdkRuntime()</code> is the Node entrypoint for refreshing one
 external workspace&#39;s checked-in <code>arcane/</code> projection from its one exact
@@ -140,16 +278,35 @@ unsafe structure and grants no Core capability or provider authority.</p>
 </details>
 <p>See <a href="../event-manager/">EventManager and time-travel review</a> for the callable
 surface, DOM privacy defaults, playback modes, and recovery behavior.</p>
+<h2 id="explicit-host-documents">Explicit host documents</h2>
+<p><code>generateDocumentImportMaps()</code> accepts one document root, an existing
+materialized runtime root, and explicit document-root-relative paths. It
+inventories the runtime and constructs the shared browser map once per call,
+then resolves each document&#39;s map against its first href-bearing base or its
+own URL. An absolute or root-relative base, or a relative base traversing above
+the document root, requires the caller&#39;s directory <code>deploymentUrl</code>; target-only
+bases leave URL resolution unchanged.</p>
+<p>The operation preserves authored content, resource URLs, custom import maps,
+and script order, updating only SDK-managed inline map blocks. It prepares all
+documents before sequential writes and reports <code>import-map.documents.started</code>,
+<code>import-map.write.progress</code>, and <code>import-map.documents.completed</code>. Cancellation
+can leave completed document writes in place. Successful writes remain
+successful when event delivery fails, with a degraded-delivery record in the
+return value. Runtime materialization, serving, and writer coordination remain
+with the caller. See the <a href="../sdk-api/#generatedocumentimportmaps">API guide</a> for
+the complete inputs, results, errors, and example. The app-scoped discovery and
+map-artifact lifecycle below remains separate.</p>
 <h2 id="browser-runtime-delivery">Browser runtime delivery</h2>
-<p>External and modern integrated workspaces keep the same application URLs and a
-browser-standard import map. Each selected app owns
-<code>apps/&lt;id&gt;/modules/arcane.importmap.json</code>; the exact canonical JSON is also
+<p>External and modern integrated workspaces use a browser-standard import map.
+Each selected app owns <code>modules/arcane.importmap.json</code> relative to its app root:
+the repository root for a standalone app, or <code>apps/&lt;id&gt;/</code> for an explicitly
+nested app. The exact canonical JSON is also
 embedded in its HTML entry as a managed <code>&lt;script type=&quot;importmap&quot; data-arcane-import-map&gt;</code>. The map follows <code>&lt;base&gt;</code> and precedes module scripts,
 classic scripts, and module preloads, so application code can use stable named
 imports such as:</p>
-<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import ollama from &#39;arcane/Ollama&#39;;
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import ollama from &#39;arcane-os/modules/Ollama.js&#39;;
 </code></pre></div>
-<p>The physical-v1 tree lives entirely beneath <code>arcane/</code>. SDK <code>0.5.17</code> projects the
+<p>The supported physical-v1 tree lives entirely beneath <code>arcane/</code>. It projects the
 complete canonical runtime and browser runtime selected by the installed SDK
 package. Runtime dependencies stay under
 <code>arcane/dependencies/</code>; the SDK event and browser-AI closure stays under
@@ -162,9 +319,9 @@ directory exists; its external license route remains second. The modern
 integrated physical route uses the same ordered include list in its one route.
 Omitting only that final optional entry is compatible. Removing, reordering, or
 renaming any preceding entry changes the physical contract.</p>
-<p>The <code>0.5.17</code> map derives its complete entries from the selected runtime graph;
+<p>The map derives its complete entries from the selected runtime graph;
 application source imports do not select a fixed entry count. The operation
-result reports <code>imports</code>, <code>entryCount</code>, and <code>excludedModules</code>; reached-file
+result reports <code>imports</code>, <code>documentCount</code>, and <code>excludedModules</code>; reached-file
 traversal remains internal. The
 managed graph exposes <code>arcane-os/event-manager</code>, <code>arcane-os/ai/browser-wasm</code>,
 <code>arcane-os/ai/browser-speech</code>, <code>arcane-os/preference-store</code>, and
@@ -207,18 +364,25 @@ runtime or SDK root traversal observes them.</p>
 <td><code>./arcane/sdk/dependencies/event-pubsub/index.js</code></td>
 </tr>
 <tr>
+<td><code>strong-type</code></td>
+<td><code>./arcane/dependencies/strong-type/index.js</code></td>
+</tr>
+<tr>
 <td><code>./node_modules/strong-type/index.js</code></td>
 <td><code>./arcane/dependencies/strong-type/index.js</code></td>
 </tr></tbody>
 </table>
 </div>
-<p>There is no <code>arcane-os</code> package-root mapping, bare <code>strong-type</code> mapping, or
-catch-all <code>arcane/</code> prefix. Classic scripts, workers, stylesheets, and other
+<p>Direct installed routes translate these targets to their actual npm destinations,
+including aliases. There is no <code>arcane-os</code> package-root mapping or catch-all
+<code>arcane/</code> prefix. Classic scripts, workers, stylesheets, and other
 non-ESM assets use their documented URL or host loading contract rather than
 invented package bindings. Development serves the selected app plus the
 complete selected tree.
-Packaging copies the same map, app entry, and physical content into <code>dist/&lt;id&gt;</code>;
-targets never resolve through the consumer workspace&#39;s root <code>node_modules/</code>.
+Packaging copies the same map, app entry, and physical content into the
+<a href="#app-selected-package-output">selected package output</a>, defaulting to <code>dist/&lt;id&gt;</code>;
+physical targets stay beneath the selected <code>arcane/</code> routes, while direct
+installed targets retain <code>node_modules/&lt;dependency&gt;/...</code> inside the output.
 The two lowercase static runtime package specifiers above and the shared
 speech-text helper are exact npm package exports, so Node and managed-browser
 source can share those specifiers
@@ -227,36 +391,31 @@ without data URLs, copied modules, or a consumer-owned loader.</p>
 The shared app-document owner derives the configured entry plus the
 deterministic admitted <code>.html</code>/<code>.htm</code> inventory from the descriptor&#39;s package
 include/exclude rules. <code>import-map</code>, development, and packaging all reuse that
-discovery. One transaction writes the artifact and the same managed
-JSON into every selected document. The result reports
-<code>documentPaths</code>, <code>documentCount</code>, and <code>files</code>: artifact first, configured entry
-second, then additional documents as <code>role:&quot;document&quot;</code>. The public CLI keeps
+discovery. Import-map generation prepares the complete selection, then writes
+the artifact and the same managed JSON into each selected document in order.
+The result reports
+<code>artifactPath</code>, <code>entryPath</code>, <code>documentPaths</code>, <code>documentCount</code>, the complete
+<code>imports</code> record, and <code>committed</code>. <code>documentPaths</code> lists the configured entry
+first, followed by the other selected documents. The public CLI keeps
 its existing two-option command; callers never maintain a separate page list.</p>
-<p>An external package and development server expose the runtime
-inventory at <code>/ARCANE_RUNTIME_PROJECTION.json</code>:</p>
-<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const result = {
-  schemaVersion: 1,
-  kind: &#39;arcane-app-runtime-projection&#39;,
-  sdkVersion,
-  pathPrefix: &#39;arcane/&#39;,
-  files: [{path}]
-};
-</code></pre></div>
-<p>The projection contains the complete public paths relative to its declared
-<code>pathPrefix:&#39;arcane/&#39;</code> (for example, <code>modules/...</code> and <code>sdk/...</code>). It does not
-expose the private <code>/ARCANE_APP_RELEASE.json</code>. Genuinely malformed projection
-data fails <code>ARCANE_RUNTIME_PROJECTION_INVALID</code>.</p>
+<p>The managed import map derives its complete bindings from the selected runtime
+files. Enabled PWA delivery publishes its resource inventory in
+<code>arcane-offline.json</code>; packaging records its complete file inventory in
+<code>ARCANE_APP_RELEASE.json</code>. There is no generated
+<code>ARCANE_RUNTIME_PROJECTION.json</code> endpoint in the current serving or packaging
+contract.</p>
 <p>External <code>validateWorkspace()</code> results also expose <code>sdkInstallation</code> with
 exactly <code>dependencyName</code>, <code>packageSource</code>,
 <code>canonicalPackageRoot</code>, <code>packageName</code>, <code>packageVersion</code>, <code>runtimeRoot</code>,
 and <code>browserRuntimeRoot</code>. A
-workspace may use the canonical dependency name or one exact npm alias such as
-<code>npm:arcane-os@0.5.17</code>; the physical package manifest must still identify
-exactly as <code>arcane-os@0.5.17</code>. Canonical-plus-alias duplicates, multiple aliases,
-links/junctions, indirect package roots, or version drift are reported.</p>
-<p>For external workspaces, <code>arcane dev</code> serves the projected <code>arcane/</code> root,
-including <code>arcane/sdk</code> and <code>arcane/dependencies</code>, alongside the selected
-application. Integrated workspaces retain their configured physical routes.
+workspace may use the canonical dependency name or one npm alias such as
+<code>npm:arcane-os@0.51.1</code>; the installed package manifest identifies <code>arcane-os</code>
+and supplies its actual version. The resolver requires one declaration and a
+direct physical installation with runtime and browser-runtime directories.
+The application&#39;s normal npm declaration and lockfile own version selection.</p>
+<p>For external workspaces, <code>arcane dev</code> serves the selected direct npm, virtual
+installed or physical routes alongside the selected application. Integrated
+workspaces retain their configured physical routes.
 The explicit live-source development mapping remains a separate development
 path and does not rewrite the installed projection.</p>
 <p>The imported module can be pure browser logic, standard-Web-API logic, or a
@@ -264,20 +423,23 @@ client of <code>globalThis.Arcane</code>. Import-map resolution is not a new Arc
 protocol, Core capability, network authority, or provider fallback. Import
 transport and host RPC remain separate layers.</p>
 <details><summary>Refresh lifecycle and managed-file commit behavior</summary>
-<p>Scaffolding (<code>new</code> and <code>init</code>) creates the map. <code>dev</code> refreshes once before
-binding. <code>import-map</code> refreshes every admitted document explicitly.
-Non-dry-run <code>package</code>, browser <code>build</code>, and paired native packaging refresh
-before collecting source. Packaging does not run tests or checks automatically.
+<p>Root scaffolding reports the map as pending until its SDK dependency is installed;
+root <code>init</code> with an installed SDK and explicit nested scaffolds generate it.
+<code>dev</code> refreshes once before binding. <code>import-map</code> refreshes every admitted
+document explicitly. <code>package</code>, browser <code>build</code>, and paired native packaging
+consume the saved source and managed maps. Refresh maps through <code>import-map</code> or
+ordinary <code>dev</code> startup when needed. Packaging does not run tests or checks
+automatically.
 Explicit <code>test</code> and <code>check</code> operations read the existing map without rewriting it;
 <code>verify</code>, <code>bundle</code>, and browser <code>run</code> do not refresh. Dry-run packaging/build
 validates an existing map without rewriting it, and <code>import-map</code> itself has no
 supported dry-run.</p>
-<p>Generation stages the artifact and every selected HTML document beside their
-destinations and uses backups to restore the prior managed files after a
-handled pre-commit failure. Success reports <code>committed: true</code> and the complete
-managed path inventory. Cleanup failures after commit remain warnings. This is
-a handled-error transaction, not a claim of one filesystem-atomic rename for
-all files and not a durable crash journal.</p>
+<p>Generation prepares the artifact and every selected HTML document, checks their
+destinations, then writes the artifact followed by the documents. Cancellation
+or a write failure can leave completed writes in place. Success reports
+<code>committed: true</code> and the selected document paths. Event-delivery failure after
+successful writes is returned as degraded delivery; it does not undo those
+writes. There is no all-file rollback or durable crash journal.</p>
 <p>When tests are explicitly selected, external app tests receive an
 <code>arcane-test-import-map/1</code> context for that app&#39;s managed map. Each isolated
 Node child uses the existing loader for managed names and URL-like compatibility
@@ -299,9 +461,13 @@ comes from the selected runtime and owns independent <code>llm</code>, <code>stt
 <code>tts</code> selections. This SDK release ships browser-WASM LLM and browser
 speech provider/2 adapters and also adapts selected TWiN Cloud LLM,
 Core-backed Ollama LLM, on-device Whisper STT, and on-device Kokoro TTS routes
-into provider/2. There is no cloud speech route;
-other native, Core, or cloud routes require an externally supplied compatible
-adapter. The singleton itself is not an authentication or capability token. It
+into provider/2. Built-in speech selections use <code>LOCAL_SPEACH</code> with
+<code>whisper-small</code> for STT and <code>kokoro</code> for TTS; these local routes need no TWiN key.
+Applications may explicitly configure <code>createTwinCloudTTSProvider()</code> with their
+TWiN key for cloud TTS. Native browser recognition and synthesis providers are
+also available through <code>arcane-os/ai/browser-speech</code>; their browser-owned engines
+may use remote services. Other routes require a compatible provider adapter.
+The singleton itself is not an authentication or capability token. It
 normalizes inspection, model authority,
 load/unload/dispose, cancellation, stream cleanup, status, and startup
 barriers. Each selected provider retains its real execution requirements.
@@ -311,8 +477,9 @@ cloud, or different-provider fallback.</p>
 <a href="../ai/browser-wasm/"><code>arcane-os/ai/browser-wasm</code></a> exposes <code>createArcaneAI()</code>
 and an adapter into the same provider-neutral lifecycle. For browser speech,
 <a href="../ai/browser-speech/"><code>arcane-os/ai/browser-speech</code></a> creates independent
-Whisper STT and Kokoro TTS providers that register directly with the normalized
-runtime. The SDK supplies mechanism; applications retain model/runtime choice,
+Whisper STT, Kokoro TTS, native browser recognition/synthesis and explicit cloud
+TTS providers. These providers register directly with the normalized runtime.
+The SDK supplies mechanism; applications retain model/runtime choice,
 licenses, prompts, tools, voices, and disclosure policy.</p>
 <h3 id="browser-wasm-llm-lifecycle">Browser-WASM LLM lifecycle</h3>
 <p>The shipped browser runtime contains the Wllama JavaScript/WASM engine and its
@@ -347,10 +514,12 @@ only a compatible completed cache, otherwise it rejects with
 does not silently delete the app-owned cache. A complete whole member supersedes
 its current resumable fragments. Cleanup failure is warned without hiding the
 usable model.</p>
-<p>SDK <code>0.5.17</code> requires WebGPU. Load requests full offload and waits for the runtime
-to report a loaded model. <code>navigator.gpu</code> presence alone is
-not readiness. There is no CPU fallback, partial-offload success mode, or
-silent switch to native/Core/cloud inference.</p>
+<p>Browser-WASM loads default to full WebGPU offload. Explicit
+<code>loadDefaults:{gpuLayers:0}</code> or <code>load({gpuLayers:0})</code> selects CPU through the
+same packaged Wllama runtime without GPU initialization or GPU-only
+requirements. Both routes wait for the runtime to report the complete model
+loaded. <code>navigator.gpu</code> presence alone is not readiness. There is no automatic
+CPU fallback or silent switch to native/Core/cloud inference.</p>
 <h3 id="browser-speech-lifecycle">Browser speech lifecycle</h3>
 <p>The browser-speech package contains plain-JavaScript authority, DBOPFS store,
 provider, client, and Worker machinery. It redistributes no Whisper, Kokoro,
@@ -367,8 +536,13 @@ resolution and leaves bare <code>fetch</code>, <code>caches</code>, and <code>Wo
 the module declares a shadowing binding with the same name. Explicit
 <code>globalThis</code> or <code>self</code> calls continue through the materialized-file router.</p>
 <p>The speech Worker uses its ordinary global Worker message boundary directly for
-requests, results, errors, and cancellation. It creates no private
-<code>MessageChannel</code> and publishes no Worker progress transport.</p>
+requests, progress, results, errors, and cancellation. It creates no private
+<code>MessageChannel</code>. During loading, <code>{protocol,id,type:&#39;progress&#39;,progress}</code>
+messages retain the active request id without settling its pending result.
+Progress records describe the current phase, stage, message, file, and completed
+file count with <code>total:null</code> for dynamically discovered model files. Complete
+upstream callback content remains in the adjacent <code>detail</code> field. The ordinary
+final success or failure envelope ends the request and its progress stream.</p>
 <p>Worker operations use <code>arcane-ai-speech-worker/1</code>. The public Worker client
 supports <code>load</code>, <code>use</code>, <code>status</code>, <code>unload</code>, and <code>dispose</code>; the transport host
 additionally supports its internal <code>cancel</code> control. Every other operation
@@ -439,9 +613,11 @@ while the loaded provider remains ready.
 Speech failure neither disables text chat nor retries through another local,
 native, or cloud provider. The provider/Worker layer is event-neutral: it
 exposes promises, <code>AbortSignal</code>, and precise lifecycle/status records, but owns
-no event bus or listener registry. The provider/2 load context accepts an
-optional progress callback for interface compatibility; the current
-browser-speech artifact and Worker transport publishes no progress records.</p>
+no event bus. The provider/2 load context accepts an optional <code>progress</code>
+callback that receives artifact preparation, upstream model loading, and session
+initialization records. Compatible concurrent observers share one load and
+receive its current progress; cancelling one observer leaves the others active.
+The shared AI runtime projects those records into sticky role state.</p>
 <h3 id="persistent-chat-and-document-context">Persistent chat and document context</h3>
 <p>The SDK runtime owns
 <a href="../runtime-modules/#dbopfsdocumentlibraryjs"><code>DBOPFSDocumentLibrary</code></a>,
@@ -520,7 +696,12 @@ load it. Neither state observation nor either shared speech component imports a
 model or selects a fallback. <code>speech.html</code> and <code>voice-transcription.html</code> consume
 one shared <code>createSTTActivationController()</code> contract for selected, unloaded,
 loading, unloading, error, and ready presentation plus cancelable user intent.
-Both keep capture unavailable until sticky STT state is exactly ready.</p>
+Both keep capture unavailable until sticky STT state is exactly ready.
+On mobile browsers, <code>speech.html</code> additionally omits transcription activation,
+capture, and transcription status/progress while retaining its TTS control and
+voice status. Its public activation callback returns <code>false</code> without dispatch.
+This uses the SDK&#39;s browser-device classification, including tablets, and does
+not change the dedicated <code>voice-transcription.html</code> workflow or provider APIs.</p>
 <p>Each shared speech component owns an <code>AbortController</code> for its STT request and
 passes its signal through <code>AI.fetchSTT()</code>. <code>voice-transcription.html</code> also adds
 that signal to the existing injected <code>transcribe(file,context)</code> callback
@@ -680,9 +861,9 @@ and artifacts preserve their complete selected content. Required credential
 protection, genuinely malformed input rejection, applicable law, external
 protocol requirements, and host platform safety remain in effect.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#layer-map">Layer map</a><a href="#sdk-package-and-cli-protocols">SDK package and CLI protocols</a><a href="#installed-sdk-runtime-materialization">Installed SDK runtime materialization</a><a href="#central-events-and-time-travel-data">Central events and time-travel data</a><a href="#browser-runtime-delivery">Browser runtime delivery</a><a href="#portable-ai-provider-runtime">Portable AI provider runtime</a><a href="#arcane-application-protocol">Arcane application protocol</a><a href="#native-host-transports">Native host transports</a><a href="#development-and-remote-http-transport">Development and remote HTTP transport</a><a href="#core-dispatch-and-capability-admission">Core dispatch and capability admission</a><a href="#arcane-ollama-protocol-path">Arcane Ollama protocol path</a><a href="#explicit-cloud-provider-path">Explicit cloud provider path</a><a href="#events-streaming-and-cancellation">Events, streaming, and cancellation</a><a href="#cross-kernel-normalization-boundary">Cross-kernel normalization boundary</a><a href="#complete-content-boundary">Complete-content boundary</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#layer-map">Layer map</a><a href="#sdk-package-and-cli-protocols">SDK package and CLI protocols</a><a href="#app-selected-package-output">App-selected package output</a><a href="#installed-package-browser-routes">Installed-package browser routes</a><a href="#installed-sdk-runtime-materialization">Installed SDK runtime materialization</a><a href="#central-events-and-time-travel-data">Central events and time-travel data</a><a href="#explicit-host-documents">Explicit host documents</a><a href="#browser-runtime-delivery">Browser runtime delivery</a><a href="#portable-ai-provider-runtime">Portable AI provider runtime</a><a href="#arcane-application-protocol">Arcane application protocol</a><a href="#native-host-transports">Native host transports</a><a href="#development-and-remote-http-transport">Development and remote HTTP transport</a><a href="#core-dispatch-and-capability-admission">Core dispatch and capability admission</a><a href="#arcane-ollama-protocol-path">Arcane Ollama protocol path</a><a href="#explicit-cloud-provider-path">Explicit cloud provider path</a><a href="#events-streaming-and-cancellation">Events, streaming, and cancellation</a><a href="#cross-kernel-normalization-boundary">Cross-kernel normalization boundary</a><a href="#complete-content-boundary">Complete-content boundary</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.5.18, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.51.1, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

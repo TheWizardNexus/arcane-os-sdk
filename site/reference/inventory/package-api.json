@@ -1,12 +1,16 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.5.18",
+  "sdkVersion": "0.51.1",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 202,
+  "memberCount": 223,
+  "runtimeSubpathPatterns": {
+    "arcane-os/modules/*": "./runtime/arcane/modules/*",
+    "arcane-os/entities/*": "./runtime/arcane/entities/*"
+  },
   "members": [
     {
       "id": "root:APP_BUNDLE_DESCRIPTOR_NAME",
@@ -460,14 +464,14 @@
       "name": "createAppReleaseBundle",
       "displayName": "createAppReleaseBundle()",
       "kind": "function",
-      "signature": "async createAppReleaseBundle({ receipt, releaseRoot, outputPath, overwrite=false, signal, onEvent }={})",
+      "signature": "async createAppReleaseBundle({releaseRoot, appDescriptor, outputPath, overwrite=false, signal, onEvent}={})",
       "entrypoints": [
         "arcane-os",
         "arcane-os/release-bundle"
       ],
       "primaryImport": "arcane-os",
       "group": "Packaging and release bundles",
-      "summary": "Writes one deterministic USTAR+gzip external application bundle from the selected authored release state.",
+      "summary": "Writes one deterministic USTAR+gzip external application bundle, using per-file POSIX PAX path extensions for complete long or non-ASCII filenames.",
       "availability": "Node",
       "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Normalized SDK validation with complete canonical archive and release content"
@@ -773,6 +777,22 @@
       "normalization": "ArcaneError and JSON-safe error normalization"
     },
     {
+      "id": "root:generateDocumentImportMaps",
+      "name": "generateDocumentImportMaps",
+      "displayName": "generateDocumentImportMaps()",
+      "kind": "function",
+      "signature": "async generateDocumentImportMaps({documentRoot, runtimeRoot, documents, version=SDK_VERSION, deploymentUrl, signal, onEvent}={})",
+      "entrypoints": [
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os",
+      "group": "Runtime and app descriptors",
+      "summary": "Writes SDK-managed inline import maps for explicit host documents using an existing materialized runtime and each document's authored base.",
+      "availability": "Node on Windows, Linux, and macOS",
+      "protocol": "Explicit host documents",
+      "normalization": "Absolute filesystem result paths, document-relative browser maps, ordered write events, cancellation, and degraded event-delivery reporting"
+    },
+    {
       "id": "root:getSdkBrowserRuntimeRoot",
       "name": "getSdkBrowserRuntimeRoot",
       "displayName": "getSdkBrowserRuntimeRoot()",
@@ -882,7 +902,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Packaging and release bundles",
-      "summary": "Loads one validated packager app plan, including the shared descriptor-admitted browser document inventory.",
+      "summary": "Loads one validated packager app plan, including the shared descriptor-admitted browser document inventory and final workspace-relative output selected by app outputDirectory or default dist/appId.",
       "availability": "Node",
       "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Normalized SDK validation with complete canonical archive and release content"
@@ -1177,7 +1197,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Packaging and release bundles",
-      "summary": "Builds one selected browser application release through the low-level packager API; it never runs tests or checks automatically.",
+      "summary": "Builds one selected browser application release into app outputDirectory or default dist/appId through staged whole-directory replacement, preserving source and unrelated prior destinations; it never runs tests or checks automatically.",
       "availability": "Node",
       "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Normalized SDK validation with complete canonical archive and release content"
@@ -1194,7 +1214,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Headless toolchain operations",
-      "summary": "Runs the high-level package operation for one selected application.",
+      "summary": "Runs the high-level package operation for one selected application using the same app-selected final outputDirectory, defaulting to dist/appId, with no separate destination override.",
       "availability": "Node; selected operation may produce browser or native output",
       "protocol": "Shared headless operation API + arcane-cli-events/1",
       "normalization": "SDK-normalized inputs, errors, events, and documented result"
@@ -2011,7 +2031,7 @@
       ],
       "primaryImport": "arcane-os/packager",
       "group": "Packaging and release bundles",
-      "summary": "Validates one schema-1 packager app configuration and its relationship to the root config.",
+      "summary": "Validates one schema-1 packager app configuration and its relationship to the root config, including optional workspace-relative final outputDirectory without changing source layout or app identity.",
       "availability": "Node",
       "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Normalized SDK validation with complete canonical archive and release content"
@@ -2144,7 +2164,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Packaging and release bundles",
-      "summary": "Parses and authenticates one deterministic app bundle without extraction.",
+      "summary": "Parses one deterministic app bundle without extraction, supporting ordinary USTAR entries and complete per-file POSIX PAX paths within the existing same-SDK-version contract.",
       "availability": "Node",
       "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Normalized SDK validation with complete canonical archive and release content"
@@ -2902,7 +2922,23 @@
       "summary": "Creates the provider-neutral browser AI API module and LLM lifecycle controller around one compatible provider or controller.",
       "availability": "Browser; the selected provider observes its own WebAssembly, storage, and model readiness",
       "protocol": "arcane-ai-adapter/1",
-      "normalization": "Normalizes lazy or manual load, mutable complete lifecycle status, cancellation, complete all-choice nonstructural stream projection, complete provider data callbacks, single-choice text or multi-choice terminal output, required structural arguments.message, and atomic exact matching nonblank all-ID tool-result sequencing without executing tools; an existing ModelController retains its preconfigured load policy and rejects a new security option"
+      "normalization": "Normalizes lazy or manual load, mutable complete lifecycle status, cancellation, complete all-choice nonstructural stream projection, provider chunks with private structural fields removed, complete terminal data callbacks, optional toolText:{name,field} and distinct onToolText(text,call,displayId) delivery of selected decoded argument text, single-choice text or multi-choice terminal output, required structural arguments.message, and atomic exact matching nonblank all-ID tool-result sequencing without executing tools; an existing ModelController retains its preconfigured load policy and rejects a new security option"
+    },
+    {
+      "id": "tool-text-stream:createToolTextObserver",
+      "name": "createToolTextObserver",
+      "displayName": "createToolTextObserver()",
+      "kind": "function",
+      "signature": "createToolTextObserver(selection, onText, {signal}={})",
+      "entrypoints": [
+        "arcane-os/ai/tool-text-stream"
+      ],
+      "primaryImport": "arcane-os/ai/tool-text-stream",
+      "group": "AI provider integration",
+      "summary": "Observes one selected root string argument from actual tool-call chunks before provider structural filtering.",
+      "availability": "Compatible JavaScript module host; no browser capability required",
+      "protocol": "OpenAI-compatible tool-call deltas and complete message snapshots",
+      "normalization": "Returns null for absent selection or an async chunk observer; preserves decoded text and whitespace, emits actual normalized call identity metadata, observes each raw delta once, avoids replay from complete snapshots, awaits callbacks, and stops later observation after cancellation without altering payloads, executing tools, or persisting history"
     },
     {
       "id": "browser-wasm:createBrowserModelSource",
@@ -2932,7 +2968,7 @@
       "primaryImport": "arcane-os/ai/browser-wasm",
       "group": "Browser-WASM local AI",
       "summary": "Creates the packaged Wllama browser provider with complete serialized inference, streaming, abort, unload, and probe operations.",
-      "availability": "Browser context with WebAssembly, OPFS/DBOPFS, and WebGPU; no CPU fallback",
+      "availability": "Browser context with WebAssembly and OPFS/DBOPFS; WebGPU by default or explicit CPU with gpuLayers:0",
       "protocol": "arcane-ai-adapter/1 with OpenAI-like chat completion and streaming envelopes",
       "normalization": "Mutable complete lifecycle/status records, declaration/history validation, atomic nonblank all-ID tool-result sequencing, complete all-choice nonstructural ordinary iterator projections, all-choice terminal validation, terminal-only structural-call acceptance, and exact structured tool-call data with required user-facing message and retained extension fields; the SDK never invokes application tools"
     },
@@ -2951,6 +2987,92 @@
       "availability": "Browser with a ready DBOPFS instance and OPFS support",
       "protocol": "Resumable ordered model members and deterministic per-member Range parts over existing DBOPFS method semantics",
       "normalization": "Uses one bounded transfer axis, preserves ordered completed shards and deterministic current Range parts within any member across interruption, emits coalesced additive loaded/total/remaining/rate/ETA/active-worker telemetry, rolls discarded partial writes back out of progress, cleans superseded current Range parts after a complete replacement exists, and settles failed or cancelled peers while retaining completed work for retry"
+    },
+    {
+      "id": "browser-device:getBrowserDeviceClass",
+      "name": "getBrowserDeviceClass",
+      "displayName": "getBrowserDeviceClass()",
+      "kind": "function",
+      "signature": "getBrowserDeviceClass(navigatorObject = globalThis.navigator)",
+      "entrypoints": [
+        "arcane-os/browser-device"
+      ],
+      "primaryImport": "arcane-os/browser-device",
+      "group": "Browser device settings",
+      "summary": "Returns a mobile or desktop browser identity hint for application-owned settings.",
+      "availability": "Node and Browser; no model, storage, or GPU capability required",
+      "protocol": "Synchronous optional navigator-like identity input and mobile or desktop string result",
+      "normalization": "Positive mobile hints, Android or iOS identity, and iPadOS Mac-platform touch identity select mobile; missing or unrecognized identity selects desktop. Importing the dependency-free entrypoint loads no AI runtime, and classification performs no model, GPU, storage, network, or listener operation."
+    },
+    {
+      "id": "pwa:PWA_STATE_EVENT",
+      "name": "PWA_STATE_EVENT",
+      "displayName": "PWA_STATE_EVENT",
+      "kind": "constant",
+      "signature": "const PWA_STATE_EVENT",
+      "entrypoints": ["arcane-os/pwa"],
+      "primaryImport": "arcane-os/pwa",
+      "group": "Progressive web applications",
+      "summary": "Names the shared PWA lifecycle and page-local update availability state event.",
+      "availability": "Browser lifecycle; importable without registration",
+      "protocol": "Existing Arcane event owner and native service worker lifecycle",
+      "normalization": "The exact event name is arcane.pwa.state."
+    },
+    {
+      "id": "pwa:registerPwa",
+      "name": "registerPwa",
+      "displayName": "registerPwa()",
+      "kind": "function",
+      "signature": "registerPwa({workerUrl = './arcane-sw.js', scope} = {})",
+      "entrypoints": ["arcane-os/pwa"],
+      "primaryImport": "arcane-os/pwa",
+      "group": "Progressive web applications",
+      "summary": "Starts PWA registration and DBOPFS-backed page-load resource checks without blocking rendering, returning an observable lifecycle owner.",
+      "availability": "Browser service workers; explicit unsupported state elsewhere",
+      "protocol": "Native registration, updatefound, statechange and controllerchange events",
+      "normalization": "Synchronous owner exposes ready, state, subscribe, update and dispose; current state replays by default. updateAvailable latches after a complete successful refresh with different parseable modification dates or a successfully checked addition to the prior durable inventory; initial fill, eviction repair, unchanged or unknown responses and partial failure do not announce updates. Pending evidence survives worker termination. update only checks the native worker, without reloading the page. Failures remain observable; disposal does not unregister the worker or delete saved data."
+    },
+    {
+      "id": "pwa:PWA_INSTALL_STATE_EVENT",
+      "name": "PWA_INSTALL_STATE_EVENT",
+      "displayName": "PWA_INSTALL_STATE_EVENT",
+      "kind": "constant",
+      "signature": "const PWA_INSTALL_STATE_EVENT",
+      "entrypoints": ["arcane-os/pwa"],
+      "primaryImport": "arcane-os/pwa",
+      "group": "Progressive web applications",
+      "summary": "Names the shared native installation availability, choice and update-prompt state event.",
+      "availability": "Browser installation lifecycle; importable without starting observation",
+      "protocol": "Existing Arcane event owner and native browser installation events",
+      "normalization": "The exact event name is arcane.pwa.install.state."
+    },
+    {
+      "id": "pwa:getPwaInstall",
+      "name": "getPwaInstall",
+      "displayName": "getPwaInstall()",
+      "kind": "function",
+      "signature": "getPwaInstall()",
+      "entrypoints": ["arcane-os/pwa"],
+      "primaryImport": "arcane-os/pwa",
+      "group": "Progressive web applications",
+      "summary": "Returns one shared page owner for native installation, prompt choices, independent update availability and explicit page reload.",
+      "availability": "Browser native installation events; waiting state while no prompt is available",
+      "protocol": "Native beforeinstallprompt, appinstalled and display-mode change events",
+      "normalization": "Synchronous owner exposes ready, state, subscribe, prompt, dismiss, update, dismissUpdate and dispose; subscriptions replay current state. prompt invokes the native event directly in the user click and consumes it once; installation dismissal preserves that event. updateAvailable and updateDismissed are independent page-local fields. A late prompt reads current state from live registration owners; the generated bootstrap observes before registration. Explicit update synchronously calls ordinary location.reload and returns true, returns false when unavailable/disposed, and propagates native errors. Native unload cancellation leaves Update available. dismissUpdate returns state without a durable write. Installed/running status and earlier installation dismissal do not suppress updates. Native unload handling and application draft ownership remain unchanged."
+    },
+    {
+      "id": "pwa:mountPwaInstallPrompt",
+      "name": "mountPwaInstallPrompt",
+      "displayName": "mountPwaInstallPrompt()",
+      "kind": "function",
+      "signature": "mountPwaInstallPrompt({appName = ''} = {})",
+      "entrypoints": ["arcane-os/pwa"],
+      "primaryImport": "arcane-os/pwa",
+      "group": "Progressive web applications",
+      "summary": "Starts shared installation/update observation and mounts one initially hidden, themed suggestion without delaying application rendering.",
+      "availability": "Browser document and managed HTML import; resolves to null without a document",
+      "protocol": "Shared native install owner and pwa-install.html component lifecycle",
+      "normalization": "Repeated calls return the same mounting promise; the first appName initializes the component, success resolves to its ready html-import host, absence of a document or disposal before mounting resolves to null, and component loading failures reject. Removal or disposal during loading rejects with AbortError. A rejected mount permits another explicit attempt. Generated PWA bootstraps invoke it automatically."
     },
     {
       "id": "browser-speech:BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL",
@@ -2985,6 +3107,48 @@
       "normalization": "Exact protocol string; it grants no model authority and names no model download"
     },
     {
+      "id": "browser-speech:createDigitalOceanFalTTSProvider",
+      "name": "createDigitalOceanFalTTSProvider",
+      "displayName": "createDigitalOceanFalTTSProvider()",
+      "kind": "function",
+      "signature": "createDigitalOceanFalTTSProvider({id,model,getApiKey,maxConcurrentRequests=4,followUpQueue:{maxConcurrentRequests=4,intervalMs=250}={},fetch=globalThis.fetch}={})",
+      "entrypoints": ["arcane-os/ai/browser-speech"],
+      "primaryImport": "arcane-os/ai/browser-speech",
+      "group": "Browser speech providers",
+      "summary": "Compatibility export of createTwinCloudTTSProvider using the same function and implementation.",
+      "availability": "Browser or Node with Fetch, Blob, AbortController, and an application-owned DigitalOcean inference key",
+      "protocol": "arcane-ai-provider/2 tts/synthesize",
+      "normalization": "Same TWiN Cloud options, complete-job and submission queues, shared rate-limit cooldown, queued follow-ups, complete audio Blob results and cancellation contract. Existing imports, stored provider IDs and credentials remain valid without migration."
+    },
+    {
+      "id": "browser-speech:createTwinCloudTTSProvider",
+      "name": "createTwinCloudTTSProvider",
+      "displayName": "createTwinCloudTTSProvider()",
+      "kind": "function",
+      "signature": "createTwinCloudTTSProvider({id,model,getApiKey,maxConcurrentRequests=4,followUpQueue:{maxConcurrentRequests=4,intervalMs=250}={},fetch=globalThis.fetch}={})",
+      "entrypoints": ["arcane-os/ai/browser-speech"],
+      "primaryImport": "arcane-os/ai/browser-speech",
+      "group": "Browser speech providers",
+      "summary": "Creates an explicitly selected TWiN Cloud remote TTS provider with complete-job queues and independently configurable follow-up HTTP scheduling.",
+      "availability": "Browser or Node with Fetch, Blob, AbortController, and an application-owned inference key",
+      "protocol": "arcane-ai-provider/2 tts/synthesize",
+      "normalization": "Construction and activation make no adapter network requests. Whole-job slots cover credentials, submission, remote completion and complete audio. Initial POST attempts and eligible retries are queued; HTTP 429 sets a shared cooldown. Follow-up status/result/audio reads use independent capacity and cadence through complete body consumption. Ambiguous paid POST failures are surfaced without replay. Applications own model, voice, credentials, activation and queue settings."
+    },
+    {
+      "id": "browser-speech:createBrowserSpeechRecognitionProvider",
+      "name": "createBrowserSpeechRecognitionProvider",
+      "displayName": "createBrowserSpeechRecognitionProvider()",
+      "kind": "function",
+      "signature": "createBrowserSpeechRecognitionProvider({id,model,language}={})",
+      "entrypoints": ["arcane-os/ai/browser-speech"],
+      "primaryImport": "arcane-os/ai/browser-speech",
+      "group": "Browser speech providers",
+      "summary": "Creates an explicitly selected native browser speech recognition provider with gesture-started live capture.",
+      "availability": "Browser or WebView exposing SpeechRecognition or webkitSpeechRecognition; construction remains available on unsupported hosts",
+      "protocol": "arcane-ai-provider/2 stt with optional createCapture",
+      "normalization": "Non-local service declaration, independent STT lifecycle, exact final segments, transient interim results, graceful stop/drain and native abort. No model download, storage, microphone on activation, file-transcription emulation, or automatic fallback."
+    },
+    {
       "id": "browser-speech:createBrowserKokoroProvider",
       "name": "createBrowserKokoroProvider",
       "displayName": "createBrowserKokoroProvider()",
@@ -2998,7 +3162,7 @@
       "summary": "Creates a local-only Kokoro text-to-speech provider for the provider-neutral AI runtime.",
       "availability": "Browser with DBOPFS, Web Locks, Workers, object URLs, and caller-selected kokoro-js runtime/model content",
       "protocol": "arcane-ai-provider/2 tts/synthesize",
-      "normalization": "Independent load, status, request, unload, cancellation, and disposal; provider-native requests return 24000 Hz Float32Array PCM, while shared AI.js requests use wav and return complete Uint8Array audio/wav data; never selects a cloud fallback"
+      "normalization": "Independent load, status, request, unload, cancellation and disposal; optional ordinary model.voices records remain complete in the synchronous catalog without loading or constraining synthesis. Provider-native requests return 24000 Hz Float32Array PCM, while shared AI.js requests use wav and return complete Uint8Array audio/wav data; never selects a cloud fallback"
     },
     {
       "id": "browser-speech:createBrowserSpeechArtifactGraph",
@@ -3273,6 +3437,146 @@
       "availability": "Node and browser",
       "protocol": "Shared user.developer preference",
       "normalization": "Returns null until target.user.ready is true, then whether target.user.developer is exactly true; returns false if preference access throws"
+    },
+    {
+      "id": "twin-cloud:fetchRequest",
+      "name": "fetchRequest",
+      "displayName": "fetchRequest()",
+      "kind": "function",
+      "signature": "async fetchRequest(options={})",
+      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "primaryImport": "arcane-os/ai/twin-cloud",
+      "group": "TWiN Cloud requests",
+      "summary": "Sends one complete TWiN Cloud request with an explicit caller-owned key and model.",
+      "availability": "Node and Browser; remote HTTPS provider",
+      "protocol": "TWiN Cloud complete-response chat",
+      "normalization": "Preserves complete messages and parsed provider JSON; maps explicit structured-output, tool, and reasoning options; shares overload-only HTTP 429 retry after 3000 ms and cancellation; retains no browser profile, storage, or request history"
+    },
+    {
+      "id": "twin-cloud:fetchSystemOneRequest",
+      "name": "fetchSystemOneRequest",
+      "displayName": "fetchSystemOneRequest()",
+      "kind": "function",
+      "signature": "async fetchSystemOneRequest({twinKey,model,state,questions,signal=null,id=Date.now(),onRequest,onResponse,onRetry=null}={})",
+      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "primaryImport": "arcane-os/ai/twin-cloud",
+      "group": "TWiN Cloud state-and-questions requests",
+      "summary": "Sends caller-owned model, state, and questions to the native System One endpoint with explicit credentials.",
+      "availability": "Node and Browser; remote HTTPS provider",
+      "protocol": "TWiN Cloud native System One request",
+      "normalization": "Preserves complete state and questions within JSON transport and returns the full parsed provider result; shares existing JSON transport retry, diagnostics, and cancellation; leaves model choice, scales, and answer interpretation with the caller and retains no history"
+    },
+    {
+      "id": "browser-speech:createBrowserSpeechSynthesisProvider",
+      "name": "createBrowserSpeechSynthesisProvider",
+      "displayName": "createBrowserSpeechSynthesisProvider()",
+      "kind": "function",
+      "signature": "createBrowserSpeechSynthesisProvider({id,model,language}={})",
+      "entrypoints": ["arcane-os/ai/browser-speech"],
+      "primaryImport": "arcane-os/ai/browser-speech",
+      "group": "Native browser speech",
+      "summary": "Creates a native browser TTS provider with silent voice discovery and preparation, live catalog subscriptions, and owned playback.",
+      "availability": "Browser with speechSynthesis and SpeechSynthesisUtterance; no SDK model, Worker or storage required",
+      "protocol": "arcane-ai-provider/2 tts/synthesize with native-speech playback descriptors",
+      "normalization": "Preserves complete input and native voiceURI/language metadata; setDefaultVoice changes future preparations without replacing the provider; explicit playback owns order, pause, resume, stop, completion and release; browser voices may use remote services and no audio file is fabricated"
+    },
+    {
+      "id": "twin-cloud:generateImages",
+      "name": "generateImages",
+      "displayName": "generateImages()",
+      "kind": "function",
+      "signature": "async generateImages({model,prompt,parameters={},twinKey,getApiKey,signal=null,id=Date.now(),onRequest,onResponse,onProgress}={})",
+      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "primaryImport": "arcane-os/ai/twin-cloud",
+      "group": "TWiN Cloud image generation",
+      "summary": "Generates caller-selected images and returns every image as a Blob in provider order.",
+      "availability": "Node and Browser with Fetch, Blob and AbortController; remote HTTPS provider",
+      "protocol": "TWiN Cloud async FAL Flux Schnell or Stable Diffusion image generation",
+      "normalization": "Returns {images:[{blob,mediaType,width?,height?}]}; preserves complete prompts and provider parameters, observes semantic progress and complete diagnostics, submits once, polls accepted jobs, propagates cancellation and retains no history or durable media"
+    },
+    {
+      "id": "twin-cloud:fetchHTTPResponse",
+      "name": "fetchHTTPResponse",
+      "displayName": "fetchHTTPResponse()",
+      "kind": "function",
+      "signature": "async fetchHTTPResponse(url,options)",
+      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "primaryImport": "arcane-os/ai/twin-cloud",
+      "group": "Shared AI transport integration",
+      "summary": "Returns a successful unconsumed Fetch Response through the shared AI HTTP owner.",
+      "availability": "Node and Browser",
+      "protocol": "Shared AI HTTP transport",
+      "normalization": "Preserves caller Fetch options and complete error bodies; repeats only overload HTTP 429 after 3000 ms; signal cancellation uses ARCANE_AI_REQUEST_ABORTED"
+    },
+    {
+      "id": "twin-cloud:fetchJSONResponse",
+      "name": "fetchJSONResponse",
+      "displayName": "fetchJSONResponse()",
+      "kind": "function",
+      "signature": "async fetchJSONResponse(url,options)",
+      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "primaryImport": "arcane-os/ai/twin-cloud",
+      "group": "Shared AI transport integration",
+      "summary": "Reads the complete successful provider JSON through the shared HTTP owner.",
+      "availability": "Node and Browser",
+      "protocol": "Shared AI HTTP transport",
+      "normalization": "Requires application/json, retains every parsed field without envelope validation, and checks cancellation before delivery"
+    },
+    {
+      "id": "twin-cloud:structuredOutputFormat",
+      "name": "structuredOutputFormat",
+      "displayName": "structuredOutputFormat()",
+      "kind": "function",
+      "signature": "structuredOutputFormat(value=false)",
+      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "primaryImport": "arcane-os/ai/twin-cloud",
+      "group": "Shared AI transport integration",
+      "summary": "Normalizes the existing structured-output option while preserving a supplied schema.",
+      "availability": "Node and Browser",
+      "protocol": "Shared AI structured-output options",
+      "normalization": "False/null/undefined return null, true/json return json, a plain schema object is returned unchanged, and other inputs use AI_STRUCTURED_OUTPUT_INVALID"
+    },
+    {
+      "id": "twin-cloud:openAIResponseFormat",
+      "name": "openAIResponseFormat",
+      "displayName": "openAIResponseFormat()",
+      "kind": "function",
+      "signature": "openAIResponseFormat(format)",
+      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "primaryImport": "arcane-os/ai/twin-cloud",
+      "group": "Shared AI transport integration",
+      "summary": "Maps normalized structured-output settings to chat-completion response_format.",
+      "availability": "Node and Browser",
+      "protocol": "Shared AI structured-output options",
+      "normalization": "Returns json_object, strict json_schema named structured_response with the original schema, or null; does not validate schema contents"
+    },
+    {
+      "id": "twin-cloud:isAIRequestAbort",
+      "name": "isAIRequestAbort",
+      "displayName": "isAIRequestAbort()",
+      "kind": "function",
+      "signature": "isAIRequestAbort(error,signal)",
+      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "primaryImport": "arcane-os/ai/twin-cloud",
+      "group": "Shared AI transport integration",
+      "summary": "Recognizes an aborted signal or an existing AI request cancellation error.",
+      "availability": "Node and Browser",
+      "protocol": "Shared AI cancellation",
+      "normalization": "Returns a boolean for AbortError or ARCANE_REQUEST_ABORTED, ARCANE_AI_REQUEST_ABORTED, and AI_REQUEST_ABORTED; changes no operation"
+    },
+    {
+      "id": "twin-cloud:normalizeAIRequestAbort",
+      "name": "normalizeAIRequestAbort",
+      "displayName": "normalizeAIRequestAbort()",
+      "kind": "function",
+      "signature": "normalizeAIRequestAbort(error)",
+      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "primaryImport": "arcane-os/ai/twin-cloud",
+      "group": "Shared AI transport integration",
+      "summary": "Returns the common AI AbortError while preserving the original cause.",
+      "availability": "Node and Browser",
+      "protocol": "Shared AI cancellation",
+      "normalization": "Preserves an existing ARCANE_AI_REQUEST_ABORTED value or returns an AbortError with that code and the supplied cause"
     }
   ]
 }

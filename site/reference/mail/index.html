@@ -2,23 +2,23 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
-  <meta name="description" content="Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is network and durable-state work, while the Resend credential belongs in the local Node gateway rather than in browser or WebAssembly state.">
+  <meta name="description" content="Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is network and durable-state work. The Resend credential belongs in the Node gateway and is never included in browser or WebAssembly state.">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
-  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/mail/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css?v=back-to-top"><link rel="stylesheet" href="../reference.css?v=visible-toolbar">
-  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Mail gateway and durable outbox · Arcane OS SDK"><meta property="og:description" content="Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is network and durable-state work, while the Resend credential belongs in the local Node gateway rather than in browser or WebAssembly state."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/mail/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Mail gateway and durable outbox · Arcane OS SDK"><meta name="twitter:description" content="Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is network and durable-state work, while the Resend credential belongs in the local Node gateway rather than in browser or WebAssembly state."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <title>Mail gateway and durable outbox | Arcane OS SDK</title><script src="../../app.js?v=back-to-top" defer></script><script src="../reference.js" type="module"></script>
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/mail/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Mail gateway and durable outbox · Arcane OS SDK"><meta property="og:description" content="Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is network and durable-state work. The Resend credential belongs in the Node gateway and is never included in browser or WebAssembly state."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/mail/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Mail gateway and durable outbox · Arcane OS SDK"><meta name="twitter:description" content="Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is network and durable-state work. The Resend credential belongs in the Node gateway and is never included in browser or WebAssembly state."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Mail gateway and durable outbox | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Mail gateway and durable outbox</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="mail-gateway-and-durable-outbox">Mail gateway and durable outbox</h1><p class="doc-lead">Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is network and durable-state work, while the Resend credential belongs in the local Node gateway rather than in browser or WebAssembly state.</p><div class="doc-meta"><span>SDK 0.5.18</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Mail gateway and durable outbox</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="mail-gateway-and-durable-outbox">Mail gateway and durable outbox</h1><p class="doc-lead">Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is network and durable-state work. The Resend credential belongs in the Node gateway and is never included in browser or WebAssembly state.</p><div class="doc-meta"><span>SDK 0.51.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/mail.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#ownership-and-availability">Ownership and availability</a><a href="#public-npm-import">Public npm import</a><a href="#two-separate-credential-boundaries">Two separate credential boundaries</a><a href="#configure-the-browser-runtime">Configure the browser runtime</a><a href="#durable-send-semantics">Durable send semantics</a><a href="#operate-the-cli-and-local-gateway">Operate the CLI and local gateway</a><a href="#operational-verification">Operational verification</a></nav></details><p>Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is
-network and durable-state work, while the Resend credential belongs in the
-local Node gateway rather than in browser or WebAssembly state.</p>
+      <article class="prose reference-prose" data-reference-source="docs/reference/mail.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#ownership-and-availability">Ownership and availability</a><a href="#public-npm-import">Public npm import</a><a href="#provider-and-subscription-credentials">Provider and subscription credentials</a><a href="#configure-the-browser-runtime">Configure the browser runtime</a><a href="#durable-send-semantics">Durable send semantics</a><a href="#operate-the-cli-and-gateway">Operate the CLI and gateway</a><a href="#configure-subscription-verification">Configure subscription verification</a><a href="#error-reports-and-retries">Error reports and retries</a><a href="#gateway-request-lifecycle">Gateway request lifecycle</a><a href="#operational-verification">Operational verification</a></nav></details><p>Arcane Mail is a pure-JavaScript SDK path. It does not use WebAssembly: mail is
+network and durable-state work. The Resend credential belongs in the Node
+gateway and is never included in browser or WebAssembly state.</p>
 <h2 id="ownership-and-availability">Ownership and availability</h2>
 <div class="table-wrap" data-columns="3" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
@@ -50,20 +50,22 @@ local Node gateway rather than in browser or WebAssembly state.</p>
 </tr>
 <tr>
 <td><code>arcane mail serve</code></td>
-<td>Node on the local machine</td>
-<td>Authenticates the local caller, protects the provider credential, applies any explicitly configured recipient policy, and makes the single server-side Resend request.</td>
+<td>Node on the configured host</td>
+<td>Owns caller verification, protects the provider credential, applies explicitly configured recipient and origin settings, and makes one server-side Resend request.</td>
 </tr>
 <tr>
 <td><code>arcane mail key ...</code></td>
-<td>Node on Windows</td>
-<td>Stores, inspects, or deletes a Resend API key in Windows Credential Manager.</td>
+<td>Node on Windows, Linux, or macOS</td>
+<td>Stores, inspects, or deletes a Resend API key in the selected <code>.arcane.env.json</code>.</td>
 </tr></tbody>
 </table>
 </div>
 <p>The browser never receives the Resend API key. The gateway never writes that
 key to source, argv, logs, events, fixtures, browser storage, or its public
-lifecycle result. Non-Windows hosts report credential operations as unavailable;
-there is no plaintext fallback.</p>
+lifecycle result. The CLI and gateway use the same Node filesystem and network
+interfaces on Windows, Linux, and macOS. An Android host supplies a compatible
+Node runtime and an accessible configuration directory; the mail implementation
+contains no Windows credential process or platform-specific path convention.</p>
 <h2 id="public-npm-import">Public npm import</h2>
 <p>The portable programmatic contract is one subpath:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import Mail,{
@@ -82,51 +84,74 @@ there is no plaintext fallback.</p>
 and <code>sendMailReport</code>.</li>
 </ul>
 <p>This entrypoint contains only the portable browser/WebView runtime, outbox, and
-transport contract. It does not import the Node HTTP gateway or Windows
-Credential Manager adapter. Programmatic developer tooling reaches those
+transport contract. It does not import the Node HTTP gateway or its filesystem
+credential adapter. Programmatic developer tooling reaches those
 host-owned operations through the existing <code>createToolchain().mail(...)</code>
 boundary; ordinary operators use <code>arcane mail send</code>, <code>arcane mail serve</code>, and
 <code>arcane mail key ...</code>. This keeps Node credential and server authority out of a
 browser import while preserving one shared CLI/toolchain implementation.</p>
-<h2 id="two-separate-credential-boundaries">Two separate credential boundaries</h2>
+<h2 id="provider-and-subscription-credentials">Provider and subscription credentials</h2>
 <p>Arcane Mail deliberately separates two credentials:</p>
 <ul>
-<li>The <strong>Resend API key</strong> is provider authority. <code>arcane mail key set &lt;profile&gt;</code>
-stores it in Windows Credential Manager. <code>mail send --profile &lt;profile&gt;</code> and
-<code>mail serve --profile &lt;profile&gt;</code> read it only inside the owning Node process.</li>
-<li>The <strong>mail app key</strong> authenticates one browser/application caller to the
-loopback gateway. It is supplied to <code>mail serve</code> through hidden terminal
-input, or through redirected input with <code>--app-key-stdin</code>, and must match the
-browser&#39;s <code>arcane.config.mail.appKey</code>. It is a nonempty printable ASCII
-bearer-like local authentication value, never the Resend API key.</li>
+<li>The <strong>Resend API key</strong> is provider authority. The Node process reads it from
+<code>.arcane.env.json</code>. <code>arcane mail key set [profile]</code> can store it there through hidden
+input; <code>mail send</code> and <code>mail serve</code> read the selected profile inside that process.</li>
+<li>The <strong>subscription key</strong> is the application user&#39;s subscription credential.
+When present, the browser sends it as <code>Authorization: Bearer &lt;subscriptionKey&gt;</code>,
+with the exact application name in <code>X-Mail-App</code>. The application name identifies the
+subscription account to verify; it is a separate field from the key and the
+report content.</li>
 </ul>
 <p>Do not put either secret on the command line. Command-line arguments may be
-recorded by the operating system or shell history. Structured CLI output
-requires the matching explicit redirected-input flag and rejects TTY input so
-the terminal cannot echo a secret.</p>
-<p>The mail app key is not confidential from scripts executing in the same page:
-same-runtime script or XSS can read browser configuration and issue the same
-request. Inject it at runtime, never hardcode it in shipped assets, protect the
-page&#39;s script boundary, restrict the exact gateway destination, and rotate it
-when page or process trust is lost. It protects the loopback server from
-unadmitted local callers; it is not provider authority or a replacement for
-browser application security.</p>
+recorded by the operating system or shell history. The credential-store
+command uses hidden terminal input or explicitly selected redirected input;
+subscription credentials are supplied through runtime configuration.</p>
+<p>Subscription credentials stay in runtime configuration or the canonical User
+entity. They are not added to reports, outbox records, delivery events, or
+provider payloads. Supply credentials at runtime; do not hardcode them in
+shipped source or fixtures.</p>
 <h2 id="configure-the-browser-runtime">Configure the browser runtime</h2>
-<p>One application declares an exact app id, gateway endpoint, and local app key:</p>
+<p>Configure Mail before its durable lifecycle starts:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">globalThis.arcane = globalThis.arcane || {};
 globalThis.arcane.config = globalThis.arcane.config || {};
 globalThis.arcane.config.mail = {
-    appName: &#39;arcane-dev&#39;,
-    appKey: localMailAppKey,
-    endpoint: &#39;http://127.0.0.1:8025/v1/mail&#39;
+    appName: &#39;My application&#39;
 };
 </code></pre></div>
-<p>The transport endpoint must be HTTPS or loopback HTTP at <code>localhost</code>,
-<code>127.0.0.1</code>, or <code>[::1]</code>. The SDK CLI gateway itself binds numeric loopback only. An
-explicit HTTPS endpoint receives the app key as <code>X-Mail-Key</code>, so its ownership
-and trust must be verified before configuration. A hosted default is derived
-only when the page declares an admitted Arcane mail base domain; otherwise
-configuration fails rather than selecting an arbitrary remote host.</p>
+<p><code>appName</code> is an arbitrary nonempty string, preserved as supplied. <code>BOSS</code> and
+<code>TWiN</code> are examples, not an enum or an admission list. When <code>appName</code> is omitted,
+Mail reads the page&#39;s <code>arcane-app-id</code> metadata without changing its value.</p>
+<p>On an HTTP or HTTPS page, the default endpoint is <code>/v1/mail</code> on the current
+origin, including its port. Mail does not infer a base domain, select a mail
+subdomain, or treat loopback addresses specially. An explicit <code>endpoint</code> may
+select a shared server on another domain. The transport resolves it through
+the URL parser and accepts HTTP or HTTPS; relative URLs and query strings are
+supported. The gateway routes by pathname. Its configured CORS origins must
+include a caller on another origin.</p>
+<p>An explicit <code>endpoint: &#39;&#39;</code> disables HTTP delivery and selects the existing
+native <code>Arcane.mail.send</code> fallback when available. Pages with a non-HTTP origin
+also have no default HTTP endpoint. Configured HTTP delivery takes precedence
+over an available native bridge.</p>
+<p>An explicit nonempty string <code>subscriptionKey</code> supplies the HTTP credential.
+When it is omitted, Mail resolves the current canonical User entity at the actual HTTP delivery,
+waits for its existing <code>load()</code> operation, and reads <code>subscription_key</code>.
+An injected <code>options.user</code> retains precedence, including an explicit <code>null</code>.
+Mail does not retain a separate User instance, so later deliveries observe a
+replacement canonical User. This adds no page-startup wait, polling, new
+credential storage, or migration of saved data.</p>
+<p>An absent key, <code>null</code>, or an empty string omits the Authorization header; the
+transport does not block initial setup because a key is missing. Explicit
+<code>subscriptionKey: null</code> or <code>subscriptionKey: &#39;&#39;</code> also skips User lookup.
+A supplied value of another type is rejected. A gateway with subscription
+verification configured owns rejection of requests without a usable key,
+subject to its <a href="#automatic-same-ip-exception">automatic same-IP exception</a>.</p>
+<p>For a caller-owned key and shared endpoint:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">globalThis.arcane.config.mail = {
+    appName: &#39;Another application&#39;,
+    subscriptionKey: currentSubscriptionKey,
+    endpoint: &#39;https://mail.example.test/v1/mail&#39;
+};
+</code></pre></div>
 <p>The ordinary browser transport has no automatic request deadline and reads the
 complete gateway response. A caller may explicitly supply a positive
 <code>requestTimeout</code> when its own lifecycle requires a deadline; cancellation then
@@ -136,7 +161,7 @@ accepted the request.</p>
 <p><code>Mail.send(to, subject, payload, messageStyle, messageType)</code> preserves the
 existing signature. <code>messageType</code> is <code>error</code>, <code>report</code>, or <code>crisis_detected</code>.
 Report and crisis mail require at least one recipient; error mail may use the
-gateway&#39;s configured allowlisted fallback recipients.</p>
+gateway&#39;s configured fallback recipients.</p>
 <p>In a browser, the module owns the one <code>window.mail</code> singleton. An explicit
 <code>new Mail(config, options)</code> may configure that owned singleton only before its
 durable lifecycle or outbox has begun; later reconfiguration fails with
@@ -151,9 +176,10 @@ option <code>{includeContext:true}</code>, every message also captures
 current User entity and add its <code>username</code>, <code>email</code>, <code>language</code>, and <code>phone</code>
 values to the locally rendered content. Those fields are then stored and sent
 unencrypted as part of the message, so the application owns consent, purpose,
-recipient scope, retention, and disclosure. Without that option, Mail neither
-loads the User profile nor adds the path/profile fields. The generated
-<code>source_at</code> timestamp, caller-supplied payload, subject, type, and recipients
+recipient scope, retention, and disclosure. Without that option, Mail adds no
+path/profile fields to the report. HTTP subscription lookup may still load
+the User at delivery without copying profile fields into the report. The
+generated <code>source_at</code> timestamp, caller-supplied payload, subject, type, and recipients
 remain part of the requested report in either mode.</p>
 <p>The public <code>Mail</code> integration requires its compatible DBOPFS adapter. Before the
 first delivery attempt, it serializes the exact provider-neutral report and
@@ -169,8 +195,9 @@ durable claims then belong to that adapter&#39;s implemented <code>get</code>, <
 <code>getAllKeys</code>, and shared-lock semantics rather than to DBOPFS. The browser
 default uses <code>navigator.locks</code>; when that cross-context authority is absent,
 the outbox reports <code>MAIL_OUTBOX_LOCK_UNAVAILABLE</code> and does not start the drain.</p>
-<p>Call <code>await mail.start()</code> during application startup so pre-existing records
-are scanned even when the application does not send a new report. The first
+<p>Start <code>mail.start()</code> during application startup so pre-existing records are
+scanned even when the application does not send a new report. Observe its
+completion or error without holding page rendering behind the drain. The first
 <code>send()</code> also starts the lifecycle if needed.</p>
 <div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
@@ -300,9 +327,13 @@ boundary.</p>
 <p>Mail publishes complete semantic events through the SDK singleton event
 authority. Public detail includes the full mutable durable record, serialized
 report, result or failure, provider details, and complete drain inventory
-available at that transition. It never includes the Resend API key or mail app
-key. Listener exceptions are observational and cannot change a committed mail
-operation result.</p>
+available at that transition. It never includes the Resend API key or
+subscription key. Listener exceptions are observational and cannot change a
+committed mail operation result.</p>
+<p>Provider IDs, provider codes, and nonempty failure codes retain their complete
+string values through delivery, persistence, and retrieval. They have no SDK
+character grammar. Missing values retain the existing fallback behavior.
+Request IDs and outbox filenames retain their existing contracts.</p>
 <p>When both an explicit endpoint and native <code>Arcane.mail.send</code> exist, Mail uses
 the configured HTTP endpoint so the authenticated SDK gateway can return its
 complete provider result. The native bridge remains a fallback when no endpoint
@@ -312,69 +343,600 @@ is retained as an uncertain same-key retry, while temporary native transport
 unavailability is a non-ambiguous retryable failure. Once a valid accepted
 result has returned, a racing lifecycle cancellation cannot erase that
 committed acceptance result.</p>
-<h2 id="operate-the-cli-and-local-gateway">Operate the CLI and local gateway</h2>
-<p>Store one Resend key under a local profile:</p>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane mail key set arcane-dev
-arcane mail key status arcane-dev
-arcane mail key delete arcane-dev
+<h2 id="operate-the-cli-and-gateway">Operate the CLI and gateway</h2>
+<h3 id="mail-cli-parameters">Mail CLI parameters</h3>
+<p><code>mail serve</code> starts the shared mail server. <code>mail send</code> makes one direct Resend
+request. <code>mail key set|status|delete</code> manages the provider credential.</p>
+<div class="table-wrap" data-columns="4" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Command</th>
+<th>What it does</th>
+<th>When omitted</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--app &lt;label&gt;</code></td>
+<td><code>mail serve</code></td>
+<td>Supplies a fallback application label for server events. An incoming <code>X-Mail-App</code> supplies the request&#39;s label. This option does not choose a Stripe account or limit which apps may send mail.</td>
+<td>Uses <code>mail.appId</code> when configured; otherwise adds no fallback label.</td>
+</tr>
+<tr>
+<td><code>--from &lt;sender&gt;</code></td>
+<td><code>mail serve</code>, <code>mail send</code></td>
+<td>Overrides the sender, for example <code>&quot;Dragon Dispatch &lt;dispatch@example.com&gt;&quot;</code>. On the server, the override applies to every report. Resend must accept that sender.</td>
+<td>Uses <code>mail.from</code> when configured, then the report&#39;s <code>from</code> or provider template default.</td>
+</tr>
+<tr>
+<td><code>--report-stdin</code></td>
+<td><code>mail send</code></td>
+<td>Reads one complete UTF-8 report JSON object from redirected standard input, including recipients, subject, body, and other provider fields.</td>
+<td>Required; the command reports a usage error.</td>
+</tr>
+<tr>
+<td><code>--report-key &lt;id&gt;</code></td>
+<td><code>mail send</code></td>
+<td>Identifies one intended email and is forwarded unchanged as Resend&#39;s <code>Idempotency-Key</code>. Use a new value for a new email; reuse the value and unchanged report for an intentional retry. It is not a credential.</td>
+<td>Required; the command reports a usage error.</td>
+</tr>
+<tr>
+<td><code>--host &lt;address&gt;</code></td>
+<td><code>mail serve</code></td>
+<td>Selects the listener bind address. <code>0.0.0.0</code> accepts connections through all IPv4 interfaces.</td>
+<td>Uses <code>mail.host</code>, then <code>0.0.0.0</code>.</td>
+</tr>
+<tr>
+<td><code>--port &lt;number&gt;</code></td>
+<td><code>mail serve</code></td>
+<td>Selects the HTTPS listener port. Explicit <code>0</code> asks the operating system for an available port.</td>
+<td>Uses <code>mail.port</code>, then <code>4433</code>.</td>
+</tr>
+<tr>
+<td><code>--origin &lt;origin&gt;</code></td>
+<td><code>mail serve</code></td>
+<td>Replaces the configured CORS origins with one exact browser origin, including scheme and any nondefault port. Use the JSON <code>origins</code> array for multiple origins; repeated flags keep only the last value.</td>
+<td>Uses <code>mail.origins</code>; an absent or empty list uses the current request authority. Requests without an <code>Origin</code> header continue normally.</td>
+</tr>
+<tr>
+<td><code>--allow-to &lt;addresses&gt;</code></td>
+<td><code>mail serve</code></td>
+<td>Replaces the recipient allowlist with a comma-separated list. Applies to <code>to</code>, <code>cc</code>, and <code>bcc</code>, and supplies error-report fallback recipients unless <code>mail.errorRecipients</code> is configured separately.</td>
+<td>Uses <code>mail.recipientAllowlist</code>; an absent or empty list leaves recipients unrestricted.</td>
+</tr>
+<tr>
+<td><code>--request-timeout &lt;ms&gt;</code></td>
+<td><code>mail serve</code>, <code>mail send</code></td>
+<td>Sets the deadline for one Resend request, in milliseconds. A timeout after sending begins leaves delivery uncertain; it does not schedule a retry.</td>
+<td>Uses <code>mail.providerTimeoutMs</code>; absent or null adds no provider deadline.</td>
+</tr>
+<tr>
+<td><code>--profile &lt;name&gt;</code></td>
+<td><code>mail serve</code>, <code>mail send</code></td>
+<td>Selects an alternate saved Resend credential for this invocation. One listener uses that selected provider key for all callers.</td>
+<td>Uses <code>mail.profile</code> if configured, otherwise the normal <code>mail.apiKey</code>. The single-key setup needs no profile setting.</td>
+</tr>
+<tr>
+<td><code>[profile]</code></td>
+<td><code>mail key set\|status\|delete</code></td>
+<td>Optional positional name of the credential to manage; it is not a flag.</td>
+<td>Manages the normal <code>mail.apiKey</code>, independently of <code>mail.profile</code>.</td>
+</tr>
+<tr>
+<td><code>--secret-stdin</code></td>
+<td><code>mail key set</code></td>
+<td>Reads the Resend API key from deliberately redirected standard input instead of the hidden terminal prompt.</td>
+<td>Prompts with hidden input. Machine-output mode requires redirected input.</td>
+</tr>
+<tr>
+<td><code>--output human\|json\|ndjson</code></td>
+<td>All mail commands</td>
+<td>Selects readable console output, one JSON result, or newline-delimited JSON events.</td>
+<td>Uses <code>human</code>.</td>
+</tr>
+<tr>
+<td><code>--help</code></td>
+<td>CLI</td>
+<td>Displays CLI help instead of running the mail operation.</td>
+<td>Runs the requested operation.</td>
+</tr>
+<tr>
+<td><code>--version</code></td>
+<td>CLI</td>
+<td>Displays the SDK version instead of running the mail operation.</td>
+<td>Runs the requested operation.</td>
+</tr></tbody>
+</table>
+</div>
+<p>There is no <code>--report</code> flag. <code>--report-stdin</code> supplies the message;
+<code>--report-key</code> identifies that same message across attempts. Browser <code>Mail.send()</code>
+generates and retains its report key automatically.</p>
+<p>Mail reads configuration from the directory in which the command runs;
+<code>--workspace</code> does not relocate these mail files. Mail HTTPS uses <code>mail.certPath</code>
+and <code>mail.keyPath</code> in JSON. The <code>--cert</code>, <code>--key</code>, <code>--https</code>, and <code>--http-port</code>
+flags belong to browser <code>dev</code>/<code>run</code>, and <code>--http</code> belongs to <code>dev</code>.</p>
+<h3 id="mail-configuration">Mail configuration</h3>
+<p>Keep app-supplied SDK settings under named capability members, starting with
+<code>mail</code>. Put the nonsecret mail settings in <code>arcane.config.json</code> in the directory
+from which the command runs:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>json</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-json">{
+  &quot;mail&quot;: {
+    &quot;host&quot;: &quot;0.0.0.0&quot;,
+    &quot;port&quot;: 4433,
+    &quot;origins&quot;: [
+      &quot;https://dragons.example&quot;,
+      &quot;https://www.dragons.example&quot;
+    ],
+    &quot;certPath&quot;: &quot;certificates/fullchain.pem&quot;,
+    &quot;keyPath&quot;: &quot;certificates/private-key.pem&quot;
+  }
+}
+</code></pre></div>
+<p>Put the Resend provider key in the separate <code>.arcane.env.json</code>:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>json</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-json">{
+  &quot;mail&quot;: {
+    &quot;apiKey&quot;: &quot;&quot;
+  }
+}
+</code></pre></div>
+<p>The SDK repository ignores <code>.arcane.env.json</code>. Keep the same entry in a consuming
+project&#39;s <code>.gitignore</code>. <code>arcane.config.json</code> contains settings suitable for source
+control; its certificate fields contain file paths, never PEM contents or provider
+keys. Both files are read directly as JSON without copying values into
+<code>process.env</code>. Other top-level capability members remain untouched. The portable
+browser <code>arcane-os/mail</code> import does not read these Node-side files.</p>
+<p>The supported <code>arcane.config.json.mail</code> fields are:</p>
+<div class="table-wrap" data-columns="3" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Purpose and default</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>host</code></td>
+<td>string</td>
+<td>Listener bind address; defaults to <code>0.0.0.0</code>.</td>
+</tr>
+<tr>
+<td><code>port</code></td>
+<td>integer</td>
+<td>Listener port; defaults to <code>4433</code>. Explicit <code>0</code> selects an available port.</td>
+</tr>
+<tr>
+<td><code>origins</code></td>
+<td>string array</td>
+<td>Exact allowed browser origins. An absent or empty list uses the current request authority as described below.</td>
+</tr>
+<tr>
+<td><code>profile</code></td>
+<td>string</td>
+<td>Resend credential profile for send/serve; defaults to <code>mail</code>.</td>
+</tr>
+<tr>
+<td><code>from</code></td>
+<td>string</td>
+<td>Optional shared sender override. Omit it to retain each report&#39;s sender or provider template default.</td>
+</tr>
+<tr>
+<td><code>appId</code></td>
+<td>string</td>
+<td>Optional server event label; does not restrict incoming application names.</td>
+</tr>
+<tr>
+<td><code>recipientAllowlist</code></td>
+<td>string array</td>
+<td>Optional allowed recipients; absent or empty means unrestricted recipients.</td>
+</tr>
+<tr>
+<td><code>errorRecipients</code></td>
+<td>string array</td>
+<td>Error-report fallback recipients; defaults to the effective recipient allowlist. An explicit empty array supplies no fallback.</td>
+</tr>
+<tr>
+<td><code>bodyTimeoutMs</code></td>
+<td>integer or null</td>
+<td>Optional request-body deadline in milliseconds; absent or null adds no deadline.</td>
+</tr>
+<tr>
+<td><code>providerTimeoutMs</code></td>
+<td>integer or null</td>
+<td>Optional provider deadline in milliseconds; absent or null adds no deadline.</td>
+</tr>
+<tr>
+<td><code>retryableDelayMs</code></td>
+<td>positive integer</td>
+<td>Retry guidance in a retryable result; defaults to <code>1000</code>. It does not schedule a retry.</td>
+</tr>
+<tr>
+<td><code>certPath</code></td>
+<td>string</td>
+<td>PEM certificate-chain file path, required for gateway HTTPS.</td>
+</tr>
+<tr>
+<td><code>keyPath</code></td>
+<td>string</td>
+<td>PEM private-key file path, required for gateway HTTPS.</td>
+</tr></tbody>
+</table>
+</div>
+<p>Resend is the supported provider; no provider selector is needed. Keep callbacks,
+injected providers, <code>fetchImpl</code>, <code>onEvent</code>, <code>requestIdFactory</code>,
+<code>verifySubscription</code>, and <code>AbortSignal</code> values in programmatic options. They are
+runtime inputs, not JSON settings. Reports and their idempotency keys remain
+inputs to each send operation.</p>
+<p>The single-key configuration above needs no <code>profile</code> or <code>profiles</code> member.
+Omitting the selection uses <code>.arcane.env.json.mail.apiKey</code>; multiple apps and
+domains can share that provider key.</p>
+<p>For callers that already select an alternate credential, named-profile support
+remains available: <code>--profile &lt;name&gt;</code> or <code>mail.profile</code> selects
+<code>.arcane.env.json.mail.profiles[name].apiKey</code>. An absent named profile does not
+fall back to the default key. Selection happens once when send or serve starts;
+it does not map incoming apps or domains to different provider accounts.
+The profile selects Resend provider credentials, separately from the incoming
+application name and subscriber key. Existing top-level <code>RESEND_API_KEY</code> and
+<code>MAIL_PROFILES[profile].RESEND_API_KEY</code> remain supported. A nested selected
+<code>apiKey</code> takes precedence when the property exists, including null or an empty
+string, which means the selected key is absent. Only an absent nested key
+property permits fallback to the corresponding root or profile key.</p>
+<p>Programmatic operations resolve both files from <code>options.cwd</code>, then
+<code>options.workspaceRoot</code>, then <code>process.cwd()</code>, choosing the first supplied
+directory. The CLI uses its invocation directory. There is no upward directory
+search or dependency on a Windows installation directory or temporary-directory
+environment variable. Missing files are optional configuration sources; send and
+serve still report their missing required values before attempting delivery or
+binding. Malformed or unreadable files produce an error.</p>
+<p>Configuration precedence is explicit:</p>
+<ol>
+<li>A CLI/API option overrides its file setting when its value is not <code>undefined</code>.
+An explicit null retains the option&#39;s existing meaning; it does not select
+the file value again.</li>
+<li><code>arcane.config.json.mail</code> supplies nonsecret settings absent from those options.</li>
+<li><code>.arcane.env.json</code> root <code>MAIL_TLS_CERT_PATH</code> and <code>MAIL_TLS_KEY_PATH</code>
+supply certificate paths absent from the selected options and config member.</li>
+<li>Remaining settings use the defaults above.</li>
+</ol>
+<p>The existing programmatic aliases <code>origin</code>, <code>allowTo</code>, <code>errorTo</code>, and
+<code>requestTimeout</code> take precedence over their corresponding canonical options
+<code>origins</code>, <code>recipientAllowlist</code>, <code>errorRecipients</code>, and <code>providerTimeoutMs</code> when
+both are supplied. The CLI continues to expose <code>--origin</code>, <code>--allow-to</code>, and
+<code>--request-timeout</code>. <code>origin</code> accepts a string or an array; the recipient aliases
+accept address arrays or comma-separated strings. Lists replace the lower-priority
+list completely. The configuration reader does not concatenate or deduplicate
+lists, rewrite case, or automatically add local addresses.</p>
+<p>Use the JSON <code>origins</code> array for multiple origins. Repeating the current
+<code>--origin</code> option keeps only its last value; there is no <code>--origins</code> CLI option.
+The CLI leaves omitted host, port, and send/serve profile options unset until
+configuration resolves, so its defaults do not mask file settings.</p>
+<p>Keep the configuration in the deployment directory even when the SDK is nested
+below it:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">my-site/
+├── arcane.config.json
+├── .arcane.env.json
+└── arcane-os-sdk/
+    └── bin/arcane.mjs
+</code></pre></div>
+<p>Run from <code>my-site</code>, for example:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>sh</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-sh">node ./arcane-os-sdk/bin/arcane.mjs mail serve
+</code></pre></div>
+<p>The SDK directory does not choose the configuration location. When upgrading
+from SDK 0.22.1 or earlier, rename the existing <code>.env.json</code> to
+<code>.arcane.env.json</code> in the invocation directory, preserving its contents.
+The secret loader reads only <code>.arcane.env.json</code>; it does not read the old filename.
+Existing root key, profile, and TLS fields can remain in that file. Adopting the
+capability members does not perform an automatic rewrite or migration.</p>
+<p>The existing key commands manage the same file:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane mail key set
+arcane mail key status
+arcane mail key delete
 </code></pre></div>
 <p><code>key set</code> prompts with hidden input. <code>--secret-stdin</code> is the explicit
-non-interactive alternative and rejects a TTY.</p>
+non-interactive alternative and rejects a TTY. Each command accepts an optional
+profile argument, defaulting to <code>mail</code> independently of <code>arcane.config.json.mail.profile</code>.
+Set and delete preserve other JSON settings and profiles; status reports
+existence without returning the key. A new credential is written to the nested
+mail member. An existing root or profile credential is updated at its existing location
+unless the selected nested key property exists, in which case set updates that
+nested property. Delete removes both representations of only the selected key,
+so an older key cannot reappear through fallback. Other settings and profile
+containers remain intact.
+Results identify <code>storage: &#39;.arcane.env.json&#39;</code>. An already-absent deletion succeeds
+with <code>exists: false</code>.</p>
+<p>Existing Windows Credential Manager records remain untouched. The JSON path
+does not read, migrate, or delete those records; populate the selected JSON
+setting to use it. Missing files or missing/empty provider settings produce an
+actionable startup/send error naming the file and exact setting. Unreadable or
+invalid JSON is reported without including credential content in the error.</p>
 <p>Perform one provider attempt directly from the SDK CLI:</p>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane mail send --profile arcane-dev --from &quot;Arcane &lt;verified@example.com&gt;&quot; --report-key &lt;stable-id&gt; --report-stdin
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane mail send --from &quot;Arcane &lt;verified@example.com&gt;&quot; --report-key &lt;stable-id&gt; --report-stdin
 </code></pre></div>
-<p>The redirected UTF-8 JSON input is read completely. A report requires <code>type</code>,
-<code>to</code>, <code>subject</code>, and at least one of <code>text</code> or <code>html</code>; additional
-JSON-compatible provider fields are preserved. Direct CLI sends require at
-least one explicit recipient, including for <code>error</code> reports. Message content is
-not accepted in argv. Programmatic results and observer events preserve the
-complete report, provider request, provider response, and error detail while
+<p>The redirected UTF-8 JSON object is read completely. Its fields and values
+are retained; the Resend adapter removes the SDK&#39;s <code>type</code> routing field,
+uses <code>from</code> when configured (otherwise the report or provider template supplies
+the sender). Direct sending supplies no fallback recipients. Resend evaluates
+its own required provider fields. Message
+content is not accepted in argv. Programmatic results and observer events
+preserve the complete report, provider request, provider response, and error detail while
 never exposing either credential.</p>
-<p>The caller must create and retain a safe-character <code>--report-key</code> before the
+<p>The caller must create and retain a nonempty <code>--report-key</code> before the
 attempt. It is the Resend idempotency key and may be reused only with the same
 serialized report content for an intentional retry or reconciliation. The
 CLI performs exactly one attempt and never retries automatically. Exit zero
-requires a successful Resend response containing a valid provider id; that is
+requires a successful Resend response containing a nonempty string provider id; that is
 provider acceptance, not an inbox-delivery claim. Timeout, connection loss, or
 cancellation after the provider attempt begins is returned as an ambiguous
 nonzero outcome because the provider may already have accepted the request.
 Cancellation before the attempt exits 130 without sending.
 For both CLI mail operations, <code>--request-timeout</code> accepts 1 through 2147483647
-milliseconds, the Node timer range. When omitted, the SDK adds no provider
-deadline.</p>
-<p>Start the authenticated gateway:</p>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane mail serve --profile arcane-dev --from &quot;Arcane &lt;verified@example.com&gt;&quot; --app arcane-dev --origin http://127.0.0.1:8000 --allow-to recipient@example.com
+milliseconds, the Node timer range. The same range applies to configured body
+and provider deadlines. When no provider timeout is selected in options or
+configuration, the SDK adds no provider deadline.</p>
+<p><code>mail send</code> consumes the selected profile, sender, provider timeout, and retry
+guidance from the same configuration. It does not require gateway TLS paths.
+Send and serve read each required JSON file once, concurrently when both are
+needed, before consuming their settings. An injected <code>readCredential</code> remains
+the credential owner and reads once. With that injection, send reads only
+<code>arcane.config.json</code>; serve also reads <code>.arcane.env.json</code> for root TLS paths
+without interpreting its unused file credential.</p>
+<p>Start the gateway:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">npm exec -- arcane mail serve
 </code></pre></div>
-<p>Human output prompts for the separate mail app key with hidden input.
-Non-interactive structured output requires <code>--app-key-stdin</code> and redirected
-stdin. The server binds numeric loopback only; the default is
-<code>127.0.0.1:8025/v1/mail</code>.</p>
-<p>The gateway protects the provider credential by requiring:</p>
-<ul>
-<li>its exact numeric-loopback <code>Host</code> authority and <code>/v1/mail</code> route;</li>
-<li>an exact configured <code>Origin</code>, app id, and constant-time app-key match;</li>
-<li>complete JSON requests with at least one recipient, or configured fallback
-recipients for an <code>error</code> report;</li>
-<li>an optional explicit recipient allowlist when one is configured; and</li>
-<li>one fixed Resend endpoint with the stable Arcane report key forwarded as
-<code>Idempotency-Key</code>.</li>
-</ul>
-<p>The gateway returns <code>202</code> only after Resend returns a valid provider id.
+<p>The default listener is <code>0.0.0.0:4433</code>; <code>mail.host</code> and <code>mail.port</code> select its
+configured bind address and port, and explicit <code>--host</code> / <code>--port</code> override them.
+The server can serve callers from multiple domains on the same machine.
+Configure the caller&#39;s endpoint to reach that listener.</p>
+<p><code>mail serve</code> uses HTTPS with HTTP/2 on that selected port. The published
+<code>node-http-server</code> PEM API owns TLS and negotiates HTTP/2 or HTTP/1.1 on the
+same listener. It creates no additional plain-HTTP listener. The returned URL
+uses <code>https://</code>; <code>0.0.0.0</code> is the bind address, so callers use the deployed
+domain, for example <code>https://mail.example.com:4433/v1/mail</code>.</p>
+<p>Set <code>arcane.config.json.mail.certPath</code> to the PEM certificate chain and
+<code>mail.keyPath</code> to its PEM private-key file. These settings belong to the listener
+and apply regardless of the selected provider profile. The root
+<code>MAIL_TLS_CERT_PATH</code> and <code>MAIL_TLS_KEY_PATH</code> fields in <code>.arcane.env.json</code> remain
+fallbacks. Relative certificate paths resolve from the selected configuration
+directory, including explicit programmatic path options; absolute paths are also accepted.
+The certificate must cover the hostname callers use. One certificate may
+cover multiple names; the gateway does not require one certificate per calling
+application. Keep private-key files outside tracked source, such as in the
+already-ignored <code>.arcane/</code> directory or an existing host certificate directory.</p>
+<p>Startup reads each JSON file once, reports missing TLS settings before
+binding, and lets the TLS owner report unreadable or unusable PEM files. It
+does not generate certificates, modify system trust, or add a renewal watcher.
+No JSON configuration file is reread for an incoming HTTP request.
+Restart the gateway after the configured certificate files are renewed.
+The same Node file and TLS APIs are used on Windows, Linux, and macOS; Android
+requires a compatible Node host and accessible configuration and certificate
+paths. These platform contracts are separate from actual platform execution.</p>
+<p>The public <code>createToolchain().mail({action: &#39;serve&#39;, ...options})</code> operation
+uses the same settings with explicit options taking precedence. Internally,
+<code>startResendMailServer</code> accepts
+<code>certPath</code> and <code>keyPath</code> and retains its existing HTTP behavior when neither
+is supplied. That internal function is not an npm package export.</p>
+<p>If the selected port is occupied, startup reports
+<code>Mail port &lt;port&gt; is already taken, possibly by another mail server.</code>
+The CLI exits with status 1. Programmatic callers receive the same message,
+with native <code>EADDRINUSE</code> metadata and the original error retained as <code>cause</code>.
+The existing listener remains running; this launch does not retry or select
+another port.</p>
+<p><code>--app</code> is an optional server event label and does not restrict incoming
+application names. <code>--from</code> and <code>mail.from</code> are optional shared sender overrides;
+omit both to preserve each report&#39;s sender or its provider template&#39;s default.
+<code>mail.origins</code> supplies an array of exact allowed caller origins. An explicit
+<code>--origin</code> replaces that array; the programmatic <code>origin</code> alias also accepts an
+array. With no origins configured, the gateway accepts an Origin matching its request
+authority (<code>:authority</code> for HTTP/2, <code>Host</code> for HTTP/1.1) using HTTP or HTTPS.
+An Origin outside the configured list or current-authority default receives
+<code>403 mail_origin_not_allowed</code>. Origin strings are compared exactly: include the
+scheme and any nondefault port, with no path or trailing slash. There are no
+wildcards, subdomain expansion, normalization, or loopback exceptions.
+Requests without an <code>Origin</code> header continue normally. This is a declared-origin
+CORS list, not a client-IP or connecting-machine allowlist; ordinary
+server-to-server requests commonly omit Origin.
+Cross-origin preflight permits <code>Content-Type</code>, <code>Idempotency-Key</code>, <code>X-Mail-App</code>,
+and <code>Authorization</code>.</p>
+<p><code>mail.recipientAllowlist</code> or explicit <code>--allow-to</code> limits recipients when
+configured. An absent or empty effective list imposes no recipient allowlist.
+When configured, the list applies to
+every recipient in the resolved <code>to</code>, <code>cc</code>, and <code>bcc</code> fields, whether supplied
+as a string or an array. Sender, recipient, subject, and body
+values are not trimmed, lowercased, or filtered by an SDK email grammar at
+the gateway. Error reports with an empty <code>to</code> array use configured fallback
+recipients; other report content is preserved.</p>
+<h2 id="configure-subscription-verification">Configure subscription verification</h2>
+<p>Subscription verification is disabled during initial setup when
+<code>verifySubscription</code> is omitted. The server reports
+<code>callerAuthentication: &#39;none&#39;</code> and can perform mail delivery without a
+subscription key. Starting the ordinary CLI gateway uses this mode. This does
+not claim that a subscription was checked.</p>
+<h3 id="automatic-same-ip-exception">Automatic same-IP exception</h3>
+<p>The gateway automatically skips subscription verification when the incoming
+connection&#39;s nonempty <code>request.socket.remoteAddress</code> equals
+<code>request.socket.localAddress</code>. This also applies when a verifier is configured
+and the request has no subscription key or supplies an invalid one. The
+verification callback is not called for that request.</p>
+<p>No <code>.arcane.env.json</code> setting or domain allowlist is needed. The comparison uses
+the actual source and destination IP addresses exposed by Node&#39;s request socket
+for HTTP/1.1 and HTTP/2. It adds no DNS lookup, configuration read, cache, or
+interface scan. <code>Origin</code>, <code>Host</code>, <code>Forwarded</code>, and <code>X-Forwarded-For</code> do not
+establish the connection&#39;s IP equality.</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Caller connection</th>
+<th>Subscription behavior with a verifier configured</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>The verification service connects to mail using the same source and destination IP</td>
+<td>Skips subscription checking, allowing its service-generated emails without a subscriber key.</td>
+</tr>
+<tr>
+<td>A local development request has equal source and destination IPs, including an ordinary loopback connection</td>
+<td>Uses the same automatic exception. There is no special loopback rule.</td>
+</tr>
+<tr>
+<td>Another machine on the same intranet connects from a different IP</td>
+<td>Uses the configured subscription verifier. Sharing a network or subnet supplies no exception.</td>
+</tr>
+<tr>
+<td>Two services on one machine connect through different interface IPs</td>
+<td>Uses the configured subscription verifier when the actual addresses differ. Machine identity alone supplies no exception.</td>
+</tr>
+<tr>
+<td>The request has no usable socket source address</td>
+<td>Uses the configured subscription verifier; absent addresses do not count as equal.</td>
+</tr></tbody>
+</table>
+</div>
+<p>The exception skips only subscription checking. Existing CORS, route, method,
+idempotency-key, report, recipient, and provider handling still apply. The gateway
+continues to require its Resend provider credential and reports acceptance only
+after the provider accepts the email.</p>
+<h3 id="verification-callback-contract">Verification callback contract</h3>
+<p>The hosting process enables verification by supplying the programmatic
+<code>verifySubscription</code> function through
+<code>createToolchain().mail({action:&#39;serve&#39;, verifySubscription, ...options})</code>.
+The server then reports <code>callerAuthentication: &#39;subscription&#39;</code>, identifying the
+configured mode while retaining the same-IP exception above. The callback
+contract is:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">verifySubscription({appName, subscriptionKey, signal})
+</code></pre></div>
+<p>It may return a promise. Return exactly <code>true</code> for a valid subscription;
+return <code>false</code> for an invalid one, and throw when the verifier service fails.
+The gateway also treats any other returned value as invalid. <code>appName</code> is the
+exact incoming <code>X-Mail-App</code> value, <code>subscriptionKey</code> is the incoming Bearer
+key, and <code>signal</code> follows the request lifecycle. These control fields stay
+separate from the mail report and Resend payload. The verifier runs for each
+POST request outside the same-IP exception before any provider attempt; results
+are not cached.</p>
+<p><code>X-Mail-App</code> identifies the originating app so the verifier can select that
+app&#39;s subscription account, such as the appropriate Stripe account for <code>BOSS</code>
+or <code>TWiN</code>. It is separate from the gateway&#39;s optional <code>--app</code> event label.
+The missing-header and Bearer errors below apply only when <code>verifySubscription</code>
+is configured and the same-IP exception does not apply. Ordinary <code>mail serve</code>
+does not require either header.</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Configured-verifier outcome</th>
+<th>Gateway response</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Missing or empty <code>X-Mail-App</code></td>
+<td><code>400 mail_invalid_headers</code></td>
+</tr>
+<tr>
+<td>Missing or malformed Bearer credential</td>
+<td><code>401 mail_subscription_required</code></td>
+</tr>
+<tr>
+<td>Callback returns anything except <code>true</code></td>
+<td><code>401 mail_subscription_invalid</code></td>
+</tr>
+<tr>
+<td>Callback throws</td>
+<td><code>503 mail_subscription_verification_failed</code>, retryable with the configured <code>retryableDelayMs</code></td>
+</tr>
+<tr>
+<td>Request cancelled while verifying</td>
+<td><code>408 mail_request_cancelled</code>, with no provider attempt</td>
+</tr></tbody>
+</table>
+</div>
+<p>The <code>401</code> responses include <code>WWW-Authenticate: Bearer</code>. A successful callback
+permits the existing mail-delivery path; it is not itself a mail-acceptance
+result. The SDK supplies no default verification URL or built-in Stripe
+endpoint adapter. Connecting the actual subscription endpoint is a separate
+hosting integration.</p>
+<p>The gateway uses Node&#39;s native header representations. HTTP/1.1 uses
+<code>headersDistinct</code>, retaining its repeated-field detection. HTTP/2 uses the
+compatibility request&#39;s <code>headers</code> object; Node owns duplicate joining or
+discarding for each field. The SDK does not split a native header value again.</p>
+<p>CLI startup output says <code>Subscription verification: disabled</code> or
+<code>Subscription verification: configured</code>. Structured <code>server.ready</code> output
+includes the corresponding <code>callerAuthentication</code> value.</p>
+<h2 id="error-reports-and-retries">Error reports and retries</h2>
+<p>An incoming report with <code>type: &#39;error&#39;</code> is an email supplied by its caller.
+The gateway&#39;s <code>errorRecipients</code> setting only supplies fallback recipients for
+that report when its <code>to</code> array is empty. A gateway or provider failure returns
+an HTTP error and diagnostic events; it does not generate another error email.
+Gateway event-handler failures are written to the console. Each POST and each
+direct CLI send performs at most one provider attempt, with no automatic server retry.</p>
+<p>The browser outbox retains the same report and key after a retryable delivery
+failure. Each drain attempts each eligible record once; a later startup,
+connectivity event, or explicit drain can retry it. Browser <code>Errors</code> notification
+failure retains the same pending occurrence and logs a warning without scheduling
+itself again.</p>
+<p>A separate browser callback path can feed back into error reporting: a mail-event
+subscriber that repeatedly throws can reach global error capture, create another
+error report, and trigger another mail event. Subscriber failures cannot change
+an already committed mail result, though global capture can report them as new
+errors. This is a source-level possibility, not evidence of a deployed loop.</p>
+<p>For a verification service&#39;s own emails sent through the same IP, the gateway
+skips its subscription callback and proceeds to provider delivery. That removes
+the circular dependency <code>mail -&gt; verify subscription -&gt; send mail -&gt; verify subscription</code> for this connection path. Connections from a different IP still
+use the configured callback, whose owning service must preserve a verification
+path that can return without recursively depending on another verification.
+The exception does not change the separate browser event-subscriber behavior
+described above.</p>
+<h2 id="gateway-request-lifecycle">Gateway request lifecycle</h2>
+<p>The gateway uses the published <code>node-http-server</code> instance lifecycle. Its raw
+request hook hands the original request and response directly to the mail
+handler before body parsing or static routing. Socket inactivity timeout remains
+disabled; caller-selected mail deadlines, cancellation, and complete responses
+remain owned by the mail handler.</p>
+<p>The gateway handles POST requests to <code>/v1/mail</code> and the corresponding OPTIONS
+preflight. JSON parsing owns request readability; the gateway does not reject
+a parseable body because of its Content-Type spelling. One nonempty
+<code>Idempotency-Key</code> is forwarded unchanged to the fixed Resend endpoint. The
+browser and gateway preserve complete request and response content without
+body-size gates. With no event observer, the gateway does not construct event
+payloads or parse a second provider-request representation for observation.</p>
+<p>Requests whose path does not match <code>/v1/mail</code> receive <code>303 See Other</code> with an
+empty body and <code>Location: https://&lt;current-hostname&gt;/404.html</code>. The destination
+uses the request&#39;s HTTP/2 authority or HTTP/1.1 Host hostname, omits the API port,
+and replaces the requested path and query. For example:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Unmatched request URL</th>
+<th>Redirect destination</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>https://mail.thewizardnexus.com:4433/</code></td>
+<td><code>https://mail.thewizardnexus.com/404.html</code></td>
+</tr>
+<tr>
+<td><code>https://mail.precrisis.ai:4433/missing?example=1</code></td>
+<td><code>https://mail.precrisis.ai/404.html</code></td>
+</tr></tbody>
+</table>
+</div>
+<p>The HTTPS website on the current hostname owns that page. The mail listener
+only returns the redirect. Requests to <code>/v1/mail</code>, including its query-bearing
+form, retain the existing CORS policy, OPTIONS preflight, method handling, and
+structured API errors. For example, <code>GET /v1/mail</code> still receives <code>405</code>.
+Subscription verification and its automatic same-IP exception remain unchanged.</p>
+<p>The gateway returns <code>202</code> only after Resend returns a nonempty string provider id.
 Transport loss, an explicit caller-selected timeout, an invalid success body,
 or an unreadable provider response returns an explicit uncertain result and never claims
 delivery. Rate limits, concurrent idempotency requests, permanent validation
 failures, and provider failures are mapped to structured retryable/permanent
 results with the complete available provider response or error detail.</p>
 <h2 id="operational-verification">Operational verification</h2>
-<p>The focused SDK tests use only synthetic keys, addresses, responses, storage,
-and loopback requests. They do not contact Resend or send email. A live
+<p>The focused SDK tests use synthetic keys, addresses, responses, storage,
+and local HTTP requests. They do not contact Resend or send email. A live
 acceptance send is a separate operational boundary: use a disposable message,
-the real allowlist, and the selected credential profile, then verify both the
+the selected recipient configuration and credential profile, then verify both the
 gateway&#39;s provider-acceptance id and the intended inbox outcome.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#ownership-and-availability">Ownership and availability</a><a href="#public-npm-import">Public npm import</a><a href="#two-separate-credential-boundaries">Two separate credential boundaries</a><a href="#configure-the-browser-runtime">Configure the browser runtime</a><a href="#durable-send-semantics">Durable send semantics</a><a href="#operate-the-cli-and-local-gateway">Operate the CLI and local gateway</a><a href="#operational-verification">Operational verification</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#ownership-and-availability">Ownership and availability</a><a href="#public-npm-import">Public npm import</a><a href="#provider-and-subscription-credentials">Provider and subscription credentials</a><a href="#configure-the-browser-runtime">Configure the browser runtime</a><a href="#durable-send-semantics">Durable send semantics</a><a href="#operate-the-cli-and-gateway">Operate the CLI and gateway</a><a href="#configure-subscription-verification">Configure subscription verification</a><a href="#error-reports-and-retries">Error reports and retries</a><a href="#gateway-request-lifecycle">Gateway request lifecycle</a><a href="#operational-verification">Operational verification</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.5.18, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.51.1, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

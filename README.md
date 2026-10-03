@@ -15,8 +15,9 @@
 
 `arcane-os` is the application SDK and command-line toolchain for Arcane OS. It
 supports two explicit workspace profiles: an external app repository uses the
-version-locked SDK runtime, while an integrated Arcane checkout uses its live
-`arcane/` runtime. Both profiles share the theme, packaging, event, cancellation,
+version-locked SDK runtime, while an integrated Arcane checkout consumes its
+selected SDK projection or an explicit live SDK source mount. Both profiles
+share the theme, packaging, event, cancellation,
 and browser run contracts while retaining their selected application layout.
 
 This checkout defines the `0.51.1` SDK contract. Applications pin one exact npm
@@ -73,11 +74,27 @@ Enabled browser delivery also mounts the shared, themed installation suggestion.
 It appears when the browser offers installation, includes Install and Close,
 and remembers dismissal for the tab session without interrupting page startup.
 
-That registry query is a maintainer action, not an application behavior. Apps
+Registry queries are maintainer actions. Apps
 never poll npm for SDK updates or replace their own SDK or synchronized runtime.
 The app repository's exact dependency and lockfile select the SDK; changing that
 selection is an explicit repository update. Tests and checks run only when the
 user expressly selects them, or when required for a selected release output.
+
+## Current capabilities
+
+| Build this | Start here |
+| --- | --- |
+| A standalone browser app with shared theme, components, source serving and PWA resources | [Beginner quick start](#beginner-quick-start), [CLI](docs/reference/cli.md), [PWA](docs/reference/pwa.md) |
+| Streaming or complete AI responses, structural tools and a model selected for one request | [AI runtime](docs/reference/runtime-modules.md#aijs), [TWiN Cloud](docs/reference/ai/twin-cloud.md) |
+| Stateless state-and-questions evaluation or image generation | [`fetchSystemOneRequest`](docs/reference/ai/twin-cloud.md#evaluate-caller-owned-state-with-system-one), [`generateImages`](docs/reference/ai/twin-cloud.md#generate-images-with-an-application-selected-model) |
+| Browser-local language models with an application-owned model catalog | [Browser-WASM AI](docs/reference/ai/browser-wasm.md) |
+| Local Whisper/Kokoro, native browser recognition and voices, or selected cloud speech | [Speech provider guide](docs/reference/ai/browser-speech.md) |
+| Editable live transcription, ordered speech playback and printed conversations | [Chat](docs/reference/runtime-components.md#chathtml), [SpeechPlayback](docs/reference/runtime-modules.md#speechplaybackjs) |
+| Complete saved conversations, request-only turns, document retrieval and stored Markdown images | [Chat sessions](docs/reference/runtime-modules.md#persistentaichatsessionjs), [document library](docs/reference/runtime-modules.md#dbopfsdocumentlibraryjs), [MarkdownMedia](docs/reference/runtime-modules.md#markdownmediajs) |
+| Windows, Linux or Android development output from the same app | [Native target matrix](docs/platform-targets.md) |
+
+Provider and platform availability are documented at each surface. Applications
+own model selection, credentials, prompts, saved data and product behavior.
 
 ## Beginner quick start
 
@@ -85,7 +102,7 @@ Create one browser application, install its pinned SDK, and start its source
 server:
 
 ```bash
-npx arcane-os@0.34.1 new hello-speech --path ./hello-speech --target browser
+npx arcane-os@latest new hello-speech --path ./hello-speech --target browser
 cd hello-speech
 npm install
 ```
@@ -135,24 +152,26 @@ PWA and storage availability still depend on the browser's secure-context
 rules; see [HTTP development](docs/reference/cli.md#explicit-http-development).
 
 Open the URL printed by the server. The generated page owns its import map and
-Arcane theme; its application module is `apps/hello-speech/modules/App.js`.
-`arcane/AI` is a managed **browser import**, not an npm-exported Node inference
-module.
+Arcane theme; its application module is `modules/App.js` at the repository root.
+Root applications use managed `arcane-os/*` browser imports. Importing
+`arcane-os/ai` resolves the shared AI module; its browser lifecycle still
+requires the documented browser environment. For a stateless Node request,
+use `arcane-os/ai/twin-cloud`.
 
 For a first spoken sentence, copy the application-owned
 [`speech-selection.js` configuration from the speech quick start](https://github.com/TheWizardNexus/arcane-os-sdk/blob/main/docs/reference/ai/browser-speech.md#quick-start-say-one-sentence)
 beside `App.js`, then use this module. That one configuration file defines the
 upstream runtime, model, dtype, and voice. This module creates the application's
 DBOPFS store; the SDK creates and manages its speech providers and Workers.
-The linked automatic/WebGPU-first selection uses `fp32` because
+The linked automatic NPU/GPU/CPU selection uses `fp32` because
 [Kokoro.js recommends `fp32` when using WebGPU](https://github.com/hexgrad/kokoro/tree/main/kokoro.js#usage).
 Its `selectedDevice` status reports the loaded route, not speech correctness or
 audio quality.
 
 ```javascript
-import arcaneThemeReady from 'arcane/ThemeBootstrap';
-import AI, { AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL } from 'arcane/AI';
-import DBOPFS from 'arcane/DBOPFS';
+import arcaneThemeReady from 'arcane-os/modules/ThemeBootstrap.js';
+import AI, { AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL } from 'arcane-os/ai';
+import DBOPFS from 'arcane-os/modules/DBOPFS.js';
 import { speechSelection } from './speech-selection.js';
 
 await arcaneThemeReady;
@@ -204,7 +223,7 @@ If your app already has complete segments in an array, let the shared
 `SpeechPlayback` owner submit them as soon as they are available:
 
 ```javascript
-import SpeechPlayback from 'arcane/SpeechPlayback';
+import SpeechPlayback from 'arcane-os/speech-playback';
 
 const audio = document.body.appendChild(document.createElement('audio'));
 audio.controls = true;
@@ -239,7 +258,7 @@ the application or prove that a selected provider supports one:
 import {
   SPEECH_VOICE_ALIASES,
   SPEECH_VOICE_OPTIONS
-} from 'arcane/SpeechPlayback';
+} from 'arcane-os/speech-playback';
 
 console.log(SPEECH_VOICE_OPTIONS[0]); // {value: 'alloy', label: 'Alloy'}
 console.log(SPEECH_VOICE_ALIASES.has('alloy')); // true
@@ -308,11 +327,13 @@ TWiN Cloud is the SDK's default remote language-model service, identified by
 `openai-gpt-oss-120b`. Supply the bearer credential through `ai.twinKey` or
 `globalThis.arcane.config.twinCloud.accessKey`. The established `ai.license`
 property remains available. Applications should present the service and
-credential as **TWiN Cloud** and **TWiN access key**. The TWiN key is used only
-for remote LLM chat. Audio stays
-on device: Whisper (`LOCAL_SPEACH` / `whisper-small`) owns transcription and
-Kokoro (`LOCAL_SPEACH` / `kokoro`) owns speech synthesis. Neither audio route
-uses the TWiN key, and neither requires a cloud audio key.
+credential as **TWiN Cloud** and **TWiN access key**. Explicit cloud speech,
+System One and image requests also use application-supplied credentials.
+The built-in local speech selections remain Whisper (`LOCAL_SPEACH` /
+`whisper-small`) for transcription and Kokoro (`LOCAL_SPEACH` / `kokoro`) for
+synthesis. Those local routes use no TWiN key. Applications may separately
+select native browser speech or TWiN Cloud TTS; browser-native services may
+process speech remotely.
 
 The built-in provider and default-model preference sentinel are both `TWIN`.
 Applications upgrading saved preference tuples must replace only uppercase
@@ -334,6 +355,12 @@ Cloud maps it to DigitalOcean Serverless Inference `reasoning_effort`; omitting
 it preserves the provider default. TWiN Cloud defaults to
 `openai-gpt-oss-120b`, and applications may explicitly select
 `openai-gpt-oss-20b` without changing streaming or structural-tool behavior.
+An explicit request `model` selects that call's model without changing saved
+preferences. The stateless `fetchRequest`, `fetchSystemOneRequest` and
+`generateImages` exports in `arcane-os/ai/twin-cloud` require a caller-selected
+model and return the complete documented provider result. They retain no chat
+history. See the [TWiN Cloud guide](docs/reference/ai/twin-cloud.md) for each
+request shape, diagnostic callbacks, cancellation and image-job behavior.
 
 ## Browser-local AI
 
@@ -387,8 +414,9 @@ Capability reports evaluate each
 app-supplied model as `compatible`, `incompatible`, or `unknown`; the app can
 render that result without the SDK inventing or filtering its catalog.
 
-`arcane-os/ai/browser-speech` exposes independent Whisper STT and Kokoro TTS
-provider factories. The package contains the plain-JavaScript provider and
+`arcane-os/ai/browser-speech` exposes independent Whisper STT, Kokoro TTS,
+native browser recognition, native browser synthesis and TWiN Cloud TTS
+provider factories. The local-model path contains the plain-JavaScript provider and
 Worker machinery, not speech runtimes, models, voices, or a CDN default. An app
 must supply each runtime/model selection explicitly. Speech roles
 load, cancel, unload, fail, and recover independently, so speech failure never
@@ -402,6 +430,16 @@ sessions and accepts capacities from one through four. Both roles expose
 requested and selected devices through execution status. A selected backend
 reports successful upstream loading, not physical accelerator use for every
 operation; model and hardware compatibility remain upstream.
+
+Native speech requires the browser's actual recognition or synthesis API.
+Voice discovery and preparation are silent; explicit playback owns completion,
+pause, resume, cancellation and release. `provider.setDefaultVoice(voiceURI|null)`
+changes future native preparations while preserving explicit choices and
+already prepared speech. `ai.prepareTTSPlayback(payload,signal)` returns a native
+playback descriptor or real Blob audio; `fetchTTS()` and durable `prepareTTS()` require real
+audio and report native audio-export unavailability. Cloud TTS queues complete
+jobs and preserves original-order playback. See the [speech guide](docs/reference/ai/browser-speech.md)
+for voice catalogs, recognition language and provider-specific limits.
 
 Applications that need faster spoken-response onset can configure the shared
 TTS stream without taking over synthesis or playback:
@@ -453,12 +491,14 @@ uses the same controller for automatic memory extraction.
 
 ## Install
 
-Create a new repository-shaped Arcane application with the exact stable SDK:
+Create a standalone Arcane application from the current stable SDK. The scaffold
+records the selected exact version:
 
 ```bash
-npx arcane-os@0.12.0 new my-app --path ./my-app --target portable --git
+npx arcane-os@latest new my-app --path ./my-app --target browser --git
 cd my-app
 npm install
+# Configure HTTPS as described above, then start source development.
 npm run dev
 ```
 
@@ -466,8 +506,8 @@ To enroll an existing repository, install the exact SDK and initialize only
 missing Arcane files:
 
 ```bash
-npm install --save-dev --save-exact arcane-os@0.12.0
-npm exec -- arcane init my-app --target portable
+npm install --save-exact arcane-os@latest
+npm exec -- arcane init my-app --target browser
 ```
 
 The npm package is named `arcane-os`. Its primary executable is `arcane`, and
@@ -482,7 +522,7 @@ npm exec -- arcane-os targets
 No global SDK install or standalone Arcane CLI is required. The application
 repository's exact npm dependency and lockfile own the CLI and toolchain version.
 
-Use `npx arcane-os@0.12.0` for the initial bootstrap because it names this npm
+Use `npx arcane-os@latest` for the initial bootstrap because it names this npm
 package explicitly; bare `npx arcane` outside an installed project could resolve
 a different package. Both installed commands invoke the same headless toolchain.
 Project-local npm scripts use the SDK pinned by that app's `package-lock.json`,
@@ -498,11 +538,11 @@ tarball install in the app's package manifest and lock:
 # From the arcane-os-sdk checkout
 npm ci
 npm run pack:local
-node ./bin/arcane.mjs new local-app --path ../local-app --target portable --git
+node ./bin/arcane.mjs new local-app --path ../local-app --target browser --git
 
 # From the generated app repository
 cd ../local-app
-npm install --save-dev --save-exact ../arcane-os-sdk/arcane-os-0.12.0.tgz
+npm install --save-exact "../arcane-os-sdk/arcane-os-<selected-version>.tgz"
 npm ci
 ```
 
@@ -511,7 +551,7 @@ same location. The lockfile retains the selected package dependency while
 Arcane uses the installed package name and version. Local directory `file:` dependencies are not
 accepted because npm may install them as links; use a packed `.tgz`. A GitHub
 runner also needs that tarball at the locked path. After publication, replace
-the local declaration with the exact `arcane-os@0.12.0` registry package and
+the local declaration with the selected exact registry version and
 commit the regenerated lock.
 
 Generated repositories use `npm ci --ignore-scripts` in CI. Run dependency
@@ -622,16 +662,11 @@ Portable path validation rejects file/directory prefix conflicts,
 case-colliding prefix spellings, and Windows device aliases including
 superscript COM/LPT digits.
 
-The reusable `.github/workflows/release-app.yml` workflow
-builds one selected app in a `contents: read` job with no OIDC or attestation
-authority. An always-run fresh job downloads the uploaded artifact by immutable
-artifact id, checks out only the reusable workflow's selected SDK revision, uses
-supported Node 24, and checks the selected app id and complete inventory.
-When requested, a third job downloads that same artifact id, independently
-repeats those checks against the post-upload outputs, and alone receives narrow
-OIDC/attestation permissions. No package manager, dependency resolution, caller
-checkout, check, or adapter runs with that authority. An unattested uploaded
-artifact remains an ordinary build output.
+Use the public package and bundle commands for the selected app output.
+The checked-in reusable `release-app.yml` workflow still pins an older SDK and
+is outside the current supported release path. See
+[publication scope](docs/publishing.md#reusable-application-release-workflow)
+before selecting a repository release workflow.
 
 ## SDK test sets
 
@@ -654,7 +689,7 @@ package installation, or assertions.
 
 ## Current target support
 
-Version `0.12.0` exposes one browser target and five explicitly paired
+The SDK exposes one browser target and five explicitly paired
 native development targets: a non-runnable portable directory, a
 Windows x64 unsigned-local-test EXE bundle, Linux x64 and Linux ARM64
 unsigned-local-test DEBs, and an Android development-signed APK. The
@@ -764,7 +799,8 @@ extraction sequence is tracked in [docs/roadmap.md](https://github.com/TheWizard
 
 ## Canonical app descriptor
 
-New apps own `apps/<id>/arcane-app.json` schema 2. It contains publisher,
+New standalone apps own root `arcane-app.json` schema 2; explicitly selected
+multi-app layouts use `apps/<id>/arcane-app.json`. It contains publisher,
 optional permissions and security declarations, native presentation, optional
 Core requirements, and target intent, and deterministically projects the schema-1
 `arcane-package.json` required by the current browser packager. The pinned
@@ -793,6 +829,7 @@ The synchronized Arcane runtime and packager are currently distributed under
 AGPL-3.0-only. The commercial-license notice does not itself grant proprietary
 distribution rights. Resolve the applicable Arcane commercial or open-source
 license before distributing a closed-source app that bundles this runtime. Each
-browser release carries `LICENSE`, `COMMERCIAL-LICENSE.md`, and `NOTICE` under
-`licenses/arcane-os/`; the notice includes the complete bundled Marked and
-QRCode.js MIT terms.
+browser release carries `LICENSE`, `COMMERCIAL-LICENSE.md`, and `NOTICE` at the
+configured SDK package route: `node_modules/<dependency>/` for direct installed
+routes, or `licenses/arcane-os/` for a configured physical runtime layout. The
+notice includes the complete bundled Marked and QRCode.js MIT terms.

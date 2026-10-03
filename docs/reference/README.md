@@ -17,15 +17,15 @@ high-level page links to the relevant deep section instead of repeating it.
 Install the SDK in your application:
 
 ```sh
-npm install --save-exact arcane-os@0.5.17
+npm install --save-exact arcane-os@latest
 ```
 
 For your first AI call, follow the [TWiN Cloud quick start](ai/twin-cloud.md).
-For on-device speech, follow the [browser speech quick start](ai/browser-speech.md)
+For local models, native browser voices or cloud speech, follow the [browser speech guide](ai/browser-speech.md)
 and the complete [browser AI demo](https://github.com/TheWizardNexus/arcane-os-sdk/tree/main/examples/wasm-ai-demo).
 Each guide names the application configuration you supply and shows the public
 call, response, cancellation, and error handling. Browser module imports use
-the SDK's [materialized import map](cli.md#arcane-import-map); installing npm
+the SDK's [managed import map](cli.md#arcane-import-map); installing npm
 alone does not make bare module names resolve in a browser.
 
 ## Reference map
@@ -47,8 +47,11 @@ alone does not make bare module names resolve in a browser.
 | Subscribe to native events | [Arcane event reference](core/arcane-events.md) |
 | Use provider-neutral AI lifecycle, chat, speech, persistence, or document context | [Normalized AI](#normalized-ai) |
 | Run a caller-selected local LLM in the browser | [Browser-WASM local AI](ai/browser-wasm.md) |
-| Run caller-selected Whisper or Kokoro in the browser | [Browser speech providers](ai/browser-speech.md) |
-| Send one TWiN Cloud request or migrate saved LLM preferences | [TWiN Cloud quick start](ai/twin-cloud.md) |
+| Run caller-selected Whisper/Kokoro, native browser recognition/voices or cloud TTS | [Browser speech providers](ai/browser-speech.md) |
+| Send TWiN chat, System One state/questions or image requests | [TWiN Cloud guide](ai/twin-cloud.md) |
+| Edit live transcription before Send, or print a complete conversation | [Chat component](runtime-components.md#chathtml) |
+| Store images outside Markdown and hydrate them in previews | [MarkdownMedia](runtime-modules.md#markdownmediajs) |
+| Print complete rendered documents, previews and conversations | [PrintView](runtime-modules.md#printviewjs) |
 | Use Arcane Ollama | [Arcane Ollama guide](arcane-ollama.md) |
 | Understand transports and protocol switching | [Protocol and host architecture](protocols.md) |
 | Run contract and behavior tests | [Behavioral testing](behavioral-testing.md) |
@@ -59,9 +62,9 @@ This repository contains explicitly versioned surfaces with different owners:
 
 | Surface | Source identity | Meaning |
 | --- | --- | --- |
-| SDK and CLI | `arcane-os` `0.5.17` | The Node.js toolchain, portable `arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`, `arcane-os/preference-store`, `arcane-os/speech-playback`, and `arcane-os/speech-text` entrypoints, plus the browser-only `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints in this checkout. |
-| Browser runtime | SDK `0.5.17`, protocol `arcane/1`, `runtime/` | The SDK-canonical runtime tree. `listRuntimeFiles()`, `readRuntimeFile()`, and `loadRuntimeRelease()` derive its current inventory directly from the selected directory. |
-| Browser SDK runtime | SDK `0.5.17`, `browser-runtime/` | The browser closure for events, shared logging, speech-text cleanup, Wllama, and Browser Speech mechanisms. `listSdkBrowserRuntimeFiles()`, `readSdkBrowserRuntimeFile()`, and `loadSdkBrowserRuntimeRelease()` derive its current inventory directly from the selected directory. |
+| SDK and CLI | `arcane-os`; version in [`package.json`](../../package.json) | The Node.js toolchain and focused public entrypoints listed in the [SDK API](sdk-api.md). Each entrypoint retains its own runtime requirements. |
+| Browser runtime | Selected SDK, protocol `arcane/1`, `runtime/` | The SDK-canonical runtime tree. `listRuntimeFiles()`, `readRuntimeFile()`, and `loadRuntimeRelease()` derive its current inventory directly from the selected directory. |
+| Browser SDK runtime | Selected SDK, `browser-runtime/` | Events, logging, Wllama, local/native/cloud speech, TWiN requests and PWA mechanisms. `listSdkBrowserRuntimeFiles()`, `readSdkBrowserRuntimeFile()`, and `loadSdkBrowserRuntimeRelease()` derive its current inventory directly from the selected directory. |
 | Core reference snapshot | Arcane OS commit `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, protocol `arcane/1` | The application-facing Core contract imported into `docs/reference/core/`, with SDK-local links and package-boundary notes added explicitly. |
 
 The SDK runtime source and Core reference have different owners. A browser
@@ -76,7 +79,9 @@ and the distinction between a documentation snapshot and the selected runtime.
 
 ## Installed documentation and release identity
 
-This reference accompanies `arcane-os@0.5.17`. The installed package includes
+The repository reference follows the current committed SDK capabilities. A
+documentation-only repository update can be newer than the text bundled in an
+already published package. The installed package includes
 the maintained `docs/` tree and `examples/wasm-ai-demo/` source alongside
 README and CHANGELOG. Open `node_modules/arcane-os/docs/reference/README.md`
 for the matching local reference. The generated website and test suites remain
@@ -125,28 +130,26 @@ Public reference entries follow the established Arcane documentation model:
 
 ## Public runtime inventory
 
-The package exposes 205 semantic JavaScript records across 20 JavaScript
-entrypoints, plus eight JSON Schemas and package metadata. Ten entrypoints are
-Node.js control-plane surfaces,
-`arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`, `arcane-os/preference-store`, and
-`arcane-os/speech-playback`, `arcane-os/speech-text`, and `arcane-os/browser-device`
-run in Node and browsers, and
-`arcane-os/pwa`, `arcane-os/ai/browser-wasm` plus `arcane-os/ai/browser-speech` are browser-only.
-The [machine-readable package
-inventory](inventory/package-api.json) and [SDK member reference](sdk-api.md)
-are checked bidirectionally against every declared JavaScript export.
+The public export map is maintained in [`package.json`](../../package.json).
+It includes Node tooling, focused portable/browser entrypoints, direct runtime
+module and entity patterns, eight JSON Schemas and package metadata. The
+[SDK member reference](sdk-api.md) and [package inventory](inventory/package-api.json)
+describe focused functions; the runtime catalogs document the existing
+namespaces exposed through lowercase aliases and filename-based imports.
+Resolving a package name in Node does not supply browser, media, storage or
+Core capabilities. See the [availability matrix](availability-and-normalization.md).
 
 The seven update-check records are explicit on-demand checks; they do not poll,
 download, install, or self-update.
 
 The synchronized browser payload exposes:
 
-- 83 JavaScript module artifacts under `runtime/arcane/modules/`, including
+- JavaScript modules under `runtime/arcane/modules/`, including
   ESM modules, classic vendor globals, one worker protocol, and one Node-oriented
   mail transport;
-- 14 shared entity modules under `runtime/arcane/entities/`;
-- 40 reusable HTML-import components under `runtime/arcane/components/`;
-- seven shared CSS artifacts, images, optional physical-workspace security
+- shared entity modules under `runtime/arcane/entities/`;
+- reusable HTML-import components under `runtime/arcane/components/`;
+- shared CSS artifacts, images, optional physical-workspace security
   files where present, and the vendored `strong-type` dependency.
 
 The module and component catalogs enumerate every shipped artifact, including
@@ -165,9 +168,11 @@ Ollama, Wllama, Whisper, Kokoro, native, or cloud transport:
 | Observe sticky role state and startup settlement | [`AIRuntimeState.js`](runtime-modules.md#airuntimestatejs) | Cross-host EventTarget state; observation grants no authority. |
 | Offer explicit selected-model start/cancel UI | [`chat.html`](runtime-components.md#chathtml), [`speech.html`](runtime-components.md#speechhtml), and [`voice-transcription.html`](runtime-components.md#voice-transcriptionhtml) | Browser/native WebView components; user activation emits a cancelable request before any LLM or STT load intent, and recording stays disabled without sticky ready STT. |
 | Use Core-normalized chat | [`globalThis.Arcane.ai`](core/arcane-ai-contracts.md) | Native/Core only when separately admitted. |
-| Run a caller-selected GGUF LLM locally | [`arcane-os/ai/browser-wasm`](ai/browser-wasm.md) | Browser secure context with WebGPU full-offload availability, WebAssembly, and OPFS/DBOPFS. |
-| Run caller-selected Whisper/Kokoro locally | [`arcane-os/ai/browser-speech`](ai/browser-speech.md) | Browser with DBOPFS, Web Locks, Workers, and caller-supplied runtime and model sources; Kokoro supports bounded Worker/session concurrency with automatic WebGPU-first execution and complete WASM-pool fallback. |
-| Add bounded persistent history and memory | [`PersistentAIChatSession.js`](runtime-modules.md#persistentaichatsessionjs) | Browser/native WebView runtime with ChatEntity/DBOPFS and a configured chat function. |
+| Run a caller-selected GGUF LLM locally | [`arcane-os/ai/browser-wasm`](ai/browser-wasm.md) | Browser secure context with WebAssembly and OPFS/DBOPFS; explicit CPU selection or WebGPU with full offload and no automatic CPU fallback. |
+| Run caller-selected Whisper/Kokoro locally | [`arcane-os/ai/browser-speech`](ai/browser-speech.md) | Browser with DBOPFS, Web Locks, Workers and selected upstream sources; automatic WebNN NPU, WebGPU, then WASM loading, or an explicit backend. |
+| Use native browser recognition/voices or selected cloud TTS | [Speech provider choices](ai/browser-speech.md) | Native APIs depend on the browser and may use remote services; cloud TTS requires the application key and endpoint access. |
+| Send complete chat, System One or image requests without retained history | [`arcane-os/ai/twin-cloud`](ai/twin-cloud.md) | Node or browser with Fetch and explicit model/credentials; image results contain every returned image as a Blob. |
+| Add persistent history and memory | [`PersistentAIChatSession.js`](runtime-modules.md#persistentaichatsessionjs) | Browser/native WebView runtime with ChatEntity/DBOPFS and a configured chat function; `persist:false` ends retention when the operation settles. |
 | Add explicit document search/context | [`DBOPFSDocumentLibrary.js`](runtime-modules.md#dbopfsdocumentlibraryjs) | Existing DBOPFS-style adapter; search occurs only after the app calls it or deliberately wires its context builder into chat. |
 
 There is no automatic local-to-cloud, browser-to-Core, provider-to-provider, or

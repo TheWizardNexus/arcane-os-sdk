@@ -4,7 +4,9 @@ The npm package exposes a Node.js ESM control plane, the portable
 `arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`,
 `arcane-os/preference-store`, `arcane-os/speech-playback`,
 `arcane-os/speech-text`, `arcane-os/ai/tool-text-stream`, `arcane-os/ai/twin-cloud`, and `arcane-os/browser-device` entrypoints, and the browser-only
-`arcane-os/pwa`, `arcane-os/ai/browser-wasm` and `arcane-os/ai/browser-speech` entrypoints.
+`arcane-os/pwa` and `arcane-os/ai/browser-wasm` entrypoints. The
+`arcane-os/ai/browser-speech` entrypoint includes local and native browser
+providers plus a cloud TTS adapter usable in Node with Fetch and Blob.
 The `arcane-os/modules/<filename>` and `arcane-os/entities/<filename>` paths
 resolve directly to the existing runtime files, with their actual extension.
 They are public Node package exports and managed browser keys, without a wrapper.
@@ -17,14 +19,20 @@ browser names such as `arcane/AIProviderRuntime`, `arcane/AIRuntimeState`, and
 direct-installed root maps use the package namespace instead. Applications call `globalThis.Arcane` for capability-gated host
 behavior.
 
-This page is the canonical inventory for every JavaScript name reachable through `package.json#exports`. The same binding can appear at the root and a focused subpath; those entrypoints are listed together. The root workspace `discoverApps` and the low-level packager `discoverApps` are intentionally separate records because they are different functions.
+This page documents the focused package APIs. The same binding can appear at
+the root and a focused subpath; those entrypoints are listed together. Direct
+runtime-module aliases and filename patterns expose the complete namespaces in
+the [runtime module](runtime-modules.md) and [entity](runtime-entities.md)
+catalogs. The root workspace `discoverApps` and low-level packager
+`discoverApps` are separate functions with separate records.
 
 ## Import map
 
 This table is the Node `package.json#exports` map: it defines package
 entrypoints for SDK/tooling code. It is distinct from the generated browser
-import map that resolves application-facing `arcane/*` modules and the focused
-EventManager entry. See [browser runtime delivery](protocols.md#browser-runtime-delivery)
+import map that resolves application-facing `arcane-os/*` names for root/direct
+layouts and `arcane/*` compatibility names for physical/nested layouts.
+See [browser runtime delivery](protocols.md#browser-runtime-delivery)
 for the shared browser destinations used by installed-package and physical
 runtime layouts.
 
@@ -66,8 +74,8 @@ runtime layouts.
 | `arcane-os/pwa` | Nonblocking PWA registration, worker updates, native installation state and a dismissible installation component. |
 | `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, complete DBOPFS model storage, streaming, cancellation, and structural tool-call results. |
 | `arcane-os/ai/tool-text-stream` | Shared selected tool-argument text observer for provider integration. |
-| `arcane-os/ai/twin-cloud` | Complete TWiN Cloud requests from Node or a browser with an explicit key/model and shared retry/cancellation behavior. |
-| `arcane-os/ai/browser-speech` | Caller-selected browser-local Whisper STT and Kokoro TTS, explicit TWiN Cloud remote TTS, ordinary upstream assets, role lifecycle, and cancellation. |
+| `arcane-os/ai/twin-cloud` | Stateless chat, System One state/questions and image generation with explicit key/model, complete results and operation-specific retry/cancellation. |
+| `arcane-os/ai/browser-speech` | Caller-selected Whisper/Kokoro, native browser recognition/synthesis, cloud TTS, upstream assets, role lifecycle and cancellation. |
 | `arcane-os/mail` | Portable Mail runtime, durable outbox, complete transport responses, and provider-neutral acceptance contracts. |
 
 These lowercase runtime-module entrypoints expose their existing exports; they
@@ -86,7 +94,10 @@ Eight JSON schemas and `package.json` are data-only export subpaths. In Node ESM
 
 ### Managed AI narration
 
-Applications import `AI` through `arcane/AI` in the managed browser map.
+Root applications import `AI` through `arcane-os/ai` in the managed browser map.
+`ai.prepareTTSPlayback(payload,signal)` silently prepares real Blob audio or a
+native speech descriptor for playback. Native browser voices expose no audio
+file; use this path or shared streaming/SpeechPlayback for native output.
 `ai.prepareTTS({parts,storage,identity,signal,onState})` prepares complete
 punctuation segments without playing them and optionally saves/reuses their
 audio through application-owned DBOPFS. Its immediate handle exposes ordered
@@ -111,19 +122,18 @@ Protocol mechanics are intentionally kept in the [deep protocol guide](protocols
 
 ## Canonical member inventory
 
-The current JavaScript member total is derived mechanically from every JavaScript
-entrypoint in `package.json#exports`. Records are grouped by export name and
-`Object.is()` binding identity, then retain the sorted entrypoints that expose
-that binding; `memberCount` in
-[`inventory/package-api.json`](inventory/package-api.json) is the resulting
-graph-node count. The remaining data-only subpaths are eight JSON Schemas and
-package metadata. Runtime projection modules in the managed
-browser map are cataloged separately in [Runtime modules](runtime-modules.md).
+`memberCount` in [`inventory/package-api.json`](inventory/package-api.json)
+counts the authored focused API records below. Shared bindings retain their
+entrypoints together. Runtime aliases and filename patterns are documented in
+[Runtime modules](runtime-modules.md) and [Runtime entities](runtime-entities.md).
+The remaining data-only subpaths are eight JSON Schemas and package metadata.
 
 | Member | Kind | Import | Group | Availability |
 | --- | --- | --- | --- | --- |
 | `fetchRequest()` | function | `arcane-os/ai/twin-cloud` | TWiN Cloud requests | Node and Browser; remote HTTPS provider |
 | `fetchSystemOneRequest()` | function | `arcane-os/ai/twin-cloud` | TWiN Cloud state-and-questions requests | Node and Browser; remote HTTPS provider |
+| `generateImages()` | function | `arcane-os/ai/twin-cloud` | TWiN Cloud image generation | Node and Browser with Fetch and Blob; remote HTTPS provider |
+| `createBrowserSpeechSynthesisProvider()` | function | `arcane-os/ai/browser-speech` | Native browser speech | Browser with speechSynthesis and SpeechSynthesisUtterance |
 | `fetchHTTPResponse()` | function | `arcane-os/ai/twin-cloud` | Shared AI transport integration | Node and Browser |
 | `fetchJSONResponse()` | function | `arcane-os/ai/twin-cloud` | Shared AI transport integration | Node and Browser |
 | `structuredOutputFormat()` | function | `arcane-os/ai/twin-cloud` | Shared AI transport integration | Node and Browser |
@@ -855,12 +865,14 @@ selected input, or required control paths fail before output writes. Source
 layout, app identity, OPFS scope, and internal package paths remain unchanged.
 See [app-selected package output](protocols.md#app-selected-package-output).
 
-Selected app files are emitted beneath `apps/<id>/`; shared files retain their
-configured route destinations. When selected shared content supplies no root
-`index.html`, the SDK generates one that opens the selected app page. The result
+Root app files retain their paths at the output root; explicitly nested apps
+retain their `apps/<id>/` paths. Shared files retain their configured route
+destinations. When the selected content supplies no root `index.html`, the SDK
+generates one that opens the selected app page. The result
 contains `outputRoot`, `manifest`, and the complete `files` inventory.
 `manifest.app.entry` stays app-relative, while `manifest.app.start`
-is the package launch URL, such as `./apps/hello-world/index.html`. Release
+is the package launch URL, such as `./index.html` for a root app or
+`./apps/hello-world/index.html` for a nested app. Release
 schema `1`, kind `arcane-app-release`, and packager identity
 `arcane-app-packager-v1` remain unchanged. A dry run returns the planned output
 and file inventory without writing source or output.
@@ -1260,7 +1272,7 @@ Import it from `arcane-os`.
 | `documentRoot` | Required filesystem directory containing the selected documents. Returned root paths are absolute. |
 | `runtimeRoot` | Existing materialized runtime directory containing `modules/`, `entities/`, `sdk/`, and its other selected content. Defaults to `arcane/` under `documentRoot`. Pass an absolute path when selecting another directory; relative root arguments resolve from the current working directory. |
 | `documents` | Required nonempty array of document-root-relative file paths, such as `['shell/home.html', 'settings.html']`. Use forward slashes and normalized paths without a leading `./` or parent traversal. Duplicate paths are processed once, in first-selected order. |
-| `version` | Version used in generated import-map targets and URL compatibility keys. Defaults to the installed SDK's `SDK_VERSION`; `null` selects unversioned map URLs. Authored resource URLs outside the managed map stay unchanged. |
+| `version` | Retained argument with default `SDK_VERSION`; generated local URLs stay clean and retired `arcaneVersion` fields are removed regardless of this value. Other authored query values and fragments remain unchanged. |
 | `deploymentUrl` | Optional absolute directory URL ending in `/` that corresponds to `documentRoot`, such as `https://example.com/control/`. Required when a selected document has an absolute or root-relative base URL, or a relative base that traverses above `documentRoot`. |
 | `signal` | Optional `AbortSignal`, observed during inventory, document preparation, and before each write. |
 | `onEvent` | Optional named callback receiving the ordered events below. An asynchronous callback is awaited before the operation continues. |
@@ -1292,7 +1304,8 @@ The first `<base>` with an `href` determines each document's effective base.
 A target-only base, such as `<base target="_blank">`, does not change URL
 resolution. With no base, `shell/home.html` resolves the default runtime through
 `../arcane/`. With `<base href="../">`, the same page resolves it through
-`./arcane/`. Generated URLs include the selected version when one is supplied.
+`./arcane/`. Generated local URLs stay clean regardless of the retained
+`version` argument.
 
 The host serves the runtime at the same relative location as `runtimeRoot`
 has to `documentRoot`. `deploymentUrl` supplies that directory's public URL
@@ -1783,14 +1796,16 @@ const schema=preferenceSchema([]);
 
 Default binding for the canonical SpeechPlayback runtime class. The static
 specifier `arcane-os/speech-playback` works in Node package consumers and maps
-to the same runtime module in managed browsers. `arcane/SpeechPlayback` is the
-direct browser runtime name generated into the managed import map.
+to the same runtime module in managed browsers. Physical/nested maps also
+retain the `arcane/SpeechPlayback` compatibility name.
 
-When the supplied `speech` client has `fetchTTS` and reports a positive
+When the supplied `speech` client has `prepareTTSPlayback` or `fetchTTS` and reports a positive
 `providerRuntime.status('tts', {execution:true}).execution.maxConcurrentRequests`,
 `prepare()` submits every complete part immediately. The provider owns its
-bounded FIFO queue (browser Kokoro defaults to four), while Blob URLs and
-playback remain in exact input order. A native or custom client without that
+bounded FIFO queue (browser Kokoro defaults to four), while Blob audio or native
+playback descriptors remain in exact input order. Preparation prefers
+`prepareTTSPlayback` when available. Native playback owns pause, resume, stop
+and release without creating an audio-file URL. A native or custom client without that
 advertised capacity stays serialized with one lookahead. Replay keeps completed
 URLs and pending requests while retrying failed missing provider segments.
 The optional constructor `onState(detail)` callback runs synchronously after
@@ -4183,7 +4198,7 @@ const toolchain = createToolchain({
 
 // Only this explicit call refreshes the managed map and selected HTML documents.
 const result = await toolchain.importMap();
-console.log(result.importMap.entryCount); // derived from installed inventories
+console.log(Object.keys(result.importMap.imports).length);
 console.log(result.importMap.documentPaths, result.importMap.documentCount);
 ```
 
@@ -4263,12 +4278,14 @@ async function usedevelopApplication(...arguments_) {
 Dispatches one named headless SDK operation with normalized acceptance, events, cancellation, and failure.
 
 The exact command `'import-map'` dispatches one app-scoped refresh
-across every `.html`/`.htm` file selected by the descriptor's existing
-include/exclude rules and returns `{workspaceRoot, workspaceMode, appId,
+across directly navigable `.html`/`.htm` documents selected by the descriptor's
+existing include/exclude rules, excluding component fragments, and returns
+`{workspaceRoot, workspaceMode, appId,
 importMap}`. The `importMap` value reports the generated imports and complete
 ordered `documentPaths`. This route mutates the map artifact and selected managed HTML
-documents as one atomic refresh and has no
-supported dry-run.
+documents through sequential writes and has no supported dry-run or
+all-file transaction. An error or cancellation can leave completed writes in
+place; rerun the operation after resolving the cause.
 
 The exact command `'upgrade'` dispatches `upgradeApplication(options)`. It is
 external-workspace-only and runs that application's ordinary `npm upgrade`
@@ -4303,7 +4320,7 @@ const result = await executeOperation('import-map', {
     workspaceRoot:process.cwd(),
     appId:'hello-world'
 });
-console.log(result.importMap.committed, result.importMap.entryCount);
+console.log(result.importMap.committed, Object.keys(result.importMap.imports).length);
 console.log(result.importMap.documentPaths, result.importMap.documentCount);
 ```
 
@@ -4315,8 +4332,9 @@ Runs the high-level package operation for one selected application. It reads
 the installed SDK/runtime selection and packages the saved source and managed
 import maps through `packageApp()`. Map generation remains the explicit
 `arcane import-map` operation and the ordinary `arcane dev` startup refresh.
-Selected app files retain their `apps/<id>/` paths alongside the shared routes
-and root launcher described by `packageApp()`.
+Root app files retain their paths at the output root, while explicitly nested
+apps retain `apps/<id>/` paths alongside the shared routes and any root launcher
+described by `packageApp()`.
 
 The same low-level operation resolves the app's optional `outputDirectory`;
 there is no separate high-level destination override. `release.outputRoot`
@@ -6123,11 +6141,14 @@ console.log(stack.sessionId, stack.events.length);
 
 Mutable metadata for the browser-only runtime behind
 `arcane-os/ai/browser-wasm`. It records protocol
-`arcane-ai-browser-wasm/2`, `@wllama/wllama` `3.6.0`, the embedded llama.cpp
-revision, the exact packaged JavaScript and WebAssembly assets, retained MIT
-licenses, and the disabled compatibility-runtime/remote-model-helper policy.
-Its execution policy requires WebGPU, proves full model offload, and declares
-`cpuFallback:false`. It contains no model weights or default model catalog.
+`arcane-ai-browser-wasm/2`, `@wllama/wllama` `3.6.0`, the packaged JavaScript
+and WebAssembly asset locations, MIT license identifiers for Wllama and
+llama.cpp, and the disabled compatibility-runtime/remote-model-helper policy.
+Its execution policy declares `webgpuRequired:false`,
+`defaultGpuLayers:99999`, `cpuGpuLayers:0`, and `cpuFallback:false`. The default
+requests full GPU offload; `gpuLayers:0` explicitly selects CPU. A failed GPU
+load never silently switches to CPU. The metadata contains no model weights
+or default model catalog and does not establish that a model has loaded.
 
 ### Value and import
 
@@ -6237,7 +6258,7 @@ applies the supplied `loadPolicy`.
 `Promise<PersistentAIChatSession>`, and binds its AI API to this exact
 controller. Applications continue to use this public controller method rather
 than importing that private specifier. `options` must be a plain object and cannot contain
-`chat`. The resulting session preserves coherent complete live context while
+`ai` or `chat`. The resulting session preserves coherent complete live context while
 letting each user/assistant/tool turn choose matching durable ChatEntity/DBOPFS
 persistence. A `persist:false` turn participates in one request and response,
 then retains neither side in subsequent model context, the transcript, durable
@@ -6649,7 +6670,7 @@ Direct `load()` selects a catalog model and returns `{model,status}`; the
 public AI API module's `ai.load()` returns the flat controller status. Load settings include
 offline mode, `AbortSignal`, progress, threads, and context/batch/micro-batch
 tokens. `loadDefaults:{gpuLayers:0}` or `load({gpuLayers:0})` explicitly selects
-CPU. Omission retains full GPU offload (`gpuLayers:99999`); GPU failures never
+CPU. Omission requests full GPU offload (`gpuLayers:99999`); GPU failures never
 silently switch to CPU.
 
 Chat supports OpenAI-like message/generation fields, tools, tool choice,
@@ -6670,18 +6691,20 @@ turn.
 
 ### Availability and normalization
 
-**Browser context with WebAssembly and OPFS/DBOPFS.** The default GPU route
+**Browser secure context with WebAssembly and OPFS/DBOPFS.** The default GPU route
 also requires WebGPU; explicit `gpuLayers:0` CPU loading skips GPU requirements
 and adapter work. A load succeeds after Wllama confirms the complete model is
-loaded. There is no automatic CPU fallback.
+loaded and its context was created. There is no automatic CPU fallback.
 Cross-origin isolation and coarse hardware fields remain observations rather
 than hard gates. Ordinary status reports complete catalog compatibility and
-lifecycle state. GPU adapter selection is instrumented as
+lifecycle state. `capabilities()` reports `executionDevice:'cpu'|'webgpu'` and
+`webgpuRequired` for the active load plan. GPU adapter selection is instrumented as
 `arcane.ai.browser-wasm.webgpu.adapter.selected`.
 Cancellation normalizes to `ARCANE_AI_REQUEST_ABORTED`; load or availability failures
 surface stable `ARCANE_AI_*` codes such as `ARCANE_AI_WEBGPU_REQUIRED`,
 `ARCANE_AI_MODEL_FULL_OFFLOAD_UNPROVEN`, and
-`ARCANE_AI_MODEL_GPU_MEMORY_INSUFFICIENT`. Concurrent runtime inference can fail
+`ARCANE_AI_MODEL_GPU_MEMORY_INSUFFICIENT` on the GPU route, or
+`ARCANE_AI_MODEL_CPU_MEMORY_INSUFFICIENT` on the CPU route. Concurrent runtime inference can fail
 `ARCANE_AI_RUNTIME_BUSY`; inspection and status can report
 `ARCANE_AI_PROVIDER_UNAVAILABLE` or fallback `ARCANE_AI_RUNTIME_FAILED` without
 misrepresenting those observations as a successful load.
@@ -6783,8 +6806,8 @@ async function openCachedModel() {
 ### Overview
 
 Projects one compatible v1 browser-WASM provider into the provider-neutral
-LLM role consumed by the managed `arcane/AIProviderRuntime` projection. The
-runtime checks the v1 protocol, required identity/methods, and local-only
+LLM role consumed by `arcane-os/ai-provider-runtime`. The
+runtime checks protocol `arcane-ai-adapter/1`, required identity/methods, and local-only
 capability; it does not establish ownership for an arbitrary compatible
 object. The adapter does not
 change the wrapped provider, download a model, create a fallback, or execute a
@@ -6825,7 +6848,7 @@ or CPU fallback behavior.
 
 ```javascript
 import {adaptV1LlmProvider} from 'arcane-os/ai/browser-wasm';
-import {getAIProviderRuntime} from 'arcane/AIProviderRuntime';
+import {getAIProviderRuntime} from 'arcane-os/ai-provider-runtime';
 
 const runtime = getAIProviderRuntime();
 const releaseProvider = runtime.register(adaptV1LlmProvider(provider));
@@ -7249,6 +7272,72 @@ async function selectNativeRecognition(ai, signal) {
 }
 ```
 
+## createBrowserSpeechSynthesisProvider()
+
+### Overview
+
+Creates a provider/2 TTS adapter for native `speechSynthesis`. Construction,
+voice discovery and preparation are silent. Applications choose when to play
+and retain ownership of voice preferences. Browser voices may use remote
+services, so the provider declares `localOnly:false`.
+
+### Signature and result
+
+```text
+createBrowserSpeechSynthesisProvider({id,model,language}={})
+```
+
+Supply `id` and `model:{id,name?,defaultVoice?}`; optional `language` is a
+browser language tag. The provider exposes ordinary `catalog`, `inspect`,
+`status`, `load`, `request`, `unload` and `dispose` methods, plus:
+
+- `catalog()` returns the selected model with `speech:{playback:'native'}`
+  and actual `voices` records `{id,name,lang,default,localService}`. Voice `id`
+  is the browser's exact `voiceURI`.
+- `subscribeCatalog(callback)` immediately delivers the current catalog and
+  observes `voiceschanged`; its returned function removes that subscription.
+- `setDefaultVoice(voiceURI|null)` synchronously changes the default for future
+  preparations and returns the selected value. An empty string selects `null`.
+  Repeating a value is silent; changing it publishes the catalog. Explicit
+  choices and prepared, queued or active speech keep their captured voice.
+- `prepare({input,model?,voice?,language?,speed?},{signal?})` returns a
+  `{kind:'native-speech',input,voice,language,speed,play}` descriptor. Preparation
+  preserves complete text and starts no speech. `play({signal,onState})`
+  returns an owned handle with `finished`, `released`, `pause()`, `resume()`
+  and `stop()`, plus observable state and errors.
+
+`AI.prepareTTSPlayback(payload,signal)` returns this native descriptor or real
+Blob audio from a speech request. Streaming TTS and `SpeechPlayback` consume
+those prepared results. Audio-file methods `fetchTTS` and durable `prepareTTS`
+require real audio and report `ARCANE_AI_TTS_AUDIO_EXPORT_UNAVAILABLE` for native output.
+Unload and disposal cancel owned playback and wait for native release.
+
+### Availability, errors and example
+
+The actual browser must provide synthesis, utterance and voice-event APIs.
+No SDK model, Worker, Core or DBOPFS is required. Missing native synthesis
+reports `ARCANE_AI_SPEECH_SYNTHESIS_UNAVAILABLE`; an unavailable selected voice
+reports `ARCANE_AI_SPEECH_VOICE_UNAVAILABLE`. Activation and playback remain
+subject to browser behavior. A resolved playback operation describes its
+observed native lifecycle, not proof that a person heard it.
+
+```javascript
+import {createBrowserSpeechSynthesisProvider} from 'arcane-os/ai/browser-speech';
+
+// Call from the application's speech-selection action. This stays silent.
+async function selectNativeVoice(ai) {
+    const provider = createBrowserSpeechSynthesisProvider({
+        id: 'browser-voice',
+        model: {id: 'browser-voice'}
+    });
+    await ai.configureSpeechProvider('tts', provider, {modelId: 'browser-voice'});
+    return provider;
+}
+```
+
+See [native speech and voice selection](ai/browser-speech.md) for live catalogs,
+explicit playback, cancellation and language handling.
+
 ## createTwinCloudTTSProvider()
 
 ### Overview
@@ -7291,21 +7380,22 @@ instead of clamping. Returned media is fetched without the inference key.
 Cancelling a credential wait leaves the application's shared refresh alone
 and prevents a late result from starting this cancelled operation.
 
-The SDK sends each initial synthesis POST immediately after credential readiness,
-outside the follow-up queue. One queue handles only status/result GETs and the
-final audio download. Its defaults are four in-flight follow-ups and 250 ms
-between dispatch starts, with each slot held through complete JSON, Blob, or
-error-body consumption. Each job awaits its response and body before enqueueing
-its next incomplete-status check; there is no per-job polling delay.
+The whole-job queue holds each slot through credential readiness, submission,
+remote completion and the complete audio response. Excess jobs wait in FIFO
+order; cancellation removes waiting work before submission. A separate queue
+owns initial POST attempts and eligible retries. Follow-up status/result GETs
+and audio downloads retain independent configurable capacity and cadence,
+defaulting to four requests and 250 ms between starts. Slots remain held
+through complete response-body consumption.
 
-A readable `Retry-After` postpones only the affected job's next eligibility.
-Other jobs and initial submissions remain independent. One readable HTTP 429
-retry is allowed per submission or status read; POST retries retain a one-second minimum, and
-follow-up retries use the configured queue cadence plus any longer readable
-`Retry-After`. An accepted job's failed status Fetch may retry once after a
-network failure, not after a JSON parsing failure. Repeated failures surface
-complete developer diagnostics without cancelling sibling jobs. An ambiguous
-paid POST network failure is never automatically replayed.
+Readable HTTP 429 responses set a provider-wide cooldown observed by submissions
+and follow-ups. One readable rate-limit retry is allowed per submission or
+status read, respecting its applicable minimum delay and longer `Retry-After`.
+An accepted job's failed status Fetch may retry once after a network failure.
+Ambiguous POST network, JSON or error-body failures are surfaced without
+replaying a potentially accepted paid job. A failed job leaves sibling jobs
+intact. See the [cloud speech queue contract](ai/browser-speech.md#twin-cloud-text-to-speech)
+for full scheduling, retry and cancellation behavior.
 
 Each provider/2 `tts/synthesize` request returns one complete audio Blob.
 Request cancellation, unload, and disposal stop local polling/downloads and
@@ -7354,7 +7444,7 @@ Accepts the same options and returns the same provider as
 ### Availability and normalization
 
 The alias shares the canonical factory's Browser and Node requirements,
-immediate submission, queued follow-ups, cancellation, and result contract.
+whole-job and submission queues, queued follow-ups, cancellation and result contract.
 Existing caller imports, stored provider IDs, and credentials remain valid;
 renaming a caller's import requires no saved-data migration.
 
@@ -7376,6 +7466,12 @@ console.log(createDigitalOceanFalTTSProvider === createTwinCloudTTSProvider);
 Creates a local-only Kokoro text-to-speech provider for the provider-neutral AI
 runtime. It owns one independent, bounded Worker/session pool and never selects
 a cloud, native, or LLM fallback.
+
+An ordinary `model.voices` array supplies optional display metadata for the
+application's voice selector. `catalog()` retains each complete record without
+loading or fetching a model. This metadata neither restricts synthesis voice
+values nor proves playback availability. Artifact-graph voice paths remain a
+separate asset-routing contract.
 
 ### Signature and result
 
@@ -8012,6 +8108,66 @@ The runtime configuration, state, and questions in this example belong to the
 application. The JEV identifier is an explicit caller choice, not a default.
 See [TWiN Cloud](ai/twin-cloud.md#evaluate-caller-owned-state-with-system-one)
 for the complete transport and callback contract.
+
+## generateImages()
+
+### Overview
+
+Generates images through TWiN Cloud with a caller-selected model and complete
+prompt. Returns every image as a Blob in provider order. The application owns
+display, filenames, storage, credentials and model choice.
+
+### Signature and result
+
+```text
+async generateImages({model,prompt,parameters={},twinKey,getApiKey,signal=null,id=Date.now(),onRequest,onResponse,onProgress}={})
+```
+
+Supported models are `fal-ai/flux/schnell` through async invocation and
+`stable-diffusion-3.5-large` through image generation. `prompt` is a string;
+`parameters` carries the selected provider's additional fields. Supply the
+prompt through its named argument, and the model through `model`. An explicit
+`twinKey` takes precedence over `getApiKey()`; the latter may return a promise.
+
+The result is `{images:[{blob,mediaType,width?,height?},...]}`. Media metadata is
+retained when the provider supplies it. `onRequest(request,id,metadata)` and
+`onResponse(result,id,false)` receive complete diagnostic records;
+`onProgress({stage,model,id,requestId?})` reports credentials, requesting,
+queued, generating, downloading and complete stages as applicable. Keep these
+diagnostics outside durable conversation history.
+
+The operation submits once. Async jobs are polled using their returned request
+ID; a readable `Retry-After` controls the wait. Ambiguous submission failures
+are surfaced without automatic resubmission. Cancellation covers credentials,
+observers, requests, response bodies and media downloads; it cannot promise
+that an accepted remote job was cancelled. Media downloads omit the inference
+credential. The SDK writes no image or conversation records.
+
+### Availability, errors and example
+
+Node or browser with Fetch, Blob and AbortController; browser requests also
+depend on endpoint CORS. Missing credentials report `AI_PROVIDER_NOT_CONFIGURED`,
+unsupported models `ARCANE_AI_IMAGE_MODEL_UNSUPPORTED`, malformed returned
+media `ARCANE_AI_INVALID_PROVIDER_RESULT`, and cancellation
+`ARCANE_AI_REQUEST_ABORTED`. HTTP/provider failures preserve their returned
+detail. Call only from the application's explicit generation action:
+
+```javascript
+import {generateImages} from 'arcane-os/ai/twin-cloud';
+
+async function drawLunarGarden(twinKey, signal) {
+    return generateImages({
+        twinKey,
+        model: 'fal-ai/flux/schnell',
+        prompt: 'A moon gardener watering a single enormous radish.',
+        signal
+    });
+}
+```
+
+See [image generation](ai/twin-cloud.md#generate-images-with-an-application-selected-model)
+and [MarkdownMedia](runtime-modules.md#markdownmediajs) for application-owned
+image storage and document references.
 
 ## fetchHTTPResponse()
 

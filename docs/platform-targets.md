@@ -5,6 +5,7 @@ named operations:
 
 ```text
 describe -> doctor -> prepare -> plan -> build -> run
+                                           \-> verify (explicit selection)
 ```
 
 The available browser adapter plans from the selected workspace and schema-1
@@ -24,9 +25,10 @@ output. For example:
 
 ```bash
 # Choose one target when creating each app repository.
-npx arcane-os@dev new my-app --path ./my-app --target portable --git
+npx arcane-os@latest new my-app --path ./my-app --target portable --git
 cd my-app
 npm install
+npm run import-map
 npm exec -- arcane native-doctor --target portable --arcane-root "../Arcane OS"
 npm exec -- arcane build --target portable --arcane-root "../Arcane OS"
 
@@ -52,7 +54,12 @@ npm exec -- arcane run --target android-arm64 --arcane-root "../Arcane OS" --for
 
 Every native scaffold also declares the browser target, so one repository can
 use the normal browser development loop and its one selected native build. It
-includes the raster icon required by the current native platform. Use the
+uses the repository root by default (`appsRoot: "."`) and reads SDK resources
+from its installed npm dependency. After `npm install`, run
+`npm run import-map` before the first package or build so the root app's managed
+browser maps are present. The initial scaffold reports that map as pending while
+the SDK dependency is absent. The scaffold includes the raster icon required
+by the current native platform. Use the
 matching scaffold target (`portable`, `windows-x64`, `linux-x64`, `linux-arm64`,
 or `android-arm64`) before running the corresponding command.
 
@@ -79,6 +86,12 @@ for the complete compatibility and breaking-change rule.
 | `linux-x64` | `deb` | Available with explicit `--arcane-root`; unsigned local development only |
 | `linux-arm64` | `deb` | Available with explicit `--arcane-root` on a compatible native ARM64 toolchain; unsigned local development only |
 | `android-arm64` | `apk` | Available with explicit `--arcane-root`; development-signed, architecture-neutral, and physical/native ARM64 for run |
+
+macOS can consume browser applications and portable JavaScript capabilities
+within their declared runtimes. The current target registry has no macOS native
+package adapter; it exposes only the six targets above. A source-development
+native wrapper is also not an exposed `arcane dev` target. Native `run` uses the
+selected packaged application through its paired provider.
 
 Every native target accepts one selected app release and its complete bundled
 dependency closure through the provider boundary. The providers retain the

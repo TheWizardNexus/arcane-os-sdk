@@ -11,6 +11,13 @@ Entity creation and serialization are usually cross-host. Methods that touch
 DOM, DBOPFS, local storage, AI, or object URLs require the corresponding browser
 or native-WebView dependency.
 
+Apps import entities with `arcane-os/entities/<file>.js`; the SDK-managed
+import map resolves these names through the selected runtime routes. Default
+root applications use their installed npm package directly. Absolute
+`/arcane/entities/...` examples below assume an explicitly configured physical
+or virtual `/arcane` route. Use the corresponding package specifier in direct
+npm applications; entity inputs and behavior are the same.
+
 ## Canonical inventory
 
 | Module | Exports | Capability | Availability / normalization |
@@ -86,12 +93,17 @@ with complete ordinary visible call, public result, and assistant content.
 storage boundary. User and assistant records contain role, complete
 visible content, and their real timestamp. An assistant record may also carry
 its application-owned display `name`. A visible tool record may
-additionally carry its public name and plain result status, while its `content`
-comes only from the tool call's required user-facing `message`. System prompts,
+additionally carry its public name and plain result status. A requested-call
+record uses the call's required user-facing `message`; a settled tool result
+uses its supplied public message. System prompts,
 reasoning, provider-extension fields, memory flags, raw tool calls, call IDs,
 argument objects, and raw tool returns never enter new DBOPFS writes.
 Messages added with `persist:false` participate only in their current operation;
 they are not retained in `messages`, `transcript`, memory extraction, or DBOPFS.
+Setting `chat.persist=false` applies the same rule to new additions: the append
+returns `false` before adding records to retained state or starting a write.
+Existing retained messages and saved history remain unchanged. An already
+accepted persistence write keeps its operation ownership and may finish.
 One complete nonblank assistant record is also a durable conversation entry, so
 a model-authored opening can be stored and survive maintenance before the first
 ordinary user turn. No synthetic user record is required or written.

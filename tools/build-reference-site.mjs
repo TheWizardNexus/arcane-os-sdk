@@ -1513,7 +1513,7 @@ function moduleDefaultBinding(record){
 }
 
 function moduleLoadCode(record){
-    const url=`/arcane/modules/${record.name}`;
+    const url=`/node_modules/arcane-os/runtime/arcane/modules/${record.name}`;
     if(record.kind==='stylesheet')return `<link rel="stylesheet" href="${url}">`;
     if(record.kind==='classic-script')return `<script src="${url}"></script>`;
     if(record.kind==='worker')return `const worker = new Worker('${url}');`;
@@ -1526,7 +1526,7 @@ function moduleLoadCode(record){
 
 function moduleExample(record){
     const examples={
-        'AI.js':`import AI from '/arcane/modules/AI.js';
+        'AI.js':`import AI from '/node_modules/arcane-os/runtime/arcane/modules/AI.js';
 
 // The application supplies this runtime argument; never put its key in source.
 async function sayHello(applicationRuntime) {
@@ -1543,7 +1543,7 @@ async function sayHello(applicationRuntime) {
         console.error(error.code, error.message);
     }
 }`,
-        'ConfiguredAIChatSession.js':`import ConfiguredAIChatSession from '/arcane/modules/ConfiguredAIChatSession.js';
+        'ConfiguredAIChatSession.js':`import ConfiguredAIChatSession from '/node_modules/arcane-os/runtime/arcane/modules/ConfiguredAIChatSession.js';
 
 async function askConfiguredSessionAfterUserChoice() {
     const session = new ConfiguredAIChatSession({
@@ -1561,12 +1561,12 @@ async function askConfiguredSessionAfterUserChoice() {
         'AppDataScope.js':`import {
     resolveApplicationId,
     resolveApplicationLocalStorageKey
-} from '/arcane/modules/AppDataScope.js';
+} from '/node_modules/arcane-os/runtime/arcane/modules/AppDataScope.js';
 
 const applicationId = await resolveApplicationId();
 const countKey = resolveApplicationLocalStorageKey('hello-count', {applicationId});
 localStorage.setItem(countKey, '1');`,
-        'DirectoryPicker.js':`import DirectoryPicker from '/arcane/modules/DirectoryPicker.js';
+        'DirectoryPicker.js':`import DirectoryPicker from '/node_modules/arcane-os/runtime/arcane/modules/DirectoryPicker.js';
 
 const picker = new DirectoryPicker();
 if (!picker.available) throw new Error('Native directory selection is unavailable.');
@@ -1574,19 +1574,19 @@ const selection = await picker.select({title: 'Choose a project directory'});
 if (!selection.cancelled) console.info(selection.path);`,
         'ThemeBootstrap.js':`import arcaneThemeReady, {
     bootstrapArcaneTheme
-} from '/arcane/modules/ThemeBootstrap.js';
+} from '/node_modules/arcane-os/runtime/arcane/modules/ThemeBootstrap.js';
 
 const initialTheme = await arcaneThemeReady;
 const refreshedTheme = await bootstrapArcaneTheme();
 console.info(initialTheme.state, refreshedTheme.state);`,
-        'CalculatorEngine.js':`import {evaluateExpression} from '/arcane/modules/CalculatorEngine.js';
+        'CalculatorEngine.js':`import {evaluateExpression} from '/node_modules/arcane-os/runtime/arcane/modules/CalculatorEngine.js';
 
 const result = evaluateExpression('sqrt(81) + 3 ^ 2');
 console.info(result);`,
-        'AnsiText.js':`import {stripAnsi} from '/arcane/modules/AnsiText.js';
+        'AnsiText.js':`import {stripAnsi} from '/node_modules/arcane-os/runtime/arcane/modules/AnsiText.js';
 
 console.info(stripAnsi('\u001b[32mReady\u001b[0m'));`,
-        'Ollama.js':`import ollama from '/arcane/modules/Ollama.js';
+        'Ollama.js':`import ollama from '/node_modules/arcane-os/runtime/arcane/modules/Ollama.js';
 
 // Advanced provider-specific access. Ordinary chat uses Arcane.ai.chat().
 const status = await globalThis.Arcane.localAI.status();
@@ -1597,7 +1597,7 @@ const response = await ollama.chat({
     messages: [{role: 'user', content: 'Reply with one word.'}]
 });
 console.info(response.message?.content);`,
-        'SpeechPlayback.js':`import SpeechPlayback from '/arcane/modules/SpeechPlayback.js';
+        'SpeechPlayback.js':`import SpeechPlayback from '/node_modules/arcane-os/runtime/arcane/modules/SpeechPlayback.js';
 
 const audio = document.createElement('audio');
 audio.controls = true;
@@ -1614,14 +1614,14 @@ await speech.prepare({
     parts: ['First complete segment.', '**Second complete segment.**'],
     autoplay: true
 });`,
-        'TerminalClient.js':`import TerminalClient from '/arcane/modules/TerminalClient.js';
+        'TerminalClient.js':`import TerminalClient from '/node_modules/arcane-os/runtime/arcane/modules/TerminalClient.js';
 
 const terminal = new TerminalClient();
 if (!terminal.available) throw new Error('The native terminal is unavailable.');
 terminal.addEventListener('terminal-output', event => console.info(event.detail.data));
 const session = await terminal.start({shell: 'auto', columns: 100, rows: 30});
 await terminal.write(session.id, 'node --version\\n');`,
-        'IsolatedModelQuestionRunner.js':`import IsolatedModelQuestionRunner from '/arcane/modules/IsolatedModelQuestionRunner.js';
+        'IsolatedModelQuestionRunner.js':`import IsolatedModelQuestionRunner from '/node_modules/arcane-os/runtime/arcane/modules/IsolatedModelQuestionRunner.js';
 
 async function askSelectedModel({model, expectedModel, prompt, onPhase}) {
     const runner = new IsolatedModelQuestionRunner({
@@ -1873,8 +1873,13 @@ function identifierAppears(source,name){
 }
 
 function copyableModuleExample(record,semanticContract,sourceContract){
-    const example=semanticContract.example.trim();
-    if(record.kind!=='esm'||example.includes(`/arcane/modules/${record.name}`))return example;
+    const example=semanticContract.example.trim().replaceAll(
+        '/arcane/modules/', '/node_modules/arcane-os/runtime/arcane/modules/'
+    );
+    if(record.kind!=='esm'
+        ||example.includes(`/node_modules/arcane-os/runtime/arcane/modules/${record.name}`)
+        ||example.includes(`arcane-os/modules/${record.name}`)
+        ||(record.name==='MailApi.mjs'&&example.includes("from 'arcane-os/mail'")))return example;
     const named=sourceContract.exports
         .filter(binding=>binding.name!=='default'&&identifierAppears(example,binding.name))
         .map(binding=>binding.name);
@@ -1885,11 +1890,11 @@ function copyableModuleExample(record,semanticContract,sourceContract){
         &&!named.includes(defaultName)
         &&identifierAppears(example,defaultName)
     );
-    let statement=`import '/arcane/modules/${record.name}';`;
+    let statement=`import '/node_modules/arcane-os/runtime/arcane/modules/${record.name}';`;
     if(usesDefault||named.length){
         const defaultPart=usesDefault?defaultName:'';
         const namedPart=named.length?`{${named.join(', ')}}`:'';
-        statement=`import ${[defaultPart,namedPart].filter(Boolean).join(', ')} from '/arcane/modules/${record.name}';`;
+        statement=`import ${[defaultPart,namedPart].filter(Boolean).join(', ')} from '/node_modules/arcane-os/runtime/arcane/modules/${record.name}';`;
     }
     return `${statement}\n\n${example}`;
 }
@@ -1960,10 +1965,10 @@ function baseAIDecisionBody({output,targets}){
 
 function aiDecisionBody({output,targets}){
     const link=(source,label,fragment='')=>`<a href="${escapeHtml(`${relativeOutputHref(output,targets.get(source))}${fragment}`)}">${escapeHtml(label)}</a>`;
-    const choiceRows=`<tr><td>Provider registration, normalized lifecycle, and per-role state</td><td>${link('@reference/module/ai-provider-runtime','AIProviderRuntime.js')} and ${link('@reference/module/ai-runtime-state','AIRuntimeState.js')}</td><td>One application-owned runtime validates selections, publishes independent LLM/STT/TTS state, and routes requests without silent fallback.</td></tr><tr><td>Visible selected-model activation request</td><td>${link('docs/reference/runtime-components.md','chat.html','#chathtml')}</td><td>Send remains disabled for a selected unloaded LLM; a keyboard-operable Start/Try again or Cancel loading control emits a cancelable public request before the host callback. The provider/runtime owner decides whether and how to execute the resulting intent.</td></tr><tr><td>Caller-configured browser-local speech</td><td>${link('docs/reference/ai/browser-speech.md','arcane-os/ai/browser-speech')}</td><td>Browser-only Whisper STT and Kokoro TTS providers over caller-owned, pinned model and adapter closures; no bundled model or runtime assets.</td></tr><tr><td>Durable chat history and document retrieval</td><td>${link('@reference/module/persistent-ai-chat-session','PersistentAIChatSession.js')} and ${link('@reference/module/dbopfs-document-library','DBOPFSDocumentLibrary.js')}</td><td>Explicit persistence plus bounded lexical retrieval or caller-source evaluation; provider choice and application policy remain outside the storage helpers.</td></tr>`;
+    const choiceRows=`<tr><td>Provider registration, normalized lifecycle, and per-role state</td><td>${link('@reference/module/ai-provider-runtime','AIProviderRuntime.js')} and ${link('@reference/module/ai-runtime-state','AIRuntimeState.js')}</td><td>One application-owned runtime validates selections, publishes independent LLM/STT/TTS state, and routes requests without silent fallback.</td></tr><tr><td>Visible selected-model activation request</td><td>${link('docs/reference/runtime-components.md','chat.html','#chathtml')}</td><td>Send remains disabled for a selected unloaded LLM; a keyboard-operable Start/Try again or Cancel loading control emits a cancelable public request before the host callback. The provider/runtime owner decides whether and how to execute the resulting intent.</td></tr><tr><td>Local, native browser or cloud speech</td><td>${link('docs/reference/ai/browser-speech.md','arcane-os/ai/browser-speech')}</td><td>Whisper/Kokoro use selected upstream models; native recognition and synthesis use browser APIs; TWiN Cloud TTS uses an application key. Each provider owns its lifecycle and availability.</td></tr><tr><td>Durable chat history and document retrieval</td><td>${link('@reference/module/persistent-ai-chat-session','PersistentAIChatSession.js')} and ${link('@reference/module/dbopfs-document-library','DBOPFSDocumentLibrary.js')}</td><td>Complete persistent records, request-only turns, lexical retrieval and caller-source evaluation; provider choice and application policy remain application-owned.</td></tr>`;
     const lifecycle=`<h2 id="provider-runtime-and-state">Provider runtime and normalized state</h2><p>${link('@reference/module/ai-provider-runtime','AIProviderRuntime.js')} owns admitted provider registration, configuration, lifecycle, cancellation, speech mute state, and normalized request routing. ${link('@reference/module/ai-runtime-state','AIRuntimeState.js')} publishes the normalized aggregate and independent <code>llm</code>, <code>stt</code>, and <code>tts</code> role states. Applications should consume those state records instead of inferring readiness from a loaded module or protocol label.</p>`;
-    const browserSpeech=`<h2 id="browser-speech-providers">Browser speech providers</h2><p>${link('docs/reference/ai/browser-speech.md','Browser speech')} is the explicit browser-only choice for caller-supplied Whisper speech-to-text and Kokoro text-to-speech runtimes. It implements <code>arcane-ai-provider/2</code>, downloads nothing on import, and ships no model weights, adapter runtime assets, voices, URLs, catalog, or cloud fallback.</p><p>Capacity 4 means up to four segments synthesize at once. Segment 5 and later wait in the SDK’s FIFO queue; they are not dropped. Synthesis may finish out of order, but playback waits for earlier segments and plays exact segment order. Every TTS entrypoint automatically removes repeated same formatting marks from only the outbound speech-input copy; caller, displayed, stored, and model content stays exact.</p><p>Use <code>ai.providerRuntime.status(&#39;tts&#39;, {execution:true}).execution</code> to read the selected device after load. Requested <code>auto</code> with selected <code>wasm</code> identifies fallback; it is not evidence of physical GPU kernel overlap.</p>`;
-    const durable=`<h2 id="durable-chat-and-retrieval">Durable chat and retrieval</h2><p>${link('@reference/module/persistent-ai-chat-session','PersistentAIChatSession.js')} makes chat persistence explicit. ${link('@reference/module/dbopfs-document-library','DBOPFSDocumentLibrary.js')} and ${link('@reference/module/document-lexical-search','DocumentLexicalSearch.js')} provide bounded document storage, caller-source evaluation, context construction, and lexical ranking without assuming a provider or copying provider runtime assets.</p>`;
+    const browserSpeech=`<h2 id="browser-speech-providers">Browser speech providers</h2><p>${link('docs/reference/ai/browser-speech.md','Browser speech')} offers caller-selected Whisper and Kokoro, native browser recognition and synthesis, and TWiN Cloud TTS through <code>arcane-ai-provider/2</code>. Importing starts no download or speech. Local models use selected upstream assets; native voices come from the actual browser catalog and may use remote services; cloud TTS requires an application key.</p><p>Kokoro defaults to four synthesis sessions; cloud TTS defaults to four complete jobs through final audio. Further jobs wait in FIFO order. Playback preserves input order. Native synthesis prepares silent descriptors and owns actual playback release; audio-file APIs report native export unavailability. Shared AI and SpeechPlayback remove repeated same formatting marks from their outbound speech-input copy; direct native provider preparation preserves its input; caller, displayed, stored, and model content stays exact.</p><p>Use <code>ai.providerRuntime.status(&#39;tts&#39;, {execution:true}).execution</code> to read the selected device after load. Local speech <code>auto</code> tries WebNN NPU, WebGPU, then WASM; an explicit backend does not fall back. Status reports successful upstream loading, not physical accelerator use for every operation.</p>`;
+    const durable=`<h2 id="durable-chat-and-retrieval">Durable chat and retrieval</h2><p>${link('@reference/module/persistent-ai-chat-session','PersistentAIChatSession.js')} makes chat persistence explicit. ${link('@reference/module/dbopfs-document-library','DBOPFSDocumentLibrary.js')} and ${link('@reference/module/document-lexical-search','DocumentLexicalSearch.js')} provide complete document storage, caller-source evaluation, context construction and lexical ranking. A <code>persist:false</code> turn participates only in its active operation and then leaves retained transcript, recurring context, durable storage and memory.</p>`;
     return baseAIDecisionBody({output,targets})
         .replace(
             '</tbody></table></div><h2 id="runtime-ai-module">',

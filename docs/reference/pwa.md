@@ -86,9 +86,11 @@ establish any particular installed application's browser lifecycle.
 `offline.include` and `offline.exclude` select literal paths or directory
 prefixes from the selected emitted inventory. An omitted or empty include list
 selects that inventory; exclusions subtract from it. App files use app-relative
-paths and shared runtime files use paths such as `arcane/sdk/pwa.mjs`.
-For example, selecting `modules` matches packaged
-`apps/<id>/modules/...`; emitted offline URLs keep the `apps/<id>/` prefix.
+paths. Shared runtime selections follow the configured destinations: for example,
+`node_modules/arcane-os/browser-runtime/pwa.mjs` for a direct installed route,
+or `arcane/sdk/pwa.mjs` for a physical or virtual route.
+For example, selecting `modules` matches a root app's `modules/...` or a nested
+app's `apps/<id>/modules/...`; emitted offline URLs retain that selected layout.
 The application entry and generated PWA shell records are retained. Select the
 resources needed by every offline page, including its shared modules and styles.
 The worker script itself is never an application cache entry.
@@ -120,9 +122,10 @@ Browser packaging emits these files at the selected deployment root:
 | `arcane-sw.js` | Stable worker URL with the selected offline manifest embedded in its source. |
 | `arcane-pwa.mjs` | Independent registration and installation-component bootstrap importing the SDK client. |
 
-The selected app files remain under `apps/<id>/`, with shared runtime routes
-alongside them. The SDK supplies a root `index.html` launcher when selected
-shared content has no root page. The generated PWA files stay at the deployment
+Standalone app files stay at the output root. Explicit multi-app workspaces
+retain their selected app under `apps/<id>/`, with shared runtime routes alongside
+it. The SDK supplies a root `index.html` launcher when selected content has no
+root page. The generated PWA files stay at the deployment
 root so their worker can serve the selected app and shared resources. The
 worker is registered for the deployment root independently of any app-authored
 manifest scope.
@@ -140,12 +143,13 @@ The same bootstrap starts one initially hidden `pwa-install.html` component with
 the generated manifest's app name. Component loading and worker registration
 proceed independently.
 
-The selected PWA browser delivery removes only SDK-owned `arcaneVersion` fields
+All SDK browser-resource delivery removes only SDK-owned `arcaneVersion` fields
 from actual local resource references, including the managed import map. Authored
 fields such as `v`, encoded and repeated fields, empty query segments, fragments,
 source spelling and unrelated payloads are preserved. The offline
-manifest now carries release information. Non-PWA and native delivery retain
-the [existing asset version contract](asset-versioning.md).
+manifest carries release information. Non-PWA and native packaging use the same
+[clean local resource URLs](asset-versioning.md). Native packaging does not
+generate the browser PWA worker, installation manifest or registration bootstrap.
 
 ## Development and hosting
 
@@ -157,9 +161,11 @@ Package-only applications retain their existing descriptor workflow.
 
 With the external [`installed-v1` routes](protocols.md#installed-package-browser-routes),
 the server inventories the selected SDK directly in `node_modules`. Runtime
-resources retain their public `arcane/`, `arcane/sdk/`, and
-`arcane/dependencies/strong-type/` URLs, so offline selections use those logical
-paths rather than package filesystem paths. No workspace `arcane/` tree or
+resources follow the configured destinations. Direct routes use real
+`node_modules/<dependency>/...` URLs, including an npm alias when selected.
+Earlier virtual routes retain their `arcane/`, `arcane/sdk/`, and
+`arcane/dependencies/strong-type/` destinations. Offline selections use those
+same emitted paths. No workspace `arcane/` tree or
 `arcane.lock.json` is needed. Packaging uses the same route selection and copies
 the selected resources into the portable output; existing physical projections
 remain supported.
@@ -179,7 +185,8 @@ write is needed. Edits to selected source files are picked up by the next due
 page-load check while the server remains running.
 
 For an enabled application, `arcane dev` serves the generated PWA files at the
-origin root and starts at the selected app page under `/apps/<id>/`. Use one
+origin root and starts at the selected app entry: `/index.html` for a standalone
+root app with that entry, or `/apps/<id>/<entry>` for a nested app. Use one
 selected app per development origin. The SDK uses `node-http-server` for source
 and packaged-preview serving, including conditional resource responses.
 Arcane development servers default to HTTPS, including localhost, and packaged

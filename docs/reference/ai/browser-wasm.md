@@ -3,19 +3,19 @@
 Use this browser-only entrypoint when an application deliberately owns a local
 GGUF model authority and wants provider-neutral LLM lifecycle, chat, streaming,
 cancellation, and structural tool-call results without an Arcane Core host.
-For ordinary hosted applications, start with the [Arcane AI
-contracts](../core/arcane-ai-contracts.md) and `globalThis.Arcane.ai`. This
-page is the focused local-browser path beneath the normalized AI decision
-guide.
+For a remote request with an explicit model and key, use
+[TWiN Cloud](twin-cloud.md). Applications using an Arcane Core host can use
+the [native AI contracts](../core/arcane-ai-contracts.md) through
+`globalThis.Arcane.ai`. This page covers local inference in the browser.
 
 The wiring example assumes a scaffolded or materialized Arcane application
-using the current checkout's runtime tree and browser import map.
-`arcane/DBOPFS` is a managed browser-map specifier, not an npm package export.
+using its installed SDK and managed browser import map. Browser modules use
+the published `arcane-os` exports below; DBOPFS still requires a browser host.
 See [browser runtime delivery](../protocols.md#browser-runtime-delivery) before
 using the example in a custom host or bundler.
 
 ```javascript
-import DBOPFS from 'arcane/DBOPFS';
+import DBOPFS from 'arcane-os/modules/DBOPFS.js';
 import {
     createArcaneAI,
     createBrowserModelSource,
@@ -106,7 +106,7 @@ selection; a failed GPU load does not silently switch to CPU.
 | `ai.llm.chat(request)` / `ai.fetchRequest(request)` | Validated OpenAI-like completion. |
 | `ai.llm.stream(request)` | Mutable async-iterator handle with `result` and `cancel(reason)`. |
 | `ai.streamRequest(request)` | Consumes the stream, publishes every choice's ordinary content/reasoning in provider order, and returns complete JSON text for a multi-choice terminal completion, one structural-call array for selected tool output, or ordinary single-choice text. |
-| `ai.createChatSession(options)` | Asynchronously resolves `Promise<PersistentAIChatSession>` bound to this exact controller; caller-supplied `chat` is rejected. |
+| `ai.createChatSession(options)` | Asynchronously resolves `Promise<PersistentAIChatSession>` bound to this exact controller; caller-supplied `ai` and `chat` are rejected. |
 | `ai.unload()` | Cancels active work, releases the Wllama session, and returns flat unloaded status; the DBOPFS cache remains. |
 | `ai.dispose()` | Permanently disposes the controller; explicit `store.remove(source)` is required to delete cached model content. |
 
@@ -212,7 +212,7 @@ cached entry or rejects with `ARCANE_AI_MODEL_OFFLINE_MISS`.
 
 ```javascript
 const {security, cache} = ai.status().llm;
-console.log(security.secure); // false unless explicitly selected
+console.log(security?.secure === true); // false when the optional field is absent
 console.log(cache);
 ```
 
@@ -254,8 +254,11 @@ the selected hardware. Chromium's optional adapter `type` is a
 [developer feature](https://developer.chrome.com/docs/web-platform/webgpu/developer-features);
 the standard API does not always expose integrated or discrete classification.
 The Profile says **Already using the performance GPU.** for an explicitly
-reported discrete GPU and hides performance flag advice. Missing classification
-shows **GPU available.** without flag advice and remains unconfirmed.
+reported discrete GPU. Missing classification shows **GPU available.** and
+remains unconfirmed. On supported Windows desktop Chromium browsers, Profile
+keeps its **Copy GPU flag address** control available regardless of adapter
+classification or detection outcome. This Profile control is separate from
+the provider's conditional one-time alert described above.
 The browser does not expose the flag's current value or a reliable machine-wide
 GPU count, and a discrete adapter does not prove it is the fastest available.
 See [Chrome's GPU selection guidance](https://developer.chrome.com/docs/web-platform/webgpu/troubleshooting-tips#webgpu_is_slower_than_webgl).
@@ -349,7 +352,7 @@ connect its existing display operations without parsing provider protocol:
 ```javascript
 import {
     formatConversationClosingReportText
-} from '/arcane/modules/ConversationClosingReport.js';
+} from 'arcane-os/conversation-closing-report';
 
 async function streamClosingReport(ai, messages, closingTool, view, signal) {
     return ai.streamRequest(
@@ -415,10 +418,10 @@ explain why load is available, blocked, or not yet measured without guessing.
 `capabilities()` reports browser observations such as WebAssembly, OPFS,
 WebGPU API presence, WebGPU operation, secure context, cross-origin
 isolation, and hardware concurrency. `navigator.gpu` alone is not operational
-evidence. The authoritative runtime can operate without cross-origin isolation,
-so that flag is not a hard gate; secure context and WebGPU/full-offload support
-are platform requirements. `probe()` exercises packaged Wllama backend
-operations only while unloaded; it does not download a model.
+evidence. The authoritative runtime can operate without cross-origin isolation.
+Secure context remains required; WebGPU/full-offload support applies to the
+GPU route, while explicit `gpuLayers:0` uses CPU. `probe()` exercises packaged
+Wllama backend operations only while unloaded; it does not download a model.
 
 ## BROWSER_WASM_RUNTIME_AUTHORITY
 
@@ -427,9 +430,9 @@ operations only while unloaded; it does not download a model.
 Mutable metadata for the shipped browser runtime. Its protocol is
 `arcane-ai-browser-wasm/2`; the direct provider uses
 `arcane-ai-adapter/1` and `adaptV1LlmProvider()` projects it into
-`arcane-ai-provider/2`. It records Wllama `3.6.0`, the embedded llama.cpp
-revision, licenses, and the disabled compatibility-runtime and
-remote-model-helper policy.
+`arcane-ai-provider/2`. It records Wllama `3.6.0`, upstream license metadata,
+packaged runtime asset URLs, execution policy, and the disabled
+compatibility-runtime and remote-model-helper policy.
 
 ### Value and import
 
@@ -541,9 +544,9 @@ async function loadCachedModelAfterUserChoice() {
 `await ai.createChatSession(options)` dynamically creates a
 [`PersistentAIChatSession`](../runtime-modules.md#persistentaichatsessionjs)
 whose AI API is permanently bound to this controller. `options` must
-be a plain object and must not contain `chat`; this prevents a session from
-claiming the controller's lifecycle while sending its turns through another
-provider.
+be a plain object and must not contain `ai` or `chat`; this prevents a session
+from claiming the controller's lifecycle while sending its turns through
+another provider.
 
 ## createBrowserModelSource()
 
@@ -728,7 +731,7 @@ console.
 ### Availability and normalization
 
 The adapter is available anywhere the caller can supply a compatible
-`arcane-ai-browser-wasm/1` provider object. It performs only the versioned
+`arcane-ai-adapter/1` provider object. It performs only the versioned
 provider-shape normalization into `arcane-ai-provider/2`. The v1 ingress,
 terminal result, cancellation, and ordinary iterator projection use the same
 structural-message contract; the wrapper does not create a
@@ -741,7 +744,7 @@ provider and are forwarded through the normalized role contract.
 
 ```javascript
 import {adaptV1LlmProvider} from 'arcane-os/ai/browser-wasm';
-import {getAIProviderRuntime} from 'arcane/AIProviderRuntime';
+import {getAIProviderRuntime} from 'arcane-os/ai-provider-runtime';
 
 const runtime = getAIProviderRuntime();
 const release = runtime.register(adaptV1LlmProvider(provider));

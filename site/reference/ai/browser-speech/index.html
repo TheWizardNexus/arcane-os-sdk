@@ -2,36 +2,409 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
-  <meta name="description" content="arcane-os/ai/browser-speech is the browser-only SDK boundary for caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It provides artifact storage, live module routing, role Workers, provider/2 adapters, bounded parallel TTS synthesis, audio normalization, cancellation, and cleanup.">
+  <meta name="description" content="arcane-os/ai/browser-speech supplies caller-selected Whisper transcription, native browser recognition and synthesis, Kokoro text-to-speech, and TWiN Cloud text-to-speech providers. Its local model path provides artifact storage, live module routing, role Workers, provider/2 adapters, bounded parallel TTS synthesis, audio normalization, cancellation, and cleanup.">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
-  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-speech/"><link rel="icon" type="image/png" href="../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../styles.css?v=back-to-top"><link rel="stylesheet" href="../../reference.css?v=visible-toolbar">
-  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Browser speech providers · Arcane OS SDK"><meta property="og:description" content="arcane-os/ai/browser-speech is the browser-only SDK boundary for caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It provides artifact storage, live module routing, role Workers, provider/2 adapters, bounded parallel TTS synthesis, audio normalization, cancellation, and cleanup."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-speech/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Browser speech providers · Arcane OS SDK"><meta name="twitter:description" content="arcane-os/ai/browser-speech is the browser-only SDK boundary for caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It provides artifact storage, live module routing, role Workers, provider/2 adapters, bounded parallel TTS synthesis, audio normalization, cancellation, and cleanup."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <title>Browser speech providers | Arcane OS SDK</title><script src="../../../app.js?v=back-to-top" defer></script><script src="../../reference.js" type="module"></script>
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-speech/"><link rel="icon" type="image/png" href="../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../styles.css"><link rel="stylesheet" href="../../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Browser speech providers · Arcane OS SDK"><meta property="og:description" content="arcane-os/ai/browser-speech supplies caller-selected Whisper transcription, native browser recognition and synthesis, Kokoro text-to-speech, and TWiN Cloud text-to-speech providers. Its local model path provides artifact storage, live module routing, role Workers, provider/2 adapters, bounded parallel TTS synthesis, audio normalization, cancellation, and cleanup."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-speech/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Browser speech providers · Arcane OS SDK"><meta name="twitter:description" content="arcane-os/ai/browser-speech supplies caller-selected Whisper transcription, native browser recognition and synthesis, Kokoro text-to-speech, and TWiN Cloud text-to-speech providers. Its local model path provides artifact storage, live module routing, role Workers, provider/2 adapters, bounded parallel TTS synthesis, audio normalization, cancellation, and cleanup."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Browser speech providers | Arcane OS SDK</title><script src="../../../app.js" defer></script><script src="../../reference.js" type="module"></script>
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../examples/">Hello World</a><a href="../../../guides/">Guides</a><a href="../../sdk-api/">API</a><a href="../../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">Browser speech providers</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="browser-speech-providers">Browser speech providers</h1><p class="doc-lead">arcane-os/ai/browser-speech is the browser-only SDK boundary for caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It provides artifact storage, live module routing, role Workers, provider/2 adapters, bounded parallel TTS synthesis, audio normalization, cancellation, and cleanup.</p><div class="doc-meta"><span>SDK 0.5.18</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">Browser speech providers</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="browser-speech-providers">Browser speech providers</h1><p class="doc-lead">arcane-os/ai/browser-speech supplies caller-selected Whisper transcription, native browser recognition and synthesis, Kokoro text-to-speech, and TWiN Cloud text-to-speech providers. Its local model path provides artifact storage, live module routing, role Workers, provider/2 adapters, bounded parallel TTS synthesis, audio normalization, cancellation, and cleanup.</p><div class="doc-meta"><span>SDK 0.51.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../">Normalized AI</a><a href="../twin-cloud/">TWiN Cloud quick start</a><a href="../browser-wasm/">Browser-WASM AI</a><a href="./" aria-current="page">Browser speech</a><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../core/">Core map</a><a href="../../core/arcane-api/">Arcane API</a><a href="../../core/capabilities/">Capabilities and admission</a><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../../core/arcane-events/">Events</a><a href="../../core/arcane-ai-contracts/">AI contracts</a><a href="../../core/arcane-entities/">Entity exports</a><a href="../../core/ollama-module/">Ollama internals (advanced)</a><a href="../../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/ai/browser-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#quick-start-say-one-sentence">Quick start: say one sentence</a><a href="#developer-diagnostics">Developer diagnostics</a><a href="#four-synthesis-slots-and-exact-order-playback">Four synthesis slots and exact-order playback</a><a href="#play-a-complete-array-with-speechplayback">Play a complete array with SpeechPlayback</a><a href="#queue-complete-passages-and-wait-for-playback">Queue complete passages and wait for playback</a><a href="#prepare-narration-once-and-replay-stored-audio">Prepare narration once and replay stored audio</a><a href="#stream-chunks-as-they-arrive">Stream chunks as they arrive</a><a href="#automatic-speech-input-formatting-cleanup">Automatic speech-input formatting cleanup</a><a href="#choose-a-device-or-reduce-memory-use">Choose a device or reduce memory use</a><a href="#inspect-the-requested-and-selected-device">Inspect the requested and selected device</a><a href="#stop-mute-cancel-and-release">Stop, mute, cancel, and release</a><a href="#advanced-provider-and-artifact-reference">Advanced provider and artifact reference</a><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-identifiers">Protocol identifiers</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#ordinary-module-routing">Ordinary module routing</a><a href="#onnx-runtime-configuration">ONNX runtime configuration</a><a href="#providers">Providers</a><a href="#lifecycle-and-cancellation">Lifecycle and cancellation</a><a href="#errors">Errors</a><a href="#ownership">Ownership</a><a href="#related">Related</a></nav></details><p><code>arcane-os/ai/browser-speech</code> is the browser-only SDK boundary for
-caller-selected Whisper speech-to-text and Kokoro text-to-speech runtimes. It
+      <article class="prose reference-prose" data-reference-source="docs/reference/ai/browser-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#choose-a-speech-provider">Choose a speech provider</a><a href="#native-browser-speech-recognition">Native browser speech recognition</a><a href="#native-browser-text-to-speech-and-voice-previews">Native browser text-to-speech and voice previews</a><a href="#twin-cloud-text-to-speech">TWiN Cloud text-to-speech</a><a href="#quick-start-say-one-sentence">Quick start: say one sentence</a><a href="#browser-npu-and-gpu-setup">Browser NPU and GPU setup</a><a href="#developer-diagnostics">Developer diagnostics</a><a href="#local-synthesis-capacity-and-exact-order-playback">Local synthesis capacity and exact-order playback</a><a href="#play-a-complete-array-with-speechplayback">Play a complete array with SpeechPlayback</a><a href="#queue-complete-passages-and-wait-for-playback">Queue complete passages and wait for playback</a><a href="#prepare-narration-once-and-replay-stored-audio">Prepare narration once and replay stored audio</a><a href="#stream-chunks-as-they-arrive">Stream chunks as they arrive</a><a href="#automatic-speech-input-formatting-cleanup">Automatic speech-input formatting cleanup</a><a href="#choose-a-device-or-reduce-memory-use">Choose a device or reduce memory use</a><a href="#inspect-the-requested-and-selected-device">Inspect the requested and selected device</a><a href="#stop-mute-cancel-and-release">Stop, mute, cancel, and release</a><a href="#advanced-provider-and-artifact-reference">Advanced provider and artifact reference</a><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-identifiers">Protocol identifiers</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#removebrowserspeechmodelcache">removeBrowserSpeechModelCache()</a><a href="#ordinary-module-routing">Ordinary module routing</a><a href="#onnx-runtime-configuration">ONNX runtime configuration</a><a href="#providers">Providers</a><a href="#lifecycle-and-cancellation">Lifecycle and cancellation</a><a href="#errors">Errors</a><a href="#ownership">Ownership</a><a href="#related">Related</a></nav></details><p><code>arcane-os/ai/browser-speech</code> supplies caller-selected Whisper transcription,
+native browser recognition and synthesis, Kokoro text-to-speech, and TWiN Cloud
+text-to-speech providers. Its local model path
 provides artifact storage, live module routing, role Workers, provider/2
 adapters, bounded parallel TTS synthesis, audio normalization, cancellation,
 and cleanup.</p>
+<h2 id="choose-a-speech-provider">Choose a speech provider</h2>
+<div class="table-wrap" data-columns="4" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Need</th>
+<th>Factory</th>
+<th>Input or output</th>
+<th>Runtime and locality</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Transcribe a recorded clip</td>
+<td><code>createBrowserWhisperProvider</code></td>
+<td>Audio input, complete transcript output</td>
+<td>Caller-selected local model and Worker runtime</td>
+</tr>
+<tr>
+<td>Recognize live microphone speech</td>
+<td><code>createBrowserSpeechRecognitionProvider</code></td>
+<td>Final segments and transient interim text</td>
+<td>Native browser service; may use a remote service</td>
+</tr>
+<tr>
+<td>Speak with installed browser voices</td>
+<td><code>createBrowserSpeechSynthesisProvider</code></td>
+<td>Silent native playback descriptor, then explicit playback</td>
+<td>Native voice inventory; individual voices may be remote</td>
+</tr>
+<tr>
+<td>Generate reusable audio locally</td>
+<td><code>createBrowserKokoroProvider</code></td>
+<td>Synthesized audio</td>
+<td>Caller-selected local model, voice and Worker runtime</td>
+</tr>
+<tr>
+<td>Generate audio through TWiN Cloud</td>
+<td><code>createTwinCloudTTSProvider</code></td>
+<td>Completed remote synthesis returned as audio</td>
+<td>Application-owned key reader and selected FAL model</td>
+</tr></tbody>
+</table>
+</div>
+<p>STT and TTS have independent selections and lifecycles. Applications choose
+their defaults, recognition language, voice, and activation controls. Native
+browser providers need no SDK model download or DBOPFS artifact store.</p>
+<h2 id="native-browser-speech-recognition">Native browser speech recognition</h2>
+<p>Select the browser&#39;s <code>SpeechRecognition</code> or <code>webkitSpeechRecognition</code> service
+explicitly. It may use a remote browser service, so this provider declares
+<code>localOnly:false</code>; it is never substituted for Whisper automatically. The
+application owns the provider/model identifiers and saved Profile selection.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createBrowserSpeechRecognitionProvider} from &#39;arcane-os/ai/browser-speech&#39;;
+
+async function selectBrowserRecognition(ai, signal) {
+    const provider = createBrowserSpeechRecognitionProvider(
+        {id: &#39;WEB_SPEECH&#39;, model: {id: &#39;WEB_SPEECH&#39;}}
+    );
+    await ai.configureSpeechProvider(&#39;stt&#39;, provider, {modelId: &#39;WEB_SPEECH&#39;, signal});
+}
+</code></pre></div>
+<p>Configuration and activation use the existing independent STT lifecycle.
+Construction and <code>catalog()</code> succeed when the native API is absent;
+<code>inspect()</code> reports unavailable and <code>load()</code> reports an unsupported error.
+Neither factory, configuration nor load opens a microphone, downloads a
+model, accesses storage, or changes TTS, typing, existing defaults, or saved
+data. Browser/OS availability, microphone permission, language support and
+service connectivity remain native platform requirements across Windows,
+Linux, macOS and Android hosts.</p>
+<p>After STT activation, the existing <code>speech.html</code> and <code>voice-transcription.html</code>
+recording controls select live capture automatically. <code>speech.html</code> retains
+every final result and emits one complete <code>speech-transcription-complete</code>
+message when capture ends. Its live display retains finalized words alongside
+the current interim text while speaking. The voice component appends each final result
+through its existing ordered save queue. Interim text appears only in a
+transient surface and never enters a save or completion event. A custom voice
+component <code>transcribe(file,context)</code> callback retains the existing clip path.
+Final segments waiting behind an application save remain visible in that
+transient surface until the ordered queue appends them to the main transcript.</p>
+<h3 id="recognition-language-and-editable-chat-drafts">Recognition language and editable Chat drafts</h3>
+<p>The shared speech control exposes <code>recognitionLanguage</code> as an editable BCP47
+tag. Its visible picker is available before live capture, shows every suggested
+language when opened, and filters after the user changes its text. Suggestions
+retain native language and region labels; callers can also supply an exact
+custom tag. The picker is disabled during capture and outside live-recognition
+mode. Recognition language is independent of Chat&#39;s conversation language.</p>
+<p>For an initialized shared Chat component, choose whether the completed
+transcription submits immediately or remains editable:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">// chat is the application&#39;s ready shared Chat component.
+chat.transcriptionMode = &#39;draft&#39;;
+chat.recognitionLanguage = &#39;es-MX&#39;;
+chat.appendDraft(&#39;Captain, the moon-powered toaster reports: &#39;);
+</code></pre></div>
+<p><code>&#39;submit&#39;</code> is the existing default. In <code>&#39;draft&#39;</code> mode, final and interim native
+recognition appear immediately in the composer alongside typed text. Completion
+leaves Send to the user. Interim replacement preserves user edits; cancellation
+retires only the unedited interim range and retains confirmed text. The shared
+speech component emits cumulative <code>speech-transcription-progress</code> detail with
+<code>text</code>, <code>interim</code>, and <code>operationId</code>; confirmed completion keeps the existing
+<code>speech-transcription-complete</code> event. Interim text remains transient and never
+enters a completion payload or durable history.</p>
+<h3 id="direct-capture">Direct capture</h3>
+<p>For direct use, <code>ai.supportsTranscriptionCapture()</code> detects the selected
+provider&#39;s capture capability. <code>ai.createTranscriptionCapture(options)</code> returns
+<code>null</code> for a file-only provider or a single-use capture handle with
+<code>start({signal})</code>, <code>stop()</code>, <code>cancel()</code>, <code>destroy()</code> and <code>done</code>.
+Options are <code>{language,continuous,onSegment,onInterim,onState,onError}</code>;
+<code>onSegment({text,sequence})</code> receives each complete final result once, and
+<code>onInterim({text})</code> receives the current mutable hypothesis. Callbacks are
+observational and never delay native capture. The voice component, rather than
+the capture callback, owns asynchronous ordered application saves.</p>
+<p>Call <code>start()</code> directly from the initiating user gesture. Its promise resolves
+to whether native capture actually started. <code>stop()</code> asks the browser to stop
+listening and finish recognition, retaining final results through native <code>end</code>;
+<code>stop()</code> and <code>done</code> resolve <code>true</code> for normal native completion and <code>false</code> for
+cancellation or failure after capture settlement. Runtime cleanup failure
+rejects the runtime handle&#39;s promises. <code>cancel()</code>, an aborted signal,
+provider replacement, unload, and disposal request native <code>abort()</code> and suppress
+late text. Capture is an owned busy STT operation; it is never delayed into a
+request queue that would lose the gesture. Natural native <code>end</code> stops the
+session without automatic restart. The user can start another session.
+If native <code>abort()</code> itself throws, the complete failure remains observable and
+the capture stays owned until native <code>end</code>; requesting abort is not evidence
+that the browser microphone has disconnected.</p>
+<p>Missing API reports <code>ARCANE_AI_SPEECH_RECOGNITION_UNAVAILABLE</code>; file input
+reports <code>ARCANE_AI_SPEECH_INPUT_UNSUPPORTED</code>. Native service errors use
+<code>ARCANE_AI_SPEECH_RECOGNITION_FAILED</code>, retain the browser reason and complete
+event as their cause, and remain available in developer diagnostics. Shared
+ordinary controls show concise failure status. Confirmed final words received
+before a service failure remain deliverable; explicit cancellation or
+supersession suppresses the pending chat submission.</p>
+<p>This API captures live microphone speech. <code>AI.fetchSTT(file)</code> remains the
+Whisper/file-provider contract; native recognition rejects file transcription
+honestly rather than recording again or silently switching providers. See the
+<a href="https://webaudio.github.io/web-speech-api/#speechreco-methods" target="_blank" rel="noreferrer">Web Speech specification</a>
+for native stop/abort behavior.</p>
+<h2 id="native-browser-text-to-speech-and-voice-previews">Native browser text-to-speech and voice previews</h2>
+<p><code>createBrowserSpeechSynthesisProvider({id,model:{id,name?,defaultVoice?},language?})</code>
+uses the host browser&#39;s <code>speechSynthesis</code> and <code>SpeechSynthesisUtterance</code>.
+The application selects this provider as its default when desired; constructing
+it does not change global preferences, activate Chat speech, or play audio.
+The provider declares <code>localOnly:false</code> because a browser voice may use a remote
+service. Individual catalog records expose the browser&#39;s <code>localService</code> value.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createBrowserSpeechSynthesisProvider} from &#39;arcane-os/ai/browser-speech&#39;;
+
+const voicePreview = createBrowserSpeechSynthesisProvider({
+  id: &#39;browser-preview&#39;,
+  model: {id: &#39;browser-voices&#39;, name: &#39;Browser voices&#39;}
+});
+const unsubscribe = voicePreview.subscribeCatalog(function showVoices(models) {
+  // Pass these real records to the application&#39;s language/voice selector.
+  console.log(models[0].voices);
+});
+
+// Call only from the application&#39;s explicit Play action.
+function playIntroduction(input, voice) {
+  return voicePreview.play({input, voice});
+}
+
+// voiceURI comes from the real catalog or the application&#39;s saved selection.
+function selectDefaultVoice(voiceURI) {
+  return voicePreview.setDefaultVoice(voiceURI);
+}
+// The owning view unsubscribes and disposes voicePreview when it closes.
+</code></pre></div>
+<p><code>catalog()</code> synchronously returns an array of model records. Each model has
+<code>speech:{playback:&#39;native&#39;}</code> and <code>voices:[{id,name,lang,default,localService}]</code>;
+<code>id</code> is the exact native <code>voiceURI</code>. <code>subscribeCatalog(callback)</code> immediately
+replays that same shape and updates it on <code>voiceschanged</code> or a changed default,
+returning an unsubscribe function. An initially empty inventory is ordinary pending browser
+state. There is no polling, discovery utterance, model download, or page-load
+barrier. Language selectors derive their choices from this actual inventory.</p>
+<p><code>provider.setDefaultVoice(voiceURI)</code> updates the provider&#39;s current
+<code>catalog()[0].defaultVoice</code> synchronously and returns that current value.
+The application may call it from its catalog subscription after asynchronous
+voice discovery or when its saved selection changes. The SDK supplies no
+voice-name preference: preserve an explicit saved choice in the application
+and pass the exact native <code>voiceURI</code>. Repeating the current value is a no-op,
+so a catalog subscription can apply the same choice without notification loops.
+<code>null</code>, an empty string, or an omitted argument clears the configured default
+and restores the existing browser-default behavior. A non-string, non-null
+value throws <code>TypeError</code>; an unloading or disposed provider retains its
+existing lifecycle error. A voice need not be present when setting the default:
+the existing preparation/playback availability behavior below still applies.</p>
+<p>Only future preparations use the new default. Explicit request voices and
+already-prepared, queued, or active speech keep their selected voice. Updating
+the default does not load, unload, replace, cancel, pause, resume, or speak.
+AI&#39;s ordinary speech path reads this current catalog for new requests, so no
+provider reconfiguration is necessary.</p>
+<p><code>prepare({input,voice?,language?,speed?},{signal?})</code> returns an inert
+<code>{kind:&#39;native-speech&#39;,input,voice,language,speed,play(options)}</code> descriptor.
+<code>play(payload,{signal,onState})</code> is the explicit-preview convenience. Both
+preserve complete input. Omitted voice uses the current default, initially
+<code>model.defaultVoice</code>, or the actual browser default; a supplied voice is never replaced with a named
+SDK alias. Language comes from that voice unless explicitly provided. Neither
+API reads the conversation&#39;s language preference. A saved voice waits for
+<code>voiceschanged</code> if the inventory is empty; a nonempty inventory missing it
+reports <code>ARCANE_AI_SPEECH_VOICE_UNAVAILABLE</code>.</p>
+<p>Playback returns <code>{finished,released,state,error,pause(),resume(),stop()}</code>.
+<code>finished</code> resolves <code>true</code> on actual native end, <code>false</code> on stop/abort, and
+rejects genuine native failures. <code>released</code> resolves when native resource
+ownership actually ends: a failed pause/resume/cancel can report an error before
+the utterance terminates. <code>onState({state,error})</code> observes queued,
+waiting-for-voices, playing, paused, complete, stopped, or error. Keep complete
+errors in diagnostics and ordinary status in the interface.</p>
+<p>Preview does not depend on AI mute or model activation. Use a separate provider
+instance when the preview should have a lifetime independent of Chat&#39;s selected
+provider. Provider unload/dispose stop their own playback, invalidate prepared
+descriptors, and disposal removes catalog listeners. Web Speech pause/resume/cancel
+operate on the native synthesis object globally; the SDK serializes its own
+utterances and does not claim control isolation from unrelated direct native
+callers. See the <a href="https://webaudio.github.io/web-speech-api/#tts-section" target="_blank" rel="noreferrer">native synthesis contract</a>.</p>
+<p>For Chat, configure this provider with <code>ai.configureSpeechProvider(&#39;tts&#39;,provider)</code>
+and retain the existing explicit mute/unmute lifecycle. <code>AI.streamTTS()</code> and
+<code>SpeechPlayback</code> use actual utterance completion and cancellation in original
+order. <code>AI.prepareTTSPlayback(payload,signal)</code> returns either real Blob audio or
+the native descriptor without speaking; its signal remains attached by default
+when the returned descriptor is played. <code>AI.fetchTTS()</code> and durable
+<code>AI.prepareTTS()</code> remain audio-file APIs and report
+<code>ARCANE_AI_TTS_AUDIO_EXPORT_UNAVAILABLE</code> for native synthesis, which exposes no
+downloadable audio file.</p>
+<p>Choose preparation according to the result the application needs:</p>
+<div class="table-wrap" data-columns="3" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>API</th>
+<th>Result</th>
+<th>Playback and retention</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>provider.prepare(payload,{signal})</code></td>
+<td>Native speech descriptor</td>
+<td>Silent until its explicit <code>play()</code> call; keeps the selected voice</td>
+</tr>
+<tr>
+<td><code>ai.prepareTTSPlayback(payload,signal)</code></td>
+<td>Promise resolving a native descriptor or real audio Blob</td>
+<td>Silent, provider-neutral preparation; no durable storage</td>
+</tr>
+<tr>
+<td><code>ai.streamTTS(text,end,options)</code></td>
+<td>Promise resolving a preparation or playback boolean</td>
+<td>Shared segmentation and playback in original order</td>
+</tr>
+<tr>
+<td><code>ai.fetchTTS(payload,signal)</code></td>
+<td>Promise resolving a real audio Blob</td>
+<td>Audio-file providers only; does not play</td>
+</tr>
+<tr>
+<td><code>ai.prepareTTS(options)</code></td>
+<td>Preparation handle with <code>ready</code> and <code>getAudio(index)</code></td>
+<td>Audio-file providers only; optional caller-owned durable storage</td>
+</tr></tbody>
+</table>
+</div>
+<p>&lt;a id=&quot;digitalocean-fal-text-to-speech&quot;&gt;&lt;/a&gt;</p>
+<h2 id="twin-cloud-text-to-speech">TWiN Cloud text-to-speech</h2>
+<p>Use the same AI speech queue with an explicitly selected remote provider.
+The application supplies its current DigitalOcean inference key through a
+function returning a string or promise; never place that key in source, logs, or model records.
+This example receives an existing <code>ai</code> and application-owned key reader:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createTwinCloudTTSProvider} from &#39;arcane-os/ai/browser-speech&#39;;
+
+async function selectCloudVoice(ai, getApiKey) {
+  const provider = createTwinCloudTTSProvider({
+    id: &#39;my-cloud-voice&#39;,
+    model: {
+      id: &#39;fal-ai/elevenlabs/tts/multilingual-v2&#39;,
+      defaultVoice: &#39;Rachel&#39;
+    },
+    getApiKey,
+    maxConcurrentRequests: 4,
+    followUpQueue: {maxConcurrentRequests: 4, intervalMs: 250}
+  });
+  await ai.configureSpeechProvider(&#39;tts&#39;, provider, {
+    modelId: provider.catalog()[0].id
+  });
+  return provider;
+}
+</code></pre></div>
+<p><code>createDigitalOceanFalTTSProvider</code> remains a compatibility export of the same
+factory. Existing provider IDs and credentials remain valid; the TWiN Cloud
+name does not change the underlying DigitalOcean FAL endpoint or protocol.</p>
+<p>Construction and configuration make no network request. Explicit
+<code>ai.setSpeechMuted(false)</code> awaits the key reader, checks credential presence, and activates
+the adapter; its ready state does not prove remote credential validity.
+Only synthesis submits text. Keep local STT configured independently, before
+or after this TTS selection. Existing shared Chat/Speech controls own user
+mute/unmute intent; do not reapply a saved unmute over a later manual mute.
+An asynchronous key reader may await the application&#39;s already-running key
+refresh at this activation boundary; it does not delay provider configuration
+or page rendering. Cancellation releases this request&#39;s wait without cancelling
+the application&#39;s shared refresh, and no late key result starts synthesis.</p>
+<p>Once explicit activation is requested, feed each arriving text chunk immediately through
+<code>ai.streamTTS(chunk)</code> and observe each promise without awaiting it ahead of
+the next chunk. Pending activation retains these segments in the existing queue
+until the selected provider is ready; text does not initiate activation itself.
+<code>ai.finishTTS()</code> submits the final remainder. The existing
+punctuation segmentation, concurrent provider queue, and original-order
+playback remain the only owners. Use
+<code>ai.configureTTSSegmentation({punctuation:&#39;any&#39;,wordCadence:null})</code> when each
+punctuation boundary should submit promptly. This is incremental playback of
+completed synthesis jobs, not a live audio stream from TWiN Cloud.</p>
+<p>The provider queues each complete synthesis job, including initial
+<code>POST https://inference.do-ai.run/v1/async-invoke</code> and any eligible submission
+retry. <code>maxConcurrentRequests</code> defaults to four whole jobs. Each slot remains
+occupied through credential readiness, submission, queued/running status, and
+the complete final audio response. Additional requests wait in order; cancelling
+a waiting job removes it before credential reading or submission. This capacity
+is separate from <code>followUpQueue.maxConcurrentRequests</code>.</p>
+<p>One provider-local <code>js-queue</code> owns only follow-up status/result GETs and the final
+audio GET. <code>followUpQueue</code> defaults to <code>{maxConcurrentRequests:4,intervalMs:250}</code>;
+the application may supply those settings explicitly. A follow-up slot remains
+occupied through the complete JSON, audio Blob, or error response body. Dispatch
+starts observe <code>intervalMs</code>, with at most the configured number in flight. Each
+job awaits its current response and body before immediately enqueueing another
+request only when incomplete or eligible for a retry. There is no additional
+per-job polling delay.</p>
+<p>A successful pending response&#39;s <code>Retry-After</code> changes that job&#39;s next eligibility.
+A <code>429</code> applies a shared cooldown to all queued submission and follow-up starts,
+using a one-second minimum and any longer readable <code>Retry-After</code>. A completely
+readable <code>429</code> permits one retry of that submission or status read, within the
+same whole-job slot. Already dispatched operations retain their response ownership.
+An accepted job&#39;s status Fetch network failure may retry once for the same job;
+Ambiguous POST network, JSON parsing, and error-body read failures never replay
+the submission. Repeated failures surface their
+complete diagnostics without an endless retry loop; a failed job does not cancel
+siblings. Retry diagnostics remain in the developer console, outside conversation
+history.</p>
+<p>The provider-local queues are created when this cloud factory is called, not when the browser
+speech entrypoint is imported. Local Kokoro and Whisper do not use this queue;
+their setup, Workers, synthesis/transcription, and lifecycle remain independent.</p>
+<p>Ordinary Kokoro descriptors may supply <code>model.voices</code> as complete display records,
+for example <code>{id:&#39;af_heart&#39;,name:&#39;Heart&#39;,lang:&#39;en-US&#39;}</code>. The synchronous
+<code>provider.catalog()[0].voices</code> preserves that array and its metadata without
+loading the model or fetching a catalog. The application supplies the inventory
+for its selected runtime; these records neither create a synthesis allow-list
+nor establish that a voice has loaded or played. Ordinary Worker configuration
+does not receive this display inventory. Existing artifact-graph voice paths
+retain their separate meaning.</p>
+<p>The SDK pins published <code>js-queue</code> through npm. Its browser Queue entry, original
+package metadata, and license are projected unchanged by
+<code>node tools/sync-js-queue.mjs</code> after an SDK dependency update. The existing runtime
+materializer serves that same entry; applications do not need another import-map
+setting. <code>easy-stack</code> remains an npm dependency and is not imported by the Queue
+entry. Do not hand-edit this upstream projection.</p>
+<p>An ambiguous submission network failure is not automatically resubmitted: a
+browser cannot distinguish a rejected preflight from an accepted paid job whose
+response was lost. This contract has no submission idempotency mechanism, and
+unreadable response headers cannot supply a retry delay. Follow-up pacing does
+not claim to free upstream concurrency slots or fix CORS.
+The audio download never receives the inference Authorization header.
+The selected multilingual-v2 service supports speed <code>0.7</code> through <code>1.2</code>;
+unsupported speeds reject rather than being silently clamped. Complete
+input remains intact except for the existing explicitly owned speech-only
+formatting cleanup described below. A cloud failure never selects local TTS.</p>
+<p><code>ai.stopAudio()</code> cancels the current local request/poll/download/playback
+lifetime. Mute additionally unloads TTS. DigitalOcean exposes no documented
+job cancellation operation through this contract: a submitted remote job may
+continue after local cancellation. Browser use also depends on the inference
+and returned media endpoints allowing the requesting origin.</p>
+<p>Release this exact configured provider with:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">// Keep the provider returned by selectCloudVoice(ai, getApiKey).
+await ai.configureSpeechProvider(&#39;tts&#39;, null, {expectedProvider: provider});
+</code></pre></div>
+<p>The identity is rechecked inside the SDK&#39;s serialized configuration operation,
+so a later selected provider remains untouched. Returning to local TTS uses
+the normal TTS-only <code>configureBrowserSpeech()</code> configuration. Neither action
+unloads STT or changes its stored artifacts.</p>
+<p>Transport references: <a href="https://docs.digitalocean.com/reference/api/reference/serverless-inference/#inference_create_async_invoke" target="_blank" rel="noreferrer">DigitalOcean asynchronous inference</a>,
+<a href="https://docs.digitalocean.com/products/inference/how-to/use-fal-models/" target="_blank" rel="noreferrer">DigitalOcean FAL guide</a>,
+and <a href="https://fal.ai/models/fal-ai/elevenlabs/tts/multilingual-v2/api" target="_blank" rel="noreferrer">multilingual-v2 model schema</a>.</p>
 <h2 id="quick-start-say-one-sentence">Quick start: say one sentence</h2>
 <p>Use this in a browser application served by <code>arcane dev</code>, where the generated
-import map resolves <code>arcane/AI</code> and <code>arcane/DBOPFS</code>. These browser modules are
-not Node inference APIs. To create an application:</p>
-<div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npx arcane-os@0.5.18 new hello-speech --path ./hello-speech --target browser
+import map resolves <code>arcane-os/ai</code> and <code>arcane-os/modules/DBOPFS.js</code>. These
+browser modules require a browser host. To create an application:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npx arcane-os@latest new hello-speech --path ./hello-speech --target browser
 cd hello-speech
 npm install
 npm run dev
 </code></pre></div>
 <p>Keep the generated page&#39;s Arcane theme and import map. The examples below go in
-<code>apps/hello-speech/modules/App.js</code> and the adjacent <code>speech-selection.js</code>.
+<code>modules/App.js</code> at the application root and the adjacent <code>speech-selection.js</code>.
 Follow the development server&#39;s printed URL. Installing the SDK supplies its
 provider, storage, and Worker code; it does not install a speech model or choose
 an upstream speech runtime for your application.</p>
@@ -62,20 +435,20 @@ Loading this selection uses those upstream publishers&#39; downloads and caches.
   }
 };
 </code></pre></div>
-<p>The omitted execution record below uses the SDK&#39;s WebGPU-first automatic
-selection, so this basic configuration uses <code>fp32</code> because
+<p>The omitted execution record below uses the SDK&#39;s NPU, GPU, then CPU automatic
+selection. This basic configuration uses <code>fp32</code> because
 <a href="https://github.com/hexgrad/kokoro/tree/main/kokoro.js#usage" target="_blank" rel="noreferrer">Kokoro.js recommends <code>fp32</code> when using WebGPU</a>.
-Automatic fallback carries this same selected model and dtype to WASM; the SDK
-does not rewrite the application selection. If you intentionally choose
+Automatic fallback carries this same selected model and dtype between devices;
+the SDK does not rewrite the application selection. If you intentionally choose
 another dtype, evaluate that exact model, browser, and execution route.
 <code>selectedDevice</code> reports routing after load, not pronunciation, text fidelity,
 or audio quality.</p>
 <p>Then use this <strong><code>App.js</code></strong>. The application creates and owns the DBOPFS
 instance. Configuration selects the provider without loading it; the button
 explicitly loads and unmutes TTS before requesting speech.</p>
-<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import arcaneThemeReady from &#39;arcane/ThemeBootstrap&#39;;
-import AI, { AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL } from &#39;arcane/AI&#39;;
-import DBOPFS from &#39;arcane/DBOPFS&#39;;
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import arcaneThemeReady from &#39;arcane-os/modules/ThemeBootstrap.js&#39;;
+import AI, { AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL } from &#39;arcane-os/ai&#39;;
+import DBOPFS from &#39;arcane-os/modules/DBOPFS.js&#39;;
 import { speechSelection } from &#39;./speech-selection.js&#39;;
 
 await arcaneThemeReady;
@@ -128,13 +501,58 @@ window.addEventListener(&#39;ai-tts-failure&#39;, function reportSpeechFailure(e
 }, { signal: speechEvents.signal });
 </code></pre></div>
 <p>Call <code>speechEvents.abort()</code> when disposing that interface to remove the listener.</p>
+<h2 id="browser-npu-and-gpu-setup">Browser NPU and GPU setup</h2>
+<p>Applications can place the shared <code>browser-ai-setup.html</code> component in their
+profile or settings page. It reports whether this page exposes WebNN and
+WebGPU, then requests one WebGPU adapter to display its availability and reported
+name. It does not load a model or create a GPU device or WebNN context:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>html</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-html">&lt;html-import
+  id=&quot;browserAISetup&quot;
+  href=&quot;/node_modules/arcane-os/runtime/arcane/components/browser-ai-setup.html&quot;&gt;
+&lt;/html-import&gt;
+</code></pre></div>
+<p><strong>NPU setup</strong> provides a <strong>Copy NPU flag address</strong> button regardless of WebNN
+availability, with one short explanation. Chrome uses
+<code>chrome://flags/#web-machine-learning-neural-network</code>; Edge uses
+<code>edge://flags/#web-machine-learning-neural-network</code>. Unrecognized browsers
+receive explicit Chrome and Edge choices. A failed copy shows the complete
+address as selectable text; the component does not open internal browser pages.
+The <a href="https://onnxruntime.ai/docs/tutorials/web/ep-webnn.html" target="_blank" rel="noreferrer">ONNX Runtime WebNN guide</a>
+documents the <strong>Enables WebNN API</strong> flag and model/operator requirements.</p>
+<p>The <strong>GPU performance</strong> section shows a short adapter status and a <strong>Copy GPU
+flag address</strong> button on desktop Windows Chromium browsers. The button remains
+available for every adapter class, unavailable API, or detection failure. One
+shared instruction explains pasting, enabling, saving work, then closing the
+browser and reopening it, with the final step underlined and emphasized. Identified
+Chrome uses <code>chrome://flags/#force-high-performance-gpu</code>; other recognized
+Chromium browsers use their corresponding internal scheme. <strong>Refresh</strong>
+requests a new availability result; concurrent
+requests share the pending operation. The public <code>checkGpu()</code> method provides
+the same promise, while <code>refresh()</code> remains a synchronous API-presence and
+settings update. Component readiness does not wait for adapter detection.</p>
+<p>Adapter selection uses <code>powerPreference: &quot;high-performance&quot;</code> as a hint, not proof
+of the selected GPU&#39;s performance or the flag&#39;s current state. When the browser
+explicitly reports a discrete GPU, Profile says <strong>Already using the performance
+GPU.</strong> Explicit integrated or software/fallback
+metadata is reported as such. Missing type metadata shows <strong>GPU available.</strong>
+and leaves performance selection unconfirmed; a vendor name is not a GPU
+classification. The component cannot read the browser flag or prove that a
+model is executing on the adapter. See the
+<a href="../../runtime-components/#browser-ai-setuphtml">component contract</a> for result
+fields, failure handling, and disposal behavior.</p>
+<p>This control does not save an execution preference, change browser settings,
+restart the browser, or report that the NPU is active. A WebNN API presence
+result is not proof of NPU hardware, a compatible model, or physical execution.
+The profile also cannot report a different chat page&#39;s loaded runtime. The
+existing automatic speech route remains NPU, then GPU, then CPU; upstream
+sessions can still place unsupported operators on CPU. Use the owning model
+runtime&#39;s evidence to determine actual accelerator execution.</p>
 <h2 id="developer-diagnostics">Developer diagnostics</h2>
-<p>The shared logging API and speech traces are available in SDK <code>0.5.14</code>.</p>
 <p>Arcane uses the existing shared <code>user.developer</code> preference for diagnostic
 logging. Enable <strong>developer mode</strong> in the application&#39;s profile settings; the
 logger reads that preference on every emission after the shared user is ready.
-There is no separate speech verbosity or language setting. Ordinary warnings
-and errors remain visible with developer mode disabled.</p>
+There is no separate speech verbosity setting. Ordinary warnings and errors
+remain visible with developer mode disabled.</p>
 <p>Applications can use the same owner for their complete AI requests and parsed
 responses:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import { arcaneLogging } from &#39;arcane-os/logging&#39;;
@@ -163,9 +581,10 @@ fill the audio clock continuously. A scheduled event alone does not establish
 that the buffer finished; use its <code>playback.ended</code> event.</p>
 <p>Diagnostics do not change text, voice, speed, language selection, segmentation,
 generation capacity, or playback scheduling. They stay outside chat history.</p>
-<h2 id="four-synthesis-slots-and-exact-order-playback">Four synthesis slots and exact-order playback</h2>
-<p>Capacity 4 means up to four segments synthesize at once. Segment 5 and later
-wait in the SDK&#39;s FIFO queue; they are not dropped. Synthesis may finish out of
+<p>&lt;a id=&quot;four-synthesis-slots-and-exact-order-playback&quot;&gt;&lt;/a&gt;</p>
+<h2 id="local-synthesis-capacity-and-exact-order-playback">Local synthesis capacity and exact-order playback</h2>
+<p>The default Kokoro capacity of 4 means up to four segments synthesize at once.
+Segment 5 and later wait in the SDK&#39;s FIFO queue; they are not dropped. Synthesis may finish out of
 order, but playback waits for earlier segments and plays exact input order.
 Each slot owns a Worker/model session, so raising capacity trades memory for
 latency.</p>
@@ -177,7 +596,7 @@ overlap or audio quality. LLM and Whisper/STT capacity remains one.</p>
 <h2 id="play-a-complete-array-with-speechplayback">Play a complete array with <code>SpeechPlayback</code></h2>
 <p>Use this when your application already has complete segments in an array. The
 configured <code>ai</code> below is the same instance created in the quick start.</p>
-<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import SpeechPlayback from &#39;arcane/SpeechPlayback&#39;;
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import SpeechPlayback from &#39;arcane-os/speech-playback&#39;;
 
 const audio = document.body.appendChild(document.createElement(&#39;audio&#39;));
 audio.controls = true;
@@ -197,24 +616,30 @@ speakAll.addEventListener(&#39;click&#39;, async function speakAllSegments() {
 });
 </code></pre></div>
 <p><code>prepare()</code> submits all three parts immediately because this <code>ai</code> exposes
-<code>fetchTTS</code> and advertises TTS execution capacity. With the default configuration,
-the provider admits up to four synthesis requests and keeps later requests in
+<code>prepareTTSPlayback</code> and advertises TTS execution capacity. With the Kokoro
+configuration above, the provider admits up to four synthesis requests and keeps later requests in
 its FIFO queue. Completed audio remains indexed, so playback is always first,
 second, third even if the third synthesis finishes first.</p>
+<p><code>SpeechPlayback</code> prefers <code>prepareTTSPlayback()</code> when present and also supports
+existing audio-only <code>fetchTTS()</code> clients. Native browser descriptors and real
+audio Blobs remain in the same ordered sequence, including requested pauses.
+Native segments advance only after actual utterance completion and resource
+release; they are never converted into placeholder audio files.</p>
 <p>This eager path is capability-driven. A native <code>Arcane.speech.synthesize</code>
 client, or a custom client without a positive advertised TTS execution capacity,
 retains serialized synthesis with one lookahead segment. <code>togglePause()</code> pauses
-and resumes the same <code>audio</code> element. <code>stop()</code> cancels all requests owned by the
-playback. <code>replay()</code> keeps completed and pending provider segments and retries
+and resumes the active native utterance or the same <code>audio</code> element.
+<code>stop()</code> cancels all requests owned by the playback. <code>replay()</code> keeps completed
+and pending provider segments and retries
 only failed missing segments.</p>
 <p>The default <code>{device:&#39;auto&#39;,maxConcurrentRequests:4}</code> attempts the full ONNX
-Worker/session pool on WebGPU, then recreates that pool on WASM only if WebGPU
-loading fails. The basic configuration above keeps <code>fp32</code> for this WebGPU-first
-path and any automatic WASM fallback. Use the status example below to read
+Worker/session pool on WebNN NPU, then WebGPU, then CPU through WASM. It skips
+an accelerator when its browser API is absent and replaces a failed candidate
+with a fresh pool before trying the next device. The basic configuration above
+keeps <code>fp32</code> throughout that sequence. Use the status example below to read
 <code>selectedDevice</code>; console node-assignment warnings alone do not identify the
 selected execution device or assess the generated audio.</p>
 <h2 id="queue-complete-passages-and-wait-for-playback">Queue complete passages and wait for playback</h2>
-<p>These options are available in SDK <code>0.5.12</code>.</p>
 <p>For a complete page or passage, call
 <code>ai.streamTTS(text, true, {voice, speed, pauseAfterMs, waitForPlayback:true})</code>.
 The existing AI queue owns segmentation, concurrent synthesis, ordered
@@ -508,9 +933,14 @@ before feeding the stream. Chunk boundaries themselves do not force a sentence
 boundary; <code>finishTTS()</code> flushes any remaining text. It is not a playback-ended
 notification. Do not mute or dispose immediately after it if playback should
 continue.</p>
+<p>Automatic model-stream completion reads the AI instance&#39;s current mute state.
+While muted, it clears pending speech text and formatting state and stops
+prepared playback without invoking <code>finishTTS()</code> or <code>streamTTS()</code>. Unmuted
+completion keeps its ordinary speech flush. Explicit calls to either public
+speech method retain their existing behavior.</p>
 <h2 id="automatic-speech-input-formatting-cleanup">Automatic speech-input formatting cleanup</h2>
-<p>Every TTS entrypoint removes repeated same formatting marks from the outbound
-speech-input copy automatically. No application option is required:</p>
+<p>The shared streaming, audio-file, and <code>SpeechPlayback</code> paths remove repeated
+same formatting marks from the outbound speech-input copy automatically:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">ai.streamTTS(&#39;## Heading\n**Hello&#39;);
 ai.streamTTS(&#39;**. Next sentence.&#39;);
 await ai.finishTTS();
@@ -530,6 +960,11 @@ payload only after one cleanup pass, preventing a second non-idempotent pass.
 Applications omit that internal metadata. Displayed messages, saved history,
 model input, caller payload objects, language, voice, synthesis capacity, and
 playback timing are not changed by the filter.</p>
+<p>Direct native <code>provider.prepare()</code> and <code>provider.play()</code> preserve their complete
+<code>input</code> as supplied. The native route of <code>ai.prepareTTSPlayback()</code> also preserves
+that input; shared streaming and <code>SpeechPlayback</code> perform their existing cleanup
+before calling it. Choose the high-level narration path when that speech-only
+formatting cleanup is desired.</p>
 <p>The shared helper is public for code that needs the speech-only
 transformation directly:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {
@@ -543,8 +978,19 @@ console.log(speechText.append(&#39;## Head&#39;, false)); // &#39; Head&#39;
 console.log(speechText.append(&#39;ing&#39;, true)); // ing
 </code></pre></div>
 <h2 id="choose-a-device-or-reduce-memory-use">Choose a device or reduce memory use</h2>
-<p>Omitting <code>tts.execution</code> selects <code>{device:&#39;auto&#39;,maxConcurrentRequests:4}</code>.
-These are three alternative configurations, not a sequence of required loads:</p>
+<p>Local Whisper and Kokoro roles accept
+<code>execution:{device,maxConcurrentRequests}</code>. Omitting <code>stt.execution</code> selects
+<code>{device:&#39;auto&#39;,maxConcurrentRequests:1}</code>; omitting
+<code>tts.execution</code> selects <code>{device:&#39;auto&#39;,maxConcurrentRequests:4}</code>. Whisper keeps
+one transcription slot. Kokoro accepts capacities 1 through 4.</p>
+<p>Automatic selection tries <code>webnn-npu</code> when <code>navigator.ml.createContext</code> is
+exposed, then <code>webgpu</code> when <code>navigator.gpu</code> is exposed, then CPU through <code>wasm</code>.
+API exposure only determines which upstream backend to attempt; it
+does not establish compatible hardware, operators, or model shapes. A failed
+candidate is fully cleaned up before the next candidate uses fresh Workers
+with the same prepared model and dtype. An explicit <code>webnn-npu</code>, <code>webgpu</code>, or
+<code>wasm</code> selection attempts only that backend and reports its failure.</p>
+<p>These are four alternative TTS configurations:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function selectSpeechExecution(execution) {
   await ai.configureBrowserSpeech({
     protocol: AI_BROWSER_SPEECH_CONFIGURATION_PROTOCOL,
@@ -562,28 +1008,34 @@ These are three alternative configurations, not a sequence of required loads:</p
 
 // Choose and call one from your application settings action:
 // await selectSpeechExecution({ device: &#39;auto&#39; });
+// await selectSpeechExecution({ device: &#39;webnn-npu&#39; });
 // await selectSpeechExecution({ device: &#39;webgpu&#39; });
 // await selectSpeechExecution({ device: &#39;wasm&#39;, maxConcurrentRequests: 1 });
 </code></pre></div>
-<p>The override accepts integers 1, 2, 3, or 4. <code>auto</code> tries a complete WebGPU pool
-when available, then recreates a complete WASM pool if that load cannot finish.
-Explicit <code>webgpu</code> reports a load error when unavailable; explicit <code>wasm</code> never
-attempts WebGPU. The same application-selected model and dtype apply on both
-devices. A configuration change leaves TTS muted; explicitly load/unmute again.</p>
+<p>The TTS capacity override accepts integers 1, 2, 3, or 4; an STT capacity
+override accepts only 1. Apply the same device choices to the configured
+<code>stt.execution</code> record. A configuration change leaves TTS muted; explicitly
+load/unmute again.</p>
+<p>The selected upstream versions expose WebNN NPU through
+<a href="https://github.com/huggingface/transformers.js/blob/4.2.0/packages/transformers/src/backends/onnx.js" target="_blank" rel="noreferrer">Transformers.js device selection</a>
+and <a href="https://github.com/hexgrad/kokoro/blob/664c76a704021239ba59c84dcbaa4d3dece01fe9/kokoro.js/src/kokoro.js" target="_blank" rel="noreferrer">Kokoro.js device forwarding</a>.
+WebNN compatibility depends on the model&#39;s shapes and operations, browser,
+drivers, and hardware. Unsupported operations may run through WASM even after
+an NPU session loads; see the <a href="https://onnxruntime.ai/docs/tutorials/web/ep-webnn.html" target="_blank" rel="noreferrer">ONNX Runtime WebNN contract</a>.</p>
 <h2 id="inspect-the-requested-and-selected-device">Inspect the requested and selected device</h2>
 <p>Request the execution projection on the existing public runtime status after
 loading. This explicitly reads the selected provider&#39;s current report; ordinary
 <code>status()</code> retains its existing sticky snapshot and identity. There is no
 separate execution-state event subscription.</p>
-<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">function printSpeechStatus() {
-  const status = ai.providerRuntime.status(&#39;tts&#39;, { execution: true });
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">function printSpeechStatus(role = &#39;tts&#39;) {
+  const status = ai.providerRuntime.status(role, { execution: true });
   const execution = status.execution;
-  console.log(&#39;TTS state:&#39;, status.state);
+  console.log(&#39;Speech role and state:&#39;, role, status.state);
   if (execution) {
     console.log(&#39;Requested device:&#39;, execution.requestedDevice);
     console.log(&#39;Selected device:&#39;, execution.selectedDevice);
     console.log(&#39;Capacity:&#39;, execution.maxConcurrentRequests);
-    console.log(&#39;Active synthesis requests:&#39;, execution.activeRequestCount);
+    console.log(&#39;Active requests:&#39;, execution.activeRequestCount);
     console.log(&#39;Automatic WASM fallback:&#39;,
       execution.requestedDevice === &#39;auto&#39; &amp;&amp; execution.selectedDevice === &#39;wasm&#39;);
   }
@@ -592,13 +1044,18 @@ separate execution-state event subscription.</p>
 <p>Call <code>printSpeechStatus()</code> after the load in <code>sayHello()</code> or from your status
 button. The same projection is at
 <code>ai.providerRuntime.status(null, {execution:true}).roles.tts.execution</code>.
+For configured Whisper, call <code>printSpeechStatus(&#39;stt&#39;)</code> or read the corresponding
+<code>roles.stt.execution</code> projection.
 <code>selectedDevice</code> is <code>null</code>
 until a pool is selected and returns to <code>null</code> on unload. Providers without an
 execution report omit <code>execution</code>; do not infer a device from <code>navigator.gpu</code>
 or a configured preference alone. An explicit inspection can throw a provider
 status error; handle it with the same <code>error.code</code> / <code>error.message</code> pattern.
-Treat <code>selectedDevice</code> as route status only; evaluate actual speech output for
-the model, dtype, browser, and device combinations your application supports.</p>
+<code>selectedDevice</code> names the backend requested by the successful upstream session
+load. It does not prove that every operation ran on a physical NPU or GPU, or
+establish transcription correctness, pronunciation, or audio quality. Evaluate
+actual speech output for the model, dtype, browser, and device combinations your
+application supports.</p>
 <h2 id="stop-mute-cancel-and-release">Stop, mute, cancel, and release</h2>
 <p>These are actions for your own controls, using the same <code>ai</code> instance:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">function stopSpeech() {
@@ -693,9 +1150,9 @@ records; this contract does not freeze them or shorten their content.</p>
 </tr>
 </thead>
 <tbody><tr>
-<td>Browser</td>
+<td>Local browser models</td>
 <td>Shipped</td>
-<td>Requires Workers, Fetch, Blob/File, object URLs, DBOPFS/OPFS, and Web Locks. Blob/File STT requests also require the browser audio decoder.</td>
+<td>Require Workers, Fetch, Blob/File, object URLs, DBOPFS/OPFS, and Web Locks. Blob/File STT requests also require the browser audio decoder.</td>
 </tr>
 <tr>
 <td>Native WebView</td>
@@ -704,13 +1161,23 @@ records; this contract does not freeze them or shorten their content.</p>
 </tr>
 <tr>
 <td>Node</td>
-<td>Importable, execution unavailable</td>
-<td>The ESM subpath imports, but the SDK supplies no Node speech storage, Worker, or audio-decoder host.</td>
+<td>Remote adapter available; local execution unavailable</td>
+<td>TWiN Cloud uses Fetch and Blob. The local providers have no SDK Node speech-storage, Worker, or audio-decoder host.</td>
 </tr>
 <tr>
-<td>Cloud</td>
-<td>Not offered</td>
-<td>The SDK&#39;s built-in speech profile is device-only: Whisper owns STT and Kokoro owns TTS.</td>
+<td>Remote TTS</td>
+<td>Explicitly selected</td>
+<td>TWiN Cloud uses standard Fetch and Blob with an application-owned key; no Worker, OPFS, or local model is needed for this adapter.</td>
+</tr>
+<tr>
+<td>Native browser STT</td>
+<td>Explicitly selected, conditional</td>
+<td>Requires <code>SpeechRecognition</code> or <code>webkitSpeechRecognition</code> and native microphone/service availability. No Worker, OPFS, or SDK model download; locality is not promised.</td>
+</tr>
+<tr>
+<td>Native browser TTS</td>
+<td>Explicitly selected, conditional</td>
+<td>Requires <code>speechSynthesis</code> and <code>SpeechSynthesisUtterance</code>. Uses the native voice catalog and playback lifecycle; no Worker, OPFS, or SDK model download. Native voices expose no audio export.</td>
 </tr></tbody>
 </table>
 </div>
@@ -721,10 +1188,15 @@ one role does not disable the other role or authorize a fallback provider.</p>
   BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL,
   BROWSER_SPEECH_ARTIFACT_PROTOCOL,
   createBrowserKokoroProvider,
+  createBrowserSpeechRecognitionProvider,
+  createBrowserSpeechSynthesisProvider,
   createBrowserSpeechArtifactGraph,
   createBrowserSpeechAuthority,
   createBrowserWhisperProvider,
-  createDbopfsSpeechArtifactStore
+  createDbopfsSpeechArtifactStore,
+  createDigitalOceanFalTTSProvider,
+  createTwinCloudTTSProvider,
+  removeBrowserSpeechModelCache
 } from &#39;arcane-os/ai/browser-speech&#39;;
 </code></pre></div>
 <p>Importing this entrypoint downloads nothing, opens no cache, creates no Worker,
@@ -904,6 +1376,28 @@ function that revokes the materialized URLs.</p>
 forward a security payload to the Worker and performs no security work. Passing
 <code>{secure:true}</code> does not activate hardening. Any future hardening stage requires
 a separate user review and an explicit implementation change before it may execute.</p>
+<h2 id="removebrowserspeechmodelcache"><code>removeBrowserSpeechModelCache()</code></h2>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const removal = await removeBrowserSpeechModelCache(
+    {repository: &#39;Xenova/whisper-small&#39;, signal}
+);
+</code></pre></div>
+<p>Exported by <code>arcane-os/ai/browser-speech</code>. This explicit operation removes all
+cached revisions of the exact selected Hugging Face model from the current
+origin&#39;s existing <code>transformers-cache</code>. It returns <code>{repository,removed}</code>,
+where <code>removed</code> contains the complete URLs actually deleted. An absent cache or
+model returns an empty list. Other models, runtime files, the Kokoro voice
+cache, DBOPFS files, and preferences remain untouched. No model is loaded or
+downloaded and no inference is started.</p>
+<p>The caller owns model retirement policy and must stop using the retired model
+before removal so a live provider cannot download it again. This operation is
+separate from <code>store.remove(authority)</code>, which removes declared DBOPFS files.
+<code>cacheStorage</code> may explicitly supply a CacheStorage implementation; it defaults
+to <code>globalThis.caches</code>. Missing storage rejects with
+<code>ARCANE_AI_STORAGE_UNAVAILABLE</code>; cache failures reject with
+<code>ARCANE_AI_STORAGE_DELETE_FAILED</code>. An aborted <code>signal</code> stops further removals
+with <code>AbortError</code>. Deletions already completed are retained in <code>error.removed</code>;
+removal is repeatable and does not claim transactional rollback. The operation
+enumerates one cache once and awaits each matching deletion in order.</p>
 <h2 id="ordinary-module-routing">Ordinary module routing</h2>
 <p>Artifact-graph preparation reads each stored JavaScript module, discovers
 ordinary module operations, and materializes the complete stored files as
@@ -942,11 +1436,12 @@ they do not silently convert into a rejection policy.</p>
 <p>The Worker applies only the selected runtime settings needed to run the chosen
 provider:</p>
 <ul>
-<li>Kokoro forwards the pool&#39;s selected <code>webgpu</code> or <code>wasm</code> device to
+<li>Kokoro forwards the pool&#39;s selected <code>webnn-npu</code>, <code>webgpu</code>, or <code>wasm</code> device to
 <code>KokoroTTS.from_pretrained()</code>. Its configured dtype remains exactly the
-caller-selected dtype on both paths. The WASM path also uses
+caller-selected dtype on every path. The WASM path also uses
 <code>namespace.env.wasmPaths = {mjs,wasm}</code>.</li>
-<li>Transformers uses
+<li>Transformers forwards the selected device to its speech-recognition pipeline,
+preserves the caller-selected dtype, and uses
 <code>namespace.env.backends.onnx.wasm.wasmPaths = {mjs,wasm}</code>, keeps remote model
 loading enabled, and applies caller-selected <code>numThreads</code> when present.</li>
 </ul>
@@ -975,15 +1470,15 @@ const kokoro = createBrowserKokoroProvider({
 <p>The constructors also accept ordinary <code>model</code> and <code>runtime</code> descriptors instead
 of <code>graph</code>; the two forms are mutually exclusive. Both forms require an
 SDK-created DBOPFS speech artifact store. <code>localOnly</code> remains <code>true</code>.</p>
-<p>Kokoro additionally accepts the exact <code>execution</code> record
-<code>{device,maxConcurrentRequests}</code>. <code>device</code> is <code>auto</code>, <code>webgpu</code>, or <code>wasm</code>;
-<code>maxConcurrentRequests</code> is an integer from 1 through 4. Omission defaults to
-<code>{device:&#39;auto&#39;,maxConcurrentRequests:4}</code>. <code>auto</code> attempts a complete WebGPU
-Worker pool only when the browser exposes WebGPU. If that pool cannot load, the
-SDK tears it down and creates a complete WASM pool with the same caller-selected
-model and dtype. Explicit <code>webgpu</code> rejects when WebGPU cannot load; explicit
-<code>wasm</code> never attempts GPU. Whisper remains one WASM Worker and does not accept
-this option.</p>
+<p>Both constructors accept the exact <code>execution</code> record
+<code>{device,maxConcurrentRequests}</code>. <code>device</code> is <code>auto</code>, <code>webnn-npu</code>, <code>webgpu</code>, or
+<code>wasm</code>. Whisper permits capacity 1 and defaults to
+<code>{device:&#39;auto&#39;,maxConcurrentRequests:1}</code>. Kokoro permits integer capacities 1
+through 4 and defaults to <code>{device:&#39;auto&#39;,maxConcurrentRequests:4}</code>. <code>auto</code>
+tries WebNN NPU when <code>navigator.ml.createContext</code> is exposed, then WebGPU when
+<code>navigator.gpu</code> is exposed, then WASM. Before advancing after a failed load,
+the SDK tears down the candidate and creates fresh Workers using the same
+prepared model and dtype. Explicit device selections never fall back.</p>
 <p>Each constructor returns an <code>arcane-ai-provider/2</code> object with:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">{
   protocol,
@@ -1007,7 +1502,7 @@ materialized URLs. <code>dispose()</code> performs final teardown and prevents l
 <h3 id="upstream-package-authority">Upstream-package authority</h3>
 <p><code>createBrowserSpeechAuthority({providerId,role,model,runtime,security})</code> creates
 the ordinary single-entrypoint authority. The model descriptor is
-<code>{id,repository,revision,dtype?,defaultVoice?,files?}</code>. The runtime descriptor is
+<code>{id,repository,revision,dtype?,defaultVoice?,voices?,files?}</code>. The runtime descriptor is
 <code>{adapter,version,revision,entry,wasmPaths?,files}</code>. A file is
 <code>{path,url,mediaType?}</code>. Model files may be omitted so the selected upstream
 provider performs its normal model and voice downloads after explicit use.</p>
@@ -1052,16 +1547,28 @@ mutable values.</p>
 <p>Provider states are <code>unloaded</code>, <code>loading</code>, <code>ready</code>, <code>unloading</code>, <code>error</code>, and
 <code>disposed</code>. <code>status()</code> includes role, provider/model ids, state, lifecycle
 status and reason, active operation, loaded/busy flags, generation, error code,
-cache state, and warnings. Kokoro status also includes an <code>execution</code> record
+cache state, and warnings. Both speech roles include an <code>execution</code> record
 with requested and selected device, request limit, and active request count. A
-successful <code>selectedDevice:&#39;webgpu&#39;</code> reports the execution provider selected by
-the upstream model load; it does not claim that browser, driver, or GPU kernels
-overlap physically or that generated audio has been quality-validated. A
-security field is absent in ordinary mode.</p>
-<p>The provider/2 load context accepts an optional progress callback for interface
-compatibility, but the current browser-speech artifact and Worker transport
-publishes no progress records. Consumers present the explicit lifecycle states
-instead of inventing a numeric total.</p>
+successful <code>selectedDevice</code> reports the backend requested by the upstream model
+load. It does not prove that every operation ran on a physical NPU or GPU,
+that accelerator kernels overlap, or that generated speech is correct. WebNN
+may execute unsupported operations through WASM. A security field is absent
+in ordinary mode.</p>
+<p>The provider/2 load context accepts an optional <code>progress</code> callback. Speech
+artifact preparation and upstream model loading publish records through that
+callback and the shared sticky AI runtime state. Records include <code>phase</code>,
+<code>stage</code>, <code>message</code>, the current <code>file</code> when available, and <code>elapsedMs</code>.
+Known artifact inventories report <code>completed</code>, <code>total</code>, and <code>unit:&#39;files&#39;</code>.
+Upstream model files are discovered during loading, so their total remains
+<code>null</code> while completed files are counted. Remaining TTS pool initialization
+reports completed model sessions. Consumers use an indeterminate progress bar
+when no final total is known; transfer quantities do not determine this display.</p>
+<p>The Worker sends intermediate <code>{protocol,id,type:&#39;progress&#39;,progress}</code> messages
+for its active load request. They do not settle the request; the ordinary final
+response still owns completion or failure. Complete upstream callback content
+remains in the adjacent <code>detail</code> field for diagnostics. Compatible observers
+receive the latest progress when joining an active load, and cancelled,
+superseded, or settled loads stop publishing progress.</p>
 <p>Compatible concurrent loads share one underlying preparation and pool load
 while each caller retains its own cancellation signal. One observer cannot
 cancel another still-active observer; cancellation of the final observer stops
@@ -1122,7 +1629,7 @@ operation.</p>
 <h2 id="ownership">Ownership</h2>
 <ul>
 <li>Applications own model, runtime, dtype, sample-rate, voice, profile, prompt,
-catalog, activation, optional TTS execution override, and presentation
+catalog, activation, optional STT/TTS execution override, and presentation
 policy.</li>
 <li>Upstream publishers own their runtime, model, voice, and license delivery.</li>
 <li>The SDK owns storage, materialization, routing, Worker lifecycle, normalized
@@ -1140,9 +1647,9 @@ this entrypoint.</li>
 <li><a href="../../protocols/#portable-ai-provider-runtime">Protocol architecture</a></li>
 </ul>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#quick-start-say-one-sentence">Quick start: say one sentence</a><a href="#developer-diagnostics">Developer diagnostics</a><a href="#four-synthesis-slots-and-exact-order-playback">Four synthesis slots and exact-order playback</a><a href="#play-a-complete-array-with-speechplayback">Play a complete array with SpeechPlayback</a><a href="#queue-complete-passages-and-wait-for-playback">Queue complete passages and wait for playback</a><a href="#prepare-narration-once-and-replay-stored-audio">Prepare narration once and replay stored audio</a><a href="#stream-chunks-as-they-arrive">Stream chunks as they arrive</a><a href="#automatic-speech-input-formatting-cleanup">Automatic speech-input formatting cleanup</a><a href="#choose-a-device-or-reduce-memory-use">Choose a device or reduce memory use</a><a href="#inspect-the-requested-and-selected-device">Inspect the requested and selected device</a><a href="#stop-mute-cancel-and-release">Stop, mute, cancel, and release</a><a href="#advanced-provider-and-artifact-reference">Advanced provider and artifact reference</a><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-identifiers">Protocol identifiers</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#ordinary-module-routing">Ordinary module routing</a><a href="#onnx-runtime-configuration">ONNX runtime configuration</a><a href="#providers">Providers</a><a href="#lifecycle-and-cancellation">Lifecycle and cancellation</a><a href="#errors">Errors</a><a href="#ownership">Ownership</a><a href="#related">Related</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#choose-a-speech-provider">Choose a speech provider</a><a href="#native-browser-speech-recognition">Native browser speech recognition</a><a href="#native-browser-text-to-speech-and-voice-previews">Native browser text-to-speech and voice previews</a><a href="#twin-cloud-text-to-speech">TWiN Cloud text-to-speech</a><a href="#quick-start-say-one-sentence">Quick start: say one sentence</a><a href="#browser-npu-and-gpu-setup">Browser NPU and GPU setup</a><a href="#developer-diagnostics">Developer diagnostics</a><a href="#local-synthesis-capacity-and-exact-order-playback">Local synthesis capacity and exact-order playback</a><a href="#play-a-complete-array-with-speechplayback">Play a complete array with SpeechPlayback</a><a href="#queue-complete-passages-and-wait-for-playback">Queue complete passages and wait for playback</a><a href="#prepare-narration-once-and-replay-stored-audio">Prepare narration once and replay stored audio</a><a href="#stream-chunks-as-they-arrive">Stream chunks as they arrive</a><a href="#automatic-speech-input-formatting-cleanup">Automatic speech-input formatting cleanup</a><a href="#choose-a-device-or-reduce-memory-use">Choose a device or reduce memory use</a><a href="#inspect-the-requested-and-selected-device">Inspect the requested and selected device</a><a href="#stop-mute-cancel-and-release">Stop, mute, cancel, and release</a><a href="#advanced-provider-and-artifact-reference">Advanced provider and artifact reference</a><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-identifiers">Protocol identifiers</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#removebrowserspeechmodelcache">removeBrowserSpeechModelCache()</a><a href="#ordinary-module-routing">Ordinary module routing</a><a href="#onnx-runtime-configuration">ONNX runtime configuration</a><a href="#providers">Providers</a><a href="#lifecycle-and-cancellation">Lifecycle and cancellation</a><a href="#errors">Errors</a><a href="#ownership">Ownership</a><a href="#related">Related</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.5.18, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.51.1, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

@@ -2,47 +2,395 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
-  <meta name="description" content="TWiN Cloud is the high-level AI.js default remote LLM service, named TWIN. Speech stays on device and does not use the TWiN access key. This guide uses the same managed browser imports as the browser speech quick start.">
+  <meta name="description" content="Use fetchRequest from arcane-os/ai/twin-cloud for a complete TWiN Cloud request in Node or a browser with an explicit key and model. It imports no browser profile, DOM, user singleton, or storage, and starts no work on import. The existing browser AI.js interface remains available for applications that already use its provider selection, lifecycle, and speech. TWiN Cloud is that interface&#39;s default remote LLM service, named TWIN. Speech is selected independently: applications can use local models, native browser speech, or TWiN Cloud TTS with an application-owned key reader.">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
-  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/twin-cloud/"><link rel="icon" type="image/png" href="../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../styles.css?v=back-to-top"><link rel="stylesheet" href="../../reference.css?v=visible-toolbar">
-  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="TWiN Cloud: one request · Arcane OS SDK"><meta property="og:description" content="TWiN Cloud is the high-level AI.js default remote LLM service, named TWIN. Speech stays on device and does not use the TWiN access key. This guide uses the same managed browser imports as the browser speech quick start."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/twin-cloud/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="TWiN Cloud: one request · Arcane OS SDK"><meta name="twitter:description" content="TWiN Cloud is the high-level AI.js default remote LLM service, named TWIN. Speech stays on device and does not use the TWiN access key. This guide uses the same managed browser imports as the browser speech quick start."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <title>TWiN Cloud: one request | Arcane OS SDK</title><script src="../../../app.js?v=back-to-top" defer></script><script src="../../reference.js" type="module"></script>
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/twin-cloud/"><link rel="icon" type="image/png" href="../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../styles.css"><link rel="stylesheet" href="../../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="TWiN Cloud requests, images, and state evaluation · Arcane OS SDK"><meta property="og:description" content="Use fetchRequest from arcane-os/ai/twin-cloud for a complete TWiN Cloud request in Node or a browser with an explicit key and model. It imports no browser profile, DOM, user singleton, or storage, and starts no work on import. The existing browser AI.js interface remains available for applications that already use its provider selection, lifecycle, and speech. TWiN Cloud is that interface&#39;s default remote LLM service, named TWIN. Speech is selected independently: applications can use local models, native browser speech, or TWiN Cloud TTS with an application-owned key reader."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/twin-cloud/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="TWiN Cloud requests, images, and state evaluation · Arcane OS SDK"><meta name="twitter:description" content="Use fetchRequest from arcane-os/ai/twin-cloud for a complete TWiN Cloud request in Node or a browser with an explicit key and model. It imports no browser profile, DOM, user singleton, or storage, and starts no work on import. The existing browser AI.js interface remains available for applications that already use its provider selection, lifecycle, and speech. TWiN Cloud is that interface&#39;s default remote LLM service, named TWIN. Speech is selected independently: applications can use local models, native browser speech, or TWiN Cloud TTS with an application-owned key reader."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>TWiN Cloud requests, images, and state evaluation | Arcane OS SDK</title><script src="../../../app.js" defer></script><script src="../../reference.js" type="module"></script>
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../examples/">Hello World</a><a href="../../../guides/">Guides</a><a href="../../sdk-api/">API</a><a href="../../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">TWiN Cloud: one request</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="twin-cloud-one-request">TWiN Cloud: one request</h1><p class="doc-lead">TWiN Cloud is the high-level AI.js default remote LLM service, named TWIN. Speech stays on device and does not use the TWiN access key. This guide uses the same managed browser imports as the browser speech quick start.</p><div class="doc-meta"><span>SDK 0.5.18</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">TWiN Cloud requests, images, and state evaluation</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="twin-cloud-requests-images-and-state-evaluation">TWiN Cloud requests, images, and state evaluation</h1><p class="doc-lead">Use fetchRequest from arcane-os/ai/twin-cloud for a complete TWiN Cloud request in Node or a browser with an explicit key and model. It imports no browser profile, DOM, user singleton, or storage, and starts no work on import. The existing browser AI.js interface remains available for applications that already use its provider selection, lifecycle, and speech. TWiN Cloud is that interface&#39;s default remote LLM service, named TWIN. Speech is selected independently: applications can use local models, native browser speech, or TWiN Cloud TTS with an application-owned key reader.</p><div class="doc-meta"><span>SDK 0.51.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../">Normalized AI</a><a href="./" aria-current="page">TWiN Cloud quick start</a><a href="../browser-wasm/">Browser-WASM AI</a><a href="../browser-speech/">Browser speech</a><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../core/">Core map</a><a href="../../core/arcane-api/">Arcane API</a><a href="../../core/capabilities/">Capabilities and admission</a><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../../core/arcane-events/">Events</a><a href="../../core/arcane-ai-contracts/">AI contracts</a><a href="../../core/arcane-entities/">Entity exports</a><a href="../../core/ollama-module/">Ollama internals (advanced)</a><a href="../../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/ai/twin-cloud.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#install-and-import">Install and import</a><a href="#supply-the-key-at-runtime-and-display-the-response">Supply the key at runtime and display the response</a><a href="#migrate-saved-preference-tuples-before-using-them">Migrate saved preference tuples before using them</a><a href="#related">Related</a></nav></details><p>TWiN Cloud is the high-level <code>AI.js</code> default remote LLM service, named <code>TWIN</code>.
-Speech stays on device and does not use the TWiN access key. This guide uses the
-same managed browser imports as the <a href="../browser-speech/">browser speech quick start</a>.</p>
+      <article class="prose reference-prose" data-reference-source="docs/reference/ai/twin-cloud.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#node-explicit-key-model-and-structured-result">Node: explicit key, model, and structured result</a><a href="#shared-request-behavior">Shared request behavior</a><a href="#evaluate-caller-owned-state-with-system-one">Evaluate caller-owned state with System One</a><a href="#generate-images-with-an-application-selected-model">Generate images with an application-selected model</a><a href="#existing-browser-ai-interface">Existing browser AI interface</a><a href="#install-and-import">Install and import</a><a href="#supply-the-key-at-runtime-and-display-the-response">Supply the key at runtime and display the response</a><a href="#use-a-model-for-one-browser-request">Use a model for one browser request</a><a href="#migrate-saved-preference-tuples-before-using-them">Migrate saved preference tuples before using them</a><a href="#related">Related</a></nav></details><p>Use <code>fetchRequest</code> from <code>arcane-os/ai/twin-cloud</code> for a complete TWiN Cloud
+request in Node or a browser with an explicit key and model. It imports no
+browser profile, DOM, user singleton, or storage, and starts no work on import.
+The existing browser <code>AI.js</code> interface remains available for applications that
+already use its provider selection, lifecycle, and speech. TWiN Cloud is that
+interface&#39;s default remote LLM service, named <code>TWIN</code>. Speech is selected
+independently: applications can use local models, native browser speech, or
+<a href="../browser-speech/#twin-cloud-text-to-speech">TWiN Cloud TTS</a> with an
+application-owned key reader.</p>
+<div class="table-wrap" data-columns="4" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Public API</th>
+<th>Caller supplies</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Chat completion</td>
+<td><code>fetchRequest(options)</code></td>
+<td>Key, model, complete messages, and optional tools or output schema</td>
+<td>Complete parsed provider JSON</td>
+</tr>
+<tr>
+<td>State and questions</td>
+<td><code>fetchSystemOneRequest(options)</code></td>
+<td>Key, a System One model, complete state, and questions</td>
+<td>Complete parsed native System One response</td>
+</tr>
+<tr>
+<td>Image generation</td>
+<td><code>generateImages(options)</code></td>
+<td>Model, prompt, provider parameters, and key or key reader</td>
+<td>Every generated image as a Blob in provider order</td>
+</tr></tbody>
+</table>
+</div>
+<p>These functions share no retained conversation. Choose the operation supported
+by the selected model; each section below describes its own transport,
+callbacks, cancellation, and retry behavior.</p>
+<h2 id="node-explicit-key-model-and-structured-result">Node: explicit key, model, and structured result</h2>
+<p>Install the published <code>arcane-os</code> package in the Node project. Keep the key in
+the application&#39;s existing server configuration, outside source control and
+diagnostics. In this example, <code>server-config.json</code> is that caller-owned local
+configuration file with a <code>twinKey</code> property; add its exact path to <code>.gitignore</code>
+before creating it. The SDK does not discover or write this file.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import serverConfig from &#39;./server-config.json&#39; with {type: &#39;json&#39;};
+import {fetchRequest} from &#39;arcane-os/ai/twin-cloud&#39;;
+
+const response = await fetchRequest({
+    twinKey: serverConfig.twinKey,
+    model: &#39;openai-gpt-oss-20b&#39;,
+    messages: [{
+        role: &#39;user&#39;,
+        content: &#39;Explain why the moon-powered toaster keeps burning breakfast. Return HTML and plain text.&#39;
+    }],
+    structuredOutput: {
+        type: &#39;object&#39;,
+        properties: {
+            html: {type: &#39;string&#39;},
+            text: {type: &#39;string&#39;}
+        },
+        required: [&#39;html&#39;, &#39;text&#39;],
+        additionalProperties: false
+    }
+});
+
+console.log(response);
+</code></pre></div>
+<p><code>model</code> is required and remains exactly the supplied identifier. This function
+does not select the browser profile&#39;s default model. The example&#39;s prompt and
+<code>html</code>/<code>text</code> schema are caller-owned data, not SDK business logic. Changing
+those fields changes the requested result without changing the SDK.</p>
+<p>The resolved value is the complete parsed provider JSON, including every
+choice and provider field. The SDK does not extract only the first message,
+parse its content into a second object, or replace the response with an
+application-specific record. The supplied schema becomes
+<code>response_format: {type:&#39;json_schema&#39;, json_schema:{name:&#39;structured_response&#39;, strict:true, schema:...}}</code>. <code>structuredOutput:true</code> or <code>&#39;json&#39;</code> instead selects
+<code>response_format:{type:&#39;json_object&#39;}</code>; omission leaves structured output off.</p>
+<h2 id="shared-request-behavior">Shared request behavior</h2>
+<p>The focused API accepts complete <code>messages</code>, optional <code>tools</code>, <code>toolChoice</code>,
+<code>parallelToolCalls</code>, and <code>reasoningEffort</code> in addition to the explicit
+<code>twinKey</code> and <code>model</code>. Tool options use the existing chat-completion wire fields
+<code>tools</code>, <code>tool_choice</code>, and <code>parallel_tool_calls</code> when <code>tools</code> is nonempty.
+A supplied nonempty <code>reasoningEffort</code> uses the provider&#39;s <code>reasoning_effort</code>
+field; omission preserves its default. No output limit is added by this API.
+The function neither executes tools nor adds provider-response envelope
+validation.</p>
+<p>Optional <code>id</code>, <code>onRequest(request,id,metadata)</code>, and
+<code>onResponse(response,id,false)</code> follow the complete-response <code>AI.fetchRequest</code>
+callback shape. The request callback runs before dispatch; the response
+callback receives the complete parsed result before it is returned. Omitted
+<code>id</code> uses <code>Date.now()</code>; request metadata is
+<code>{operation:&#39;fetch&#39;,transport:&#39;http&#39;,destination:&#39;https://inference.do-ai.run/v1/chat/completions&#39;}</code>.
+The key is
+transport authentication, not part of either callback&#39;s message payload. Keep
+credentials out of application logging as well.</p>
+<p>Before a successful response is consumed, a rejected Fetch or HTTP <code>529</code> can
+retry up to three times, waiting <code>3000</code> milliseconds before each retry. These
+two failure types share that three-retry budget. HTTP <code>429</code> with a message
+containing <code>overload</code> (case-insensitive) retains its unlimited three-second
+retry behavior and does not consume that budget. Each attempt reuses the exact
+destination, Fetch options, serialized request, and signal. Other HTTP errors,
+successful-response decoding failures, and application callback failures do not
+retry. A known HTTP <code>529</code> also retries when reading or parsing its diagnostic
+body fails; <code>onRetry.error</code> retains that exact failure, which is thrown unchanged
+if recovery is exhausted. Diagnostic-body failures for other HTTP statuses do
+not retry. The last complete failure is thrown unchanged when recovery is exhausted.
+Pass a fresh
+<code>AbortController</code>&#39;s <code>signal</code> and call <code>abort()</code> to cancel. Cancellation during
+the request, response-body read, retry wait, or callback settlement prevents
+successful result delivery and rejects with <code>ARCANE_AI_REQUEST_ABORTED</code>.
+Other HTTP failures throw the complete parsed JSON error body or text body.
+A missing key uses <code>AI_PROVIDER_NOT_CONFIGURED</code>, a missing explicit model
+throws <code>TypeError</code>, and an unsupported <code>structuredOutput</code> input uses
+<code>AI_STRUCTURED_OUTPUT_INVALID</code>.</p>
+<p>Optional <code>onRetry({phase,attempt,delayMs,status,error})</code> observes each retry.
+<code>phase:&#39;waiting&#39;</code> arrives before the abortable delay; <code>phase:&#39;requesting&#39;</code>
+arrives immediately before the next Fetch. <code>attempt</code> is the one-based upcoming
+retry number across both retry policies, <code>delayMs</code> is <code>3000</code>, <code>status</code> is the
+HTTP status or <code>null</code> for a rejected Fetch, and <code>error</code> is the complete original
+failure value. This observer runs synchronously without awaiting its returned
+promise. Synchronous throws and rejected promises are reported through the
+shared console logger and cannot change the request outcome or trigger another
+retry. <code>onRequest</code> still runs once per logical request. Retry observations stay
+outside the model payload and retained history.</p>
+<p>The SDK retains no request or response history between calls and uses no
+DBOPFS, chat entity, or memory extraction. Each call&#39;s <code>messages</code> are its
+complete caller-supplied context. The caller decides whether and how to keep
+the result; this stateless transport adds no saved conversation or migration.</p>
+<p>Browser applications can use this same focused import through their generated
+managed import map. Browser Fetch and CORS behavior still apply. Importing it
+does not instantiate <code>AI</code>, read saved preferences, configure speech, or change
+the existing <code>arcane-os/ai</code> browser entry.</p>
+<h2 id="evaluate-caller-owned-state-with-system-one">Evaluate caller-owned state with System One</h2>
+<p>Use the named <code>fetchSystemOneRequest</code> export for the provider&#39;s native
+state-and-questions operation. The application supplies the model and complete
+provider-compatible <code>state</code> and <code>questions</code>; the SDK selects no model or scoring
+policy and assigns no meaning to questions, answer keys, or scales.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {fetchSystemOneRequest} from &#39;arcane-os/ai/twin-cloud&#39;;
+
+const response = await fetchSystemOneRequest({
+    twinKey: applicationRuntime.twinKey,
+    model: &#39;typesafe-jev-1.13.0&#39;,
+    state: applicationState,
+    questions: applicationQuestions,
+    signal: controller.signal
+});
+</code></pre></div>
+<p><code>applicationRuntime</code>, <code>applicationState</code>, <code>applicationQuestions</code>, and
+<code>controller</code> are supplied by the application. The example&#39;s JEV identifier is
+an explicit caller selection, not an SDK default. For OSS chat-completion models
+such as <code>openai-gpt-oss-120b</code> and <code>openai-gpt-oss-20b</code>, use <code>fetchRequest</code> with
+caller-owned messages and structured-output settings instead. The application
+chooses the operation matching its model&#39;s provider contract.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">fetchSystemOneRequest({
+    twinKey,
+    model,
+    state,
+    questions,
+    signal,
+    id,
+    onRequest,
+    onResponse,
+    onRetry
+})
+// Promise&lt;complete parsed provider JSON&gt;
+</code></pre></div>
+<p>The SDK posts exactly <code>{model,state,questions}</code> as JSON to
+<code>https://inference.do-ai.run/v1/systemone</code>, using <code>twinKey</code> only as bearer
+authentication. It adds no prompt, chat envelope, tool call, output limit, or
+answer conversion. Caller content stays unchanged within ordinary JSON
+transport encoding. The request is serialized before <code>onRequest</code>, so that
+diagnostic callback cannot rewrite the dispatched payload. The entire parsed
+provider JSON reaches <code>onResponse</code> and the returned promise without selecting
+or transforming answers.</p>
+<p>The explicit key/model requirements, optional <code>signal</code>, <code>id</code>, callbacks,
+retry observer, complete errors, and lack of retained history follow the shared
+request behavior above. <code>onRequest(request,id,metadata)</code> receives
+<code>{operation:&#39;systemone&#39;,transport:&#39;http&#39;,destination:&#39;https://inference.do-ai.run/v1/systemone&#39;}</code>
+as metadata. <code>onResponse(response,id,false)</code> receives the complete parsed
+response. Both callbacks are awaited; failures propagate and cancellation is
+checked again after they settle. The existing <code>fetchJSONResponse</code> owner
+provides the same HTTP retries and cancellation for this operation; no separate
+transport or retry loop is created.</p>
+<h3 id="shared-low-level-integration-helpers">Shared low-level integration helpers</h3>
+<p>The same module also exports the helpers used by browser <code>AI.js</code>. Ordinary
+callers use <code>fetchRequest</code> or <code>fetchSystemOneRequest</code>; these exports let SDK
+transport integration share the existing implementation rather than maintain
+another retry or body reader.</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Export</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>fetchHTTPResponse(url,options,{onRetry=null}={})</code></td>
+<td>Uses the caller&#39;s exact Fetch options and shared retry/cancellation behavior; returns a successful <code>Response</code> with its body unconsumed. The separate optional control observes retries without entering Fetch options.</td>
+</tr>
+<tr>
+<td><code>fetchJSONResponse(url,options,{onRetry=null}={})</code></td>
+<td>Uses that HTTP owner and retry observer, requires <code>application/json</code>, and returns the complete parsed body without selecting choices.</td>
+</tr>
+<tr>
+<td><code>structuredOutputFormat(value=false)</code></td>
+<td>Maps false/null/undefined to null, true/<code>&#39;json&#39;</code> to <code>&#39;json&#39;</code>, and preserves a supplied plain JSON Schema object. Other inputs use <code>AI_STRUCTURED_OUTPUT_INVALID</code>.</td>
+</tr>
+<tr>
+<td><code>openAIResponseFormat(format)</code></td>
+<td>Maps the normalized value to <code>json_object</code>, strict <code>json_schema</code> named <code>structured_response</code>, or null.</td>
+</tr>
+<tr>
+<td><code>isAIRequestAbort(error,signal)</code></td>
+<td>Recognizes an aborted signal, <code>AbortError</code>, or the existing Arcane AI/request cancellation codes.</td>
+</tr>
+<tr>
+<td><code>normalizeAIRequestAbort(error)</code></td>
+<td>Preserves an existing <code>ARCANE_AI_REQUEST_ABORTED</code> error or creates that <code>AbortError</code> with the original value as its cause.</td>
+</tr></tbody>
+</table>
+</div>
+<p>These helpers start no work on import. HTTP helpers require explicit URL and
+options; they do not add a key, model, browser state, or retained conversation.
+Retry warnings and observer failures use the shared console logger and preserve
+the complete original error.</p>
+<h2 id="generate-images-with-an-application-selected-model">Generate images with an application-selected model</h2>
+<p><code>generateImages</code> is a separate stateless operation on the same public import.
+The application owns the selected model, labels, prompt, provider parameters,
+credential source, display, and any saved image. It does not instantiate the
+browser AI singleton or change chat, speech, model preferences, or history.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {generateImages} from &#39;arcane-os/ai/twin-cloud&#39;;
+
+const controller = new AbortController();
+const {images} = await generateImages({
+    model: &#39;stable-diffusion-3.5-large&#39;,
+    prompt: &#39;A moon-powered toaster launches croissants over purple craters.&#39;,
+    parameters: {n: 2, size: &#39;1024x1024&#39;, output_format: &#39;png&#39;},
+    getApiKey: applicationRuntime.getTwinKey,
+    signal: controller.signal,
+    onProgress({stage}) {
+        console.log(stage);
+    }
+});
+
+for (const image of images) {
+    await applicationRuntime.saveGeneratedImage(image.blob, image.mediaType);
+}
+</code></pre></div>
+<p><code>applicationRuntime.getTwinKey</code> and <code>saveGeneratedImage</code> are caller-owned
+functions in this example, not SDK APIs. Pass the credential function with any
+required receiver already bound. Use <code>twinKey</code> instead when the application
+already has its key. <code>getApiKey()</code> may return a key or a promise and is called
+only when <code>twinKey</code> is <code>undefined</code>. An explicitly supplied empty key fails with
+<code>AI_PROVIDER_NOT_CONFIGURED</code>; it does not select another credential source.
+The example&#39;s model and parameters are application choices, not SDK defaults.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">generateImages({
+    model,
+    prompt,
+    parameters,
+    twinKey,
+    getApiKey,
+    signal,
+    id,
+    onRequest,
+    onResponse,
+    onProgress
+})
+// Promise&lt;{images: [{blob, mediaType, width?, height?}]}&gt;
+</code></pre></div>
+<p><code>parameters</code> defaults to <code>{}</code>, <code>signal</code> to <code>null</code>, and <code>id</code> to <code>Date.now()</code>.
+All diagnostic and progress callbacks are optional.</p>
+<p>The SDK owns the route for these exact supported identifiers:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Explicit model</th>
+<th>Submission and result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>fal-ai/flux/schnell</code></td>
+<td>POST <code>/v1/async-invoke</code> with <code>{model_id:model,input:{...parameters,prompt}}</code>; pending jobs use GET <code>/v1/async-invoke/{request_id}/status</code>, then GET <code>/v1/async-invoke/{request_id}</code> when the completed status lacks <code>output.images</code>.</td>
+</tr>
+<tr>
+<td><code>stable-diffusion-3.5-large</code></td>
+<td>POST <code>/v1/images/generations</code> with <code>{...parameters,model,prompt}</code>; images come from the completed response&#39;s <code>data</code> array.</td>
+</tr></tbody>
+</table>
+</div>
+<p>Both routes use <code>https://inference.do-ai.run</code>. Missing or unsupported model
+identifiers reject with <code>ARCANE_AI_IMAGE_MODEL_UNSUPPORTED</code>; there is no SDK
+image model default. The prompt must be a string and is sent unchanged,
+including whitespace. <code>parameters</code> is an object of additional provider fields;
+the SDK neither supplies nor changes image counts, dimensions, quality, seeds,
+or output limits. Supply the prompt only through <code>prompt</code>, and the synchronous
+model only through <code>model</code>; duplicate reserved fields in <code>parameters</code> throw
+<code>TypeError</code> instead of silently replacing one input. Provider-supported
+parameter names and values remain that selected model&#39;s contract.</p>
+<p>Every returned image is materialized in provider order. Base64 image data
+becomes a <code>Blob</code>; returned URLs are fetched concurrently without an inference
+Authorization header or browser credentials. The output&#39;s <code>mediaType</code> uses the
+downloaded Blob&#39;s declared type, provider <code>content_type</code>, or a declared
+<code>output_format</code> of <code>png</code>, <code>jpeg</code>/<code>jpg</code>, or <code>webp</code>. With no declared type or known
+format, it is <code>application/octet-stream</code>; the SDK does not guess dimensions or
+image metadata. <code>width</code> and <code>height</code> are included only when the provider supplies
+them. The SDK saves nothing and creates no object URLs; the caller owns any
+storage and the lifetime of display URLs it creates.</p>
+<p><code>onRequest(request,id,metadata)</code> runs once before submission with the complete
+provider request. Metadata is <code>{operation:&#39;images&#39;,transport:&#39;http&#39;,destination}</code>.
+<code>onResponse(response,id,false)</code> runs once with the complete final provider JSON
+after successful generation and before image materialization. Intermediate
+poll replies do not call it. These are explicit diagnostic callbacks: keep raw
+protocol outside ordinary user status and durable chat history. Credentials are
+transport-only and are absent from these payloads. The request and image
+descriptors are captured before their diagnostic callbacks so observer edits do
+not rewrite the operation&#39;s content.</p>
+<p><code>onProgress({stage,model,id,requestId?})</code> reports semantic stages: <code>credentials</code>,
+<code>requesting</code>, <code>queued</code>, <code>generating</code>, <code>downloading</code>, and <code>complete</code>. Pending
+stages can repeat; immediately completed jobs skip them. Async job stages
+include <code>requestId</code> when present. Progress contains no image data or protocol
+body. All three callbacks may return a promise; their settlement is awaited
+and their failure rejects the operation. <code>onResponse</code> means generation returned
+a final result, not that media downloads have finished. The resolved promise
+delivers all materialized images; a failed download rejects instead of returning
+an incomplete collection.</p>
+<p>The image operation submits once and performs no automatic retry, including
+after a network loss, HTTP <code>429</code>, body-read failure, or callback failure. A lost
+POST response may correspond to an accepted paid job. This image-specific rule
+does not alter chat or speech retry behavior. While a FAL job is <code>QUEUED</code> or
+<code>IN_PROGRESS</code>, polling uses the provider&#39;s <code>Retry-After</code> delay when supplied,
+otherwise one second. Completed jobs accept <code>COMPLETED</code> and the guide&#39;s
+<code>COMPLETE</code> spelling. Failed or unusable job results reject with
+<code>ARCANE_AI_INVALID_PROVIDER_RESULT</code> and the complete result in <code>error.cause</code>.
+HTTP failures throw their complete parsed JSON or text body; transport,
+decoding, and callback failures remain their original errors.</p>
+<p>Calling <code>controller.abort()</code> cancels local credential/callback waits, requests,
+body reads, polling timers, and downloads. It rejects with
+<code>ARCANE_AI_REQUEST_ABORTED</code> and ignores later settlement from an operation that
+does not honor the signal. A callback already running remains caller-owned;
+the SDK invokes no subsequent callbacks after cancellation. Local cancellation
+does not claim to cancel a remote paid job. Dispose the controller with the
+owning page or operation; no global startup wait is required.</p>
+<p>The route and response contracts follow DigitalOcean&#39;s official
+<a href="https://docs.digitalocean.com/products/inference/how-to/use-fal-models/" target="_blank" rel="noreferrer">FAL inference guide</a>
+and <a href="https://docs.digitalocean.com/products/inference/how-to/use-multimodal-inference/" target="_blank" rel="noreferrer">multimodal inference guide</a>.</p>
+<h2 id="existing-browser-ai-interface">Existing browser AI interface</h2>
+<p>The following browser example uses the same managed imports as the
+<a href="../browser-speech/">browser speech quick start</a>.</p>
 <h2 id="install-and-import">Install and import</h2>
 <p>Create an application and start its source server:</p>
-<div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npx arcane-os@0.5.17 new hello-twin --path ./hello-twin --target browser
+<div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npx arcane-os@latest new hello-twin --path ./hello-twin --target browser
 cd hello-twin
 npm install
 npm run dev
 </code></pre></div>
 <p>Keep the generated Arcane theme and import map. Place the JavaScript below in
-<code>apps/hello-twin/modules/App.js</code>. Run it in the served browser page, not Node.
+<code>modules/App.js</code> at the application root. Run it in the served browser page.
 This first example is for the new application created above. An existing
 application must complete the saved-preference migration below before importing
-<code>arcane/AI</code> or any module that imports it.</p>
+<code>arcane-os/ai</code> or any module that imports it.</p>
 <h2 id="supply-the-key-at-runtime-and-display-the-response">Supply the key at runtime and display the response</h2>
 <p><code>applicationRuntime</code> is the <strong>one application-supplied placeholder</strong> in this
 example. It represents the authenticated host/application configuration that
 supplies a <code>twinKey</code> at runtime. Replace the placeholder with your existing
 configuration source; do not put a real key in this module, Git, or diagnostics.
 The SDK also reads <code>globalThis.arcane.config.twinCloud.accessKey</code> when present.</p>
-<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import arcaneThemeReady from &#39;arcane/ThemeBootstrap&#39;;
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import arcaneThemeReady from &#39;arcane-os/modules/ThemeBootstrap.js&#39;;
 
 await arcaneThemeReady;
 // In an upgrade bootstrap, the existing preference owner&#39;s migration must
 // already be complete before this dynamic import evaluates AI.js.
-const { default: AI } = await import(&#39;arcane/AI&#39;);
+const { default: AI } = await import(&#39;arcane-os/ai&#39;);
 const applicationRuntime = globalThis.applicationRuntime;
 const ai = new AI();
 ai.twinKey = applicationRuntime.twinKey;
@@ -78,6 +426,32 @@ this request. <code>ai.license</code> remains an alias of <code>ai.twinKey</code
 controller&#39;s <code>abort()</code> when the operation is cancelled or its page detaches.
 <code>streamRequest()</code> is the corresponding object-form streaming API. See the
 <a href="../../runtime-modules/#aijs">AI module reference</a> for its complete options.</p>
+<h2 id="use-a-model-for-one-browser-request">Use a model for one browser request</h2>
+<p>Both object-form methods accept <code>model</code> for that request. For example, an
+application can use 20B for document search while retaining its configured
+120B conversation model:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const result = await ai.fetchRequest({
+  model: &#39;openai-gpt-oss-20b&#39;,
+  messages: searchMessages
+});
+
+await ai.streamRequest({
+  model: &#39;openai-gpt-oss-20b&#39;,
+  messages: summaryMessages,
+  onChunk: displaySummaryChunk
+});
+</code></pre></div>
+<p><code>searchMessages</code>, <code>summaryMessages</code>, and <code>displaySummaryChunk</code> are supplied by
+the application. Their content and callbacks keep their ordinary contracts.
+The exact model goes into each TWiN request payload without changing <code>ai.model</code>
+or selecting another provider. Concurrent calls can choose different models;
+later calls that omit <code>model</code> (or pass <code>undefined</code>) use the configured model.
+Retries keep the same request model. Provider-returned model metadata remains
+authoritative; an assembled stream completion uses the request model only when
+the response omits it.</p>
+<p>The browser API forwards an explicitly supplied model to registered providers,
+whose own request contract determines its meaning. This does not switch or
+activate the loaded model of a browser-WASM provider.</p>
 <h2 id="migrate-saved-preference-tuples-before-using-them">Migrate saved preference tuples before using them</h2>
 <p>The six tuple slots consumed by <code>ai.setAI(...tuple)</code> are:</p>
 <div class="table-wrap" data-columns="3" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
@@ -145,13 +519,13 @@ does not supply a new migration storage API.</p>
 user-readiness handler immediately. If <code>window.user.ready</code> is already true, it
 can immediately read that user&#39;s preference tuple and construct <code>window.ai</code>.
 Waiting until a later <code>setAI()</code>, provider-startup call, or button click is too
-late. A static <code>import AI from &#39;arcane/AI&#39;</code> evaluates before the surrounding
+late. A static <code>import AI from &#39;arcane-os/ai&#39;</code> evaluates before the surrounding
 module body, even if its text appears below migration code. Keep AI and its
 importing modules out of the bootstrap&#39;s static import graph, finish the
 existing owner&#39;s migration, then cross the dynamic-import boundary:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">// Place these lines after the application&#39;s existing preference migration
 // has finished writing and exposing migratedTuple, not before that operation.
-const { default: AI } = await import(&#39;arcane/AI&#39;);
+const { default: AI } = await import(&#39;arcane-os/ai&#39;);
 const ai = new AI(...migratedTuple);
 </code></pre></div>
 <p>Here <code>migratedTuple</code> is the result of the exact transformation shown above,
@@ -180,9 +554,9 @@ An explicitly saved <code>openai-gpt-oss-20b</code> in slot 3 stays that exact m
 <li><a href="../../core/arcane-ai-contracts/">Core AI contracts</a></li>
 </ul>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#install-and-import">Install and import</a><a href="#supply-the-key-at-runtime-and-display-the-response">Supply the key at runtime and display the response</a><a href="#migrate-saved-preference-tuples-before-using-them">Migrate saved preference tuples before using them</a><a href="#related">Related</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#node-explicit-key-model-and-structured-result">Node: explicit key, model, and structured result</a><a href="#shared-request-behavior">Shared request behavior</a><a href="#evaluate-caller-owned-state-with-system-one">Evaluate caller-owned state with System One</a><a href="#generate-images-with-an-application-selected-model">Generate images with an application-selected model</a><a href="#existing-browser-ai-interface">Existing browser AI interface</a><a href="#install-and-import">Install and import</a><a href="#supply-the-key-at-runtime-and-display-the-response">Supply the key at runtime and display the response</a><a href="#use-a-model-for-one-browser-request">Use a model for one browser request</a><a href="#migrate-saved-preference-tuples-before-using-them">Migrate saved preference tuples before using them</a><a href="#related">Related</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.5.18, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.51.1, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

@@ -94,6 +94,22 @@ const config = resolveMailConfig(
 console.log(config);`
     },
     {
+        name:'MailApi.mjs',
+        classification:'public-first-party',
+        lifecycleSideEffects:'Re-exports the existing renderer mail, outbox, and HTTP transport owners. Import retains Mail.js singleton installation in a browser window; it creates no additional delivery or queue owner.',
+        paramsResults:'The managed-browser arcane-os/mail entrypoint exports default and named Mail, resolveMailConfig, the four MAIL_OUTBOX constants, MailOutbox, createMailOutbox, MailTransportError, normalizeMailEndpoint, serializeMailReport, and sendMailReport. Default and named Mail refer to the same class. Each re-export preserves its owning module inputs, complete results, errors, and lifecycle.',
+        events:[],
+        errors:['The re-exported Mail, MailOutbox, and MailTransport contracts retain their original errors.'],
+        capabilitiesCore:'Renderer entrypoint with the same optional Core mail.send and explicit HTTP delivery as Mail.js. Node resolves the public arcane-os/mail entrypoint to its separate Node implementation.',
+        example:String.raw`import {resolveMailConfig} from 'arcane-os/mail';
+
+const configuration=resolveMailConfig(
+    {appName:'dragon-dispatch',endpoint:'https://mail.example.com/v1/mail'},
+    {document:null,location:new URL('https://dispatch.example.com/')}
+);
+console.log(configuration.endpoint);`
+    },
+    {
         name:'MailOutbox.mjs',
         classification:'public-first-party',
         lifecycleSideEffects:'Construction validates caller-owned DBOPFS-compatible storage, Web Locks, delivery, clock, and online-event adapters. enqueue() persists complete content before delivery; start() owns the online listener; drain() serializes FIFO attempts; stop() detaches the listener and its owned online drain without deleting records.',

@@ -696,7 +696,7 @@ console.log(encoder.encode());`
     {
         name:'HTMLImport.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Import registers html-import; connection fetches one same-origin fragment into an open shadow root, sequentially executes inline scripts with host binding, and emits ready or error.',
+        lifecycleSideEffects:'Import exports the existing html-import registry constructor, or registers and exports the SDK loader when absent. The SDK loader connection callback fetches one same-origin fragment into an open shadow root, sequentially executes inline scripts with host binding, and emits ready or error. Repeated imports reuse the same registered constructor and existing instances.',
         paramsResults:'Set href before connecting; ready becomes true after a successful 2xx load and inline-script completion. An external script src is logged and stops further script execution; cross-origin URLs, redirects, fetch, DOM, and script failures become a bounded public error detail.',
         events:['html-import-ready','html-import-error'],
         errors:['HTML_IMPORT_FAILED in error event detail','underlying failure is caught and logged'],

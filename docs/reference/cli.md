@@ -47,6 +47,8 @@ meaning and cardinality rules:
 | `--display-name` | string | `new`, `init` |
 | `--workspace` | directory | Commands that select an external or integrated workspace; defaults to `.`. |
 | `--app` | app id or label | Workspace/app operations except shared scope and `verify-bundle`; optional diagnostic label for `mail serve`. |
+| `--apps-root` | `.` or `apps` | `new`, `init`; standalone setup defaults to the repository root. |
+| `--sdk-runtime-source` | SDK checkout directory | `dev` only; maps live SDK source through the selected browser destinations for that server process. |
 | `--arcane-root` | directory | `doctor`, native `build`/`run`, `native-doctor`, `native-prepare` |
 | `--host` / `--port` | host / integer 0–65535 | Browser `dev`/`run` default to HTTPS at `127.0.0.1:8000`; `mail serve` defaults to HTTPS with HTTP/2 at `0.0.0.0:4433` and accepts an explicit bind host. |
 | `--http-port` | integer 0–65535 | Browser `dev`/`run` HTTP redirect listener; defaults to `0`, which selects an available port. |
@@ -198,8 +200,8 @@ npm exec -- arcane doctor --workspace . --arcane-root "../Arcane OS"
 Refreshes one selected application's browser runtime map, generates
 its standard browser import map, discovers every directly navigable
 `.html`/`.htm` document admitted by the selected descriptor's existing
-include/exclude rules, and commits the map artifact plus those managed documents
-as one transactional refresh. A directly navigable entry document declares exactly
+include/exclude rules, and prepares the map artifact plus those managed documents
+before writing them in order. A directly navigable entry document declares exactly
 one `<meta name="arcane-app-id" content="<selected-id>">`; an unmarked secondary
 document may instead carry an active `<base>`.
 Wrong or duplicate explicit app identity fails. The renderer then requires one
@@ -238,8 +240,8 @@ files remain unchanged. The same layout applies to `arcane dev` and
 `arcane package`. Generated and offline app files are committed; GitHub Actions
 consume those committed files. See [root generated output](pwa.md#root-generated-output).
 
-SDK `0.5.17` preserves the physical workspace route count and ordered include
-list. External and modern integrated routes require `components`, `css`,
+The supported physical layout preserves its route count and ordered include
+list. External and modern integrated physical routes require `components`, `css`,
 `dependencies`, `entities`, `img`, `modules`, and `sdk`; a physical workspace
 may omit only an optional trailing `security` include. The external license
 route remains separate and second.
@@ -248,10 +250,11 @@ External applications can instead select the four ordered
 [`installed-v1` routes](protocols.md#installed-package-browser-routes) in
 `arcane-packager.json`. This reads directly from the installed SDK package and
 requires neither a workspace `arcane/` directory nor `arcane.lock.json`.
-The generated browser destinations remain `arcane/`, `arcane/sdk/`, and
-`arcane/dependencies/strong-type/`; an npm alias changes package source paths,
-not those browser URLs. The SDK version comes from that installed package.
-Existing physical workspaces and scaffold output remain supported unchanged.
+Direct routes use the actual `node_modules/<dependency>/...` browser paths;
+an npm alias selects that alias's folder. Earlier virtual routes retain
+`arcane/`, `arcane/sdk/`, and `arcane/dependencies/strong-type/` destinations.
+The SDK version comes from the installed package. Existing physical workspaces
+and explicitly selected nested scaffolds remain supported.
 
 ### Result and safety
 
@@ -278,12 +281,16 @@ Success returns the normal selected-workspace wrapper:
 
 For the direct CLI command, `documentPaths` contains the configured entry first
 and every other descriptor-selected HTML/HTM document afterward in
-deterministic order. The generated artifact and selected documents are written
-together. A post-commit observer failure preserves delivery with
+deterministic order. The generated artifact is written first, followed by the
+selected documents. A write failure or cancellation can leave earlier writes
+in place; the operation does not restore them automatically. After successful
+writes, an observer failure preserves delivery with
 `eventDelivery.status === 'degraded'` and `ARCANE_EVENT_DELIVERY_FAILED`; it
 does not roll back complete application content.
 
-`new` and `init` generate the map during scaffolding. `dev` refreshes all
+Root `new` reports a pending map until the SDK is installed. Root `init` generates
+the map when the installation is available and otherwise reports the same pending
+state; explicit nested scaffolds generate it during setup. `dev` refreshes all
 selected documents once before binding. `package` consumes the saved source
 and maps; use `import-map` to refresh them explicitly before selecting output
 that needs updated maps. Packaging does not run tests or checks automatically.
@@ -293,10 +300,9 @@ Explicit `test` and `check` operations read the existing map without regeneratin
 watcher, polling, scheduled refresh, download, or self-update behavior.
 
 There is no supported `--dry-run` for `import-map`: do not pass that parser-wide
-flag because this command performs the real commit. Import-map-specific failures
+flag because this command writes the selected files. Import-map-specific failures
 use `ARCANE_IMPORT_MAP_INVALID`, `ARCANE_IMPORT_MAP_UNRESOLVED`, or
-`ARCANE_IMPORT_MAP_COLLISION`; packaging can additionally report
-`ARCANE_IMPORT_MAP_CLEANUP_FAILED`. Workspace, policy, usage, busy, and
+`ARCANE_IMPORT_MAP_COLLISION`. Workspace, policy, usage, busy, and
 cancellation failures retain their normal SDK codes.
 
 ### Example
@@ -348,7 +354,7 @@ An explicit live-source SDK mapping follows the selected browser destinations
 while reading canonical SDK source; it never replaces installed files.
 
 ```text
-arcane dev [--app <id>] [--public] [--http | --https] [--cert <file> --key <file>] [--host <address>] [--port 8000] [--http-port 0]
+arcane dev [--app <id>] [--public] [--http | --https] [--cert <file> --key <file>] [--host <address>] [--port 8000] [--http-port 0] [--sdk-runtime-source <sdk-root>]
 ```
 
 ### Lifecycle
@@ -569,8 +575,9 @@ arcane package [--app <id>] [--dry-run]
 
 The result includes the release root, manifest, and complete selected inventory.
 `ARCANE_APP_RELEASE.json` keeps the authored app-relative `app.entry` and records
-the package launch URL in `app.start`, such as `./apps/hello-world/index.html`.
-The file inventory includes that app tree and the root `index.html`.
+the package launch URL in `app.start`: `./index.html` for a root app with that
+entry, or `./apps/hello-world/index.html` for a nested app. The complete file
+inventory follows the selected layout and includes the root `index.html`.
 `--dry-run` plans the package without refreshing source, running tests, or
 replacing output.
 
@@ -742,6 +749,8 @@ The preview always uses HTTPS with the workspace certificate pair. Supply
 `--port` selects the HTTPS application port, and `--http-port` selects the
 paired HTTP `308` redirect port. The HTTP port defaults to an available port;
 the CLI prints its actual redirect URL and reports both listener endpoints.
+The preview uses the same complete `node-http-server` MIME map as source
+development, including PDF, Markdown and supported audio/video types.
 For a paired native target, it performs package, prepare, plan, build, launch,
 readiness, and owned cancellation in one process.
 

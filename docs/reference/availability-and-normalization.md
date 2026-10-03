@@ -71,17 +71,22 @@ version; WebKitGTK availability must not be generalized to macOS.
 | Build browser UI and app-local behavior | `/arcane/modules/*.js`, shared entities, and components | **Browser**; many modules also run inside every native renderer | Pure modules own their result contracts. Modules that call `Arcane` inherit the bridge boundary described below. |
 | Select and observe independent LLM/STT/TTS roles | `/arcane/modules/AIProviderRuntime.js` and `AIRuntimeState.js` | **Cross-host** controller/state; registered providers retain their own host requirements | Required/projected provider members, route/configuration records, and status fields; per-role lifecycle, cancellation, stream cleanup, sticky state, and startup barriers are normalized. `localOnly` creates no fallback. |
 | Run a caller-selected local LLM entirely in a browser renderer | `arcane-os/ai/browser-wasm` through `createArcaneAI()` | **Browser** only; secure context, WebAssembly, and OPFS/DBOPFS; full WebGPU offload by default or explicit CPU with `gpuLayers:0` | The public AI API module normalizes multi-model lifecycle, status, complete all-choice streaming, cancellation, exact ordered structural tool-call visibility, and session persistence. Model sources are canonical ordered file descriptors; licenses and model choice remain application policy. |
-| Run caller-selected Whisper or Kokoro in a browser renderer | `arcane-os/ai/browser-speech` registered with `AIProviderRuntime` | **Browser** only; DBOPFS, Web Locks, Workers, Fetch/object URLs, and a caller-supplied self-contained runtime/model closure are required | STT/TTS use independent provider/2 lifecycle and status. Kokoro adds bounded Worker/session concurrency and explicit `auto`, `webgpu`, or `wasm` execution. Complete model/runtime selection, offline behavior, cancellation, Worker teardown, and request/result shapes are normalized. No runtime/model content or cloud fallback is supplied. |
+| Run caller-selected Whisper or Kokoro in a browser renderer | `arcane-os/ai/browser-speech` registered with `AIProviderRuntime` | **Browser** only; DBOPFS, Web Locks, Workers, Fetch/object URLs, and a caller-supplied self-contained runtime/model closure are required | Independent provider/2 lifecycle and status, with `auto`, `webnn-npu`, `webgpu`, or `wasm` execution. Whisper owns one Worker/session; Kokoro defaults to four and accepts one through four. Complete model/runtime selection, offline behavior, cancellation, Worker teardown, and request/result shapes are normalized. No runtime/model content or cloud fallback is supplied. |
 | Capture speech with the explicitly selected native browser service | `createBrowserSpeechRecognitionProvider` from `arcane-os/ai/browser-speech`, configured as STT | **Browser / native WebView**, conditional on `SpeechRecognition` or `webkitSpeechRecognition`; no SDK model, Worker, or storage required | `localOnly:false` because the browser may use a remote service. Factory/catalog remain usable without native support; inspect/load report availability. User-gesture start, exact final results, transient interim text, stop/drain and abort are owned by the provider/runtime and shared controls. No provider fallback. |
-| Prepare ordered speech playback or reuse the speech-input formatting filter | `arcane-os/speech-playback` and `arcane-os/speech-text` | **Node** with injected media adapters, or **Browser / Native WebView** media; the text filter itself is **Cross-host** | Stored and caller-owned text stays exact. Only the outbound synthesis copy automatically loses repeated same formatting marks. A capacity-advertising provider receives complete segments immediately while retaining indexed playback; native/custom synthesis stays serialized. |
-| Preserve complete chat history and memory | `/arcane/modules/PersistentAIChatSession.js` | **Browser / native WebView** with ChatEntity/DBOPFS and a configured chat function | Existing DBOPFS names and memory semantics are preserved. Live-context commit is atomic; durable persistence is explicit and coherent across user/assistant turns and atomic all-ID tool-result batches. |
+| Speak with the explicitly selected browser voice service | `createBrowserSpeechSynthesisProvider` from `arcane-os/ai/browser-speech`, configured as TTS | **Browser / native WebView**, conditional on `speechSynthesis` and `SpeechSynthesisUtterance` | `localOnly:false`; actual voice metadata and a replaying catalog subscription, synchronous `setDefaultVoice(voiceURI\|null)`, silent preparation, and explicit playback controls. Native completion and resource release are distinct. Native speech provides playback descriptors; exporting audio requires a provider that returns real audio. |
+| Prepare ordered speech playback or reuse the speech-input formatting filter | `arcane-os/speech-playback`, `AI.prepareTTSPlayback`, and `arcane-os/speech-text` | **Node** with injected media adapters, or **Browser / native WebView** media; the text filter itself is **Cross-host** | Stored and caller-owned text stays exact. Only the outbound synthesis copy loses repeated same formatting marks. Complete Blob segments or inert native descriptors keep their original order. Provider capacity owns synthesis admission; actual native release controls when the playback lane is free. |
+| Compose editable speech drafts and print a conversation | Shared [`chat.html`](runtime-components.md#chathtml) | **Browser / native WebView** with the selected AI/speech runtime | `transcriptionMode='draft'` places confirmed and interim recognition in the editable composer for manual Send. `appendDraft(text)` preserves existing text and selection. `print()` requests the complete rendered conversation with optional `printTitle`; a successful return confirms the dialog request only. |
+| Preserve complete chat history and memory | `/arcane/modules/PersistentAIChatSession.js` | **Browser / native WebView** with ChatEntity/DBOPFS and a configured chat function | Live-context commit is atomic; new durable records contain complete visible content and timestamps with optional application display metadata. Per-turn `persist:false` and entity-wide `persist=false` keep the operation's input and response outside retained context, transcript, memory, and DBOPFS. Existing saved records remain unchanged. |
+| Store and display images referenced by Markdown | `/arcane/modules/MarkdownMedia.js` and shared Markdown views | **Browser / native WebView** with application-owned DBOPFS storage | Complete image records stay in the selected table; raw Markdown holds stable `arcane-media:` references. Hydration owns temporary display URLs, cancellation, per-image errors, and print-resource retention. Pure record decoding performs no storage or network work. |
+| Print rendered editor content or file previews | `/arcane/modules/PrintView.js`, editor `print()`, and file/history `printPreview()` | **Browser / native WebView** with DOM and browser printing | Complete current rendered content, fonts, and resolved media are captured for print. Explicit requests await view preparation; native Print captures synchronously. Shared `print.css` supplies a light paper palette and one-inch margins; snapshots stay owned through `afterprint`. |
 | Search an app-owned document corpus for explicit chat context | `/arcane/modules/DBOPFSDocumentLibrary.js` | **Browser** or compatible injected DBOPFS adapter | Generation/manifest completion, complete lexical search, partial read failures, and untrusted context labels are normalized. Construction does not search; an explicitly wired context builder performs retrieval for each prepared chat send. |
 | Read host identity, capabilities, storage, preferences, appearance, or platform state | `globalThis.Arcane` | **Cross-host** where the method is implemented and admitted | Promise behavior and `Arcane.Error` are normalized. Result fields are normalized unless the method explicitly documents a platform-dependent snapshot. |
 | Use local AI without coupling app code to Ollama HTTP | `Arcane.localAI`, `Arcane.ai`, or `/arcane/modules/Ollama.js` | Primarily **Native**; Android exposes a narrower admitted inference projection | Admission, errors, and managed-operation events are normalized. Direct Ollama response envelopes remain **Provider-native**. |
 | Use TWiN Cloud from the renderer profile | `/arcane/modules/AI.js` | **Cloud** from an allowed browser/native renderer | High-level chat behavior is normalized by the module. The TWiN access key authenticates remote LLM chat; raw provider diagnostics remain provider-specific. No automatic cloud fallback is inferred from local failure. |
 | Send one TWiN Cloud request with an explicit key and model | `fetchRequest` from `arcane-os/ai/twin-cloud` | **Node** and **Browser**, using standard Fetch and a remote HTTPS provider | Keeps complete messages and returns the full parsed provider JSON. Rejected Fetch and HTTP 529 share three retries after 3000 ms; HTTP 429 overload retains unlimited three-second retries. Optional `onRetry` reports waiting/requesting phases without blocking recovery. Shared structured-output mapping and cancellation match browser TWiN transport. No browser profile, AI/user singleton, DBOPFS, or retained request history is created. |
 | Evaluate caller-owned state and questions with TWiN System One | `fetchSystemOneRequest` from `arcane-os/ai/twin-cloud` | **Node** and **Browser**, using standard Fetch and a remote HTTPS provider | Posts the explicit model and complete state/questions through the existing JSON transport. Returns the entire parsed provider result and shares its retry, diagnostic, and cancellation behavior. Model choice, question definitions, answer interpretation, and scoring policy stay with the caller; no conversation state is retained. |
-| Use speech through one application helper | `/arcane/modules/AI.js` and `Arcane.speech` | **Browser** or **Native** | Whisper and Kokoro keep their on-device paths; explicitly selected Web Speech STT and TWiN Cloud TTS declare their non-local behavior. The helper automatically cleans only the outbound synthesis-input copy and normalizes application-facing audio/text behavior while request/response plumbing differs below that boundary. |
+| Generate images from a complete caller-owned prompt | `generateImages` from `arcane-os/ai/twin-cloud` | **Node** and **Browser**, using standard Fetch, Blob, and a remote HTTPS provider | Caller selects `fal-ai/flux/schnell` or `stable-diffusion-3.5-large`, credentials, and provider parameters. Returns every image as a Blob with media metadata in provider order; owns progress, job polling, and cancellation. Submission is not automatically replayed after an ambiguous failure. Display and storage stay application-owned. |
+| Use speech through one application helper | `/arcane/modules/AI.js` and `Arcane.speech` | **Browser** or **Native** | Whisper and Kokoro keep their on-device paths; explicitly selected Web Speech STT/TTS and TWiN Cloud TTS declare their non-local behavior. `prepareTTSPlayback` supports real audio and silent native descriptors; `fetchTTS` and durable `prepareTTS` require real audio. Provider choice, model, voice, and credentials stay application-owned. |
 | Inspect or manage raw Ollama models | `Arcane.ollama` or `/arcane/modules/Ollama.js` | **Native** desktop Core for management; narrower Android inference only | Wrapper method names, errors, streaming correlation, and admission are Arcane-controlled. Direct Ollama success envelopes are intentionally provider-native. |
 | Use native terminal, installation, user, provisioning, or machine controls | matching `Arcane.*` namespace | **Native** and app/capability restricted | Calls and errors use the common bridge contract. Platform results can be host-specific and are marked in the method guide. |
 
@@ -189,18 +194,22 @@ status, and error state. The SDK supplies neither speech adapter runtime nor
 model/voice content; every selected file is application-owned and stored
 through the SDK-created DBOPFS adapter.
 
-Kokoro defaults to `{device:'auto',maxConcurrentRequests:4}`. Automatic
-selection attempts the complete Worker/session pool on WebGPU when exposed and
-recreates the complete pool on WASM if WebGPU loading rejects. Explicit
-`webgpu` or `wasm` disables that fallback. Each accepted synthesis owns one
-pool slot, and provider-neutral FIFO backpressure preserves later requests.
-Whisper remains one WASM Worker.
+Both speech roles default to `device:'auto'`: try `webnn-npu` when
+`navigator.ml.createContext` exists, then exposed WebGPU, then WASM. A failed
+backend load releases its Worker/session pool before a fresh pool tries the
+same prepared model and precision on the next backend. Explicit `webnn-npu`,
+`webgpu`, or `wasm` selects only that backend. Whisper accepts exactly one
+Worker/session. Kokoro defaults to `maxConcurrentRequests:4` and accepts one
+through four; its FIFO queue preserves later requests while those slots are
+occupied.
 
 For high-level speech, read
-`ai.providerRuntime.status('tts', {execution:true}).execution` after load.
-Kokoro reports `requestedDevice`, `selectedDevice`, `maxConcurrentRequests`,
-and `activeRequestCount`; requested `auto` with selected `wasm` identifies
-fallback. `selectedDevice` is `null` while unloaded. The default `status()`
+`ai.providerRuntime.status(role, {execution:true}).execution` for `stt` or `tts`
+after load. Both report `requestedDevice`, `selectedDevice`,
+`maxConcurrentRequests`, and `activeRequestCount`. `selectedDevice` is `null`
+while unloaded and identifies the successful session backend after load.
+WebNN may use WASM for unsupported operations, so that field does not establish
+that every operation ran on a physical NPU. The default `status()`
 remains the sticky lifecycle snapshot; execution is an explicit provider read,
 and inspection errors propagate. Neither state proves physical GPU kernel
 overlap. See the [copyable speech quick start](ai/browser-speech.md).
@@ -215,12 +224,14 @@ The projected [`AIProviderRuntime`](runtime-modules.md#aiproviderruntimejs)
 normalizes those browser providers and can admit an externally supplied native
 or cloud provider/2 adapter. `AI.js` also supplies built-in adapters for
 an already-selected TWiN Cloud LLM route, Ollama route, or admitted local Core
-speech route. Its built-in audio selections are on-device only: saved `OPENAI`
-speech selections migrate to `LOCAL_SPEACH` with `whisper-small` for STT and
-`kokoro` for TTS. The SDK publishes no privileged Core implementation,
-credential,
-model, or speech-runtime authority, and those adapters never probe, select,
-download, or fall back. The sticky
+speech route. Application-selected Web Speech recognition, Web Speech
+synthesis, and TWiN Cloud/FAL synthesis can be registered through
+`ai.configureSpeechProvider(role,provider,{modelId})`; configuration owns only
+the selected role and performs no network request. Saved selections remain
+application-owned, including selections waiting for provider registration.
+The SDK publishes no privileged Core implementation, credential, model, or
+speech-runtime authority. Capability-only built-in adapters report their
+existing routes without probing, downloading, or changing providers. The sticky
 [`AIRuntimeState`](runtime-modules.md#airuntimestatejs) surface keeps
 application UI independent of transport. A selected route remains explicit:
 browser failure is not permission to invoke Core or cloud.

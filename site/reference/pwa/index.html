@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="An application supplies its installation identity and offline resource selection. The SDK generates the Web App Manifest, offline inventory, service worker and nonblocking registration module. Its shared installation owner and dismissible component expose the browser&#39;s available install action. Native packages keep their existing lifecycle.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/pwa/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Progressive web applications · Arcane OS SDK"><meta property="og:description" content="An application supplies its installation identity and offline resource selection. The SDK generates the Web App Manifest, offline inventory, service worker and nonblocking registration module. Its shared installation owner and dismissible component expose the browser&#39;s available install action. Native packages keep their existing lifecycle."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/pwa/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Progressive web applications · Arcane OS SDK"><meta name="twitter:description" content="An application supplies its installation identity and offline resource selection. The SDK generates the Web App Manifest, offline inventory, service worker and nonblocking registration module. Its shared installation owner and dismissible component expose the browser&#39;s available install action. Native packages keep their existing lifecycle."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Progressive web applications | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Progressive web applications</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="progressive-web-applications">Progressive web applications</h1><p class="doc-lead">An application supplies its installation identity and offline resource selection. The SDK generates the Web App Manifest, offline inventory, service worker and nonblocking registration module. Its shared installation owner and dismissible component expose the browser&#39;s available install action. Native packages keep their existing lifecycle.</p><div class="doc-meta"><span>SDK 0.51.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/pwa.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#application-configuration">Application configuration</a><a href="#generated-output">Generated output</a><a href="#development-and-hosting">Development and hosting</a><a href="#updates-and-stored-data">Updates and stored data</a><a href="#installation-component">Installation component</a><a href="#getpwainstall">getPwaInstall()</a><a href="#mountpwainstallprompt">mountPwaInstallPrompt()</a><a href="#registerpwa">registerPwa()</a></nav></details><p>An application supplies its installation identity and offline resource selection.
+The SDK generates the Web App Manifest, offline inventory, service worker and
+nonblocking registration module. Its shared installation owner and dismissible
+component expose the browser&#39;s available install action. Native packages keep
+their existing lifecycle.</p>
+<h2 id="application-configuration">Application configuration</h2>
+<p>Set <code>package.pwa</code> in the application&#39;s <code>arcane-app.json</code>. Its ordinary package
+projection carries the same <code>pwa</code> record in <code>arcane-package.json</code>:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>json</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-json">{
+  &quot;enabled&quot;: true,
+  &quot;manifest&quot;: {
+    &quot;name&quot;: &quot;Example Library&quot;,
+    &quot;short_name&quot;: &quot;Library&quot;,
+    &quot;display&quot;: &quot;standalone&quot;,
+    &quot;icons&quot;: [
+      {
+        &quot;src&quot;: &quot;img/library.png&quot;,
+        &quot;sizes&quot;: &quot;512x512&quot;,
+        &quot;type&quot;: &quot;image/png&quot;
+      }
+    ]
+  },
+  &quot;offline&quot;: {
+    &quot;exclude&quot;: [&quot;documents&quot;]
+  }
+}
+</code></pre></div>
+<p><code>enabled</code> defaults to <code>false</code>. <code>manifest</code> contains ordinary Web App Manifest
+metadata. Its default name comes from <code>displayName</code>; its default start page
+comes from the selected application entry. The app owns names, icons, colors,
+display preference, routes and descriptions. Use real app icons; the SDK does
+not invent branding or claim that a browser has installed the app.</p>
+<p>Manifest URL fields are relative to the application directory. Each standalone
+app&#39;s root is its repository root. Explicit multi-app source and packaged
+delivery retain the selected app tree at <code>apps/&lt;id&gt;/</code>. For multi-app packaged output,
+the default <code>start_url</code> is <code>./apps/&lt;id&gt;/&lt;entry&gt;</code>, resolved from the generated
+root manifest. The default <code>id</code> and <code>scope</code> remain <code>./</code>, preserving the existing
+deployment-root installation identity. Authored relative URL fields, including
+explicit <code>id</code> and <code>scope</code> values, resolve against <code>./apps/&lt;id&gt;/</code>; an icon such
+as <code>img/library.png</code> therefore remains beneath the app directory. Absolute URL
+fields retain their authored destination.</p>
+<p>For <code>appsRoot: &quot;.&quot;</code>, application URLs stay at the deployment root. Direct npm
+routes keep runtime URLs under <code>/node_modules/&lt;dependency&gt;/...</code>. The public
+<code>arcane import-map</code> operation generates static PWA files beside the root entry
+and adds their links to the selected navigable documents. This works with an
+ordinary static host; it does not copy the installed runtime into <code>arcane/</code>.
+The source root defaults its installation ID to <code>/apps/&lt;id&gt;/</code> to preserve the
+previous source identity while its start URL and scope move to the root. An
+authored <code>manifest.id</code> remains authoritative. Packaged default identity remains
+<code>./</code>. App identity and saved application data remain unchanged.</p>
+<h3 id="root-generated-output">Root generated output</h3>
+<p>For a standalone application, <code>appsRoot: &quot;.&quot;</code> places the app at its repository
+root. Import-map refresh, <code>arcane dev</code>, package inspection/dry run and browser
+packaging use that layout directly:</p>
+<ul>
+<li>The four root PWA files are generated normally when PWA is enabled.</li>
+<li>The SDK generates no <code>apps/&lt;id&gt;/</code> navigation pages, nested worker or duplicate
+offline inventory, and adds no redirects for that path family.</li>
+<li>Runtime resources use the selected npm package paths; no repository-root
+<code>arcane/</code> projection is generated.</li>
+<li>The default source installation ID remains <code>/apps/&lt;id&gt;/</code>, the default
+packaged installation ID remains <code>./</code>, and an explicit <code>manifest.id</code> remains
+authoritative. An ID identifies the installation; it does not generate a
+directory or a redirect.</li>
+<li>Authored resources follow their normal include/exclude selection. Generation
+does not delete existing files, stored application data, or worker caches.</li>
+</ul>
+<p>Generated and offline app files are committed. GitHub Actions consume those
+committed files rather than generating them. Actual multi-app workspaces keep
+their explicit <code>appsRoot: &quot;apps&quot;</code> layout. This source/package contract does not
+establish any particular installed application&#39;s browser lifecycle.</p>
+<h3 id="offline-resource-selection">Offline resource selection</h3>
+<p><code>offline.include</code> and <code>offline.exclude</code> select literal paths or directory
+prefixes from the selected emitted inventory. An omitted or empty include list
+selects that inventory; exclusions subtract from it. App files use app-relative
+paths. Shared runtime selections follow the configured destinations: for example,
+<code>node_modules/arcane-os/browser-runtime/pwa.mjs</code> for a direct installed route,
+or <code>arcane/sdk/pwa.mjs</code> for a physical or virtual route.
+For example, selecting <code>modules</code> matches a root app&#39;s <code>modules/...</code> or a nested
+app&#39;s <code>apps/&lt;id&gt;/modules/...</code>; emitted offline URLs retain that selected layout.
+The application entry and generated PWA shell records are retained. Select the
+resources needed by every offline page, including its shared modules and styles.
+The worker script itself is never an application cache entry.</p>
+<p>For direct installed-package root applications, public <code>arcane import-map</code>
+generation follows the same source resource graph as <code>arcane dev</code> before writing
+the static offline inventory. Imports from unvisited pages, shared runtime
+modules, component styles, and statically declared Worker URLs retain their
+authored query values. SDK component <code>./arcane/</code> resource attributes resolve from
+that component&#39;s actual runtime root, including installed package aliases and
+nested component directories; ordinary application document bases keep their
+normal meaning. The graph selects resources already present in the configured
+routes. It does not invent resource paths or enumerate user-specific page URLs.</p>
+<p>These settings describe published application resources. They do not select
+user uploads, provider responses, live API requests, saved conversations,
+preferences, IndexedDB, OPFS, or a model owner&#39;s download/cache lifecycle.
+Offline page availability does not imply that cloud inference or other network
+services work offline. Applications own the corresponding visible behavior.</p>
+<h2 id="generated-output">Generated output</h2>
+<p>Browser packaging emits these files at the selected deployment root:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>arcane.webmanifest</code></td>
+<td>Browser installation metadata.</td>
+</tr>
+<tr>
+<td><code>arcane-offline.json</code></td>
+<td>App ID/version, SDK version, deployment revision, resource URLs and explicit navigation aliases.</td>
+</tr>
+<tr>
+<td><code>arcane-sw.js</code></td>
+<td>Stable worker URL with the selected offline manifest embedded in its source.</td>
+</tr>
+<tr>
+<td><code>arcane-pwa.mjs</code></td>
+<td>Independent registration and installation-component bootstrap importing the SDK client.</td>
+</tr></tbody>
+</table>
+</div>
+<p>Standalone app files stay at the output root. Explicit multi-app workspaces
+retain their selected app under <code>apps/&lt;id&gt;/</code>, with shared runtime routes alongside
+it. The SDK supplies a root <code>index.html</code> launcher when selected content has no
+root page. The generated PWA files stay at the deployment
+root so their worker can serve the selected app and shared resources. The
+worker is registered for the deployment root independently of any app-authored
+manifest scope.</p>
+<p>Each packaged output gets one deployment revision shared by its offline
+manifest and worker. It distinguishes separately generated outputs even when
+their app and SDK versions match. It is not a content measurement.</p>
+<p>The package owns its selected inventory once, after any app adapter finishes.
+It follows actual resource references to include meaningful query variants.
+Generated application pages receive a manifest link and an <code>async</code> module
+marked <code>data-arcane-pwa</code>. Existing application scripts retain their order.
+PWA registration does not wait for models, storage, preferences or page rendering.
+The same bootstrap starts one initially hidden <code>pwa-install.html</code> component with
+the generated manifest&#39;s app name. Component loading and worker registration
+proceed independently.</p>
+<p>All SDK browser-resource delivery removes only SDK-owned <code>arcaneVersion</code> fields
+from actual local resource references, including the managed import map. Authored
+fields such as <code>v</code>, encoded and repeated fields, empty query segments, fragments,
+source spelling and unrelated payloads are preserved. The offline
+manifest carries release information. Non-PWA and native packaging use the same
+<a href="../asset-versioning/">clean local resource URLs</a>. Native packaging does not
+generate the browser PWA worker, installation manifest or registration bootstrap.</p>
+<h2 id="development-and-hosting">Development and hosting</h2>
+<p>Use the ordinary <code>arcane dev --app &lt;id&gt;</code> command after editing the selected
+app&#39;s <code>arcane-app.json</code>. Startup refreshes that app&#39;s generated
+<code>arcane-package.json</code> from the authored descriptor before refreshing its import
+maps and starting the server. No packaging or <code>dist</code> output is required.
+Package-only applications retain their existing descriptor workflow.</p>
+<p>With the external <a href="../protocols/#installed-package-browser-routes"><code>installed-v1</code> routes</a>,
+the server inventories the selected SDK directly in <code>node_modules</code>. Runtime
+resources follow the configured destinations. Direct routes use real
+<code>node_modules/&lt;dependency&gt;/...</code> URLs, including an npm alias when selected.
+Earlier virtual routes retain their <code>arcane/</code>, <code>arcane/sdk/</code>, and
+<code>arcane/dependencies/strong-type/</code> destinations. Offline selections use those
+same emitted paths. No workspace <code>arcane/</code> tree or
+<code>arcane.lock.json</code> is needed. Packaging uses the same route selection and copies
+the selected resources into the portable output; existing physical projections
+remain supported.</p>
+<p>Add a file or directory to <code>package.include</code> to make it part of the app&#39;s
+resources. A new file inside an already included directory needs no separate
+entry. <code>package.include</code> is an application resource selection, not a file list
+inside the Web App Manifest. <code>arcane.webmanifest</code> contains browser installation
+metadata; <code>arcane-offline.json</code> contains the selected offline resource inventory.
+If <code>package.pwa.offline.include</code> is nonempty, the resource must also
+match that offline selection and must not match <code>offline.exclude</code>. Adding a
+path only to the offline selection does not add it to the app&#39;s resources.
+The running source server reads changed app descriptors before the next app,
+root-navigation or generated-PWA request. Include/exclude rules, the entry and
+PWA settings share the current selection; no restart or package projection
+write is needed. Edits to selected source files are picked up by the next due
+page-load check while the server remains running.</p>
+<p>For an enabled application, <code>arcane dev</code> serves the generated PWA files at the
+origin root and starts at the selected app entry: <code>/index.html</code> for a standalone
+root app with that entry, or <code>/apps/&lt;id&gt;/&lt;entry&gt;</code> for a nested app. Use one
+selected app per development origin. The SDK uses <code>node-http-server</code> for source
+and packaged-preview serving, including conditional resource responses.
+Arcane development servers default to HTTPS, including localhost, and packaged
+browser previews require HTTPS. Configure the workspace certificate pair before
+starting the ordinary command; see <a href="../cli/#development-https-setup">development HTTPS setup</a>.
+Explicit source-only <code>arcane dev --http</code> serves the same generated PWA routes
+without loading certificates; see <a href="../cli/#explicit-http-development">explicit HTTP development</a>.
+<code>--public</code> selects the IPv4 wildcard bind address; it does not enable PWA
+configuration, change manifest metadata, or determine browser installability.</p>
+<p>Live source inventory work begins when the browser requests the worker or current
+offline manifest, after the page can start. It traverses the selected route
+inventory once for that request, follows page and runtime resource references
+to retain selected query variants, and shares an in-flight traversal with
+concurrent requests. Each referenced source file is read once per traversal;
+document corpus bodies remain under their existing owner. It does not rebuild
+the application. Installation metadata and bootstrap requests reuse the current
+generated bundle.</p>
+<p>An explicit root import-map refresh also performs that traversal to produce the
+committed static PWA files. It opens no server or listener. Its generated
+inventory is available to ordinary static hosting without first visiting each
+page through the development server.</p>
+<p>The SDK owns version information in <code>arcane-offline.json</code>:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Owner and update rule</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>schemaVersion</code></td>
+<td>SDK offline-manifest format; currently <code>1</code>.</td>
+</tr>
+<tr>
+<td><code>appVersion</code></td>
+<td>The app descriptor&#39;s top-level <code>version</code>.</td>
+</tr>
+<tr>
+<td><code>sdkVersion</code></td>
+<td>The selected installed SDK or explicit live SDK source version.</td>
+</tr>
+<tr>
+<td><code>revision</code></td>
+<td><code>development</code> for the source server; a fresh generated deployment ID for each packaged output.</td>
+</tr></tbody>
+</table>
+</div>
+<p>Do not hand-edit generated manifests or bump a version for every source edit.
+<code>arcane.webmanifest</code> holds installation metadata and has no separate SDK-managed
+release counter. Resource freshness uses each response&#39;s <code>Last-Modified</code> header.</p>
+<p>On each page load, the SDK reads one <code>lastChecked</code> value for the app and worker
+scope from DBOPFS in the background. When that value is missing or older than
+the delivery mode&#39;s interval, it checks the current offline manifest and every
+selected resource:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Page-load check interval</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Development</td>
+<td>120 seconds</td>
+</tr>
+<tr>
+<td>Packaged browser delivery</td>
+<td>15 minutes</td>
+</tr></tbody>
+</table>
+</div>
+<p>These intervals schedule revalidation; they never expire a cached file. The
+worker sends <code>GET</code> with <code>If-Modified-Since</code> using the cached response&#39;s
+<code>Last-Modified</code>. A <code>304 Not Modified</code> retains the complete cached response. A
+successful <code>200</code> replaces it after the new response is stored. Missing cached
+resources are downloaded. Network and server failures retain an existing
+offline copy and remain observable through SDK diagnostics. A host without
+modification headers must send the current response because freshness cannot
+be established from a missing header.</p>
+<p>Complete resource responses remain in browser CacheStorage. DBOPFS stores one
+successful whole-cycle timestamp, updated only after the manifest and every
+selected resource have been checked successfully. A partial failure preserves
+the previous timestamp so the next page load can retry. Each cached response
+retains its own <code>Last-Modified</code> header, but there are no per-file check times.
+The SDK imposes no age-based cache deletion and
+retains resource bodies across app and SDK version changes. Requests for a page
+do not wait for the complete resource inventory to finish checking. A file
+already in the current resource cache also returns immediately when its own
+conditional check is pending or in flight. That background check keeps its
+existing owner and updates the stored response for subsequent requests.
+The page receives the cached response&#39;s original status, commonly <code>200</code>, even
+when the separate conditional network response is <code>304</code>. Status alone does
+not identify a network transfer; use the browser&#39;s response source and timing
+details to distinguish cache access from worker startup, queueing and network.
+The SDK
+uses at most four concurrent background resource requests and starts no timer
+or polling loop between page loads.</p>
+<p>During initial installation, selected resources are cached before the browser
+activates the worker. Failures remain observable through native worker state
+and SDK diagnostics. HTTP modification dates have second-level precision;
+hosts must report changes to the served representation, including generated
+output, rather than only the date of an unrelated source file.</p>
+<p>The SDK development server sends <code>Cache-Control: no-cache</code> for PWA resources.
+An independent static host should support <code>Last-Modified</code> and conditional GET
+for stable HTML, module, style and import-map URLs, revalidate worker URLs, and
+serve JavaScript with a JavaScript content type.
+Keep the worker beside the deployment root it controls. The browser requires a
+supported secure context, such as trusted HTTPS or localhost, to register it.
+The SDK does not change certificates or browser permissions.</p>
+<p>An initial visit can load before a worker controls the document. Revalidation
+therefore matters even when an offline cache exists. Updating files in place
+while installation fetches them is not an atomic release snapshot; the host owns
+consistent deployment of the selected output.</p>
+<p>An offline navigation alias redirects to its selected entry page, preserving the
+document URL used to resolve relative modules and styles.</p>
+<p>For a same-origin navigation to a selected static <code>.html</code> or <code>.htm</code> document,
+the worker can reuse that document&#39;s cached body while leaving the complete
+query and fragment in the browser&#39;s navigation URL. Pages such as
+<code>dashboard.html?id=person</code> therefore retain their application-owned parameters
+without enumerating people or saving a cache entry for every query. An exact
+query-specific resource already selected in the inventory takes precedence.
+When the plain document has no retained cached body, the original navigation
+request goes to the network unchanged; its response is not saved over the plain
+document. This does not change query matching for assets, API calls, ordinary
+fetch requests, unselected documents or other origins. Cache refresh and the
+Update prompt keep their existing lifecycle.</p>
+<p>Browser storage eviction can remove an offline cache. A missing release cache
+entry falls back to the network, so offline availability still depends on the
+browser retaining the selected resources.</p>
+<p>After a complete successful refresh, <code>updateAvailable</code> becomes true for an
+already-open page when at least one cached replacement has different parseable
+old and new <code>Last-Modified</code> dates, or a successfully checked resource was absent
+from the prior durable offline inventory. Different modification dates are the
+server&#39;s declaration of modification, not a comparison of response content.
+Initial cache population, eviction repair of a previously selected URL, <code>304</code>,
+and <code>200</code> responses with equal, missing or unreadable modification dates do not
+establish an update. Such successful responses still follow the existing cache
+replacement behavior. A host without meaningful modification dates cannot
+announce same-URL changes through this contract.</p>
+<p>The resource cache privately retains the pre-refresh inventory membership and
+a pending-change flag while a refresh is incomplete. Before replacing a resource
+with a different modification date, it also saves that resource&#39;s prior date.
+Writes to this one metadata entry are ordered; independent resource fetches
+remain concurrent. This lifecycle record is outside the resource inventory and
+is never fetched from the server. A change becomes evidence only after the
+resource&#39;s cache write succeeds. After interruption, the cached response&#39;s date
+is compared with the retained prior date, so a failed later metadata write cannot
+lose that evidence. Failed replacements alone establish no update. The record
+survives worker termination and partial refresh failure and is cleared after
+complete success.
+Partial failure never announces a newly available update. The completed worker
+reply and a scoped message to existing window clients carry the result; each
+page owner keeps its own sticky availability state. A new page does not replay
+an old completed notification.</p>
+<h2 id="updates-and-stored-data">Updates and stored data</h2>
+<p>An updated worker installs alongside the current worker, then waits for the
+browser&#39;s normal activation boundary. Existing controlled pages retain their
+worker while they are open. Closing those pages allows activation; a refresh
+can leave overlapping document clients and keep the update waiting.</p>
+<p>The SDK does not call <code>skipWaiting</code>, claim the initial page, automatically reload a page,
+restart a model or poll for updates. Worker activation preserves cached
+resources and the DBOPFS check history for the same app and registration scope.
+Saved application data and caches owned by other capabilities are untouched.</p>
+<p>When importing caches from an older SDK worker, the new worker fetches the
+SDK-owned registration bootstrap and PWA client once so the page can use the
+current cache-check protocol. Other cached resource bodies retain the normal
+check cadence. This transition follows native worker installation and
+activation without forcing a page reload.</p>
+<p>When a complete resource refresh establishes an update, the shared prompt shows
+<strong>Update available</strong> and <strong>Update</strong>, including in an installed or running app
+and after an earlier installation suggestion was dismissed. Update dismissal
+is separate and lasts for this page owner&#39;s lifetime. Clicking Update calls
+ordinary <code>location.reload()</code> for the current page, with no extra SDK
+confirmation or cache reset. Native <code>beforeunload</code> handling and application-owned
+draft/session persistence retain their normal ownership. This is a page reload,
+not a promise to preserve transient application state or an active chat.</p>
+<p>Switching a server from a packaged release to live development does not replace
+an already active release worker inside an open document. The same native
+worker lifecycle applies.</p>
+<h2 id="installation-component">Installation component</h2>
+<p>Starting with SDK <code>0.13.0</code>, enabled PWA pages automatically mount the shared
+<a href="../runtime-components/#pwa-installhtml"><code>pwa-install.html</code> component</a>. It appears
+when the browser supplies an installation prompt, offers <strong>Install</strong> and a
+clearly labeled close control, and does not move focus when it appears.
+The floating suggestion has no automatic dismissal timer. Closing it remembers
+the choice for the current tab session and manifest URL, so another page
+load does not immediately show it again. A storage failure leaves the current
+page&#39;s dismissal functional and reports the error through console diagnostics.</p>
+<p>An application can also place the same component inline through <code>html-import</code>
+with <code>data-presentation=&quot;inline&quot;</code>. Both presentations share one page-owned
+native installation event. Dismissing the floating suggestion does not consume
+that event or disable an explicitly placed inline component. Closing an inline
+instance hides only that instance. See the component reference for its
+configuration, methods and events.</p>
+<p>The browser controls the URL-bar installation indicator and native prompt.
+The SDK cannot force either to appear. Without a captured
+<code>beforeinstallprompt</code>, installation remains hidden; an available update can
+still show. That waiting installation state does
+not establish that installation is unsupported. The browser may still be
+evaluating the app, may already have it installed, or may only support a
+manual browser-menu installation path.</p>
+<h3 id="browser-installation-requirements">Browser installation requirements</h3>
+<p>Inspect the loaded page&#39;s manifest link and the browser&#39;s manifest diagnostics
+when an install action is missing. Confirm that the generated manifest has the
+intended name, <code>start_url</code>, scope and app display mode, and that its icon URLs
+resolve to actual images with the declared dimensions. For Chromium&#39;s manifest
+install promotion, provide a <code>purpose: &quot;any&quot;</code> icon, or omit <code>purpose</code> to use
+that default, in PNG, SVG or WebP format. Its strict installation icon selector
+excludes JPEG even when the same image renders successfully on the page.
+Do not change a file&#39;s extension or MIME declaration without converting the
+actual image at the application&#39;s asset owner. See Chromium&#39;s
+<a href="https://raw.githubusercontent.com/chromium/chromium/main/third_party/blink/common/manifest/manifest_icon_selector.cc" target="_blank" rel="noreferrer">icon selection implementation</a>.</p>
+<p>Providing 192-by-192 and 512-by-512 raster icons follows the
+<a href="https://web.dev/articles/add-manifest" target="_blank" rel="noreferrer">browser guidance</a>. Their absence alone
+does not prove the failure: Chromium can select one larger supported icon.
+Keep actual icon dimensions in <code>sizes</code>. Browser diagnostics about missing
+<code>screenshots</code> concern the richer installation dialog; screenshots are optional
+and are separate from a usable installation icon.</p>
+<p>Browser installation requires HTTPS or the browser&#39;s localhost/loopback
+exception. A device-facing LAN address is not loopback. Selecting HTTP serving
+does not make that LAN origin a secure context. Chromium documents a separate
+<a href="https://www.chromium.org/Home/chromium-security/deprecating-powerful-features-on-insecure-origins/" target="_blank" rel="noreferrer">explicit developer origin setting</a>;
+the SDK does not configure that setting or claim that starting the server proves
+installation eligibility. Browser engagement,
+installation state and platform support also affect whether native promotion
+appears; worker cache readiness is not an installation UI prerequisite. See
+<a href="https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable" target="_blank" rel="noreferrer">browser installation requirements</a>.</p>
+<p>Browsers without <code>beforeinstallprompt</code> can offer manual installation. For
+example, current iPhone Safari uses Share, <strong>Add to Home Screen</strong>, <strong>Open as
+Web App</strong>, then <strong>Add</strong>. A product may explain that browser-owned path in its
+help, but should not present it as a programmatic SDK install action. The SDK
+does not infer installation support from the user-agent string. See
+<a href="https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios" target="_blank" rel="noreferrer">Apple&#39;s installation instructions</a>.</p>
+<h2 id="getpwainstall">getPwaInstall()</h2>
+<p>Import <code>getPwaInstall</code> and <code>PWA_INSTALL_STATE_EVENT</code> from <code>arcane-os/pwa</code>.
+<code>getPwaInstall()</code> synchronously returns the shared page owner with <code>state</code>, <code>ready</code>,
+<code>subscribe</code>, <code>prompt</code>, <code>dismiss</code>, <code>update</code>, <code>dismissUpdate</code> and <code>dispose</code>. Call it early when owning a
+separate install entry point so it can capture <code>beforeinstallprompt</code> before
+loading the UI. The generated bootstrap already does this through
+<code>mountPwaInstallPrompt()</code>.</p>
+<p><code>state</code> contains <code>status</code>, <code>available</code>, <code>installed</code>, <code>dismissed</code>, <code>updateAvailable</code>,
+<code>updateDismissed</code>, <code>outcome</code>,
+<code>error</code> and <code>storageError</code>.
+Status is <code>waiting</code>, <code>available</code>, <code>prompting</code>, <code>accepted</code>, <code>dismissed</code>,
+<code>installed</code>, <code>running</code>, <code>error</code> or <code>disposed</code>. <code>available</code> means a native event
+is retained, the initial installation-record read has settled, and installation
+has not been recorded or detected. A dismissed floating suggestion can still
+have <code>available: true</code>. <code>installed</code> is true after browser-reported installation
+or restoration of that app&#39;s saved installation record.
+<code>outcome</code> is the browser&#39;s <code>accepted</code> or <code>dismissed</code> choice, or <code>null</code> before a
+choice. <code>error</code> carries the complete prompt error, or <code>null</code>; <code>storageError</code>
+carries the complete DBOPFS read or write error, or <code>null</code>.</p>
+<p><code>updateAvailable</code> starts false and remains true after this owner observes a
+completed changed refresh for the current page&#39;s worker scope through
+<code>arcane.pwa.state</code>. <code>updateDismissed</code> starts false and is independent of
+installation dismissal and saved installation status. Neither field changes
+native installation <code>status</code> or <code>available</code>. A late-created prompt reads the
+current state of live registration owners before returning; earlier creation
+is still needed to capture a browser installation event that has not yet fired.
+The generated bootstrap establishes observation before registering the worker.</p>
+<p><code>ready</code> resolves to the state after the initial DBOPFS read settles. Native
+events are captured synchronously while this read runs. Only installation
+availability waits for it; page rendering, component loading and worker
+registration continue independently. A storage failure is logged and published
+as <code>storageError</code>; <code>ready</code> still resolves and native installation remains usable.</p>
+<p><code>subscribe(listener, {emitCurrent: true, signal} = {})</code> immediately replays
+state by default and returns an unsubscribe function. Later state travels
+through the existing Arcane event owner using <code>PWA_INSTALL_STATE_EVENT</code>
+(<code>arcane.pwa.install.state</code>). A subscription does not wait for worker
+registration, storage initialization or model readiness.</p>
+<p>Call <code>prompt()</code> directly from the user&#39;s install click, before any asynchronous
+wait. It invokes the browser prompt in the same call stack, consumes the event
+once, and returns a promise for the browser&#39;s choice. It resolves to <code>null</code>
+when installation is unavailable, including while the saved state is loading
+or after installation is remembered. Failure publishes
+<code>error</code> state and rejects. A new native event is required for another prompt.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {getPwaInstall} from &#39;arcane-os/pwa&#39;;
+
+const install = getPwaInstall();
+const installButton = document.querySelector(&#39;#install&#39;);
+
+install.subscribe(function showInstallAvailability(state) {
+    installButton.hidden = !state.available;
+});
+installButton.addEventListener(&#39;click&#39;, function requestInstallation() {
+    install.prompt().catch(function reportInstallFailure(error) {
+        console.error(error);
+    });
+});
+</code></pre></div>
+<p><code>dismiss()</code> remembers the session choice without consuming the retained event
+and returns the current state. A browser-native dismissed choice is remembered
+too. <code>appinstalled</code> clears the event, publishes <code>installed</code>, and saves
+<code>{installed: true}</code> as <code>pwa/installed.json</code> through the current app-scoped
+DBOPFS singleton. An installed-app launch in standalone, minimal-ui or
+window-controls-overlay mode, or with <code>navigator.standalone === true</code>, also
+records installation. Ordinary fullscreen suppresses the current prompt but
+does not record installation because browsers can enter fullscreen without
+installing an app; see the <a href="https://drafts.csswg.org/mediaqueries-5/#display-modes" target="_blank" rel="noreferrer">display-mode specification</a>.</p>
+<p>Every new owner reads the saved flag, so both floating and explicit inline
+controls stay hidden on subsequent visits in that browser origin&#39;s app scope.
+The SDK never clears this flag or resets it when display mode changes. Prompt
+acceptance and dismissal alone do not write it. The record is independent of
+resource-check history and other application data. A pending read cannot undo
+newly observed installation, and a confirmed installation&#39;s pending write is
+retained through owner disposal. A write failure remains observable without
+making the current installed session eligible again.</p>
+<p><code>update()</code> synchronously calls the current page&#39;s ordinary <code>location.reload()</code>
+and returns <code>true</code> when an update is available, including after dismissal.
+It returns <code>false</code> when unavailable or disposed. A native reload error propagates
+to the caller. It leaves availability unchanged so a cancelled native unload
+does not discard the update. <code>dismissUpdate()</code> hides the update suggestion for
+this page owner and returns the current state, without changing installation
+dismissal or writing a durable record. A disposed owner returns its current
+state unchanged. Call <code>update()</code> only from the user&#39;s explicit Update action.</p>
+<p>Running in an app display mode publishes <code>running</code>. These states
+do not establish offline readiness. On Android, <code>appinstalled</code> can arrive
+before WebAPK creation finishes. See the
+<a href="https://web.dev/learn/pwa/detection/" target="_blank" rel="noreferrer">browser lifecycle distinction</a>.</p>
+<p><code>dispose()</code> removes the shared owner&#39;s native listeners and subscriptions.
+Leaving the page disposes it automatically, except when the browser retains
+the page in its back/forward cache.
+Because the owner is shared, an individual component should dispose its own
+subscription instead. A later <code>getPwaInstall()</code> creates a new owner after
+disposal; it cannot recover a native event that was already consumed.</p>
+<h2 id="mountpwainstallprompt">mountPwaInstallPrompt()</h2>
+<p><code>mountPwaInstallPrompt({appName = &#39;&#39;} = {})</code> starts native install observation
+synchronously, then loads the shared HTML import and theme modules concurrently
+and appends one initially hidden component when the document body is available.
+It returns the same mounting promise on repeated calls; the first call supplies
+the initial app name. The promise resolves to the ready <code>html-import</code> host, or
+<code>null</code> without a document or when the owner is disposed before mounting. It
+rejects if component loading fails, or with <code>AbortError</code> when the loading host
+is removed or its owner disposed. A rejected mount releases its slot so an
+explicit later call can try again. Observe the rejection without making page
+rendering wait for it.</p>
+<p>The generated PWA bootstrap calls this automatically using the manifest name.
+Applications need not add another floating suggestion. A separate entry point
+can call it explicitly:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {mountPwaInstallPrompt} from &#39;arcane-os/pwa&#39;;
+
+mountPwaInstallPrompt({appName: &#39;Example Library&#39;}).catch(
+    function reportInstallComponentFailure(error) {
+        console.error(error);
+    }
+);
+</code></pre></div>
+<h2 id="registerpwa">registerPwa()</h2>
+<p>Import <code>registerPwa</code> and <code>PWA_STATE_EVENT</code> from <code>arcane-os/pwa</code> through the
+managed browser import map. The generated bootstrap already calls this API;
+manual callers use it when they own a separate registration entry point.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {registerPwa} from &#39;arcane-os/pwa&#39;;
+
+const pwa = registerPwa(
+    {
+        workerUrl: new URL(&#39;./arcane-sw.js&#39;, import.meta.url).href,
+        scope: new URL(&#39;./&#39;, import.meta.url).href
+    }
+);
+
+pwa.subscribe(function showPwaState(state) {
+    console.log(state);
+});
+pwa.ready.catch(function reportRegistrationFailure(error) {
+    console.error(error);
+});
+</code></pre></div>
+<p>The function returns synchronously with <code>{ready, state, subscribe, update, dispose}</code>. <code>ready</code> settles with the native registration, or <code>null</code> when service
+workers are unavailable. A registration failure rejects it and publishes error
+state. Do not await it before rendering or confuse it with a controlled page.</p>
+<p><code>state</code> reports <code>status</code>, <code>workerUrl</code>, <code>scope</code>, <code>controller</code>, <code>installing</code>,
+<code>waiting</code>, <code>active</code>, <code>updateAvailable</code> and the complete <code>error</code> when present. Status is one of
+<code>registering</code>, <code>unsupported</code>, <code>registered</code>, <code>installing</code>, <code>waiting</code>, <code>active</code>,
+<code>error</code> or <code>disposed</code>. Native worker state fields are strings or <code>null</code>.
+<code>updateAvailable</code> starts false and latches true after a successful full refresh
+with known change evidence; later native lifecycle/error events preserve it,
+and subscriptions replay it. Duplicate worker replies and broadcasts do not
+produce another availability transition. It is page-local, not persisted in
+DBOPFS, and remains separate from native worker activation.</p>
+<p><code>subscribe(listener, {emitCurrent: true, signal} = {})</code> immediately replays the
+current state by default and returns an unsubscribe function. Subsequent state
+uses the existing Arcane event owner and <code>PWA_STATE_EVENT</code> (<code>arcane.pwa.state</code>).
+<code>update()</code> requests the browser&#39;s normal worker update check on demand, not a
+page reload or a forced resource refresh; failure is
+observable in state and through its returned promise. <code>dispose()</code> removes
+page-owned listeners and subscriptions without unregistering the persistent
+worker or deleting stored data.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#application-configuration">Application configuration</a><a href="#generated-output">Generated output</a><a href="#development-and-hosting">Development and hosting</a><a href="#updates-and-stored-data">Updates and stored data</a><a href="#installation-component">Installation component</a><a href="#getpwainstall">getPwaInstall()</a><a href="#mountpwainstallprompt">mountPwaInstallPrompt()</a><a href="#registerpwa">registerPwa()</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.51.1, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

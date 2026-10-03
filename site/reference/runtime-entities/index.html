@@ -2,27 +2,35 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
-  <meta name="description" content="The synchronized runtime ships 14 entity modules with 29 public ESM bindings. This page explains each module&#39;s capability and host assumptions. The exact constructor/function/value contracts are canonical in the Arcane shared entity inventory.">
+  <meta name="description" content="The synchronized runtime ships 14 entity modules with 30 public ESM bindings. This page explains each module&#39;s capability and host assumptions. The exact constructor/function/value contracts are canonical in the Arcane shared entity inventory, with later SDK additions documented below and in the current runtime entity inventory.">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
-  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-entities/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css?v=back-to-top"><link rel="stylesheet" href="../reference.css?v=visible-toolbar">
-  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane runtime entity modules · Arcane OS SDK"><meta property="og:description" content="The synchronized runtime ships 14 entity modules with 29 public ESM bindings. This page explains each module&#39;s capability and host assumptions. The exact constructor/function/value contracts are canonical in the Arcane shared entity inventory."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-entities/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane runtime entity modules · Arcane OS SDK"><meta name="twitter:description" content="The synchronized runtime ships 14 entity modules with 29 public ESM bindings. This page explains each module&#39;s capability and host assumptions. The exact constructor/function/value contracts are canonical in the Arcane shared entity inventory."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <title>Arcane runtime entity modules | Arcane OS SDK</title><script src="../../app.js?v=back-to-top" defer></script><script src="../reference.js" type="module"></script>
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-entities/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane runtime entity modules · Arcane OS SDK"><meta property="og:description" content="The synchronized runtime ships 14 entity modules with 30 public ESM bindings. This page explains each module&#39;s capability and host assumptions. The exact constructor/function/value contracts are canonical in the Arcane shared entity inventory, with later SDK additions documented below and in the current runtime entity inventory."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-entities/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane runtime entity modules · Arcane OS SDK"><meta name="twitter:description" content="The synchronized runtime ships 14 entity modules with 30 public ESM bindings. This page explains each module&#39;s capability and host assumptions. The exact constructor/function/value contracts are canonical in the Arcane shared entity inventory, with later SDK additions documented below and in the current runtime entity inventory."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Arcane runtime entity modules | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane runtime entity modules</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-runtime-entity-modules">Arcane runtime entity modules</h1><p class="doc-lead">The synchronized runtime ships 14 entity modules with 29 public ESM bindings. This page explains each module&#39;s capability and host assumptions. The exact constructor/function/value contracts are canonical in the Arcane shared entity inventory.</p><div class="doc-meta"><span>SDK 0.5.18</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane runtime entity modules</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-runtime-entity-modules">Arcane runtime entity modules</h1><p class="doc-lead">The synchronized runtime ships 14 entity modules with 30 public ESM bindings. This page explains each module&#39;s capability and host assumptions. The exact constructor/function/value contracts are canonical in the Arcane shared entity inventory, with later SDK additions documented below and in the current runtime entity inventory.</p><div class="doc-meta"><span>SDK 0.51.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="./" aria-current="page">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/runtime-entities.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#canonical-inventory">Canonical inventory</a><a href="#apimodelrecordjs">ApiModelRecord.js</a><a href="#calculationjs">Calculation.js</a><a href="#chatjs">Chat.js</a><a href="#communicationmessagejs">CommunicationMessage.js</a><a href="#communicationthreadjs">CommunicationThread.js</a><a href="#documentjs">Document.js</a><a href="#filejs">File.js</a><a href="#imagejs">Image.js</a><a href="#intentenvelopejs">IntentEnvelope.js</a><a href="#preferencejs">Preference.js</a><a href="#terminalsessionjs">TerminalSession.js</a><a href="#themejs">Theme.js</a><a href="#userjs">User.js</a><a href="#weatherjs">Weather.js</a><a href="#availability-and-protocol-details">Availability and protocol details</a></nav></details><p>The synchronized runtime ships 14 entity modules with 29 public ESM bindings.
+      <article class="prose reference-prose" data-reference-source="docs/reference/runtime-entities.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#canonical-inventory">Canonical inventory</a><a href="#apimodelrecordjs">ApiModelRecord.js</a><a href="#calculationjs">Calculation.js</a><a href="#chatjs">Chat.js</a><a href="#communicationmessagejs">CommunicationMessage.js</a><a href="#communicationthreadjs">CommunicationThread.js</a><a href="#documentjs">Document.js</a><a href="#filejs">File.js</a><a href="#imagejs">Image.js</a><a href="#intentenvelopejs">IntentEnvelope.js</a><a href="#preferencejs">Preference.js</a><a href="#terminalsessionjs">TerminalSession.js</a><a href="#themejs">Theme.js</a><a href="#userjs">User.js</a><a href="#weatherjs">Weather.js</a><a href="#availability-and-protocol-details">Availability and protocol details</a></nav></details><p>The synchronized runtime ships 14 entity modules with 30 public ESM bindings.
 This page explains each module&#39;s capability and host assumptions. The exact
 constructor/function/value contracts are canonical in the
-<a href="../core/arcane-entities/">Arcane shared entity inventory</a>.</p>
+<a href="../core/arcane-entities/">Arcane shared entity inventory</a>, with later SDK
+additions documented below and in the current
+<a href="../inventory/runtime-entities.json">runtime entity inventory</a>.</p>
 <p>Entity creation and serialization are usually cross-host. Methods that touch
 DOM, DBOPFS, local storage, AI, or object URLs require the corresponding browser
 or native-WebView dependency.</p>
+<p>Apps import entities with <code>arcane-os/entities/&lt;file&gt;.js</code>; the SDK-managed
+import map resolves these names through the selected runtime routes. Default
+root applications use their installed npm package directly. Absolute
+<code>/arcane/entities/...</code> examples below assume an explicitly configured physical
+or virtual <code>/arcane</code> route. Use the corresponding package specifier in direct
+npm applications; entity inputs and behavior are the same.</p>
 <h2 id="canonical-inventory">Canonical inventory</h2>
 <div class="table-wrap" data-columns="4" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
@@ -107,9 +115,9 @@ or native-WebView dependency.</p>
 </tr>
 <tr>
 <td><code>User.js</code></td>
-<td><code>default</code></td>
-<td>User preferences/profile state with DBLS/DBOPFS lifecycle.</td>
-<td>Browser/native WebView; storage behavior mixed.</td>
+<td><code>default</code>, <code>profileUpdateFromSearchParams</code></td>
+<td>User preferences/profile state and pure URL-query profile mapping.</td>
+<td>Browser/native WebView module; mapping itself has no side effects.</td>
 </tr>
 <tr>
 <td><code>Weather.js</code></td>
@@ -147,22 +155,40 @@ console.log(new Calculation({expression: &#39;2 + 2&#39;, result: 4}).toJSON());
 <p><code>ChatEntity</code> owns message history, saved state, tool exchanges, memory lookup,
 and optional app-scoped DBOPFS persistence. It installs no independent native
 authority; AI and storage dependencies must be available to the host.</p>
+<p>Each new chat receives a timestamp plus independently generated random identifier
+in its default <code>.jsonl</code> filename, so chats created during the same clock tick do
+not share a storage key. Explicit filenames and existing saved files remain
+unchanged; no saved records are renamed or migrated.</p>
 <p><code>messages</code> returns provider-facing recurring context. An unresolved structural
 call and its matching results remain raw only through their one active provider
 continuation. Once that continuation settles, <code>messages</code> replaces the protocol
 with complete ordinary visible call, public result, and assistant content.
 <code>transcript</code> returns the narrow human-readable projection owned by the durable
-storage boundary. User and assistant records contain only role, complete
-visible content, and their real timestamp. A visible tool record may
-additionally carry its public name and plain result status, while its <code>content</code>
-comes only from the tool call&#39;s required user-facing <code>message</code>. System prompts,
+storage boundary. User and assistant records contain role, complete
+visible content, and their real timestamp. An assistant record may also carry
+its application-owned display <code>name</code>. A visible tool record may
+additionally carry its public name and plain result status. A requested-call
+record uses the call&#39;s required user-facing <code>message</code>; a settled tool result
+uses its supplied public message. System prompts,
 reasoning, provider-extension fields, memory flags, raw tool calls, call IDs,
 argument objects, and raw tool returns never enter new DBOPFS writes.
 Messages added with <code>persist:false</code> participate only in their current operation;
 they are not retained in <code>messages</code>, <code>transcript</code>, memory extraction, or DBOPFS.
+Setting <code>chat.persist=false</code> applies the same rule to new additions: the append
+returns <code>false</code> before adding records to retained state or starting a write.
+Existing retained messages and saved history remain unchanged. An already
+accepted persistence write keeps its operation ownership and may finish.
 One complete nonblank assistant record is also a durable conversation entry, so
 a model-authored opening can be stored and survive maintenance before the first
 ordinary user turn. No synthetic user record is required or written.</p>
+<p><code>aiName</code> defaults to an empty string. <code>addAIMessage(text,{name=chat.aiName,...})</code>
+and <code>addTurn({name=chat.aiName,...})</code> capture that application-owned name on the
+new assistant record. A nonblank string is preserved exactly; blank or
+nonstring names are omitted. Provider <code>message.name</code> never establishes that
+display attribution. The name is transcript-only metadata: <code>messages</code> and
+memory extraction omit it, including during a pending tool continuation.
+Changing <code>aiName</code> affects later messages only; loading existing records does
+not rename or rewrite them.</p>
 <p>An assistant record may open an ordered array of structural calls with unique
 IDs in transient provider state. Until every pending ID receives exactly one
 matching nonblank <code>role:&#39;tool&#39;</code> result in the same active session, another
@@ -286,10 +312,106 @@ console.log(theme.toJSON());
 <p>Owns persisted user preference/profile fields, explicit-preference updates,
 fresh reads, saves, and JSON projection. It installs <code>window.user</code> after its
 DBLS/DBOPFS lifecycle and emits <code>user-entity-loaded</code>.</p>
+<h3 id="ainame">AI_name</h3>
+<p>Saved AI-name preference alongside <code>AI_personality</code>. It is a string with an
+empty-string default and preserves the complete supplied text, including
+Unicode, whitespace, and an explicitly empty value. The property setter follows
+the same persistence setting as <code>AI_personality</code>; non-string assignments throw
+<code>Error(&#39;AI_name must be string&#39;)</code>.</p>
+<p><code>explicit</code>, <code>toJSON()</code>, <code>load()</code>, <code>refresh()</code>, and <code>updateExplicit()</code> include
+this field through the existing profile schema. Loading an older record that
+omits it leaves a new entity&#39;s empty default in memory and does not rewrite the
+stored record. Partial updates that omit it retain the current value.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">await user.updateExplicit(
+    {AI_name: &#39;Captain Moonboots&#39;}
+);
+</code></pre></div>
+<p>The application owns naming choices and any mapping to its AI display name;
+this preference changes neither the human <code>username</code> nor chat history. No
+automatic migration or naming policy runs when it is loaded or saved.</p>
+<h3 id="updateexplicitupdate">updateExplicit(update)</h3>
+<p>Accepts an ordinary partial profile object, a JSON string, or a function
+<code>current =&gt; partialOrNull</code>. It returns <code>Promise&lt;UserEntityData&gt;</code> with the
+resulting explicit profile, retaining the existing field setters and their
+validation behavior.</p>
+<p>The function is called once after the latest durable profile has been read,
+inside the existing serialized update and Web Lock. It may return a promise.
+Return only the fields to change, or return <code>null</code> to skip the durable write
+and receive the fresh profile unchanged. This no-write meaning applies only
+to the callback result; ordinary object/string inputs and direct <code>null</code> retain
+their existing behavior. With <code>persist=false</code>, the callback uses current
+memory and performs no durable read or write.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const displayedName = user.username;
+const profile = await user.updateExplicit(function renameTheCaptain(current) {
+    if (current.username !== displayedName) return null;
+    return {username: &#39;Captain Moonboots&#39;};
+});
+</code></pre></div>
+<p>Callbacks compute a patch without mutating <code>current</code>. Do not call or await
+<code>updateExplicit()</code>, <code>withFreshExplicit()</code>, or <code>refresh()</code> on the same instance
+inside the callback: those operations depend on the current queue entry
+finishing. Fetch outside the callback; compare against <code>current</code> at the write
+boundary. Rendering and unrelated background work need not await this update.</p>
+<p>A thrown or rejected callback causes no save and rejects with the original
+error. A failed save restores the fresh baseline in memory and rejects with
+the save error. The persistence setting is restored and later queued updates
+remain usable. The existing <code>current_time</code> and <code>last_successful_time</code> setters
+keep their immediate in-memory assignment, then save only their timestamp
+field through this same fresh partial-update owner. This preserves newer
+durable profile fields when TimeGuard records a check. Automatic timestamp
+save failures are reported through Arcane logging; callers requiring durable
+completion use and await <code>updateExplicit({current_time: value})</code> or the
+corresponding <code>last_successful_time</code> partial update.</p>
+<h3 id="profileupdatefromsearchparamssearchparams">profileUpdateFromSearchParams(searchParams)</h3>
+<p>Named export from <code>arcane-os/entities/User.js</code>. Pass an existing
+<code>URLSearchParams</code>; the helper returns a new ordinary profile-update record.</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Query parameter</th>
+<th>Profile field</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>subscription</code>, otherwise <code>subscription_key</code></td>
+<td><code>subscription_key</code></td>
+</tr>
+<tr>
+<td><code>TWiN</code> (exact case)</td>
+<td><code>license_key</code></td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>username</code></td>
+</tr>
+<tr>
+<td><code>email</code></td>
+<td><code>email</code></td>
+</tr>
+<tr>
+<td><code>phone</code></td>
+<td><code>phone</code></td>
+</tr></tbody>
+</table>
+</div>
+<p>Presence selects <code>subscription</code> over the fallback, even when its first value
+is empty. Missing or empty selected values are omitted. Repeated parameters
+use their first value, following <code>URLSearchParams.get()</code>. Normal URL decoding
+occurs once when the caller creates the parameters; the helper preserves the
+decoded strings, including spaces, Unicode, literal plus signs, and leading
+zeros, without trimming, further decoding, or numeric conversion. Whitespace
+is a supplied nonempty value. Unknown keys, including <code>zipcode</code>, are ignored;
+no extra name fields are inferred.</p>
+<p>The helper does not mutate the parameters, read or change the current URL,
+hydrate, render, or save. Importing <code>User.js</code> still has its existing browser
+singleton lifecycle. Applications own URL capture/removal, manual-draft
+protection, readiness, and their awaited <code>user.updateExplicit(update)</code> call.</p>
 <h3 id="example-12">Example</h3>
-<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import UserEntity from &#39;/arcane/entities/User.js&#39;;
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {profileUpdateFromSearchParams} from &#39;arcane-os/entities/User.js&#39;;
 
-console.log(typeof UserEntity.prototype.toJSON);
+const params = new URLSearchParams(&#39;name=Captain+Moonboots&amp;phone=00123&#39;);
+const update = profileUpdateFromSearchParams(params);
+// {username: &#39;Captain Moonboots&#39;, phone: &#39;00123&#39;}
 </code></pre></div>
 <h2 id="weatherjs">Weather.js</h2>
 <h3 id="overview-13">Overview</h3>
@@ -311,6 +433,6 @@ cross the dependency named by that entity. See
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#canonical-inventory">Canonical inventory</a><a href="#apimodelrecordjs">ApiModelRecord.js</a><a href="#calculationjs">Calculation.js</a><a href="#chatjs">Chat.js</a><a href="#communicationmessagejs">CommunicationMessage.js</a><a href="#communicationthreadjs">CommunicationThread.js</a><a href="#documentjs">Document.js</a><a href="#filejs">File.js</a><a href="#imagejs">Image.js</a><a href="#intentenvelopejs">IntentEnvelope.js</a><a href="#preferencejs">Preference.js</a><a href="#terminalsessionjs">TerminalSession.js</a><a href="#themejs">Theme.js</a><a href="#userjs">User.js</a><a href="#weatherjs">Weather.js</a><a href="#availability-and-protocol-details">Availability and protocol details</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.5.18, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.51.1, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

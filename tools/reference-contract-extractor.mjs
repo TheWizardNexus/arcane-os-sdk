@@ -15,7 +15,7 @@ export const RUNTIME_DOCUMENTED_CALLABLE_MEMBERS={
     'AI.js':[
         'setAI','configureProviders','transitionAI','transitionProviders',
         'startProviders','setSpeechMuted','streamRequest','streamMessage','fetchRequest','fetch',
-        'configureTTSSegmentation','streamTTS','prepareTTS','playPreparedTTS','finishTTS','fetchSTT',
+        'configureTTSSegmentation','streamTTS','prepareTTS','prepareTTSPlayback','playPreparedTTS','finishTTS','fetchSTT',
         'stopAudio','resumeAudio','playAudio'
     ],
     'AIModelSelectionController.js':[
@@ -90,7 +90,9 @@ export const RUNTIME_DOCUMENTED_CALLABLE_MEMBERS={
         'scoreDocumentBody','scoreDocumentLexicalIndex','rank','search'
     ],
     'GifEncoder.js':['indexPixels','lzw'],
-    'HTMLImport.js':['connectedCallback'],
+    // The default is the existing registered constructor when present; its
+    // concrete class members cannot be inferred from this module alone.
+    'HTMLImport.js':[],
     'InMemoryCommunicationProvider.js':[
         'listThreads','getMessages','send'
     ],

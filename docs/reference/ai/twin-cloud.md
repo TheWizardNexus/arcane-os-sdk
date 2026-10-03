@@ -1,12 +1,24 @@
-# TWiN Cloud: one request
+# TWiN Cloud requests, images, and state evaluation
 
 Use `fetchRequest` from `arcane-os/ai/twin-cloud` for a complete TWiN Cloud
 request in Node or a browser with an explicit key and model. It imports no
 browser profile, DOM, user singleton, or storage, and starts no work on import.
 The existing browser `AI.js` interface remains available for applications that
 already use its provider selection, lifecycle, and speech. TWiN Cloud is that
-interface's default remote LLM service, named `TWIN`; speech stays on device
-and does not use the TWiN access key.
+interface's default remote LLM service, named `TWIN`. Speech is selected
+independently: applications can use local models, native browser speech, or
+[TWiN Cloud TTS](browser-speech.md#twin-cloud-text-to-speech) with an
+application-owned key reader.
+
+| Operation | Public API | Caller supplies | Result |
+| --- | --- | --- | --- |
+| Chat completion | `fetchRequest(options)` | Key, model, complete messages, and optional tools or output schema | Complete parsed provider JSON |
+| State and questions | `fetchSystemOneRequest(options)` | Key, a System One model, complete state, and questions | Complete parsed native System One response |
+| Image generation | `generateImages(options)` | Model, prompt, provider parameters, and key or key reader | Every generated image as a Blob in provider order |
+
+These functions share no retained conversation. Choose the operation supported
+by the selected model; each section below describes its own transport,
+callbacks, cancellation, and retry behavior.
 
 ## Node: explicit key, model, and structured result
 
@@ -331,17 +343,17 @@ The following browser example uses the same managed imports as the
 Create an application and start its source server:
 
 ```bash
-npx arcane-os@0.5.17 new hello-twin --path ./hello-twin --target browser
+npx arcane-os@latest new hello-twin --path ./hello-twin --target browser
 cd hello-twin
 npm install
 npm run dev
 ```
 
 Keep the generated Arcane theme and import map. Place the JavaScript below in
-`apps/hello-twin/modules/App.js`. Run it in the served browser page, not Node.
+`modules/App.js` at the application root. Run it in the served browser page.
 This first example is for the new application created above. An existing
 application must complete the saved-preference migration below before importing
-`arcane/AI` or any module that imports it.
+`arcane-os/ai` or any module that imports it.
 
 ## Supply the key at runtime and display the response
 
@@ -352,12 +364,12 @@ configuration source; do not put a real key in this module, Git, or diagnostics.
 The SDK also reads `globalThis.arcane.config.twinCloud.accessKey` when present.
 
 ```javascript
-import arcaneThemeReady from 'arcane/ThemeBootstrap';
+import arcaneThemeReady from 'arcane-os/modules/ThemeBootstrap.js';
 
 await arcaneThemeReady;
 // In an upgrade bootstrap, the existing preference owner's migration must
 // already be complete before this dynamic import evaluates AI.js.
-const { default: AI } = await import('arcane/AI');
+const { default: AI } = await import('arcane-os/ai');
 const applicationRuntime = globalThis.applicationRuntime;
 const ai = new AI();
 ai.twinKey = applicationRuntime.twinKey;
@@ -470,7 +482,7 @@ This ordering matters during module evaluation: `AI.js` installs its
 user-readiness handler immediately. If `window.user.ready` is already true, it
 can immediately read that user's preference tuple and construct `window.ai`.
 Waiting until a later `setAI()`, provider-startup call, or button click is too
-late. A static `import AI from 'arcane/AI'` evaluates before the surrounding
+late. A static `import AI from 'arcane-os/ai'` evaluates before the surrounding
 module body, even if its text appears below migration code. Keep AI and its
 importing modules out of the bootstrap's static import graph, finish the
 existing owner's migration, then cross the dynamic-import boundary:
@@ -478,7 +490,7 @@ existing owner's migration, then cross the dynamic-import boundary:
 ```javascript
 // Place these lines after the application's existing preference migration
 // has finished writing and exposing migratedTuple, not before that operation.
-const { default: AI } = await import('arcane/AI');
+const { default: AI } = await import('arcane-os/ai');
 const ai = new AI(...migratedTuple);
 ```
 

@@ -3,16 +3,16 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.5.18",
+    "sdk": "0.51.1",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
   "counts": {
-    "markdownPages": 29,
+    "markdownPages": 30,
     "collectionPages": 2,
-    "generatedPages": 87,
-    "runtimeModulePages": 85,
-    "htmlPages": 118,
+    "generatedPages": 94,
+    "runtimeModulePages": 92,
+    "htmlPages": 126,
     "inventories": 4
   },
   "pages": [
@@ -191,6 +191,12 @@
       "kind": "markdown"
     },
     {
+      "source": "docs/reference/pwa.md",
+      "output": "site/reference/pwa/index.html",
+      "route": "reference/pwa/",
+      "kind": "markdown"
+    },
+    {
       "source": "docs/reference/runtime-components.md",
       "output": "site/reference/runtime-components/index.html",
       "route": "reference/runtime-components/",
@@ -207,6 +213,21 @@
       "output": "site/reference/runtime-modules/index.html",
       "route": "reference/runtime-modules/",
       "kind": "markdown"
+    },
+    {
+      "source": "runtime/arcane/modules/AIModelSelectionController.js",
+      "output": "site/reference/runtime-modules/ai-model-selection-controller/index.html",
+      "route": "reference/runtime-modules/ai-model-selection-controller/",
+      "kind": "runtime-module",
+      "moduleClassification": "public-first-party",
+      "contractCounts": {
+        "exports": 2,
+        "reviewedCallables": 4,
+        "publicMembers": 5,
+        "literalCustomEvents": 0,
+        "directCodedFailures": 0,
+        "exportedErrorSubclasses": 0
+      }
     },
     {
       "source": "runtime/arcane/modules/AIPreferenceRuntime.js",
@@ -247,7 +268,7 @@
       "contractCounts": {
         "exports": 6,
         "reviewedCallables": 25,
-        "publicMembers": 32,
+        "publicMembers": 34,
         "literalCustomEvents": 0,
         "directCodedFailures": 0,
         "exportedErrorSubclasses": 0
@@ -291,10 +312,10 @@
       "moduleClassification": "public-first-party",
       "contractCounts": {
         "exports": 8,
-        "reviewedCallables": 19,
-        "publicMembers": 38,
+        "reviewedCallables": 20,
+        "publicMembers": 43,
         "literalCustomEvents": 0,
-        "directCodedFailures": 32,
+        "directCodedFailures": 33,
         "exportedErrorSubclasses": 0
       }
     },
@@ -569,6 +590,21 @@
       }
     },
     {
+      "source": "runtime/arcane/modules/ContinuousVoiceCapture.js",
+      "output": "site/reference/runtime-modules/continuous-voice-capture/index.html",
+      "route": "reference/runtime-modules/continuous-voice-capture/",
+      "kind": "runtime-module",
+      "moduleClassification": "public-first-party",
+      "contractCounts": {
+        "exports": 1,
+        "reviewedCallables": 0,
+        "publicMembers": 4,
+        "literalCustomEvents": 0,
+        "directCodedFailures": 0,
+        "exportedErrorSubclasses": 0
+      }
+    },
+    {
       "source": "runtime/arcane/modules/ConversationActionItems.js",
       "output": "site/reference/runtime-modules/conversation-action-items/index.html",
       "route": "reference/runtime-modules/conversation-action-items/",
@@ -590,7 +626,7 @@
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
-        "exports": 6,
+        "exports": 7,
         "reviewedCallables": 0,
         "publicMembers": 0,
         "literalCustomEvents": 0,
@@ -697,9 +733,9 @@
       "contractCounts": {
         "exports": 3,
         "reviewedCallables": 0,
-        "publicMembers": 25,
+        "publicMembers": 27,
         "literalCustomEvents": 0,
-        "directCodedFailures": 0,
+        "directCodedFailures": 1,
         "exportedErrorSubclasses": 0
       }
     },
@@ -801,8 +837,8 @@
       "moduleClassification": "public-first-party",
       "contractCounts": {
         "exports": 1,
-        "reviewedCallables": 1,
-        "publicMembers": 2,
+        "reviewedCallables": 0,
+        "publicMembers": 0,
         "literalCustomEvents": 0,
         "directCodedFailures": 0,
         "exportedErrorSubclasses": 0
@@ -869,6 +905,21 @@
       }
     },
     {
+      "source": "runtime/arcane/modules/MailApi.mjs",
+      "output": "site/reference/runtime-modules/mail-api/index.html",
+      "route": "reference/runtime-modules/mail-api/",
+      "kind": "runtime-module",
+      "moduleClassification": "public-first-party",
+      "contractCounts": {
+        "exports": 13,
+        "reviewedCallables": 0,
+        "publicMembers": 0,
+        "literalCustomEvents": 0,
+        "directCodedFailures": 0,
+        "exportedErrorSubclasses": 0
+      }
+    },
+    {
       "source": "runtime/arcane/modules/MailOutbox.mjs",
       "output": "site/reference/runtime-modules/mail-outbox/index.html",
       "route": "reference/runtime-modules/mail-outbox/",
@@ -914,6 +965,21 @@
       }
     },
     {
+      "source": "runtime/arcane/modules/MarkdownMedia.js",
+      "output": "site/reference/runtime-modules/markdown-media/index.html",
+      "route": "reference/runtime-modules/markdown-media/",
+      "kind": "runtime-module",
+      "moduleClassification": "public-first-party",
+      "contractCounts": {
+        "exports": 5,
+        "reviewedCallables": 0,
+        "publicMembers": 0,
+        "literalCustomEvents": 0,
+        "directCodedFailures": 0,
+        "exportedErrorSubclasses": 0
+      }
+    },
+    {
       "source": "runtime/arcane/modules/MarkdownSpeech.js",
       "output": "site/reference/runtime-modules/markdown-speech/index.html",
       "route": "reference/runtime-modules/markdown-speech/",
@@ -952,7 +1018,7 @@
       "contractCounts": {
         "exports": 1,
         "reviewedCallables": 1,
-        "publicMembers": 6,
+        "publicMembers": 7,
         "literalCustomEvents": 0,
         "directCodedFailures": 0,
         "exportedErrorSubclasses": 0
@@ -1072,7 +1138,7 @@
       "contractCounts": {
         "exports": 3,
         "reviewedCallables": 8,
-        "publicMembers": 11,
+        "publicMembers": 13,
         "literalCustomEvents": 0,
         "directCodedFailures": 0,
         "exportedErrorSubclasses": 0
@@ -1105,6 +1171,21 @@
         "publicMembers": 0,
         "literalCustomEvents": 0,
         "directCodedFailures": 1,
+        "exportedErrorSubclasses": 0
+      }
+    },
+    {
+      "source": "runtime/arcane/modules/PrintView.js",
+      "output": "site/reference/runtime-modules/print-view/index.html",
+      "route": "reference/runtime-modules/print-view/",
+      "kind": "runtime-module",
+      "moduleClassification": "public-first-party",
+      "contractCounts": {
+        "exports": 1,
+        "reviewedCallables": 0,
+        "publicMembers": 0,
+        "literalCustomEvents": 0,
+        "directCodedFailures": 0,
         "exportedErrorSubclasses": 0
       }
     },
@@ -1252,7 +1333,7 @@
       "contractCounts": {
         "exports": 6,
         "reviewedCallables": 1,
-        "publicMembers": 28,
+        "publicMembers": 33,
         "literalCustomEvents": 0,
         "directCodedFailures": 6,
         "exportedErrorSubclasses": 0
@@ -1370,9 +1451,24 @@
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
-        "exports": 2,
-        "reviewedCallables": 1,
+        "exports": 3,
+        "reviewedCallables": 2,
         "publicMembers": 12,
+        "literalCustomEvents": 0,
+        "directCodedFailures": 0,
+        "exportedErrorSubclasses": 0
+      }
+    },
+    {
+      "source": "runtime/arcane/modules/ThemePresentation.js",
+      "output": "site/reference/runtime-modules/theme-presentation/index.html",
+      "route": "reference/runtime-modules/theme-presentation/",
+      "kind": "runtime-module",
+      "moduleClassification": "public-first-party",
+      "contractCounts": {
+        "exports": 0,
+        "reviewedCallables": 4,
+        "publicMembers": 4,
         "literalCustomEvents": 0,
         "directCodedFailures": 0,
         "exportedErrorSubclasses": 0
@@ -1444,6 +1540,21 @@
       "route": "reference/runtime-modules/u-plot-min/",
       "kind": "runtime-module",
       "moduleClassification": "vendor",
+      "contractCounts": {
+        "exports": 0,
+        "reviewedCallables": 0,
+        "publicMembers": 0,
+        "literalCustomEvents": 0,
+        "directCodedFailures": 0,
+        "exportedErrorSubclasses": 0
+      }
+    },
+    {
+      "source": "runtime/arcane/modules/VoiceCaptureWorklet.js",
+      "output": "site/reference/runtime-modules/voice-capture-worklet/index.html",
+      "route": "reference/runtime-modules/voice-capture-worklet/",
+      "kind": "runtime-module",
+      "moduleClassification": "internal-worker",
       "contractCounts": {
         "exports": 0,
         "reviewedCallables": 0,

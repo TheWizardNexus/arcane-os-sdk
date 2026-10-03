@@ -5,9 +5,9 @@
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
     "branch": "main",
     "path": "runtime/arcane/components",
-    "sdkVersion": "0.5.18"
+    "sdkVersion": "0.51.1"
   },
-  "componentCount": 39,
+  "componentCount": 41,
   "loader": "/arcane/modules/HTMLImport.js",
   "artifacts": [
     {
@@ -77,6 +77,30 @@
       "normalization": "DOM-normalized; caller/provider results remain external"
     },
     {
+      "file": "runtime/arcane/components/browser-ai-setup.html",
+      "name": "browser-ai-setup.html",
+      "purpose": "Displays browser API availability, browser-reported GPU class, and copyable NPU/GPU flags addresses.",
+      "methods": [
+        "refresh()",
+        "checkGpu()",
+        "open()",
+        "destroy()",
+        "ready"
+      ],
+      "events": [
+        "browser-ai-setup-ready"
+      ],
+      "slots": [],
+      "dependencies": [
+        "browser-device-settings.mjs",
+        "arcane-os/logging",
+        "arcane-os/event-manager"
+      ],
+      "availability": "Browser and supported native WebViews",
+      "transport": "HTMLImport + DOM; Clipboard API and WebGPU adapter request. Settings addresses use Copy controls and appear as text if copying fails; open() copies the NPU address without navigation or an alert.",
+      "normalization": "API presence, adapter availability, explicit browser GPU class, and copy instructions normalized. Supported browser NPU and GPU flag copy controls remain available regardless of API availability, adapter class, or detection failure. A reported discrete GPU shows Already using the performance GPU. Absent type metadata shows GPU available and leaves performance selection unconfirmed. Mounting starts one adapter request; checkGpu() coalesces concurrent calls, while refresh() remains synchronous. No GPU device, model, or WebNN context is created. Adapter metadata does not establish browser flag state, the fastest physical GPU, or another page's model execution."
+    },
+    {
       "file": "runtime/arcane/components/calculator.html",
       "name": "calculator.html",
       "purpose": "Calculator keypad and result/error event surface backed by CalculatorEngine.",
@@ -125,7 +149,7 @@
     {
       "file": "runtime/arcane/components/chat.html",
       "name": "chat.html",
-      "purpose": "Shared chat, visible selected-model activation/progress, masked auto-scrolling transcript, structural tool inspection/settlement, speech, language, and conversation-timebox surface.",
+      "purpose": "Shared chat, selected-model activation/progress, complete streamed transcript, structural tool settlement, editable speech drafts, rendered printing, language, and conversation timeboxes.",
       "methods": [
         "streamMessage()",
         "setMessageProgress()",
@@ -142,6 +166,11 @@
         "pendingToolCall",
         "pendingToolCalls",
         "sendMessage()",
+        "appendDraft()",
+        "transcriptionMode",
+        "recognitionLanguage",
+        "print()",
+        "printTitle",
         "languageChanged()",
         "requestAIActivation()",
         "destroy()"
@@ -171,7 +200,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "UI/runtime state, honest model progress, complete timestamped transcript including ui_hidden stored records, user-facing structural arguments.message, nonblank all-ID tool-result restoration, collapsed complete raw inspection, ordered parallel-call replay validation, per-choice streamed/terminal complete-envelope correlation, complete nonstructural stream rendering, automatic repeated-formatting-mark removal from only the outbound speech-input copy while displayed and stored Markdown stays exact, generic visible failure outcomes with complete console diagnostics, atomic executed/declined/cancelled/not-executed result batches with one continuation, plural pending-call reload recovery, reentrant terminal-event ownership, and BFCache-preserving page lifecycle are normalized; destroy aborts observation and returns true once/false thereafter; AI/storage/media behavior remains mixed"
+      "normalization": "Default completed-transcription submit or opt-in transcriptionMode=draft, complete appendDraft text with preserved existing selection, native interim-range ownership, and rendered conversation print/printTitle are normalized. No-retention submissions stay outside transcript, recurring context, memory, and DBOPFS. UI/runtime state, honest model progress, complete timestamped transcript including ui_hidden stored records, exact saved nonblank assistant display names with AI fallback rather than current-name inference, live session name capture with host.aiName display fallback, user-facing structural arguments.message, nonblank all-ID tool-result restoration, collapsed complete raw inspection, ordered parallel-call replay validation, per-choice streamed/terminal complete-envelope correlation, complete nonstructural stream rendering, automatic repeated-formatting-mark removal from only the outbound speech-input copy while displayed and stored Markdown stays exact, generic visible failure outcomes with complete console diagnostics, atomic executed/declined/cancelled/not-executed result batches with one continuation, plural pending-call reload recovery, reentrant terminal-event ownership, and BFCache-preserving page lifecycle are normalized; destroy aborts observation and returns true once/false thereafter; AI/storage/media behavior remains mixed"
     },
     {
       "file": "runtime/arcane/components/conversation-view.html",
@@ -248,10 +277,12 @@
     {
       "file": "runtime/arcane/components/data-view.html",
       "name": "data-view.html",
-      "purpose": "Opens a generic modal-style data view around an injected provider.",
+      "purpose": "Opens a modal file view and forwards application-owned preview and directory-filter callbacks to the shared file manager.",
       "methods": [
         "beforeOpen()",
         "open()",
+        "close()",
+        "printPreview()",
         "destroy()"
       ],
       "events": [
@@ -263,7 +294,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "DOM-native result"
+      "normalization": "DOM-native result. close() closes the child preview before the containing dialog and preserves the settled preview if closure is refused; printPreview() delegates to the active child print view. Forwards previewDescriptor, previewTransform, directoryFilter, data-hidden-prefixes, and data-show-hidden before the child file manager first loads; reopening refreshes them before loadAll. beforeOpen runs before those values are consumed. The child owns neutral preview rendering, cancellation, and media cleanup; destroy also destroys the child and modal."
     },
     {
       "file": "runtime/arcane/components/directory-picker.html",
@@ -372,13 +403,16 @@
     {
       "file": "runtime/arcane/components/file-manager.html",
       "name": "file-manager.html",
-      "purpose": "Browses, filters, selects, opens, and acts on app-scoped files.",
+      "purpose": "Browses app-scoped files, filters directories before reads, and renders application-described complete document, conversation, collection, and media previews.",
       "methods": [
         "setProvider()",
         "loadAll()",
         "setFilter()",
+        "setDirectoryFilter()",
         "select()",
         "clearSelection()",
+        "close()",
+        "printPreview()",
         "destroy()"
       ],
       "events": [
@@ -391,11 +425,12 @@
       "dependencies": [
         "DBOPFS.js",
         "File.js",
+        "MD.js",
         "WaitForComponent.js"
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "Selection/filter state normalized; storage/provider behavior mixed"
+      "normalization": "Rendered printPreview() awaits selected-view readiness and preserves resources through afterprint. close() cancels pending opening and releases the settled preview only after successful closure. Declared image records in JSON-family files decode through MarkdownMedia while ordinary JSON and application preview hooks keep their presentation. Selection/filter state and neutral previews normalized; storage/provider behavior mixed. Initial directoryFilter and setDirectoryFilter(fn|null) use false-only exclusion before built-in DBOPFS key/metadata reads; data-hidden-prefixes also applies to directories unless data-show-hidden is present. Existing file predicates preserve their first argument and receive optional directory/fileName/path/layout context. previewDescriptor(original File,{directory,fileName,extension,path,mimeType,signal}) may asynchronously return text/markdown/html/json content, conversation messages with role/content/real timestamp and optional name/status, collection items, or image/audio/pdf/download content as Blob/File or a lazy ({signal}) loader. Assistant conversation labels use the exact nonblank string name or AI without a role suffix; other role labels retain existing name/role presentation. User and assistant cards have distinct theme backgrounds and preserve data-role. Downloads require fileName; descriptors accept title and images accept alt. Lazy items load only on explicit request and retain item-local retry. Close, replacement, and destroy abort the preview signal, suppress late output, remove iframe srcdoc, stop audio, and revoke all owned object URLs. HTML preserves the exact string in iframe srcdoc; HTML/Markdown MIME fallback supports extensionless files. Nullish descriptors preserve previewTransform for JSON-family files and native previews; untransformed JSONL/NDJSON retains complete raw text, and other binary files download the original File."
     },
     {
       "file": "runtime/arcane/components/header.html",
@@ -489,11 +524,13 @@
     {
       "file": "runtime/arcane/components/markdown-editor.html",
       "name": "markdown-editor.html",
-      "purpose": "Configurable Markdown authoring, toolbar, preview, title, and save surface.",
+      "purpose": "Markdown authoring, toolbar, live media preview, plain-text title, insertion, rendered printing, and saving, with optional input/preview panes and edit-position following.",
       "methods": [
         "configure()",
         "focus()",
         "clear()",
+        "insertMarkdown()",
+        "print()",
         "saveEntry()",
         "destroy()"
       ],
@@ -509,7 +546,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "Editor values normalized; injected save result mixed"
+      "normalization": "insertMarkdown(text) replaces the current selection through the existing complete change lifecycle; print() captures the rendered preview without saving. Local MarkdownMedia images hydrate independently and remain owned through print. Editor values and optional presentation behavior normalized; injected save result mixed. fit and followPreview default false, preserve omitted prior configuration, and accept explicit false resets; data-fit and data-follow-preview select the initial options. Fit requires an application-bounded host and provides independent input/preview scrolling in roomy columns or narrow stacked panes without changing the application shell. Following responds to body typing/format edits, leaves manual preview scrolling independent until the next edit, and does not treat title edits or programmatic value replacement as follow requests. Preview rendering preserves the current source viewport and selection; configuration/value replacement retain source offsets and applicable selection positions, and layout changes never reattach the textarea. Formatting selects the formatted text without panning the source or its ancestors. Native typing, keyboard selection, and manual source scrolling remain independent without deferred scroll restoration. Public parts editor/title/toolbar/input/preview/actions/status/save-action allow application styling while the title stays native plain text. Existing controls, complete save payload, save cancellation, and destruction behavior remain."
     },
     {
       "file": "runtime/arcane/components/media-embed.html",
@@ -620,6 +657,36 @@
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
       "normalization": "Normalized form values"
+    },
+    {
+      "file": "runtime/arcane/components/pwa-install.html",
+      "name": "pwa-install.html",
+      "purpose": "Presents independent installation and explicit update/reload actions with floating or inline placement.",
+      "methods": [
+        "configure()",
+        "install()",
+        "dismiss()",
+        "update()",
+        "dismissUpdate()",
+        "destroy()",
+        "state",
+        "ready"
+      ],
+      "events": [
+        "pwa-install-ready",
+        "pwa-install-change",
+        "pwa-install-dismissed"
+      ],
+      "slots": [],
+      "dependencies": [
+        "strong-type",
+        "arcane-os/pwa",
+        "arcane-os/event-manager",
+        "arcane-os/logging"
+      ],
+      "availability": "Installation requires beforeinstallprompt; a completed changed refresh independently enables the Update action",
+      "transport": "HTMLImport + DOM; shared PWA owner, browser-native install prompt and explicit ordinary page reload",
+      "normalization": "Complete labels and independent installation/update state; update dismissal is page-local, and native unload cancellation leaves Update available"
     },
     {
       "file": "runtime/arcane/components/record-timeline.html",
@@ -733,7 +800,7 @@
     {
       "file": "runtime/arcane/components/speech.html",
       "name": "speech.html",
-      "purpose": "Coordinates explicit speech-to-text activation, request cancellation, speech controls, transcription completion, mute state, and microphone availability.",
+      "purpose": "Coordinates selected speech providers, native recognition language and live progress, transcription completion, cancellation, TTS mute state, and microphone availability.",
       "methods": [
         "configure()",
         "setMuted()",
@@ -743,10 +810,13 @@
         "availability",
         "muted",
         "initialMuted",
+        "recognitionLanguage",
+        "displayTranscription",
         "componentReady"
       ],
       "events": [
         "speech-ready",
+        "speech-transcription-progress",
         "speech-transcription-complete",
         "speech-transcription-error",
         "speech-transcription-cancelled",
@@ -765,7 +835,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "UI/runtime state, explicit STT activation intent, request-owned cancellation, capture generation/operation correlation, and BFCache-preserving page lifecycle are normalized; pending release retires only its generation and stale permission settlement cannot clear a newer retry; persisted pageshow resynchronizes mute state and rerenders retained controls/status, while nonpersisted pagehide destroys; provider/model authority and media behavior remain external"
+      "normalization": "Explicit native recognition emits cumulative final text and transient interim hypotheses with the original capture operationId. recognitionLanguage accepts exact BCP47 tags independently of conversation language; the desktop live-mode picker opens with all suggestions and filters only after editing. displayTranscription defaults true and may be disabled when Chat owns its editable draft. UI/runtime state, explicit STT activation intent, request-owned cancellation, capture generation/operation correlation, and BFCache-preserving page lifecycle are normalized; pending release retires only its generation and stale permission settlement cannot clear a newer retry; persisted pageshow resynchronizes mute state and rerenders retained controls/status, while nonpersisted pagehide destroys; provider/model authority and media behavior remain external"
     },
     {
       "file": "runtime/arcane/components/summary-strip.html",
@@ -936,12 +1006,14 @@
     {
       "file": "runtime/arcane/components/voice-transcription.html",
       "name": "voice-transcription.html",
-      "purpose": "Records segmented microphone audio only after authoritative STT admission, exposes explicit selected-STT activation, transcribes with cancellation, persists, and completes a combined transcript.",
+      "purpose": "Records manual or continuous microphone input, including explicitly selected native recognition, with complete live output, ordered transcription and saves, retained failures, retry, and cancellation.",
       "methods": [
         "configure()",
         "requestSTTActivation()",
         "startRecording()",
         "stopRecording()",
+        "retryTranscription()",
+        "cancelRecording()",
         "save()",
         "completeTranscription()/complete()",
         "clear()",
@@ -952,6 +1024,8 @@
         "voice-transcription-ready",
         "voice-transcription-state",
         "voice-transcription-segment",
+        "voice-transcription-empty",
+        "voice-transcription-error",
         "voice-transcription-change",
         "voice-transcription-complete",
         "speech-transcription-complete",
@@ -964,11 +1038,12 @@
         "MD.js",
         "ComponentContracts.js",
         "AIRuntimeState.js",
+        "ContinuousVoiceCapture.js",
         "AI.js"
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "Sticky runtime STT readiness, explicit activation, request cancellation, state/text, and BFCache-preserving page lifecycle are normalized; persisted pageshow rerenders retained state without restarting work, while nonpersisted pagehide destroys; media/provider behavior remains external"
+      "normalization": "Selected native recognition puts canonical text, queued final segments, and transient interim text in the existing live output in order; only confirmed text enters value and the ordered save queue. Native stop drains final results; browser end does not restart capture. Sticky STT readiness and explicit activation; default manual capture; optional continuous amplitude-based capture with rolling pre-roll, ordered STT/save stages, retained failures, save-only retry, sequence-bearing segment events, and capture/processing/queued/errorPhase/error state. Complete text remains exact. Continuous stop flushes and drains; explicit cancel, transcript/configuration replacement, and destruction abort outstanding work and suppress late effects. Persisted pagehide stops and flushes continuous capture while retaining component state; persisted pageshow rerenders without restarting capture; nonpersisted pagehide destroys. Media/provider behavior remains external."
     },
     {
       "file": "runtime/arcane/components/weather-widget.html",

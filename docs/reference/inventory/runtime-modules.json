@@ -5,12 +5,12 @@
     "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
     "branch": "main",
     "path": "runtime/arcane",
-    "sdkVersion": "0.6.0",
+    "sdkVersion": "0.51.1",
     "protocol": "arcane/1"
   },
-  "artifactCount": 89,
-  "javascriptArtifactCount": 87,
-  "esmExportCount": 357,
+  "artifactCount": 92,
+  "javascriptArtifactCount": 90,
+  "esmExportCount": 372,
   "artifacts": [
     {
       "file": "runtime/arcane/modules/AI.js",
@@ -30,7 +30,7 @@
       "availability": "Browser + native bridge + TWiN Cloud",
       "protocol": "arcane-ai-browser-speech-configuration/1, AIProviderRuntime arcane-ai-provider/2 routes, globalThis.arcaneEvents, TWiN Cloud HTTPS, Arcane.ollama, Arcane.speech, Android WebView bridge",
       "normalization": "Complete mutable caller-owned browser speech authority, SDK-owned provider registration/replacement/disposal, explicit STT/TTS activation, normalized Whisper STT and Kokoro TTS execution with default capacities 1 and 4 respectively, explicit provider-neutral execution snapshots through status(role,{execution:true}), sticky readiness, canonical window.user readiness without compatibility-event object-identity admission or polling, exact ordered structural calls with required arguments.message, atomic nonblank all-ID tool-result sequencing, complete all-choice streaming/data validation, native Ollama structural adaptation, complete-response then all validated tool callbacks then completion ordering, observed async callbacks, Blob/File transcription, automatic repeated-formatting-mark removal from cloned outbound TTS input while caller and visible content stays exact, immediate exact-segment synthesis, per-call voice/speed capture, optional final-segment pause on the existing audio clock, optional per-call terminal playback completion, detached preparation with complete semantic DBOPFS audio reuse and same-owner pending request sharing, independent prepared playback without a model load for cached audio, ordered audio-clock scheduling, playable audio, active-generation TTS operation-failure routing, mute, and cancellation are normalized; provider/model/runtime/voice policy remains caller-owned. Both speech roles default execution.device to auto: webnn-npu when navigator.ml.createContext is exposed, then webgpu when navigator.gpu is exposed, then wasm for CPU execution. Failed backend loads clean up the pool before trying fresh Workers with the same prepared model and dtype; explicit devices never fall back. STT capacity only accepts 1; TTS accepts 1 through 4. Execution snapshots expose requestedDevice, selectedDevice, maxConcurrentRequests, and activeRequestCount for both roles; selectedDevice is null while unloaded and names the successful upstream session backend request when loaded. It does not prove every operation used the physical NPU: WebNN unsupported operations may use WASM, and compatibility depends on the browser, driver, hardware, and graph.",
-      "surface": "Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; explicit `providerRuntime.status(role,{execution:true})` snapshots; `streamTTS(text,end,options={})` with optional voice, speed, pauseAfterMs, and waitForPlayback; automatic speech-input cleanup with SDK-internal preparation metadata; `prepareTTS({parts,storage,identity,signal,onState})` returning ordered segments, state, ready, getAudio(index), and cancel(); `playPreparedTTS(prepared,{signal,onState})` returning state, error, finished, pause(), resume(), and stop() with one playback lane per AI and observational state/error callbacks; configure/dispose speech, route lifecycle, declaration-validated chat/stream requests with exact ordered calls; optional streamRequest toolText:{name,field} and onToolText(text,call,displayId) for decoded selected argument text with actual call identity, distinct from ordinary prose and terminal tool execution; synthesis/transcription and playback controls; initializes from current canonical user readiness, installs `window.ai`, and projects `ai-ready` plus active-generation `ai-tts-failure`."
+      "surface": "prepareTTSPlayback(payload,signal) silently returns a real Blob or native-speech descriptor; native controls expose finished/released/state/error/pause/resume/stop, and actual release owns the playback lane. fetchTTS and durable prepareTTS report ARCANE_AI_TTS_AUDIO_EXPORT_UNAVAILABLE for native voices. Request-local model overrides remain exact and never mutate the configured model. Browser-speech protocol/event/error/reason constants; default `AI`; read-only `providerRuntime`, `browserSpeechConfiguration`, and `browserSpeechDescriptor`; explicit `providerRuntime.status(role,{execution:true})` snapshots; `streamTTS(text,end,options={})` with optional voice, speed, pauseAfterMs, and waitForPlayback; automatic speech-input cleanup with SDK-internal preparation metadata; `prepareTTS({parts,storage,identity,signal,onState})` returning ordered segments, state, ready, getAudio(index), and cancel(); `playPreparedTTS(prepared,{signal,onState})` returning state, error, finished, pause(), resume(), and stop() with one playback lane per AI and observational state/error callbacks; configure/dispose speech, route lifecycle, declaration-validated chat/stream requests with exact ordered calls; optional streamRequest toolText:{name,field} and onToolText(text,call,displayId) for decoded selected argument text with actual call identity, distinct from ordinary prose and terminal tool execution; synthesis/transcription and playback controls; initializes from current canonical user readiness, installs `window.ai`, and projects `ai-ready` plus active-generation `ai-tts-failure`."
     },
     {
       "file": "runtime/arcane/modules/AIModelSelectionController.js",
@@ -801,6 +801,31 @@
       "surface": "default `Mail`, `resolveMailConfig()`; installs `window.mail`; `send()`."
     },
     {
+      "file": "runtime/arcane/modules/MailApi.mjs",
+      "name": "MailApi.mjs",
+      "kind": "esm",
+      "exports": [
+        "MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS",
+        "MAIL_OUTBOX_PROTOCOL",
+        "MAIL_OUTBOX_STATES",
+        "MAIL_OUTBOX_TABLE",
+        "Mail",
+        "MailOutbox",
+        "MailTransportError",
+        "createMailOutbox",
+        "default",
+        "normalizeMailEndpoint",
+        "resolveMailConfig",
+        "sendMailReport",
+        "serializeMailReport"
+      ],
+      "summary": "Re-exports renderer Mail, durable outbox, and HTTP transport APIs through the public mail entrypoint.",
+      "availability": "Browser/native renderer; each re-export retains its owning module's host requirements",
+      "protocol": "Mail configuration and Arcane.mail.send or HTTP(S); arcane-mail-outbox/1",
+      "normalization": "Preserves the complete contracts of Mail.js, MailOutbox.mjs, and MailTransport.mjs without creating another transport or queue. Import retains Mail.js singleton installation in a browser window.",
+      "surface": "Default and named Mail, resolveMailConfig, MailOutbox/createMailOutbox and its four constants, MailTransportError, normalizeMailEndpoint, serializeMailReport, and sendMailReport."
+    },
+    {
       "file": "runtime/arcane/modules/MailOutbox.mjs",
       "name": "MailOutbox.mjs",
       "kind": "esm",
@@ -834,6 +859,23 @@
       "protocol": "HTTP(S) fetch + AbortController",
       "normalization": "Endpoint, timeout, cancellation, network, HTTP, and response-contract errors are normalized.",
       "surface": "`MailTransportError`, `normalizeMailEndpoint()`, `serializeMailReport()`, and `sendMailReport()`."
+    },
+    {
+      "file": "runtime/arcane/modules/MarkdownMedia.js",
+      "name": "MarkdownMedia.js",
+      "kind": "esm",
+      "exports": [
+        "decodeMarkdownMediaRecord",
+        "hydrateMarkdownMedia",
+        "parseMarkdownMediaReference",
+        "readMarkdownMedia",
+        "saveMarkdownMedia"
+      ],
+      "summary": "Stores complete local image records separately from Markdown and hydrates their stable references in rendered views.",
+      "availability": "Browser/native WebView with Blob, DOM, object URLs, and application-owned DBOPFS for storage operations",
+      "protocol": "arcane-media references, complete mediaType/dataUrl records, and DBOPFS",
+      "normalization": "Pure record decoding preserves complete content and singleton record layers. Hydration starts independent reads, removes unresolved local image sources before insertion, preserves successful siblings after an image failure, and owns cancellation, display URLs, and retained print resources.",
+      "surface": "saveMarkdownMedia({blob,tableName,fileName}), parseMarkdownMediaReference(reference), decodeMarkdownMediaRecord(value), readMarkdownMedia(reference), and hydrateMarkdownMedia(root,{signal}) returning ready/destroy/retain."
     },
     {
       "file": "runtime/arcane/modules/MarkdownSpeech.js",
@@ -1010,7 +1052,7 @@
       "availability": "Browser or native WebView with the projected ChatEntity, DBOPFS, and a configured chat function or normalized Arcane.ai surface",
       "protocol": "Existing ChatEntity/DBOPFS methods plus provider-neutral chat request/result records",
       "normalization": "Preserves complete ordinary visible recurring provider history, one active raw structural continuation, every sanitized timestamped transcript record, and arbitrary nonempty caller-owned chat file names; commits live context atomically; falls back from optional streaming to configured non-stream transport; carries per-turn generation options while owning lifecycle callbacks; exposes complete data callbacks; accepts terminal-only structural calls; correlates every observed per-choice call against the exact validated terminal envelope before callback/persistence; atomically settles every pending ID once; and keeps malformed stored records readable without inventing or rewriting messages.",
-      "surface": "Default/named `PersistentAIChatSession`, `createPersistentAIChatSession()`; `create()`, `ai`, `chatEntity`, `fileName`, `ready()`, `history()`, `transcript()`, `settleMemory()`, `open()`, `send()`, and `stream()`. Optional constructor aiName and getter/setter accept a string; open/send/stream capture it before their first await. A nonblank application name is preserved exactly on the copied terminal message and retained assistant transcript, with the actual assistant record timestamp when available. Complete raw providerResponse stays unchanged; configured model context and memory omit the application display name. Existing history is never renamed or rewritten, and persist:false remains operation-only."
+      "surface": "Per-turn persist:false and chatEntity.persist=false retain neither request nor response after the active operation; completed send/stream results expose retained outside provider content. New durable records contain role/content/timestamp and optional application display name or public tool name/status; existing stored records remain untouched. Default/named `PersistentAIChatSession`, `createPersistentAIChatSession()`; `create()`, `ai`, `chatEntity`, `fileName`, `ready()`, `history()`, `transcript()`, `settleMemory()`, `open()`, `send()`, and `stream()`. Optional constructor aiName and getter/setter accept a string; open/send/stream capture it before their first await. A nonblank application name is preserved exactly on the copied terminal message and retained assistant transcript, with the actual assistant record timestamp when available. Complete raw providerResponse stays unchanged; configured model context and memory omit the application display name. Existing history is never renamed or rewritten, and persist:false remains operation-only."
     },
     {
       "file": "runtime/arcane/modules/PreferenceStore.js",
@@ -1041,6 +1083,19 @@
       "protocol": "In-process preparation handle plus caller-owned DBOPFS raw audio and version-1 semantic manifest",
       "normalization": "Preserves complete original parts and JSON-compatible semantic context, shares pending matching work on the same owner/storage group, admits segments in order, stores complete Blobs and MIME metadata, retains successful audio after failure or cancellation, and separates generation readiness from playback.",
       "surface": "Named prepareSpeech({owner,parts,originalParts,selection,segmentation,storage,identity,signal,onState,synthesize}) returns {segments,state,ready,getAudio(index),cancel()}; applications use AI.prepareTTS and AI.playPreparedTTS so the shared AI owner retains segmentation, provider readiness, capacity, and playback."
+    },
+    {
+      "file": "runtime/arcane/modules/PrintView.js",
+      "name": "PrintView.js",
+      "kind": "esm",
+      "exports": [
+        "createPrintView"
+      ],
+      "summary": "Prints complete current rendered content through one document-owned print lifecycle and shared print stylesheet.",
+      "availability": "Browser/native WebView with DOM, Fetch, and browser printing",
+      "protocol": "DOM snapshots, beforeprint/afterprint, and shared css/print.css",
+      "normalization": "Explicit requests await view-owned preparation; native Print captures synchronously. Rendered content, fonts, images, and resource retention remain complete. A true print result confirms only a requested browser dialog; snapshots and retained media survive until afterprint.",
+      "surface": "createPrintView({host,content,title,active,priority,signal,onError,retain,prepare}) returns print() and destroy(). Import awaits the required shared print stylesheet."
     },
     {
       "file": "runtime/arcane/modules/QRCode.min.js",
@@ -1194,9 +1249,9 @@
       ],
       "summary": "Preserves exact nonblank stored segment text; removes repeated formatting marks from only each outbound synthesis copy; eagerly submits complete parts to a capacity-advertising fetchTTS provider while keeping playback indexed; and retains serialized one-segment lookahead for other clients.",
       "availability": "Browser + compatible AI/native bridge",
-      "protocol": "AI.fetchTTS plus providerRuntime TTS execution capacity, or compatible serialized Arcane.speech.synthesize; globalThis.arcaneEvents, Blob URLs, audio element",
+      "protocol": "AI.prepareTTSPlayback or AI.fetchTTS plus providerRuntime TTS execution capacity, native provider.prepare, or compatible serialized Arcane.speech.synthesize; globalThis.arcaneEvents, Blob URLs/audio element, and native playback controls",
       "normalization": "Exact nonblank split/part input strings are preserved in mutable records. Each synthesis request clones that part, removes repeated formatting marks from only the outbound input, and carries SDK-internal preparation metadata to prevent a second cleanup pass. A capable provider receives complete segments immediately and owns bounded FIFO admission; URLs and playback stay in exact input order. Native/custom clients remain serialized. Canonical state dispatch precedes the optional synchronous onState callback. Cancellation, Replay recovery, Blob results, and lifecycle state are normalized; provider failures remain external.",
-      "surface": "SpeechPlayback class/default, mutable `SPEECH_VOICE_OPTIONS` records, mutable `SPEECH_VOICE_ALIASES` membership, `SPEECH_PLAYBACK_STATE_EVENT`, optional constructor `onState(detail)`, `splitSpeechText()`, canonical playback lifecycle events, cancellation, and destroy APIs."
+      "surface": "prepareTTSPlayback or direct native provider.prepare may return silent native-speech descriptors. autoplay:false stays silent; actual completion advances ordered parts and failed cancellation retains controls until released. Replay preserves completed segments and retries only missing failed generation. SpeechPlayback class/default, mutable `SPEECH_VOICE_OPTIONS` records, mutable `SPEECH_VOICE_ALIASES` membership, `SPEECH_PLAYBACK_STATE_EVENT`, optional constructor `onState(detail)`, `splitSpeechText()`, canonical playback lifecycle events, cancellation, and destroy APIs."
     },
     {
       "file": "runtime/arcane/modules/StaticDocumentCatalog.js",

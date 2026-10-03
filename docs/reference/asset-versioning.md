@@ -1,50 +1,46 @@
-# Release-derived browser asset URLs
+# Clean browser resource URLs
 
-Applications that enable [PWA delivery](pwa.md) use clean local resource URLs.
-Their generated offline manifest and service worker own the selected application
-and SDK release information. In that mode, the delivery transformer removes
-only the SDK-owned `arcaneVersion` field, preserving authored query fields and fragments.
-The behavior below continues to apply when PWA delivery is disabled and to native
-packages. Workspace runtime materialization remains usable by either target;
-the selected browser delivery applies its PWA URL policy.
+The SDK's managed import maps, source server and application packager use clean
+local resource URLs for PWA, non-PWA and native delivery. Their shared
+transformation removes the SDK-owned `arcaneVersion` field. It never appends a
+release version to those URLs. Enabled [PWA delivery](pwa.md) records the
+application and SDK versions in its generated offline manifest and worker.
 
-The SDK's public import-map generator, runtime materializer, source server and
-application packager use the selected SDK package version for local browser
-resource references. The query field is `arcaneVersion`. Its value comes from
-SDK package metadata, not a timestamp, content measurement, or application
-constant.
-
-For example, an existing `./arcane/modules/HTMLImport.js?v=6#module` reference
-becomes `./arcane/modules/HTMLImport.js?v=6&arcaneVersion=${version}#module`.
-`arcaneVersion` is the SDK's resource version field: transformation updates its
-first existing value and removes duplicate `arcaneVersion` fields, or appends it
-when absent. Regenerating for another SDK release replaces only that SDK value.
+For example,
+`./node_modules/arcane-os/runtime/arcane/modules/HTMLImport.js?v=6&arcaneVersion=0.51.1#module`
+becomes
+`./node_modules/arcane-os/runtime/arcane/modules/HTMLImport.js?v=6#module`.
+Every SDK-owned field is removed, including duplicate and encoded spellings.
 Authored fields, including `v`, encoded keys and values, repeated or empty query
-segments, their source spelling, and fragments remain intact.
+segments, their source spelling, and fragments remain intact. Remote URLs and
+fragment-only references retain their existing value.
 
 ## Public tooling
 
 - Run the installed SDK's `materializeInstalledSdkRuntime()` to refresh the
-  workspace runtime from that installation. Its generated local resource
-  references use the installed package version, including npm aliases.
+  physical workspace runtime from that installation. It copies the complete
+  selected runtime; direct installed-package workspaces read their npm routes
+  without requiring this copy.
 - Run `arcane import-map` through the installed SDK to regenerate the managed
   import map and its application HTML. Named SDK imports and URL-shaped module
-  entries point to versioned resources.
+  entries point to the selected clean resource URLs.
 - `arcane dev` applies the same reference transformation to served source
-  without editing the source files. An explicit live SDK source mount uses the
-  version in that source checkout's `package.json`. Otherwise it uses the
-  materialized SDK version recorded by the workspace's existing semantic lock.
-- The application packager applies resource versioning after its selected
-  adapter finishes. The resulting application can be served by an ordinary
+  without editing the source files. An explicit live SDK source mount changes
+  the source of those resources. PWA release metadata still identifies the
+  selected source or installed SDK version.
+- The application packager applies the clean-URL transformation after its
+  selected adapter finishes. The resulting application can be served by an ordinary
   static host without a JavaScript transformation service.
 
 The shared transformation edits actual local module imports, resource URL
 construction, HTML resource attributes and CSS resource references. It does not
 change displayed text, prompts, application data, downloaded model content,
 remote provider URLs, or arbitrary strings that happen to resemble filenames.
-Worker entry references and their local module imports are versioned separately:
-Workers do not inherit a document's import map. `HTMLImport` carries its own
-release query into local dynamically loaded components and their resources.
+Worker entry references and their local module imports are handled at their
+own resource boundaries because workers do not inherit a document's import map.
+`HTMLImport` removes the SDK-owned field from same-origin component resource
+references and resolves SDK component resources from the component's actual
+runtime root, including direct installed-package paths.
 
 Computed application URLs that have no statically identifiable resource
 reference remain application-owned expressions. The SDK does not intercept
@@ -55,7 +51,7 @@ an exact matching computed module URL, but is not a wildcard query rule.
 
 The SDK server sends `Cache-Control: no-cache` for application entry/managed
 HTML and managed import-map JSON. This allows storage but requests revalidation, so an ordinary navigation
-or refresh obtains the current entry document and release URLs. Other assets
+or refresh obtains the current entry document and clean resource URLs. Other assets
 retain ordinary caching; no cache or user storage is cleared.
 
 For PWA delivery the SDK server revalidates all served resources, including
@@ -64,12 +60,13 @@ revalidate stable resource URLs. The service worker maintains its own selected
 offline resource cache independently of the HTTP cache.
 
 An independently configured static host must likewise revalidate entry HTML
-and managed import-map JSON. The generated package supplies versioned resource
-references; it cannot configure another server's HTTP headers.
+and managed import-map JSON, and set resource caching appropriate to its delivery
+workflow. The generated package supplies clean resource references; it cannot
+configure another server's HTTP headers.
 
-An already-open document keeps modules it has evaluated. Versioned references
-take effect on ordinary navigation or refresh; they do not replace live module
-instances, force a reload, restart a model, or erase a conversation. The SDK does
+An already-open document keeps modules it has evaluated. Changed files become
+available through ordinary navigation and cache revalidation; they do not replace
+live module instances, force a reload, restart a model, or erase a conversation. The SDK does
 not retain earlier installed runtime trees after materialization.
 
 `HTMLImport` registers its element once per browser custom-element registry.

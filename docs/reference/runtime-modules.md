@@ -2,7 +2,17 @@
 
 Every file shipped under `runtime/arcane/modules/` appears here. Start with the capability and example; expand into [protocol and host architecture](protocols.md) only when transport detail matters.
 
-Apps import renderer ESM from `/arcane/modules/<file>`. Classic scripts, the OPFS worker, uPlot stylesheet, and vendor license are called out explicitly. Importing a module does not grant a native capability.
+Apps import renderer ESM with `arcane-os/modules/<file>`, including the `.js`
+or `.mjs` extension. The SDK-managed import map resolves that name through the
+application's selected runtime routes. Root applications use the installed
+npm package directly by default. Absolute `/arcane/modules/<file>` examples
+below describe an explicitly configured physical or virtual `/arcane` route;
+that directory is not required by a direct npm layout.
+
+Classic scripts, the OPFS worker, uPlot stylesheet, and vendor license use
+their actual configured asset URLs and are called out separately. Importing a
+module does not grant a native capability. See [installed-package browser
+routes](protocols.md#installed-package-browser-routes) for route selection.
 
 Applications own response-detail preferences, their saved values, and any
 verbosity instruction appended to the system prompt. The former
@@ -94,6 +104,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`LocalAIReadiness.js`](#localaireadinessjs) | esm | Derives selected AI requirements and returns a complete readiness/recovery report across browser, desktop, and Android modes. | Browser/native hybrid | Fully normalized report and stable error codes; browsers never probe Ollama. |
 | [`LocalAIReadinessController.js`](#localaireadinesscontrollerjs) | esm | Coordinates local-AI status component checks, ensured recovery, availability projection, and teardown. | Browser/native hybrid | Normalized controller state and change events. |
 | [`Mail.js`](#mailjs) | esm | Builds complete reports and prefers the native mail capability with an explicit HTTP transport fallback. | Browser/native hybrid + cloud | Mail inputs/results normalized; transport failures mixed. |
+| [`MailApi.mjs`](#mailapimjs) | esm | Public renderer entrypoint for Mail, durable outbox, and HTTP transport APIs. | Browser/native renderer | Re-exports preserve their owning module's contracts. |
 | [`MailOutbox.mjs`](#mailoutboxmjs) | esm | Persists complete mail reports before delivery and normalizes idempotent enqueue, retry, reconciliation, and invalid-record maintenance. | Browser/native WebView or compatible injected host | Complete records, full work, cancellation, and lifecycle states normalized; storage, lock, and delivery failures coded. |
 | [`MailTransport.mjs`](#mailtransportmjs) | esm | Sends one complete mail report to a normalized HTTP(S) endpoint. | Browser/server with fetch + cloud | Normalized endpoint and transport errors; remote detail preserved. |
 | [`MarkdownMedia.js`](#markdownmediajs) | esm | Saves local Markdown images separately, decodes complete stored records, and resolves stable references in rendered views. | Browser / supported native WebView | Complete image records, concurrent display reads, cancellation, and print-owned URL lifetime. |
@@ -2485,7 +2496,11 @@ Defines the same-origin `<html-import>` loader with open shadow root, inline scr
 
 ### Public surface
 
-default `HTMLImport`; registers `html-import`; `connectedCallback()` and `ready`.
+Default export: the constructor registered for `html-import`. When no
+constructor is registered, the module registers its SDK loader, whose
+`connectedCallback()` owns fragment loading and whose `ready` property reports
+completion. The browser invokes the connection callback when the host enters
+the document.
 
 Registration occurs once per custom-element registry. Imports through different
 module URLs reuse and export the registered constructor, including overlapping
@@ -2646,6 +2661,40 @@ Exact exports: `default`, `resolveMailConfig`.
 import * as module from '/arcane/modules/Mail.js';
 
 console.log(Object.keys(module));
+```
+
+## MailApi.mjs
+
+### Overview
+
+The managed-browser `arcane-os/mail` entrypoint re-exports the existing
+[`Mail.js`](#mailjs), [`MailOutbox.mjs`](#mailoutboxmjs), and
+[`MailTransport.mjs`](#mailtransportmjs) APIs. Their configuration, storage,
+delivery, errors, and lifecycle remain owned by those modules.
+
+### Public surface
+
+Exact exports: `default`, `Mail`, `resolveMailConfig`,
+`MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS`, `MAIL_OUTBOX_PROTOCOL`,
+`MAIL_OUTBOX_STATES`, `MAIL_OUTBOX_TABLE`, `MailOutbox`, `createMailOutbox`,
+`MailTransportError`, `normalizeMailEndpoint`, `sendMailReport`, and
+`serializeMailReport`.
+
+`default` and `Mail` refer to the same renderer Mail class. Import retains
+`Mail.js`'s browser singleton installation; it creates no additional queue or
+transport. Node resolves `arcane-os/mail` through the separate
+[Node mail entrypoint](mail.md).
+
+### Example
+
+```javascript
+import {resolveMailConfig} from 'arcane-os/mail';
+
+const mailConfig = resolveMailConfig(
+    {appName:'dragon-dispatch', endpoint:'https://mail.example.com/v1/mail'},
+    {document:null, location:new URL('https://dispatch.example.com/')}
+);
+console.log(mailConfig.endpoint);
 ```
 
 ## MailOutbox.mjs

@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.5.18",
+  "sdkVersion": "0.51.1",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 220,
+  "memberCount": 223,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
@@ -3118,7 +3118,7 @@
       "summary": "Compatibility export of createTwinCloudTTSProvider using the same function and implementation.",
       "availability": "Browser or Node with Fetch, Blob, AbortController, and an application-owned DigitalOcean inference key",
       "protocol": "arcane-ai-provider/2 tts/synthesize",
-      "normalization": "Same TWiN Cloud options, queued follow-ups, complete audio Blob results, and cancellation contract. Existing imports, stored provider IDs, and credentials remain valid without migration."
+      "normalization": "Same TWiN Cloud options, complete-job and submission queues, shared rate-limit cooldown, queued follow-ups, complete audio Blob results and cancellation contract. Existing imports, stored provider IDs and credentials remain valid without migration."
     },
     {
       "id": "browser-speech:createTwinCloudTTSProvider",
@@ -3129,10 +3129,10 @@
       "entrypoints": ["arcane-os/ai/browser-speech"],
       "primaryImport": "arcane-os/ai/browser-speech",
       "group": "Browser speech providers",
-      "summary": "Creates an explicitly selected TWiN Cloud remote TTS provider with immediate synthesis submission and configurable queued audio follow-ups.",
+      "summary": "Creates an explicitly selected TWiN Cloud remote TTS provider with complete-job queues and independently configurable follow-up HTTP scheduling.",
       "availability": "Browser or Node with Fetch, Blob, AbortController, and an application-owned inference key",
       "protocol": "arcane-ai-provider/2 tts/synthesize",
-      "normalization": "Construction and activation make no adapter network requests. SDK initial POSTs bypass the provider-local js-queue; follow-up status/result/audio GETs use followUpQueue capacity and cadence through complete body consumption. Retry-After affects only its job. Whole-job maxConcurrentRequests remains independent. Local Kokoro and Whisper paths are unchanged. Applications own model, voice, credentials, activation, and queue settings."
+      "normalization": "Construction and activation make no adapter network requests. Whole-job slots cover credentials, submission, remote completion and complete audio. Initial POST attempts and eligible retries are queued; HTTP 429 sets a shared cooldown. Follow-up status/result/audio reads use independent capacity and cadence through complete body consumption. Ambiguous paid POST failures are surfaced without replay. Applications own model, voice, credentials, activation and queue settings."
     },
     {
       "id": "browser-speech:createBrowserSpeechRecognitionProvider",
@@ -3162,7 +3162,7 @@
       "summary": "Creates a local-only Kokoro text-to-speech provider for the provider-neutral AI runtime.",
       "availability": "Browser with DBOPFS, Web Locks, Workers, object URLs, and caller-selected kokoro-js runtime/model content",
       "protocol": "arcane-ai-provider/2 tts/synthesize",
-      "normalization": "Independent load, status, request, unload, cancellation, and disposal; provider-native requests return 24000 Hz Float32Array PCM, while shared AI.js requests use wav and return complete Uint8Array audio/wav data; never selects a cloud fallback"
+      "normalization": "Independent load, status, request, unload, cancellation and disposal; optional ordinary model.voices records remain complete in the synchronous catalog without loading or constraining synthesis. Provider-native requests return 24000 Hz Float32Array PCM, while shared AI.js requests use wav and return complete Uint8Array audio/wav data; never selects a cloud fallback"
     },
     {
       "id": "browser-speech:createBrowserSpeechArtifactGraph",
@@ -3465,6 +3465,34 @@
       "availability": "Node and Browser; remote HTTPS provider",
       "protocol": "TWiN Cloud native System One request",
       "normalization": "Preserves complete state and questions within JSON transport and returns the full parsed provider result; shares existing JSON transport retry, diagnostics, and cancellation; leaves model choice, scales, and answer interpretation with the caller and retains no history"
+    },
+    {
+      "id": "browser-speech:createBrowserSpeechSynthesisProvider",
+      "name": "createBrowserSpeechSynthesisProvider",
+      "displayName": "createBrowserSpeechSynthesisProvider()",
+      "kind": "function",
+      "signature": "createBrowserSpeechSynthesisProvider({id,model,language}={})",
+      "entrypoints": ["arcane-os/ai/browser-speech"],
+      "primaryImport": "arcane-os/ai/browser-speech",
+      "group": "Native browser speech",
+      "summary": "Creates a native browser TTS provider with silent voice discovery and preparation, live catalog subscriptions, and owned playback.",
+      "availability": "Browser with speechSynthesis and SpeechSynthesisUtterance; no SDK model, Worker or storage required",
+      "protocol": "arcane-ai-provider/2 tts/synthesize with native-speech playback descriptors",
+      "normalization": "Preserves complete input and native voiceURI/language metadata; setDefaultVoice changes future preparations without replacing the provider; explicit playback owns order, pause, resume, stop, completion and release; browser voices may use remote services and no audio file is fabricated"
+    },
+    {
+      "id": "twin-cloud:generateImages",
+      "name": "generateImages",
+      "displayName": "generateImages()",
+      "kind": "function",
+      "signature": "async generateImages({model,prompt,parameters={},twinKey,getApiKey,signal=null,id=Date.now(),onRequest,onResponse,onProgress}={})",
+      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "primaryImport": "arcane-os/ai/twin-cloud",
+      "group": "TWiN Cloud image generation",
+      "summary": "Generates caller-selected images and returns every image as a Blob in provider order.",
+      "availability": "Node and Browser with Fetch, Blob and AbortController; remote HTTPS provider",
+      "protocol": "TWiN Cloud async FAL Flux Schnell or Stable Diffusion image generation",
+      "normalization": "Returns {images:[{blob,mediaType,width?,height?}]}; preserves complete prompts and provider parameters, observes semantic progress and complete diagnostics, submits once, polls accepted jobs, propagates cancellation and retains no history or durable media"
     },
     {
       "id": "twin-cloud:fetchHTTPResponse",

@@ -90,8 +90,8 @@ An external workspace can select `installed-v1` routes directly from its
 runtime, browser runtime, runtime dependency, and licenses to the configured
 browser destinations. Direct destinations are the real npm paths. Existing
 `physical-v1` workspaces, virtual installed routes, and the explicit materializer
-remain supported. Root scaffolding selects direct npm routes; the existing
-multi-app scaffold retains its physical layout. See [installed-package routes](reference/protocols.md#installed-package-browser-routes)
+remain supported. Root scaffolding selects direct npm routes; an explicitly
+selected multi-app scaffold retains its physical layout. See [installed-package routes](reference/protocols.md#installed-package-browser-routes)
 for the configuration and npm-alias form.
 
 An Arcane OS checkout is an integrated SDK consumer, not the owner
@@ -156,6 +156,9 @@ selected source route and the last successful check when evaluating freshness.
 
 The shared dev server uses RIAEvangelist's published `node-http-server` 10.0.0
 public interface for HTTPS and conditional responses on those selected routes.
+Source files, generated resources and packaged previews use the module's complete
+published MIME map, including PDF, Markdown, audio and video. Unknown file
+extensions use `application/octet-stream`.
 PEM-backed HTTPS uses Node's `Http2SecureServer` with HTTP/1.1 compatibility;
 clients negotiate either protocol on the same HTTPS port. The SDK
 owns source selection and generated representations. By default, source development
@@ -213,8 +216,20 @@ release artifact.
 
 ## App and release contract
 
-The first SDK version deliberately preserves Arcane's current repository-shaped
-URLs and release schema:
+Standalone applications use their repository root as their app root. The default
+scaffold uses `appsRoot: "."` and direct installed-package SDK routes:
+
+```text
+arcane-app.json
+arcane-package.json
+index.html
+node_modules/arcane-os/
+dist/<id>/index.html
+dist/<id>/node_modules/arcane-os/
+dist/<id>/ARCANE_APP_RELEASE.json
+```
+
+Explicit multi-app and integrated workspaces retain `appsRoot: "apps"`:
 
 ```text
 apps/<id>/arcane-app.json
@@ -236,20 +251,20 @@ release URLs. Preview, verification, bundling, and native browser-content input
 consume that same selected release root; native executable output remains
 separate. See the [complete output contract](reference/protocols.md#app-selected-package-output).
 
-Packaging places each selected app file beneath `apps/<id>/` in the release
-and preserves every shared route destination. When no selected shared payload
-supplies a root `index.html`, the SDK generates one that opens the selected app
-entry. Authored document bases, app URLs, relative module imports, and shared
-runtime paths therefore resolve through the same layout in
+Packaging keeps standalone app files at the release root and places an explicitly
+nested app beneath `apps/<id>/`. It preserves every shared route destination.
+When selected content supplies no root `index.html`, the SDK generates one that
+opens the selected app entry. Authored document bases, app URLs, relative module
+imports and shared runtime paths therefore resolve through the same layout in
 source development and packaged delivery. Packaging consumes the saved source
 and managed import maps; use `arcane import-map` to refresh those maps, or the
 ordinary `arcane dev` startup that performs that refresh.
 
 The release manifest keeps `app.entry` relative to the app directory and records
-the package launch URL in `app.start`, such as
-`./apps/hello-world/index.html`. Its complete `files` inventory includes the
-root `index.html` and the prefixed app files. Packaged browser serving opens
-`app.start`; a previously generated flat release without `app.start` retains
+the package launch URL in `app.start`: `./index.html` for a root app with that
+entry, or `./apps/hello-world/index.html` for a nested app. Its complete `files`
+inventory follows the selected layout and includes the root `index.html`.
+Packaged browser serving opens `app.start`; a previously generated flat release without `app.start` retains
 its `app.entry` launch path.
 
 The authored schema-2 descriptor is canonical for new apps and projects an
@@ -271,8 +286,9 @@ same URLs. Existing physical `arcane/` routes retain their behavior.
 `appsRoot: "."` places one standalone application at the workspace root while
 retaining its declared ID and app-relative entries. The existing `apps` option
 keeps multi-app and integrated layouts. Root static hosting consumes the same
-npm URLs, managed maps, generated PWA files, and compatibility navigation pages
-as SDK development. TWiN's ordinary static host needs no additional server;
+npm URLs, managed maps and generated PWA files as SDK development. It generates
+no nested `apps/<id>/` navigation pages or redirects. TWiN's ordinary static
+host needs no additional server;
 separate Node API hosts such as Stripe keep their existing server and SDK mail
 imports. Application location does not change their listeners or configuration.
 
@@ -400,8 +416,8 @@ paths are withheld from the native provider. The provider copies the complete
 selected release rather than accepting an unrelated source path. Verification
 is a separate explicit operation for a selected release artifact.
 
-The SDK `0.9.0` runtime requires Arcane `0.8.12` or newer. Compatibility
-is contractual rather than exact-version pinning: the prepared Core must meet
+The current native build contract requires Arcane Core `0.8.12` or newer.
+Compatibility is contractual rather than exact-version pinning: the prepared Core must meet
 the highest minimum declared by the runtime, selected app, and bundled app
 dependencies; keep each app's Arcane protocol generation; and provide every
 declared feature, capability, and method. Missing requirements stop before

@@ -1,15 +1,18 @@
 {
   "schemaVersion": 1,
   "source": {
-    "commit": "567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e",
-    "bundleVersion": "0.8.12"
+    "authority": "sdk-canonical",
+    "repository": "https://github.com/TheWizardNexus/arcane-os-sdk.git",
+    "branch": "main",
+    "path": "runtime/arcane/entities",
+    "sdkVersion": "0.51.1"
   },
   "moduleCount": 14,
   "exportCount": 30,
   "modules": [
     {"file":"runtime/arcane/entities/ApiModelRecord.js","exports":["default"],"availability":"cross-host","normalization":"normalized"},
     {"file":"runtime/arcane/entities/Calculation.js","exports":["default"],"availability":"cross-host","normalization":"normalized"},
-    {"file":"runtime/arcane/entities/Chat.js","exports":["default"],"availability":"browser/native-webview","normalization":"New default filenames combine the timestamp with an independent random identifier; explicit and saved filenames remain unchanged. Provider-facing recurring messages preserve raw structural protocol only for the one active matching continuation, then replace settled exchanges with complete ordinary visible content; transcript records remain sanitized and readable, including ui_hidden rows. aiName defaults to empty; addAIMessage and addTurn capture an optional exact nonblank application-owned name on new assistant records only. Provider names do not establish display attribution; assistant display names stay out of messages and memory extraction, and existing records are never renamed or rewritten. ordered parallel structural calls require one exact nonblank result for every pending ID in one atomic turn, with rollback-safe persistence."},
+    {"file":"runtime/arcane/entities/Chat.js","exports":["default"],"availability":"browser/native-webview","normalization":"Per-message persist:false and entity-wide persist=false skip new retained messages, transcript records, memory extraction, and DBOPFS writes; prior retained history and already accepted writes remain untouched. Requested tool records use the call message; settled tool records use the supplied public result message. New default filenames combine the timestamp with an independent random identifier; explicit and saved filenames remain unchanged. Provider-facing recurring messages preserve raw structural protocol only for the one active matching continuation, then replace settled exchanges with complete ordinary visible content; transcript records remain sanitized and readable, including ui_hidden rows. aiName defaults to empty; addAIMessage and addTurn capture an optional exact nonblank application-owned name on new assistant records only. Provider names do not establish display attribution; assistant display names stay out of messages and memory extraction, and existing records are never renamed or rewritten. ordered parallel structural calls require one exact nonblank result for every pending ID in one atomic turn, with rollback-safe persistence."},
     {"file":"runtime/arcane/entities/CommunicationMessage.js","exports":["communicationChannels","default"],"availability":"cross-host","normalization":"normalized"},
     {"file":"runtime/arcane/entities/CommunicationThread.js","exports":["default"],"availability":"cross-host","normalization":"normalized"},
     {"file":"runtime/arcane/entities/Document.js","exports":["default"],"availability":"browser/native-webview","normalization":"mixed"},

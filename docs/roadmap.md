@@ -1,22 +1,29 @@
 # Development roadmap
 
-The SDK contract keeps target names and operations stable while each current
-development provider gathers its remaining promotion evidence. Each item below
-is small enough to become a GitHub issue without combining every platform into
-one unbounded build.
+The SDK already provides root application scaffolding, direct npm browser
+routes, managed import maps, live source serving, browser/PWA packaging and
+explicit native provider pairing. This roadmap distinguishes those implemented
+contracts from remaining development work. Future items do not select an
+implementation, dependency, publication or deployment.
 
-## Publication prerequisites
+## Current delivery baseline
 
-- Mark the Arcane OS monorepo root package private or give it an internal-only
-  package name before the first `arcane-os` publication.
-- Decide and document the license that permits proprietary applications to
-  bundle the synchronized Arcane runtime.
-- Publish one fresh, never-reused prerelease candidate under only the npm `dev`
-  tag, verify the tarball and
-  provenance, add a second appropriate npm owner, and configure the exact
-  trusted-publisher workflow.
+- SDK publication uses the existing selected-package workflow. `dev` and
+  `latest` are npm channels; `main` remains the canonical source branch. See
+  [publishing](publishing.md) for the selected-artifact procedure.
+- License terms and commercial licensing information are already documented in
+  [LICENSE](../LICENSE), [COMMERCIAL-LICENSE.md](../COMMERCIAL-LICENSE.md) and
+  [NOTICE](../NOTICE).
+- Standalone apps use their repository root and installed npm resources.
+  Explicit multi-app and integrated workspaces retain their selected layout.
+- The browser path includes PWA installation, offline resource selection,
+  conditional refresh and the shared update prompt. Development and packaged
+  preview serving share the published `node-http-server` MIME map.
+- The reusable application release workflow remains unavailable until its
+  checked-in implementation matches the documented package-and-upload contract.
+  This is separate from SDK npm publication.
 
-## App admission and native extraction
+## Native provider continuity
 
 - Keep the implemented process-local `arcane-native-build-plan/1` and
   `arcane-native-builder/1` lifecycle as the single provider seam for the CLI,
@@ -31,16 +38,11 @@ one unbounded build.
 - Preserve the implemented portable, Windows x64, Linux x64, Linux ARM64, and
   Android ARM64 providers as one selected app plus its exact declared dependency
   closure. Add new providers without weakening that release-reader boundary.
-- Extend the implemented same-process retained receipt lifecycle through an
-  authenticated Arcane host broker only when persistent cross-process reuse or
-  restartable app-scoped Core sessions are required.
-- Preserve exact packaged-artifact authority across browser and native plan,
-  verify, and run boundaries; never regress to treating a mutable path or
-  manifest file as a reusable receipt.
-- Add a manifest-declared origin policy for native enforcement and an optional
-  policy-faithful development mode. The current capability-gated loopback host
-  deliberately uses a broad development-only policy so the shared runtime can
-  exercise remote providers, media, WebSockets, and embeds.
+- Keep native build and launch within the paired provider's process lifecycle.
+  Persistent sessions or restartable host integration require a separately
+  selected capability and its owning host implementation.
+- Preserve complete selected app releases through planning, build and run.
+  Explicit verification remains separate from the ordinary build/run lifecycle.
 
 ## Platform adapters
 
@@ -62,6 +64,9 @@ one unbounded build.
   reproducible. The APK contains no native ABI and is architecture-neutral. Add
   AAB, release signing, store publishing, and update continuity only as explicit
   later promotion work.
+- macOS: the current registry provides browser delivery and no native package
+  adapter. A native adapter remains additional platform work; shared portable
+  SDK behavior must keep its declared macOS support.
 
 ## Developer experience
 
@@ -70,8 +75,9 @@ one unbounded build.
   development check, never app discovery or an arbitrary package-script loop.
 - Add the Arcane Developer control panel as a client of the same operation API;
   it stores local repository paths per user and never becomes a second builder.
-- Add authenticated GitHub artifact admission so Arcane OS installs verified
-  releases without cloning proprietary source.
+- Add an Arcane-owned source-development native wrapper around the same live
+  browser surface when that capability is selected. The current native `run`
+  command packages and builds its selected app; it is a different lifecycle.
 - Preserve the implemented integrated app-scoped native path: `--workspace` and
   `--arcane-root` identify the same checkout, one app and one target are
   selected, and `--output-root` remains outside the checkout. Future GUI clients

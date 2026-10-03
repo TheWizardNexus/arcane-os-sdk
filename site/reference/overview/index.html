@@ -4,16 +4,16 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
   <meta name="description" content="This reference answers developer questions in this order:">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
-  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/overview/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css?v=back-to-top"><link rel="stylesheet" href="../reference.css?v=visible-toolbar">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/overview/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
   <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Arcane OS SDK developer reference · Arcane OS SDK"><meta property="og:description" content="This reference answers developer questions in this order:"><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/overview/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
   <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Arcane OS SDK developer reference · Arcane OS SDK"><meta name="twitter:description" content="This reference answers developer questions in this order:"><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <title>Arcane OS SDK developer reference | Arcane OS SDK</title><script src="../../app.js?v=back-to-top" defer></script><script src="../reference.js" type="module"></script>
+  <title>Arcane OS SDK developer reference | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK developer reference</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-developer-reference">Arcane OS SDK developer reference</h1><p class="doc-lead">This reference answers developer questions in this order:</p><div class="doc-meta"><span>SDK 0.5.18</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK developer reference</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-developer-reference">Arcane OS SDK developer reference</h1><p class="doc-lead">This reference answers developer questions in this order:</p><div class="doc-meta"><span>SDK 0.51.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="./" aria-current="page">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/README.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#start-with-one-working-request">Start with one working request</a><a href="#reference-map">Reference map</a><a href="#version-scope-and-source-ownership">Version scope and source ownership</a><a href="#installed-documentation-and-release-identity">Installed documentation and release identity</a><a href="#mdn-style-page-contract">MDN-style page contract</a><a href="#public-runtime-inventory">Public runtime inventory</a><a href="#normalized-ai">Normalized AI</a><a href="#authority-and-feature-detection">Authority and feature detection</a><a href="#source-and-licensing">Source and licensing</a></nav></details><aside class="callout callout-info"><strong>Normalized AI comes first.</strong> Ordinary applications start with <a href="../ai/"><code>AI.js</code> or <code>globalThis.Arcane.ai</code></a>. Use Ollama APIs only when provider-native fields or an admitted provider-specific operation is intentional.</aside><p>This reference answers developer questions in this order:</p>
@@ -29,14 +29,14 @@ kept in the <a href="../protocols/">protocol and host architecture guide</a>, an
 high-level page links to the relevant deep section instead of repeating it.</p>
 <h2 id="start-with-one-working-request">Start with one working request</h2>
 <p>Install the SDK in your application:</p>
-<div class="code-block reference-code"><div class="code-bar"><span>sh</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-sh">npm install --save-exact arcane-os@0.5.17
+<div class="code-block reference-code"><div class="code-bar"><span>sh</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-sh">npm install --save-exact arcane-os@latest
 </code></pre></div>
 <p>For your first AI call, follow the <a href="../ai/twin-cloud/">TWiN Cloud quick start</a>.
-For on-device speech, follow the <a href="../ai/browser-speech/">browser speech quick start</a>
+For local models, native browser voices or cloud speech, follow the <a href="../ai/browser-speech/">browser speech guide</a>
 and the complete browser AI demo.
 Each guide names the application configuration you supply and shows the public
 call, response, cancellation, and error handling. Browser module imports use
-the SDK&#39;s <a href="../cli/#arcane-import-map">materialized import map</a>; installing npm
+the SDK&#39;s <a href="../cli/#arcane-import-map">managed import map</a>; installing npm
 alone does not make bare module names resolve in a browser.</p>
 <h2 id="reference-map">Reference map</h2>
 <div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
@@ -61,6 +61,10 @@ alone does not make bare module names resolve in a browser.</p>
 <tr>
 <td>Use the <code>arcane</code> command</td>
 <td><a href="../cli/">CLI reference</a></td>
+</tr>
+<tr>
+<td>Install an app and cache selected resources offline</td>
+<td><a href="../pwa/">Progressive web applications</a></td>
 </tr>
 <tr>
 <td>Generate named browser imports or inspect the selected physical runtime</td>
@@ -103,12 +107,24 @@ alone does not make bare module names resolve in a browser.</p>
 <td><a href="../ai/browser-wasm/">Browser-WASM local AI</a></td>
 </tr>
 <tr>
-<td>Run caller-selected Whisper or Kokoro in the browser</td>
+<td>Run caller-selected Whisper/Kokoro, native browser recognition/voices or cloud TTS</td>
 <td><a href="../ai/browser-speech/">Browser speech providers</a></td>
 </tr>
 <tr>
-<td>Send one TWiN Cloud request or migrate saved LLM preferences</td>
-<td><a href="../ai/twin-cloud/">TWiN Cloud quick start</a></td>
+<td>Send TWiN chat, System One state/questions or image requests</td>
+<td><a href="../ai/twin-cloud/">TWiN Cloud guide</a></td>
+</tr>
+<tr>
+<td>Edit live transcription before Send, or print a complete conversation</td>
+<td><a href="../runtime-components/#chathtml">Chat component</a></td>
+</tr>
+<tr>
+<td>Store images outside Markdown and hydrate them in previews</td>
+<td><a href="../runtime-modules/#markdownmediajs">MarkdownMedia</a></td>
+</tr>
+<tr>
+<td>Print complete rendered documents, previews and conversations</td>
+<td><a href="../runtime-modules/#printviewjs">PrintView</a></td>
 </tr>
 <tr>
 <td>Use Arcane Ollama</td>
@@ -136,18 +152,18 @@ alone does not make bare module names resolve in a browser.</p>
 </thead>
 <tbody><tr>
 <td>SDK and CLI</td>
-<td><code>arcane-os</code> <code>0.5.17</code></td>
-<td>The Node.js toolchain, portable <code>arcane-os/event-manager</code>, <code>arcane-os/logging</code>, <code>arcane-os/mail</code>, <code>arcane-os/preference-store</code>, <code>arcane-os/speech-playback</code>, and <code>arcane-os/speech-text</code> entrypoints, plus the browser-only <code>arcane-os/ai/browser-wasm</code> and <code>arcane-os/ai/browser-speech</code> entrypoints in this checkout.</td>
+<td><code>arcane-os</code>; version in <code>package.json</code></td>
+<td>The Node.js toolchain and focused public entrypoints listed in the <a href="../sdk-api/">SDK API</a>. Each entrypoint retains its own runtime requirements.</td>
 </tr>
 <tr>
 <td>Browser runtime</td>
-<td>SDK <code>0.5.17</code>, protocol <code>arcane/1</code>, <code>runtime/</code></td>
+<td>Selected SDK, protocol <code>arcane/1</code>, <code>runtime/</code></td>
 <td>The SDK-canonical runtime tree. <code>listRuntimeFiles()</code>, <code>readRuntimeFile()</code>, and <code>loadRuntimeRelease()</code> derive its current inventory directly from the selected directory.</td>
 </tr>
 <tr>
 <td>Browser SDK runtime</td>
-<td>SDK <code>0.5.17</code>, <code>browser-runtime/</code></td>
-<td>The browser closure for events, shared logging, speech-text cleanup, Wllama, and Browser Speech mechanisms. <code>listSdkBrowserRuntimeFiles()</code>, <code>readSdkBrowserRuntimeFile()</code>, and <code>loadSdkBrowserRuntimeRelease()</code> derive its current inventory directly from the selected directory.</td>
+<td>Selected SDK, <code>browser-runtime/</code></td>
+<td>Events, logging, Wllama, local/native/cloud speech, TWiN requests and PWA mechanisms. <code>listSdkBrowserRuntimeFiles()</code>, <code>readSdkBrowserRuntimeFile()</code>, and <code>loadSdkBrowserRuntimeRelease()</code> derive its current inventory directly from the selected directory.</td>
 </tr>
 <tr>
 <td>Core reference snapshot</td>
@@ -165,7 +181,9 @@ functional compatibility.</p>
 <p>See the <a href="../core/">Core reference source notes</a> for the imported inventory
 and the distinction between a documentation snapshot and the selected runtime.</p>
 <h2 id="installed-documentation-and-release-identity">Installed documentation and release identity</h2>
-<p>This reference accompanies <code>arcane-os@0.5.17</code>. The installed package includes
+<p>The repository reference follows the current committed SDK capabilities. A
+documentation-only repository update can be newer than the text bundled in an
+already published package. The installed package includes
 the maintained <code>docs/</code> tree and <code>examples/wasm-ai-demo/</code> source alongside
 README and CHANGELOG. Open <code>node_modules/arcane-os/docs/reference/README.md</code>
 for the matching local reference. The generated website and test suites remain
@@ -226,25 +244,24 @@ envelopes;</li>
 actions merely by being copied.</li>
 </ul>
 <h2 id="public-runtime-inventory">Public runtime inventory</h2>
-<p>The package exposes 202 semantic JavaScript records across 18 JavaScript
-entrypoints, plus eight JSON Schemas and package metadata. Ten entrypoints are
-Node.js control-plane surfaces,
-<code>arcane-os/event-manager</code>, <code>arcane-os/logging</code>, <code>arcane-os/mail</code>, <code>arcane-os/preference-store</code>, and
-<code>arcane-os/speech-playback</code> plus <code>arcane-os/speech-text</code> run in Node and browsers, and
-<code>arcane-os/ai/browser-wasm</code> plus <code>arcane-os/ai/browser-speech</code> are browser-only.
-The <a href="../inventory/package-api.json">machine-readable package
-inventory</a> and <a href="../sdk-api/">SDK member reference</a>
-are checked bidirectionally against every declared JavaScript export.</p>
+<p>The public export map is maintained in <code>package.json</code>.
+It includes Node tooling, focused portable/browser entrypoints, direct runtime
+module and entity patterns, eight JSON Schemas and package metadata. The
+<a href="../sdk-api/">SDK member reference</a> and <a href="../inventory/package-api.json">package inventory</a>
+describe focused functions; the runtime catalogs document the existing
+namespaces exposed through lowercase aliases and filename-based imports.
+Resolving a package name in Node does not supply browser, media, storage or
+Core capabilities. See the <a href="../availability-and-normalization/">availability matrix</a>.</p>
 <p>The seven update-check records are explicit on-demand checks; they do not poll,
 download, install, or self-update.</p>
 <p>The synchronized browser payload exposes:</p>
 <ul>
-<li>83 JavaScript module artifacts under <code>runtime/arcane/modules/</code>, including
+<li>JavaScript modules under <code>runtime/arcane/modules/</code>, including
 ESM modules, classic vendor globals, one worker protocol, and one Node-oriented
 mail transport;</li>
-<li>14 shared entity modules under <code>runtime/arcane/entities/</code>;</li>
-<li>39 reusable HTML-import components under <code>runtime/arcane/components/</code>;</li>
-<li>seven shared CSS artifacts, images, optional physical-workspace security
+<li>shared entity modules under <code>runtime/arcane/entities/</code>;</li>
+<li>reusable HTML-import components under <code>runtime/arcane/components/</code>;</li>
+<li>shared CSS artifacts, images, optional physical-workspace security
 files where present, and the vendored <code>strong-type</code> dependency.</li>
 </ul>
 <p>The module and component catalogs enumerate every shipped artifact, including
@@ -285,17 +302,27 @@ Ollama, Wllama, Whisper, Kokoro, native, or cloud transport:</p>
 <tr>
 <td>Run a caller-selected GGUF LLM locally</td>
 <td><a href="../ai/browser-wasm/"><code>arcane-os/ai/browser-wasm</code></a></td>
-<td>Browser secure context with WebGPU full-offload availability, WebAssembly, and OPFS/DBOPFS.</td>
+<td>Browser secure context with WebAssembly and OPFS/DBOPFS; explicit CPU selection or WebGPU with full offload and no automatic CPU fallback.</td>
 </tr>
 <tr>
 <td>Run caller-selected Whisper/Kokoro locally</td>
 <td><a href="../ai/browser-speech/"><code>arcane-os/ai/browser-speech</code></a></td>
-<td>Browser with DBOPFS, Web Locks, Workers, and caller-supplied runtime and model sources; Kokoro supports bounded Worker/session concurrency with automatic WebGPU-first execution and complete WASM-pool fallback.</td>
+<td>Browser with DBOPFS, Web Locks, Workers and selected upstream sources; automatic WebNN NPU, WebGPU, then WASM loading, or an explicit backend.</td>
 </tr>
 <tr>
-<td>Add bounded persistent history and memory</td>
+<td>Use native browser recognition/voices or selected cloud TTS</td>
+<td><a href="../ai/browser-speech/">Speech provider choices</a></td>
+<td>Native APIs depend on the browser and may use remote services; cloud TTS requires the application key and endpoint access.</td>
+</tr>
+<tr>
+<td>Send complete chat, System One or image requests without retained history</td>
+<td><a href="../ai/twin-cloud/"><code>arcane-os/ai/twin-cloud</code></a></td>
+<td>Node or browser with Fetch and explicit model/credentials; image results contain every returned image as a Blob.</td>
+</tr>
+<tr>
+<td>Add persistent history and memory</td>
 <td><a href="../runtime-modules/#persistentaichatsessionjs"><code>PersistentAIChatSession.js</code></a></td>
-<td>Browser/native WebView runtime with ChatEntity/DBOPFS and a configured chat function.</td>
+<td>Browser/native WebView runtime with ChatEntity/DBOPFS and a configured chat function; <code>persist:false</code> ends retention when the operation settles.</td>
 </tr>
 <tr>
 <td>Add explicit document search/context</td>
@@ -342,6 +369,6 @@ as package admission. Each method rechecks native policy at invocation time.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#start-with-one-working-request">Start with one working request</a><a href="#reference-map">Reference map</a><a href="#version-scope-and-source-ownership">Version scope and source ownership</a><a href="#installed-documentation-and-release-identity">Installed documentation and release identity</a><a href="#mdn-style-page-contract">MDN-style page contract</a><a href="#public-runtime-inventory">Public runtime inventory</a><a href="#normalized-ai">Normalized AI</a><a href="#authority-and-feature-detection">Authority and feature detection</a><a href="#source-and-licensing">Source and licensing</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.5.18, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.51.1, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

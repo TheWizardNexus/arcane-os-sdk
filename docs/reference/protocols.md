@@ -69,8 +69,10 @@ include `arcane-os/preference-store`, `arcane-os/speech-playback`,
 `arcane-os/model-definition`, `arcane-os/conversation-timebox`,
 `arcane-os/conversation-action-items`, `arcane-os/conversation-closing-report`,
 and `arcane-os/chat-records`.
-`arcane/PreferenceStore` and `arcane/SpeechPlayback` remain their established
-browser import-map names. The additional portable `arcane-os/speech-text`
+Physical, nested and virtual layouts also retain the established
+`arcane/PreferenceStore` and `arcane/SpeechPlayback` browser names. Direct
+installed-package root apps use the package-namespaced imports. The additional
+portable `arcane-os/speech-text`
 subpath owns shared speech-input cleanup and has the same
 managed browser key. `arcane-os/mail` remains the existing Mail aggregation.
 There is
@@ -324,19 +326,20 @@ map-artifact lifecycle below remains separate.
 
 ## Browser runtime delivery
 
-External and modern integrated workspaces keep the same application URLs and a
-browser-standard import map. Each selected app owns
-`apps/<id>/modules/arcane.importmap.json`; the exact canonical JSON is also
+External and modern integrated workspaces use a browser-standard import map.
+Each selected app owns `modules/arcane.importmap.json` relative to its app root:
+the repository root for a standalone app, or `apps/<id>/` for an explicitly
+nested app. The exact canonical JSON is also
 embedded in its HTML entry as a managed `<script type="importmap"
 data-arcane-import-map>`. The map follows `<base>` and precedes module scripts,
 classic scripts, and module preloads, so application code can use stable named
 imports such as:
 
 ```javascript
-import ollama from 'arcane/Ollama';
+import ollama from 'arcane-os/modules/Ollama.js';
 ```
 
-The physical-v1 tree lives entirely beneath `arcane/`. SDK `0.5.17` projects the
+The supported physical-v1 tree lives entirely beneath `arcane/`. It projects the
 complete canonical runtime and browser runtime selected by the installed SDK
 package. Runtime dependencies stay under
 `arcane/dependencies/`; the SDK event and browser-AI closure stays under
@@ -351,9 +354,9 @@ integrated physical route uses the same ordered include list in its one route.
 Omitting only that final optional entry is compatible. Removing, reordering, or
 renaming any preceding entry changes the physical contract.
 
-The `0.5.17` map derives its complete entries from the selected runtime graph;
+The map derives its complete entries from the selected runtime graph;
 application source imports do not select a fixed entry count. The operation
-result reports `imports`, `entryCount`, and `excludedModules`; reached-file
+result reports `imports`, `documentCount`, and `excludedModules`; reached-file
 traversal remains internal. The
 managed graph exposes `arcane-os/event-manager`, `arcane-os/ai/browser-wasm`,
 `arcane-os/ai/browser-speech`, `arcane-os/preference-store`, and
@@ -371,16 +374,19 @@ The focused physical targets remain stable when their bindings are reached:
 | `arcane-os/preference-store` | `./arcane/modules/PreferenceStore.js` |
 | `arcane-os/speech-playback` | `./arcane/modules/SpeechPlayback.js` |
 | `event-pubsub` | `./arcane/sdk/dependencies/event-pubsub/index.js` |
+| `strong-type` | `./arcane/dependencies/strong-type/index.js` |
 | `./node_modules/strong-type/index.js` | `./arcane/dependencies/strong-type/index.js` |
 
-There is no `arcane-os` package-root mapping, bare `strong-type` mapping, or
-catch-all `arcane/` prefix. Classic scripts, workers, stylesheets, and other
+Direct installed routes translate these targets to their actual npm destinations,
+including aliases. There is no `arcane-os` package-root mapping or catch-all
+`arcane/` prefix. Classic scripts, workers, stylesheets, and other
 non-ESM assets use their documented URL or host loading contract rather than
 invented package bindings. Development serves the selected app plus the
 complete selected tree.
 Packaging copies the same map, app entry, and physical content into the
 [selected package output](#app-selected-package-output), defaulting to `dist/<id>`;
-targets never resolve through the consumer workspace's root `node_modules/`.
+physical targets stay beneath the selected `arcane/` routes, while direct
+installed targets retain `node_modules/<dependency>/...` inside the output.
 The two lowercase static runtime package specifiers above and the shared
 speech-text helper are exact npm package exports, so Node and managed-browser
 source can share those specifiers
@@ -390,42 +396,34 @@ without data URLs, copied modules, or a consumer-owned loader.
 The shared app-document owner derives the configured entry plus the
 deterministic admitted `.html`/`.htm` inventory from the descriptor's package
 include/exclude rules. `import-map`, development, and packaging all reuse that
-discovery. One transaction writes the artifact and the same managed
-JSON into every selected document. The result reports
-`documentPaths`, `documentCount`, and `files`: artifact first, configured entry
-second, then additional documents as `role:"document"`. The public CLI keeps
+discovery. Import-map generation prepares the complete selection, then writes
+the artifact and the same managed JSON into each selected document in order.
+The result reports
+`artifactPath`, `entryPath`, `documentPaths`, `documentCount`, the complete
+`imports` record, and `committed`. `documentPaths` lists the configured entry
+first, followed by the other selected documents. The public CLI keeps
 its existing two-option command; callers never maintain a separate page list.
 
-An external package and development server expose the runtime
-inventory at `/ARCANE_RUNTIME_PROJECTION.json`:
-
-```javascript
-{
-  schemaVersion: 1,
-  kind: 'arcane-app-runtime-projection',
-  sdkVersion,
-  pathPrefix: 'arcane/',
-  files: [{path}]
-}
-```
-
-The projection contains the complete public paths relative to its declared
-`pathPrefix:'arcane/'` (for example, `modules/...` and `sdk/...`). It does not
-expose the private `/ARCANE_APP_RELEASE.json`. Genuinely malformed projection
-data fails `ARCANE_RUNTIME_PROJECTION_INVALID`.
+The managed import map derives its complete bindings from the selected runtime
+files. Enabled PWA delivery publishes its resource inventory in
+`arcane-offline.json`; packaging records its complete file inventory in
+`ARCANE_APP_RELEASE.json`. There is no generated
+`ARCANE_RUNTIME_PROJECTION.json` endpoint in the current serving or packaging
+contract.
 
 External `validateWorkspace()` results also expose `sdkInstallation` with
 exactly `dependencyName`, `packageSource`,
 `canonicalPackageRoot`, `packageName`, `packageVersion`, `runtimeRoot`,
 and `browserRuntimeRoot`. A
-workspace may use the canonical dependency name or one exact npm alias such as
-`npm:arcane-os@0.5.17`; the physical package manifest must still identify
-exactly as `arcane-os@0.5.17`. Canonical-plus-alias duplicates, multiple aliases,
-links/junctions, indirect package roots, or version drift are reported.
+workspace may use the canonical dependency name or one npm alias such as
+`npm:arcane-os@0.51.1`; the installed package manifest identifies `arcane-os`
+and supplies its actual version. The resolver requires one declaration and a
+direct physical installation with runtime and browser-runtime directories.
+The application's normal npm declaration and lockfile own version selection.
 
-For external workspaces, `arcane dev` serves the projected `arcane/` root,
-including `arcane/sdk` and `arcane/dependencies`, alongside the selected
-application. Integrated workspaces retain their configured physical routes.
+For external workspaces, `arcane dev` serves the selected direct npm, virtual
+installed or physical routes alongside the selected application. Integrated
+workspaces retain their configured physical routes.
 The explicit live-source development mapping remains a separate development
 path and does not rewrite the installed projection.
 
@@ -437,21 +435,24 @@ transport and host RPC remain separate layers.
 <details>
 <summary>Refresh lifecycle and managed-file commit behavior</summary>
 
-Scaffolding (`new` and `init`) creates the map. `dev` refreshes once before
-binding. `import-map` refreshes every admitted document explicitly.
-Non-dry-run `package`, browser `build`, and paired native packaging refresh
-before collecting source. Packaging does not run tests or checks automatically.
+Root scaffolding reports the map as pending until its SDK dependency is installed;
+root `init` with an installed SDK and explicit nested scaffolds generate it.
+`dev` refreshes once before binding. `import-map` refreshes every admitted
+document explicitly. `package`, browser `build`, and paired native packaging
+consume the saved source and managed maps. Refresh maps through `import-map` or
+ordinary `dev` startup when needed. Packaging does not run tests or checks
+automatically.
 Explicit `test` and `check` operations read the existing map without rewriting it;
 `verify`, `bundle`, and browser `run` do not refresh. Dry-run packaging/build
 validates an existing map without rewriting it, and `import-map` itself has no
 supported dry-run.
 
-Generation stages the artifact and every selected HTML document beside their
-destinations and uses backups to restore the prior managed files after a
-handled pre-commit failure. Success reports `committed: true` and the complete
-managed path inventory. Cleanup failures after commit remain warnings. This is
-a handled-error transaction, not a claim of one filesystem-atomic rename for
-all files and not a durable crash journal.
+Generation prepares the artifact and every selected HTML document, checks their
+destinations, then writes the artifact followed by the documents. Cancellation
+or a write failure can leave completed writes in place. Success reports
+`committed: true` and the selected document paths. Event-delivery failure after
+successful writes is returned as degraded delivery; it does not undo those
+writes. There is no all-file rollback or durable crash journal.
 
 When tests are explicitly selected, external app tests receive an
 `arcane-test-import-map/1` context for that app's managed map. Each isolated
@@ -478,9 +479,13 @@ comes from the selected runtime and owns independent `llm`, `stt`, and
 `tts` selections. This SDK release ships browser-WASM LLM and browser
 speech provider/2 adapters and also adapts selected TWiN Cloud LLM,
 Core-backed Ollama LLM, on-device Whisper STT, and on-device Kokoro TTS routes
-into provider/2. There is no cloud speech route;
-other native, Core, or cloud routes require an externally supplied compatible
-adapter. The singleton itself is not an authentication or capability token. It
+into provider/2. Built-in speech selections use `LOCAL_SPEACH` with
+`whisper-small` for STT and `kokoro` for TTS; these local routes need no TWiN key.
+Applications may explicitly configure `createTwinCloudTTSProvider()` with their
+TWiN key for cloud TTS. Native browser recognition and synthesis providers are
+also available through `arcane-os/ai/browser-speech`; their browser-owned engines
+may use remote services. Other routes require a compatible provider adapter.
+The singleton itself is not an authentication or capability token. It
 normalizes inspection, model authority,
 load/unload/dispose, cancellation, stream cleanup, status, and startup
 barriers. Each selected provider retains its real execution requirements.
@@ -491,8 +496,9 @@ For a browser-only LLM,
 [`arcane-os/ai/browser-wasm`](ai/browser-wasm.md) exposes `createArcaneAI()`
 and an adapter into the same provider-neutral lifecycle. For browser speech,
 [`arcane-os/ai/browser-speech`](ai/browser-speech.md) creates independent
-Whisper STT and Kokoro TTS providers that register directly with the normalized
-runtime. The SDK supplies mechanism; applications retain model/runtime choice,
+Whisper STT, Kokoro TTS, native browser recognition/synthesis and explicit cloud
+TTS providers. These providers register directly with the normalized runtime.
+The SDK supplies mechanism; applications retain model/runtime choice,
 licenses, prompts, tools, voices, and disclosure policy.
 
 ### Browser-WASM LLM lifecycle
