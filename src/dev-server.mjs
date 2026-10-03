@@ -324,7 +324,8 @@ async function serveGeneratedRepresentation(fileServer, request, response, {
 }
 
 async function serveSourceFile(fileServer, request, response, opened, {
-    assetVersion, revalidate = false, onReference, pwaEntry = false, lastModified
+    assetVersion, revalidate = false, onReference, pwaEntry = false, lastModified,
+    representationTracked = false
 } = {}) {
     const extension = path.extname(opened.candidate).toLowerCase();
     const rewrite = assetVersion !== undefined && /\.(?:m?js|html?|css|json)$/iu.test(extension);
@@ -336,9 +337,27 @@ async function serveSourceFile(fileServer, request, response, opened, {
         response.writeHead = function writeDevelopmentHeaders(...arguments_) {
             this.removeHeader('ETag');
             this.removeHeader('X-Content-Type-Options');
+            if (representationTracked) {
+                if (lastModified) this.setHeader('Last-Modified', lastModified.toUTCString());
+                else this.removeHeader('Last-Modified');
+            }
             return writeHead.apply(this, arguments_);
         };
-        await fileServer.serveFile(opened.candidate, request, response);
+        const modifiedSince = request.headers['if-modified-since'];
+        const range = request.headers.range;
+        if (representationTracked) {
+            const currentTime = lastModified ? Date.parse(lastModified.toUTCString()) : NaN;
+            if (!(Date.parse(modifiedSince) >= currentTime)) delete request.headers['if-modified-since'];
+            if (request.headers['if-range'] && !(Date.parse(request.headers['if-range']) >= currentTime)) {
+                delete request.headers.range;
+            }
+        }
+        try {
+            await fileServer.serveFile(opened.candidate, request, response);
+        } finally {
+            if (modifiedSince !== undefined) request.headers['if-modified-since'] = modifiedSince;
+            if (range !== undefined) request.headers.range = range;
+        }
         return;
     }
     await serveGeneratedRepresentation(
@@ -552,7 +571,7 @@ async function packagedRoutes(releaseRoot){
     };
 }
 
-async function sourcePwaAssets(routeSet, mappings, signal, resourceUrls, resourcePaths, componentPaths = new Set()) {
+async function sourcePwaAssets(routeSet, mappings, signal, resourceUrls, resourcePaths, runtimeDocuments = new Set()) {
     const records = new Map();
     const resources = new Map();
     for (const mapping of mappings) {
@@ -613,6 +632,9 @@ async function sourcePwaAssets(routeSet, mappings, signal, resourceUrls, resourc
         if (!/\.(?:m?js|html?|css)$/iu.test(pathname) && !managedMap) continue;
         visited.add(context);
         resourcePaths.add(decodeURIComponent(pathname));
+        if (record.mapping.kind !== 'app' && /\.html?$/iu.test(pathname)) {
+            runtimeDocuments.add(decodeURIComponent(pathname));
+        }
         let references = referencesByPath.get(pathname);
         if (!references) {
             const opened = await openSafeFile(record.mapping.root, record.relative);
@@ -661,7 +683,6 @@ async function sourcePwaAssets(routeSet, mappings, signal, resourceUrls, resourc
             const targetRecord = resources.get(target.pathname);
             if (kind === 'document' && targetRecord.mapping.kind === 'app'
                 && !selectedApplicationDocument(routeSet.app, targetRecord.relative.join('/'))) continue;
-            if (kind === 'component') componentPaths.add(decodeURIComponent(target.pathname));
             const traversable = kind !== 'fetch'
                 && (kind !== 'asset' || /\.css(?:[?#]|$)/iu.test(url));
             if (traversable) {
@@ -950,21 +971,33 @@ async function startOwnedDevServer({
         );
         return managed;
     }
-    function sourceRepresentationModifiedAt(opened, version, pwaEntry) {
+    function sourceRepresentation(opened, version, pwaEntry, rewritten) {
         const modifiedAt = opened.modifiedAt.getTime();
         const previous = representationMetadata.get(opened.candidate);
         if (previous?.modifiedAt === modifiedAt
-            && previous.version === version && previous.pwaEntry === pwaEntry) {
-            return previous.lastModified;
+            && previous.version === version && previous.pwaEntry === pwaEntry
+            && previous.rewritten === rewritten) {
+            if (!previous.lastModified && Date.now() >= previous.ambiguousThrough + 1000) {
+                previous.lastModified = new Date();
+            }
+            return previous;
         }
         const lastModified = new Date(
             Math.max(modifiedAt, generatorModifiedAt, assetVersionModifiedAt, previous ? Date.now() : 0)
         );
-        representationMetadata.set(
-            opened.candidate,
-            {modifiedAt, version, pwaEntry, lastModified}
-        );
-        return lastModified;
+        const previousTime = previous?.lastModified
+            ? Date.parse(previous.lastModified.toUTCString()) : previous?.ambiguousThrough;
+        // HTTP dates cannot distinguish two representations within one second.
+        // Omit that ambiguous validator until a later request can date it honestly.
+        const ambiguous = previousTime !== undefined
+            && Date.parse(lastModified.toUTCString()) <= previousTime;
+        const record = {
+            modifiedAt, version, pwaEntry, rewritten,
+            lastModified: ambiguous ? undefined : lastModified,
+            ambiguousThrough: ambiguous ? previousTime : undefined
+        };
+        representationMetadata.set(opened.candidate, record);
+        return record;
     }
     for(const mapping of mappings){
         const info=await lstat(mapping.root);
@@ -1097,7 +1130,7 @@ async function startOwnedDevServer({
                 const generatedAt = new Date();
                 state.inventoryTask = Promise.all(
                     [
-                        sourcePwaAssets(selectedRoutes, selectedRoutes.mappings, signal, pwaResourceUrls, resourcePaths, componentPaths),
+                        sourcePwaAssets(selectedRoutes, selectedRoutes.mappings, signal, pwaResourceUrls, resourcePaths, runtimeDocuments),
                         selectedAssetVersion().then(
                             function rememberCurrentInventoryVersion(version) {
                                 if (selectedRoutes === currentSourceRoutes) rememberAssetVersion(version);
@@ -1132,7 +1165,66 @@ async function startOwnedDevServer({
     // Remember actual resource edges as their owners are served, not every
     // HTML/JS/CSS file in an application's document or attachment corpus.
     const resourcePaths=new Set([routeSet.startPath]);
-    const componentPaths=new Set();
+    const runtimeDocuments=new Set();
+    const componentReferences=new Map();
+    async function isCurrentComponent(targetPath, selectedRoutes) {
+        // Retain parsed edges, not lifetime classifications. Only current page
+        // roots and observed runtime documents can make an original a component.
+        const pending = [selectedRoutes.startPath, ...runtimeDocuments];
+        for (const document of selectedRoutes.app.documents) {
+            pending.push(applicationSourcePath(selectedRoutes.config, selectedRoutes.appId, document));
+        }
+        const visited = new Set();
+        for (const ownerPath of pending) {
+            throwIfAborted(signal);
+            if (visited.has(ownerPath)) continue;
+            visited.add(ownerPath);
+            const target = parseRequestTarget(ownerPath.split('/').map(encodeURIComponent).join('/'));
+            if (!target) continue;
+            const mapping = selectedRoutes.mappings.find(function componentOwnerMapping(route) {
+                return route.prefix.every(function componentOwnerSegment(segment, index) {
+                    return target.segments[index] === segment;
+                });
+            });
+            if (!mapping) continue;
+            const relative = target.segments.slice(mapping.prefix.length);
+            if (!relative.length || (mapping.allow && !mapping.allow(relative))) continue;
+            if (!/\.html?$/iu.test(ownerPath)) continue;
+            const opened = await openSafeFile(mapping.root, relative, {readContent: false});
+            if (!opened) continue;
+            const modifiedAt = opened.modifiedAt.getTime();
+            let record = componentReferences.get(opened.candidate);
+            if (record?.modifiedAt !== modifiedAt) {
+                const references = [];
+                rewriteAssetReferences(await readFile(opened.candidate, 'utf8'), {
+                    filePath: opened.candidate,
+                    version: null,
+                    onReference: function currentComponentReference(reference) {
+                        if (reference.kind === 'component') references.push(reference);
+                    }
+                });
+                record = {modifiedAt, references};
+                componentReferences.set(opened.candidate, record);
+            }
+            const ownerUrl = new URL(target.pathname, 'http://arcane.invalid');
+            for (const reference of record.references) {
+                let component;
+                try {
+                    component = resolveAssetReference(reference, {ownerUrl});
+                } catch {
+                    // Non-URL values retain their authored behavior.
+                    continue;
+                }
+                if (component.origin !== ownerUrl.origin) continue;
+                const componentTarget = parseRequestTarget(component.pathname);
+                if (!componentTarget) continue;
+                const componentPath = componentTarget.path;
+                if (componentPath === targetPath) return true;
+                pending.push(componentPath);
+            }
+        }
+        return false;
+    }
     const requestTasks=new Set();
     const runFileWork=createFileWorkLimiter();
     async function serveDevelopmentRequest(request, response) {
@@ -1232,13 +1324,16 @@ async function startOwnedDevServer({
                 // version record on navigation, not on each resource request.
                 if(entryDocument||managedMap)rememberAssetVersion(await selectedAssetVersion());
                 const runtimeResource=mapping.kind!=='app';
+                if (runtimeResource && html) runtimeDocuments.add(target.path);
                 const browserResource=['script','style','worker','sharedworker','serviceworker']
                     .includes(request.headers['sec-fetch-dest']);
                 // Selecting application pages does not turn retained originals
                 // into resources. HTML components remain owned by html-import.
-                const retainedDocument=explicitDocuments&&html&&!selectedDocument&&!componentPaths.has(target.path);
+                const componentDocument=explicitDocuments&&html&&!selectedDocument
+                    &&await isCurrentComponent(target.path, selectedRoutes);
+                const retainedDocument=explicitDocuments&&html&&!selectedDocument&&!componentDocument;
                 const rewrite=!retainedDocument&&(runtimeResource||entryDocument||browserResource||managedMap
-                    ||resourcePaths.has(target.path));
+                    ||componentDocument||resourcePaths.has(target.path));
                 const onReference = function observeServedResource(reference) {
                     const {url,kind,baseKind}=reference;
                     if (pwaEnabled && kind !== 'fetch'
@@ -1269,7 +1364,6 @@ async function startOwnedDevServer({
                             if(kind==='document'&&mode==='source'&&appRelative!==null
                                 &&sourcePathAllowed(appRelative.split('/'),selectedRoutes.app)
                                 &&!selectedApplicationDocument(selectedRoutes.app,appRelative))return;
-                            if(kind==='component')componentPaths.add(resourcePath);
                             resourcePaths.add(resourcePath);
                         }
                     }catch{ /* Non-URL values remain under their existing owner. */ }
@@ -1278,6 +1372,8 @@ async function startOwnedDevServer({
                 const pwaEntry = mode === 'source' && pwaEnabled && entryDocument;
                 const transformed = pwaEntry || (selectedVersion !== undefined
                     && /\.(?:m?js|html?|css|json)$/iu.test(extension));
+                const representation = transformed || retainedDocument
+                    ? sourceRepresentation(opened, assetVersion, pwaEntry, transformed) : undefined;
                 await serveSourceFile(
                     fileServer,
                     request,
@@ -1288,9 +1384,8 @@ async function startOwnedDevServer({
                         revalidate: pwaEnabled || entryDocument || managedMap,
                         pwaEntry,
                         onReference,
-                        lastModified: transformed
-                            ? sourceRepresentationModifiedAt(opened, assetVersion, pwaEntry)
-                            : undefined
+                        lastModified: representation?.lastModified,
+                        representationTracked: representation !== undefined
                     }
                 );
             });

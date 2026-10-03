@@ -348,7 +348,10 @@ for (const enabled of [true, false]) {
                 assert.equal(await response.text(), content);
                 assert.equal(await readFile(path.join(workspaceRoot, relative), 'utf8'), content);
             }
-            const panel = await (await globalThis.fetch(`${instance.origin}/panel.html`)).text();
+            const panelResponse = await globalThis.fetch(`${instance.origin}/panel.html`);
+            const panelModified = panelResponse.headers.get('last-modified');
+            assert.ok(panelModified);
+            const panel = await panelResponse.text();
             assert.equal(panel, '<script type="module" src="./modules/entry-child.js"></script>\n');
             assert.equal(await readFile(path.join(workspaceRoot, 'panel.html'), 'utf8'), component);
             const secondaryPath = path.join(workspaceRoot, 'secondary.html');
@@ -365,6 +368,79 @@ for (const enabled of [true, false]) {
             assert.equal(await (await globalThis.fetch(`${instance.origin}/secondary.html`)).text(), secondary);
             assert.equal(await (await globalThis.fetch(`${instance.origin}/documents/frame.html`)).text(), framed);
             assert.equal(await (await globalThis.fetch(`${instance.origin}/panel.html`)).text(), panel);
+
+            // Removing the importing edge must take effect without first
+            // fetching its owner again or restarting the source server.
+            await writeFile(path.join(workspaceRoot, 'index.html'), entry.replace('</body>',
+                '<iframe src="./panel.html"></iframe></body>'));
+            for (const client of ['first', 'second']) {
+                const formerComponent = await globalThis.fetch(`${instance.origin}/panel.html`, {
+                    headers: {'if-modified-since': panelModified}
+                });
+                assert.equal(formerComponent.status, 200, client);
+                assert.equal(await formerComponent.text(), component, client);
+            }
+            if (enabled) {
+                await (await globalThis.fetch(`${instance.origin}/arcane-offline.json`)).text();
+                assert.equal(await (await globalThis.fetch(`${instance.origin}/panel.html`)).text(), component);
+            }
+
+            // Another currently selected owner preserves its own component
+            // edge; removing that owner from selection removes its contribution.
+            await writeFile(secondaryPath, secondary.replace('</body>',
+                '<html-import href="./panel.html"></html-import></body>'));
+            app.documents = ['secondary.html'];
+            await writeFile(packagePath, JSON.stringify(app));
+            assert.equal(await (await globalThis.fetch(`${instance.origin}/panel.html`)).text(), panel);
+            app.documents = [];
+            await writeFile(packagePath, JSON.stringify(app));
+            assert.equal(await (await globalThis.fetch(`${instance.origin}/panel.html`)).text(), component);
+
+            // A disconnected component cycle cannot keep itself classified.
+            const nested = '<html-import href="./panel.html"></html-import>'
+                + '<script src="./modules/entry-child.js?arcaneVersion=old"></script>';
+            const parent = component + '<html-import href="./nested.html"></html-import>';
+            await writeFile(path.join(workspaceRoot, 'nested.html'), nested);
+            await writeFile(path.join(workspaceRoot, 'panel.html'), parent);
+            app.include.push('nested.html');
+            await writeFile(packagePath, JSON.stringify(app));
+            await writeFile(path.join(workspaceRoot, 'index.html'), entry.replace('</body>',
+                '<html-import href="./panel.html"></html-import></body>'));
+            assert.equal(await (await globalThis.fetch(`${instance.origin}/nested.html`)).text(),
+                nested.replace('?arcaneVersion=old', ''));
+            await writeFile(path.join(workspaceRoot, 'index.html'), entry.replace('</body>',
+                '<iframe src="./panel.html"></iframe></body>'));
+            assert.equal(await (await globalThis.fetch(`${instance.origin}/nested.html`)).text(), nested);
+            assert.equal(await (await globalThis.fetch(`${instance.origin}/panel.html`)).text(), parent);
+
+            // A dynamically served runtime component is also a real owner.
+            const runtimeOwner = 'node_modules/arcane-os/runtime/arcane/components/owner.html';
+            await mkdir(path.dirname(path.join(workspaceRoot, runtimeOwner)), {recursive: true});
+            await writeFile(path.join(workspaceRoot, runtimeOwner), '<html-import href="/panel.html"></html-import>');
+            await (await globalThis.fetch(`${instance.origin}/${runtimeOwner}`)).text();
+            assert.equal(await (await globalThis.fetch(`${instance.origin}/panel.html`)).text(),
+                parent.replace('?arcaneVersion=old', ''));
+            await writeFile(path.join(workspaceRoot, runtimeOwner), '<p>Runtime owner no longer imports the panel.</p>');
+            assert.equal(await (await globalThis.fetch(`${instance.origin}/panel.html`)).text(), parent);
+
+            // Stable raw representations still support conditional requests.
+            await waitForHttpDateChange(1100);
+            const retained = await globalThis.fetch(`${instance.origin}/panel.html`);
+            const retainedModified = retained.headers.get('last-modified');
+            assert.ok(retainedModified);
+            assert.equal(await retained.text(), parent);
+            const unchanged = await globalThis.fetch(`${instance.origin}/panel.html`, {
+                headers: {'if-modified-since': retainedModified}
+            });
+            assert.equal(unchanged.status, 304);
+            await unchanged.text();
+            await writeFile(path.join(workspaceRoot, runtimeOwner), '<html-import href="/panel.html"></html-import>');
+            const componentAgain = await globalThis.fetch(`${instance.origin}/panel.html`, {
+                headers: {'if-modified-since': retainedModified}
+            });
+            assert.equal(componentAgain.status, 200);
+            assert.equal(await componentAgain.text(), parent.replace('?arcaneVersion=old', ''));
+            assert.equal(await readFile(path.join(workspaceRoot, 'panel.html'), 'utf8'), parent);
             await assert.rejects(lstat(path.join(workspaceRoot, 'dist')), {code: 'ENOENT'});
         }
     );
