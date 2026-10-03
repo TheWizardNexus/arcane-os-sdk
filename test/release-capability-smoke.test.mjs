@@ -553,7 +553,7 @@ test('installed npm sources own maps, development serving and portable output',{
     const rootOffline=JSON.parse(await readFile(path.join(workspaceRoot,'arcane-offline.json'),'utf8'));
     assert.equal(rootOffline.appId,rootAppId);
     assert.equal(rootOffline.sdkVersion,version);
-    assert.deepEqual(rootOffline.navigationAliases,{'/':'/index.html'});
+    assert.deepEqual(rootOffline.navigationAliases,{});
     assert.ok(rootOffline.assets.includes(rootTheme.substring(1)));
     assert.equal(rootOffline.assets.some(function nestedRootAsset(asset){return asset.startsWith('/apps/');}),false);
     await assert.rejects(stat(path.join(workspaceRoot,'apps',rootAppId)),{code:'ENOENT'});
@@ -584,7 +584,7 @@ test('installed npm sources own maps, development serving and portable output',{
         path.join(rootPackaged.outputRoot,'arcane-offline.json'),'utf8'));
     assert.equal(packagedRootOffline.appId,rootAppId);
     assert.equal(packagedRootOffline.sdkVersion,version);
-    assert.deepEqual(packagedRootOffline.navigationAliases,{'./':'./index.html'});
+    assert.deepEqual(packagedRootOffline.navigationAliases,{});
     assert.ok(packagedRootOffline.assets.includes(rootTheme));
     assert.equal(packagedRootOffline.assets.some(function nestedRootAsset(asset){return asset.startsWith('./apps/');}),false);
     const packagedRootWorker=await readFile(path.join(rootPackaged.outputRoot,'arcane-sw.js'),'utf8');
