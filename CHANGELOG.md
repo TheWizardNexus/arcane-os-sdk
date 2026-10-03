@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.52.1
+
+- Preserve an authored host `index.html` at `/` independently of application
+  entry and offline selection. Root import-map/PWA generation no longer aliases
+  that public homepage to the app entry. Existing app-only roots retain their
+  launcher behavior; excluded homepage content and assets stay outside the
+  application's managed documents and offline inventory.
+- Source development follows root-file creation/removal without a descriptor
+  edit, serves an unselected host root unchanged, and avoids stale conditional
+  responses when generated aliases change within one HTTP second. Ordinary
+  selected routes, startup entry, manifest identity and worker lifecycle remain
+  unchanged.
+- Packaged authored roots carry optional generated `app.rootDocument` metadata
+  so preview serves them at `/`; older and app-only packages retain their
+  existing redirects and queries. Worker directory navigation uses only indexes
+  already selected in its current offline inventory, with exact-query priority.
+  No dependency, configuration option, saved-data migration or cache reset is
+  introduced. Consumers regenerate their normal public SDK outputs after update.
+
 ## 0.52.0
 
 - Add optional `package.documents` to select managed application HTML separately
