@@ -514,6 +514,10 @@ function applicationSourcePath(config,appId,relative='') {
     return `/${root?`${root}/`:''}${relative}`;
 }
 
+function selectedApplicationDocument(app,relative){
+    return app.documents===undefined||relative===app.entry||app.documents.includes(relative);
+}
+
 async function packagedRoutes(releaseRoot){
     if(!is.string(releaseRoot)||!releaseRoot.trim())fail('releaseRoot is required in packaged mode.','ARCANE_USAGE');
     const requested=path.resolve(releaseRoot);
@@ -548,7 +552,7 @@ async function packagedRoutes(releaseRoot){
     };
 }
 
-async function sourcePwaAssets(routeSet, mappings, signal, resourceUrls, resourcePaths) {
+async function sourcePwaAssets(routeSet, mappings, signal, resourceUrls, resourcePaths, componentPaths = new Set()) {
     const records = new Map();
     const resources = new Map();
     for (const mapping of mappings) {
@@ -590,7 +594,7 @@ async function sourcePwaAssets(routeSet, mappings, signal, resourceUrls, resourc
     const pending = [{url: entryUrl, documentUrl: entryUrl}];
     const visited = new Set();
     const referencesByPath = new Map();
-    for (const selected of routeSet.app.include) {
+    for (const selected of routeSet.app.documents ?? routeSet.app.include) {
         if (!/\.html?$/iu.test(selected)) continue;
         const url = new URL(
             applicationSourcePath(routeSet.config,routeSet.appId,selected.split('/').map(encodeURIComponent).join('/')),
@@ -654,6 +658,10 @@ async function sourcePwaAssets(routeSet, mappings, signal, resourceUrls, resourc
             }
             if (target.origin !== origin || !resources.has(target.pathname)) continue;
             resourceUrls.add(`${target.pathname}${target.search}`);
+            const targetRecord = resources.get(target.pathname);
+            if (kind === 'document' && targetRecord.mapping.kind === 'app'
+                && !selectedApplicationDocument(routeSet.app, targetRecord.relative.join('/'))) continue;
+            if (kind === 'component') componentPaths.add(decodeURIComponent(target.pathname));
             const traversable = kind !== 'fetch'
                 && (kind !== 'asset' || /\.css(?:[?#]|$)/iu.test(url));
             if (traversable) {
@@ -1089,7 +1097,7 @@ async function startOwnedDevServer({
                 const generatedAt = new Date();
                 state.inventoryTask = Promise.all(
                     [
-                        sourcePwaAssets(selectedRoutes, selectedRoutes.mappings, signal, pwaResourceUrls, resourcePaths),
+                        sourcePwaAssets(selectedRoutes, selectedRoutes.mappings, signal, pwaResourceUrls, resourcePaths, componentPaths),
                         selectedAssetVersion().then(
                             function rememberCurrentInventoryVersion(version) {
                                 if (selectedRoutes === currentSourceRoutes) rememberAssetVersion(version);
@@ -1124,6 +1132,7 @@ async function startOwnedDevServer({
     // Remember actual resource edges as their owners are served, not every
     // HTML/JS/CSS file in an application's document or attachment corpus.
     const resourcePaths=new Set([routeSet.startPath]);
+    const componentPaths=new Set();
     const requestTasks=new Set();
     const runFileWork=createFileWorkLimiter();
     async function serveDevelopmentRequest(request, response) {
@@ -1208,11 +1217,15 @@ async function startOwnedDevServer({
                 }
                 const extension=path.extname(opened.candidate).toLowerCase();
                 const html=extension==='.html'||extension==='.htm';
+                const explicitDocuments = mode === 'source' && mapping.kind === 'app'
+                    && selectedRoutes.app.documents !== undefined;
+                const explicitDocument = explicitDocuments && html
+                    && selectedApplicationDocument(selectedRoutes.app, relative.join('/'));
                 const selectedPwaDocument = mode === 'source' && pwaEnabled && html
                     && mapping.kind === 'app'
-                    && selectedRoutes.app.include.includes(relative.join('/'));
-                const selectedDocument = target.path === selectedRoutes.startPath || selectedPwaDocument;
-                const managedDocument = !selectedDocument && html && await isManagedDocument(opened);
+                    && !explicitDocuments && selectedRoutes.app.include.includes(relative.join('/'));
+                const selectedDocument = target.path === selectedRoutes.startPath || explicitDocument || selectedPwaDocument;
+                const managedDocument = !selectedDocument && !explicitDocuments && html && await isManagedDocument(opened);
                 const entryDocument = selectedDocument || managedDocument;
                 const managedMap=path.basename(opened.candidate)==='arcane.importmap.json';
                 // A live server can span an SDK upgrade. Refresh the small
@@ -1221,8 +1234,11 @@ async function startOwnedDevServer({
                 const runtimeResource=mapping.kind!=='app';
                 const browserResource=['script','style','worker','sharedworker','serviceworker']
                     .includes(request.headers['sec-fetch-dest']);
-                const rewrite=runtimeResource||entryDocument||browserResource||managedMap
-                    ||resourcePaths.has(target.path);
+                // Selecting application pages does not turn retained originals
+                // into resources. HTML components remain owned by html-import.
+                const retainedDocument=explicitDocuments&&html&&!selectedDocument&&!componentPaths.has(target.path);
+                const rewrite=!retainedDocument&&(runtimeResource||entryDocument||browserResource||managedMap
+                    ||resourcePaths.has(target.path));
                 const onReference = function observeServedResource(reference) {
                     const {url,kind,baseKind}=reference;
                     if (pwaEnabled && kind !== 'fetch'
@@ -1247,7 +1263,14 @@ async function startOwnedDevServer({
                         const resource=resolveAssetReference(reference,{ownerUrl:documentUrl});
                         if(resource.origin===documentUrl.origin
                             &&/\.(?:m?js|html?|css)$/iu.test(resource.pathname)){
-                            resourcePaths.add(decodeURIComponent(resource.pathname));
+                            const resourcePath=decodeURIComponent(resource.pathname);
+                            const appPrefix=applicationSourcePath(selectedRoutes.config,selectedRoutes.appId);
+                            const appRelative=resourcePath.startsWith(appPrefix)?resourcePath.slice(appPrefix.length):null;
+                            if(kind==='document'&&mode==='source'&&appRelative!==null
+                                &&sourcePathAllowed(appRelative.split('/'),selectedRoutes.app)
+                                &&!selectedApplicationDocument(selectedRoutes.app,appRelative))return;
+                            if(kind==='component')componentPaths.add(resourcePath);
+                            resourcePaths.add(resourcePath);
                         }
                     }catch{ /* Non-URL values remain under their existing owner. */ }
                 };

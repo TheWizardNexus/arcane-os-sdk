@@ -166,6 +166,16 @@ function validatePathList(value,label,{required=false,allowRoot=false}={}){
     return normalized;
 }
 
+export function normalizeAppDocuments(value,label='documents'){
+    if(value===undefined)return undefined;
+    if(!is.array(value))fail(`${label} must be an array of application-relative HTML paths.`);
+    return value.map(function normalizeDocumentPath(entry,index){
+        const document=normalizeRelativePath(entry,`${label}[${index}]`);
+        if(!/\.html?$/iu.test(document))fail(`${label}[${index}] must name an HTML or HTM file.`);
+        return document;
+    });
+}
+
 function isAlwaysForbidden(relative){
     return relative.split('/').some(segment=>{
         const key=pathKey(segment);
@@ -308,7 +318,7 @@ function normalizeOptionalRecord(value,label){
 export function validateAppConfig(value,appId,rootConfig,configPath=path.posix.join(appRelativeRoot(rootConfig,appId),APP_CONFIG_NAME)){
     assertOnlyKeys(value,new Set([
         'schemaVersion','id','displayName','version','entry','strategy','security',
-        'localAIModelPolicy','include','exclude','shared','adapter','pwa','outputDirectory'
+        'localAIModelPolicy','include','exclude','shared','adapter','pwa','outputDirectory','documents'
     ]),`${appId}/${APP_CONFIG_NAME}`);
     if(value.schemaVersion!==1)fail(`${appId}/${APP_CONFIG_NAME}.schemaVersion must be 1.`);
     if(!is.string(value.id)||value.id!==appId||!APP_ID_PATTERN.test(value.id)){
@@ -317,6 +327,7 @@ export function validateAppConfig(value,appId,rootConfig,configPath=path.posix.j
     const displayName=assertPresentationText(value.displayName,`${appId}/${APP_CONFIG_NAME}.displayName`);
     parseSemver(value.version);
     const entry=normalizeRelativePath(value.entry,`${appId}/${APP_CONFIG_NAME}.entry`);
+    const documents=normalizeAppDocuments(value.documents,`${appId}/${APP_CONFIG_NAME}.documents`);
     const outputDirectory=value.outputDirectory===undefined?undefined:normalizeRelativePath(
         value.outputDirectory,`${appId}/${APP_CONFIG_NAME}.outputDirectory`
     );
@@ -355,6 +366,7 @@ export function validateAppConfig(value,appId,rootConfig,configPath=path.posix.j
         displayName,
         version:value.version,
         entry,
+        ...(documents===undefined?{}:{documents}),
         ...(outputDirectory===undefined?{}:{outputDirectory}),
         strategy:value.strategy,
         ...(value.pwa===undefined?{}:{pwa:normalizePwaConfig(value.pwa)}),
@@ -603,7 +615,23 @@ async function collectPackageRecords(context,{signal}={}){
     return records;
 }
 
-async function browserDocuments(records,entry){
+async function browserDocuments(records,entry,selected){
+    if(selected!==undefined){
+        const appRecords=new Map(records.filter(function applicationRecord(record){
+            return record.appRelativePath!==undefined;
+        }).map(function applicationRecordPath(record){
+            return [record.appRelativePath,record];
+        }));
+        const documentPaths=[entry,...[...new Set(selected)].filter(function secondaryDocument(document){
+            return document!==entry;
+        }).sort(compareText)];
+        return Promise.all(documentPaths.map(async function inspectSelectedDocument(documentPath){
+            const record=appRecords.get(documentPath);
+            if(!record)fail(`Application document is missing from the selected files: ${documentPath}.`);
+            const inspected=inspectImportMapHtml(await readFile(record.source,'utf8'),{documentPath});
+            return {path:documentPath,packagePath:record.destination,...copyJson(inspected)};
+        }));
+    }
     let entryDocument=null;
     const documents=[];
     for(const record of records){
@@ -638,12 +666,13 @@ async function optionalDescriptor(context){
 
 async function inspectContext(context,{signal,records}={}){
     const selectedRecords=records??await collectPackageRecords(context,{signal});
-    const documents=await browserDocuments(selectedRecords,context.config.entry);
+    const documents=await browserDocuments(selectedRecords,context.config.entry,context.config.documents);
     return {
         appId:context.appId,
         displayName:context.config.displayName,
         version:context.config.version,
         entry:context.config.entry,
+        ...(context.config.documents===undefined?{}:{documents:[...context.config.documents]}),
         ...(context.config.outputDirectory===undefined?{}:{outputDirectory:context.config.outputDirectory}),
         strategy:context.config.strategy,
         ...(context.config.pwa===undefined?{}:{pwa:copyJson(context.config.pwa)}),
@@ -888,9 +917,12 @@ async function packageWithContext(context,options={}){
         const offlineReferences=new Set();
         const entryUrl=new URL(packageResourceUrl(entryPath),'http://arcane.invalid/');
         const pwaDocumentSources=new Map();
+        const explicitDocumentPaths=context.config.documents===undefined?null:new Set(
+            inspected.browserDocuments.map(function selectedDocumentPath(document){return document.packagePath;})
+        );
         if(pwaEnabled){
-            const documentPaths=new Set([entryPath]);
-            for(const selected of context.config.include){
+            const documentPaths=new Set(explicitDocumentPaths??[entryPath]);
+            for(const selected of explicitDocumentPaths===null?context.config.include:[]){
                 const selectedPath=appPackagePath(context,selected);
                 if(/\.html?$/iu.test(selected)&&inventory.has(selectedPath))documentPaths.add(selectedPath);
             }
@@ -925,6 +957,9 @@ async function packageWithContext(context,options={}){
             ?new URL(entryDocument.bases[0].href,entryUrl):entryUrl;
         const pending=[{file:entryPath,documentUrl}];
         const sharedFiles=new Set(records.filter(record=>record.appRelativePath===undefined).map(record=>record.destination));
+        const applicationFiles=new Set(records.filter(function applicationRecord(record){
+            return record.appRelativePath!==undefined;
+        }).map(function applicationDestination(record){return record.destination;}));
         for(const file of files){
             if((sharedFiles.has(file)||/^arcane\/(?:modules|entities|components|css|sdk|dependencies)\//u.test(file))
                 &&/\.(?:m?js|html?|css)$/iu.test(file))pending.push({file,documentUrl});
@@ -985,7 +1020,9 @@ async function packageWithContext(context,options={}){
                         if(pwaEnabled&&offlineInventory.has(file)){
                             offlineReferences.add(versionAssetUrl(`.${target.pathname}${target.search}`,null));
                         }
-                        if(traversable)pending.push({
+                        const selectedDocument=kind!=='document'||!applicationFiles.has(file)||explicitDocumentPaths===null
+                            ||explicitDocumentPaths.has(file);
+                        if(traversable&&selectedDocument)pending.push({
                             file,
                             documentUrl:kind==='document'?target
                                 :baseHref?new URL(baseHref,ownerUrl):current.documentUrl

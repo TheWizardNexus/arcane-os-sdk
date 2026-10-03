@@ -66,6 +66,49 @@ test('canonical descriptor projects exact browser and native compatibility input
     assert.deepEqual(value.targets,['windows-x64']);
 });
 
+test('document selectors preserve authored omission, empty selection, and page paths through projection',async t=>{
+    const workspaceRoot=await temporaryDirectory(t);
+    const appRoot=path.join(workspaceRoot,'apps','sample-app');
+    await mkdir(appRoot,{recursive:true});
+    for(const documents of [undefined,[],['modules/review.HTM']]){
+        const authored=descriptor();
+        if(documents!==undefined)authored.package.documents=[...documents];
+        const original=structuredClone(authored);
+        const value=validateAppDescriptor(authored);
+        const manifest=projectPackageManifest(authored);
+        assert.equal(Object.hasOwn(value.package,'documents'),documents!==undefined);
+        assert.equal(Object.hasOwn(manifest,'documents'),documents!==undefined);
+        assert.deepEqual(value.package.documents,documents);
+        assert.deepEqual(manifest.documents,documents);
+        assert.deepEqual(authored,original);
+        assert.equal(Object.hasOwn(projectNativeDescriptor(authored),'documents'),false);
+        await writeFile(path.join(appRoot,'arcane-app.json'),`${JSON.stringify(authored,null,2)}\n`);
+        const loaded=await loadAppDescriptor({
+            workspaceRoot,appRoot,appId:'sample-app',packageManifest:manifest
+        });
+        assert.equal(loaded.source,'authored');
+        assert.deepEqual(loaded.descriptor.package.documents,documents);
+        assert.deepEqual(projectPackageManifest(loaded.descriptor),manifest);
+    }
+});
+
+test('package-only descriptor synthesis retains an explicit document selector',async t=>{
+    const workspaceRoot=await temporaryDirectory(t);
+    const appRoot=path.join(workspaceRoot,'apps','sample-app');
+    await mkdir(appRoot,{recursive:true});
+    for(const documents of [undefined,[],['modules/review.html']]){
+        const manifest=projectPackageManifest(descriptor());
+        if(documents!==undefined)manifest.documents=[...documents];
+        const loaded=await loadAppDescriptor({
+            workspaceRoot,appRoot,appId:'sample-app',packageManifest:manifest
+        });
+        assert.equal(loaded.source,'package-projection');
+        assert.equal(Object.hasOwn(loaded.descriptor.package,'documents'),documents!==undefined);
+        assert.deepEqual(loaded.descriptor.package.documents,documents);
+        assert.deepEqual(projectPackageManifest(loaded.descriptor).documents,documents);
+    }
+});
+
 test('ordinary browser descriptors normalize omitted capability and origin declarations',()=>{
     const browser=descriptor({
         native:{type:'app',icon:null,order:100,bundledApps:[]},

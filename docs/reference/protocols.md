@@ -51,16 +51,12 @@ App-scoped managed browser imports have three supported control-plane entrypoint
 uses `arcane import-map`; Node callers use
 `executeOperation('import-map', options)` or
 `createToolchain(defaults).importMap(options)`. These are three routes to the
-same app-scoped operation, not three import-map formats. Each route discovers
-the selected descriptor's directly navigable admitted `.html`/`.htm` documents
-through the package include/exclude rules and writes one canonical map to the
-artifact plus every such document. The current marker is exactly one matching
-`meta[name="arcane-app-id"]`; an unmarked secondary page with an active `base`
-remains admitted under the current secondary-document rule. Wrong or duplicate
-explicit identity fails, and the selected page then must pass exact path-relative
-base validation.
-Included HTML with neither signal is a component fragment and remains a
-complete package file.
+same app-scoped operation, not three import-map formats. Each route uses the
+[application document selection](#application-document-selection) shared by
+inspection, development and packaging, and writes one canonical map to the
+artifact plus every selected document. Each selected page retains the existing
+path-relative base requirement. Included component fragments remain complete
+package files and keep their existing component processing.
 Public lowercase runtime subpaths resolve directly to canonical runtime-module
 namespaces from both Node package exports and managed browser keys. These
 include `arcane-os/preference-store`, `arcane-os/speech-playback`,
@@ -97,6 +93,48 @@ or `dist`. Distribution instead uses the app's installed package and
 materializes the complete required SDK runtime,
 browser-runtime, and managed-import-map closure inside that app's own artifact.
 No application polls for SDK changes.
+
+## Application document selection
+
+An authored schema-2 `arcane-app.json` may select the HTML pages that receive
+application-document processing through `package.documents`:
+
+```json
+{
+  "package": {
+    "entry": "index.html",
+    "include": ["index.html", "pages", "originals", "modules", "css"],
+    "documents": ["index.html", "pages/viewer.html"]
+  }
+}
+```
+
+This is a package excerpt. Each `documents` member is a literal app-root-relative
+`.html` or `.htm` file path, not a directory or glob. Every selected document
+must already be present in the app's included, non-excluded files. The entry is
+always selected first, followed by the other selected paths in deterministic
+lexical order without duplicates. An empty list selects only the entry. The
+authored `documents` declaration remains as supplied, including `[]`.
+
+Omitting `documents` preserves automatic discovery: the SDK selects the entry
+and included secondary HTML pages with an active `<base>`. A
+`meta[name="arcane-app-id"]` marker does not select a page. Selected pages retain
+the existing requirement for one path-correct active base.
+
+The schema-1 `arcane-package.json` field is `documents` at the top level.
+Descriptor projection and synthesis preserve an omitted property as omitted
+and an authored empty list as `[]`. Package-only applications may author that
+schema-1 field directly. Ordinary inspect, import-map, dev and package operations
+use the same declaration; there is no document-selection CLI flag.
+
+Document selection controls application-document scanning, base handling,
+managed import maps and PWA injection. It does not change `include`/`exclude`,
+serving, package membership or offline resource selection. With an explicit
+list, other included HTML documents retain their exact content, even when a
+selected page references them through an iframe. They remain available as
+included resources without receiving application-document processing.
+Component processing and shared runtime-resource traversal retain their existing
+behavior. Offline inclusion still follows the app's PWA resource selection.
 
 ## App-selected package output
 

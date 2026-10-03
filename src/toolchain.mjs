@@ -299,6 +299,7 @@ async function refreshPreparedImportMap(prepared,{signal,onEvent,workspaceOperat
         signal
     });
     if(inspected.entry!==manifest.entry
+        ||JSON.stringify(inspected.documents)!==JSON.stringify(manifest.documents)
         ||JSON.stringify(inspected.include)!==JSON.stringify(manifest.include)
         ||JSON.stringify(inspected.exclude)!==JSON.stringify(manifest.exclude)){
         throw new ArcaneError(

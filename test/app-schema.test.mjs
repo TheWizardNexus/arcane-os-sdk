@@ -3,7 +3,8 @@ import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {isDeepStrictEqual} from 'node:util';
-import {validateAppDescriptor} from '../src/app-descriptor.mjs';
+import {projectPackageManifest,validateAppDescriptor} from '../src/app-descriptor.mjs';
+import {validateAppConfig} from '../src/packager/core.mjs';
 import {repositoryRoot} from './helpers.mjs';
 
 function descriptor(overrides={}){
@@ -115,6 +116,47 @@ function runtimeAccepts(value){
         return false;
     }
 }
+
+test('descriptor and package schemas accept optional literal HTML document selectors',async()=>{
+    const [appSchema,packageSchema]=await Promise.all([
+        readFile(path.join(repositoryRoot,'schemas','arcane-app.schema.json'),'utf8'),
+        readFile(path.join(repositoryRoot,'schemas','arcane-package.schema.json'),'utf8')
+    ]).then(function parseSchemas(sources){return sources.map(source=>JSON.parse(source));});
+    const cases=[
+        {name:'omitted selection',documents:undefined,expected:true},
+        {name:'entry only',documents:[],expected:true},
+        {name:'selected secondary HTML and HTM',documents:['modules/review.html','modules/summary.HTM'],expected:true},
+        {name:'non-array selection',documents:'index.html',expected:false},
+        {name:'null selection',documents:null,expected:false},
+        {name:'non-HTML file',documents:['modules/report.txt'],expected:false},
+        {name:'directory selection',documents:['modules'],expected:false},
+        {name:'glob selection',documents:['modules/*.html'],expected:false},
+        {name:'parent path',documents:['../outside.html'],expected:false}
+    ];
+    for(const {name,documents,expected} of cases){
+        const authored=descriptor();
+        const manifest=projectPackageManifest(authored);
+        if(documents!==undefined){
+            authored.package.documents=documents;
+            manifest.documents=documents;
+        }
+        assert.equal(matchesSchema(appSchema,authored),expected,`${name} descriptor schema`);
+        assert.equal(runtimeAccepts(authored),expected,`${name} descriptor runtime`);
+        assert.equal(matchesSchema(packageSchema,manifest),expected,`${name} package schema`);
+        const validatePackage=function validateSelectedPackage(){
+            return validateAppConfig(manifest,'sample-app',{
+                appsRoot:'apps',sharedPayloads:{'browser-runtime':[]}
+            });
+        };
+        if(expected){
+            const normalized=validatePackage();
+            assert.equal(Object.hasOwn(normalized,'documents'),documents!==undefined,name);
+            assert.deepEqual(normalized.documents,documents,name);
+        }else{
+            assert.throws(validatePackage,undefined,name);
+        }
+    }
+});
 
 test('descriptor schema and runtime agree on native icon and capability semantics',async()=>{
     const schema=JSON.parse(await readFile(

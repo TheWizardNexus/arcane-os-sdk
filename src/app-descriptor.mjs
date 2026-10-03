@@ -12,6 +12,7 @@ import {
 } from './constants.mjs';
 import {
     normalizeRelativePath,
+    normalizeAppDocuments,
     parseSemver,
     validateAppConfig as validateAppPackageConfig
 } from './packager/core.mjs';
@@ -110,9 +111,10 @@ function validateLocalAIModelPolicy(value,label){
 
 function validatePackage(value,appId){
     assertOnlyKeys(value,new Set([
-        'entry','strategy','include','exclude','shared','adapter','localAIModelPolicy','pwa'
+        'entry','strategy','include','exclude','shared','adapter','localAIModelPolicy','pwa','documents'
     ]),'descriptor.package');
     const entry=normalizeRelativePath(value.entry,'descriptor.package.entry');
+    const documents=normalizeAppDocuments(value.documents,'descriptor.package.documents');
     if(!['static','adapter'].includes(value.strategy))fail('descriptor.package.strategy must be static or adapter.');
     const include=relativePaths(value.include,'descriptor.package.include',{required:true});
     const exclude=relativePaths(value.exclude??[],'descriptor.package.exclude');
@@ -134,6 +136,7 @@ function validatePackage(value,appId){
     }
     return completeValue({
         entry,
+        ...(documents===undefined?{}:{documents}),
         strategy:value.strategy,
         include,
         exclude,
@@ -317,6 +320,7 @@ export function projectPackageManifest(descriptor){
         displayName:value.displayName,
         version:value.version,
         entry:value.package.entry,
+        ...(value.package.documents===undefined?{}:{documents:[...value.package.documents]}),
         strategy:value.package.strategy,
         ...(hasAuthoredSecurity?{security:{
             connectOrigins:[...value.security.connectOrigins],
@@ -381,6 +385,7 @@ function synthesizedDescriptor(packageManifest,nativeDescriptor){
         publisher:{id:'publisher-undeclared',name:'Publisher not declared'},
         package:{
             entry:packageManifest.entry,
+            ...(packageManifest.documents===undefined?{}:{documents:[...packageManifest.documents]}),
             strategy:packageManifest.strategy,
             ...(packageManifest.localAIModelPolicy?{localAIModelPolicy:packageManifest.localAIModelPolicy}:{}),
             ...(packageManifest.pwa===undefined?{}:{pwa:packageManifest.pwa}),

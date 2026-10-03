@@ -10,6 +10,7 @@ import {
     developApplication,
     executeOperation,
     initializeApplication,
+    inspectApp,
     materializeInstalledSdkRuntime,
     packageApplication,
     projectPackageManifest,
@@ -218,6 +219,103 @@ test('application upgrade runs the application npm upgrade without runtime recon
     assert.equal(Object.hasOwn(upgraded,'lockReconciliation'),false);
     assert.equal(await readFile(staleRuntimePath,'utf8'),'stale\n');
     assert.equal(await readFile(reviewPath,'utf8'),'<main>ordinary application content</main>\n');
+});
+
+test('public import-map selection preserves included original documents and keeps the entry first',async t=>{
+    const parent=await temporaryDirectory(t,{prefix:'arcane-document-selection-'});
+    const workspaceRoot=path.join(parent,'workspace');
+    const appId='document-selection';
+    await createApplication({
+        targetPath:workspaceRoot,appId,displayName:'Document Selection',appsRoot:'apps'
+    });
+    const rootConfig=JSON.parse(await readFile(path.join(workspaceRoot,'arcane-packager.json'),'utf8'));
+    rootConfig.sharedPayloads['browser-runtime']=[rootConfig.sharedPayloads['browser-runtime'][0]];
+    await Promise.all([
+        writeJson(path.join(workspaceRoot,'arcane-packager.json'),rootConfig),
+        writeJson(path.join(workspaceRoot,'package.json'),{name:'arcane-os',private:true,type:'module'}),
+        writeJson(path.join(workspaceRoot,'machine_bundles','arcane-os-machine-bundle','package.json'),{
+            name:'arcane-os-machine-bundle',version:'0.8.12'
+        })
+    ]);
+    const appRoot=path.join(workspaceRoot,'apps',appId);
+    const descriptorPath=path.join(appRoot,'arcane-app.json');
+    const packagePath=path.join(appRoot,'arcane-package.json');
+    const authored=JSON.parse(await readFile(descriptorPath,'utf8'));
+    const entryPath=path.join(appRoot,'index.html');
+    const entrySource=await readFile(entryPath,'utf8');
+    const reviewPath=path.join(appRoot,'modules','review.html');
+    await writeFile(reviewPath,entrySource.replace('<base href="../../">','<base href="../../../">'));
+
+    const automatic=await executeOperation('import-map',{workspaceRoot,appId});
+    assert.deepEqual(automatic.importMap.documentPaths,[entryPath,reviewPath]);
+    const originals=new Map([
+        ['modules/archive.html','<!doctype html><html><head><base href="https://archive.example.test/">'
+            +'<script src="scripts/archive.js?arcaneVersion=original"></script></head>'
+            +'<body><p>Complete archived dragon census.  </p></body></html>\n'],
+        ['modules/framed.htm','<!doctype html><html><head><base href="./">'
+            +'<script src="./original.js?arcaneVersion=original&amp;view=full"></script></head>'
+            +'<body><p>Complete framed census.  </p></body></html>\n'],
+        ['modules/unparsed.html','<!doctype html><script src="unfinished original attribute'],
+        ['modules/fragment.html','<main>Selected fragment has no document base.</main>\n']
+    ]);
+    await Promise.all([
+        ...Array.from(originals,function writeOriginal([relative,content]){
+            return writeFile(path.join(appRoot,relative),content,'utf8');
+        }),
+        writeFile(entryPath,entrySource.replace('</body>',
+            `<iframe src="./apps/${appId}/modules/framed.htm"></iframe></body>`),'utf8')
+    ]);
+    async function saveDocumentSelection(documents,exclude=[]){
+        authored.package.documents=[...documents];
+        authored.package.exclude=[...exclude];
+        const manifest=projectPackageManifest(authored);
+        await Promise.all([
+            writeJson(descriptorPath,authored),
+            writeJson(packagePath,manifest)
+        ]);
+    }
+    await saveDocumentSelection(['modules/review.html']);
+    const explicit=await executeOperation('import-map',{workspaceRoot,appId});
+    assert.deepEqual(explicit.importMap.documentPaths,[entryPath,reviewPath]);
+    const inspected=await inspectApp({workspaceRoot,appId});
+    assert.deepEqual(inspected.documents,['modules/review.html']);
+    assert.deepEqual(inspected.browserDocuments.map(document=>document.path),['index.html','modules/review.html']);
+    for(const [relative,content] of originals){
+        assert.equal(await readFile(path.join(appRoot,relative),'utf8'),content,relative);
+        assert.ok(inspected.files.includes(`apps/${appId}/${relative}`),relative);
+    }
+    const packaged=await packageApplication({workspaceRoot,appId});
+    for(const [relative,content] of originals){
+        assert.equal(await readFile(path.join(packaged.release.outputRoot,'apps',appId,relative),'utf8'),content,relative);
+    }
+
+    await saveDocumentSelection([]);
+    const reviewBefore=await readFile(reviewPath,'utf8');
+    const entryOnly=await executeOperation('import-map',{workspaceRoot,appId});
+    assert.deepEqual(entryOnly.importMap.documentPaths,[entryPath]);
+    assert.equal(await readFile(reviewPath,'utf8'),reviewBefore);
+    assert.deepEqual(JSON.parse(await readFile(packagePath,'utf8')).documents,[]);
+
+    await saveDocumentSelection(['modules/fragment.html']);
+    await assert.rejects(executeOperation('import-map',{workspaceRoot,appId}),function missingDocumentBase(error){
+        assert.equal(error.code,'ARCANE_IMPORT_MAP_INVALID');
+        assert.match(error.message,/base/u);
+        return true;
+    });
+    assert.equal(await readFile(path.join(appRoot,'modules/fragment.html'),'utf8'),originals.get('modules/fragment.html'));
+
+    for(const selection of [
+        {documents:['modules/missing.html'],exclude:[],path:'modules/missing.html'},
+        {documents:['modules/review.html'],exclude:['modules/review.html'],path:'modules/review.html'}
+    ]){
+        await assert.rejects(async function selectUnavailableDocument(){
+            await saveDocumentSelection(selection.documents,selection.exclude);
+            return executeOperation('import-map',{workspaceRoot,appId});
+        },function unselectedDocument(error){
+            assert.ok(error.message.includes(selection.path),error.message);
+            return true;
+        });
+    }
 });
 
 test('integrated Arcane workspace supports the complete browser app workflow',async t=>{

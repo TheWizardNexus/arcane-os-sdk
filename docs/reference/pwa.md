@@ -58,6 +58,27 @@ previous source identity while its start URL and scope move to the root. An
 authored `manifest.id` remains authoritative. Packaged default identity remains
 `./`. App identity and saved application data remain unchanged.
 
+### Application pages and preserved HTML resources
+
+Optional `package.documents` in `arcane-app.json` selects the app-root-relative
+`.html`/`.htm` pages that receive managed import maps and PWA links/bootstrap.
+Its schema-1 projection is `arcane-package.json`'s top-level `documents`.
+For example, `"documents": ["index.html"]` selects the entry while other
+included HTML documents retain their exact content. The entry is always selected;
+`[]` also selects only the entry. Omitting the property preserves automatic
+discovery of the entry and included secondary pages with an active `<base>`.
+Selected pages retain the existing path-correct base requirement.
+
+This declaration does not add or remove resources from `package.include`,
+`package.exclude`, serving, packaging or the offline inventory. Included
+originals remain available and can be cached under the normal offline selection,
+including when a selected page displays them in an iframe. With an explicit
+list, those unselected documents are not scanned as application pages or given
+managed import maps, base handling or PWA injection. HTML-import components and
+shared runtime-resource traversal keep their existing processing. See
+[application document selection](protocols.md#application-document-selection)
+for ordering and the complete declaration contract.
+
 ### Root generated output
 
 For a standalone application, `appsRoot: "."` places the app at its repository
@@ -136,16 +157,18 @@ their app and SDK versions match. It is not a content measurement.
 
 The package owns its selected inventory once, after any app adapter finishes.
 It follows actual resource references to include meaningful query variants.
-Generated application pages receive a manifest link and an `async` module
+Selected application pages receive a manifest link and an `async` module
 marked `data-arcane-pwa`. Existing application scripts retain their order.
 PWA registration does not wait for models, storage, preferences or page rendering.
 The same bootstrap starts one initially hidden `pwa-install.html` component with
 the generated manifest's app name. Component loading and worker registration
 proceed independently.
 
-All SDK browser-resource delivery removes only SDK-owned `arcaneVersion` fields
-from actual local resource references, including the managed import map. Authored
-fields such as `v`, encoded and repeated fields, empty query segments, fragments,
+SDK processing of selected application pages, components and runtime resources
+removes only SDK-owned `arcaneVersion` fields from actual local resource references,
+including the managed import map. Explicitly unselected HTML documents keep their
+exact content. Authored fields such as `v`, encoded and repeated fields, empty
+query segments, fragments,
 source spelling and unrelated payloads are preserved. The offline
 manifest carries release information. Non-PWA and native packaging use the same
 [clean local resource URLs](asset-versioning.md). Native packaging does not
@@ -179,9 +202,9 @@ If `package.pwa.offline.include` is nonempty, the resource must also
 match that offline selection and must not match `offline.exclude`. Adding a
 path only to the offline selection does not add it to the app's resources.
 The running source server reads changed app descriptors before the next app,
-root-navigation or generated-PWA request. Include/exclude rules, the entry and
-PWA settings share the current selection; no restart or package projection
-write is needed. Edits to selected source files are picked up by the next due
+root-navigation or generated-PWA request. Include/exclude rules, the entry,
+document selection and PWA settings share the current selection; no restart or
+package projection write is needed. Edits to selected source files are picked up by the next due
 page-load check while the server remains running.
 
 For an enabled application, `arcane dev` serves the generated PWA files at the

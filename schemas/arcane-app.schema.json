@@ -38,6 +38,11 @@
       "required": ["entry", "strategy", "include", "exclude", "shared"],
       "properties": {
         "entry": { "$ref": "#/$defs/relativePath" },
+        "documents": {
+          "type": "array",
+          "description": "Application-relative HTML/HTM pages managed by import-map and PWA processing. Entry is always first; an empty list selects entry only. Omission preserves automatic discovery. File inclusion and serving remain controlled by include/exclude.",
+          "items": { "allOf": [{ "$ref": "#/$defs/relativePath" }, { "pattern": "\\.[Hh][Tt][Mm][Ll]?$" }] }
+        },
         "strategy": { "enum": ["static", "adapter"] },
         "localAIModelPolicy": { "$ref": "#/$defs/localAIModelPolicy" },
         "pwa": { "$ref": "#/$defs/pwa" },

@@ -197,19 +197,24 @@ npm exec -- arcane doctor --workspace . --arcane-root "../Arcane OS"
 
 ### Overview
 
-Refreshes one selected application's browser runtime map, generates
-its standard browser import map, discovers every directly navigable
-`.html`/`.htm` document admitted by the selected descriptor's existing
-include/exclude rules, and prepares the map artifact plus those managed documents
-before writing them in order. A directly navigable entry document declares exactly
-one `<meta name="arcane-app-id" content="<selected-id>">`; an unmarked secondary
-document may instead carry an active `<base>`.
-Wrong or duplicate explicit app identity fails. The renderer then requires one
-path-correct base for every selected document. Included HTML files with neither
-the identity marker nor an active base are component fragments: they remain
-package files and are not rewritten with a document-level import map.
-Packaging and development use the same discovery owner. Packaging consumes
-the saved managed import maps in directly navigable source pages.
+Refreshes one selected application's browser runtime map, generates its standard
+browser import map, and prepares the map artifact plus the selected managed
+`.html`/`.htm` documents before writing them in order. Optional
+`package.documents` in `arcane-app.json` selects literal app-root-relative HTML
+paths that are already included and not excluded. The entry is always first;
+`[]` selects only the entry. Omitting the field retains automatic selection of
+the entry and included secondary pages with an active `<base>`. An app identity
+meta tag does not select a page. The renderer requires one path-correct active
+base for each selected document.
+
+The schema-1 package projection carries this field as `documents`, preserving
+the distinction between omission and `[]`. With explicit selection, other
+included HTML documents keep their exact content, including originals referenced
+through iframes. Selection does not change serving, packaging or offline resource
+membership; component processing and shared runtime-resource traversal retain
+their existing behavior. Inspection, packaging and development use the same
+[document-selection contract](protocols.md#application-document-selection).
+Packaging consumes the saved managed import maps in selected source pages.
 
 ```text
 arcane import-map [--workspace <directory>] [--app <id>]
@@ -279,11 +284,12 @@ Success returns the normal selected-workspace wrapper:
 }
 ```
 
-For the direct CLI command, `documentPaths` contains the configured entry first
-and every other descriptor-selected HTML/HTM document afterward in
-deterministic order. The generated artifact is written first, followed by the
-selected documents. A write failure or cancellation can leave earlier writes
-in place; the operation does not restore them automatically. After successful
+For the direct CLI command, `documentPaths` contains the configured entry first.
+Other selected paths follow in deterministic lexical order without duplicates.
+The authored `documents` declaration remains as supplied, including `[]`.
+The generated artifact is written first, followed by the selected documents.
+A write failure or cancellation can leave earlier writes in place; the operation
+does not restore them automatically. After successful
 writes, an observer failure preserves delivery with
 `eventDelivery.status === 'degraded'` and `ARCANE_EVENT_DELIVERY_FAILED`; it
 does not roll back complete application content.

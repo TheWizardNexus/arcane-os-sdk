@@ -308,6 +308,66 @@ test('root source PWA retains identity and follows direct installed alias routes
 });
 
 for (const enabled of [true, false]) {
+    test(`explicit source documents preserve included originals with PWA ${enabled ? 'enabled' : 'disabled'}`,
+        async function explicitSourceDocuments(context) {
+            const {workspaceRoot, entry} = await sourceFixture(context, {
+                rootApp: true, directPackage: 'node_modules/arcane-os', http: true,
+                enabled, serve: false
+            });
+            const original = '<!doctype html><base href="https://evidence.example/">'
+                + '<script src="./original.js?arcaneVersion=retained"></script><p>  Original text.  </p>\n';
+            const framed = '<!doctype html><base href="./"><script type="importmap" data-arcane-import-map>'
+                + '{"imports":{}}</script><script src="./original.js?arcaneVersion=retained"></script>\n';
+            const component = '<script type="module" src="./modules/entry-child.js?arcaneVersion=old"></script>\n';
+            await writeFile(path.join(workspaceRoot, 'source.html'), original);
+            await writeFile(path.join(workspaceRoot, 'documents', 'frame.html'), framed);
+            await writeFile(path.join(workspaceRoot, 'panel.html'), component);
+            await writeFile(path.join(workspaceRoot, 'index.html'), entry.replace('</body>',
+                '<iframe src="./documents/frame.html"></iframe><html-import href="./panel.html"></html-import></body>'));
+            const packagePath = path.join(workspaceRoot, 'arcane-package.json');
+            const app = JSON.parse(await readFile(packagePath, 'utf8'));
+            app.documents = [];
+            app.include.push('source.html', 'panel.html');
+            await writeFile(packagePath, JSON.stringify(app));
+            const instance = await startDevServer({workspaceRoot, appId: 'fixture', port: 0, http: true});
+            context.after(async function closeSelectedSourceServer() { await instance.close(); });
+            const selected = await (await globalThis.fetch(instance.url)).text();
+            assert.equal(selected.includes('data-arcane-pwa'), enabled);
+            if (enabled) {
+                const offline = await (await globalThis.fetch(`${instance.origin}/arcane-offline.json`)).json();
+                assert.ok(offline.assets.includes('/source.html'));
+                assert.ok(offline.assets.includes('/documents/frame.html'));
+                assert.ok(offline.assets.includes('/panel.html'));
+                assert.equal(offline.assets.some(function originalReference(url) {
+                    return url.includes('original.js');
+                }), false);
+            }
+            for (const [relative, content] of [['source.html', original], ['documents/frame.html', framed]]) {
+                const response = await globalThis.fetch(`${instance.origin}/${relative}`);
+                assert.equal(response.status, 200);
+                assert.equal(await response.text(), content);
+                assert.equal(await readFile(path.join(workspaceRoot, relative), 'utf8'), content);
+            }
+            const panel = await (await globalThis.fetch(`${instance.origin}/panel.html`)).text();
+            assert.equal(panel, '<script type="module" src="./modules/entry-child.js"></script>\n');
+            assert.equal(await readFile(path.join(workspaceRoot, 'panel.html'), 'utf8'), component);
+            const secondaryPath = path.join(workspaceRoot, 'secondary.html');
+            const secondary = await readFile(secondaryPath, 'utf8');
+            assert.equal(await (await globalThis.fetch(`${instance.origin}/secondary.html`)).text(), secondary);
+            app.documents = ['secondary.html'];
+            await writeFile(packagePath, JSON.stringify(app));
+            const newlySelected = await (await globalThis.fetch(`${instance.origin}/secondary.html`)).text();
+            assert.equal(newlySelected.includes('data-arcane-pwa'), enabled);
+            assert.equal(await (await globalThis.fetch(`${instance.origin}/panel.html`)).text(), panel);
+            if (enabled) await (await globalThis.fetch(`${instance.origin}/arcane-offline.json`)).text();
+            app.documents = [];
+            await writeFile(packagePath, JSON.stringify(app));
+            assert.equal(await (await globalThis.fetch(`${instance.origin}/secondary.html`)).text(), secondary);
+            assert.equal(await (await globalThis.fetch(`${instance.origin}/documents/frame.html`)).text(), framed);
+            assert.equal(await (await globalThis.fetch(`${instance.origin}/panel.html`)).text(), panel);
+            await assert.rejects(lstat(path.join(workspaceRoot, 'dist')), {code: 'ENOENT'});
+        }
+    );
     test(`root-only source serving retains authored resources with PWA ${enabled ? 'enabled' : 'disabled'}`,
         async function rootOnlySourceRoutes(context) {
             const {workspaceRoot, instance} = await sourceFixture(context, {

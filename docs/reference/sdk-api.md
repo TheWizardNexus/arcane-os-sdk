@@ -779,12 +779,22 @@ async inspectApp({workspaceRoot, appId, signal}={})
 ```
 
 Import it from `arcane-os` or `arcane-os/packager`. The result includes the
-configured `entry`, `include`, and `exclude` values plus `browserDocuments`, the
-entry-first ordered `.html`/`.htm` paths selected by the same package traversal
-used by import-map refresh and packaging. Current pages declare exactly one
-matching `meta[name="arcane-app-id"]`; unmarked pages with an active `base`
-remain selected for patch compatibility. Included HTML with neither signal is
-retained as a package fragment rather than rewritten as a document.
+configured `entry`, `include`, and `exclude` values, the optional `documents`
+declaration when authored, and `browserDocuments`, the entry-first ordered
+`.html`/`.htm` paths shared by import-map refresh, development and packaging.
+`package.documents` in an authored descriptor, or `documents` in a schema-1
+package, selects literal app-root-relative paths already included and not
+excluded. Other selected paths follow the entry in deterministic lexical order
+without duplicates. The authored `documents` declaration remains as supplied,
+including `[]`, which selects only the entry. Omitting the property retains
+automatic discovery of the entry and included secondary pages with an active `<base>`. App identity
+meta tags do not select documents.
+
+Selected pages retain their existing base requirements. Explicit selection
+leaves other included HTML documents unchanged, including iframe-referenced
+originals, while preserving package, serving and offline resource membership.
+Component processing and shared runtime-resource traversal retain their existing
+behavior. See [application document selection](protocols.md#application-document-selection).
 
 `entry` and each app browser document's `path` stay relative to the app
 directory. Each browser document also reports `packagePath`, the emitted path
@@ -2110,6 +2120,11 @@ async function useprojectNativeDescriptor(...arguments_) {
 ### Overview
 
 Projects a schema-2 descriptor into the compatible schema-1 application package contract.
+
+Optional `package.documents` becomes top-level `documents`. Omission stays
+omitted and an authored empty list stays `[]`, so projection preserves automatic
+discovery versus entry-only selection. See
+[application document selection](protocols.md#application-document-selection).
 
 ### Signature and result
 
@@ -4277,9 +4292,9 @@ async function usedevelopApplication(...arguments_) {
 
 Dispatches one named headless SDK operation with normalized acceptance, events, cancellation, and failure.
 
-The exact command `'import-map'` dispatches one app-scoped refresh
-across directly navigable `.html`/`.htm` documents selected by the descriptor's
-existing include/exclude rules, excluding component fragments, and returns
+The exact command `'import-map'` dispatches one app-scoped refresh across the
+`.html`/`.htm` documents selected by
+[`package.documents` or automatic discovery](protocols.md#application-document-selection), and returns
 `{workspaceRoot, workspaceMode, appId,
 importMap}`. The `importMap` value reports the generated imports and complete
 ordered `documentPaths`. This route mutates the map artifact and selected managed HTML

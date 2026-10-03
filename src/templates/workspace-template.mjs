@@ -195,10 +195,20 @@ npm run run
 
 The explicit \`import-map\` command refreshes
 \`${appPrefix}modules/arcane.importmap.json\` and the managed inline browser
-import map in every directly navigable descriptor-admitted \`.html\`/\`.htm\`
-document. HTML component fragments remain package files but do not receive a
-document-level base or managed import map.
-Development, package, and build refresh that shared inventory when the selected operation needs it.
+import map in each selected application \`.html\`/\`.htm\` document.
+Optional \`package.documents\` in \`arcane-app.json\` selects literal app-root-relative
+HTML paths already included and not excluded, for example \`["index.html"]\`.
+The entry is always selected first; \`[]\` selects only the entry. Omission
+retains automatic discovery of the entry and included secondary pages with an
+active base. The schema-1 package projection preserves this as \`documents\`,
+including the distinction between omission and an empty list.
+Selected pages retain their existing path-correct base requirement. With an
+explicit list, other included HTML documents retain their exact content, even
+when referenced by an iframe. Document selection leaves serving, packaging and
+offline resource membership unchanged. HTML component processing and shared
+runtime-resource traversal retain their existing behavior.
+Development startup refreshes the selected managed maps; package and build
+consume the saved source maps and the same document selection.
 Commit generated import maps and enabled offline app files. Hosting workflows consume those committed files rather than generating them.
 Named \`${directRuntime?'arcane-os/modules/* and arcane-os/entities/*':'arcane/*'}\` imports resolve through the managed map to the selected SDK files. Packaging copies the complete selected application, runtime, and specifier
 map to \`dist/${appId}\` without running application tests. Run \`verify\` only when

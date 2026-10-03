@@ -450,6 +450,69 @@ test(
 );
 
 test(
+    'explicit PWA document selection preserves original HTML and iframe payloads while keeping component resources',
+    async function selectedPwaDocuments(context) {
+        const fixture = await workspaceFixture(context);
+        fixture.packageManifest.documents = ['pages/settings.html'];
+        const originalDocuments = new Map([
+            ['about.html', '<!doctype html><html><head><base href="https://archive.example.test/">'
+                + '<script src="./census.js?arcaneVersion=original"></script></head>'
+                + '<body><p>Complete archived dragon census.  </p></body></html>\n'],
+            ['content/framed.htm', '<!doctype html><html><head><base href="./">'
+                + '<script src="./payload.js?arcaneVersion=original&amp;view=full"></script></head>'
+                + '<body><p>Complete local iframe original.  </p></body></html>\n'],
+            ['content/unparsed.html', '<!doctype html><script src="unfinished original attribute'],
+            ['content/document.html', CORPUS_HTML],
+            ['pages/help.html', await readFile(path.join(fixture.appRoot, 'pages/help.html'), 'utf8')]
+        ]);
+        const component = '<section><script type="module" '
+            + 'src="./apps/pwa-app/modules/app.js?arcaneVersion=old&amp;mode=panel"></script>'
+            + '<p>Reusable dragon census panel.</p></section>\n';
+        const entry = (await readFile(path.join(fixture.appRoot, 'index.html'), 'utf8')).replace(
+            '</body>',
+            '<iframe src="./apps/pwa-app/content/framed.htm"></iframe>'
+                + '<html-import href="./apps/pwa-app/content/panel.html"></html-import></body>'
+        );
+        await Promise.all([
+            writeJson(fixture.appRoot, 'arcane-package.json', fixture.packageManifest),
+            writeText(fixture.appRoot, 'index.html', entry),
+            writeText(fixture.appRoot, 'content/panel.html', component),
+            ...Array.from(originalDocuments, function writeOriginalDocument([relative, content]) {
+                return writeText(fixture.appRoot, relative, content);
+            })
+        ]);
+        for (const documents of [['pages/settings.html'], []]) {
+            fixture.packageManifest.documents = documents;
+            await writeJson(fixture.appRoot, 'arcane-package.json', fixture.packageManifest);
+            const packaged = await packageApp({workspaceRoot: fixture.workspaceRoot, appId: 'pwa-app'});
+            const offline = JSON.parse(await readFile(path.join(packaged.outputRoot, 'arcane-offline.json'), 'utf8'));
+            const packagedEntry = await readFile(path.join(packaged.outputRoot, 'apps/pwa-app/index.html'), 'utf8');
+            assert.match(packagedEntry, /data-arcane-pwa/u);
+            for (const [relative, content] of originalDocuments) {
+                const outputPath = `apps/pwa-app/${relative}`;
+                assert.ok(packaged.files.includes(outputPath), relative);
+                assert.ok(offline.assets.includes(`./${outputPath}`), relative);
+                assert.equal(await readFile(path.join(packaged.outputRoot, outputPath), 'utf8'), content, relative);
+                assert.equal(await readFile(path.join(fixture.appRoot, relative), 'utf8'), content, relative);
+            }
+            const settingsSource = await readFile(path.join(fixture.appRoot, 'pages/settings.html'), 'utf8');
+            const settingsOutput = await readFile(path.join(packaged.outputRoot, 'apps/pwa-app/pages/settings.html'), 'utf8');
+            if (documents.length === 0) {
+                assert.equal(settingsOutput, settingsSource);
+            } else {
+                assert.match(settingsOutput, /data-arcane-pwa/u);
+            }
+            assert.equal(await readFile(path.join(packaged.outputRoot, 'apps/pwa-app/content/panel.html'), 'utf8'),
+                component.replace('?arcaneVersion=old&amp;mode=panel', '?mode=panel'));
+            assert.ok(offline.assets.includes('./apps/pwa-app/modules/app.js?mode=panel'));
+            assert.ok(offline.assets.includes('./arcane/modules/Shared.js?v=old&mode=full'));
+            assert.equal(await readFile(path.join(fixture.appRoot, 'content/panel.html'), 'utf8'), component);
+            assert.equal(await readFile(path.join(fixture.appRoot, 'index.html'), 'utf8'), entry);
+        }
+    }
+);
+
+test(
     'PWA packaging resolves SDK component runtime resources independently of nesting while ordinary pages retain their base',
     async function componentRuntimeResourceInventory(context) {
         const fixture = await workspaceFixture(context, {enabled: true, offline: {exclude: ['content']}});
