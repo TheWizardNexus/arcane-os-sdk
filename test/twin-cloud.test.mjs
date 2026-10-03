@@ -86,6 +86,53 @@ function requestAborted(error) {
 }
 
 test(
+    'TWiN temperature preserves zero, omission, independent calls and retries',
+    async function callerOwnedTemperature(context) {
+        const messages = [
+            {role: 'system', content: 'Keep the lunar lunch inventory complete.'},
+            {role: 'user', content: '  Count every moon raccoon.\n🦝  '}
+        ];
+        const originalMessages = structuredClone(messages);
+        const parsed = {choices: [{message: {role: 'assistant', content: '  Every raccoon counted.\n'}}], extension: {complete: true}};
+        let failNextAttempt = false;
+        const fixture = runtimeFixture(
+            context,
+            async function answerTemperatureRequest() {
+                if (failNextAttempt) {
+                    failNextAttempt = false;
+                    throw new TypeError('Synthetic transport failure.');
+                }
+                return response(200, parsed);
+            }
+        );
+        for (const options of [{}, {temperature: 0.8}, {temperature: 0}, {temperature: undefined}, {}]) {
+            const start = fixture.requests.length;
+            failNextAttempt = options.temperature === 0;
+            const result = await fetchRequest({
+                twinKey,
+                model,
+                messages,
+                ...options,
+                onRequest(request) {
+                    assert.equal(request.messages, messages);
+                    assert.equal(request.temperature, options.temperature);
+                    assert.equal(Object.hasOwn(request, 'temperature'), options.temperature !== undefined);
+                }
+            });
+            assert.equal(result, parsed);
+            assert.deepEqual(messages, originalMessages);
+            const expected = {model, messages: originalMessages, stream: false};
+            if (options.temperature !== undefined) expected.temperature = options.temperature;
+            for (let index = start; index < fixture.requests.length; index += 1) {
+                assert.deepEqual(JSON.parse(fixture.requests[index].options.body), expected);
+            }
+            assert.equal(fixture.requests.length - start, options.temperature === 0 ? 2 : 1);
+        }
+        assert.deepEqual(fixture.delays, [3000]);
+    }
+);
+
+test(
     'TWiN System One preserves caller state, questions and the complete native response',
     async function completeSystemOneRequest(context) {
         const state = {document: '  The moon-powered toaster launched every croissant.\n  '};

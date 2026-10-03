@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from '../src/testing.mjs';
 
 test(
-    'AI request models stay local to each transport operation',
+    'AI request models and TWiN temperatures stay local to each transport operation',
     async function aiRequestModelContract() {
         const previousGlobals = new Map(
             ['window', 'document', 'localStorage', 'fetch', 'Arcane'].map(
@@ -86,6 +86,9 @@ test(
                 {name: 'supplied', options: {model: smallerModel}, expectedModel: smallerModel},
                 {name: 'omitted', options: {}, expectedModel: defaultModel},
                 {name: 'undefined', options: {model: undefined}, expectedModel: defaultModel},
+                {name: 'temperature zero', options: {model: smallerModel, temperature: 0, reasoningEffort: 'low'}, expectedModel: smallerModel},
+                {name: 'temperature supplied', options: {model: smallerModel, temperature: 0.8}, expectedModel: smallerModel},
+                {name: 'temperature undefined', options: {temperature: undefined}, expectedModel: defaultModel},
                 {
                     name: 'authoritative response',
                     options: {model: smallerModel},
@@ -109,6 +112,9 @@ test(
                         assert.equal(url, ai.url, label);
                         assert.equal(options.method, 'POST', label);
                         assert.equal(request.model, scenario.expectedModel, label);
+                        assert.equal(request.temperature, scenario.options.temperature, label);
+                        assert.equal(request.reasoning_effort, scenario.options.reasoningEffort, label);
+                        assert.equal(Object.hasOwn(request, 'temperature'), scenario.options.temperature !== undefined, label);
                         assert.deepEqual(request.messages, originalMessages, label);
                         assert.deepEqual(request, callbackRequest, label);
                         assertDefaultSelection(label);
@@ -123,6 +129,9 @@ test(
                         onRequest(request, id) {
                             assert.equal(id, label);
                             assert.equal(request.model, scenario.expectedModel, label);
+                            assert.equal(request.temperature, scenario.options.temperature, label);
+                            assert.equal(request.reasoning_effort, scenario.options.reasoningEffort, label);
+                            assert.equal(Object.hasOwn(request, 'temperature'), scenario.options.temperature !== undefined, label);
                             assert.equal(request.messages, messages, label);
                             assertDefaultSelection(label);
                             callbackRequest = structuredClone(request);
@@ -186,10 +195,11 @@ test(
                 assertDefaultSelection('concurrent response');
                 return request.stream ? streamResponse() : jsonResponse(request.model);
             };
-            const concurrentFetch = ai.fetchRequest({messages, model: smallerModel});
+            const concurrentFetch = ai.fetchRequest({messages, model: smallerModel, temperature: 0});
             const concurrentStream = ai.streamRequest({
                 messages,
                 model: defaultModel,
+                temperature: 0.8,
                 onResponse(response) { concurrentResponses.push(response); }
             });
             const concurrentResults = await Promise.all([concurrentFetch, concurrentStream]);
@@ -198,34 +208,40 @@ test(
                 [smallerModel, defaultModel].sort()
             );
             for (const request of concurrentRequests) assert.deepEqual(request.messages, originalMessages);
+            assert.equal(concurrentRequests.find(function isFetch(request) { return !request.stream; }).temperature, 0);
+            assert.equal(concurrentRequests.find(function isStream(request) { return request.stream; }).temperature, 0.8);
             assert.equal(concurrentResults[0].model, smallerModel);
             assert.equal(concurrentResults[1], content);
             assert.equal(concurrentResponses[0].model, defaultModel);
             assertDefaultSelection('concurrent completion');
 
             for (const operation of ['chat', 'stream']) {
-                let transportModel;
-                globalThis.fetch = async function answerBuiltInModelBridge(url, options) {
-                    const request = JSON.parse(options.body);
-                    transportModel = request.model;
-                    assert.deepEqual(request.messages, originalMessages);
-                    assertDefaultSelection('built-in runtime bridge');
-                    return request.stream ? streamResponse() : jsonResponse(request.model);
-                };
-                const response = await ai.providerRuntime.request('llm', {
-                    operation,
-                    payload: {messages, model: smallerModel},
-                    localOnly: false,
-                    signal: null
-                });
-                if (operation === 'stream') {
-                    for await (const chunk of response) assert.ok(chunk);
-                    assert.equal((await response.result).model, smallerModel);
-                } else {
-                    assert.equal(response.model, smallerModel);
+                for (const scenario of [{}, {temperature: undefined}, {temperature: 0}, {temperature: 0.8}]) {
+                    let transportModel;
+                    globalThis.fetch = async function answerBuiltInModelBridge(url, options) {
+                        const request = JSON.parse(options.body);
+                        transportModel = request.model;
+                        assert.equal(request.temperature, scenario.temperature);
+                        assert.equal(Object.hasOwn(request, 'temperature'), scenario.temperature !== undefined);
+                        assert.deepEqual(request.messages, originalMessages);
+                        assertDefaultSelection('built-in runtime bridge');
+                        return request.stream ? streamResponse() : jsonResponse(request.model);
+                    };
+                    const response = await ai.providerRuntime.request('llm', {
+                        operation,
+                        payload: {messages, model: smallerModel, ...scenario},
+                        localOnly: false,
+                        signal: null
+                    });
+                    if (operation === 'stream') {
+                        for await (const chunk of response) assert.ok(chunk);
+                        assert.equal((await response.result).model, smallerModel);
+                    } else {
+                        assert.equal(response.model, smallerModel);
+                    }
+                    assert.equal(transportModel, smallerModel);
+                    assertDefaultSelection('built-in runtime completion');
                 }
-                assert.equal(transportModel, smallerModel);
-                assertDefaultSelection('built-in runtime completion');
             }
 
             for (const method of ['fetchRequest', 'streamRequest']) {
@@ -274,6 +290,7 @@ test(
             const retried = await ai.fetchRequest({
                 messages,
                 model: smallerModel,
+                temperature: 0.8,
                 onRetry(state) {
                     retryPhases.push(state.phase);
                     assertDefaultSelection('retry callback');
@@ -282,6 +299,7 @@ test(
             assert.equal(retried.model, smallerModel);
             assert.equal(retryRequests.length, 2);
             assert.equal(retryRequests[0].model, smallerModel);
+            assert.equal(retryRequests[0].temperature, 0.8);
             assert.deepEqual(retryRequests[0], retryRequests[1]);
             assert.deepEqual(retryRequests[0].messages, originalMessages);
             assert.deepEqual(retryPhases, ['waiting', 'requesting']);
@@ -313,10 +331,13 @@ test(
                     await ai[method]({
                         messages,
                         model: 'granite3.3:2b',
+                        temperature: 0.8,
                         localOnly: true,
                         onResponse(response) { observedModel = response.model; }
                     });
                     assert.equal(nativeCalls.at(-1).model, 'granite3.3:2b');
+                    assert.equal(Object.hasOwn(nativeCalls.at(-1), 'temperature'), false);
+                    assert.equal(Object.hasOwn(nativeCalls.at(-1), 'options'), false);
                     assert.deepEqual(nativeCalls.at(-1).messages, originalMessages);
                     assert.equal(observedModel, returnedModel ?? 'granite3.3:2b');
                     assert.equal(ai.model, 'granite3.3:8b');

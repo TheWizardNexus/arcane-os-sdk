@@ -4448,7 +4448,8 @@ class AI {
             signal,
             payload.reasoningEffort,
             onRetry,
-            payload.model
+            payload.model,
+            payload.temperature
         );
     }
 
@@ -4480,7 +4481,8 @@ class AI {
             payload.reasoningEffort,
             observeToolText,
             onRetry,
-            payload.model
+            payload.model,
+            payload.temperature
         );
     }
 
@@ -4810,7 +4812,8 @@ class AI {
                 normalizedReasoningEffort,
                 observeToolText,
                 onRetry,
-                model
+                model,
+                temperature
             );
             const structuralToolCalls=normalizeAICompletionToolCalls(
                 completion
@@ -4920,7 +4923,8 @@ class AI {
         reasoningEffort,
         observeToolText=null,
         onRetry = null,
-        model=this.model
+        model=this.model,
+        temperature
     ){
         let speechTurnCompleted=false;
 
@@ -4947,6 +4951,10 @@ class AI {
             model,
             messages:messages, 
             stream:true
+        }
+
+        if(this.llmService==='TWIN' && temperature!==undefined){
+            request.temperature=temperature;
         }
 
         if(structuredOutputFormat){
@@ -5740,7 +5748,8 @@ class AI {
             signal,
             normalizedReasoningEffort,
             onRetry,
-            model
+            model,
+            temperature
         );
     }
 
@@ -5795,7 +5804,8 @@ class AI {
         signal=null,
         reasoningEffort,
         onRetry = null,
-        model=this.model
+        model=this.model,
+        temperature
     ){
         validateAIStructuralRequest(messages,tools,parallel_tool_calls);
         this.#assertServiceConfigured(this.llmService);
@@ -5817,6 +5827,10 @@ class AI {
             model,
             messages:messages, 
             stream:false
+        }
+
+        if(this.llmService==='TWIN' && temperature!==undefined){
+            request.temperature=temperature;
         }
 
         if(structuredOutputFormat){

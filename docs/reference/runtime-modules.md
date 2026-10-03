@@ -195,6 +195,14 @@ payload; an omitted value remains absent. The provider owns interpretation.
 This option does not switch a loaded browser-WASM model or its lifecycle:
 explicit provider/model selection and activation remain necessary there.
 
+Both object-form methods also forward an optional request-local `temperature`
+unchanged to built-in TWiN Cloud, including through its provider-runtime
+adapter. Explicit `0` is preserved; omission or `undefined` leaves the outbound
+field absent and preserves the provider default. The value is not clamped or
+saved as a preference, concurrent calls remain independent, and retries reuse
+the same value. This adds no output limit or native Ollama option mapping;
+other registered providers retain their existing interpretation of the option.
+
 Built-in cloud chat decodes an HTTP error body once as JSON or text and rejects
 with that complete value unchanged. It does not reconstruct an Error, replace
 the message, or add `providerMessage`, `status`, or an SDK failure code to the

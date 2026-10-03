@@ -15,6 +15,7 @@ export async function fetchRequest({
     toolChoice = 'auto',
     parallelToolCalls,
     reasoningEffort,
+    temperature,
     signal = null,
     id = Date.now(),
     onRequest = function observeTWiNRequest(){},
@@ -47,6 +48,9 @@ export async function fetchRequest({
     }
     if(reasoningEffort){
         request.reasoning_effort = reasoningEffort;
+    }
+    if(temperature !== undefined){
+        request.temperature = temperature;
     }
 
     try{

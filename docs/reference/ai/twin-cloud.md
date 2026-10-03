@@ -69,13 +69,20 @@ strict:true, schema:...}}`. `structuredOutput:true` or `'json'` instead selects
 ## Shared request behavior
 
 The focused API accepts complete `messages`, optional `tools`, `toolChoice`,
-`parallelToolCalls`, and `reasoningEffort` in addition to the explicit
+`parallelToolCalls`, `reasoningEffort`, and `temperature` in addition to the explicit
 `twinKey` and `model`. Tool options use the existing chat-completion wire fields
 `tools`, `tool_choice`, and `parallel_tool_calls` when `tools` is nonempty.
 A supplied nonempty `reasoningEffort` uses the provider's `reasoning_effort`
 field; omission preserves its default. No output limit is added by this API.
 The function neither executes tools nor adds provider-response envelope
 validation.
+
+An optional caller-selected `temperature` is forwarded unchanged, including
+`0`. Omitting it or passing `undefined` leaves the field absent so the selected
+provider uses its own default. The SDK does not clamp it, persist it as a
+preference, or add an output limit. Each request and its retries keep that
+request's value. The browser `AI.fetchRequest` and `AI.streamRequest` object
+APIs support the same option on their built-in TWiN route.
 
 Optional `id`, `onRequest(request,id,metadata)`, and
 `onResponse(response,id,false)` follow the complete-response `AI.fetchRequest`

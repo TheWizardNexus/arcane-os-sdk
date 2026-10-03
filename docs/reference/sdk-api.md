@@ -8008,10 +8008,14 @@ it reads no browser preference or default-model selection. Optional
 A supplied JSON Schema sends `response_format:{type:'json_schema',
 json_schema:{name:'structured_response',strict:true,schema:...}}`. Omission
 leaves structured output off. Optional `tools`, `toolChoice`,
-`parallelToolCalls`, and `reasoningEffort` map to their existing TWiN wire
+`parallelToolCalls`, `reasoningEffort`, and `temperature` map to their existing TWiN wire
 fields. Tool fields are sent when `tools` is nonempty; a nonempty
 `reasoningEffort` is forwarded without selecting a default. No default output
 cap, tool execution, or provider-response envelope validation is added.
+
+`temperature` is forwarded unchanged when supplied, including `0`. Omission or
+`undefined` leaves it out of the request, preserving the provider's default.
+The SDK adds no clamp or saved preference, and retries retain the same value.
 
 The return value is the entire parsed provider JSON, not only one choice or
 message. Optional callbacks are `onRequest(request,id,metadata)` before
