@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.51.2
+
+- Forward caller-selected `temperature` through the focused TWiN Cloud
+  `fetchRequest` and the full AI TWiN fetch/stream paths, including their
+  built-in provider adapters. Preserve explicit `0`; omission or `undefined`
+  leaves the provider default in effect. The value remains request-local and
+  is retained by existing observers and retries. No clamp, saved preference,
+  output limit, native Ollama option mapping, or new dependency is introduced.
+  Complete messages, selected model, reasoning behavior, response content,
+  cancellation, other providers, and existing positional APIs stay unchanged.
+
 ## 0.51.1
 
 - Restore the published `node-http-server` MIME map in development and packaged
