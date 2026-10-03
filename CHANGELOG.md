@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.52.0
+
+- Add optional `package.documents` to select managed application HTML separately
+  from files retained by `include` and `exclude`. The schema-1 projection uses
+  top-level `documents`. The entry is always first, `[]` selects the entry only,
+  and omission preserves automatic discovery. Secondary paths retain existing
+  deterministic ordering while the authored declaration remains unchanged.
+- Use that selection across ordinary inspection, import-map generation,
+  development serving, packaging and PWA document processing. Explicitly
+  unselected HTML originals retain their content, including iframe-referenced
+  documents, while remaining included, served, packaged and offline-eligible
+  under the existing resource selection. HTML-import components and shared
+  runtime resources retain their existing processing. No dependency, migration,
+  default selection change or extra CLI flag is introduced.
+
 ## 0.51.2
 
 - Forward caller-selected `temperature` through the focused TWiN Cloud
