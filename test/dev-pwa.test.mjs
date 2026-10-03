@@ -216,7 +216,7 @@ for (const packageSource of ['node_modules/arcane-os', 'node_modules/arcane-sdk'
         assert.equal(offline.assets.includes('/documents/raw.js?v=4'), false);
         assert.equal(offline.mode, 'development');
         assert.equal(offline.sdkVersion, SDK_VERSION);
-        assert.deepEqual(offline.navigationAliases, {'/': '/index.html'});
+        assert.deepEqual(offline.navigationAliases, {});
         const manifest = JSON.parse(await readFile(path.join(workspaceRoot, 'arcane.webmanifest'), 'utf8'));
         assert.equal(manifest.id, '/apps/fixture/');
         assert.equal(manifest.scope, '/');
@@ -240,8 +240,10 @@ test('root source PWA retains identity and follows direct installed alias routes
     assert.equal(instance.url, `${instance.origin}/index.html`);
     const query = '?view=complete%20content&tag=first&tag=second';
     const rootEntry = await globalThis.fetch(`${instance.origin}/${query}`, {redirect: 'manual'});
-    assert.equal(rootEntry.status, 302);
-    assert.equal(rootEntry.headers.get('location'), `/index.html${query}`);
+    assert.equal(rootEntry.status, 200);
+    assert.equal(rootEntry.headers.get('location'), null);
+    assert.equal(rootEntry.url, `${instance.origin}/${query}`);
+    assert.ok((await rootEntry.text()).includes('First source content'));
     for (const unselectedPath of [
         '/apps/fixture', '/apps/fixture/', '/apps/fixture/index.html',
         '/apps/fixture/secondary.html', '/apps/fixture/arcane-sw.js',
@@ -277,7 +279,7 @@ test('root source PWA retains identity and follows direct installed alias routes
     assert.ok(bootstrap.includes(`from "/${packageSource}/browser-runtime/pwa.mjs";`));
     const offline = await (await globalThis.fetch(`${instance.origin}/arcane-offline.json`)).json();
     assert.equal(offline.sdkVersion, SDK_VERSION);
-    assert.deepEqual(offline.navigationAliases, {'/': '/index.html'});
+    assert.deepEqual(offline.navigationAliases, {});
     assert.ok(offline.assets.includes(`/${packageSource}/runtime/arcane/modules/child.js`));
     assert.ok(offline.assets.includes(`/${packageSource}/runtime/arcane/modules/child.js?v=4`));
     assert.ok(offline.assets.includes('/modules/leaf.js?mode=worker&v=4'));
@@ -297,17 +299,147 @@ test('root source PWA retains identity and follows direct installed alias routes
     assert.equal(changed.start_url, '/secondary.html');
     assert.equal(changed.scope, '/');
     const root = await globalThis.fetch(`${instance.origin}/${query}`, {redirect: 'manual'});
-    assert.equal(root.headers.get('location'), `/secondary.html${query}`);
+    assert.equal(root.status, 200);
+    assert.equal(root.headers.get('location'), null);
+    assert.ok((await root.text()).includes('First source content'));
     const absentEntry = await globalThis.fetch(`${instance.origin}/apps/fixture/index.html${query}`, {redirect: 'manual'});
     assert.equal(absentEntry.status, 404);
     assert.equal(absentEntry.headers.get('location'), null);
     await absentEntry.text();
     const changedOffline = await (await globalThis.fetch(`${instance.origin}/arcane-offline.json`)).json();
-    assert.deepEqual(changedOffline.navigationAliases, {'/': '/secondary.html'});
+    assert.deepEqual(changedOffline.navigationAliases, {});
     await assert.rejects(lstat(path.join(workspaceRoot, 'dist')), {code: 'ENOENT'});
 });
 
 for (const enabled of [true, false]) {
+    test(
+        `authored host root stays raw and refreshes file existence with PWA ${enabled ? 'enabled' : 'disabled'}`,
+        async function liveHostRootSelection(context) {
+            const {workspaceRoot} = await sourceFixture(
+                context,
+                {rootApp: true, directPackage: 'node_modules/arcane-os', http: true, enabled, serve: false}
+            );
+            const packagePath = path.join(workspaceRoot, 'arcane-package.json');
+            const app = JSON.parse(
+                await readFile(packagePath, 'utf8')
+            );
+            app.entry = 'secondary.html';
+            app.documents = [];
+            app.include = app.include.filter(
+                function retainAppFile(relative) {
+                    return relative !== 'index.html';
+                }
+            );
+            const packageSource = JSON.stringify(app);
+            await writeFile(packagePath, packageSource);
+            const rootPath = path.join(workspaceRoot, 'index.html');
+            const landing = '<!doctype html><html lang="en"><head>'
+                + '<script src="./landing.js?arcaneVersion=keep"></script>'
+                + '</head><body>  The public turnip shop.  </body></html>\n';
+            await writeFile(rootPath, landing);
+            await writeFile(path.join(workspaceRoot, 'landing.js'), 'export const shop = true;\n');
+            const instance = await startDevServer(
+                {workspaceRoot, appId: 'fixture', port: 0, http: true}
+            );
+            context.after(
+                async function closeHostRootServer() {
+                    await instance.close();
+                }
+            );
+            const query = '?view=complete%20content&tag=first&tag=second';
+            const rootUrl = `${instance.origin}/${query}`;
+            const root = await globalThis.fetch(
+                rootUrl,
+                {redirect: 'manual'}
+            );
+            assert.equal(root.status, 200);
+            assert.equal(root.headers.get('location'), null);
+            assert.equal(root.url, rootUrl);
+            assert.equal(await root.text(), landing);
+            for (const resource of ['index.html', 'landing.js']) {
+                const unselected = await globalThis.fetch(`${instance.origin}/${resource}`);
+                assert.equal(unselected.status, 404, resource);
+                await unselected.text();
+            }
+            let initialOfflineModified = null;
+            if (enabled) {
+                const offlineResponse = await globalThis.fetch(`${instance.origin}/arcane-offline.json`);
+                initialOfflineModified = offlineResponse.headers.get('last-modified');
+                assert.ok(initialOfflineModified);
+                const offline = await offlineResponse.json();
+                assert.deepEqual(offline.navigationAliases, {});
+                assert.equal(offline.assets.includes('/index.html'), false);
+                assert.equal(
+                    offline.assets.some(
+                        function hostOnlyResource(asset) {
+                            return asset.includes('landing.js');
+                        }
+                    ),
+                    false
+                );
+            }
+
+            await unlink(rootPath);
+            const absent = await globalThis.fetch(
+                rootUrl,
+                {redirect: 'manual'}
+            );
+            assert.equal(absent.status, 302);
+            assert.equal(absent.headers.get('location'), `/secondary.html${query}`);
+            await absent.text();
+            if (enabled) {
+                const absentOfflineResponse = await globalThis.fetch(
+                    `${instance.origin}/arcane-offline.json`,
+                    {headers: {'If-Modified-Since': initialOfflineModified}}
+                );
+                assert.equal(absentOfflineResponse.status, 200);
+                const absentOffline = await absentOfflineResponse.json();
+                assert.deepEqual(absentOffline.navigationAliases, {'/': '/secondary.html'});
+            }
+            await writeFile(rootPath, landing);
+            if (enabled) {
+                // Inventory refresh must observe the new root before a page request does.
+                const restoredOfflineResponse = await globalThis.fetch(`${instance.origin}/arcane-offline.json`);
+                const restoredOffline = await restoredOfflineResponse.json();
+                assert.deepEqual(restoredOffline.navigationAliases, {});
+                assert.equal(restoredOffline.assets.includes('/index.html'), false);
+                const manifestResponse = await globalThis.fetch(`${instance.origin}/arcane.webmanifest`);
+                const manifest = await manifestResponse.json();
+                assert.equal(manifest.id, '/apps/fixture/');
+                assert.equal(manifest.start_url, '/secondary.html');
+                assert.equal(manifest.scope, '/');
+            }
+            const restored = await globalThis.fetch(
+                rootUrl,
+                {redirect: 'manual'}
+            );
+            assert.equal(restored.status, 200);
+            assert.equal(restored.headers.get('location'), null);
+            assert.equal(await restored.text(), landing);
+            assert.equal(await readFile(packagePath, 'utf8'), packageSource);
+
+            // Package membership permits the direct URL without selecting the page for transformation.
+            app.include.push('index.html');
+            if (enabled) app.pwa.offline.exclude.push('index.html');
+            await writeFile(packagePath, JSON.stringify(app));
+            for (const resource of ['/', '/index.html']) {
+                const selected = await globalThis.fetch(
+                    `${instance.origin}${resource}`,
+                    {redirect: 'manual'}
+                );
+                assert.equal(selected.status, 200, resource);
+                assert.equal(selected.headers.get('location'), null, resource);
+                assert.equal(await selected.text(), landing, resource);
+            }
+            if (enabled) {
+                const selectedOfflineResponse = await globalThis.fetch(`${instance.origin}/arcane-offline.json`);
+                const selectedOffline = await selectedOfflineResponse.json();
+                assert.deepEqual(selectedOffline.navigationAliases, {});
+                assert.equal(selectedOffline.assets.includes('/index.html'), false);
+            }
+            assert.equal(await readFile(rootPath, 'utf8'), landing);
+        }
+    );
     test(`explicit source documents preserve included originals with PWA ${enabled ? 'enabled' : 'disabled'}`,
         async function explicitSourceDocuments(context) {
             const {workspaceRoot, entry} = await sourceFixture(context, {
@@ -452,8 +584,9 @@ for (const enabled of [true, false]) {
             });
             const query = '?view=complete%20content&tag=first&tag=second';
             const root = await globalThis.fetch(`${instance.origin}/${query}`, {redirect: 'manual'});
-            assert.equal(root.status, 302);
-            assert.equal(root.headers.get('location'), `/index.html${query}`);
+            assert.equal(root.status, 200);
+            assert.equal(root.headers.get('location'), null);
+            assert.ok((await root.text()).includes('First source content'));
             const entry = await globalThis.fetch(instance.url);
             assert.equal(entry.status, 200);
             assert.ok((await entry.text()).includes('First source content'));
@@ -483,7 +616,7 @@ for (const enabled of [true, false]) {
                 assert.equal(manifest.start_url, '/index.html');
                 const offline = await (await globalThis.fetch(`${instance.origin}/arcane-offline.json`)).json();
                 assert.equal(offline.appId, 'fixture');
-                assert.deepEqual(offline.navigationAliases, {'/': '/index.html'});
+                assert.deepEqual(offline.navigationAliases, {});
                 assert.ok(offline.assets.includes('/node_modules/arcane-os/browser-runtime/pwa.mjs'));
                 assert.equal(offline.assets.includes('/apps/fixture/arcane-sw.js'), false);
                 assert.equal(offline.assets.includes('/apps/fixture/arcane-offline.json'), false);
@@ -525,7 +658,7 @@ for (const enabled of [true, false]) {
             assert.equal(await readFile(ignored, 'utf8'), '  Retained unselected source.  ');
             if (enabled) {
                 const offline = await (await globalThis.fetch(`${instance.origin}/arcane-offline.json`)).json();
-                assert.deepEqual(offline.navigationAliases, {'/': '/index.html'});
+                assert.deepEqual(offline.navigationAliases, {});
                 for (const relative of authored.keys()) assert.ok(offline.assets.includes(`/${relative}`), relative);
             }
             await assert.rejects(lstat(path.join(workspaceRoot, 'dist')), {code: 'ENOENT'});
@@ -534,7 +667,7 @@ for (const enabled of [true, false]) {
 }
 
 test('configured nested source routes retain their selected application base', async function nestedSourceRoutes(context) {
-    const {instance} = await sourceFixture(context, {http: true});
+    const {workspaceRoot, instance} = await sourceFixture(context, {http: true});
     assert.equal(instance.url, `${instance.origin}/apps/fixture/index.html`);
     const root = await globalThis.fetch(`${instance.origin}/`, {redirect: 'manual'});
     assert.equal(root.headers.get('location'), '/apps/fixture/index.html');
@@ -545,6 +678,16 @@ test('configured nested source routes retain their selected application base', a
     assert.equal(manifest.id, '/apps/fixture/');
     assert.equal(manifest.scope, '/apps/fixture/');
     assert.equal(manifest.start_url, '/apps/fixture/index.html');
+    const landing = '<!doctype html><p>  Host landing outside the nested application.  </p>\n';
+    await writeFile(path.join(workspaceRoot, 'index.html'), landing);
+    const authoredRoot = await globalThis.fetch(`${instance.origin}/?view=host`, {redirect: 'manual'});
+    assert.equal(authoredRoot.status, 200);
+    assert.equal(authoredRoot.headers.get('location'), null);
+    assert.equal(await authoredRoot.text(), landing);
+    const offline = await (await globalThis.fetch(`${instance.origin}/arcane-offline.json`)).json();
+    assert.deepEqual(offline.navigationAliases, {});
+    assert.equal(offline.assets.includes('/index.html'), false);
+    assert.equal((await globalThis.fetch(`${instance.origin}/index.html`)).status, 404);
 });
 
 test(

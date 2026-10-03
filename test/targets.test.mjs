@@ -187,6 +187,7 @@ test(
         assert.equal(packaged.release.outputRoot, releaseRoot);
         assert.equal(packaged.release.manifest.app.id, appId);
         assert.equal(packaged.release.manifest.app.start, './index.html');
+        assert.equal(packaged.release.manifest.app.rootDocument, './index.html');
         const completePage = await readFile(path.join(releaseRoot, 'index.html'), 'utf8');
         await writeSyntheticTlsFiles(workspaceRoot);
         const instance = await runApplication({
@@ -199,6 +200,10 @@ test(
         const response = await fetchSyntheticTls(instance.url);
         assert.equal(response.status, 200);
         assert.equal(await response.text(), completePage);
+        const root = await fetchSyntheticTls(`${instance.origin}/?view=complete%20content`, {redirect: 'manual'});
+        assert.equal(root.status, 200);
+        assert.equal(root.headers.get('location'), null);
+        assert.equal(await root.text(), completePage);
         assert.equal(await readFile(descriptorPath, 'utf8'), authoredDescriptor);
         assert.equal(JSON.parse(await readFile(configPath, 'utf8')).outputDirectory, 'ai');
     }

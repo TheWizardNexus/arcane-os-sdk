@@ -544,9 +544,12 @@ for (const liveSource of [false, true]) {
             context.after(function closeRootSourceServer() { return instance.close(); });
             assert.equal(instance.url, `${instance.origin}/index.html`);
             const query = '?request=full%20content&tag=one&tag=two';
-            const redirect = await globalThis.fetch(`${instance.origin}/${query}`, {redirect: 'manual'});
-            assert.equal(redirect.status, 302);
-            assert.equal(redirect.headers.get('location'), `/index.html${query}`);
+            const root = await globalThis.fetch(`${instance.origin}/${query}`, {redirect: 'manual'});
+            assert.equal(root.status, 200);
+            assert.equal(root.headers.get('location'), null);
+            assert.equal(root.url, `${instance.origin}/${query}`);
+            const entry = await globalThis.fetch(instance.url);
+            assert.equal(await root.text(), await entry.text());
             const absent = await globalThis.fetch(`${instance.origin}/apps/${appId}/index.html${query}`, {redirect: 'manual'});
             assert.equal(absent.status, 404);
             assert.equal(absent.headers.get('location'), null);
@@ -738,9 +741,9 @@ test('packaged development server serves its selected real directory without adm
     t.after(()=>instance.close());
     const origin=developmentOrigin(instance);
 
-    const root=await request(origin,'/');
+    const root=await request(origin,'/?view=complete%20content&tag=first&tag=second');
     assert.equal(root.status,302);
-    assert.equal(root.headers.get('location'),'/index.html');
+    assert.equal(root.headers.get('location'),'/index.html?view=complete%20content&tag=first&tag=second');
     assertPermissiveDevelopmentHeaders(root);
     const entry=await request(origin,'/index.html');
     assert.equal(entry.status,200);
@@ -770,6 +773,46 @@ test('packaged development server serves its selected real directory without adm
     assert.equal(changedRelease.status,200);
     assert.equal(await changedRelease.text(),'changed package content\n');
 });
+
+test(
+    'packaged preview serves its declared authored root without changing the application entry',
+    async function packagedAuthoredRoot(context) {
+        useSyntheticTls(context);
+        const workspaceRoot = await temporaryDirectory(
+            context,
+            {prefix: 'arcane-authored-preview-'}
+        );
+        await writeSyntheticTlsFiles(workspaceRoot);
+        const releaseRoot = path.join(workspaceRoot, 'packaged-app');
+        await mkdir(releaseRoot);
+        const landing = '<!doctype html><p>  A public landing beside the installed app.  </p>\n';
+        const entry = '<!doctype html><p>  The separately selected application.  </p>\n';
+        const release = {app: {entry: 'app.html', start: './app.html', rootDocument: './index.html'}};
+        await Promise.all(
+            [
+                writeFile(path.join(releaseRoot, 'index.html'), landing),
+                writeFile(path.join(releaseRoot, 'app.html'), entry),
+                writeFile(path.join(releaseRoot, 'ARCANE_APP_RELEASE.json'), JSON.stringify(release))
+            ]
+        );
+        const instance = await startDevServer(
+            {mode: 'packaged', workspaceRoot, releaseRoot, host: '127.0.0.1', port: 0}
+        );
+        context.after(
+            async function closeAuthoredRootPreview() {
+                await instance.close();
+            }
+        );
+        assert.equal(instance.url, `${instance.origin}/app.html`);
+        const root = await request(instance.origin, '/?view=host&tag=first&tag=second');
+        assert.equal(root.status, 200);
+        assert.equal(root.headers.get('location'), null);
+        assert.equal(await root.text(), landing);
+        const app = await request(instance.origin, '/app.html');
+        assert.equal(app.status, 200);
+        assert.equal(await app.text(), entry);
+    }
+);
 
 test('development server keeps local defaults and supports explicit public binding',async function serverBindAddresses(t){
     useSyntheticTls(t);

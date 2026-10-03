@@ -543,11 +543,13 @@ async function packagedRoutes(releaseRoot){
     const canonical=await canonicalRealDirectory(requested,'Packaged release root');
     let pwa = false;
     let startPath = '/index.html';
+    let rootDocument = null;
     try {
         const release = JSON.parse(
             await readFile(path.join(canonical, 'ARCANE_APP_RELEASE.json'), 'utf8')
         );
         const start = release.app.start ?? release.app.entry;
+        if (release.app.rootDocument === './index.html') rootDocument = '/index.html';
         const startUrl = new URL(start, 'http://arcane.invalid/');
         startPath = `${startUrl.pathname}${startUrl.search}${startUrl.hash}`;
     } catch (error) {
@@ -564,6 +566,7 @@ async function packagedRoutes(releaseRoot){
         appId:null,
         pwa,
         startPath,
+        rootDocument,
         mappings:[{
             prefix:[],
             root:canonical
@@ -1026,19 +1029,30 @@ async function startOwnedDevServer({
     }
     async function readCurrentSourceRoutes() {
         throwIfAborted(signal);
-        let manifestPath = path.join(appMapping.root, APP_DESCRIPTOR_NAME);
-        let authored = true;
-        let input;
-        try {
-            input = await lstat(manifestPath);
-        } catch (error) {
+        function optionalSourceMetadata(error) {
             if (error.code !== 'ENOENT') throw error;
+            return null;
+        }
+        let manifestPath = path.join(appMapping.root, APP_DESCRIPTOR_NAME);
+        const [rootIndex, descriptorInput] = await Promise.all(
+            [
+                lstat(path.join(routeSet.workspaceRoot, 'index.html')).catch(optionalSourceMetadata),
+                lstat(manifestPath).catch(optionalSourceMetadata)
+            ]
+        );
+        const rootDocument = rootIndex?.isFile() ? '/index.html' : null;
+        let authored = true;
+        let input = descriptorInput;
+        if (!input) {
             authored = false;
             manifestPath = path.join(appMapping.root, APP_CONFIG_NAME);
             input = await lstat(manifestPath);
         }
         if (sourceManifestInput?.path === manifestPath
             && sourceManifestInput.modifiedAt === input.mtimeMs) {
+            if (currentSourceRoutes.rootDocument !== rootDocument) {
+                currentSourceRoutes = {...currentSourceRoutes, rootDocument};
+            }
             return currentSourceRoutes;
         }
         const value = JSON.parse(await readFile(manifestPath, 'utf8'));
@@ -1060,6 +1074,7 @@ async function startOwnedDevServer({
         currentSourceRoutes = {
             ...routeSet,
             app: manifest,
+            rootDocument,
             startPath: applicationSourcePath(routeSet.config,routeSet.appId,manifest.entry),
             mappings: mappings.map(
                 function currentSourceMapping(mapping) {
@@ -1076,7 +1091,7 @@ async function startOwnedDevServer({
     function developmentPwaArtifacts(selectedRoutes, assets = [], version = assetVersion) {
         const rootApp = selectedRoutes.config.appsRoot === '.';
         const appBase = applicationSourcePath(selectedRoutes.config,selectedRoutes.appId);
-        const navigationAliases = {'/': selectedRoutes.startPath};
+        const navigationAliases = selectedRoutes.rootDocument ? {} : {'/': selectedRoutes.startPath};
         return createPwaArtifacts(
             {
                 app: {
@@ -1104,12 +1119,21 @@ async function startOwnedDevServer({
     function rememberPwaArtifacts(state, artifacts, generatedAt = new Date()) {
         for (const file of artifacts.files) {
             const previous = state.metadata.get(file.path);
-            const lastModified = previous?.content === file.content
+            const previousTime = previous?.lastModified
+                ? Date.parse(previous.lastModified.toUTCString()) : previous?.ambiguousThrough;
+            let lastModified = previous?.content === file.content
                 ? previous.lastModified
                 : generatedAt;
+            if (!lastModified && generatedAt.getTime() >= previousTime + 1000) {
+                lastModified = generatedAt;
+            }
+            // A changed alias must not validate the prior body within one HTTP second.
+            const ambiguous = previous?.content !== file.content && previousTime !== undefined
+                && Date.parse(generatedAt.toUTCString()) <= previousTime;
+            if (ambiguous) lastModified = undefined;
             state.metadata.set(
                 file.path,
-                {content: file.content, lastModified}
+                {content: file.content, lastModified, ambiguousThrough: lastModified ? undefined : previousTime}
             );
         }
         state.artifacts = artifacts;
@@ -1277,22 +1301,29 @@ async function startOwnedDevServer({
                 );
                 return;
             }
-            if(segments.length===0){
+            const rootRequest = segments.length === 0;
+            if (rootRequest && !selectedRoutes.rootDocument) {
                 response.writeHead(302,{location:`${selectedRoutes.startPath}${target.search}`});
                 response.end();
                 return;
             }
-            const mapping = selectedRoutes.mappings.find(
-                function requestedSourceMapping(route) {
-                    return route.prefix.every(
-                        function matchingSourcePrefix(segment, index) {
-                            return segments[index] === segment;
-                        }
-                    );
-                }
-            );
+            const resourceSegments = rootRequest ? ['index.html'] : segments;
+            const hostRoot = rootRequest && mode === 'source'
+                && (selectedRoutes.config.appsRoot !== '.' || !sourcePathAllowed(resourceSegments, selectedRoutes.app));
+            // Only the host's exact root document is outside app selection.
+            // Its direct URL and every other resource keep the selected routes.
+            const mapping = hostRoot ? {kind: 'host', root: selectedRoutes.workspaceRoot, prefix: []}
+                : selectedRoutes.mappings.find(
+                    function requestedSourceMapping(route) {
+                        return route.prefix.every(
+                            function matchingSourcePrefix(segment, index) {
+                                return resourceSegments[index] === segment;
+                            }
+                        );
+                    }
+                );
             if(!mapping){deny(response,404,'Not found.');return;}
-            const relative=segments.slice(mapping.prefix.length);
+            const relative=resourceSegments.slice(mapping.prefix.length);
             if(relative.length===0){deny(response,404,'Not found.');return;}
             if(mapping.allow&&!mapping.allow(relative)){deny(response,404,'Not found.');return;}
             await runFileWork(async function serveMappedResource() {
@@ -1307,6 +1338,18 @@ async function startOwnedDevServer({
                     deny(response,404,'Not found.');
                     return;
                 }
+                if (hostRoot) {
+                    const representation = sourceRepresentation(opened, assetVersion, false, false);
+                    await serveSourceFile(
+                        fileServer,
+                        request,
+                        response,
+                        opened,
+                        {lastModified: representation.lastModified, representationTracked: true}
+                    );
+                    return;
+                }
+                const resourcePath = rootRequest ? selectedRoutes.rootDocument : target.path;
                 const extension=path.extname(opened.candidate).toLowerCase();
                 const html=extension==='.html'||extension==='.htm';
                 const explicitDocuments = mode === 'source' && mapping.kind === 'app'
@@ -1316,7 +1359,7 @@ async function startOwnedDevServer({
                 const selectedPwaDocument = mode === 'source' && pwaEnabled && html
                     && mapping.kind === 'app'
                     && !explicitDocuments && selectedRoutes.app.include.includes(relative.join('/'));
-                const selectedDocument = target.path === selectedRoutes.startPath || explicitDocument || selectedPwaDocument;
+                const selectedDocument = resourcePath === selectedRoutes.startPath || explicitDocument || selectedPwaDocument;
                 const managedDocument = !selectedDocument && !explicitDocuments && html && await isManagedDocument(opened);
                 const entryDocument = selectedDocument || managedDocument;
                 const managedMap=path.basename(opened.candidate)==='arcane.importmap.json';
@@ -1324,22 +1367,22 @@ async function startOwnedDevServer({
                 // version record on navigation, not on each resource request.
                 if(entryDocument||managedMap)rememberAssetVersion(await selectedAssetVersion());
                 const runtimeResource=mapping.kind!=='app';
-                if (runtimeResource && html) runtimeDocuments.add(target.path);
+                if (runtimeResource && html) runtimeDocuments.add(resourcePath);
                 const browserResource=['script','style','worker','sharedworker','serviceworker']
                     .includes(request.headers['sec-fetch-dest']);
                 // Selecting application pages does not turn retained originals
                 // into resources. HTML components remain owned by html-import.
                 const componentDocument=explicitDocuments&&html&&!selectedDocument
-                    &&await isCurrentComponent(target.path, selectedRoutes);
+                    &&await isCurrentComponent(resourcePath, selectedRoutes);
                 const retainedDocument=explicitDocuments&&html&&!selectedDocument&&!componentDocument;
                 const rewrite=!retainedDocument&&(runtimeResource||entryDocument||browserResource||managedMap
-                    ||componentDocument||resourcePaths.has(target.path));
+                    ||componentDocument||resourcePaths.has(resourcePath));
                 const onReference = function observeServedResource(reference) {
                     const {url,kind,baseKind}=reference;
                     if (pwaEnabled && kind !== 'fetch'
                         && !(kind === 'import' && !/^(?:\.{1,2}\/|\/)/u.test(url))) {
                         try {
-                            const documentUrl = new URL(target.path, 'http://arcane.invalid');
+                            const documentUrl = new URL(resourcePath, 'http://arcane.invalid');
                             const resource = resolveAssetReference(
                                 {...reference,url:versionAssetUrl(url,null)},
                                 {ownerUrl:documentUrl}
@@ -1354,7 +1397,7 @@ async function startOwnedDevServer({
                     if(baseKind==='document'||kind==='fetch'||(kind==='asset'&&!/\.css(?:[?#]|$)/iu.test(url))
                         ||(kind==='import'&&!/^(?:\.{1,2}\/|\/)/u.test(url)))return;
                     try{
-                        const documentUrl=new URL(target.path,'http://arcane.invalid');
+                        const documentUrl=new URL(resourcePath,'http://arcane.invalid');
                         const resource=resolveAssetReference(reference,{ownerUrl:documentUrl});
                         if(resource.origin===documentUrl.origin
                             &&/\.(?:m?js|html?|css)$/iu.test(resource.pathname)){

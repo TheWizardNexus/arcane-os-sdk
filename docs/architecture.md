@@ -145,6 +145,19 @@ one metadata task; unchanged files reuse their parsed selection. Shared runtime
 requests do not wait for that refresh. Full offline inventories are enumerated
 only for worker/offline-manifest requests, with separate state for each selected
 app snapshot so an older inventory cannot overwrite newer generated metadata.
+
+Authored host-root `index.html` presence is refreshed independently of descriptor
+edits. Development serves that host index at `/` instead of redirecting to the
+app entry and suppresses the root PWA alias. An index outside the selected app
+mapping uses an unchanged exact-root response; `/index.html` and other resource
+URLs retain their existing selection rules. A selected index keeps its existing
+document classification. This broadens no app or offline inventory and adds no
+managed maps or bootstrap. With no host index, the app-entry redirect remains.
+A worker serves a directory's cached index body only when that index is already
+in its current offline selection; otherwise the host owns the unchanged request.
+The selected app launch and installation identity remain independent of this
+host-root navigation.
+
 Changed resource requests return the complete current saved source without
 packaging, copying files into `dist`, or restarting the server. Conditional
 requests for unchanged resources return `304`. Enabled PWAs check on page load
@@ -253,9 +266,12 @@ separate. See the [complete output contract](reference/protocols.md#app-selected
 
 Packaging keeps standalone app files at the release root and places an explicitly
 nested app beneath `apps/<id>/`. It preserves every shared route destination.
-When selected content supplies no root `index.html`, the SDK generates one that
-opens the selected app entry. Authored document bases, app URLs, relative module
-imports and shared runtime paths therefore resolve through the same layout in
+A selected authored output-root `index.html` is preserved and suppresses the
+deployment-root PWA navigation alias. When selected content supplies no root
+index, the SDK generates a launcher and retains the selected app-entry alias;
+an excluded source-host index does not alter that package result. Authored
+document bases, app URLs, relative module imports and shared runtime paths
+therefore resolve through the same layout in
 source development and packaged delivery. Packaging consumes the saved source
 and managed import maps; use `arcane import-map` to refresh those maps, or the
 ordinary `arcane dev` startup that performs that refresh.
@@ -266,6 +282,13 @@ entry, or `./apps/hello-world/index.html` for a nested app. Its complete `files`
 inventory follows the selected layout and includes the root `index.html`.
 Packaged browser serving opens `app.start`; a previously generated flat release without `app.start` retains
 its `app.entry` launch path.
+Only selected records supplying an authored output-root index add the optional
+generated `app.rootDocument: "./index.html"` release field. Preview serves that
+document at `/` without inferring ownership from HTML content. When the field is
+absent, older releases and generated-launcher packages retain their existing
+`302` root redirect to `app.start` or the older `app.entry` fallback, preserving
+the request query. This release fact adds no app configuration or API option and
+does not change `app.start`.
 
 The authored schema-2 descriptor is canonical for new apps and projects an
 exact schema-1 `arcane-package.json` for current consumers. Existing Arcane

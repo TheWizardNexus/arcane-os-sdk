@@ -251,14 +251,33 @@ The declared application ID remains unchanged. `appsRoot: "apps"` continues
 to discover `apps/<id>` and supports the existing integrated and multi-app
 layouts. Entries and include/exclude paths remain relative to the application.
 
-Root HTML uses `<base href="./">`; nested navigable documents use their actual
-depth back to the workspace. Managed bare imports remain the public interface;
-their targets follow the selected npm routes. `arcane import-map` generates
-enabled static PWA records at the app root, so normal static hosting needs no
+SDK-managed root HTML uses `<base href="./">`; nested navigable documents use
+their actual depth back to the workspace. Managed bare imports remain the
+public interface; their targets follow the selected npm routes. `arcane import-map`
+generates enabled static PWA records at the app root, so normal static hosting needs no
 SDK request handler or runtime copy. Managed refresh, development serving,
 inspection, dry run and packaging add no nested `apps/<id>/` navigation pages,
 redirects, or duplicate PWA worker/inventory files. There is no output-retention
 switch for those retired records.
+
+An authored source-host `index.html` suppresses the root app-entry redirect and
+generated PWA navigation alias even when that file is outside the application's
+include or offline selection. Development serves that host index at `/`. An
+index outside the selected app mapping uses an unchanged exact-root response;
+`/index.html` and other resource URLs retain their existing selection rules.
+A selected index follows the existing document classification. Root presence
+adds no page, assets, managed maps, or PWA bootstrap to the application. With no
+host index, development retains the app-entry redirect. In a package, only a
+selected authored output-root index suppresses the alias; an absent or excluded
+root retains the generated launcher and app-entry alias. Selected records that
+supply an authored output-root index add the optional generated release field
+`app.rootDocument: "./index.html"`. Preview serves that document at `/`; absence
+retains the existing `302` to `app.start` or the older `app.entry` fallback with
+the request query preserved. This is a release fact, not an app setting or HTML
+content inference, and `app.start` remains unchanged. The worker can answer a
+directory navigation from an index only when that index already belongs to its
+current offline selection and has a cached response; otherwise the unchanged
+request remains host-owned. See [authored host roots](pwa.md#authored-host-root-and-app-entry).
 
 Application identity, stored data, the existing default installation ID and an
 authored `pwa.manifest.id` remain unchanged. Authored resources continue to

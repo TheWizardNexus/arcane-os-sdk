@@ -882,7 +882,14 @@ generates one that opens the selected app page. The result
 contains `outputRoot`, `manifest`, and the complete `files` inventory.
 `manifest.app.entry` stays app-relative, while `manifest.app.start`
 is the package launch URL, such as `./index.html` for a root app or
-`./apps/hello-world/index.html` for a nested app. Release
+`./apps/hello-world/index.html` for a nested app. Only when selected records
+supply an authored output-root index does the release add
+`manifest.app.rootDocument: "./index.html"`. Preview serves that explicit
+document at `/`; without the field, older releases and generated-launcher
+packages retain the `302` redirect to `app.start` or the older `app.entry`
+fallback with the request query preserved. This generated release fact adds no
+app configuration or API option, changes no `app.start`, and requires no HTML
+content inference. Release
 schema `1`, kind `arcane-app-release`, and packager identity
 `arcane-app-packager-v1` remain unchanged. A dry run returns the planned output
 and file inventory without writing source or output.

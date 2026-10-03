@@ -788,7 +788,7 @@ async function loadAdapter(context){
     return module;
 }
 
-function releaseManifest(context,files,pwaArtifacts){
+function releaseManifest(context,files,pwaArtifacts,rootDocument){
     return {
         schemaVersion:1,
         kind:'arcane-app-release',
@@ -799,6 +799,7 @@ function releaseManifest(context,files,pwaArtifacts){
             version:context.config.version,
             entry:context.config.entry,
             start:packageResourceUrl(appPackagePath(context, context.config.entry)),
+            ...(rootDocument ? {rootDocument} : {}),
             strategy:context.config.strategy,
             shared:[...context.config.shared],
             ...(pwaArtifacts?{pwa:{
@@ -845,6 +846,11 @@ async function packageWithContext(context,options={}){
     const appPath=appRelativeRoot(context.rootConfig,context.appId);
     const entryPath=appPackagePath(context,context.config.entry);
     const records=await collectPackageRecords(context,{signal});
+    const rootDocument = records.some(
+        function selectedRootIndex(record) {
+            return record.destination === 'index.html';
+        }
+    ) ? './index.html' : undefined;
     const inspected=await inspectContext(context,{signal,records});
     if(options.dryRun){
         return {
@@ -888,9 +894,7 @@ async function packageWithContext(context,options={}){
     try{
         async function copyBase() {
             await copyRecords(records,stagingRoot,{signal,onEvent});
-            if (!records.some(function selectedRootIndex(record) {
-                return record.destination === 'index.html';
-            })) {
+            if (!rootDocument) {
                 await writePackageLauncher(context, stagingRoot);
             }
         }
@@ -1050,6 +1054,7 @@ async function packageWithContext(context,options={}){
             sdkVersion:assetVersion,
             pwa:context.config.pwa,
             files,
+            navigationAliases: rootDocument ? {} : {'./': packageResourceUrl(entryPath)},
             assets:[...offlineReferences]
         }):null;
         if(pwaArtifacts){
@@ -1080,7 +1085,7 @@ async function packageWithContext(context,options={}){
             }
             files.sort(compareText);
         }
-        const manifest=releaseManifest(context,files,pwaArtifacts);
+        const manifest=releaseManifest(context,files,pwaArtifacts,rootDocument);
         await writeFile(
             path.join(stagingRoot,RELEASE_MANIFEST_NAME),
             `${JSON.stringify(manifest,null,2)}\n`,

@@ -330,24 +330,41 @@ async function refreshRootApplicationFiles(prepared,inspected,importMap,{signal,
     const manifest=prepared.validation.app.manifest;
     const installed=await readInstalledSdkLayout(workspaceRoot,prepared.validation.config);
     const entry=`/${manifest.entry.split('/').map(encodeURIComponent).join('/')}`;
-    const navigationAliases={
-        '/':entry
-    };
+    const pwaEnabled = installed?.direct && manifest.pwa?.enabled;
+    let authoredRoot = false;
+    if (pwaEnabled) {
+        try {
+            authoredRoot = (await lstat(path.join(workspaceRoot, 'index.html'))).isFile();
+        } catch (error) {
+            if (error.code !== 'ENOENT') throw error;
+        }
+    }
+    // A host homepage need not belong to the selected application or its cache.
+    const navigationAliases = authoredRoot ? {} : {'/': entry};
+    function rootIndexPath(relative) {
+        return (process.platform === 'win32' ? relative.toLowerCase() : relative) === 'index.html';
+    }
+    const selectedRootIndex = authoredRoot && manifest.include.some(rootIndexPath)
+        && !manifest.exclude.some(rootIndexPath);
     // The source host serves the installed files in place. There is no runtime projection.
     const files=[...new Set([
-        ...inspected.files.filter(file=>file!=='index.html'||manifest.include.includes('index.html')),
+        ...inspected.files.filter(
+            function selectedSourceFile(file) {
+                return file !== 'index.html' || selectedRootIndex;
+            }
+        ),
         importMap.artifactRelativePath
     ])];
     const sourceOrigin='http://arcane.invalid';
     const selectedPaths=new Set(files.map(function selectedStaticPath(file){
         return new URL(`/${file.split('/').map(encodeURIComponent).join('/')}`,sourceOrigin).pathname;
     }));
-    const assets=installed?.direct&&manifest.pwa?.enabled
+    const assets=pwaEnabled
         ?(await collectSourcePwaAssets({workspaceRoot,appId,signal,onEvent})).filter(function selectedStaticVariant(value){
             const url=new URL(value,sourceOrigin);
             return url.origin===sourceOrigin&&selectedPaths.has(url.pathname);
         }):[];
-    const pwa=installed?.direct&&manifest.pwa?.enabled?createPwaArtifacts({
+    const pwa=pwaEnabled?createPwaArtifacts({
         app:{id:appId,displayName:manifest.displayName,version:manifest.version,entry},
         sdkVersion:installed.version,
         pwa:manifest.pwa,

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {mkdir,readFile,stat,writeFile} from 'node:fs/promises';
+import {mkdir,readFile,stat,unlink,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {inspectApp,packageApp,validateRootConfig} from '../src/packager/core.mjs';
@@ -126,7 +126,7 @@ for(const dependencyName of ['arcane-os','arcane-sdk']){
         assert.equal(offline.sdkVersion,fixture.sdkVersion);
         assert.equal(offline.mode,'development');
         assert.equal(offline.revision,'development');
-        assert.deepEqual(offline.navigationAliases,{'/':'/pages/review.html'});
+        assert.deepEqual(offline.navigationAliases,{});
         for(const resource of fixture.resources.keys())assert.ok(offline.assets.includes(`/${packageSource}/${resource}`));
         assert.ok(offline.assets.includes('/modules/arcane.importmap.json'));
         assert.ok(offline.assets.includes('/content/fragment.html'));
@@ -156,13 +156,14 @@ for(const dependencyName of ['arcane-os','arcane-sdk']){
         assert.equal(packagedManifest.id,manifestId??'./');
         assert.equal(packagedManifest.scope,'./');
         assert.equal(packaged.manifest.app.start,'./pages/review.html');
+        assert.equal(packaged.manifest.app.rootDocument,'./index.html');
         const packagedBootstrap=await readFile(path.join(packaged.outputRoot,'arcane-pwa.mjs'),'utf8');
         assert.ok(packagedBootstrap.includes(`"./${packageSource}/browser-runtime/pwa.mjs"`));
         for(const [resource,content] of fixture.resources){
             assert.equal(await readFile(path.join(packaged.outputRoot,packageSource,resource),'utf8'),content);
         }
         const packagedOffline=JSON.parse(await readFile(path.join(packaged.outputRoot,'arcane-offline.json'),'utf8'));
-        assert.deepEqual(packagedOffline.navigationAliases,{'./':'./pages/review.html'});
+        assert.deepEqual(packagedOffline.navigationAliases,{});
         assert.equal(packaged.files.some(function nestedAppFile(file){return file.startsWith('apps/');}),false);
         await assert.rejects(stat(path.join(packaged.outputRoot,'apps')),{code:'ENOENT'});
         assert.equal(await readFile(path.join(packaged.outputRoot,'content/fragment.html'),'utf8'),fixture.fragment);
@@ -184,7 +185,7 @@ for(const dependencyName of ['arcane-os','arcane-sdk']){
         assert.equal(manifest.start_url,'/pages/review.html');
         const offline=JSON.parse(await readFile(path.join(workspaceRoot,'arcane-offline.json'),'utf8'));
         assert.equal(offline.appId,appId);
-        assert.deepEqual(offline.navigationAliases,{'/':'/pages/review.html'});
+        assert.deepEqual(offline.navigationAliases,{});
         assert.equal(offline.assets.some(function nestedAppAsset(asset){return asset.startsWith('/apps/');}),false);
         assert.ok(offline.assets.includes(`/${packageSource}/browser-runtime/pwa.mjs`));
         for(const relative of ['arcane-pwa.mjs','arcane-sw.js','arcane-offline.json','arcane.webmanifest']){
@@ -211,7 +212,7 @@ for(const dependencyName of ['arcane-os','arcane-sdk']){
         assert.equal(packaged.manifest.app.id,appId);
         assert.equal(packaged.manifest.app.start,'./pages/review.html');
         const packagedOffline=JSON.parse(await readFile(path.join(packaged.outputRoot,'arcane-offline.json'),'utf8'));
-        assert.deepEqual(packagedOffline.navigationAliases,{'./':'./pages/review.html'});
+        assert.deepEqual(packagedOffline.navigationAliases,{});
         assert.equal(packagedOffline.assets.some(function nestedAppAsset(asset){return asset.startsWith('./apps/');}),false);
         for(const document of ['index.html','pages/review.html','pages/other.htm']){
             const content=await readFile(path.join(workspaceRoot,document),'utf8');
@@ -252,9 +253,92 @@ test('root output preserves explicitly selected authored resources',async functi
         }else assert.equal(packagedContent,content);
     }
     const offline=JSON.parse(await readFile(path.join(workspaceRoot,'arcane-offline.json'),'utf8'));
-    assert.deepEqual(offline.navigationAliases,{'/':'/pages/review.html'});
+    assert.deepEqual(offline.navigationAliases,{});
     for(const relative of authored.keys())assert.ok(offline.assets.includes(`/${relative}`),relative);
 });
+
+for (const rootSelection of ['outside include', 'excluded', 'offline excluded', 'absent']) {
+    test(
+        `root navigation distinguishes ${rootSelection} host content from the selected application`,
+        async function authoredHostRootSelection(context) {
+            const fixture = await rootFixture(context, 'arcane-os');
+            const {workspaceRoot, appId} = fixture;
+            const landing = '<!doctype html><html lang="en"><head>'
+                + '<script src="./landing.js?arcaneVersion=authored"></script>'
+                + '</head><body>  The turnip shop stays at its own address.  </body></html>\n';
+            const manifest = {...fixture.manifest, documents: []};
+            if (rootSelection === 'outside include' || rootSelection === 'absent') {
+                manifest.include = manifest.include.filter(
+                    function retainApplicationResource(relative) {
+                        return relative !== 'index.html';
+                    }
+                );
+            } else if (rootSelection === 'excluded') {
+                manifest.exclude = ['index.html'];
+            } else {
+                manifest.pwa = {...manifest.pwa, offline: {exclude: ['index.html']}};
+            }
+            if (rootSelection === 'absent') {
+                await unlink(path.join(workspaceRoot, 'index.html'));
+            } else {
+                await writeText(workspaceRoot, 'index.html', landing);
+                await writeText(workspaceRoot, 'landing.js', 'export const publicLanding = true;\n');
+            }
+            await writeJson(workspaceRoot, 'arcane-package.json', manifest);
+            const toolchain = createToolchain(
+                {workspaceRoot, appId}
+            );
+            await toolchain.importMap({});
+            const sourceOffline = JSON.parse(
+                await readFile(path.join(workspaceRoot, 'arcane-offline.json'), 'utf8')
+            );
+            assert.deepEqual(
+                sourceOffline.navigationAliases,
+                rootSelection === 'absent' ? {'/': '/pages/review.html'} : {}
+            );
+            assert.equal(sourceOffline.assets.includes('/index.html'), false);
+            assert.equal(
+                sourceOffline.assets.some(
+                    function landingAsset(asset) {
+                        return asset.includes('landing.js');
+                    }
+                ),
+                false
+            );
+            if (rootSelection !== 'absent') {
+                assert.equal(await readFile(path.join(workspaceRoot, 'index.html'), 'utf8'), landing);
+            }
+            const packaged = await packageApp(
+                {workspaceRoot, appId}
+            );
+            const packagedOffline = JSON.parse(
+                await readFile(path.join(packaged.outputRoot, 'arcane-offline.json'), 'utf8')
+            );
+            const packagedIndex = await readFile(path.join(packaged.outputRoot, 'index.html'), 'utf8');
+            if (rootSelection === 'offline excluded') {
+                assert.equal(packagedIndex, landing);
+                assert.equal(packaged.manifest.app.rootDocument, './index.html');
+                assert.deepEqual(packagedOffline.navigationAliases, {});
+                assert.equal(packagedOffline.assets.includes('./index.html'), false);
+            } else {
+                assert.notEqual(packagedIndex, landing);
+                assert.ok(packagedIndex.includes('pages/review.html'));
+                assert.equal(Object.hasOwn(packaged.manifest.app, 'rootDocument'), false);
+                assert.deepEqual(packagedOffline.navigationAliases, {'./': './pages/review.html'});
+            }
+            assert.equal(packaged.manifest.app.start, './pages/review.html');
+            assert.equal(packaged.manifest.app.id, appId);
+            assert.equal(
+                packagedOffline.assets.some(
+                    function packagedLandingAsset(asset) {
+                        return asset.includes('landing.js');
+                    }
+                ),
+                false
+            );
+        }
+    );
+}
 
 test('root-only output also omits navigation when PWA is disabled',async function nonPwaRootOnlyOutput(context){
     const fixture=await rootFixture(context,'arcane-os');

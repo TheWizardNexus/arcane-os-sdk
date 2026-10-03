@@ -515,9 +515,9 @@ test(
 );
 
 for (const workerScope of ['https://example.test/', 'https://example.test/releases/current/']) {
-    test(`PWA query navigation reuses selected static HTML at ${workerScope} without redirect or per-user cache entries`, async function staticDocumentQueryNavigation() {
+    test(`PWA navigation reuses selected static HTML and directory indexes at ${workerScope} without redirect or per-user cache entries`, async function staticDocumentQueryNavigation() {
         let offline = false;
-        const manifest = workerManifest({assets: ['index.html', 'pages/notes.htm']});
+        const manifest = workerManifest({assets: ['index.html', 'pages/notes.htm', 'chapters/index.html'], navigationAliases: {}});
         const fixture = workerFixture({
             manifest,
             workerScope,
@@ -543,6 +543,18 @@ for (const workerScope of ['https://example.test/', 'https://example.test/releas
                 assert.deepEqual(await navigation.background, [{status: 'fulfilled', value: undefined}]);
             }
         }
+        for (const directory of ['', 'chapters/']) {
+            for (const query of ['', '?view=complete%20content&tag=first&tag=second']) {
+                const url = `${workerScope}${directory}${query}`;
+                const navigation = fixture.request(url, {mode: 'navigate'});
+                const response = await navigation.response;
+                assert.equal(navigation.request.url, url);
+                assert.equal(response.status, 200);
+                assert.equal(response.headers.get('location'), null);
+                assert.equal(await response.text(), `Complete document:${workerScope}${directory}index.html\n  続き\n`);
+                assert.deepEqual(await navigation.background, [{status: 'fulfilled', value: undefined}]);
+            }
+        }
         assert.equal(fixture.requests.length, installedRequests);
         assert.deepEqual([...cache.keys()].sort(), installedEntries);
         assert.deepEqual(fixture.messages, []);
@@ -552,7 +564,8 @@ for (const workerScope of ['https://example.test/', 'https://example.test/releas
 
 test('PWA exact selected query variant takes precedence over its plain static document', async function exactNavigationVariant() {
     const variant = 'index.html?view=selected&tag=first&tag=second';
-    const manifest = workerManifest({assets: ['index.html', variant]});
+    const directoryVariant = '?view=selected&tag=first&tag=second';
+    const manifest = workerManifest({assets: ['index.html', variant, directoryVariant], navigationAliases: {}});
     const fixture = workerFixture({manifest});
     await fixture.lifecycle('install');
     const cache = fixture.storage.stores.get(`arcane-pwa|${JSON.stringify([manifest.appId, scope])}|resources`);
@@ -563,7 +576,16 @@ test('PWA exact selected query variant takes precedence over its plain static do
     const ordinary = fixture.request(`${scope}index.html?view=other`, {mode: 'navigate'});
     assert.equal(await (await ordinary.response).text(), `original:${scope}index.html`);
     await ordinary.background;
-    assert.equal(fixture.requests.length, 2);
+    const selectedDirectory = fixture.request(`${scope}${directoryVariant}`, {mode: 'navigate'});
+    const directoryResponse = await selectedDirectory.response;
+    assert.equal(directoryResponse.status, 200);
+    assert.equal(directoryResponse.headers.get('location'), null);
+    assert.equal(await directoryResponse.text(), `original:${scope}${directoryVariant}`);
+    await selectedDirectory.background;
+    const ordinaryDirectory = fixture.request(`${scope}?view=other`, {mode: 'navigate'});
+    assert.equal(await (await ordinaryDirectory.response).text(), `original:${scope}index.html`);
+    await ordinaryDirectory.background;
+    assert.equal(fixture.requests.length, 3);
     cache.delete(`${scope}${variant}`);
     const evicted = fixture.request(`${scope}${variant}`, {mode: 'navigate'});
     assert.equal(await (await evicted.response).text(), `original:${scope}${variant}`);
@@ -1007,7 +1029,7 @@ test(
     }
 );
 
-test('root worker inventory refresh preserves installed identity and saved caches', async function rootInventoryRefresh() {
+test('root worker inventory refresh retires the alias without serving retained unselected index content', async function rootInventoryRefresh() {
     const appId = 'retained-root-app';
     const rootScope = 'https://example.test/';
     const artifacts = createPwaArtifacts({
@@ -1016,7 +1038,7 @@ test('root worker inventory refresh preserves installed identity and saved cache
         basePath: '/', appBase: '/', installationId: `/apps/${appId}/`,
         runtimeBase: '/node_modules/arcane-os/browser-runtime/',
         assets: ['/secondary.html', '/modules/App.js', '/node_modules/arcane-os/browser-runtime/pwa.mjs'],
-        navigationAliases: {'/': '/secondary.html'}
+        navigationAliases: {}
     });
     assert.equal(artifacts.manifest.id, `/apps/${appId}/`);
     assert.equal(artifacts.manifest.scope, '/');
@@ -1057,9 +1079,11 @@ test('root worker inventory refresh preserves installed identity and saved cache
     assert.ok(fixture.requests.some(function fetchedRootInventory(request) {
         return request.url === `${rootScope}arcane-offline.json`;
     }));
-    const navigation = await fixture.request(rootScope, {mode: 'navigate'}).response;
-    assert.equal(navigation.status, 302);
-    assert.equal(navigation.headers.get('location'), `${rootScope}secondary.html`);
+    for (const query of ['', '?view=host&tag=first&tag=second']) {
+        const navigation = fixture.request(`${rootScope}${query}`, {mode: 'navigate'});
+        assert.equal(navigation.response, undefined);
+        assert.deepEqual(await navigation.background, []);
+    }
     const retainedCache = storage.stores.get(`arcane-pwa|${JSON.stringify([appId, rootScope])}|resources`);
     assert.equal(await retainedCache.get(`${rootScope}index.html`).clone().text(), `Complete content:${rootScope}index.html`);
     assert.equal(await (await savedData.match('conversation')).text(), 'Complete saved conversation.');

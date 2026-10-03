@@ -245,6 +245,12 @@ files remain unchanged. The same layout applies to `arcane dev` and
 `arcane package`. Generated and offline app files are committed; GitHub Actions
 consume those committed files. See [root generated output](pwa.md#root-generated-output).
 
+An existing authored source-host `index.html` suppresses the generated `/`
+navigation alias even when the page is outside the application or offline
+selection. It is not automatically added to either inventory or given managed
+maps or PWA bootstrap. The selected app entry and installation identity remain
+unchanged; see [authored host roots](pwa.md#authored-host-root-and-app-entry).
+
 The supported physical layout preserves its route count and ordered include
 list. External and modern integrated physical routes require `components`, `css`,
 `dependencies`, `entities`, `img`, `modules`, and `sdk`; a physical workspace
@@ -372,6 +378,16 @@ starts. Package-only apps retain their existing manifest. This operation does
 not package the app or produce `dist` output. With PWA enabled, the server
 generates the installation and offline manifests directly; see
 [PWA development and versioning](pwa.md#development-and-hosting).
+
+The startup URL remains the selected app entry. At `/`, the server serves an
+existing authored host-root `index.html` and suppresses the app-entry redirect
+and PWA alias. A root outside the selected app mapping is served unchanged only
+through this exact-root route; `/index.html` and other resource URLs retain their
+existing selection rules. A selected root follows its existing document
+classification. Root presence does not expand either inventory or cause
+bootstrap injection. With no host index, the app-entry redirect remains.
+Root-file creation or removal is reflected in subsequent root-navigation and
+generated-PWA requests without a restart or a descriptor edit.
 
 The command reports acceptance before bind/start work, emits the final URL,
 owns the server until cancellation, and restores failure to the process exit.
@@ -550,8 +566,11 @@ defaulting to `dist/<id>/`, and preserves the prior output until the replacement
 is complete. It consumes saved source and managed
 import maps, keeps standalone app files at the output root, and retains the
 configured shared route destinations. Explicit multi-app workspaces retain
-their selected app beneath `apps/<id>/`. When selected shared content supplies no root
-`index.html`, the SDK generates one that opens the selected app entry.
+their selected app beneath `apps/<id>/`. A selected authored output-root
+`index.html` is preserved and suppresses the deployment-root PWA navigation
+alias. When selected content supplies no root index, the SDK generates a launcher
+and retains the app-entry alias. An excluded source-host root does not change
+that package selection.
 Source document bases and resource URLs therefore retain their development
 layout. Packaging does not run tests or checks automatically.
 
@@ -584,6 +603,10 @@ The result includes the release root, manifest, and complete selected inventory.
 the package launch URL in `app.start`: `./index.html` for a root app with that
 entry, or `./apps/hello-world/index.html` for a nested app. The complete file
 inventory follows the selected layout and includes the root `index.html`.
+Only selected records supplying an authored output-root index add
+`app.rootDocument: "./index.html"`. This optional generated release fact selects
+root-document serving in preview; it is not an app configuration or CLI option
+and does not change `app.start`.
 `--dry-run` plans the package without refreshing source, running tests, or
 replacing output.
 
@@ -749,6 +772,11 @@ For `--target browser`, starts the existing release in the app's configured
 does not package, rebuild, test, check, or verify that release automatically.
 It opens the release manifest's `app.start` URL. Older flat releases without
 that field continue to open their `app.entry` path.
+Requests to `/` serve the explicit `app.rootDocument` when that generated
+release field is present. With no field, including older releases and app-only
+packages with a generated launcher, `/` retains its `302` redirect to
+`app.start` or the older `app.entry` fallback, preserving the request query.
+Preview does not infer root ownership from HTML content.
 The preview always uses HTTPS with the workspace certificate pair. Supply
 `--cert <file> --key <file>` together to use another pair; see
 [development HTTPS setup](#development-https-setup).

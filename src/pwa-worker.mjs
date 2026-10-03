@@ -496,8 +496,10 @@ function installPwaWorker(manifest, clientUrl) {
 
     function staticNavigationResource(url) {
         const document = new URL(url);
-        if (document.origin !== scopeOrigin || !document.search
-            || !/\.html?$/iu.test(document.pathname)) {
+        if (document.origin !== scopeOrigin) return null;
+        if (document.pathname.endsWith('/')) {
+            document.pathname += 'index.html';
+        } else if (!document.search || !/\.html?$/iu.test(document.pathname)) {
             return null;
         }
         document.search = '';

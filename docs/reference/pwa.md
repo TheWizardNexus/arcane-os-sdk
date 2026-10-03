@@ -102,6 +102,38 @@ committed files rather than generating them. Actual multi-app workspaces keep
 their explicit `appsRoot: "apps"` layout. This source/package contract does not
 establish any particular installed application's browser lifecycle.
 
+### Authored host root and app entry
+
+An authored `index.html` at the source host root keeps `/` separate from the
+selected application entry. Root import-map generation and development PWA
+generation omit the `/`-to-entry navigation alias whenever that file exists,
+including when it is outside `package.include` or the offline selection.
+Development serving answers `/` with that host index. An index outside the app's
+selected source mapping is served unchanged through this exact-root route;
+`/index.html` and other resource URLs retain their existing selection rules.
+A selected index follows its existing managed-document classification. Root
+presence alone adds no page or assets to the application or offline inventory
+and adds no managed maps or PWA bootstrap. The host owns a root response outside
+the worker's selected offline resources. With no host index, development retains
+its app-entry redirect.
+
+Packaging considers the selected output instead of unrelated source-host files.
+A selected authored output-root `index.html` is preserved and suppresses the
+deployment-root navigation alias. When selected content supplies no output-root
+index, the package retains its generated launcher and app-entry alias. An
+authored source root excluded from the package does not replace that launcher.
+Only when selected records supply an authored output-root index does packaging
+write `app.rootDocument: "./index.html"` in `ARCANE_APP_RELEASE.json`.
+Packaged preview uses that generated field to serve the authored document at
+`/`; it does not inspect HTML to infer root ownership. Without the field,
+including older releases and generated-launcher packages, preview retains its
+`302` redirect to `app.start` (or the older `app.entry` fallback), preserving the
+request query. The startup URL remains the selected app launch URL.
+
+This behavior requires no new setting. The application entry, default install
+start URL, manifest identity and scope, worker registration scope, cache
+identity, and saved application data keep their existing contracts.
+
 ### Offline resource selection
 
 `offline.include` and `offline.exclude` select literal paths or directory
@@ -304,8 +336,10 @@ therefore matters even when an offline cache exists. Updating files in place
 while installation fetches them is not an atomic release snapshot; the host owns
 consistent deployment of the selected output.
 
-An offline navigation alias redirects to its selected entry page, preserving the
-document URL used to resolve relative modules and styles.
+Where an app-entry navigation alias remains, it redirects to the selected entry
+page, preserving the document URL used to resolve relative modules and styles.
+An authored host root suppresses that alias as described above; merely retaining
+an old cached root resource does not add it to the current offline selection.
 
 For a same-origin navigation to a selected static `.html` or `.htm` document,
 the worker can reuse that document's cached body while leaving the complete
@@ -318,6 +352,14 @@ request goes to the network unchanged; its response is not saved over the plain
 document. This does not change query matching for assets, API calls, ordinary
 fetch requests, unselected documents or other origins. Cache refresh and the
 Update prompt keep their existing lifecycle.
+
+For a same-origin directory navigation without an app-entry alias, the worker
+can likewise reuse that directory's `index.html` body only when the index is
+already in the current offline selection and has a retained cached response.
+The directory URL and its query remain unchanged, including beneath a deployment
+subpath. An exact query-specific selected resource takes precedence. Otherwise,
+the original request passes to the host unchanged. This adds no page or asset to
+the inventory and does not save a host response over the selected index.
 
 Browser storage eviction can remove an offline cache. A missing release cache
 entry falls back to the network, so offline availability still depends on the
