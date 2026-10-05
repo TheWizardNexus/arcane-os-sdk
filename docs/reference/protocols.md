@@ -147,9 +147,70 @@ included resources without receiving application-document processing.
 Component processing and shared runtime-resource traversal retain their existing
 behavior. Offline inclusion still follows the app's PWA resource selection.
 
+## Native-only application resources
+
+An application's schema-2 `arcane-app.json` can explicitly select server modules
+and their complete app-owned source closure without adding them to its browser
+or PWA output:
+
+```json
+{
+  "package": {
+    "include": ["index.html", "modules", "css"],
+    "nativeResources": {
+      "include": ["server", "src", "package.json"],
+      "exclude": ["server/drafts"]
+    }
+  }
+}
+```
+
+This is a package excerpt. Each path is literal and relative to the application
+root; a directory includes its descendants. The app selects the full required
+closure explicitly. The SDK does not crawl imports to discover server source,
+filter it by extension, install app dependencies or execute a service.
+`nativeResources.include` is required and may be empty; `exclude` defaults to
+`[]`. Descriptor projection writes the same record at the top level of schema-1
+`arcane-package.json`, and package-only apps may author it there directly.
+Omission remains omission. The native registry descriptor is unchanged.
+
+`packageApp({target})` and `inspectApp({target})` default to `'browser'`. A
+nonbrowser SDK target adds these resources to the ordinary app/shared selection.
+Native exclusions apply only to the additional selection, not the browser
+selection. A file selected by both is emitted once through its ordinary browser
+processing. Files selected only as native resources retain their complete
+original content, including imports, HTML, line endings and data. They are copied
+after browser document discovery, module projection, asset rewriting and PWA
+processing, and appear in the complete release inventory. A collision with
+generated output reports an error instead of replacing that output.
+
+Target and module representation are independent: `moduleFormat:'native'`
+controls browser module/script packaging and does not select native resources.
+Nonbrowser targets use effective `browserPwa:false`; ordinary browser calls keep
+their configured PWA behavior. An app adapter receives `target` and effective
+`browserPwa` in its existing `buildArcanePackage()` context. Its `copyBase()`
+copies ordinary browser/shared files; the packager appends native-only files
+after the adapter and browser transformations finish.
+
+A nonbrowser target with a nonempty native include list writes its app input to
+`dist/.native/<target>/<app-id>`, even when the saved browser `outputDirectory`
+is custom. This keeps an existing browser/PWA output separate. An explicit
+low-level `outputDirectory` override takes precedence; it must name the
+dedicated output the caller intends to replace. Omitted or empty native
+resources preserve the existing output rules. `inspectApp()` reports the
+effective `output` and complete selected files without writing them.
+
+Paired native `buildApplication()` applies the same selected target and output
+resolution to the selected app and every explicitly bundled app. Each app keeps
+its own declaration; the provider receives actual release roots and complete
+release records. Native artifact `outputRoot` remains a different directory.
+Use `verifyApp({workspaceRoot,appId,outputDirectory:release.output})` to inspect
+that emitted app release; verification does not launch its services or host.
+See [the portable service composition guide](core-native-packaging.md#native-only-application-resources).
+
 ## App-selected package output
 
-An app may set `"outputDirectory": "ai"` in its schema-1
+For browser selection, an app may set `"outputDirectory": "ai"` in its schema-1
 `arcane-package.json`. This selects the final directory relative to the
 workspace: `<workspace>/ai`, not `<workspace>/ai/<app-id>`. Omitting the
 field retains `dist/<app-id>`. The root `arcane-packager.json` configuration
@@ -185,6 +246,10 @@ output must remain separate; a conflicting native assembly fails before it
 packages any app. App launch paths, resource URLs, and enabled PWA
 representations retain their package-relative layout.
 
+The [native-only resource selection](#native-only-application-resources) above
+adds a separate default native input directory when its include list is nonempty.
+An explicit low-level output override still selects the exact directory to replace.
+
 ## Native-module package output
 
 The public `packageApp` operation accepts `moduleFormat:'native'`. Omission, or
@@ -192,6 +257,9 @@ The public `packageApp` operation accepts `moduleFormat:'native'`. Omission, or
 `outputDirectory` overrides only this invocation's destination; `verifyApp`
 accepts that same override. Configuration, source layout, app identity, storage
 scope and previously generated sibling outputs remain unchanged.
+
+This module format does not select a native target. Use the separate `target`
+option for [native-only resources](#native-only-application-resources).
 
 The native transformation runs in the selected package stage after application
 adapter work, before the final inventory and any enabled PWA artifacts. It uses

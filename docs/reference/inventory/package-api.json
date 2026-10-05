@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.55.0",
+  "sdkVersion": "0.56.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
@@ -380,7 +380,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Headless toolchain operations",
-      "summary": "Packages the selected app and builds one explicitly selected target; tests or checks run only when explicitly requested or required for the selected release output.",
+      "summary": "Packages the selected app and builds one explicitly selected target; paired native assembly applies each selected and bundled app's nativeResources and separate input output directory, preserving complete release records and explicit providers. Tests or checks run only when explicitly requested or required for the selected release output.",
       "availability": "Node; selected operation may produce browser or native output",
       "protocol": "Shared headless operation API + arcane-cli-events/1",
       "normalization": "SDK-normalized inputs, errors, events, and documented result"
@@ -937,14 +937,14 @@
       "name": "inspectApp",
       "displayName": "inspectApp()",
       "kind": "function",
-      "signature": "async inspectApp({workspaceRoot, appId, signal}={})",
+      "signature": "async inspectApp({workspaceRoot, appId, signal, target, outputDirectory}={})",
       "entrypoints": [
         "arcane-os",
         "arcane-os/packager"
       ],
       "primaryImport": "arcane-os",
       "group": "Packaging and release bundles",
-      "summary": "Loads one validated packager app plan, including the shared descriptor-admitted browser document inventory and final workspace-relative output selected by app outputDirectory or default dist/appId.",
+      "summary": "Inspects one complete app plan without copying files. Target defaults to browser; nonbrowser selection adds explicit nativeResources outside browserDocuments and uses dist/.native/target/appId for a nonempty native include list. Explicit operation outputDirectory wins; other calls retain the saved outputDirectory or dist/appId.",
       "availability": "Node",
       "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Normalized SDK validation with complete canonical archive and release content"
@@ -1239,7 +1239,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Packaging and release bundles",
-      "summary": "Builds one selected browser application release into app outputDirectory or default dist/appId through staged whole-directory replacement, preserving source and unrelated prior destinations; it never runs tests or checks automatically.",
+      "summary": "Builds one complete app release with browser selection by default. Nonbrowser targets add explicit nativeResources through a late complete-content copy and separate native input output; moduleFormat is independent. Adapters receive actual target and effective browserPwa. Explicit operation outputDirectory wins; staged replacement preserves source and unrelated outputs. No tests or checks run automatically.",
       "availability": "Node",
       "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Normalized SDK validation with complete canonical archive and release content"
@@ -1256,7 +1256,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Headless toolchain operations",
-      "summary": "Runs the high-level package operation for one selected application using the same app-selected final outputDirectory, defaulting to dist/appId, with no separate destination override.",
+      "summary": "Runs the high-level browser package operation for one selected application using the saved outputDirectory or dist/appId, with no separate destination override. Paired native buildApplication separately applies actual target and nativeResources selection.",
       "availability": "Node; selected operation may produce browser or native output",
       "protocol": "Shared headless operation API + arcane-cli-events/1",
       "normalization": "SDK-normalized inputs, errors, events, and documented result"
@@ -1370,7 +1370,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Runtime and app descriptors",
-      "summary": "Projects a schema-2 descriptor into the compatible schema-1 application package contract.",
+      "summary": "Projects a schema-2 descriptor into the compatible schema-1 package contract, including optional package.nativeResources as top-level nativeResources; omitted selection stays omitted, empty include stays empty, and omitted exclude becomes an empty array.",
       "availability": "Node",
       "protocol": "Node ESM",
       "normalization": "SDK-normalized inputs, errors, events, and documented result"
@@ -2073,7 +2073,7 @@
       ],
       "primaryImport": "arcane-os/packager",
       "group": "Packaging and release bundles",
-      "summary": "Validates one schema-1 packager app configuration and its relationship to the root config, including optional workspace-relative final outputDirectory without changing source layout or app identity.",
+      "summary": "Validates one schema-1 packager app configuration, optional nativeResources literal include/exclude selection and workspace-relative outputDirectory without changing source layout or app identity. Native include may be empty; exclude defaults to an empty array.",
       "availability": "Node",
       "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Normalized SDK validation with complete canonical archive and release content"
@@ -2172,7 +2172,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Packaging and release bundles",
-      "summary": "Authenticates one existing browser app release through the low-level packager API.",
+      "summary": "Reads an existing app release and compares its complete file inventory with its manifest. Pass a target-selected native release's output as outputDirectory; this API does not infer a native target or execute services or hosts.",
       "availability": "Node",
       "protocol": "SDK packager and deterministic bundle contract",
       "normalization": "Normalized SDK validation with complete canonical archive and release content"

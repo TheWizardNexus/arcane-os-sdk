@@ -42,6 +42,45 @@ receipts, hashes, content limits or security policy. The package-relative source
 root comes from the provider module's own location, not `toolchainRoot` or an
 Arcane OS machine bundle.
 
+## Native-only application resources
+
+Select application service modules and their complete local source closure in
+the authored schema-2 descriptor's `package.nativeResources`, separately from
+its browser `include`/`exclude` selection:
+
+```json
+{
+  "package": {
+    "nativeResources": {
+      "include": ["native", "src", "package.json"],
+      "exclude": ["native/drafts"]
+    }
+  }
+}
+```
+
+This is a descriptor excerpt for the app-owned service example below. The
+projected schema-1 field is top-level `nativeResources`. Paths are literal and
+app-relative; directories include descendants. Omission or an empty include
+keeps previous selection and output behavior. The app supplies every required
+source file explicitly; packaging does not discover or execute services.
+
+Paired `buildApplication()` passes the actual native target to the selected app
+and every explicitly bundled app. With a nonempty native include list, their
+input releases use `dist/.native/<target>/<app-id>` instead of the saved browser
+output, preserving existing browser/PWA artifacts. Each app's own selection is
+applied; complete releases and actual roots are forwarded to the provider.
+The provider then copies them unchanged into its artifact layout described below.
+
+At the low-level `packageApp()` boundary, `target` defaults to `'browser'` and
+is independent of `moduleFormat`. Nonbrowser selection disables generated PWA
+content. Native-only files bypass browser document/module/asset transformations;
+a file also in the ordinary browser selection retains that existing processing.
+An explicit low-level `outputDirectory` still wins. Inspect the emitted input
+with `verifyApp({workspaceRoot,appId,outputDirectory:release.output})`; neither
+that inventory verification nor packaging launches the service or platform host.
+See [the complete selection contract](protocols.md#native-only-application-resources).
+
 ## Output and host contract
 
 Each build creates a fresh `arcane-portable-*` directory beneath `outputRoot`.

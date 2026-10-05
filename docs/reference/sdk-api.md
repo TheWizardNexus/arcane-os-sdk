@@ -807,7 +807,7 @@ descriptor-selected browser document inventory.
 ### Signature and result
 
 ```text
-async inspectApp({workspaceRoot, appId, signal}={})
+async inspectApp({workspaceRoot, appId, signal, target, outputDirectory}={})
 ```
 
 Import it from `arcane-os` or `arcane-os/packager`. The result includes the
@@ -834,9 +834,18 @@ such as `apps/hello-world/index.html`. The complete `files` inventory uses
 package-relative paths and includes the root `index.html`. Shared
 files retain their configured route destinations.
 
-`output` is the selected workspace-relative final package directory. It uses
-the app's optional `arcane-package.json` `outputDirectory` directly, or
-`dist/<app-id>` when omitted; the SDK appends no app ID to an explicit value.
+`target` defaults to `'browser'`. A selected nonbrowser target adds the app's
+explicit `nativeResources` to `files`, without adding those native-only paths
+to `browserDocuments`. The optional normalized `nativeResources` record is
+returned when authored. This inspection copies or executes no resources.
+
+`output` is the selected workspace-relative final package directory. An explicit
+operation `outputDirectory` wins. Otherwise, a nonbrowser target with a nonempty
+native include list uses `dist/.native/<target>/<app-id>`; the app's saved browser
+destination remains separate. Browser selection, omitted native resources and
+an empty native include list use the app's saved `outputDirectory` or
+`dist/<app-id>`. The SDK appends no app ID to an explicit destination. See
+[native-only application resources](protocols.md#native-only-application-resources).
 
 ### Availability and normalization
 
@@ -881,9 +890,10 @@ console.log(normalizeRelativePath('apps/example/index.html'));
 
 ### Overview
 
-Builds one complete browser application release through the low-level packager
-API. It does not run tests or checks automatically; verification occurs only
-when explicitly requested or when required for this selected release output.
+Builds one complete selected application release through the low-level packager
+API, with browser selection by default. It does not run tests or checks
+automatically; verification occurs only when explicitly requested or when
+required for this selected release output.
 
 ### Signature and result
 
@@ -897,6 +907,21 @@ ordinary `arcane dev` startup before selecting output that needs updated maps.
 The package preserves the complete selected content, applying the documented
 asset-version and enabled browser-PWA transformations to resource references.
 Malformed configuration or descriptors fail while preserving the prior output.
+
+`target` defaults to `'browser'`; supported target names are `browser`,
+`portable`, `windows-x64`, `linux-x64`, `linux-arm64` and `android-arm64`.
+A nonbrowser target adds the app's explicit `nativeResources` selection and
+sets the effective `browserPwa` value to `false`. It does not compile or launch
+that platform. Browser calls preserve the existing `browserPwa` default and
+explicit setting. The app adapter's `buildArcanePackage()` context receives
+the actual `target` and effective `browserPwa` alongside its existing fields.
+`copyBase()` retains the browser/shared selection; native-only resources are
+copied afterward, outside browser rewriting and PWA processing.
+
+`moduleFormat` controls browser module representation independently of `target`.
+In particular, `moduleFormat:'native'` alone remains a browser package and does
+not add native resources. The complete selection and separate-output rules are
+documented under [native-only application resources](protocols.md#native-only-application-resources).
 
 `moduleFormat` defaults to `'import-map'`, preserving the ordinary browser
 package. Select `'native'` to resolve saved document import maps into native
@@ -938,14 +963,21 @@ manifest or an operating-system launcher. Native-mode dry runs report selected
 input files; generated script/context files are included in the completed
 package's full returned inventory.
 
-The app's optional schema-1 `outputDirectory` selects the final
-workspace-relative destination. For example, `"ai"` emits directly into
+For browser selection, the app's optional schema-1 `outputDirectory` selects the
+final workspace-relative destination. For example, `"ai"` emits directly into
 `<workspace>/ai`; omission retains `dist/<app-id>`. The selected directory is
 wholly replaced through the existing staged swap, not merged. Changing the
 destination preserves the former output and siblings. Conflicting source,
 selected input, or required control paths fail before output writes. Source
 layout, app identity, OPFS scope, and internal package paths remain unchanged.
 See [app-selected package output](protocols.md#app-selected-package-output).
+
+For a nonbrowser target with a nonempty native include list, the default is
+instead `dist/.native/<target>/<app-id>`, preserving a separately emitted browser
+output even when its saved destination is custom. An explicit operation
+`outputDirectory` still wins; choose a dedicated destination because packaging
+replaces that selected directory. Omitted or empty native resources retain the
+existing destination rules.
 
 Root app files retain their paths at the output root; explicitly nested apps
 retain their `apps/<id>/` paths. Shared files retain their configured route
@@ -1147,9 +1179,15 @@ console.log(validateAppBundlePath('payload/apps/example/index.html'));
 
 Validates one schema-1 packager app configuration and its relationship to the root config.
 
-Optional `outputDirectory` is the final workspace-relative package directory;
-omission preserves `dist/<app-id>`. It is an app package field, not a change to
-the root configuration's `distRoot` or the schema-2 app identity. Packaging
+Optional `nativeResources` contains a required literal-path `include` array
+(which may be empty) and optional `exclude` array (default `[]`). It selects
+additional app-owned resources only for a nonbrowser packaging target. Ordinary
+`include`, `exclude`, shared routes and document selection remain unchanged.
+
+Optional `outputDirectory` is the saved workspace-relative browser package
+directory; omission preserves `dist/<app-id>`. Nonempty native selection uses
+the separate target-selected default described above. It is an app package
+field, not a change to the root configuration's `distRoot` or the schema-2 app identity. Packaging
 reports conflicting output/input selections with `ARCANE_PACKAGE_INVALID`
 before output writes. Authored-descriptor comparison treats the destination
 as package-local, and descriptor refresh preserves the existing setting.
@@ -1216,7 +1254,8 @@ async function usevalidateRootConfig(...arguments_) {
 
 ### Overview
 
-Authenticates one existing browser app release through the low-level packager API.
+Reads one existing application release and compares its complete file inventory
+with its release manifest through the low-level packager API.
 
 ### Signature and result
 
@@ -1228,6 +1267,9 @@ Import it from `arcane-os` or `arcane-os/packager`. The signature above states w
 
 Optional `outputDirectory` selects the same workspace-relative override accepted
 by `packageApp`, without changing the app's saved destination.
+For a target-selected native input release, pass the returned `release.output`
+as this override. `verifyApp` has no target option and does not infer the native
+directory or execute the application, its services or a platform host.
 
 ### Availability and normalization
 
@@ -1238,9 +1280,13 @@ by `packageApp`, without changing the app's saved destination.
 ```javascript
 import {verifyApp} from 'arcane-os';
 
-async function useverifyApp(...arguments_) {
-    return verifyApp(...arguments_);
-}
+// release is the result of packageApp() for this app and workspace.
+const inspected = await verifyApp({
+    workspaceRoot,
+    appId: 'moon-dashboard',
+    outputDirectory: release.output
+});
+console.log(inspected.files);
 ```
 
 ## verifyAppReleaseBundle()
@@ -2209,6 +2255,13 @@ Optional `package.documents` becomes top-level `documents`. Omission stays
 omitted and an authored empty list stays `[]`, so projection preserves automatic
 discovery versus entry-only selection. See
 [application document selection](protocols.md#application-document-selection).
+
+Optional `package.nativeResources` becomes top-level `nativeResources`.
+Omission remains omitted, an empty include remains `[]`, and an omitted exclude
+becomes `[]`. Package-only descriptor synthesis preserves the same selection.
+This is a packaging contract; `projectNativeDescriptor()` keeps its existing
+registry shape and ordinary include list. See
+[native-only application resources](protocols.md#native-only-application-resources).
 
 ### Signature and result
 
@@ -4336,7 +4389,17 @@ console.log(validation.sdkInstallation?.packageVersion);
 
 ### Overview
 
-Builds and retained-verifies one explicitly selected native target through one paired provider.
+Builds one explicitly selected target through its adapter. A paired native
+builder packages the selected app and its explicit bundled-app closure, then
+passes those complete releases to the provider. Provider verification and host
+launch remain separate operations.
+
+The selected target reaches each app's packager, so every app's own
+`nativeResources` and separate native input directory apply consistently to
+both copying and output-overlap calculations. The provider receives the actual
+release roots, manifests and complete file readers. An explicit `nativeBuilder`
+retains its existing identity and contract. See
+[portable Core packaging](core-native-packaging.md#native-only-application-resources).
 
 ### Signature and result
 
@@ -4632,8 +4695,10 @@ described by `packageApp()`.
 The same low-level operation resolves the app's optional `outputDirectory`;
 there is no separate high-level destination override. `release.outputRoot`
 names the resulting complete release directory, with omitted configuration
-retaining `dist/<app-id>`. Browser preview, bundle creation, and native
-browser-content input use that selected root.
+retaining `dist/<app-id>`. Browser preview and bundle creation use that selected
+root. This ordinary package operation retains browser selection; paired native
+assembly through `buildApplication()` separately passes its actual target and
+applies each app's native-resource output selection.
 
 Packaging does not automatically run tests or checks. Verification occurs only
 when explicitly requested or when required for the selected release output.
@@ -9419,3 +9484,8 @@ const cancelled = normalizeAIRequestAbort(new DOMException('Cancelled', 'AbortEr
 ## Data export subpaths
 
 The package also exposes eight JSON Schemas (including `arcane-os/schemas/event-stack.json`) and its package manifest. These are data contracts, not callable JavaScript members. See [schema contracts](../architecture.md) and the files under `schemas/`.
+
+`arcane-os/schemas/arcane-app.json` describes schema-2 `package.nativeResources`;
+`arcane-os/schemas/arcane-package.json` describes the projected schema-1
+`nativeResources`. Both use the existing literal application-relative path
+contract. See [native-only application resources](protocols.md#native-only-application-resources).
