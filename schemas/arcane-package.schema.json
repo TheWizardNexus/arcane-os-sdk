@@ -57,6 +57,9 @@
     "localAIModelPolicy": {
       "$ref": "#/$defs/localAIModelPolicy"
     },
+    "localAI": {
+      "$ref": "#/$defs/localAI"
+    },
     "pwa": {
       "$ref": "#/$defs/pwa"
     },
@@ -144,6 +147,47 @@
     }
   ],
   "$defs": {
+    "localAI": {
+      "type": "object",
+      "required": ["runtimes"],
+      "description": "Required Core AI runtimes. Development ensures selected runtimes locally; native builds bundle their upstream runtime distributions. Model selection remains application-owned.",
+      "properties": {
+        "runtimes": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "enum": ["llama.cpp", "ollama"] },
+              {
+                "type": "object",
+                "required": ["id"],
+                "properties": {
+                  "id": { "enum": ["llama.cpp", "ollama"] },
+                  "version": { "type": "string" },
+                  "url": { "type": "string" }
+                }
+              }
+            ]
+          }
+        },
+        "llamaCpp": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string" },
+            "model": { "type": "string" },
+            "modelsDirectory": { "type": "string" },
+            "args": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "ollama": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string" },
+            "modelsDirectory": { "type": "string" },
+            "args": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
     "pwa": {
       "type": "object",
       "additionalProperties": false,

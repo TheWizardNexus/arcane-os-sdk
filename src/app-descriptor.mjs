@@ -5,6 +5,7 @@ import {readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {throwIfAborted} from './errors.mjs';
 import {normalizePwaConfig} from './pwa.mjs';
+import {normalizeLocalAIConfig} from './local-ai/config.mjs';
 import {
     ARCANE_MACHINE_BUNDLE_VERSION,
     ARCANE_PROTOCOL,
@@ -235,7 +236,7 @@ function validateDocumentCatalog(value){
 }
 
 function validateNative(value,appId){
-    assertOnlyKeys(value,new Set(['type','icon','order','bundledApps','documentCatalog']),'descriptor.native');
+    assertOnlyKeys(value,new Set(['type','icon','order','bundledApps','documentCatalog','localAI']),'descriptor.native');
     if(!NATIVE_TYPES.has(value.type))fail('descriptor.native.type is unsupported.');
     const icon=value.icon===null?null:normalizeRelativePath(value.icon,'descriptor.native.icon');
     if(!is.integer(value.order)||value.order<0){
@@ -250,6 +251,7 @@ function validateNative(value,appId){
         icon,
         order:value.order,
         bundledApps,
+        ...(value.localAI===undefined?{}:{localAI:normalizeLocalAIConfig(value.localAI)}),
         ...(documentCatalog?{documentCatalog}:{})
     });
 }
@@ -337,6 +339,7 @@ export function projectPackageManifest(descriptor){
             mediaOrigins:[...value.security.mediaOrigins]
         }}:{}),
         ...(value.package.localAIModelPolicy?{localAIModelPolicy:value.package.localAIModelPolicy}:{}),
+        ...(value.native.localAI===undefined?{}:{localAI:value.native.localAI}),
         ...(value.package.pwa===undefined?{}:{pwa:value.package.pwa}),
         include:[...value.package.include],
         exclude:[...value.package.exclude],
@@ -382,6 +385,7 @@ export function projectNativeDescriptor(descriptor,{source}={}){
         }}:{}),
         ...(value.native.bundledApps.length?{bundledApps:[...value.native.bundledApps]}:{}),
         ...(value.native.documentCatalog?{documentCatalog:value.native.documentCatalog}:{}),
+        ...(value.native.localAI===undefined?{}:{localAI:value.native.localAI}),
         include:[...value.package.include]
     };
 }
@@ -425,6 +429,7 @@ function synthesizedDescriptor(packageManifest,nativeDescriptor){
             icon:native.icon??null,
             order:is.integer(native.order)?native.order:100,
             bundledApps:[...(native.bundledApps??[])],
+            ...((packageManifest.localAI??native.localAI)===undefined?{}:{localAI:packageManifest.localAI??native.localAI}),
             ...(native.documentCatalog?{documentCatalog:native.documentCatalog}:{})
         },
         requirements:{

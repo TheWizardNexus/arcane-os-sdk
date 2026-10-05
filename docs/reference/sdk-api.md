@@ -55,6 +55,8 @@ runtime layouts.
 | `arcane-os/core/runtime` | App-neutral native Core dispatcher and service lifecycle. |
 | `arcane-os/core/stdio` | Framed Node stdio transport with graceful runtime drain. |
 | `arcane-os/core/host` | Node-only reusable Core host lifecycle with explicitly supplied services. |
+| `arcane-os/core/local-ai` | Native llama.cpp and Ollama Core service, model readiness, complete streaming and owned process lifecycle. See [local AI through Core](local-ai.md). |
+| `arcane-os/local-ai` | Official runtime installation and native artifact bundling for selected llama.cpp/Ollama requirements. |
 | `arcane-os/integrated-provider` | Fixed integrated shared-development provider. |
 | `arcane-os/packager` | Low-level browser app packager. |
 | `arcane-os/release-bundle` | Deterministic external release bundles. |
@@ -83,6 +85,7 @@ runtime layouts.
 | `arcane-os/browser-device` | Synchronous mobile or desktop identity hints for application-owned settings. |
 | `arcane-os/pwa` | Nonblocking PWA registration, worker updates, native installation state and a dismissible installation component. |
 | `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, complete DBOPFS model storage, streaming, cancellation, and structural tool-call results. |
+| `arcane-os/ai/core-local` | Browser llama.cpp provider through an available Core connection; browser-local Wllama and ONNX remain independently available. |
 | `arcane-os/ai/browser-decisions` | Explicit-load Laya FP16 and Julia-1 FP32 typed decisions through the shared Transformers.js Worker owner. |
 | `arcane-os/ai/tool-text-stream` | Shared selected tool-argument text observer for provider integration. |
 | `arcane-os/ai/twin-cloud` | Stateless chat, System One state/questions and image generation with explicit key/model, complete results and operation-specific retry/cancellation. |

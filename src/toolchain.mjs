@@ -1,6 +1,6 @@
 import Is from 'strong-type';
 import path from 'node:path';
-import {resolvePackageOutputRoot} from './app-layout.mjs';
+import {resolveAppRoot,resolvePackageOutputRoot} from './app-layout.mjs';
 import {readdir,lstat,realpath,mkdir,readFile,writeFile} from 'node:fs/promises';
 import {createWorkspace,initWorkspace} from './scaffold.mjs';
 import {
@@ -17,6 +17,8 @@ import {createPwaArtifacts} from './pwa.mjs';
 import {readInstalledSdkLayout} from './sdk-runtime-layout.mjs';
 import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
 import {refreshAppPackageProjection} from './app-descriptor.mjs';
+import {configureDevelopmentLocalAI} from './local-ai/config.mjs';
+import {createDevelopmentLocalAI} from './local-ai/dev.mjs';
 import {
     discoverApps as discoverPackagerApps,
     inspectApp as inspectPackagedApp,
@@ -566,6 +568,11 @@ export async function developApplication(options = {}) {
             onEvent: options.onEvent
         },
         async function refreshDevelopmentWorkspace(workspaceOperationLease) {
+            await configureDevelopmentLocalAI({
+                appRoot: resolveAppRoot(profile.workspaceRoot, profile.config, appId),
+                runtimes: options.localAI,
+                signal: options.signal
+            });
             await refreshAppPackageProjection(
                 {
                     workspaceRoot: profile.workspaceRoot,
@@ -589,7 +596,19 @@ export async function developApplication(options = {}) {
             return current;
         }
     );
-    const server=await startDevServer({
+    const localAIConfig = prepared.descriptor?.native?.localAI;
+    const localAI = localAIConfig?.runtimes.length ? createDevelopmentLocalAI({
+        config: localAIConfig,
+        appRoot: prepared.appRoot,
+        directory: path.join(prepared.appRoot, '.arcane', 'local-ai', 'runtimes'),
+        application: prepared.descriptor,
+        version: prepared.descriptor.version,
+        signal: options.signal,
+        onEvent: options.onEvent
+    }) : undefined;
+    let server;
+    try {
+        server=await startDevServer({
         workspaceRoot:prepared.workspaceRoot,
         appId:prepared.appId,
         mode:'source',
@@ -605,10 +624,19 @@ export async function developApplication(options = {}) {
         tls:options.tls,
         certPath:options.certPath,
         keyPath:options.keyPath,
+        localAI,
         signal:options.signal,
         onEvent:options.onEvent
-    });
-    return {...server,appId:prepared.appId,mode:'source'};
+        });
+    } catch (error) {
+        try {
+            await localAI?.close(error);
+        } catch (closeError) {
+            throw new AggregateError([error, closeError], 'Development startup and local AI shutdown failed.');
+        }
+        throw error;
+    }
+    return {...server,appId:prepared.appId,mode:'source',...(localAI ? {localAI} : {})};
 }
 
 export async function packageApplication(options={}){

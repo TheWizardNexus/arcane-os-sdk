@@ -555,7 +555,9 @@ async function probeRequiredServices({
                         arcane,
                         requirements.llm.model
                     )
-                    :unavailableBrowserOllama()
+                    :is.function(arcane?.localAI?.status)
+                        ?probeNativeOllama(arcane,requirements.llm.model)
+                        :unavailableBrowserOllama()
             :null,
         requiresSpeech
             ?mode==='native'

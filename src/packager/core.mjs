@@ -14,6 +14,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {appRelativeRoot,resolveAppRoot,resolvePackageOutputRoot} from '../app-layout.mjs';
 import {TARGET_IDS} from '../constants.mjs';
+import {normalizeLocalAIConfig} from '../local-ai/config.mjs';
 import {readInstalledSdkLayout} from '../sdk-runtime-layout.mjs';
 import {withWorkspaceOperationLock} from '../workspace-operation-lock.mjs';
 import {materializeNativeModules} from './native-modules.mjs';
@@ -321,7 +322,7 @@ function normalizeOptionalRecord(value,label){
 export function validateAppConfig(value,appId,rootConfig,configPath=path.posix.join(appRelativeRoot(rootConfig,appId),APP_CONFIG_NAME)){
     assertOnlyKeys(value,new Set([
         'schemaVersion','id','displayName','version','entry','strategy','security',
-        'localAIModelPolicy','include','exclude','shared','adapter','pwa','outputDirectory','documents','nativeResources'
+        'localAIModelPolicy','localAI','include','exclude','shared','adapter','pwa','outputDirectory','documents','nativeResources'
     ]),`${appId}/${APP_CONFIG_NAME}`);
     if(value.schemaVersion!==1)fail(`${appId}/${APP_CONFIG_NAME}.schemaVersion must be 1.`);
     if(!is.string(value.id)||value.id!==appId||!APP_ID_PATTERN.test(value.id)){
@@ -390,6 +391,7 @@ export function validateAppConfig(value,appId,rootConfig,configPath=path.posix.j
             value.localAIModelPolicy,
             `${appId}/${APP_CONFIG_NAME}.localAIModelPolicy`
         )}),
+        ...(value.localAI===undefined?{}:{localAI:normalizeLocalAIConfig(value.localAI)}),
         include,
         exclude,
         ...(nativeResources===undefined?{}:{nativeResources}),
@@ -742,6 +744,7 @@ async function inspectContext(context,{signal,records}={}){
         ...(context.config.localAIModelPolicy===undefined?{}:{
             localAIModelPolicy:copyJson(context.config.localAIModelPolicy)
         }),
+        ...(context.config.localAI===undefined?{}:{localAI:copyJson(context.config.localAI)}),
         ...(context.config.adapter===undefined?{}:{adapter:context.config.adapter}),
         descriptor:await optionalDescriptor(context),
         browserDocuments:documents,
@@ -871,7 +874,8 @@ function releaseManifest(context,files,pwaArtifacts,rootDocument){
             ...(context.config.security===undefined?{}:{security:copyJson(context.config.security)}),
             ...(context.config.localAIModelPolicy===undefined?{}:{
                 localAIModelPolicy:copyJson(context.config.localAIModelPolicy)
-            })
+            }),
+            ...(context.config.localAI===undefined?{}:{localAI:copyJson(context.config.localAI)})
         },
         files:[...files]
     };

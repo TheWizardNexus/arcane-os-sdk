@@ -16,6 +16,7 @@ const VALUE_OPTIONS=new Set([
     'app',
     'apps-root',
     'sdk-runtime-source',
+    'local-ai',
     'arcane-root',
     'host',
     'port',
@@ -66,7 +67,7 @@ Usage:
   ${CLI_NAME} upgrade [--workspace <directory>] [--app <id>]
   ${CLI_NAME} doctor [--workspace <directory>] [--arcane-root <directory>]
   ${CLI_NAME} import-map [--workspace <directory>] [--app <id>]
-  ${CLI_NAME} dev [--app <id>] [--public] [--http | --https] [--cert <pem>] [--key <pem>] [--host <address>] [--port 8000] [--http-port 0] [--sdk-runtime-source <sdk-root>]
+  ${CLI_NAME} dev [--app <id>] [--public] [--http | --https] [--cert <pem>] [--key <pem>] [--host <address>] [--port 8000] [--http-port 0] [--sdk-runtime-source <sdk-root>] [--local-ai llama.cpp,ollama]
   ${CLI_NAME} test [--app <id>] [--scope app]
   ${CLI_NAME} test --scope shared --test-file <repo-relative.test.mjs>
   ${CLI_NAME} check [--app <id>] [--scope app] [--skip-tests]
@@ -97,6 +98,7 @@ Development:
   --host <address>               Override the bind address; takes precedence over --public.
   --http-port <port>             Browser dev/run HTTP redirect port; 0 selects an available port (default).
   --sdk-runtime-source <sdk-root>  Dev-only live SDK checkout; omitted preserves the workspace runtime mode.
+  --local-ai <runtimes>          Add required Core runtimes to app config and ensure them for development.
 
 Global:
   --workspace <directory>       Select an external or integrated Arcane workspace.
@@ -450,6 +452,9 @@ function operationOptions(command,parsed,cwd){
     if(values['sdk-runtime-source']!==undefined&&command!=='dev'){
         usage('--sdk-runtime-source is supported only by dev.');
     }
+    if(values['local-ai']!==undefined&&command!=='dev'){
+        usage('--local-ai is supported only by dev.');
+    }
     if(flags.has('public')&&command!=='dev'){
         usage('--public is supported only by dev.');
     }
@@ -546,6 +551,7 @@ function operationOptions(command,parsed,cwd){
             ...browserServerOptions,
             host:values.host??(flags.has('public')?'0.0.0.0':'127.0.0.1'),
             port:readPort(values.port,8000),
+            ...(values['local-ai']===undefined?{}:{localAI:values['local-ai']}),
             ...(values['sdk-runtime-source']===undefined?{}:{
                 sdkRuntimeSourceRoot:path.resolve(cwd,values['sdk-runtime-source'])
             })

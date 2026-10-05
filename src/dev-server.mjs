@@ -854,6 +854,7 @@ async function startOwnedDevServer({
     tls,
     certPath,
     keyPath,
+    localAI,
     signal,
     sdkRuntimeSourceRoot
 }={},events,releaseSignal){
@@ -1263,6 +1264,7 @@ async function startOwnedDevServer({
                 response.end();
                 return;
             }
+            if (localAI && await localAI.handler(request, response)) return;
             if(request.method!=='GET'&&request.method!=='HEAD'){
                 deny(response,405,'Method not allowed.');
                 return;
@@ -1498,6 +1500,7 @@ async function startOwnedDevServer({
     const cleanUrl=`${origin}${routeSet.startPath}`;
     const url=cleanUrl;
     let closeInitiated=false;
+    let localAIClosing=Promise.resolve();
     let lifecycleSettlementStarted=false;
     let operationalError=null;
     let resolveLifecycle;
@@ -1518,6 +1521,8 @@ async function startOwnedDevServer({
         signal?.removeEventListener('abort',abort);
         for (const listener of listeners) listener.removeListener('error', serverFailed);
         try{
+            const [localAIResult]=await Promise.allSettled([localAIClosing]);
+            if(localAIResult.status==='rejected')operationalError??=localAIResult.reason;
             while(requestTasks.size>0){
                 await Promise.allSettled([...requestTasks]);
             }
@@ -1556,6 +1561,8 @@ async function startOwnedDevServer({
         }
         if(!closeInitiated){
             closeInitiated=true;
+            localAIClosing=Promise.resolve().then(function closeLocalAI(){return localAI?.close(error);});
+            localAIClosing.catch(function observeLocalAICloseFailure(closeError){operationalError??=closeError;});
             try{
                 closeDevelopmentListeners(fileServer, tlsServer).then(
                     function developmentServerClosed() {
