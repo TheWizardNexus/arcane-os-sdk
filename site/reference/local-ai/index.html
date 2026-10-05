@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="Core owns native llama.cpp and Ollama processes. The browser retains its own Wllama and ONNX implementations, and can also use an explicitly connected Core when that system service is available. Runtime installation, model loading and inference are separate operations.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/local-ai/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Local AI through Core · Arcane OS SDK"><meta property="og:description" content="Core owns native llama.cpp and Ollama processes. The browser retains its own Wllama and ONNX implementations, and can also use an explicitly connected Core when that system service is available. Runtime installation, model loading and inference are separate operations."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/local-ai/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Local AI through Core · Arcane OS SDK"><meta name="twitter:description" content="Core owns native llama.cpp and Ollama processes. The browser retains its own Wllama and ONNX implementations, and can also use an explicitly connected Core when that system service is available. Runtime installation, model loading and inference are separate operations."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Local AI through Core | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Local AI through Core</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="local-ai-through-core">Local AI through Core</h1><p class="doc-lead">Core owns native llama.cpp and Ollama processes. The browser retains its own Wllama and ONNX implementations, and can also use an explicitly connected Core when that system service is available. Runtime installation, model loading and inference are separate operations.</p><div class="doc-meta"><span>SDK 0.57.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="./" aria-current="page">Local AI through Core</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/local-ai.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#application-requirements">Application requirements</a><a href="#development">Development</a><a href="#core-service">Core service</a><a href="#browser-llamacpp-provider">Browser llama.cpp provider</a><a href="#native-bundling">Native bundling</a></nav></details><p>Core owns native llama.cpp and Ollama processes. The browser retains its own
+Wllama and ONNX implementations, and can also use an explicitly connected Core
+when that system service is available. Runtime installation, model loading and
+inference are separate operations.</p>
+<p>This native service currently implements llama.cpp and Ollama. Native ONNX
+inference remains separate unfinished work. Browser ONNX continues through its
+existing browser implementation.</p>
+<h2 id="application-requirements">Application requirements</h2>
+<p>Declare required native runtimes in <code>arcane-app.json</code> under <code>native.localAI</code>.
+The package projection retains the same record as <code>arcane-package.json.localAI</code>.
+Existing native fields remain alongside this record:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>json</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-json">{
+  &quot;runtimes&quot;: [
+    {&quot;id&quot;: &quot;llama.cpp&quot;},
+    {&quot;id&quot;: &quot;ollama&quot;}
+  ],
+  &quot;llamaCpp&quot;: {
+    &quot;modelsDirectory&quot;: &quot;models/llama&quot;
+  },
+  &quot;ollama&quot;: {
+    &quot;modelsDirectory&quot;: &quot;models/ollama&quot;
+  }
+}
+</code></pre></div>
+<p>Each runtime requirement accepts <code>id</code>, optional upstream <code>version</code>, and an
+optional runtime archive <code>url</code>. A string runtime ID is also accepted.
+Omitting the version allows reuse of an available runtime. Explicit versions
+select that upstream distribution; an existing service must match the requested
+version before it is reused. A service occupying the selected address is
+preserved when its version cannot be established.</p>
+<p><code>llamaCpp</code> accepts <code>url</code>, <code>model</code>, <code>modelsDirectory</code>, and an <code>args</code> string array.
+<code>model</code> selects a single GGUF file; <code>modelsDirectory</code> selects llama.cpp router
+mode. Paths resolve from the application root. Ollama accepts <code>url</code>,
+<code>modelsDirectory</code>, and <code>args</code>. The default endpoints are
+<code>http://127.0.0.1:8080</code> and <code>http://127.0.0.1:11434</code>, respectively. Default model
+directories are <code>.arcane/models/llama.cpp</code> and <code>.arcane/models/ollama</code> inside the
+application. Applications choose and provision their models explicitly.</p>
+<h2 id="development">Development</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>sh</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-sh">arcane dev --local-ai llama.cpp,ollama
+</code></pre></div>
+<p>The option adds those runtime requirements to the authored application
+configuration. Subsequent <code>arcane dev</code> runs reuse the saved requirements.
+Development checks selected endpoints and existing executable paths, then
+installs missing runtimes under the application&#39;s <code>.arcane/local-ai/runtimes</code>.
+Runtime preparation runs alongside HTTP serving. Browser rendering continues
+while installation and model readiness are pending.</p>
+<p>The SDK downloads the official llama.cpp or Ollama distribution directly and
+preserves its runtime libraries. Installation changes no global PATH, system
+service or machine environment. Windows and macOS use the host archive utility;
+Linux requires <code>tar</code>, and <code>unzip</code> when extracting a selected Windows ZIP.
+Zstandard archives use the supported Node runtime&#39;s decompressor.</p>
+<p>For the optional development browser connection, load the bootstrap after the
+managed import map and before creating a Core-backed provider:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const {client} = await import(&#39;/arcane-local-ai.js&#39;);
+const status = await client.invoke(&#39;localai.status&#39;);
+console.log(status);
+</code></pre></div>
+<p>The bootstrap uses the existing Core client with RPC and ordered SSE events.
+Each browser connection owns its requests and cancellation. Closing a tab
+cancels that tab&#39;s requests; closing development stops its owned runtime
+processes. An already running external service remains running.</p>
+<p><code>developApplication()</code> returns its usual server handle and an optional <code>localAI</code>
+handle with <code>ready</code>, <code>current()</code>, <code>handler()</code> and <code>close()</code>. Its <code>ready</code> promise
+means installation and Core composition completed. Runtime/model readiness is
+reported separately by Core status and lifecycle events. Preparation failures
+remain on that promise and the operation event stream.</p>
+<h2 id="core-service">Core service</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createLocalAIService} from &#39;arcane-os/core/local-ai&#39;;
+
+const service = createLocalAIService(application.native.localAI, {
+  appRoot,
+  runtimes,
+  signal,
+  onEvent
+});
+</code></pre></div>
+<p>The result is a Core service definition. The launch context contains resolved
+runtime records; the native builder supplies them automatically for a selected
+application. <code>current()</code> returns the current snapshot without starting another
+process. The service starts each selected runtime independently, retains its
+process between requests, and joins cleanup during disposal.</p>
+<p><code>localai.status</code> returns <code>{runtimes}</code> and, when Ollama is selected, the existing
+<code>ollama</code> and <code>models.ollama</code> catalog fields. Runtime records distinguish
+<code>installed</code>, <code>available</code>, <code>state</code>, <code>models</code>, ownership and errors. A listening
+service and a loaded model are separate facts.</p>
+<p><code>localai.services.recover({runtimes: [&#39;llama.cpp&#39;]})</code> makes one explicit recovery
+attempt for the selected runtimes; omission selects all configured runtimes.
+Recovery restarts only SDK-owned processes and reconnects to external services.
+An external llama.cpp server returns HTTP 503 during initial model loading and
+offers no readiness subscription at that stage. Core retains <code>state: &#39;loading&#39;</code>;
+a subsequent explicit load or recovery request checks again. There is no
+background health polling.</p>
+<div class="table-wrap" data-columns="3" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Parameters</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>llama.status</code></td>
+<td><code>{}</code></td>
+<td>Runtime state and model catalog</td>
+</tr>
+<tr>
+<td><code>llama.models</code></td>
+<td><code>{}</code></td>
+<td><code>{models}</code></td>
+</tr>
+<tr>
+<td><code>llama.load</code></td>
+<td><code>{model}</code></td>
+<td>State after the exact model reports loaded</td>
+</tr>
+<tr>
+<td><code>llama.unload</code></td>
+<td><code>{model}</code></td>
+<td>Current state after release</td>
+</tr>
+<tr>
+<td><code>llama.chat</code></td>
+<td><code>{model,payload,stream?,streamId?}</code></td>
+<td>Complete OpenAI-shaped completion</td>
+</tr></tbody>
+</table>
+</div>
+<p>The <code>payload</code> is the complete request. SDK option names are translated only at
+the upstream protocol boundary; messages, tool definitions and documents remain
+unchanged. An explicit <code>payload.model</code> selects that request&#39;s model. Core waits
+for its actual readiness before inference. Router model-load work is shared
+between concurrent callers for the same model. Cancelling a caller stops its
+wait; explicit unloading releases the model.</p>
+<p>Streaming publishes every actual parsed upstream chunk as
+<code>llama.chunk: {streamId,chunk}</code> and assembles the terminal completion. Upstream
+stream errors remain visible as their original chunks and fail the request.
+<code>localai.state</code> carries current runtime/model state. Router lifecycle events
+observe load, sleep and unload changes. Direct servers expose readiness at
+request boundaries; they do not offer the router&#39;s passive model event stream.</p>
+<p>Unloading a model from an owned single-model server closes that owned process;
+a subsequent load can start it again. Releasing an externally owned direct
+server returns <code>released: true, unloaded: false</code>, retaining the real catalog
+and leaving that server running.</p>
+<p>Ollama retains the existing Core calls for <code>version</code>, <code>models</code>/<code>list</code>, <code>running</code>,
+<code>show</code>, <code>chat</code>, <code>generate</code>, <code>embed</code>, <code>pull</code>, <code>push</code>, <code>create</code>, <code>copy</code>, and <code>delete</code>.
+Those methods use Ollama&#39;s native API. Streaming uses the existing
+<code>ollama.chunk: {streamId,chunk}</code> event. Application/OS preference operations
+such as selection, settings and brain creation remain with their existing
+owners; they are separate from this runtime service.</p>
+<h2 id="browser-llamacpp-provider">Browser llama.cpp provider</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createCoreLocalAIProvider} from &#39;arcane-os/ai/core-local&#39;;
+import {getAIProviderRuntime} from &#39;arcane-os/ai-provider-runtime&#39;;
+
+const provider = createCoreLocalAIProvider({client});
+const runtime = getAIProviderRuntime();
+const unregister = runtime.register(provider);
+</code></pre></div>
+<p>The provider implements <code>arcane-ai-provider/2</code> for the LLM role, with ID
+<code>llama.cpp</code> by default. Configure an exact model through the existing provider
+runtime, then load it. <code>catalog()</code>, <code>status()</code>, <code>inspect()</code>, <code>load()</code>, <code>request()</code>,
+<code>unload()</code> and <code>dispose()</code> retain the shared lifecycle. Creating the provider
+does not install software or select a model. A missing Core connection reports
+unavailability, leaving browser Wllama/ONNX routes available for the application
+to select.</p>
+<p>If a router evicts the primary model while serving a request-specific model,
+reload the primary selection before its next request. The provider does not
+silently change the application&#39;s saved model choice. Release registration
+with <code>unregister()</code> and dispose the provider at the application&#39;s owning
+lifecycle boundary.</p>
+<h2 id="native-bundling">Native bundling</h2>
+<p>The SDK portable native build includes selected official runtime trees under
+<code>runtime/local-ai/&lt;runtime-id&gt;</code>. Runtime records in the artifact are relative
+to the artifact root and resolve on the destination machine. The generated
+Core entry composes the local AI service only when the application selects it.
+Model files remain application-selected native resources.</p>
+<p><code>ensureLocalAIRuntimes()</code> and <code>bundleLocalAIRuntimes()</code> are exported from
+<code>arcane-os/local-ai</code>. Both accept <code>{runtimes,directory,platform,architecture, signal,onEvent}</code>; bundling also requires <code>outputRoot</code>. Platform names follow
+Node: <code>win32</code>, <code>linux</code>, <code>darwin</code>, and supported Android distributions.
+Architectures are <code>x64</code> or <code>arm64</code>. Availability depends on the upstream
+runtime&#39;s published platform assets; Ollama has no official Android runtime
+archive in this installer.</p>
+<p>Ensure returns absolute <code>{id,version,platform,architecture,root,executable}</code>
+records. Bundle returns <code>{runtimes,files}</code>, with artifact-relative runtime paths
+and a complete emitted file inventory. Bundling requires a fresh native staging
+destination, preserving existing completed outputs.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#application-requirements">Application requirements</a><a href="#development">Development</a><a href="#core-service">Core service</a><a href="#browser-llamacpp-provider">Browser llama.cpp provider</a><a href="#native-bundling">Native bundling</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.57.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>
