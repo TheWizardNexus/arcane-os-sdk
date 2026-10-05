@@ -6,7 +6,7 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 254,
+  "memberCount": 256,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
@@ -3983,6 +3983,34 @@
       "availability": "Node for assembly; Windows x64 with WebView2 Runtime for execution",
       "protocol": "arcane-native-builder/1 windows-x64 provider",
       "normalization": "Binding identity is exactly equal to the named arcaneNativeBuilderProvider export"
+    },
+    {
+      "id": "core-preferences:createPreferencesService",
+      "name": "createPreferencesService",
+      "displayName": "createPreferencesService()",
+      "kind": "function",
+      "signature": "createPreferencesService({file}={})",
+      "entrypoints": ["arcane-os/core/preferences"],
+      "primaryImport": "arcane-os/core/preferences",
+      "group": "Core preference persistence",
+      "summary": "Supplies the five existing preference RPC methods with application-selected file storage.",
+      "availability": "Node Core runtime",
+      "protocol": "arcane/1 preferences methods and schemaVersion 1 entries file",
+      "normalization": "Preserves exact keys, complete JSON values and existing metadata; writes use service lifetime and flush before acknowledgment; unreadable files remain untouched and drain waits for accepted work"
+    },
+    {
+      "id": "core-preferences:default",
+      "name": "default",
+      "displayName": "createPreferencesService default export",
+      "kind": "function",
+      "signature": "default as createPreferencesService",
+      "entrypoints": ["arcane-os/core/preferences"],
+      "primaryImport": "arcane-os/core/preferences",
+      "group": "Core preference persistence",
+      "summary": "Default binding for the same Core preferences service factory.",
+      "availability": "Node Core runtime",
+      "protocol": "arcane/1 preferences methods and schemaVersion 1 entries file",
+      "normalization": "Binding identity is exactly equal to the named createPreferencesService export"
     },
     {
       "id": "core-host:readCoreLaunchContext",

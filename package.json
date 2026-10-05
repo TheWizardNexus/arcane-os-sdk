@@ -57,6 +57,7 @@
     "./core/runtime": "./src/core/runtime.mjs",
     "./core/stdio": "./src/core/stdio.mjs",
     "./core/host": "./src/core/host.mjs",
+    "./core/preferences": "./src/core/services/preferences.mjs",
     "./core/local-ai": "./src/core/services/local-ai.mjs",
     "./local-ai": "./src/local-ai/install.mjs",
     "./integrated-provider": "./src/integrated-provider-loader.mjs",
