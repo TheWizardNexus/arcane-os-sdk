@@ -41,6 +41,7 @@ runtime layouts.
 | `arcane-os` | Complete high-level SDK surface. |
 | `arcane-os/toolchain` | Headless application operations. |
 | `arcane-os/events` | CLI/event reporter. |
+| `arcane-os/websocket` | Node HTTP/1.1 WebSocket Upgrade, complete messages and connection lifecycle. Browser clients use native `WebSocket`. |
 | `arcane-os/testing` | Isolated test registration and execution. |
 | `arcane-os/targets` | Target adapters and dispatch. |
 | `arcane-os/native` | Native plan and builder protocol. |
@@ -130,6 +131,7 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 
 | Member | Kind | Import | Group | Availability |
 | --- | --- | --- | --- | --- |
+| `acceptWebSocket()` | function | `arcane-os`, `arcane-os/websocket` | WebSocket protocol | Node; browser-native client interoperability |
 | `fetchRequest()` | function | `arcane-os/ai/twin-cloud` | TWiN Cloud requests | Node and Browser; remote HTTPS provider |
 | `fetchSystemOneRequest()` | function | `arcane-os/ai/twin-cloud` | TWiN Cloud state-and-questions requests | Node and Browser; remote HTTPS provider |
 | `generateImages()` | function | `arcane-os/ai/twin-cloud` | TWiN Cloud image generation | Node and Browser with Fetch and Blob; remote HTTPS provider |
@@ -3752,6 +3754,154 @@ async function useselectApp(...arguments_) {
     return selectApp(...arguments_);
 }
 ```
+
+## acceptWebSocket()
+
+### Overview
+
+Accepts one caller-selected RFC6455 HTTP/1.1 Upgrade using Node's native
+duplex stream. The caller owns HTTP routing, TLS, listeners, application
+messages and shutdown. Use the raw `server` returned by `startDevServer`, or
+the public `.server` / `.secureServer` of `node-http-server`. There is no
+listener creation, default port, application envelope, message persistence,
+client sharing, reconnect loop or third-party WebSocket runtime.
+
+Browser clients use native `WebSocket` directly. Node's global `WebSocket` is
+also a client, not a server. This server adapter supports version 13 over an
+HTTP/1.1 `upgrade` event, including HTTP/1.1 negotiated on an HTTPS listener.
+It does not implement HTTP/2 extended CONNECT or negotiate extensions such as
+compression. TLS setup remains with the existing server owner.
+
+### Signature, modes, and result
+
+```text
+acceptWebSocket({request,socket,head,protocol,signal})
+```
+
+Import from `arcane-os/websocket` or `arcane-os`. Supply the exact `request`,
+`socket` and `head` from the selected Node `upgrade` event. Do not substitute
+`request.socket` for that event's stream. `head` defaults to an empty buffer.
+Optional `protocol` is one exact client-offered token; the default empty string
+selects no subprotocol. A browser that offers subprotocols expects one to be
+selected. Optional `signal` owns this connection's lifetime.
+
+The synchronous result is a native `EventTarget` with:
+
+| Member | Contract |
+| --- | --- |
+| `readyState` | `1` open, `2` closing, `3` closed. Acceptance queues the handshake before any messages. |
+| `protocol` | Selected subprotocol, or the empty string. |
+| `send(data)` | `Promise<void>` for a complete string, `ArrayBuffer`, or view. A view sends only its selected region. Input is snapshotted at submission; writes stay in submission order. The promise waits for the native write callback and any required drain; it is not a peer/application acknowledgement. |
+| `close(code=1000,reason='')` | Starts the close handshake after already accepted sends; returns `closed`. Repeated calls return the same promise. A peer Close rejects unsent application messages and retains the close reply. |
+| `terminate(reason?)` | Destroys only this connection's stream immediately, rejects pending sends and returns `closed`. An optional reason is reported as an error. |
+| `closed` | Resolves once the stream closes to `{code,reason,wasClean,error}`. It never rejects. Code/reason come from the peer Close; without one, code is `1006`. An empty peer Close reports `1005`. `wasClean` requires both close frames and no recorded failure. |
+
+Register listeners synchronously after acceptance. The handshake write and
+initial `head` processing begin in a microtask so those listeners receive
+buffered messages. `head` is processed once, before later stream chunks.
+
+| Native event | Payload |
+| --- | --- |
+| `message` | `MessageEvent.data`: complete text as a string, or complete binary as `Uint8Array`. Fragment boundaries never replace message boundaries. |
+| `error` | `CustomEvent.detail`: the complete original transport Error or coded protocol/abort Error. |
+| `close` | `CustomEvent.detail`: the same result as `closed`. |
+
+These are transport-local native events, not an application bus or retained
+event history. Native `EventTarget` owns listener exceptions; an async listener
+must observe its own promises. Listen for errors or inspect `closed.error`.
+Ping receives a matching Pong internally; Pong is not an application message.
+Text decoding preserves a leading U+FEFF and validates UTF-8 across the complete
+fragmented message. Binary data is never interpreted or wrapped as JSON.
+
+### Errors and cancellation
+
+Before changing the socket, an invalid handshake throws
+`ARCANE_WEBSOCKET_HANDSHAKE_INVALID` with `statusCode:400,headers:{}`;
+an unsupported WebSocket version throws `ARCANE_WEBSOCKET_VERSION_UNSUPPORTED`
+with `statusCode:426` and `headers:{'Sec-WebSocket-Version':'13'}`. The host
+owns sending that HTTP response and ending the rejected stream. Invalid socket,
+data or close arguments report `TypeError` / `RangeError`; a failed `send`
+rejects its promise without changing the payload.
+An unpaired UTF-16 surrogate cannot be represented as UTF-8: sending such text
+rejects with `ARCANE_WEBSOCKET_TEXT_INVALID`, and using it as a close reason
+throws that error before changing connection state. Valid strings remain exact.
+
+After acceptance, invalid framing reports `ARCANE_WEBSOCKET_PROTOCOL_INVALID`
+and close status `1002`; invalid text reports `ARCANE_WEBSOCKET_TEXT_INVALID`
+and `1007`. Complete platform errors remain observable. Framing lengths,
+masking, the handshake's SHA-1 accept calculation and control-frame bounds are
+RFC transport requirements only. There are no application message limits,
+byte progress, content identities, or optional security controls.
+
+A pre-aborted signal throws before taking ownership. Later abort destroys the
+stream with an `AbortError` coded `ARCANE_WEBSOCKET_ABORTED`, preserving the
+signal reason as its cause. Closing rejects new sends with
+`ARCANE_WEBSOCKET_CONNECTION_CLOSED` (or the existing failure).
+No timer silently terminates a slow close handshake; use the caller's signal or
+`terminate()` when that owner decides to stop. Server listener closure alone,
+including Node `closeAllConnections()`, does not own upgraded sockets. Track
+connections or provide a shared lifetime signal, then await their `closed`
+promises separately. None of this changes chat storage or `persist:false`.
+
+### Example
+
+This example attaches to an already-owned listener and returns a separate
+connection cleanup function. Its route and echo policy belong to the caller.
+Call it with `publicServer.server`, `publicServer.secureServer`, or an SDK
+development server's returned `server`; it creates no additional HTTP server.
+
+```javascript
+import {acceptWebSocket} from 'arcane-os/websocket';
+
+function attachEcho(server,signal){
+    const connections=new Set();
+    function upgrade(request,socket,head){
+        if(request.url!=='/socket'){
+            socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
+            return;
+        }
+        let connection;
+        try{connection=acceptWebSocket({request,socket,head,signal});}
+        catch(error){
+            console.error(error);
+            const status=error.statusCode??400;
+            const version=status===426?'Sec-WebSocket-Version: 13\r\n':'';
+            socket.end(`HTTP/1.1 ${status} Upgrade rejected\r\n${version}Connection: close\r\n\r\n`);
+            return;
+        }
+        connections.add(connection);
+        connection.addEventListener('error',function failed(event){console.error(event.detail);});
+        connection.addEventListener('message',function echo(event){
+            connection.send(event.data).catch(function sendFailed(error){console.error(error);});
+        });
+        connection.addEventListener('close',function remove(){connections.delete(connection);});
+    }
+    server.on('upgrade',upgrade);
+    return async function detach(){
+        server.off('upgrade',upgrade);
+        await Promise.all([...connections].map(function stop(connection){return connection.terminate();}));
+    };
+}
+
+// In browser code, after the host has selected its ws: or wss: URL:
+function connectEcho(url){
+    const client=new WebSocket(url);
+    client.addEventListener('open',function greet(){client.send('The moon needs a coffee break.');});
+    client.addEventListener('message',function received(event){console.log(event.data);});
+    return client;
+}
+```
+
+Protocol references: [RFC6455](https://www.rfc-editor.org/rfc/rfc6455.html),
+[Node upgrade event](https://nodejs.org/api/http.html#event-upgrade), and
+[native browser WebSocket](https://websockets.spec.whatwg.org/).
+Work is connection-local and linear in actual framing/content. Input is
+assembled once per complete message; advertised lengths do not preallocate
+payloads. Outbound framing snapshots each submitted message and uses native
+writable backpressure. Callers await `send` when producing a sustained stream.
+There is no history scan, app loop, diagnostic payload store or automatic retry.
+The authored `test/websocket.test.mjs` fixtures cover this boundary; source
+inspection is distinct from executing them or verifying a browser deployment.
 
 ## startDevServer()
 

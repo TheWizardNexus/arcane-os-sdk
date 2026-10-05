@@ -146,6 +146,7 @@ export {
 export {materializeInstalledSdkRuntime} from './installed-sdk-runtime.mjs';
 export {startDevServer} from './dev-server.mjs';
 export {startSourceExampleServer} from './source-server.mjs';
+export {acceptWebSocket} from './websocket.mjs';
 export {
     NATIVE_BUILD_PLAN_PROTOCOL,
     NATIVE_BUILDER_PROTOCOL,

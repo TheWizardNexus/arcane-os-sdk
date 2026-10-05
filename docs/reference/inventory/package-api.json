@@ -6,12 +6,26 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 223,
+  "memberCount": 224,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
   },
   "members": [
+    {
+      "id": "root:acceptWebSocket",
+      "name": "acceptWebSocket",
+      "displayName": "acceptWebSocket()",
+      "kind": "function",
+      "signature": "acceptWebSocket({request,socket,head,protocol,signal})",
+      "entrypoints": ["arcane-os", "arcane-os/websocket"],
+      "primaryImport": "arcane-os/websocket",
+      "group": "WebSocket protocol",
+      "summary": "Accept one caller-selected HTTP/1.1 Upgrade and exchange complete native WebSocket messages.",
+      "availability": "Node; interoperates with browser native WebSocket clients",
+      "protocol": "RFC6455 version 13, without extensions or HTTP/2 extended CONNECT",
+      "normalization": "Native EventTarget message/error/close events and owned send/close promises; no application envelopes or storage"
+    },
     {
       "id": "root:APP_BUNDLE_DESCRIPTOR_NAME",
       "name": "APP_BUNDLE_DESCRIPTOR_NAME",
