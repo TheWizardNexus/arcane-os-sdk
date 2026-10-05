@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.56.0
+
+- Add explicit `package.nativeResources` selection for native-only application
+  files and directories. Browser selection remains unchanged; non-browser
+  packaging keeps additional resources outside browser transformations and
+  stages them in a separate target output. Applications select their complete
+  required source closure, and target adapters receive the effective target
+  and browser-PWA selection.
+- Add `getInstalledCoreClient()` to read the exact live SDK-installed client
+  without connecting or changing globals. Terminal `failTransport(error)` and
+  the owned native failure callback preserve complete errors, settle pending
+  requests, and release the failed installation's callbacks and subscriptions.
+- Add opt-in `replayRuntimeState` for Core clients and classic injection. The
+  runtime replays its actual readiness and current service state for newly
+  connected documents without restarting services or delaying page startup.
+
+- Preserve complete UTF-8 process output when a character spans stdout or stderr
+  chunks. Independent readable-stream decoders feed the same text to captured
+  results and existing event delivery; ordering, backpressure, cancellation,
+  graceful drain, nonzero error details and line-event behavior remain unchanged.
+- Include committed Windows and Linux Core process-transport source and the
+  generic Windows SEA launcher source as native-host groundwork. These sources
+  do not activate a platform host or deliver a public native executable; app
+  host composition and the remaining native integration stay independently owned.
+- Clarify development `latest` tracking, production-designated pins, matching
+  requester notices, and required documentation/site release follow-through.
+- No new dependency, application service, automatic runtime installation,
+  application default change or saved-data migration is introduced.
+
 ## 0.55.0
 
 - Add public Core client, protocol contracts and classic-script source generation

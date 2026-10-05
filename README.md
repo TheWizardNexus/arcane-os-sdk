@@ -20,9 +20,11 @@ selected SDK projection or an explicit live SDK source mount. Both profiles
 share the theme, packaging, event, cancellation,
 and browser run contracts while retaining their selected application layout.
 
-This checkout defines the `0.55.0` SDK contract. Applications pin one exact npm
-version and lockfile; registry state is deliberately not baked into application
-artifacts.
+This checkout defines the `0.56.0` SDK contract. Development applications declare
+`arcane-os` as `latest` and retain their lockfile. Exact SDK pins begin when Roshi
+designates a production build. Follow [Consumer updates](docs/consumer-updates.md)
+to refresh and compare the installed SDK and lockfile with the published channel;
+registry state is deliberately not baked into application artifacts.
 
 Standalone browser apps use their repository root and installed npm package directly, without a
 generated workspace `arcane/` directory or `arcane.lock.json`. Select the
