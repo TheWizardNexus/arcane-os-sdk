@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import {createContext,runInContext} from 'node:vm';
 import test from '../src/testing.mjs';
+import {createCoreClassicSource} from '../src/core-classic-source.mjs';
 import {arcaneEvents} from '../browser-runtime/event-manager.mjs';
-import {createCoreClient,createCoreFacade,installCoreClient} from '../browser-runtime/core/client.mjs';
+import {createCoreClient,createCoreFacade,getInstalledCoreClient,installCoreClient} from '../browser-runtime/core/client.mjs';
 import {CORE_PROTOCOL,CoreError,serializeCoreError} from '../browser-runtime/core/contracts.mjs';
 
 function fixture(t,options={}){
@@ -295,6 +297,226 @@ test('installed WebKit facade preserves early frames, acknowledgement and cleanu
     assert.equal(global.Arcane,undefined);
     assert.equal(global.__arcaneReceive,undefined);
     assert.equal(global.__arcaneWebKitAcknowledge,undefined);
+    assert.equal(global.__arcaneTransportFailed,undefined);
+});
+
+test('terminal transport failure preserves one complete error and releases pending ownership',async function terminalFailure(t){
+    const frames=[];
+    const listeners=new Map();
+    const errors=[];
+    let unsubscribed=0;
+    let receive;
+    const global={console,addEventListener(name,listener){listeners.set(name,listener);},
+        removeEventListener(name,listener){if(listeners.get(name)===listener)listeners.delete(name);}};
+    const transport={name:'fixture',send(frame){frames.push(frame);},subscribe(listener){
+        receive=listener;
+        return function unsubscribe(){unsubscribed+=1;};
+    }};
+    const client=createCoreClient({global,transport,onError:error=>errors.push(error)});
+    t.after(()=>client.close());
+    const controller=new AbortController();
+    const first=client.invoke('application.first',{}, {signal:controller.signal});
+    const second=client.invoke('application.second');
+    const cause=new Error('Complete native pipe cause\n🌙');
+    const failure=new CoreError({code:'CORE_PROCESS_PIPE_FAILED',message:'Complete native process failure',
+        cause,details:{stderr:'  Every native diagnostic\n\u0000🌙  '},exitCode:7});
+    assert.equal(client.failTransport(failure),true);
+    await assert.rejects(first,error=>error===failure);
+    await assert.rejects(second,error=>error===failure);
+    assert.deepEqual(errors,[failure]);
+    assert.equal(errors[0].cause,cause);
+    assert.equal(errors[0].details,failure.details);
+    assert.equal(client.runtime.current().connected,false);
+    assert.equal(unsubscribed,1);
+    assert.equal(listeners.size,0);
+    controller.abort();
+    assert.equal(frames.length,2);
+    assert.equal(receive({protocol:CORE_PROTOCOL,type:'response',id:frames[0].id,ok:true,result:'late'}),false);
+    await assert.rejects(client.invoke('application.afterFailure'),error=>error===failure);
+    assert.throws(()=>client.connect(),error=>error===failure);
+    assert.equal(client.failTransport(new Error('Duplicate host notification')),false);
+    assert.equal(client.close(),false);
+    assert.deepEqual(errors,[failure]);
+});
+
+test('installed native failure settles WebKit acknowledgements and restores prior globals once',async function failedWebKit(t){
+    const previousFacade={application:'Existing global'};
+    function previousReceive(){}
+    function previousAcknowledge(){}
+    function previousFailure(){}
+    const global={console,Arcane:previousFacade,__arcaneReceive:previousReceive,
+        __arcaneWebKitAcknowledge:previousAcknowledge,__arcaneTransportFailed:previousFailure};
+    const frames=[];
+    global.__arcaneWebKitPostMessage=function send(token,serialized){frames.push({token,frame:JSON.parse(serialized)});return true;};
+    const errors=[];
+    const client=installCoreClient(global,{onError(error){
+        assert.equal(getInstalledCoreClient(global),null);
+        errors.push(error);
+    }});
+    t.after(()=>client.close());
+    assert.equal(getInstalledCoreClient(global),client);
+    const acknowledge=global.__arcaneWebKitAcknowledge;
+    const notifyFailure=global.__arcaneTransportFailed;
+    const cause=new Error('Complete original native cause');
+    const failure=new Error('Complete host failure\n🌙',{cause});
+    Object.assign(failure,{code:'CORE_HOST_EXITED',exitCode:23,details:{stderr:'  Complete stderr\n  '}});
+    const operation=client.invoke('application.pending');
+    const acknowledgement=client.connect().send({protocol:CORE_PROTOCOL,type:'control',control:'runtime.replay'});
+    const results=Promise.allSettled([operation,acknowledgement]);
+    assert.equal(notifyFailure(failure),true);
+    const settled=await results;
+    assert.equal(errors.length,1);
+    assert.equal(errors[0] instanceof CoreError,true);
+    for(const key of Object.getOwnPropertyNames(failure))assert.equal(errors[0][key],failure[key]);
+    for(const result of settled){assert.equal(result.status,'rejected');assert.equal(result.reason,errors[0]);}
+    assert.equal(getInstalledCoreClient(global),null);
+    assert.equal(global.Arcane,previousFacade);
+    assert.equal(global.__arcaneReceive,previousReceive);
+    assert.equal(global.__arcaneWebKitAcknowledge,previousAcknowledge);
+    assert.equal(global.__arcaneTransportFailed,previousFailure);
+    for(const frame of frames)assert.equal(acknowledge(frame.token,{accepted:true}),false);
+    assert.equal(notifyFailure(failure),false);
+    await Promise.resolve();
+    assert.equal(errors.length,1);
+});
+
+test('the installed accessor only observes SDK ownership and leaves foreign replacements intact',function installedOwnership(t){
+    const key=Symbol.for('arcane-os.core.client');
+    const foreign={application:'Not an SDK client'};
+    const global={console,Arcane:foreign,[key]:foreign};
+    const originalKeys=Reflect.ownKeys(global);
+    assert.equal(getInstalledCoreClient(global),null);
+    assert.deepEqual(Reflect.ownKeys(global),originalKeys);
+    assert.equal(global.Arcane,foreign);
+    assert.equal(global[key],foreign);
+    delete global[key];
+    const client=installCoreClient(global,{transport:{name:'fixture',send(){}}});
+    t.after(()=>client.close());
+    assert.equal(getInstalledCoreClient(global),client);
+    function replacementReceive(){}
+    function replacementFailure(){}
+    global[key]=foreign;
+    global.Arcane=foreign;
+    global.__arcaneReceive=replacementReceive;
+    global.__arcaneTransportFailed=replacementFailure;
+    client.close();
+    assert.equal(getInstalledCoreClient(global),null);
+    assert.equal(global[key],foreign);
+    assert.equal(global.Arcane,foreign);
+    assert.equal(global.__arcaneReceive,replacementReceive);
+    assert.equal(global.__arcaneTransportFailed,replacementFailure);
+});
+
+test('the ESM accessor returns the exact classic-installed client without another connection',async function classicIdentity(t){
+    const context=createContext({console,arcaneEvents,setTimeout,clearTimeout,
+        arcaneAndroid:{postMessage(){assert.fail('No request or replay was selected.');}}});
+    const source=await createCoreClassicSource({eventOwnerModuleURL:'/sdk/event-manager.mjs'});
+    runInContext(source,context);
+    const global=runInContext('globalThis',context);
+    const client=getInstalledCoreClient(global);
+    assert.ok(client);
+    t.after(()=>client.close());
+    assert.equal(client,global[Symbol.for('arcane-os.core.client')]);
+    assert.equal(installCoreClient(global),client);
+    client.close();
+    assert.equal(getInstalledCoreClient(global),null);
+    assert.equal(global.__arcaneTransportFailed,undefined);
+});
+
+test('ordinary close restores the prior facade and native callbacks',function ordinaryInstalledClose(t){
+    const facade={application:'Moon filing cabinet'};
+    function receive(){}
+    function failed(){}
+    const global={console,Arcane:facade,__arcaneReceive:receive,__arcaneTransportFailed:failed};
+    const client=installCoreClient(global,{transport:{name:'fixture',send(){}}});
+    t.after(()=>client.close());
+    assert.equal(client.close(),true);
+    assert.equal(getInstalledCoreClient(global),null);
+    assert.equal(global.Arcane,facade);
+    assert.equal(global.__arcaneReceive,receive);
+    assert.equal(global.__arcaneTransportFailed,failed);
+});
+
+test('terminal failure settles requests before a pending classic event-owner handoff',async function failedEarlyHandoff(t){
+    let resolveOwner;
+    const eventOwnerReady=new Promise(resolve=>{resolveOwner=resolve;});
+    const {client,frames,receive}=fixture(t,{eventOwner:null,eventOwnerReady});
+    client.events.on('application.queued',()=>assert.fail('A failed client must not replay queued events.'));
+    const operation=client.invoke('application.pendingOwner');
+    receive({protocol:CORE_PROTOCOL,type:'event',event:'application.queued',data:{complete:'Queued data'}});
+    receive({protocol:CORE_PROTOCOL,type:'response',id:frames[0].id,ok:true,result:'Queued completion'});
+    const failure=new CoreError({code:'CORE_PROCESS_EXITED',message:'Complete startup failure'});
+    client.failTransport(failure);
+    await assert.rejects(operation,error=>error===failure);
+    resolveOwner({createSource(){assert.fail('A failed client must not attach another event source.');}});
+    await client.eventsReady;
+    assert.equal(client.events.completed('transport.ready'),false);
+});
+
+test('runtime replay is opt-in, follows transport registration and is sent once without awaiting',async function runtimeReplay(t){
+    const order=[];
+    const errors=[];
+    let receive;
+    let rejectReplay;
+    const replay=new Promise(function replayDelivery(resolve,reject){rejectReplay=reject;});
+    const transport={name:'fixture',subscribe(listener){receive=listener;order.push('subscribed');},send(frame){
+        assert.equal(client.events.completed('transport.ready'),true);
+        order.push(frame);
+        receive({protocol:CORE_PROTOCOL,type:'event',event:'core.ready',data:{state:'ready'}});
+        return replay;
+    }};
+    const client=createCoreClient({transport,autoConnect:false,replayRuntimeState:true,onError:error=>errors.push(error)});
+    t.after(()=>client.close());
+    client.connect();
+    assert.deepEqual(order,['subscribed',{protocol:CORE_PROTOCOL,type:'control',control:'runtime.replay'}]);
+    assert.equal(client.events.completed('transport.ready'),true);
+    assert.equal(client.events.completed('core.ready'),true);
+    assert.equal(client.connect(),transport);
+    assert.equal(order.length,2);
+    const failure=new CoreError({code:'CORE_REPLAY_DELIVERY_FAILED',message:'Complete replay failure'});
+    rejectReplay(failure);
+    await Promise.resolve();
+    assert.deepEqual(errors,[failure]);
+    const ordinary=fixture(t);
+    assert.deepEqual(ordinary.frames,[]);
+});
+
+test('a synchronous replay failure closes the installed client without a second error report',async function synchronousReplayFailure(t){
+    const errors=[];
+    const failure=new CoreError({code:'CORE_PROCESS_EXITED',message:'The process exited during replay.',exitCode:9});
+    const global={console};
+    let sends=0;
+    let unsubscribed=0;
+    const transport={name:'fixture',subscribe(){return ()=>{unsubscribed+=1;};},send(frame){
+        sends+=1;
+        assert.equal(frame.control,'runtime.replay');
+        global.__arcaneTransportFailed(failure);
+    }};
+    const client=installCoreClient(global,{transport,replayRuntimeState:true,onError:error=>errors.push(error)});
+    t.after(()=>client.close());
+    assert.equal(getInstalledCoreClient(global),null);
+    assert.equal(client.runtime.current().connected,false);
+    assert.equal(unsubscribed,1);
+    assert.deepEqual(errors,[failure]);
+    await assert.rejects(client.invoke('application.afterReplay'),error=>error===failure);
+    assert.equal(sends,1);
+});
+
+test('failure during transport subscription releases its subsequently returned cleanup',function subscriptionFailure(t){
+    const global={console};
+    const errors=[];
+    const failure=new CoreError({code:'CORE_PROCESS_EXITED',message:'The host exited while attaching.'});
+    let unsubscribed=0;
+    const transport={name:'fixture',send(){assert.fail('A failed subscription cannot send.');},subscribe(){
+        global.__arcaneTransportFailed(failure);
+        return function unsubscribe(){unsubscribed+=1;};
+    }};
+    const client=installCoreClient(global,{transport,replayRuntimeState:true,onError:error=>errors.push(error)});
+    t.after(()=>client.close());
+    assert.equal(getInstalledCoreClient(global),null);
+    assert.equal(client.runtime.current().connected,false);
+    assert.equal(unsubscribed,1);
+    assert.deepEqual(errors,[failure]);
 });
 
 test('ordinary browser has no implicit HTTP transport',async t=>{

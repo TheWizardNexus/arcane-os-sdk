@@ -107,6 +107,16 @@ Events have `{protocol, type:'event', event, data, time}`:
 - `core.service.state`: a service's name, state and serialized error when present.
 - `core.error`: a lifecycle or transport diagnostic.
 
+A newly connected document may send
+`{protocol:'arcane/1', type:'control', control:'runtime.replay'}`. The runtime
+publishes one current snapshot: `core.ready` only when the dispatcher is ready,
+then `core.state`, followed by `core.service.state` for every registered service.
+Complete service errors and active request state are retained. Replay does not
+start or restart services, dispatch a request, poll readiness or create a second
+lifecycle owner. The runtime completes that snapshot before publishing lifecycle
+changes triggered reentrantly by its listeners. A draining runtime reports its
+draining state rather than announcing readiness.
+
 Service states are `registered`, `starting`, `ready`, `failed`, `draining` and
 `closed`. Dispatcher states are `created`, `ready`, `draining` and `closed`.
 Complete diagnostics belong in the host's developer-facing error handling, not

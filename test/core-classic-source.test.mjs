@@ -4,6 +4,27 @@ import test from '../src/testing.mjs';
 import {arcaneEvents} from '../browser-runtime/event-manager.mjs';
 import {createCoreClassicSource} from '../src/core-classic-source.mjs';
 
+test('classic host replay is explicit and requests current runtime state once', async t => {
+    for (const replayRuntimeState of [false, true]) {
+        const frames = [];
+        const context = vm.createContext({arcaneEvents, console, setTimeout, clearTimeout,
+            chrome: {webview: {
+                hostObjects: {arcaneBridge: {Send(text) { frames.push(JSON.parse(text)); return '{"accepted":true}'; }}},
+                addEventListener() {}, removeEventListener() {}
+            }}
+        });
+        const source = await createCoreClassicSource({eventOwnerModuleURL: '/sdk/event-manager.mjs', replayRuntimeState});
+        vm.runInContext(source, context);
+        const client = context[Symbol.for('arcane-os.core.client')];
+        t.after(() => client.close());
+        assert.deepEqual(frames, replayRuntimeState
+            ? [{protocol: 'arcane/1', type: 'control', control: 'runtime.replay'}] : []);
+        vm.runInContext(source, context);
+        client.connect();
+        assert.equal(frames.length, replayRuntimeState ? 1 : 0);
+    }
+});
+
 test('classic projection installs synchronous shapes and reuses the shared event owner',async t=>{
     const context=vm.createContext({arcaneEvents,console,setTimeout,clearTimeout});
     const source=await createCoreClassicSource({eventOwnerModuleURL:'/arcane/sdk/event-manager.mjs'});

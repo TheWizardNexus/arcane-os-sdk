@@ -83,17 +83,25 @@ class CoreRuntime {
         return this.#events.on(FRAME_EVENT, deliverFrame, {signal});
     }
 
-    #publish() {
-        this.#publications.push(this.current());
+    #publish(replay = false) {
+        this.#publications.push({state: this.current(), replay});
         if (this.#publishing) return;
         this.#publishing = true;
         try {
             // A synchronous subscriber can change the lifecycle. Finish each
             // state publication before delivering its reentrant successor.
             while (this.#publications.length) {
-                const state = this.#publications.shift();
+                const {state, replay: replaying} = this.#publications.shift();
+                // Finish one replay snapshot before publishing lifecycle changes
+                // triggered reentrantly by its listeners.
+                if (replaying && state.state === 'ready') {
+                    this.emit('core.ready', {version: state.version, app: state.application});
+                }
                 this.#events.dispatch(STATE_EVENT, state);
                 this.emit('core.state', state);
+                if (replaying) {
+                    for (const service of state.services) this.emit('core.service.state', service);
+                }
             }
         } finally {
             this.#publishing = false;
@@ -197,6 +205,10 @@ class CoreRuntime {
     async handle(frame) {
         if (frame?.protocol !== CORE_PROTOCOL) throw failure('INVALID_RPC_REQUEST', 'Unknown Core protocol.');
         if (frame.type === 'control') {
+            if (frame.control === 'runtime.replay') {
+                this.#publish(true);
+                return;
+            }
             if (frame.control === 'request.cancel') return this.#cancel(frame.requestId);
             if (frame.control === 'requests.cancelAll') {
                 for (const request of this.#requests.values()) this.#cancel(request.id);

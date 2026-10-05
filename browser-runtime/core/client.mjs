@@ -2,6 +2,7 @@ import {arcaneEvents} from '../event-manager.mjs';
 import {CORE_PROTOCOL,CORE_READY_EVENTS,CoreError,serializeCoreError} from './contracts.mjs';
 
 const CORE_CLIENT_KEY=Symbol.for('arcane-os.core.client');
+const CORE_CLIENT_INSTALLATION=Symbol.for('arcane-os.core.client.installation');
 const CORE_EVENT='core.rpc.event';
 const LONG_OPERATION_TIMEOUT=50*60*1000;
 
@@ -12,6 +13,7 @@ export function createCoreClient({
     eventOwner=arcaneEvents,
     eventOwnerReady,
     autoConnect=true,
+    replayRuntimeState=false,
     onError=error=>global.console?.error('Arcane Core client failed.',error)
 }={}){
     const pending=new Map();
@@ -25,8 +27,14 @@ export function createCoreClient({
     let transport=null;
     let closed=false;
     let eventOwnerFailure=null;
+    let transportFailure=null;
+    let transportFailureReported=false;
 
     function report(error){
+        if(error===transportFailure){
+            if(transportFailureReported)return;
+            transportFailureReported=true;
+        }
         try{onError(error instanceof CoreError?error:new CoreError(error));}
         catch(reportError){global.console?.error('Arcane Core error listener failed.',reportError,error);}
     }
@@ -260,7 +268,7 @@ export function createCoreClient({
         throw new CoreError({code:'ARCANE_TRANSPORT_UNAVAILABLE',message:'This interface is not connected to an Arcane native host.'});
     }
     function connect(){
-        if(closed)throw new CoreError({code:'ARCANE_CLIENT_CLOSED',message:'The Core client is closed.'});
+        if(closed)throw transportFailure??new CoreError({code:'ARCANE_CLIENT_CLOSED',message:'The Core client is closed.'});
         if(transport)return transport;
         const cleanupStart=cleanups.length;
         try{
@@ -271,7 +279,11 @@ export function createCoreClient({
             transport=selected;
             if(typeof transport.subscribe==='function'){
                 const unsubscribe=transport.subscribe(receive);
-                if(typeof unsubscribe==='function')cleanups.push(unsubscribe);
+                if(typeof unsubscribe==='function'){
+                    if(closed){
+                        try{unsubscribe();}catch(error){report(error);}
+                    }else cleanups.push(unsubscribe);
+                }
             }
         }catch(error){
             transport=null;
@@ -280,7 +292,11 @@ export function createCoreClient({
             }
             throw error;
         }
+        if(closed)throw transportFailure??new CoreError({code:'ARCANE_CLIENT_CLOSED',message:'The Core client is closed.'});
         complete('transport.ready',{protocol:CORE_PROTOCOL,transport:transport.name});
+        if(replayRuntimeState&&!closed)sendControl({protocol:CORE_PROTOCOL,type:'control',control:'runtime.replay'});
+        // A native callback may close the client synchronously during replay.
+        if(closed)throw transportFailure??new CoreError({code:'ARCANE_CLIENT_CLOSED',message:'The Core client is closed.'});
         return transport;
     }
     function runtimeSnapshot(){
@@ -312,6 +328,7 @@ export function createCoreClient({
         return true;
     }
     function invoke(method,parameters={},options={}){
+        if(transportFailure)return Promise.reject(transportFailure);
         if(eventOwnerFailure)return Promise.reject(eventOwnerFailure);
         let selected;
         try{selected=connect();}catch(error){return Promise.reject(error);}
@@ -343,23 +360,37 @@ export function createCoreClient({
         }catch(error){sendFailed(error);}
         return promise;
     }
-    function close(){
-        if(closed)return false;
-        closed=true;
-        cancelAll();
+    function disposeTransport(error){
         for(const record of acknowledgements.values()){
             clearTimeout(record.timer);
-            record.reject(new CoreError({code:'ARCANE_CLIENT_CLOSED',message:'The Core client is closed.'}));
+            record.reject(error);
         }
         acknowledgements.clear();
         for(const cleanup of cleanups.splice(0)){
             try{cleanup();}catch(error){report(error);}
         }
-        source?.dispose();
+        try{source?.dispose();}catch(disposeError){report(disposeError);}
+        source=null;
+        transport=null;
         // Registration closures and already-delivered payloads belong to this
         // client lifetime and are released when the owner explicitly closes it.
         eventActions.length=0;
         completedEvents.clear();
+    }
+    function failTransport(error){
+        if(closed)return false;
+        transportFailure=error instanceof CoreError?error:new CoreError(error);
+        closed=true;
+        for(const id of pending.keys())settle(id,transportFailure);
+        disposeTransport(transportFailure);
+        report(transportFailure);
+        return true;
+    }
+    function close(){
+        if(closed)return false;
+        closed=true;
+        cancelAll();
+        disposeTransport(new CoreError({code:'ARCANE_CLIENT_CLOSED',message:'The Core client is closed.'}));
         return true;
     }
     if(typeof global.addEventListener==='function'){
@@ -369,7 +400,7 @@ export function createCoreClient({
     if(autoConnect){
         try{connect();}catch(error){if(error.code!=='ARCANE_TRANSPORT_UNAVAILABLE')report(error);}
     }
-    return {protocol:CORE_PROTOCOL,Error:CoreError,invoke,receive,connect,close,cancelAll,events,eventsReady,runtime:{current:runtimeSnapshot},uuid};
+    return {protocol:CORE_PROTOCOL,Error:CoreError,invoke,receive,connect,close,failTransport,cancelAll,events,eventsReady,runtime:{current:runtimeSnapshot},uuid};
 }
 
 /** Existing namespace call shapes; method implementations remain host-owned. */
@@ -461,28 +492,58 @@ export function createCoreFacade(client){
     };
 }
 
+/** Reads an installed SDK client without creating a transport or changing globals. */
+export function getInstalledCoreClient(global=globalThis){
+    const client=global?.[CORE_CLIENT_KEY];
+    const installation=client?.[CORE_CLIENT_INSTALLATION];
+    return installation?.global===global&&installation.active?client:null;
+}
+
 /** Installs the same synchronous facade used by classic native-host scripts. */
 export function installCoreClient(global=globalThis,options={}){
     if(global[CORE_CLIENT_KEY])return global[CORE_CLIENT_KEY];
     const client=createCoreClient({...options,global,autoConnect:false});
     const facade=createCoreFacade(client);
+    const installation={global,active:true};
+    client[CORE_CLIENT_INSTALLATION]=installation;
+    const previousFacade=global.Arcane;
     global.Arcane=facade;
     global[CORE_CLIENT_KEY]=client;
     const previous=global.__arcaneReceive;
     global.__arcaneReceive=client.receive;
+    const previousFailure=global.__arcaneTransportFailed;
+    function nativeTransportFailed(error){return client.failTransport(error);}
+    global.__arcaneTransportFailed=nativeTransportFailed;
     const close=client.close;
-    client.close=function closeInstalledClient(){
-        const changed=close();
+    const failTransport=client.failTransport;
+    let installedTransportFailure=null;
+    function releaseInstalledClient(){
+        installation.active=false;
         if(global[CORE_CLIENT_KEY]===client)delete global[CORE_CLIENT_KEY];
-        if(global.Arcane===facade)delete global.Arcane;
+        if(global.Arcane===facade){
+            if(previousFacade===undefined)delete global.Arcane;
+            else global.Arcane=previousFacade;
+        }
         if(global.__arcaneReceive===client.receive){
             if(previous===undefined)delete global.__arcaneReceive;
             else global.__arcaneReceive=previous;
         }
-        return changed;
+        if(global.__arcaneTransportFailed===nativeTransportFailed){
+            if(previousFailure===undefined)delete global.__arcaneTransportFailed;
+            else global.__arcaneTransportFailed=previousFailure;
+        }
+    }
+    client.close=function closeInstalledClient(){
+        installation.active=false;
+        try{return close();}finally{releaseInstalledClient();}
+    };
+    client.failTransport=function failInstalledTransport(error){
+        if(installation.active)installedTransportFailure=error instanceof CoreError?error:new CoreError(error);
+        releaseInstalledClient();
+        return failTransport(installedTransportFailure??error);
     };
     try{client.connect();}catch(error){
-        if(error.code!=='ARCANE_TRANSPORT_UNAVAILABLE'){
+        if(error!==installedTransportFailure&&error.code!=='ARCANE_TRANSPORT_UNAVAILABLE'){
             if(options.onError)options.onError(error);
             else global.console?.error('Arcane Core transport initialization failed.',error);
         }

@@ -19,6 +19,81 @@ function cancel(requestId) {
     return {protocol: CORE_PROTOCOL, type: 'control', control: 'request.cancel', requestId};
 }
 
+test('reentrant shutdown follows the replay snapshot rather than preceding stale state', async function replayOrdering() {
+    const runtime = createCoreRuntime();
+    runtime.start();
+    const states = [];
+    let closing;
+    runtime.onFrame(function onReplay(frame) {
+        if (frame.event === 'core.ready') closing = runtime.close();
+        if (frame.event === 'core.state') states.push(frame.data.state);
+    });
+    await runtime.handle({protocol: CORE_PROTOCOL, type: 'control', control: 'runtime.replay'});
+    await closing;
+    assert.deepEqual(states, ['ready', 'draining', 'closed']);
+});
+
+test('document reconnect replays current Core state without restarting services', async function replayState(t) {
+    const frames = [];
+    const startGate = deferred();
+    const saveGate = deferred();
+    const saveEntered = deferred();
+    const failure = new Error('Complete startup failure\n🦑', {cause: new Error('Original cause')});
+    let starts = 0;
+    const runtime = createCoreRuntime({application: {id: 'moon-reconnect'}, version: 'selected'});
+    runtime.onFrame(function collect(frame) { frames.push(frame); });
+    const slow = runtime.registerService({name: 'slow', start() { starts += 1; return startGate.promise; }});
+    const failed = runtime.registerService({name: 'failed', start() { starts += 1; throw failure; }});
+    runtime.registerService({name: 'journal', methods: {'journal.save': {lifetime: 'service', async handle(value) {
+        saveEntered.resolve();
+        await saveGate.promise;
+        return value;
+    }}}});
+    t.after(async function finish() {
+        startGate.resolve();
+        saveGate.resolve();
+        try { await runtime.close(); }
+        catch (error) { assert.deepEqual(error.errors, [failure]); }
+    });
+    const replay = {protocol: CORE_PROTOCOL, type: 'control', control: 'runtime.replay'};
+    await runtime.handle(replay);
+    assert.equal(starts, 0);
+    assert.equal(frames.some(frame => frame.event === 'core.ready'), false);
+    assert.deepEqual(frames.find(frame => frame.event === 'core.state').data.services.map(service => service.state),
+        ['registered', 'registered', 'registered']);
+
+    runtime.start();
+    await assert.rejects(failed.ready, error => error === failure);
+    const boundary = frames.length;
+    const current = runtime.current();
+    await runtime.handle(replay);
+    const emitted = frames.slice(boundary);
+    assert.deepEqual(emitted.map(frame => frame.event),
+        ['core.ready', 'core.state', 'core.service.state', 'core.service.state', 'core.service.state']);
+    assert.deepEqual(emitted[1].data, current);
+    assert.equal(emitted[3].data.error.message, failure.message);
+    assert.equal(emitted[3].data.error.cause.message, failure.cause.message);
+    assert.equal(starts, 2);
+    assert.equal(slow.current().state, 'starting');
+
+    const payload = {text: '  Save the entire moon ledger\n🌙  '};
+    const save = runtime.handle(request('retained-save', 'journal.save', payload));
+    await saveEntered.promise;
+    const closing = runtime.close();
+    const expectedCloseFailure = assert.rejects(closing, error => error.errors.length === 1 && error.errors[0] === failure);
+    const closingBoundary = frames.length;
+    await runtime.handle(replay);
+    const closingFrames = frames.slice(closingBoundary);
+    assert.equal(closingFrames.some(frame => frame.event === 'core.ready'), false);
+    assert.equal(closingFrames[0].data.state, 'draining');
+    assert.equal(closingFrames[0].data.activeRequests[0].lifetime, 'service');
+    saveGate.resolve();
+    startGate.resolve();
+    assert.deepEqual((await save).result, payload);
+    await expectedCloseFailure;
+    assert.equal(starts, 2);
+});
+
 test('Core dispatch becomes ready while independent services are still starting', async function independentStartup(t) {
     const slowStartup = deferred();
     const slowStarted = deferred();

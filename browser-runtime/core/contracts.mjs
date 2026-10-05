@@ -7,7 +7,8 @@ export const CORE_FRAME_CONTRACTS={
     response:{type:'response',fields:['protocol','type','id','ok'],success:['result'],failure:['error'],optional:['time']},
     event:{type:'event',fields:['protocol','type','event','data'],optional:['time']},
     cancel:{type:'control',control:'request.cancel',fields:['protocol','type','control','requestId']},
-    cancelAll:{type:'control',control:'requests.cancelAll',fields:['protocol','type','control']}
+    cancelAll:{type:'control',control:'requests.cancelAll',fields:['protocol','type','control']},
+    replay:{type:'control',control:'runtime.replay',fields:['protocol','type','control']}
 };
 
 /** These names describe existing methods; installed services determine availability. */
