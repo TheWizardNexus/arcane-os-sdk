@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.54.1
+
+- Select the self-contained Transformers.js 4.3.0 browser CDN bundle for
+  `createBrowserDecisionModel`. The prior `.web.js` entry expected a bundler
+  and left `onnxruntime-web/webgpu` unresolved in the native module Worker.
+  The runtime URL correction preserves exact Laya FP16/Julia FP32 selection,
+  full inputs/results, activation and cancellation; no new runtime version,
+  backend fallback, application default change or data migration is introduced.
+
 ## 0.54.0
 
 - Add `WS` through `arcane-os/websocket-client` and the Node root export,
