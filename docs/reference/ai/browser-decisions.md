@@ -66,7 +66,7 @@ it does not substitute a quantized graph or another model.
 | `model` | Required upstream repository/base URL accepted by Transformers.js. The application owns its selection. |
 | `revision` | Upstream revision, default `main`; select a stable revision when repeatable model selection is needed. |
 | `device` | Transformers.js backend, default `webgpu`; an explicit supported alternative is caller-owned. No automatic backend fallback. |
-| `runtime.moduleUrl` | Defaults to `https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.web.js`. An explicit compatible public runtime URL may be supplied. |
+| `runtime.moduleUrl` | Defaults to the self-contained CDN entry `https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.min.js`. The `.web.js` build expects a bundler to resolve its bare ONNX Runtime import and is unsuitable for a native module Worker. An explicit compatible public runtime URL may be supplied. |
 | `runtime.wasmPaths` | Optional upstream ONNX WASM location passed to the selected runtime's public environment API. |
 
 The runtime, tokenizer and weights use normal upstream loading and caching;

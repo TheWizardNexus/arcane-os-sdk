@@ -410,7 +410,7 @@ function createWorkerFixture(context) {
     );
     function createClient(family = 'laya') {
         const client = createBrowserDecisionModel(
-            {family, model: `fixture/${family}`, runtime: {moduleUrl: 'data:text/javascript,export%20const%20fixture%20%3D%20true%3B'}}
+            {family, model: `fixture/${family}`}
         );
         clients.push(client);
         return client;
@@ -446,6 +446,10 @@ test(
         assert.equal(worker.messages[0].op, 'load');
         assert.equal(worker.messages[0].payload.family, 'laya');
         assert.equal(worker.messages[0].payload.dtype, 'fp16');
+        assert.equal(
+            worker.messages[0].payload.runtime.moduleUrl,
+            'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.min.js'
+        );
         assert.match(worker.url.pathname, /\/decision-worker\.mjs$/u);
         assert.deepEqual(
             worker.options,

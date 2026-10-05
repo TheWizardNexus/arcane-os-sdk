@@ -3,7 +3,8 @@ import {createArcaneEventSource} from '../event-manager.mjs';
 
 const is = new Is(false);
 const STATE_EVENT = 'ai.decisions.state';
-const DEFAULT_RUNTIME_MODULE = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.web.js';
+// The CDN bundle includes ONNX Runtime; the .web build leaves bare imports for bundlers.
+const DEFAULT_RUNTIME_MODULE = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.min.js';
 
 function requiredText(value, name) {
     if (!is.string(value) || value.length === 0) {
