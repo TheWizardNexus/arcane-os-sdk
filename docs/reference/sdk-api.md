@@ -868,6 +868,42 @@ The package preserves the complete selected content, applying the documented
 asset-version and enabled browser-PWA transformations to resource references.
 Malformed configuration or descriptors fail while preserving the prior output.
 
+`moduleFormat` defaults to `'import-map'`, preserving the ordinary browser
+package. Select `'native'` to resolve saved document import maps into native
+module URLs in the package stage and emit executable inline scripts as external
+files. Static imports, re-exports, string-literal dynamic imports and
+string-literal `import.meta.resolve()` retain exact/prefix/scoped mappings.
+Imported HTML components use the shared `HTMLImport` externally executable
+script path, retaining their host binding and asynchronous lifecycle. No
+application-owned module loader is needed. Source HTML, saved data and the
+ordinary browser output remain unchanged. See
+[native-module package output](protocols.md#native-module-package-output)
+for resource handling and the static transformation boundary.
+
+An operation may override `outputDirectory` without changing the saved app
+configuration. For example, package a complete application beneath an
+application-owned extension manifest and launcher:
+
+```javascript
+const release = await packageApp({
+    workspaceRoot,
+    appId: 'moon-dashboard',
+    outputDirectory: 'dist/extension/app',
+    moduleFormat: 'native',
+    browserPwa: false
+});
+```
+
+The override uses the same workspace-relative destination and staged replacement
+rules as the saved field. It replaces only `dist/extension/app`, leaving its
+extension-root siblings and an existing browser output intact. `browserPwa:false`
+omits generated PWA artifacts for this invocation; it does not change the app's
+saved PWA configuration. The app owns extension metadata, permissions and toolbar
+launch behavior. This API builds the application directory, not an extension
+manifest or an operating-system launcher. Native-mode dry runs report selected
+input files; generated script/context files are included in the completed
+package's full returned inventory.
+
 The app's optional schema-1 `outputDirectory` selects the final
 workspace-relative destination. For example, `"ai"` emits directly into
 `<workspace>/ai`; omission retains `dist/<app-id>`. The selected directory is
@@ -1151,10 +1187,13 @@ Authenticates one existing browser app release through the low-level packager AP
 ### Signature and result
 
 ```text
-async verifyApp({workspaceRoot, appId, signal, onEvent})
+async verifyApp({workspaceRoot, appId, outputDirectory, signal, onEvent})
 ```
 
 Import it from `arcane-os` or `arcane-os/packager`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
+
+Optional `outputDirectory` selects the same workspace-relative override accepted
+by `packageApp`, without changing the app's saved destination.
 
 ### Availability and normalization
 

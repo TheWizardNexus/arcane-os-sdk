@@ -174,6 +174,69 @@ output must remain separate; a conflicting native assembly fails before it
 packages any app. App launch paths, resource URLs, and enabled PWA
 representations retain their package-relative layout.
 
+## Native-module package output
+
+The public `packageApp` operation accepts `moduleFormat:'native'`. Omission, or
+`'import-map'`, retains ordinary browser output. Optional operation-level
+`outputDirectory` overrides only this invocation's destination; `verifyApp`
+accepts that same override. Configuration, source layout, app identity, storage
+scope and previously generated sibling outputs remain unchanged.
+
+The native transformation runs in the selected package stage after application
+adapter work, before the final inventory and any enabled PWA artifacts. It uses
+the existing selected document/runtime records and shared lexical/HTML owners.
+Each selected document supplies its saved maps and authored base. Native mode
+uses the static layout with map declarations before executable scripts; it does
+not reproduce late-map insertion or its already-resolved-module timing rules.
+Exact keys, longest matching prefixes and most-specific importer scopes resolve to package
+URLs, including URL aliases used by direct installed-SDK layouts. Static
+imports, re-exports, string-literal dynamic imports and string-literal
+`import.meta.resolve()` become native relative references. Query strings and
+fragments retain their meaning. Equivalent graphs share output modules;
+documents whose maps resolve differently receive distinct context files beside
+the original module, including when their graphs contain cycles.
+
+Selected document import-map elements are consumed in the output only.
+Executable inline document scripts move into complete external files while
+their script elements retain position, type and effective scheduling. The
+packager removes ineffective `async`/`defer` attributes only from formerly inline
+classic scripts, whose external form otherwise would activate those attributes.
+Module scripts and already-external document scripts retain their attributes.
+Imported component scripts use one canonical classic wrapper, with an explicit
+`data-arcane-packaged-script` marker consumed by `HTMLImport`. That path loads
+the external script directly and retains per-instance host binding, ordered
+asynchronous completion, cancellation, teardown and ready/error events. Ordinary
+browser components keep their existing inline path. Application documents not
+selected for document processing remain unchanged unless they are explicitly
+loaded as components.
+
+The selected payload is preserved in full, including runtime files, assets,
+workers and licenses. Graph processing follows each document's executable and
+resource references, including literal URLs to selected shared component HTML.
+It does not assign an unused shared file to another document's map. Unreferenced
+selected files retain their complete content. Referenced scripts, component HTML
+and stylesheets are processed at their existing owners; resource URLs are rebased
+for deployment under a directory such as `app/`. The operation adds generated scripts to the
+complete release inventory. It does not bundle, prune, minify or rewrite
+application prose, data or saved history. The existing stage replacement
+preserves prior output if packaging fails or is cancelled.
+
+This is a static module/script packaging capability, not a replacement browser
+or a runtime import-map interpreter. Computed import expressions remain authored;
+applications supply native-resolvable URLs for runtime-selected imports. It
+does not convert event-handler attributes, dynamically evaluated source, or
+provider-created executable blobs. An inline document script beneath an authored
+remote effective base cannot address a package-local generated file; native mode
+reports that incompatible transformation and preserves the original output.
+Already-external scripts retain their remote-base behavior. Remote modules/providers
+and WebAssembly still depend on their actual host capabilities. Resolving package references is
+distinct from executing the complete application on Chromium or another host.
+
+For an extension, select `browserPwa:false` for that artifact and place the
+complete SDK-produced app beneath the app-owned extension root. The application
+owns its manifest, toolbar/background launcher and permissions. Ordinary browser
+PWA configuration and generated browser output remain independently available.
+
 ## Installed-package browser routes
 
 An external application can serve and package its installed SDK directly,

@@ -946,17 +946,172 @@ function literalExpressionResults(tokens){
     return [];
 }
 
-function globalResourceCallee(tokens,index){
-    if(!identifierIsProperty(tokens,index))return index;
-    if((tokens[index-1]?.value==='.'||tokens[index-1]?.value==='?.')
-        &&new Set(['globalThis','window','self']).has(tokens[index-2]?.value)
-        &&!identifierIsProperty(tokens,index-2))return index-2;
-    return -1;
+function resourceBindingScopes(tokens){
+    const relevant=new Set([
+        'fetch','URL','Worker','SharedWorker','importScripts',
+        'globalThis','window','self','document','location'
+    ]);
+    const bindings=new Map();
+    const closing=new Map();
+    const opening=new Map();
+    const delimiters=[];
+    for(let index=0;index<tokens.length;index+=1){
+        if(tokens[index].type!=='punctuator')continue;
+        const value=tokens[index].value;
+        if(['(','[','{'].includes(value))delimiters.push(index);
+        else if([')',']','}'].includes(value)){
+            const start=delimiters.pop();
+            if(start!==undefined){closing.set(start,index);opening.set(index,start);}
+        }
+    }
+
+    const root={start:0,end:tokens.length,kind:'module',parent:null};
+    const scopeAt=[];
+    let scope=root;
+    for(let index=0;index<tokens.length;index+=1){
+        scopeAt[index]=scope;
+        if(tokens[index].type!=='punctuator')continue;
+        if(tokens[index].value==='{'){
+            scope={
+                start:index,end:closing.get(index)??tokens.length,
+                kind:tokens[index].openingBraceKind,parent:scope
+            };
+        }else if(tokens[index].value==='}')scope=scope.parent??root;
+    }
+
+    function bind(index,owner){
+        const token=tokens[index];
+        if(token?.type!=='identifier'||!relevant.has(token.value))return;
+        const entries=bindings.get(token.value)??[];
+        entries.push({
+            start:tokens[owner.start]?.start??0,
+            end:tokens[owner.end]?.end??tokens.at(-1)?.end??0
+        });
+        bindings.set(token.value,entries);
+    }
+
+    function patterns(start,end,owner){
+        const boundaries=[start-1,...topLevelCommas(tokens,start,end),end];
+        for(let index=0;index<boundaries.length-1;index+=1){
+            pattern(boundaries[index]+1,boundaries[index+1],owner);
+        }
+    }
+
+    function pattern(start,end,owner){
+        if(start>=end)return;
+        if(tokens[start]?.value==='...')start+=1;
+        const token=tokens[start];
+        if(token?.type==='identifier'){bind(start,owner);return;}
+        const close=closing.get(start);
+        if(close===undefined||close>=end)return;
+        if(token.value==='['){patterns(start+1,close,owner);return;}
+        if(token.value!=='{')return;
+        const boundaries=[start,...topLevelCommas(tokens,start+1,close),close];
+        for(let index=0;index<boundaries.length-1;index+=1){
+            const entry=boundaries[index]+1;
+            const finish=boundaries[index+1];
+            const keyEnd=tokens[entry]?.value==='['?closing.get(entry):entry;
+            const value=tokens[keyEnd+1]?.value===':'?keyEnd+2:entry;
+            pattern(value,finish,owner);
+        }
+    }
+
+    function expressionEnd(start,{declaration=false}={}){
+        let index=start;
+        while(index<tokens.length){
+            const token=tokens[index];
+            if(token.type==='punctuator'){
+                if([';',')',']','}'].includes(token.value))break;
+                if(!declaration&&token.value===',')break;
+                if(closing.has(index)){index=closing.get(index)+1;continue;}
+            }
+            if(declaration&&token.type==='identifier'&&token.lineBreakBefore
+                &&['const','let','var','export','return'].includes(token.value))break;
+            index+=1;
+        }
+        return index;
+    }
+
+    for(let index=0;index<tokens.length;index+=1){
+        const token=tokens[index];
+        if(token.type==='punctuator'&&token.value==='{'&&tokens[index-1]?.value===')'
+            &&tokens[index-1]?.closesControl!==true){
+            const start=opening.get(index-1);
+            if(start!==undefined){
+                patterns(start+1,index-1,{start,end:closing.get(index)??tokens.length});
+            }
+        }
+        if(token.type==='punctuator'&&token.value==='=>'){
+            const previous=index-1;
+            const parameterStart=tokens[previous]?.value===')'?opening.get(previous):previous;
+            if(parameterStart!==undefined){
+                const end=tokens[index+1]?.value==='{'?closing.get(index+1):expressionEnd(index+1);
+                const owner={start:parameterStart,end:end??tokens.length};
+                if(tokens[previous]?.value===')')patterns(parameterStart+1,previous,owner);
+                else pattern(parameterStart,index,owner);
+            }
+        }
+        if(token.type!=='identifier'||identifierIsProperty(tokens,index))continue;
+        if(['const','let','var'].includes(token.value)){
+            let owner=scopeAt[index];
+            if(token.value==='var'){
+                while(owner.parent&&owner.kind!=='function')owner=owner.parent;
+            }
+            // Loop bindings conservatively retain the enclosing lexical scope.
+            patterns(index+1,expressionEnd(index+1,{declaration:true}),owner);
+        }else if(token.value==='function'||token.value==='class'){
+            const name=tokens[index+1]?.value==='*'?index+2:index+1;
+            // A named expression may retain more source than its inner scope;
+            // never turn an uncertain application-owned call into an asset URL.
+            bind(name,scopeAt[index]);
+        }else if(token.value==='catch'&&tokens[index+1]?.value==='('){
+            const close=closing.get(index+1);
+            const body=close+1;
+            if(close!==undefined&&tokens[body]?.value==='{'){
+                patterns(index+2,close,{start:index+1,end:closing.get(body)??tokens.length});
+            }
+        }else if(token.value==='import'&&!['(','.'].includes(tokens[index+1]?.value)
+            &&tokens[index+1]?.type!=='string'){
+            let cursor=index+1;
+            if(tokens[cursor]?.type==='identifier'){bind(cursor,root);cursor+=1;}
+            if(tokens[cursor]?.value===',')cursor+=1;
+            if(tokens[cursor]?.value==='*'&&tokens[cursor+1]?.value==='as')bind(cursor+2,root);
+            else if(tokens[cursor]?.value==='{'){
+                const close=closing.get(cursor)??cursor;
+                const boundaries=[cursor,...topLevelCommas(tokens,cursor+1,close),close];
+                for(let entry=0;entry<boundaries.length-1;entry+=1){
+                    const start=boundaries[entry]+1;
+                    bind(tokens[start+1]?.value==='as'?start+2:start,root);
+                }
+            }
+        }
+    }
+    return bindings;
 }
 
-function localResourceBase(tokens){
+function locallyBoundResource(token,bindings){
+    const owners=bindings.get(token.value)??[];
+    return owners.some(function containsReference(owner){
+        return token.start>=owner.start&&token.start<=owner.end;
+    });
+}
+
+function globalResourceCallee(tokens,index,bindings){
+    let root=index;
+    if(identifierIsProperty(tokens,index)){
+        if((tokens[index-1]?.value!=='.'&&tokens[index-1]?.value!=='?.')
+            ||!['globalThis','window','self'].includes(tokens[index-2]?.value)
+            ||identifierIsProperty(tokens,index-2))return -1;
+        root=index-2;
+    }
+    if(locallyBoundResource(tokens[root],bindings))return -1;
+    return root;
+}
+
+function localResourceBase(tokens,bindings){
     if(!tokens)return false;
     if(tokens.some(function nonExpressionToken(token){return !['identifier','punctuator'].includes(token.type);}))return false;
+    if(tokens[0]?.value!=='import'&&tokens[0]&&locallyBoundResource(tokens[0],bindings))return false;
     const base=tokens.map(function baseToken(token){return token.value;}).join('');
     return [
         'import.meta.url','document.baseURI','location.href','window.location.href',
@@ -984,8 +1139,9 @@ function reportAssetReference(onReference,url,kind,baseKind){
     if(is.function(onReference))onReference({url,kind,baseHref:null,...(baseKind?{baseKind}:{})});
 }
 
-function javascriptReferenceEdits(source,version,onReference){
+function javascriptReferenceEdits(source,version,onReference,resolveReference){
     const tokens=tokenize(source);
+    const resourceBindings=resourceBindingScopes(tokens);
     const selected=new Map();
     const imports=moduleImportsFromTokens(tokens,'asset source').imports;
     const byOffset=new Map(tokens.map(function tokenByOffset(token){
@@ -993,38 +1149,55 @@ function javascriptReferenceEdits(source,version,onReference){
     }));
     for(const entry of imports){
         reportAssetReference(onReference,entry.specifier,'import');
-        if(/^(?:\.{1,2}\/|\/)/u.test(entry.specifier)){
-            selected.set(entry.offset,byOffset.get(entry.offset));
+        if(resolveReference||/^(?:\.{1,2}\/|\/)/u.test(entry.specifier)){
+            selected.set(entry.offset,{token:byOffset.get(entry.offset),kind:'import'});
         }
     }
     for(let index=0;index<tokens.length;index+=1){
         const token=tokens[index];
+        if(resolveReference&&token.type==='identifier'&&token.value==='import'
+            &&!identifierIsProperty(tokens,index)&&tokens[index+1]?.value==='.'
+            &&tokens[index+2]?.value==='meta'&&tokens[index+3]?.value==='.'
+            &&tokens[index+4]?.value==='resolve'&&tokens[index+5]?.value==='('
+            &&tokens[index+6]?.type==='string'&&tokens[index+7]?.value===')'){
+            const literal=tokens[index+6];
+            selected.set(literal.start,{token:literal,kind:'import-resolve'});
+        }
         if(token.type!=='identifier'||tokens[index+1]?.value!=='(')continue;
         if(!['URL','Worker','SharedWorker','importScripts','fetch'].includes(token.value))continue;
-        const callee=globalResourceCallee(tokens,index);
+        const callee=globalResourceCallee(tokens,index,resourceBindings);
         if(callee<0)continue;
         const constructor=tokens[callee-1]?.value==='new';
         if(['URL','Worker','SharedWorker'].includes(token.value)&&!constructor)continue;
         const argumentsList=callArgumentTokens(tokens,index+1);
         if(token.value==='fetch'&&!literalResourceFetch(argumentsList))continue;
-        if(token.value==='URL'&&!localResourceBase(argumentsList[1]))continue;
+        if(token.value==='URL'&&!localResourceBase(argumentsList[1],resourceBindings))continue;
         const selectedArguments=token.value==='importScripts'?argumentsList:argumentsList.slice(0,1);
         for(const argument of selectedArguments){
             for(const literal of literalExpressionResults(argument)){
                 if((token.value==='fetch'||token.value==='URL')
                     &&!RESOURCE_EXTENSION.test(literal.value))continue;
                 if((token.value==='fetch'||token.value==='URL')
-                    &&/\.html?(?:[?#]|$)/iu.test(literal.value))continue;
+                    &&!resolveReference&&/\.html?(?:[?#]|$)/iu.test(literal.value))continue;
                 const kind=token.value==='fetch'?'fetch'
                     :token.value==='URL'&&!/\.(?:js|mjs)(?:[?#]|$)/iu.test(literal.value)?'asset':'script';
                 const documentBase=['Worker','SharedWorker','fetch'].includes(token.value)
                     ||(token.value==='URL'&&argumentsList[1]?.[0]?.value!=='import');
                 reportAssetReference(onReference,literal.value,kind,documentBase?'document':undefined);
-                selected.set(literal.start,literal);
+                selected.set(literal.start,{
+                    token:literal,
+                    kind,
+                    baseKind:documentBase?'document':undefined
+                });
             }
         }
     }
-    return [...selected.values()].map(function versionJavaScriptReference(token){
+    return [...selected.values()].map(function versionJavaScriptReference({token,kind,baseKind}){
+        if(resolveReference){
+            const value=resolveReference({url:token.value,kind,baseKind});
+            if(value===undefined||value===token.value)return null;
+            return stringReferenceEdit(source,token,null,[{start:0,end:token.value.length,value}]);
+        }
         return stringReferenceEdit(source,token,version);
     }).filter(Boolean);
 }
@@ -1061,7 +1234,7 @@ function cssReferenceEdits(source,version,onReference,versionReference=versionAs
         const original=source.slice(start,end);
         if(original.includes('\\'))return;
         reportAssetReference(onReference,original,kind);
-        const value=versionReference(original,version);
+        const value=versionReference(original,version,kind);
         if(value!==original)edits.push({start,end,value});
     }
     while(cursor<source.length){
@@ -1512,10 +1685,16 @@ function parseTagAttributes(openTag){
             }
         }
         if(name){
-            if(attributes.has(name))duplicates.add(name);
+            const position={start:valueStart,end:valueEnd,quote,nameEnd,assigned};
+            if(attributes.has(name)){
+                duplicates.add(name);
+                const original=positions.get(name);
+                original.additional??=[];
+                original.additional.push(position);
+            }
             else{
                 attributes.set(name,value);
-                positions.set(name,{start:valueStart,end:valueEnd,quote,nameEnd,assigned});
+                positions.set(name,position);
             }
         }
     }
@@ -1954,11 +2133,12 @@ function htmlStyleReferenceEdits(source,version,onReference){
     });
 }
 
-function srcsetReferenceEdits(source,version,onReference){
+function srcsetReferenceEdits(source,version,onReference,versionReference=versionHtmlAttribute){
     const edits=[];
     let cursor=0;
     while(cursor<source.length){
         while(/[\t\n\f\r ,]/u.test(source[cursor]??''))cursor+=1;
+        if(cursor===source.length)break;
         const start=cursor;
         while(cursor<source.length&&!/[\t\n\f\r ]/u.test(source[cursor]))cursor+=1;
         let end=cursor;
@@ -1966,7 +2146,7 @@ function srcsetReferenceEdits(source,version,onReference){
         const original=source.slice(start,end);
         const view=htmlAttributeView(original);
         if(view)reportAssetReference(onReference,view.decoded,'asset');
-        const value=versionHtmlAttribute(original,version);
+        const value=versionReference(original,version);
         if(value!==original)edits.push({start,end,value});
         if(end<cursor)continue;
         while(cursor<source.length&&source[cursor]!==',')cursor+=1;
@@ -2148,6 +2328,52 @@ export function inspectImportMapHtml(html){
         metas,
         firstModulePosition:firstModulePosition(source)
     };
+}
+
+// Packaging shares the same lexical and HTML owners as managed browser maps.
+// These internal helpers edit only executable/resource references, never prose.
+export function nativeModuleHtml(source){
+    const structure=scanHtmlStructure(source);
+    function withAttributes(element){
+        const attributes=parseTagAttributes(element.open);
+        return {
+            ...element,
+            attributes,
+            attribute:function attribute(name){
+                return structuralAttribute(attributes,name,element.tag??'script');
+            }
+        };
+    }
+    return {
+        ...structure,
+        scripts:structure.scripts.map(withAttributes),
+        elements:structure.elements.map(withAttributes),
+        bases:structure.bases.map(withAttributes)
+    };
+}
+
+export function rewriteNativeJavaScript(source,resolveReference){
+    return applyReferenceEdits(source,javascriptReferenceEdits(source,null,null,resolveReference));
+}
+
+export function rewriteNativeStylesheet(source,resolveReference){
+    return applyReferenceEdits(source,cssReferenceEdits(source,null,null,
+        function nativeStyleReference(url,_version,kind){
+            return resolveReference({url,kind})??url;
+        }
+    ));
+}
+
+export function rewriteNativeSrcset(source,resolveReference){
+    return applyReferenceEdits(source,srcsetReferenceEdits(source,null,null,
+        function nativeSrcsetReference(url){
+            return resolveReference({url,kind:'asset'})??url;
+        }
+    ));
+}
+
+export function applyNativeReferenceEdits(source,edits){
+    return applyReferenceEdits(source,edits);
 }
 
 function renderManagedHtml(html,json,baseHref='../../'){

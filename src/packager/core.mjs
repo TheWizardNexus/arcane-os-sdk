@@ -15,6 +15,7 @@ import {pathToFileURL} from 'node:url';
 import {appRelativeRoot,resolveAppRoot,resolvePackageOutputRoot} from '../app-layout.mjs';
 import {readInstalledSdkLayout} from '../sdk-runtime-layout.mjs';
 import {withWorkspaceOperationLock} from '../workspace-operation-lock.mjs';
+import {materializeNativeModules} from './native-modules.mjs';
 import {
     applyPwaEntryReferences,
     inspectImportMapHtml,
@@ -421,7 +422,7 @@ async function assertContainedRealPath(root,candidate,label){
     }
 }
 
-async function loadContext(requestedWorkspaceRoot,appId){
+async function loadContext(requestedWorkspaceRoot,appId,{outputDirectory}={}){
     const workspaceRoot=await realDirectory(normalizeWorkspaceRoot(requestedWorkspaceRoot),'Workspace root');
     const rootConfigPath=path.join(workspaceRoot,ROOT_CONFIG_NAME);
     const rootConfig=validateRootConfig(await readJson(rootConfigPath,ROOT_CONFIG_NAME),rootConfigPath);
@@ -431,6 +432,9 @@ async function loadContext(requestedWorkspaceRoot,appId){
     await assertContainedRealPath(appsRoot,appRoot,appId);
     const configPath=path.join(appRoot,APP_CONFIG_NAME);
     const config=validateAppConfig(await readJson(configPath,`${appId}/${APP_CONFIG_NAME}`),appId,rootConfig,configPath);
+    if(outputDirectory!==undefined){
+        config.outputDirectory=normalizeRelativePath(outputDirectory,'package outputDirectory');
+    }
     return {
         workspaceRoot,
         rootConfig,
@@ -841,7 +845,10 @@ async function replaceDirectory(stagingRoot,outputRoot){
 }
 
 async function packageWithContext(context,options={}){
-    const {signal,onEvent,browserPwa=true}=options;
+    const {signal,onEvent,browserPwa=true,moduleFormat='import-map'}=options;
+    if(!['import-map','native'].includes(moduleFormat)){
+        throw new TypeError('packageApp moduleFormat must be "import-map" or "native".');
+    }
     const pwaEnabled=browserPwa&&context.config.pwa?.enabled===true;
     const appPath=appRelativeRoot(context.rootConfig,context.appId);
     const entryPath=appPackagePath(context,context.config.entry);
@@ -912,7 +919,18 @@ async function packageWithContext(context,options={}){
         }else{
             await copyBase();
         }
-        const files=await listOutputFiles(stagingRoot,{signal});
+        let files=await listOutputFiles(stagingRoot,{signal});
+        if(moduleFormat==='native'){
+            files=await materializeNativeModules({
+                stagingRoot,
+                files,
+                documents:inspected.browserDocuments.map(function documentPath(document){return document.packagePath;}),
+                sharedFiles:records.filter(function sharedRecord(record){return record.appRelativePath===undefined;})
+                    .map(function sharedPath(record){return record.destination;}),
+                signal,
+                onEvent
+            });
+        }
         // Traverse actual browser resources after the adapter finishes. Files
         // included only as application documents retain their original content.
         const assetVersion=await readWorkspaceAssetVersion(context.workspaceRoot);
@@ -1114,7 +1132,7 @@ async function packageWithContext(context,options={}){
 }
 
 export async function packageApp(options={}){
-    const context=await loadContext(options.workspaceRoot,options.appId);
+    const context=await loadContext(options.workspaceRoot,options.appId,options);
     const execute=()=>packageWithContext(context,options);
     if(options.workspaceOperationLease)return execute();
     return withWorkspaceOperationLock({
@@ -1125,9 +1143,9 @@ export async function packageApp(options={}){
     },execute);
 }
 
-export async function verifyApp({workspaceRoot,appId,signal,onEvent}={}){
+export async function verifyApp({workspaceRoot,appId,outputDirectory,signal,onEvent}={}){
     throwIfAborted(signal);
-    const context=await loadContext(workspaceRoot,appId);
+    const context=await loadContext(workspaceRoot,appId,{outputDirectory});
     const outputRoot=await realDirectory(context.outputRoot,'Package output');
     const manifest=await readJson(path.join(outputRoot,RELEASE_MANIFEST_NAME),RELEASE_MANIFEST_NAME);
     if(!isPlainObject(manifest)||manifest.schemaVersion!==1||manifest.kind!=='arcane-app-release'

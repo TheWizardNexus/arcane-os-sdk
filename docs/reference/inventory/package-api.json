@@ -2137,7 +2137,7 @@
       "name": "verifyApp",
       "displayName": "verifyApp()",
       "kind": "function",
-      "signature": "async verifyApp({workspaceRoot, appId, signal, onEvent})",
+      "signature": "async verifyApp({workspaceRoot, appId, outputDirectory, signal, onEvent})",
       "entrypoints": [
         "arcane-os",
         "arcane-os/packager"

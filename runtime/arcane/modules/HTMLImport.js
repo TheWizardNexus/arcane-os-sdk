@@ -6,6 +6,7 @@ import {
   createArcaneEventSource,
   projectArcaneDOMEvent
 } from 'arcane-os/event-manager';
+import { createHTMLImportScript } from './HTMLImportScript.js';
 
 const htmlImportHostRegistryKey=Symbol.for('arcane.html-import.hosts');
 const htmlImportHostRegistry=globalThis[htmlImportHostRegistryKey] instanceof Map
@@ -17,6 +18,47 @@ globalThis[htmlImportHostRegistryKey]=htmlImportHostRegistry;
 let htmlImportScriptId=0;
 
 const htmlImportModuleURL=new URL(import.meta.url);
+
+function appendPackagedScript(executable, signal) {
+    return new Promise(function waitForPackagedScript(resolve, reject) {
+        function removeListeners() {
+            executable.removeEventListener('load', loaded);
+            executable.removeEventListener('error', failed);
+            signal.removeEventListener('abort', cancelled);
+        }
+
+        function loaded() {
+            removeListeners();
+            resolve(true);
+        }
+
+        function failed() {
+            removeListeners();
+            reject(new Error(`HTML import packaged script failed to load: ${executable.src}`));
+        }
+
+        function cancelled() {
+            removeListeners();
+            executable.remove();
+            resolve(false);
+        }
+
+        executable.addEventListener('load', loaded, {once: true});
+        executable.addEventListener('error', failed, {once: true});
+        signal.addEventListener('abort', cancelled, {once: true});
+        if (signal.aborted) {
+            cancelled();
+            return;
+        }
+
+        try {
+            document.head.appendChild(executable);
+        } catch (error) {
+            removeListeners();
+            reject(error);
+        }
+    });
+}
 
 function cleanComponentResource(value,baseHref){
   if(!is.string(value)||!value||value.startsWith('#')){
@@ -474,42 +516,55 @@ class HTMLImport extends HTMLElement {
     try{
       for(const script of scripts){
         if(!this.#isCurrentConnection(generation,controller))return;
-        let source=script.textContent||'';
-        let sourceBaseHref=contentBaseHref;
         const scriptSource=script.getAttribute('src');
-        if(scriptSource!==null){
-          const requestedScriptHref=cleanComponentResource(
-            new URL(scriptSource,contentBaseHref).href,
-            contentBaseHref
-          );
-          const response=await fetch(requestedScriptHref,{
-            cache:'default',
-            method:'GET',
-            signal:controller.signal
-          });
-          if(!response.ok){
-            throw new Error(`HTML import script request failed with status ${response.status}.`);
-          }
-          source=await response.text();
-          sourceBaseHref=response.url||requestedScriptHref;
-          if(!this.#isCurrentConnection(generation,controller))return;
-        }
-
-        const executableSource=resolveRelativeDynamicImports(
-          source,
-          sourceBaseHref
-        );
         const executable=document.createElement('script');
         const hostToken=`html-import-${Date.now()}-${htmlImportScriptId++}`;
+        const packaged=script.getAttribute('data-arcane-packaged-script')!==null;
+        const requestedScriptHref=scriptSource===null?null:cleanComponentResource(
+          new URL(scriptSource,contentBaseHref).href,
+          contentBaseHref
+        );
+
+        if(packaged){
+          if(requestedScriptHref===null){
+            throw new Error('The HTML import packaged script has no source URL.');
+          }
+          executable.src=requestedScriptHref;
+        }else{
+          let source=script.textContent||'';
+          let sourceBaseHref=contentBaseHref;
+          if(requestedScriptHref!==null){
+            const response=await fetch(requestedScriptHref,{
+              cache:'default',
+              method:'GET',
+              signal:controller.signal
+            });
+            if(!response.ok){
+              throw new Error(`HTML import script request failed with status ${response.status}.`);
+            }
+            source=await response.text();
+            sourceBaseHref=response.url||requestedScriptHref;
+            if(!this.#isCurrentConnection(generation,controller))return;
+          }
+          executable.textContent=createHTMLImportScript(resolveRelativeDynamicImports(
+            source,
+            sourceBaseHref
+          ));
+        }
 
         executable.dataset.arcaneHostToken=hostToken;
-        executable.textContent=`(()=>{const registry=globalThis[Symbol.for('arcane.html-import.hosts')];const token=document.currentScript&&document.currentScript.dataset.arcaneHostToken;const binding=registry instanceof Map&&token?registry.get(token):null;if(!binding?.host)throw new Error('HTML import host binding is unavailable.');binding.promise=(async function(){${executableSource}}).call(binding.host);})()`;
         script.parentNode.removeChild(script);
 
         const binding={host:this,promise:null};
         htmlImportHostRegistry.set(hostToken,binding);
         try{
-          document.head.appendChild(executable);
+          if(packaged){
+            const loaded=await appendPackagedScript(executable,controller.signal);
+            // A started initializer still owns completion and any late teardown.
+            if(!loaded&&!binding.promise)return;
+          }else{
+            document.head.appendChild(executable);
+          }
           if(!binding.promise||!is.function(binding.promise.then)){
             throw new Error('The HTML import script did not start.');
           }

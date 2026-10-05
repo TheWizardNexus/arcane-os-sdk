@@ -98,7 +98,8 @@ own asynchronous work, cancellation, and backpressure.
 | [`DocumentNavigation.js`](#documentnavigationjs) | esm | Binds document navigation, filtering, history, current-item reveal, and load initialization. | Browser / native WebView | Normalized filter/navigation state; DOM effects preserved. |
 | [`Errors.js`](#errorsjs) | esm | Normalizes global errors/rejections, assigns occurrence identifiers, persists a complete ledger, and performs complete delivery. | Browser / native WebView hybrid | Incident records normalized; storage/mail failures isolated. |
 | [`GifEncoder.js`](#gifencoderjs) | esm | Encodes indexed frames into a complete animated GIF using palette mapping and LZW. | Cross-host | Normalized complete binary output. |
-| [`HTMLImport.js`](#htmlimportjs) | esm | Defines the same-origin `<html-import>` loader with open shadow root, inline script execution, and readiness/error events. | Browser / native WebView | Public error detail normalized; fetch/DOM failure preserved. |
+| [`HTMLImport.js`](#htmlimportjs) | esm | Defines the same-origin `<html-import>` loader with open shadow root, inline or packaged external script execution, and readiness/error events. | Browser / native WebView | Public error detail normalized; fetch/DOM failure preserved. |
+| [`HTMLImportScript.js`](#htmlimportscriptjs) | esm | Renders the complete classic-script host wrapper shared by HTMLImport and native-module packaging. | Cross-host | Complete source retained with a terminating newline before the wrapper closes. |
 | [`InMemoryCommunicationProvider.js`](#inmemorycommunicationproviderjs) | esm | Implements deterministic in-memory thread/message/send behavior for demos and tests. | Cross-host | Normalized communication entities. |
 | [`IsolatedModelQuestionRunner.js`](#isolatedmodelquestionrunnerjs) | esm | Inspects one selected model and runs one isolated question while preserving the complete answer. | Native bridge or injected provider | Normalized model/result and coded errors. |
 | [`LocalAIReadiness.js`](#localaireadinessjs) | esm | Derives selected AI requirements and returns a complete readiness/recovery report across browser, desktop, and Android modes. | Browser/native hybrid | Fully normalized report and stable error codes; browsers never probe Ollama. |
@@ -2500,7 +2501,7 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Defines the same-origin `<html-import>` loader with open shadow root, inline script execution, and readiness/error events.
+Defines the same-origin `<html-import>` loader with open shadow root, inline or packaged external script execution, and readiness/error events.
 
 ### Public surface
 
@@ -2520,6 +2521,14 @@ Local component resources use stable URLs. The loader removes retired SDK-owned
 including caller-owned `v` fields, and fragments remain intact. External resource
 URLs retain their complete query. Ordinary HTTP conditional caching is unchanged.
 
+Native-module packages mark component scripts with `data-arcane-packaged-script`
+and an external `src`. The loader executes those files through a real classic
+script element instead of fetching their text for inline execution. Each host
+receives its own invocation, `this` binding, ordered initialization, readiness
+and error events, cancellation, and imported `destroy()` restoration. Independent
+component hosts remain concurrent. Ordinary unmarked components retain their
+existing inline/fetched-script path.
+
 Exact exports: `default`.
 
 ### Availability and normalization
@@ -2533,6 +2542,40 @@ import * as module from '/arcane/modules/HTMLImport.js';
 
 console.log(Object.keys(module));
 ```
+
+## HTMLImportScript.js
+
+### Overview
+
+Renders the complete classic-script host wrapper shared by HTMLImport and
+native-module packaging. Rendering returns source text; it does not execute it
+or access the DOM.
+
+### Public surface
+
+`createHTMLImportScript(source)` returns the complete source inside the loader's
+async host-bound initializer. A newline separates the authored ending from the
+wrapper closure, including when the body ends in a line comment. At execution,
+the wrapper uses the current script's host token and the HTMLImport-owned
+registry, then exposes the initializer promise to that host's loader.
+
+Exact exports: `createHTMLImportScript`.
+
+### Availability and normalization
+
+**Cross-host.** Complete source retained with a terminating newline before the
+wrapper closes. Transport: In-process only. [Deep protocol details](protocols.md).
+
+### Example
+
+```javascript
+import {createHTMLImportScript} from 'arcane-os/modules/HTMLImportScript.js';
+
+const source=createHTMLImportScript('this.textContent="The moon burglar arrived.";');
+```
+
+Application packaging normally calls `packageApp({moduleFormat:'native', ...})`
+instead of assembling or executing component wrappers itself.
 
 ## InMemoryCommunicationProvider.js
 
