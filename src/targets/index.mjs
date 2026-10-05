@@ -21,7 +21,7 @@ const DEFINITIONS=[
         id:'portable',displayName:'Portable native application',status:'pairing-required',
         platforms:['windows','linux'],architectures:['x64','arm64'],formats:['portable'],
         signingModes:['unsigned-local-test'],
-        reason:'Portable output is available when paired to an Arcane OS native provider.'
+        reason:'Portable app payloads use the SDK package provider by default; explicit provider pairing remains available.'
     },
     {
         id:'windows-x64',displayName:'Windows x64 executable',status:'pairing-required',
@@ -226,6 +226,7 @@ export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
         appReleaseRoot,
         release,
         appDescriptor,
+        selectedSdk,
         dependencyReleases,
         minimumCoreVersion,
         protectedRoots,
@@ -242,6 +243,7 @@ export function createNativeTargetAdapter({targetId,nativeBuilder}={}){
             appReleaseRoot,
             release,
             appDescriptor,
+            selectedSdk,
             dependencyReleases,
             minimumCoreVersion,
             protectedRoots,

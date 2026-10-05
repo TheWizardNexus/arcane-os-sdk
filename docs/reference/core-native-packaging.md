@@ -1,0 +1,149 @@
+# Portable Core packaging
+
+`arcane-os/native/portable-provider` owns the portable native payload in the SDK
+package. It does not load Arcane OS source, choose models, download a runtime,
+or compile an executable. Windows, Linux and macOS hosts may compose this
+Node-based payload; Android needs its separate native host adaptation. The
+current CLI's portable platform selections remain Windows and Linux. A portable
+artifact is not a Windows executable, Linux package or Android application.
+
+`loadArcaneNativeProvider({target:'portable'})` selects the installed SDK provider
+without an `arcaneRoot`. Supplying an explicit `arcaneRoot` retains the existing
+checkout-provider route. Other native targets remain with their actual platform
+providers; the loader does not substitute this payload for an unavailable host.
+
+## Provider and selected input
+
+The default export and `arcaneNativeBuilderProvider` are the same provider.
+`createPortableNativeProvider({services:[]})` creates one with application-owned
+service configuration. All implement `arcane-native-builder/1`:
+
+- `describe()` identifies the portable target and `executable:false`.
+- `doctor({targetRequest, signal, onEvent})` reports missing SDK Core source files.
+- `prepare({targetRequest, signal, onEvent})` returns the selected SDK version and
+  package root. Neither operation builds or imports application services.
+- `build(request)` assembles one selected release and its explicit dependencies.
+- `verify({artifact, targetRequest, signal, onEvent})` explicitly reads its semantic
+  manifest and observes that the listed output files exist. It does not execute
+  a host or establish native behavior. Build does not implicitly run verification.
+- `run()` reports `ARCANE_NATIVE_RUN_UNSUPPORTED`; portable is not an executable.
+
+Use the existing `createNativeBuildPlan()` / `executeNativeBuildPlan()` public
+contract. Build receives `appDescriptor`, `appReleaseRoot`, `release`,
+`readReleaseFile`, `dependencies`, `minimumCoreVersion`, `protectedRoots`,
+`outputRoot`, `targetRequest`, `selectedSdk`, `signal` and `onEvent`. Dependencies provide their
+`appId`, `releaseRoot`, `release` and `readReleaseFile`. The selected release's
+`files` inventory is copied completely through its supplied reader. Direct
+callers may supply the release root for ordinary file reads instead.
+
+Both the current flat signing selection and the CLI's nested signing selection
+are accepted by the planning boundary. Portable assembly adds no signing,
+receipts, hashes, content limits or security policy. The package-relative source
+root comes from the provider module's own location, not `toolchainRoot` or an
+Arcane OS machine bundle.
+
+## Output and host contract
+
+Each build creates a fresh `arcane-portable-*` directory beneath `outputRoot`.
+The result is `{app, target, manifest}`, with its actual directory at
+`target.rootDir`. Existing artifacts are preserved. Cancellation or a failed
+assembly removes only that build's newly created directory. Source/release roots
+cannot be overwritten with generated output.
+
+The selected app is copied unchanged under `app/`. Dependencies are copied
+unchanged under `dependencies/<index>/`; the manifest relates each directory to
+its actual app identifier and selected release. No HTML, payload, line ending,
+application import, or base URL is rewritten by this provider. Dependency
+navigation and service imports remain explicit host/application composition;
+the payload does not invent cross-app routes.
+
+`node_modules/arcane-os/` contains the SDK consumer source, runtime, schemas,
+commands, package metadata and legal files. Its installed published runtime
+dependency tree is included with licenses and actual nested dependency
+resolution. The generated Core entry uses the ordinary public
+`arcane-os/core/host` import. Application service modules can use those public
+SDK exports through Node's normal package resolution. Existing app-owned
+`node_modules` content remains authoritative where the selected app supplies it;
+its own dependency completeness remains part of that app's selected release.
+For the direct installed browser layout, the ordinary native selection also
+supplies `selectedSdk:{packageRoot,packageSource}` from the application's actual
+installed SDK. Assembly completes its browser-only package directory with
+missing files and dependencies from that selected package, preserving every
+selected file. It never fills an older projection with the builder's newer
+package metadata. An already-supplied `package.json` remains app-owned, without
+replacement or automatic completion. `manifest.appSdk` identifies this app
+package separately from the builder SDK. Low-level callers composing services
+with a partial direct SDK projection must supply the actual selected package
+source; a file inventory alone does not identify its version or Node exports.
+No dependency installer or package script runs. No OS model, Shell, Provisioner,
+catalog, prompt, or native compiler is added.
+
+The semantic `arcane-native.json` names the web root, selected start URL, Node
+Core entry, classic client, dependencies and complete file inventory. A native
+host must:
+
+1. Mount `app/` at the root of its local application URL origin, preserving the
+   selected start path and all navigable documents.
+2. Inject `runtime/arcane-api.js` at document creation. It is produced by the
+   canonical `createCoreClassicSource()` generator, not a copied OS client.
+3. Start `runtime/arcane-core.mjs` with the host's supported Node runtime and
+   connect the existing framed stdin/stdout transport.
+4. Close input and await Core's drain before terminating the child process.
+
+The selected release must contain one shared `sdk/event-manager.mjs` path,
+possibly nested under its SDK payload directory, or the direct installed
+`node_modules/<package-or-alias>/browser-runtime/event-manager.mjs` path.
+The classic client imports that
+same owner with an origin-root URL, including on nested pages. It does not create
+a second event implementation. A plain file-URL launch without this host mapping
+is not the native serving contract. No host is launched during packaging.
+
+## Explicit application services
+
+Pass native service modules already included in the selected app release:
+
+```js
+import {createPortableNativeProvider} from 'arcane-os/native/portable-provider';
+
+const nativeBuilder = createPortableNativeProvider({
+    services: [{module:'native/moon-ledger.mjs', options:{ledgerName:'Cheese debts'}}]
+});
+```
+
+Each module default-exports a synchronous factory returning the existing Core
+service definition. Its options must be JSON-serializable data. Module imports
+and factories run only when the generated Core entry is launched, never during
+packaging. Put asynchronous initialization in `start()`, not a top-level await
+or asynchronous factory, so unrelated services and dispatcher readiness remain
+independent. Factories own product configuration and any service dependencies;
+the packager does not discover, install or execute them.
+
+```js
+// native/moon-ledger.mjs, owned by the application
+export default function createMoonLedger({ledgerName}) {
+    return {
+        name: 'moon-ledger',
+        methods: {
+            'moon.describe': function describeLedger() {
+                return {name:ledgerName, message:'The cheese debts are astronomical.'};
+            }
+        }
+    };
+}
+```
+
+`startCoreHost({application, version, services, input, output, onError, signal})`
+is also available directly from `arcane-os/core/host`. It returns the existing
+stdio owner's `{runtime, closed, close}` without another lifecycle controller.
+An optional abort signal invokes that same idempotent drain. Dispatcher readiness
+does not wait for service/model readiness. Accepted `lifetime:'service'` work
+survives renderer cancellation and is drained before shutdown. Errors remain
+observable through `onError` and `closed`; no process is killed or forcibly exited.
+See [the Core runtime contract](core-runtime.md) for request and service lifetime
+details and [the client contract](core-client.md) for native bridge integration.
+
+This source increment supplies portable assembly and service composition.
+Desktop WebView executables, platform child-process ownership, Android dispatch
+and executable build toolchains require their own completed adapters. Published
+consumers must adopt the numeric package that includes this increment; a source
+checkout or a successful source push is not that public package authority.

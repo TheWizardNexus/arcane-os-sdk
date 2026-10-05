@@ -692,11 +692,13 @@ npm exec -- arcane verify-bundle dist/hello-world-1.0.0.arcane-app.tar.gz
 
 ### Overview
 
-Loads one fixed native provider from one explicit Arcane OS checkout and
-diagnoses the selected target/host prerequisites without building an app.
+Loads the SDK package provider for portable by default, or the fixed provider
+from an explicitly selected Arcane OS checkout. It diagnoses the selected
+provider prerequisites without building an app. Executable targets still
+require `--arcane-root` and their platform toolchains.
 
 ```text
-arcane native-doctor --target <native-target> --arcane-root <directory>
+arcane native-doctor --target <native-target> [--arcane-root <directory>]
 ```
 
 ### Availability
@@ -722,7 +724,7 @@ It is not a prerequisite command to repeat immediately before `build`; `build`
 prepares its own selected toolchain state.
 
 ```text
-arcane native-prepare --target <native-target> --arcane-root <directory>
+arcane native-prepare --target <native-target> [--arcane-root <directory>]
 ```
 
 ### Example
@@ -749,6 +751,12 @@ The command selects one workspace, app, target, architecture, format, signing
 profile, and output root. Current providers emit a portable directory,
 Windows x64 EXE bundle, Linux x64/ARM64 DEB, or development-signed Android APK.
 The output remains target-specific inside the common plan contract.
+Portable uses the SDK package without an OS checkout, copies complete selected
+app/dependency payloads and generates the Core entry/classic client source.
+It adds no executable platform host or automatically discovered app services.
+An explicit `--arcane-root` continues to select the checkout provider.
+Integrated builds retain an output root outside the OS checkout; only an
+explicit checkout provider must share the workspace root.
 The app's `outputDirectory` selects its packaged browser-content input;
 native `--output-root` independently selects native build output.
 `--dry-run` is implemented for the browser build path. Native builds reject it

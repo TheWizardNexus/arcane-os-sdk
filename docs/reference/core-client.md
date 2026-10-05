@@ -114,6 +114,7 @@ delivery, preserving streaming callbacks before their completion cleanup.
 `client.eventsReady` observes that connection; failures are also reported
 through `onError` and reject pending requests.
 
-This client increment does not distribute a Core executable, install an app
-service, change OS callers, or remove the current native-provider checkout
-requirement. Native packaging and host cutover are separately owned work.
+The SDK's [portable native provider](core-native-packaging.md) assembles the
+Core runtime and selected app services without a native-provider checkout.
+It does not distribute a Core executable or change OS callers. Executable
+platform hosts and their cutover remain separately owned work.

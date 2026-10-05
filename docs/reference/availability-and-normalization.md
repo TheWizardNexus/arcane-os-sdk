@@ -229,8 +229,10 @@ synthesis, and TWiN Cloud/FAL synthesis can be registered through
 `ai.configureSpeechProvider(role,provider,{modelId})`; configuration owns only
 the selected role and performs no network request. Saved selections remain
 application-owned, including selections waiting for provider registration.
-The SDK publishes no privileged Core implementation, credential, model, or
-speech-runtime authority. Capability-only built-in adapters report their
+The SDK supplies reusable Core client/runtime/service-lifecycle primitives and
+portable payload composition; privileged execution stays in a native host.
+It supplies no application credential, selected model or product speech-service
+authority. Capability-only built-in adapters report their
 existing routes without probing, downloading, or changing providers. The sticky
 [`AIRuntimeState`](runtime-modules.md#airuntimestatejs) surface keeps
 application UI independent of transport. A selected route remains explicit:

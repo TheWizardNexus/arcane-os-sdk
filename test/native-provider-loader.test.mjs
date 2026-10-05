@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,rm,writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import test from 'node:test';
 import {
     ARCANE_NATIVE_PROVIDER_PATHS,
@@ -53,6 +54,7 @@ test('ordinary provider loading imports the selected module and returns direct b
     assert.equal(imported.startsWith('file:'),true);
     assert.equal(pairing.providerPath,selected.providerPath);
     assert.equal(pairing.toolchainRoot,selected.arcaneRoot);
+    assert.equal(pairing.providerSource,'arcane-checkout');
     assert.equal(pairing.nativeBuilder,builder);
 });
 
@@ -70,4 +72,40 @@ test('native provider loading preserves event and target context',async t=>{
         'native.provider.load.started',
         'native.provider.load.completed'
     ]);
+});
+
+test('portable without an override loads the installed SDK provider directly',async()=>{
+    const builder=provider();
+    const providerURL=new URL('../src/native/portable-provider.mjs',import.meta.url);
+    let imported;
+    const pairing=await loadArcaneNativeProvider({
+        target:'portable',
+        inspect(){throw new Error('A packaged provider does not inspect an OS checkout.');},
+        async importModule(specifier){
+            imported=specifier;
+            return {default:builder};
+        }
+    });
+    assert.equal(imported,providerURL.href);
+    assert.equal(pairing.providerPath,fileURLToPath(providerURL));
+    assert.equal(pairing.toolchainRoot,path.resolve(fileURLToPath(new URL('../',import.meta.url))));
+    assert.equal(pairing.arcaneRoot,null);
+    assert.equal(pairing.providerSource,'sdk-package');
+    assert.equal(pairing.nativeBuilder,builder);
+});
+
+test('packaged provider import errors retain their cause and never select a checkout',async()=>{
+    const cause=new Error('Selected package provider import failed.');
+    await assert.rejects(()=>loadArcaneNativeProvider({
+        target:'portable',
+        importModule(){throw cause;}
+    }),error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&error.cause===cause);
+});
+
+test('executable targets still require an explicit checkout and invalid overrides remain errors',async()=>{
+    for(const target of ['windows-x64','linux-x64','linux-arm64','android-arm64']){
+        await assert.rejects(()=>loadArcaneNativeProvider({target}),/requires an Arcane OS checkout/u);
+    }
+    await assert.rejects(()=>loadArcaneNativeProvider({target:'portable',arcaneRoot:''}),
+        /requires an Arcane OS checkout/u);
 });

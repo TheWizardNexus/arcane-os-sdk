@@ -91,10 +91,13 @@ function selectedTargetRequest(value){
     if(value.format!==definition.format){
         fail(`Target ${value.target} requires format ${definition.format}.`,ERROR_CODES.targetUnavailable);
     }
-    if(value.signing!==definition.signingMode){
+    const nestedSigning=isObject(value.signing);
+    const signing=nestedSigning?value.signing.mode:value.signing;
+    const signingProfileId=(nestedSigning?value.signing.profileId:value.signingProfileId)??null;
+    if(signing!==definition.signingMode){
         fail(`Target ${value.target} requires signing mode ${definition.signingMode}.`,ERROR_CODES.targetUnavailable);
     }
-    if((value.signingProfileId??null)!==definition.signingProfileId){
+    if(signingProfileId!==definition.signingProfileId){
         fail(`Target ${value.target} has a different signing profile.`,ERROR_CODES.targetUnavailable);
     }
     return {
@@ -102,8 +105,8 @@ function selectedTargetRequest(value){
         platform:value.platform,
         architecture:value.architecture,
         format:value.format,
-        signing:value.signing,
-        signingProfileId:value.signingProfileId??null
+        signing,
+        signingProfileId
     };
 }
 
@@ -177,6 +180,7 @@ export async function createNativeBuildPlan({
     appReleaseRoot,
     release,
     appDescriptor,
+    selectedSdk,
     dependencyReleases,
     minimumCoreVersion,
     protectedRoots=[],
@@ -211,6 +215,7 @@ export async function createNativeBuildPlan({
         toolchainRoot:selectedToolchainRoot,
         toolchain:{...toolchain},
         appDescriptor:descriptor,
+        ...(selectedSdk===undefined?{}:{selectedSdk}),
         application,
         dependencies,
         minimumCoreVersion:minimumCoreVersion??null,
@@ -244,6 +249,7 @@ export async function executeNativeBuildPlan(plan,{
         toolchainRoot:plan.toolchainRoot,
         toolchain:plan.toolchain,
         appDescriptor:plan.appDescriptor,
+        ...(plan.selectedSdk===undefined?{}:{selectedSdk:plan.selectedSdk}),
         appReleaseRoot:plan.application.root,
         release:plan.application.release,
         readReleaseFile:plan.application.readFile,

@@ -836,8 +836,11 @@ function sameCanonicalPath(left,right){
     return normalize(left)===normalize(right);
 }
 
-export function assertIntegratedNativeToolchain({workspaceMode,workspaceRoot,toolchainRoot,target}={}){
+export function assertIntegratedNativeToolchain({
+    workspaceMode,workspaceRoot,toolchainRoot,target,providerSource='arcane-checkout'
+}={}){
     if(workspaceMode!=='integrated')return;
+    if(providerSource==='sdk-package'&&target==='portable')return;
     if(!is.string(toolchainRoot)||!sameCanonicalPath(workspaceRoot,toolchainRoot)){
         throw new ArcaneError(
             ERROR_CODES.policyDenied,
@@ -992,6 +995,7 @@ function pathsOverlap(left,right){
 
 async function packageNativeRelease(prepared,app,{
     workspaceOperationLease,
+    selectedSdk,
     signal,
     onEvent
 }={}){
@@ -1010,6 +1014,7 @@ async function packageNativeRelease(prepared,app,{
         release,
         nativeInput:{
             appDescriptor:app.descriptor,
+            ...(selectedSdk===undefined?{}:{selectedSdk}),
             appReleaseRoot:release.outputRoot??path.resolve(prepared.workspaceRoot,release.output),
             release:{manifest:release.manifest,files:[...release.files]}
         }
@@ -1027,7 +1032,8 @@ async function executePairedNativeBuild(options,adapter,{
         target,
         workspaceMode:initialPrepared.workspaceMode,
         workspaceRoot:initialPrepared.workspaceRoot,
-        toolchainRoot:options.toolchainRoot
+        toolchainRoot:options.toolchainRoot,
+        providerSource:options.providerSource
     });
     if(options.dryRun){
         throw new ArcaneError(
@@ -1051,6 +1057,11 @@ async function executePairedNativeBuild(options,adapter,{
     }
     const dependencyApps=await nativeDependencyClosure(initialPrepared,{target,signal,onEvent});
     const prepared=initialPrepared;
+    const installedSdk=await readInstalledSdkLayout(prepared.workspaceRoot,prepared.validation.config);
+    const selectedSdk=installedSdk===null?undefined:{
+        packageRoot:installedSdk.packageRoot,
+        packageSource:installedSdk.packageSource
+    };
     const packageOutputs=[];
     for(const app of [prepared.validation.app,...dependencyApps]){
         const releaseRoot=resolvePackageOutputRoot(
@@ -1073,13 +1084,13 @@ async function executePairedNativeBuild(options,adapter,{
         descriptorSource:prepared.validation.app.descriptorSource,
         descriptorPath:prepared.validation.app.descriptorPath,
         validation:prepared.validation
-    },{workspaceOperationLease,signal,onEvent});
+    },{workspaceOperationLease,selectedSdk,signal,onEvent});
     const dependencyReleases=[];
     for(const dependency of dependencyApps){
         dependencyReleases.push(await packageNativeRelease(
             prepared,
             dependency,
-            {workspaceOperationLease,signal,onEvent}
+            {workspaceOperationLease,selectedSdk,signal,onEvent}
         ));
     }
     const toolchain=await adapter.prepare({
@@ -1094,7 +1105,11 @@ async function executePairedNativeBuild(options,adapter,{
         toolchainRoot:options.toolchainRoot,
         toolchain,
         ...selectedRelease.nativeInput,
-        dependencyReleases:dependencyReleases.map(item=>item.nativeInput),
+        dependencyReleases:dependencyReleases.map(item=>({
+            appId:item.appId,
+            releaseRoot:item.nativeInput.appReleaseRoot,
+            release:item.nativeInput.release
+        })),
         minimumCoreVersion:ARCANE_MACHINE_BUNDLE_VERSION,
         protectedRoots,
         outputRoot,

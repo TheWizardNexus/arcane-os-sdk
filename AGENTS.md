@@ -93,13 +93,15 @@ settles it: an exact matching executed, declined, cancelled, or not-executed
   source checkout at runtime. Arcane OS, Shell, Provisioner, and internal tools
   consume these same SDK paths; they do not own private portable-runtime
   imports.
-- Arcane OS and Core own privileged host implementations, app/session
-  admission, launcher and Shell orchestration, and Shell-specific system-AI
-  policy. The SDK may define the public Core bridge contract but must not embed
-  Core. Each application owns its branding, prompts, data, tools, business
-  policy, model authorities, and app-specific orchestration.
+- The SDK owns reusable Core protocol, client, runtime, service lifecycle and
+  portable packaging mechanisms. Privileged execution remains in a native host;
+  ordinary browser imports stay browser-safe. Arcane OS owns its product host
+  composition, app/session policy, launcher, Shell, Provisioner and system-AI
+  orchestration. Each application selects its services and owns its branding,
+  prompts, data, tools, business policy and model authorities. The package-owned
+  portable payload is not an executable platform host.
 - Apply this placement order before implementation: reusable by any portable
-  app -> SDK; host privilege, launcher, or Shell responsibility -> Arcane OS;
+  app -> SDK; Arcane OS product composition, launcher or Shell -> Arcane OS;
   one-product behavior -> that app. Development may use only the explicit
   dev-only live SDK source mount; distribution embeds the selected SDK
   runtime, with no hidden OS source dependency.

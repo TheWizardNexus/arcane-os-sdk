@@ -47,7 +47,9 @@ runtime layouts.
 | `arcane-os/testing` | Isolated test registration and execution. |
 | `arcane-os/targets` | Target adapters and dispatch. |
 | `arcane-os/native` | Native plan and builder protocol. |
-| `arcane-os/native-provider` | Fixed native provider loaders. |
+| `arcane-os/native-provider` | SDK portable default and explicit checkout provider loader. |
+| `arcane-os/native/portable-provider` | Node-only portable payload provider and explicit app-service composition; not an executable host. |
+| `arcane-os/core/host` | Node-only reusable Core host lifecycle with explicitly supplied services. |
 | `arcane-os/integrated-provider` | Fixed integrated shared-development provider. |
 | `arcane-os/packager` | Low-level browser app packager. |
 | `arcane-os/release-bundle` | Deterministic external release bundles. |
@@ -2321,7 +2323,9 @@ console.log(ARCANE_INTEGRATED_PROVIDER_RELATIVE_PATH);
 
 ### Overview
 
-Frozen target-to-provider path registry for native development providers.
+Target-to-provider path registry for explicitly selected Arcane OS checkout
+providers. The package-owned portable default resolves directly from the SDK
+module location and leaves this existing registry unchanged.
 
 ### Value and import
 
@@ -2329,11 +2333,13 @@ Frozen target-to-provider path registry for native development providers.
 const ARCANE_NATIVE_PROVIDER_PATHS
 ```
 
-Import it from `arcane-os` or `arcane-os/native-provider`. Treat arrays and records as immutable public values.
+Import it from `arcane-os` or `arcane-os/native-provider`. The exported path arrays
+are ordinary copies; changing them does not change the loader's fixed paths.
 
 ### Availability and normalization
 
-**Node; selected browser/native target or provider as documented.** Exact immutable SDK value. Deep protocol: [arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol](protocols.md).
+**Node.** Checkout provider path metadata; it does not load a provider or report
+runtime readiness. Deep protocol: [native provider protocols](protocols.md).
 
 ### Example
 
@@ -2347,12 +2353,14 @@ console.log(ARCANE_NATIVE_PROVIDER_PATHS);
 
 ### Overview
 
-Requires an integrated workspace and selected native toolchain root to resolve to the same canonical Arcane checkout.
+Requires an integrated workspace and explicitly selected checkout provider to
+use the same canonical Arcane checkout. The SDK-owned portable pairing uses its
+installed package root instead; other targets retain the existing requirement.
 
 ### Signature and result
 
 ```text
-assertIntegratedNativeToolchain({workspaceMode, workspaceRoot, toolchainRoot, target}={})
+assertIntegratedNativeToolchain({workspaceMode, workspaceRoot, toolchainRoot, target, providerSource='arcane-checkout'}={})
 ```
 
 Import it from `arcane-os` or `arcane-os/toolchain`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
@@ -2403,12 +2411,23 @@ async function usebuildTarget(...arguments_) {
 
 ### Overview
 
-Creates one immutable, authenticated, single-attempt native plan binding app, dependencies, toolchain, request, and output roots.
+Creates a native plan carrying the complete selected app release, dependency
+releases, toolchain, target request and output roots. Release inputs use
+`{files, ...releaseFields}` records; dependency inputs use
+`{appId,releaseRoot,release}`. Selected-file readers return the complete contents.
+Both nested CLI `signing:{mode,profileId}` and existing flat
+`signing`/`signingProfileId` inputs normalize to the same flat plan request.
+Optional `selectedSdk:{packageRoot,packageSource}` carries the app's actual
+installed SDK source through the plan and builder request. The high-level
+toolchain reads this from the workspace's existing installed SDK layout once
+per build. Direct callers composing services over a partial direct SDK
+projection supply the actual source; the builder does not infer it from the
+browser file inventory or substitute its own version.
 
 ### Signature and result
 
 ```text
-async createNativeBuildPlan({ nativeBuilder, toolchainRoot, toolchainReceipt, appReleaseRoot, appReleaseReceipt, appDescriptor, dependencyReleases=[], providerGeneration, minimumCoreVersion, protectedRoots=[], outputRoot, targetRequest, signal, onEvent }={})
+async createNativeBuildPlan({ nativeBuilder, toolchainRoot, toolchain, appReleaseRoot, release, appDescriptor, selectedSdk, dependencyReleases, minimumCoreVersion, protectedRoots=[], outputRoot, targetRequest, signal, onEvent }={})
 ```
 
 Import it from `arcane-os` or `arcane-os/native`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
@@ -2487,7 +2506,8 @@ async function usedoctorNativeTarget(...arguments_) {
 
 ### Overview
 
-Consumes one authenticated single-attempt native plan through its bound builder and event/cancellation lifecycle.
+Invokes the plan's selected builder with complete app/dependency release records,
+their file readers, the flat target request and event/cancellation lifecycle.
 
 ### Signature and result
 
@@ -2623,14 +2643,25 @@ async function useloadArcaneIntegratedProvider(...arguments_) {
 
 ### Overview
 
-Loads the fixed provider for one target from an explicitly selected Arcane OS
-checkout and authenticates that provider generation for the current SDK process.
+Loads the package-owned portable provider when `arcaneRoot` is omitted and
+`target` is `portable`. An explicit root retains the fixed Arcane OS checkout
+provider route, including its errors; there is no silent fallback. Other native
+targets still require that root. Normal Node module resolution owns imports.
 
 ### Signature and result
 
 ```text
-loadArcaneNativeProvider({ arcaneRoot, target, inspect=lstat, canonicalize=realpath, readModule=readFile, importModule=specifier=>import(specifier), generationCache=providerGenerationCache, signal, onEvent }={})
+async loadArcaneNativeProvider({ arcaneRoot, target, inspect=lstat, canonicalize=realpath, importModule=specifier=>import(specifier), signal, onEvent }={})
 ```
+
+The result retains `arcaneRoot`, `toolchainRoot`, `providerPath` and
+`nativeBuilder`, and adds `providerSource`. Package pairing returns
+`providerSource:'sdk-package'`, `arcaneRoot:null` and the installed SDK root as
+`toolchainRoot`. Explicit checkout pairing returns
+`providerSource:'arcane-checkout'` with the selected root. Load completion means
+the builder interface was loaded, not that an app, native host or service is ready.
+For explicit service composition and host lifecycle, use the separate
+[`arcane-os/native/portable-provider` and `arcane-os/core/host` guide](core-native-packaging.md).
 
 Import it from `arcane-os` or `arcane-os/native-provider`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
@@ -2652,7 +2683,7 @@ async function useloadArcaneNativeProvider(...arguments_) {
 
 ### Overview
 
-Protocol identifier for immutable authenticated native build plans.
+Protocol identifier for native plans with complete selected release inputs.
 
 ### Value and import
 

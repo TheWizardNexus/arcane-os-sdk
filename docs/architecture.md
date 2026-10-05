@@ -35,11 +35,12 @@ Arcane OS installation, source checkout or private Arcane OS import.
 Arcane OS is an SDK consumer like other applications. Its orchestrator,
 launcher, Shell, Provisioner, system AI application and internal tools use the
 same SDK modules and components rather than maintaining private runtime copies.
-Arcane OS and Core own the privileged host implementations, app/session
-admission and authorization, native transport and lifecycle, launcher and
-Shell orchestration, and system-AI policy specific to the Shell. The SDK may
-publish the capability-neutral Core bridge contract and adapters, but it does
-not embed Core or inherit another application's policy.
+The SDK owns reusable Core protocol, browser client, native runtime, service
+lifecycle and portable payload packaging. Privileged execution stays native;
+the browser client imports no native implementation. Arcane OS retains its
+product host composition, app/session policy, launcher, Shell, Provisioner and
+system-AI orchestration. Applications explicitly supply their service modules;
+the SDK does not discover or inherit another application's services or policy.
 
 Each application owns its branding, prompts, data, tools, business policy,
 model authorities and app-specific orchestration. Apply this decision order:
@@ -47,7 +48,8 @@ model authorities and app-specific orchestration. Apply this decision order:
 | Responsibility | Canonical owner |
 |---|---|
 | Reusable by any portable application | Arcane SDK |
-| Host privilege, launcher, Shell or app/session admission | Arcane OS / Core |
+| Native execution | Native host using SDK runtime and explicit app services |
+| Arcane OS product composition, launcher, Shell and app/session policy | Arcane OS |
 | Behavior unique to one product | That application |
 
 Do not copy a reusable implementation between the SDK, Arcane OS and an app,
@@ -405,18 +407,25 @@ safety remain in effect.
 
 The SDK implements protocol `arcane-native-build-plan/1` and the injected
 provider contract `arcane-native-builder/1`. Pairing is process-local; it never
-registers a mutable global provider or searches for a toolchain. For each
-supported native target, the CLI loads one fixed provider module from the
-explicit `--arcane-root` Arcane OS checkout. Provider code is bound to one
-process generation; if a pull changes loaded provider code, the caller starts a
-fresh worker. One paired toolchain can perform this lifecycle:
+registers a mutable global provider or searches for a toolchain. With no
+`--arcane-root`, the portable CLI target loads the provider from this installed
+SDK package. An explicit root retains the fixed Arcane OS provider selection;
+executable targets still require that override and their platform toolchains.
+Normal Node module resolution owns the loaded module. The pairing reports
+`providerSource` as `sdk-package` or `arcane-checkout`. One paired toolchain can
+perform this lifecycle:
 
 ```text
 doctor -> prepare -> plan -> build -> run
 ```
 
-The portable provider reports honestly that run is unavailable because its
-result is a directory. Windows x64, Linux x64,
+The package-owned portable provider copies the complete selected app and
+dependency payloads and generates a Core entry and synchronous classic facade.
+It accepts explicitly selected service modules through
+`createPortableNativeProvider({services:[{module,options}]})`. Its result is a
+directory, so run reports unavailable. It supplies no executable platform host,
+installer, model assets or OS product services. The explicit Arcane OS
+providers for Windows x64, Linux x64,
 Linux ARM64, and Android ARM64 implement same-process launch and owned
 cancellation when their compatible host/device requirements are present.
 Windows uses a retained per-build broker and host readiness. The
@@ -439,16 +448,15 @@ paths are withheld from the native provider. The provider copies the complete
 selected release rather than accepting an unrelated source path. Verification
 is a separate explicit operation for a selected release artifact.
 
-The current native build contract requires Arcane Core `0.8.12` or newer.
-Compatibility is contractual rather than exact-version pinning: the prepared Core must meet
-the highest minimum declared by the runtime, selected app, and bundled app
-dependencies; keep each app's Arcane protocol generation; and provide every
-declared feature, capability, and method. Missing requirements stop before
-provider build; a newer compatible Core is accepted. Browser-only apps may omit
-`minimumCoreVersion`, and missing permissions or optional security declarations
-normalize to empty records. The provider paths have
-been validated from independent workspaces. They do not copy proprietary source
-into the Arcane checkout.
+The native plan preserves the selected descriptors, dependency releases and
+minimum Core requirement for the provider. It accepts the CLI's nested
+`signing:{mode,profileId}` request and existing flat `signing`/`signingProfileId`
+inputs, emitting the same flat plan request. Payload assembly alone does not
+establish that a composed host supplies an app's required methods or services.
+See the [portable native packaging guide](reference/core-native-packaging.md)
+for the SDK provider's actual output and composition boundary. Browser-only apps
+may omit `minimumCoreVersion`; ordinary browser operation remains independent
+of Core.
 
 See [compatibility.md](compatibility.md) for the complete app and bundled-app
 compatibility rule and the required handling of breaking contract changes.

@@ -16,8 +16,10 @@ toolchain, platform, architecture, format, signing mode, declared dependency
 releases, and destination. Verification is a separate operation only when the
 user explicitly selects it for the release artifact.
 
-Native targets are available by explicitly pairing the SDK with fixed provider
-modules in a compatible Arcane OS checkout. Every native request also requires
+The portable target pairs with the installed SDK provider by default. An explicit
+`--arcane-root` retains fixed-provider selection from an Arcane OS checkout;
+Windows, Linux and Android executable targets still require that override and
+their platform toolchains. Every native request also requires
 the canonical app descriptor to declare the exact target selected on the
 command line. The SDK package does not silently search for a toolchain, infer a
 descriptor target, embed the Arcane machine bundle, or substitute browser
@@ -29,8 +31,8 @@ npx arcane-os@latest new my-app --path ./my-app --target portable --git
 cd my-app
 npm install
 npm run import-map
-npm exec -- arcane native-doctor --target portable --arcane-root "../Arcane OS"
-npm exec -- arcane build --target portable --arcane-root "../Arcane OS"
+npm exec -- arcane native-doctor --target portable
+npm exec -- arcane build --target portable
 
 # In an app scaffolded with --target windows-x64:
 npm exec -- arcane build --target windows-x64 --arcane-root "../Arcane OS"
@@ -66,11 +68,16 @@ or `android-arm64`) before running the corresponding command.
 `native-prepare` remains a standalone diagnostic. The normal build recipe omits
 it and lets `build` prepare the selected toolchain state.
 
-The portable output is an app-scoped Arcane Core directory. It is an explicit
-portable builder payload, not an executable, and it has no direct run operation.
-The external workspace defaults to `build/portable/`; integrated Arcane work
-must use the same canonical checkout for `--workspace` and `--arcane-root`, and
-must name an `--output-root` outside that checkout.
+The portable output is an app-scoped payload directory with complete selected
+app and dependency files, a generated Core entry and classic client source.
+It is not an executable and has no direct run operation. Explicit service
+composition uses `createPortableNativeProvider({services:[{module,options}]})`;
+the default adds no OS or application services. See
+[Core native packaging](reference/core-native-packaging.md).
+The external workspace defaults to `build/portable/`. Integrated Arcane work
+must name an `--output-root` outside that checkout. Explicit checkout providers
+still use the same canonical checkout for `--workspace` and `--arcane-root`;
+the default SDK portable provider instead uses its installed package root.
 
 Compatibility uses the highest minimum Core version declared by the SDK runtime,
 selected app, and bundled app dependencies, plus each app's Arcane protocol and
@@ -81,7 +88,7 @@ for the complete compatibility and breaking-change rule.
 | Target | Formats | Development status |
 |---|---|---|
 | `browser` | `directory` | Available |
-| `portable` | `portable` directory | Available with explicit `--arcane-root`; not executable |
+| `portable` | `portable` directory | SDK package provider by default; explicit checkout override retained; not executable |
 | `windows-x64` | `exe` bundle | Available with explicit `--arcane-root`; unsigned local development only |
 | `linux-x64` | `deb` | Available with explicit `--arcane-root`; unsigned local development only |
 | `linux-arm64` | `deb` | Available with explicit `--arcane-root` on a compatible native ARM64 toolchain; unsigned local development only |
@@ -89,7 +96,9 @@ for the complete compatibility and breaking-change rule.
 
 macOS can consume browser applications and portable JavaScript capabilities
 within their declared runtimes. The current target registry has no macOS native
-package adapter; it exposes only the six targets above. A source-development
+package adapter, and the portable CLI request currently selects only Windows
+or Linux. macOS native packaging and Android host adaptation remain incomplete;
+the SDK portable payload does not supply executable hosts. A source-development
 native wrapper is also not an exposed `arcane dev` target. Native `run` uses the
 selected packaged application through its paired provider.
 

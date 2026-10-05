@@ -23,6 +23,14 @@
     "toolchainRoot": { "type": "string", "minLength": 1 },
     "toolchain": { "type": "object" },
     "appDescriptor": { "type": "object" },
+    "selectedSdk": {
+      "description": "Actual selected app SDK installation used to complete a partial native package projection without replacing selected files.",
+      "type": "object",
+      "properties": {
+        "packageRoot": { "type": "string" },
+        "packageSource": { "type": "string" }
+      }
+    },
     "application": { "$ref": "#/$defs/releaseSelection" },
     "dependencies": {
       "type": "array",

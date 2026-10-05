@@ -75,8 +75,8 @@ Usage:
   ${CLI_NAME} verify [--app <id>]
   ${CLI_NAME} bundle [--app <id>] [--artifact <file>${APP_BUNDLE_EXTENSION}] [--overwrite]
   ${CLI_NAME} verify-bundle <file${APP_BUNDLE_EXTENSION}>
-  ${CLI_NAME} native-doctor --target <native-target> --arcane-root <directory>
-  ${CLI_NAME} native-prepare --target <native-target> --arcane-root <directory>
+  ${CLI_NAME} native-doctor --target <native-target> [--arcane-root <directory>]
+  ${CLI_NAME} native-prepare --target <native-target> [--arcane-root <directory>]
   ${CLI_NAME} build --target <target> [--arcane-root <directory>] [--output-root <directory>] [--format <format>] [--signing <mode>]
   ${CLI_NAME} run [--target <target>] [--app <id>] [--cert <pem>] [--key <pem>] [--port 8000] [--http-port 0] [--arcane-root <directory>] [--output-root <directory>] [--format <format>] [--signing <mode>]
   ${CLI_NAME} update-check
@@ -105,9 +105,10 @@ Global:
   --version                     Show the SDK version.
 
 The npm package is ${SDK_NAME}. Both the ${CLI_NAME} and arcane-os executables
-invoke this same headless toolchain. Every native operation requires one explicit
---arcane-root. Available providers build portable directories, Windows x64 EXE
-bundles, Linux x64 or ARM64 DEBs, and development-signed Android APKs.`;
+invoke this same headless toolchain. Portable uses the installed SDK provider
+by default and produces a non-executable app payload. An explicit --arcane-root
+selects the Arcane OS provider instead. Windows EXE, Linux DEB, and Android APK
+targets still require an explicit --arcane-root and their platform toolchains.`;
 
 function usage(message){
     throw new ArcaneError(ERROR_CODES.usage,message);
@@ -810,7 +811,7 @@ async function pairNativeProvider(command,options,loadProvider,{signal,onEvent}=
         usage(`${command} requires one native target.`);
     }
     const targetRequest=createNativeTargetRequest(options);
-    if(!options.arcaneRoot){
+    if(!options.arcaneRoot&&options.target!=='portable'){
         usage(`${command} for target ${options.target} requires --arcane-root <directory>.`);
     }
     const loaded=await loadProvider({
@@ -823,6 +824,7 @@ async function pairNativeProvider(command,options,loadProvider,{signal,onEvent}=
         ...options,
         nativeBuilder:loaded.nativeBuilder,
         toolchainRoot:loaded.toolchainRoot,
+        providerSource:loaded.providerSource,
         targetRequest
     };
 }

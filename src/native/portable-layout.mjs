@@ -1,0 +1,184 @@
+import {mkdir, readFile, readdir, realpath, stat, writeFile} from 'node:fs/promises';
+import {createRequire} from 'node:module';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+import Is from 'strong-type';
+import {ArcaneError, ERROR_CODES, throwIfAborted} from '../errors.mjs';
+
+const is = new Is(false);
+export const SDK_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+export const CORE_FILES = [
+    'src/core/host.mjs',
+    'src/core/runtime.mjs',
+    'src/core/stdio.mjs',
+    'src/event-manager.mjs',
+    'src/dom-event-instrumentation.mjs',
+    'browser-runtime/core/contracts.mjs',
+    'LICENSE'
+];
+
+export function outputFile(root, relative) {
+    if (!is.string(relative) || !relative || path.isAbsolute(relative)) {
+        throw new ArcaneError(ERROR_CODES.usage, 'A selected output file needs a relative path.');
+    }
+    const destination = path.resolve(root, relative);
+    const within = path.relative(root, destination);
+    if (!within || within === '..' || within.startsWith(`..${path.sep}`) || path.isAbsolute(within)) {
+        throw new ArcaneError(ERROR_CODES.usage, `The selected file leaves its output directory: ${relative}.`);
+    }
+    return destination;
+}
+
+export async function writeOutput(root, relative, content, files, signal) {
+    throwIfAborted(signal);
+    const destination = outputFile(root, relative);
+    await mkdir(path.dirname(destination), {recursive: true});
+    await writeFile(destination, content, {flag: 'wx', signal});
+    files.push(relative.split(path.sep).join('/'));
+}
+
+export async function copyRelease(selection, destination, root, files, signal) {
+    for (const relative of selection.release.files) {
+        throwIfAborted(signal);
+        // The supplied reader owns release selection. No text decoding, URL
+        // rewriting or line-ending conversion occurs at native assembly.
+        const content = is.function(selection.readReleaseFile)
+            ? await selection.readReleaseFile(relative, {signal})
+            : await readFile(outputFile(selection.releaseRoot, relative), {signal});
+        outputFile(path.join(root, destination), relative);
+        await writeOutput(root, `${destination}/${relative}`, content, files, signal);
+    }
+}
+
+async function copyPackageTree(source, relative, root, files, signal, preserved) {
+    throwIfAborted(signal);
+    const sourceRoot = await realpath(source);
+    const outputRelative = path.relative(sourceRoot, root);
+    if (!outputRelative || (!path.isAbsolute(outputRelative)
+        && outputRelative !== '..' && !outputRelative.startsWith(`..${path.sep}`))) {
+        throw new ArcaneError(ERROR_CODES.usage, `Native output would copy itself from ${sourceRoot}.`);
+    }
+    const entries = await readdir(source, {withFileTypes: true});
+    for (const entry of entries) {
+        throwIfAborted(signal);
+        const selected = path.join(source, entry.name);
+        const destination = `${relative}/${entry.name}`;
+        if (preserved.has(destination)) continue;
+        const info = await stat(selected);
+        if (info.isDirectory()) {
+            await copyPackageTree(selected, destination, root, files, signal, preserved);
+        } else if (info.isFile()) {
+            await writeOutput(root, destination, await readFile(selected, {signal}), files, signal);
+        } else {
+            throw new ArcaneError(ERROR_CODES.operationFailed, `Cannot copy the runtime package entry: ${selected}.`);
+        }
+    }
+}
+
+export async function copyCoreRuntime(root, files, signal, {
+    sourceRoot = SDK_ROOT, sdkDestination = 'node_modules/arcane-os'
+} = {}) {
+    const metadata = JSON.parse(await readFile(path.join(sourceRoot, 'package.json'), 'utf8'));
+    // A direct browser projection may already occupy this package directory.
+    // Complete it from its selected installed package without replacing content.
+    const preserved = new Set(files);
+    for (const directory of ['bin', 'src', 'browser-runtime', 'runtime', 'schemas']) {
+        await copyPackageTree(path.join(sourceRoot, directory), `${sdkDestination}/${directory}`, root, files, signal, preserved);
+    }
+    for (const relative of ['package.json', 'LICENSE', 'COMMERCIAL-LICENSE.md', 'NOTICE', 'README.md', 'CHANGELOG.md']) {
+        const destination = `${sdkDestination}/${relative}`;
+        if (!preserved.has(destination)) {
+            await writeOutput(root, destination, await readFile(path.join(sourceRoot, relative), {signal}), files, signal);
+        }
+    }
+
+    // Preserve each dependency's actual installed runtime resolution, including
+    // nested versions. Packaging reads published files; it executes no package.
+    const copied = new Map([[sdkDestination, await realpath(sourceRoot)]]);
+    async function includeDependency(name, from, parentDestination) {
+        throwIfAborted(signal);
+        const require = createRequire(path.join(from, 'package.json'));
+        let packageFile;
+        try {
+            packageFile = require.resolve(`${name}/package.json`);
+        } catch (error) {
+            if (error.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') throw error;
+            let directory = path.dirname(require.resolve(name));
+            for (;;) {
+                const candidate = path.join(directory, 'package.json');
+                try {
+                    const record = JSON.parse(await readFile(candidate, 'utf8'));
+                    if (record.name === name) { packageFile = candidate; break; }
+                } catch (failure) {
+                    if (failure.code !== 'ENOENT') throw failure;
+                }
+                const parent = path.dirname(directory);
+                if (parent === directory) throw error;
+                directory = parent;
+            }
+        }
+        const source = await realpath(path.dirname(packageFile));
+        // Reuse only a resolved ancestor package that Node can actually reach.
+        // This also terminates ordinary circular package dependencies.
+        let ancestor = parentDestination;
+        for (;;) {
+            const candidate = path.posix.join(ancestor, 'node_modules', name);
+            if (copied.has(candidate)) {
+                if (copied.get(candidate) === source) return;
+                break;
+            }
+            try { await stat(outputFile(root, `${candidate}/package.json`)); break; }
+            catch (error) { if (error.code !== 'ENOENT') throw error; }
+            if (ancestor === '.') break;
+            ancestor = path.posix.dirname(ancestor);
+        }
+        const destination = `${parentDestination}/node_modules/${name}`;
+        const record = JSON.parse(await readFile(packageFile, 'utf8'));
+        let included = false;
+        try { await stat(outputFile(root, `${destination}/package.json`)); included = true; }
+        catch (error) { if (error.code !== 'ENOENT') throw error; }
+        if (!included) await copyPackageTree(source, destination, root, files, signal, preserved);
+        copied.set(destination, source);
+        for (const dependency of Object.keys(record.dependencies ?? {})) {
+            await includeDependency(dependency, source, destination);
+        }
+    }
+    for (const dependency of Object.keys(metadata.dependencies ?? {})) {
+        await includeDependency(dependency, sourceRoot, sdkDestination);
+    }
+    return metadata;
+}
+
+export function coreEntrySource(application, version, services) {
+    const imports = services.map(function serviceImport(service, index) {
+        const specifier = '../app/' + service.module.split('/').map(encodeURIComponent).join('/');
+        return `import createService${index} from ${JSON.stringify(specifier)};`;
+    });
+    const definitions = services.map(function serviceDefinition(service, index) {
+        return `    createService${index}(${JSON.stringify(service.options === undefined ? {} : service.options)})`;
+    });
+    return [
+        "import {startCoreHost} from 'arcane-os/core/host';",
+        ...imports,
+        '',
+        'const host = startCoreHost({',
+        `    application: ${JSON.stringify(application)},`,
+        `    version: ${JSON.stringify(version)},`,
+        `    services: [\n${definitions.join(',\n')}\n    ]`,
+        '});',
+        '',
+        'function closeCore() { host.close(); }',
+        "process.on('SIGINT', closeCore);",
+        "process.on('SIGTERM', closeCore);",
+        'try {',
+        '    await host.closed;',
+        '} catch (error) {',
+        "    console.error('Arcane Core host failed:', error);",
+        '    process.exitCode = 1;',
+        '} finally {',
+        "    process.off('SIGINT', closeCore);",
+        "    process.off('SIGTERM', closeCore);",
+        '}',
+        ''
+    ].join('\n');
+}

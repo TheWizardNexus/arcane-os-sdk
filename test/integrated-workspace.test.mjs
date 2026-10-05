@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from '../src/testing.mjs';
 import {SDK_NAME,SDK_VERSION} from '../src/constants.mjs';
 import {
+    assertIntegratedNativeToolchain,
     buildApplication,
     checkApplication,
     createApplication,
@@ -21,6 +22,20 @@ import {
     verifyApplication
 } from '../src/index.mjs';
 import {repositoryRoot,temporaryDirectory} from './helpers.mjs';
+
+test('integrated native selection distinguishes SDK portable resources from checkout providers',()=>{
+    const workspaceRoot=path.resolve('integrated-os');
+    const toolchainRoot=path.resolve('installed-sdk');
+    const selected={workspaceMode:'integrated',workspaceRoot,toolchainRoot,target:'portable'};
+    assert.doesNotThrow(()=>assertIntegratedNativeToolchain({...selected,providerSource:'sdk-package'}));
+    assert.throws(()=>assertIntegratedNativeToolchain(selected),/same Arcane OS checkout/u);
+    assert.throws(()=>assertIntegratedNativeToolchain({...selected,providerSource:'arcane-checkout'}),
+        /same Arcane OS checkout/u);
+    assert.doesNotThrow(()=>assertIntegratedNativeToolchain({...selected,toolchainRoot:workspaceRoot}));
+    assert.throws(()=>assertIntegratedNativeToolchain({
+        ...selected,target:'windows-x64',providerSource:'sdk-package'
+    }),/same Arcane OS checkout/u);
+});
 
 async function writeJson(filePath,value){
     await mkdir(path.dirname(filePath),{recursive:true});

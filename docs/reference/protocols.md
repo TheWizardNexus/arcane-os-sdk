@@ -39,13 +39,22 @@ a nonzero CLI status.
 Machine output uses `arcane-cli-events/1`. Native planning and providers use:
 
 - `arcane-target-adapter/1` for target adapters;
-- `arcane-native-build-plan/1` for single-attempt native plans;
+- `arcane-native-build-plan/1` for native plans with complete selected release inputs;
 - `arcane-native-builder/1` for injected native builders;
 - `arcane-integrated-toolchain/1` for the fixed integrated shared/Core provider.
 
 These protocols normalize orchestration and results. They do not normalize a
 Windows EXE, Linux DEB, Android APK, and portable directory into the same
 artifact kind.
+
+Portable CLI operations load the installed SDK's
+`arcane-os/native/portable-provider` by default. Explicit `--arcane-root`
+selection retains the checkout provider route; executable targets still need
+their platform provider/toolchain. `arcane-os/core/host` composes the reusable
+native runtime with explicitly supplied app services. Neither export is a
+browser import, executable host or installer. The synchronous classic facade
+and browser-safe client retain their separate public entries. Integrated
+shared checks keep their existing Arcane OS development provider.
 
 App-scoped managed browser imports have three supported control-plane entrypoints. The CLI
 uses `arcane import-map`; Node callers use

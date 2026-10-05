@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
+import {createNativeTargetAdapter} from '../src/targets/index.mjs';
 import {
     NATIVE_BUILDER_PROTOCOL,
     createNativeBuildPlan,
@@ -98,4 +99,59 @@ test('native release reader rejects traversal and non-selected files',async t=>{
     });
     await assert.rejects(()=>plan.application.readFile('../outside'),/Unsafe/u);
     await assert.rejects(()=>plan.application.readFile('missing.html'),/does not contain/u);
+});
+
+test('native plans normalize nested CLI signing and preserve complete dependency selections',async t=>{
+    const fixtureRoot=path.join(repositoryRoot,'.arcane','native-plan-fixtures');
+    await mkdir(fixtureRoot,{recursive:true});
+    const root=await mkdtemp(path.join(fixtureRoot,'request-'));
+    t.after(()=>rm(root,{recursive:true,force:true}));
+    const releaseRoot=path.join(root,'release');
+    const dependencyRoot=path.join(root,'dependency');
+    await Promise.all([mkdir(releaseRoot),mkdir(dependencyRoot)]);
+    const complete='Dragon dispatch ledger\n  retain every line and trailing space \n';
+    await writeFile(path.join(dependencyRoot,'ledger.txt'),complete);
+    const descriptor={
+        schemaVersion:2,id:'dragon-dispatch',displayName:'Dragon Dispatch',
+        description:'Complete dragon ledger dispatch.',version:'1.0.0',
+        publisher:{id:'dragon-publisher',name:'Dragon Publisher'},
+        package:{entry:'index.html',strategy:'static',include:['index.html','img/icon.png'],
+            exclude:[],shared:['browser-runtime']},
+        native:{type:'app',icon:'img/icon.png',order:0,bundledApps:[]},
+        requirements:{arcaneProtocol:'arcane/1',minimumCoreVersion:'0.8.12',features:[]},
+        targets:['browser','portable','android-arm64']
+    };
+    const provider={
+        protocol:NATIVE_BUILDER_PROTOCOL,
+        describe:async()=>({protocol:NATIVE_BUILDER_PROTOCOL,targets:['portable','android-arm64']}),
+        doctor(){},prepare(){},verify(){},run(){},
+        build:async request=>request
+    };
+    const dependencyRelease={files:['ledger.txt'],manifest:{id:'dragon-ledger',title:'Complete ledger'}};
+    const selectedSdk={packageRoot:repositoryRoot,packageSource:'node_modules/dragon-sdk'};
+    for(const request of [
+        {target:'portable',platform:'linux',architecture:'arm64',format:'portable',
+            signing:{mode:'unsigned-local-test',profileId:null}},
+        {target:'android-arm64',platform:'android',architecture:'arm64',format:'apk',
+            signing:{mode:'development',profileId:'arcane-android-development-v1'}}
+    ]){
+        const adapter=createNativeTargetAdapter({targetId:request.target,nativeBuilder:provider});
+        const plan=await adapter.plan({
+            nativeBuilder:provider,toolchainRoot:root,toolchain:{},
+            appReleaseRoot:releaseRoot,release:{files:[]},appDescriptor:descriptor,
+            selectedSdk,
+            dependencyReleases:[{appId:'dragon-ledger',releaseRoot:dependencyRoot,release:dependencyRelease}],
+            outputRoot:path.join(root,'output'),targetRequest:request
+        });
+        assert.deepEqual(plan.targetRequest,{
+            ...request,signing:request.signing.mode,signingProfileId:request.signing.profileId
+        });
+        const built=await executeNativeBuildPlan(plan);
+        assert.equal(plan.selectedSdk,selectedSdk);
+        assert.equal(built.selectedSdk,selectedSdk);
+        assert.equal(built.dependencies[0].appId,'dragon-ledger');
+        assert.equal(built.dependencies[0].releaseRoot,dependencyRoot);
+        assert.deepEqual(built.dependencies[0].release,dependencyRelease);
+        assert.equal((await built.dependencies[0].readReleaseFile('ledger.txt')).toString('utf8'),complete);
+    }
 });

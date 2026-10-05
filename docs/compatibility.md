@@ -23,7 +23,16 @@ When the selected target actually uses Arcane Core, compatibility requires:
 The effective Core floor for a native build is the highest minimum explicitly
 declared by the SDK runtime, the selected app, and its complete bundled-app
 closure. Browser-only targets do not invent a Core floor. The native build plan
-checks every member of that closure before producing output.
+forwards the complete selected descriptors, release records and minimum to the
+provider. Creating a portable payload does not establish host or service
+compatibility; the composed host must actually supply the required contracts.
+
+The portable CLI selects its provider from the installed SDK unless an explicit
+`--arcane-root` chooses the existing checkout provider. Other native target
+selection and the integrated shared-development provider remain unchanged.
+Programmatic native plans accept both nested CLI signing options and the
+existing flat signing/profile fields, retaining the flat plan result. The
+package-owned portable output is a payload, not an executable host or installer.
 
 This permits normal non-breaking Arcane upgrades. For example, an app requiring
 Core `0.8.12` can run on `0.8.13` or `0.9.0` when the required protocol,

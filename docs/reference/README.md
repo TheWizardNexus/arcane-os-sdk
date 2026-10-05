@@ -67,12 +67,14 @@ This repository contains explicitly versioned surfaces with different owners:
 | Browser SDK runtime | Selected SDK, `browser-runtime/` | Events, logging, Wllama, local/native/cloud speech, TWiN requests and PWA mechanisms. `listSdkBrowserRuntimeFiles()`, `readSdkBrowserRuntimeFile()`, and `loadSdkBrowserRuntimeRelease()` derive its current inventory directly from the selected directory. |
 | Core reference snapshot | Arcane OS commit `567ad110bf57a1c2d4a3daa22ae93716cc5f4d7e`, protocol `arcane/1` | The application-facing Core contract imported into `docs/reference/core/`, with SDK-local links and package-boundary notes added explicitly. |
 
-The SDK runtime source and Core reference have different owners. A browser
-module comes from the selected SDK runtime tree. A native build selects one
-explicit Arcane OS checkout and Core, then checks the declared protocol,
-version, features, capabilities, methods, and provider contract needed by that
-build. A matching protocol name or higher version alone does not promise
-functional compatibility.
+Browser modules and reusable Core client/runtime/lifecycle source belong to the
+SDK. The portable provider uses this installed package by default and assembles
+an app payload with explicitly selected services; it supplies no executable
+platform host. Explicit Arcane OS provider overrides and integrated shared
+checks remain available. Arcane OS retains its product composition and policy.
+The historical Core reference snapshot describes a separate host contract;
+matching a protocol name or assembling a payload alone does not establish that
+a composed host supplies every required method or service.
 
 See the [Core reference source notes](core/README.md) for the imported inventory
 and the distinction between a documentation snapshot and the selected runtime.

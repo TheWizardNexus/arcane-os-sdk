@@ -1,7 +1,7 @@
 import Is from 'strong-type';
 import {lstat,realpath} from 'node:fs/promises';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
 import {validateNativeBuilder} from './native-plan.mjs';
 
@@ -106,7 +106,11 @@ async function resolveProviderLocation({
             providerPath:canonicalProvider
         });
     }
-    return {canonicalRoot,providerPath:canonicalProvider};
+    return {
+        canonicalRoot,
+        providerPath:canonicalProvider,
+        providerSource:'arcane-checkout'
+    };
 }
 
 export async function loadArcaneNativeProvider(options={}){
@@ -129,7 +133,13 @@ export async function loadArcaneNativeProvider(options={}){
         target,
         message:`Loading the Arcane ${String(target)} provider.`
     });
-    const location=await resolveProviderLocation({arcaneRoot,target,inspect,canonicalize});
+    const location=arcaneRoot===undefined&&target==='portable'
+        ?{
+            canonicalRoot:path.resolve(fileURLToPath(new URL('../',import.meta.url))),
+            providerPath:fileURLToPath(new URL('./native/portable-provider.mjs',import.meta.url)),
+            providerSource:'sdk-package'
+        }
+        :await resolveProviderLocation({arcaneRoot,target,inspect,canonicalize});
     throwIfAborted(signal);
     let namespace;
     try{
@@ -147,9 +157,10 @@ export async function loadArcaneNativeProvider(options={}){
     );
     throwIfAborted(signal);
     const pairing={
-        arcaneRoot:location.canonicalRoot,
+        arcaneRoot:location.providerSource==='arcane-checkout'?location.canonicalRoot:null,
         toolchainRoot:location.canonicalRoot,
         providerPath:location.providerPath,
+        providerSource:location.providerSource,
         nativeBuilder
     };
     await onEvent?.({
