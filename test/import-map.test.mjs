@@ -17,6 +17,8 @@ import {
     generateImportMap,
     inspectImportMapHtml,
     readApplicationTestImportMapContext,
+    rewriteAssetReferences,
+    rewriteNativeJavaScript,
     scanModuleImports
 } from '../src/import-map.mjs';
 import {temporaryDirectory} from './helpers.mjs';
@@ -220,6 +222,169 @@ test('module scanning reports literal imports while allowing runtime-selected dy
     result.imports.push({kind:'dynamic',specifier:selected,offset:0});
     assert.equal(result.imports.at(-1).specifier,selected);
 });
+
+test(
+    'named expressions keep self references local without shadowing surrounding resource calls',
+    function namedExpressionResourceScope() {
+        const expressions = [
+            "function fetch(value){return value;}",
+            "function fetch(value=fetch('/local.svg')){return fetch('/local.svg');}",
+            "function* fetch(){yield fetch('/local.svg');}",
+            "async function fetch(){return fetch('/local.svg');}",
+            "async function* fetch(){yield fetch('/local.svg');}",
+            "class fetch{static value=fetch('/local.svg');method(){return fetch('/local.svg');}}",
+            "class fetch extends owner(fetch('/local.svg')){method(){return fetch('/local.svg');}}",
+            "class fetch extends class Parent{method(){return fetch('/local.svg');}}{method(){return fetch('/local.svg');}}",
+            "class fetch extends function Parent(){return fetch('/local.svg');}{method(){return fetch('/local.svg');}}"
+        ];
+        for (const expression of expressions) {
+            const source = `fetch('/before.svg');const local=${expression};export const image=await fetch('/image.svg');`;
+            const expected = `fetch('./before.svg');const local=${expression};export const image=await fetch('./image.svg');`;
+            const references = [];
+            const output = rewriteNativeJavaScript(
+                source,
+                function rebaseGlobalExpressionResource(reference) {
+                    references.push(reference.url);
+                    return `.${reference.url}`;
+                }
+            );
+            assert.equal(output, expected);
+            assert.deepEqual(
+                references,
+                ['/before.svg', '/image.svg']
+            );
+        }
+        const source = "const local=(function fetch(){return fetch('/local.svg');})(fetch('/argument.svg'));";
+        assert.equal(
+            rewriteNativeJavaScript(
+                source,
+                function rebaseInvocationArgument(reference) {
+                    return `.${reference.url}`;
+                }
+            ),
+            "const local=(function fetch(){return fetch('/local.svg');})(fetch('./argument.svg'));"
+        );
+        const resourceNames = [
+            ["class Worker{method(){return new Worker('/local.js');}}", "new Worker('/global.js')", "new Worker('./global.js')"],
+            ["class URL{method(){return new URL('/local.svg',import.meta.url);}}", "new URL('/global.svg',import.meta.url)", "new URL('./global.svg',import.meta.url)"],
+            ["function globalThis(){return globalThis.fetch('/local.svg');}", "globalThis.fetch('/global.svg')", "globalThis.fetch('./global.svg')"],
+            ["function importScripts(){importScripts('/local.js');}", "importScripts('/global.js')", "importScripts('./global.js')"]
+        ];
+        for (const [expression, call, rewritten] of resourceNames) {
+            assert.equal(
+                rewriteNativeJavaScript(
+                    `const local=${expression};${call};`,
+                    function rebaseNamedResource(reference) {
+                        return `.${reference.url}`;
+                    }
+                ),
+                `const local=${expression};${rewritten};`
+            );
+        }
+        for (const choice of ['owner', 'owner.default', "'case'"]) {
+            const conditional = `const local=ready?${choice}:function fetch(){return fetch('/local.svg');};fetch('/global.svg');`;
+            assert.equal(
+                rewriteNativeJavaScript(
+                    conditional,
+                    function rebaseConditionalResource(reference) {
+                        return `.${reference.url}`;
+                    }
+                ),
+                `const local=ready?${choice}:function fetch(){return fetch('/local.svg');};fetch('./global.svg');`
+            );
+        }
+    }
+);
+
+test(
+    'named declarations retain surrounding resource shadows including omitted semicolons',
+    function namedDeclarationResourceScope() {
+        const sources = [
+            "fetch('/before.svg');function fetch(value){return value;}fetch('/after.svg');",
+            "async function fetch(value){return value;}fetch('/after.svg');",
+            "function* fetch(value){yield value;}fetch('/after.svg');",
+            "async function* fetch(value){yield value;}fetch('/after.svg');",
+            "export default function fetch(value){return value;}fetch('/after.svg');",
+            "export default class fetch{}fetch('/after.svg');",
+            "const previous=1\nfunction fetch(value){return value;}fetch('/after.svg');",
+            "const previous=owner\nclass fetch{}fetch('/after.svg');",
+            "const previous=of\nfunction fetch(value){return value;}fetch('/after.svg');",
+            "const previous=owner.new\nfunction fetch(value){return value;}fetch('/after.svg');",
+            "const previous=owner()\nasync function fetch(value){return value;}fetch('/after.svg');",
+            "label:function fetch(value){return value;}fetch('/after.svg');",
+            "switch(selected){case 1:function fetch(value){return value;}fetch('/after.svg');}",
+            "switch(selected){case ready?1:2:function fetch(value){return value;}fetch('/after.svg');}"
+        ];
+        for (const source of sources) {
+            const references = [];
+            const output = rewriteNativeJavaScript(
+                source,
+                function recordDeclarationReference(reference) {
+                    references.push(reference);
+                    return `.${reference.url}`;
+                }
+            );
+            assert.equal(output, source);
+            assert.deepEqual(
+                references,
+                []
+            );
+        }
+    }
+);
+
+test(
+    'named expressions preserve other lexical shadows and complete browser payloads',
+    function namedExpressionPayloadOwnership() {
+        const local = "const local=function fetch(value){return fetch('/inner.svg?arcaneVersion=authored&payload=complete');};";
+        const scopes = [
+            `function use(fetch){${local}return fetch('/local.svg');}`,
+            `try{use();}catch(fetch){${local}fetch('/local.svg');}`,
+            `{const {fetch}=owner;${local}fetch('/local.svg');}`,
+            `{const [fetch]=owner;${local}fetch('/local.svg');}`,
+            `{const fetch=owner;${local}fetch('/local.svg');}`
+        ];
+        for (const scope of scopes) {
+            assert.equal(
+                rewriteNativeJavaScript(
+                    `${scope}fetch('/outer.svg');`,
+                    function rebaseOuterScopeResource(reference) {
+                        return `.${reference.url}`;
+                    }
+                ),
+                `${scope}fetch('./outer.svg');`
+            );
+        }
+        const imported = `import fetch from './provider.mjs';${local}fetch('/local.svg');`;
+        assert.equal(
+            rewriteNativeJavaScript(
+                imported,
+                function preserveImportedResources(reference) {
+                    return reference.kind === 'import' ? reference.url : `.${reference.url}`;
+                }
+            ),
+            imported
+        );
+        const source = `${local}fetch('/outer.svg?arcaneVersion=old&payload=complete#image');`;
+        const references = [];
+        assert.equal(
+            rewriteAssetReferences(
+                source,
+                {
+                    filePath: 'fixture.mjs',
+                    onReference: function recordBrowserExpressionReference(reference) {
+                        references.push(reference.url);
+                    }
+                }
+            ),
+            `${local}fetch('/outer.svg?payload=complete#image');`
+        );
+        assert.deepEqual(
+            references,
+            ['/outer.svg?arcaneVersion=old&payload=complete#image']
+        );
+    }
+);
 
 test('generator writes one complete map into every selected browser document',async t=>{
     const workspaceRoot=await temporaryDirectory(t);

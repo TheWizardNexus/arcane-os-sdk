@@ -1032,6 +1032,66 @@ function resourceBindingScopes(tokens){
         return index;
     }
 
+    function namedDefinitionEnd(start) {
+        let index = start + 1;
+        while (index < tokens.length) {
+            const token = tokens[index];
+            if (token.type === 'punctuator' && token.value === '{') return closing.get(index);
+            if (closing.has(index)) {
+                index = closing.get(index) + 1;
+                continue;
+            }
+            if (token.type === 'identifier' && ['function', 'class'].includes(token.value)
+                && !identifierIsProperty(tokens, index)) {
+                const end = namedDefinitionEnd(index);
+                if (end === undefined) return undefined;
+                index = end + 1;
+                continue;
+            }
+            index += 1;
+        }
+        return undefined;
+    }
+
+    function namedDefinitionIsDeclaration(index) {
+        const token = tokens[index];
+        const async = token.value === 'function' && tokens[index - 1]?.value === 'async'
+            && !token.lineBreakBefore && !identifierIsProperty(tokens, index - 1);
+        const start = async ? index - 1 : index;
+        if (declarationPosition(tokens, start)) return true;
+        const previous = tokens[start - 1];
+        if (previous?.value === ':' && previous.enclosingBraceKind !== 'object') {
+            if (declarationPosition(tokens, start - 2)) return true;
+            let conditionals = 0;
+            for (let cursor = start - 2; cursor >= scopeAt[index].start; cursor -= 1) {
+                if (opening.has(cursor)) {
+                    cursor = opening.get(cursor);
+                    continue;
+                }
+                const candidate = tokens[cursor];
+                const value = candidate.value;
+                if (value === ':') conditionals += 1;
+                else if (value === '?') {
+                    if (conditionals === 0) return false;
+                    conditionals -= 1;
+                } else if (candidate.type === 'identifier' && ['case', 'default'].includes(value)
+                    && !identifierIsProperty(tokens, cursor)) return conditionals === 0;
+                else if ([';', '{', '}'].includes(value)) break;
+            }
+        }
+        // An omitted semicolon must not turn a following declaration into an expression.
+        if (!tokens[start].lineBreakBefore || !previous) return false;
+        if (['string', 'number', 'regex', 'template'].includes(previous.type)) return true;
+        if (previous.type === 'identifier') {
+            if (identifierIsProperty(tokens, start - 1)) return true;
+            if (['return', 'throw', 'yield'].includes(previous.value)) return true;
+            if (previous.contextualRegexPrefix === true) return false;
+            if (previous.value === 'await' && previous.slashGoalAfter !== 'division') return false;
+            return !REGEX_PREFIX_KEYWORDS.has(previous.value);
+        }
+        return [')', ']', '++', '--'].includes(previous.value);
+    }
+
     for(let index=0;index<tokens.length;index+=1){
         const token=tokens[index];
         if(token.type==='punctuator'&&token.value==='{'&&tokens[index-1]?.value===')'
@@ -1060,10 +1120,12 @@ function resourceBindingScopes(tokens){
             // Loop bindings conservatively retain the enclosing lexical scope.
             patterns(index+1,expressionEnd(index+1,{declaration:true}),owner);
         }else if(token.value==='function'||token.value==='class'){
-            const name=tokens[index+1]?.value==='*'?index+2:index+1;
-            // A named expression may retain more source than its inner scope;
-            // never turn an uncertain application-owned call into an asset URL.
-            bind(name,scopeAt[index]);
+            const name = tokens[index + 1]?.value === '*' ? index + 2 : index + 1;
+            if (tokens[name]?.type !== 'identifier' || !relevant.has(tokens[name].value)) continue;
+            const end = namedDefinitionIsDeclaration(index) ? undefined : namedDefinitionEnd(index);
+            // Expression names belong to their own parameters/heritage and body only.
+            const owner = end === undefined ? scopeAt[index] : {start: index, end};
+            bind(name, owner);
         }else if(token.value==='catch'&&tokens[index+1]?.value==='('){
             const close=closing.get(index+1);
             const body=close+1;
