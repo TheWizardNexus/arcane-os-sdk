@@ -6,12 +6,68 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 256,
+  "memberCount": 260,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
   },
   "members": [
+    {
+      "id": "diarization:createDiarization",
+      "name": "createDiarization",
+      "displayName": "createDiarization()",
+      "kind": "function",
+      "signature": "createDiarization({executable,modelPath,runtime,onEvent}={})",
+      "entrypoints": ["arcane-os/diarization"],
+      "primaryImport": "arcane-os/diarization",
+      "group": "Native speaker diarization",
+      "summary": "Retains one selected Nemotron 3 model helper and independently owned caller-fed audio streams.",
+      "availability": "Node with a host-built first-party helper, official NeMo-Speech.cpp CPU libraries and caller-selected model",
+      "protocol": "Owned native helper transport and replayable model lifecycle; mono Float32 audio streams",
+      "normalization": "Preserves complete audio, timed segments and requested probability frames; generic speaker labels are not person identity; finish/cancel/close retain native drain and complete failures"
+    },
+    {
+      "id": "diarization-build:buildDiarizationHelper",
+      "name": "buildDiarizationHelper",
+      "displayName": "buildDiarizationHelper()",
+      "kind": "function",
+      "signature": "async buildDiarizationHelper({runtime,outputRoot,signal,onEvent}={})",
+      "entrypoints": ["arcane-os/diarization/build"],
+      "primaryImport": "arcane-os/diarization/build",
+      "group": "Native speaker diarization",
+      "summary": "Builds the first-party helper against the explicitly installed NeMoSpeech Diarization component.",
+      "availability": "Node, installed CMake/C++17 toolchain and matching official CPU runtime for the current host",
+      "protocol": "CMake configure, build and install using runtime.cmakeDirectory",
+      "normalization": "Returns actual platform, architecture, root, executable and complete diagnostics; no compiler or model download"
+    },
+    {
+      "id": "core-diarization:createDiarizationService",
+      "name": "createDiarizationService",
+      "displayName": "createDiarizationService()",
+      "kind": "function",
+      "signature": "createDiarizationService(options={},launch={})",
+      "entrypoints": ["arcane-os/core/diarization"],
+      "primaryImport": "arcane-os/core/diarization",
+      "group": "Native speaker diarization",
+      "summary": "Composes lazy native diarization as an application-selected Core service.",
+      "availability": "Node Core runtime with explicitly selected helper, runtime and model",
+      "protocol": "arcane/1 diarization methods and state/update/probability events; f32le audio transport",
+      "normalization": "Resolves relative paths from selected workspaceRoot or appRoot; session audio uses service lifetime, recording cancellation is independent, and model loading never blocks Core startup"
+    },
+    {
+      "id": "core-diarization:default",
+      "name": "default",
+      "displayName": "createDiarizationService default export",
+      "kind": "function",
+      "signature": "default as createDiarizationService",
+      "entrypoints": ["arcane-os/core/diarization"],
+      "primaryImport": "arcane-os/core/diarization",
+      "group": "Native speaker diarization",
+      "summary": "Default binding for the same native Core diarization service factory.",
+      "availability": "Node Core runtime",
+      "protocol": "arcane/1 service definition",
+      "normalization": "Binding identity equals the named createDiarizationService export"
+    },
     {
       "id": "core-local:createCoreLocalAIProvider",
       "name": "createCoreLocalAIProvider",
