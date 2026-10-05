@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.53.0
+
+- Add `acceptWebSocket` through `arcane-os/websocket` and the Node root export.
+  Accept a caller-selected native HTTP/1.1 Upgrade and exchange complete text
+  and binary messages with fragmentation, Ping/Pong, ordered writable
+  backpressure, close/abort handling and observable connection settlement.
+  Buffered Upgrade input reaches synchronously registered listeners in order.
+- Preserve valid text, leading Unicode markers and binary view boundaries.
+  Text that cannot be represented exactly as UTF-8 reports an explicit error
+  before transmission or a close-state change. Browser clients use native
+  `WebSocket`; existing HTTP/TLS listeners, routes and application messages
+  remain caller-owned.
+- No third-party WebSocket runtime, client sharing, reconnect, application
+  envelope, storage, HTTP/2 extended CONNECT or extension negotiation is added.
+  Existing SDK behavior and dependencies remain unchanged. Ordinary consumers
+  update through their public package workflow; optional server integration
+  belongs to the consuming application.
+
 ## 0.52.1
 
 - Preserve an authored host `index.html` at `/` independently of application
