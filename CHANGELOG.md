@@ -12,14 +12,24 @@
   independently and distinguish cancellable renderer requests from accepted
   service-lifetime work. Graceful shutdown waits for accepted responses, service
   drain/disposal and queued transport output without terminating the host.
+- Add SDK-owned portable native payload assembly and explicit application-service
+  composition through `arcane-os/native/portable-provider` and `core/host`.
+  Portable provider loading no longer requires an Arcane OS checkout; explicit
+  checkout providers remain supported. Preserve complete selected releases,
+  dependency records and the application's actual SDK version separately from
+  the builder, including partial direct browser package projections. Portable
+  output declares the host's serving, client injection and stdio responsibilities;
+  it is not an executable platform host.
+- Preserve Core client FIFO order during deferred event-owner handoff, report
+  asynchronous send failures after request settlement, retain original native
+  diagnostic fields and require callable transport sending before readiness.
 - Correct disabled-PWA packaging so selected output documents lose active SDK
   manifest and bootstrap references before native-module processing. Preserve
   source PWA settings, unrelated authored links, inactive HTML and unselected
   documents; enabled PWA generation keeps its existing behavior.
-- This additive release introduces reusable Core primitives, not a completed
-  native executable, platform/provider transfer or application host cutover.
-  Existing native provider checkout requirements and application composition
-  remain unchanged. No dependency, default switch or data migration is added.
+- Executable platform hosts and application host cutover remain separate work.
+  Applications retain service composition, model selection and saved settings.
+  No new dependency, automatic model loading or data migration is added.
 
 ## 0.54.1
 
