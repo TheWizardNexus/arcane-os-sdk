@@ -222,6 +222,21 @@ npm view arcane-os@latest version
 GitHub releases
 identify the corresponding published package source. A newer website does not
 change the version installed in your application.</p>
+<h3 id="generate-the-selected-reference-site">Generate the selected reference site</h3>
+<p>The existing <code>node tools/build-reference-site.mjs --write</code> command reads the
+live checkout. For release documentation while disjoint source work continues,
+select the reviewed documentation commit explicitly:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>sh</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-sh">node tools/build-reference-site.mjs --write --source-ref &lt;documentation-commit&gt;
+</code></pre></div>
+<p>The same option is accepted by <code>createReferenceSite({sourceRef})</code> and
+<code>writeReferenceSite({sourceRef})</code>. It reads the selected commit&#39;s package
+version, complete reference documents and inventories, inventory-selected
+runtime sources, and authored site inputs directly from Git in memory. It
+creates no checkout or export and leaves source drafts untouched. Rendering
+uses the current canonical generator and its authored semantic contracts;
+select a documentation commit whose contracts match the published package.
+Generated output still belongs to the canonical <code>site/</code> tree and requires its
+usual coordinated output ownership. Generation does not publish hosted Pages.</p>
 <h3 id="historical-034-publication-record">Historical 0.3.4 publication record</h3>
 <p>The following records describe that earlier release only. They do not identify
 the current registry channel or the package covered by this reference.</p>
