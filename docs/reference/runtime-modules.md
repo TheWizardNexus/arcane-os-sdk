@@ -2252,10 +2252,11 @@ and `read`, filters source metadata before calling
 ### Availability and normalization
 
 **Browser or compatible host with an injected DBOPFS adapter.** The adapter
-keeps the existing `get`, `set`, `getAllKeys`, and `delete` method names; Node
-can use the same class only through an explicitly imported runtime module and a
-compatible storage adapter; SDK `0.5.12` publishes no Node package subpath or
-Node storage implementation for it. Bootstrap uses a concurrent
+keeps the existing `get`, `set`, `getAllKeys`, and `delete` method names. Node
+callers import the same class and factory from the public
+`arcane-os/dbopfs-document-library` subpath and supply a compatible storage
+adapter. That export supplies no Node filesystem storage implementation.
+Bootstrap uses a concurrent
 generation, commits its manifest last, cleans partial data on failure, and
 rejects case-colliding IDs. Search
 returns `{failures,matches,total}` so one malformed record remains visible
@@ -2414,7 +2415,7 @@ const search = new DocumentLexicalSearch([{
   kind: 'guide',
   tags: ['intro']
 }]);
-console.log(search.search('portable', {limit: 5}));
+console.log(search.search('portable'));
 ```
 
 ## DocumentNavigation.js
