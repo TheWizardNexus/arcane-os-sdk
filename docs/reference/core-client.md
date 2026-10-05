@@ -35,8 +35,11 @@ For a separately owned transport, use `createCoreClient({transport})` with
 `transport.name`, `send(frame)`, and an optional `subscribe(receive)` returning
 an unsubscribe function. Alternatively deliver responses/events through
 `client.receive(frame)`. An adapter may return a promise from `send`; rejection
-rejects the associated request. `autoConnect:false` defers connection until
-`connect()` or the first invocation.
+rejects the associated pending request. If cancellation, timeout or a response
+has already settled it, `onError` observes the later send failure. A transport
+without callable `send(frame)` remains disconnected and reports
+`ARCANE_TRANSPORT_INVALID`; it does not announce `transport.ready`.
+`autoConnect:false` defers connection until `connect()` or the first invocation.
 
 `client.invoke(method, parameters, {signal, timeoutMs})` returns the actual
 response result or rejects with `CoreError`. Parameters, result fields and
@@ -73,7 +76,11 @@ Call `stop()` to remove an individual subscription and `client.close()` when
 the client owner ends its lifetime.
 
 Errors retain complete native fields, including diagnostics and stack/cause
-information. Keep those details in developer diagnostics, rather than ordinary
+information. WebView2 and Android bridge failures retain native error codes,
+messages and diagnostic fields; the request method and transport are added
+where the native error does not already supply them. Errors without a native
+code receive the adapter's bridge-call failure code. Keep those details in
+developer diagnostics, rather than ordinary
 product status surfaces. The optional `onError(error)` callback observes
 transport/event-owner failures outside individual request promises.
 
@@ -100,7 +107,9 @@ immediately. Document-created injection can precede the page's import map, so
 only its event-owner module import waits until document parsing completes.
 Page rendering and RPC setup continue independently. Complete early event
 frames, subscription operations and response deliveries remain ordered until
-the event owner connects. Final response completion follows earlier event
+the event owner connects. Work received reentrantly during that handoff joins
+the end of the existing queue, including new subscriptions and response frames.
+Final response completion follows earlier event
 delivery, preserving streaming callbacks before their completion cleanup.
 `client.eventsReady` observes that connection; failures are also reported
 through `onError` and reject pending requests.

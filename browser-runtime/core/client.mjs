@@ -21,6 +21,7 @@ export function createCoreClient({
     const cleanups=[];
     const eventIdentity={};
     let source=null;
+    let drainingEvents=false;
     let transport=null;
     let closed=false;
     let eventOwnerFailure=null;
@@ -38,11 +39,16 @@ export function createCoreClient({
         source=owner.createSource(eventIdentity,{source:'core-client',eventTypes:[CORE_EVENT]});
         // This is an ordered handoff queue, not an event dispatcher. The SDK
         // event owner alone manages subscriptions and delivery.
-        while(eventActions.length&&!closed)eventActions.shift()();
+        drainingEvents=true;
+        try{
+            while(eventActions.length&&!closed)eventActions.shift()();
+        }finally{
+            drainingEvents=false;
+        }
     }
     function withEvents(action){
         if(closed)return;
-        if(source)action();
+        if(source&&!drainingEvents)action();
         else eventActions.push(action);
     }
     if(eventOwner)attachEventOwner(eventOwner);
@@ -180,9 +186,9 @@ export function createCoreClient({
                 catch(error){
                     if(error instanceof CoreError)throw error;
                     const details=serializeCoreError(error);
+                    if(error?.code===undefined)details.code='ARCANE_BRIDGE_CALL_FAILED';
                     throw new CoreError({
-                        ...details,code:'ARCANE_BRIDGE_CALL_FAILED',message:'Arcane could not communicate with its native host.',
-                        technicalMessage:details.message,causeName:details.name,method:frame.method,transport:'webview2'
+                        method:frame.method,transport:'webview2',...details
                     });
                 }
             }};
@@ -228,9 +234,9 @@ export function createCoreClient({
                 try{await android.postMessage(JSON.stringify(frame));}
                 catch(error){
                     const details=serializeCoreError(error);
+                    if(error?.code===undefined)details.code='ARCANE_ANDROID_BRIDGE_CALL_FAILED';
                     throw new CoreError({
-                        ...details,code:'ARCANE_ANDROID_BRIDGE_CALL_FAILED',message:'Arcane could not communicate with its Android host.',
-                        technicalMessage:details.message,causeName:details.name,method:frame.method,transport:'android-webview'
+                        method:frame.method,transport:'android-webview',...details
                     });
                 }
             }};
@@ -258,7 +264,11 @@ export function createCoreClient({
         if(transport)return transport;
         const cleanupStart=cleanups.length;
         try{
-            transport=providedTransport??chooseTransport();
+            const selected=providedTransport??chooseTransport();
+            if(typeof selected?.send!=='function'){
+                throw new CoreError({code:'ARCANE_TRANSPORT_INVALID',message:'The Core transport must provide send(frame).'});
+            }
+            transport=selected;
             if(typeof transport.subscribe==='function'){
                 const unsubscribe=transport.subscribe(receive);
                 if(typeof unsubscribe==='function')cleanups.push(unsubscribe);
@@ -324,9 +334,13 @@ export function createCoreClient({
             if(signal?.aborted)abort();
         });
         if(!pending.has(id))return promise;
+        function sendFailed(error){
+            const failure=error instanceof CoreError?error:new CoreError(error);
+            if(!settle(id,failure))report(failure);
+        }
         try{
-            Promise.resolve(selected.send(frame)).catch(error=>settle(id,error instanceof CoreError?error:new CoreError(error)));
-        }catch(error){settle(id,error instanceof CoreError?error:new CoreError(error));}
+            Promise.resolve(selected.send(frame)).catch(sendFailed);
+        }catch(error){sendFailed(error);}
         return promise;
     }
     function close(){

@@ -121,6 +121,74 @@ test('failed transport subscription leaves the client disconnected and retryable
     assert.equal(attempts,2);
 });
 
+test('a supplied transport becomes ready only after it provides send',async function suppliedTransport(t){
+    let subscriptions=0;
+    const transport={name:'fixture',subscribe(){subscriptions+=1;}};
+    const {client,errors}=fixture(t,{transport});
+    assert.equal(errors[0].code,'ARCANE_TRANSPORT_INVALID');
+    assert.equal(client.runtime.current().connected,false);
+    assert.equal(client.events.completed('transport.ready'),false);
+    assert.equal(subscriptions,0);
+    await assert.rejects(client.invoke('application.wait'),function invalidTransport(error){
+        return error.code==='ARCANE_TRANSPORT_INVALID';
+    });
+    transport.send=function send(){};
+    client.connect();
+    assert.equal(client.runtime.current().connected,true);
+    assert.equal(client.events.completed('transport.ready'),true);
+    assert.equal(subscriptions,1);
+});
+
+for(const completion of ['response','cancel','timeout']){
+    test(`late transport rejection is reported after request ${completion}`,async function lateSendFailure(t){
+        let rejectSend;
+        let request;
+        const sent=new Promise(function pendingSend(resolve,reject){rejectSend=reject;});
+        const transport={name:'fixture',send(frame){
+            if(frame.type==='request'){
+                request=frame;
+                return sent;
+            }
+        }};
+        const {client,errors}=fixture(t,{transport});
+        const controller=new AbortController();
+        const operation=client.invoke('application.wait',{}, {
+            signal:controller.signal,timeoutMs:completion==='timeout'?1:0
+        });
+        if(completion==='response'){
+            client.receive({protocol:CORE_PROTOCOL,type:'response',id:request.id,ok:true,result:'Complete result'});
+            assert.equal(await operation,'Complete result');
+        }else{
+            if(completion==='cancel')controller.abort();
+            await assert.rejects(operation,function settledRequest(error){
+                return error.code===(completion==='cancel'?'ARCANE_REQUEST_ABORTED':'ARCANE_REQUEST_TIMEOUT');
+            });
+        }
+        const failure=new Error('Complete late transport failure');
+        failure.code='MOON_TRANSPORT_LATE_FAILURE';
+        failure.details={complete:'  Late native diagnostic\n🌙  '};
+        rejectSend(failure);
+        await Promise.resolve();
+        assert.equal(errors.length,1);
+        for(const key of Object.getOwnPropertyNames(failure))assert.equal(errors[0][key],failure[key]);
+    });
+}
+
+test('synchronous send failure after a response is reported without replacing the result',async function synchronousLateFailure(t){
+    let client;
+    const failure=new Error('The bridge failed after delivering its response.');
+    const transport={name:'fixture',send(frame){
+        client.receive({protocol:CORE_PROTOCOL,type:'response',id:frame.id,ok:true,result:'Accepted result'});
+        throw failure;
+    }};
+    const state=fixture(t,{transport});
+    client=state.client;
+    assert.equal(await client.invoke('application.finish'),'Accepted result');
+    assert.equal(state.errors.length,1);
+    assert.equal(state.errors[0].message,failure.message);
+    assert.equal(state.errors[0].stack,failure.stack);
+});
+
 test('closing rejects reentrant requests and stops synchronous control events',async t=>{
     let receive;
     let client;
@@ -160,6 +228,38 @@ test('classic event-owner handoff retains subscriptions, chunks and final respon
     connectOwner(arcaneEvents);
     assert.equal(await operation,'Finished');
     assert.deepEqual(order,[first,'Second 🌙','Finished']);
+});
+
+test('classic handoff appends reentrant frames and subscriptions after queued response delivery',async function reentrantHandoff(t){
+    let connectOwner;
+    const eventOwnerReady=new Promise(function pendingOwner(resolve){connectOwner=resolve;});
+    const {client,frames,receive}=fixture(t,{eventOwner:null,eventOwnerReady});
+    const order=[];
+    let lateResponseAccepted;
+    client.events.on('application.frame',function receivedFrame(value){
+        order.push(value);
+        if(value==='first'){
+            client.events.on('application.reentrant',function reentrantFrame(data){
+                order.push(data);
+                lateResponseAccepted=receive({
+                    protocol:CORE_PROTOCOL,type:'response',id:frames[0].id,ok:true,result:'Late response'
+                });
+            });
+            receive({protocol:CORE_PROTOCOL,type:'event',event:'application.reentrant',data:'reentrant'});
+        }
+    });
+    const operation=client.invoke('application.ordered').then(function completed(result){
+        order.push(result);
+        return result;
+    });
+    receive({protocol:CORE_PROTOCOL,type:'event',event:'application.frame',data:'first'});
+    receive({protocol:CORE_PROTOCOL,type:'event',event:'application.frame',data:'second'});
+    receive({protocol:CORE_PROTOCOL,type:'response',id:frames[0].id,ok:true,result:'Finished'});
+    assert.deepEqual(order,[]);
+    connectOwner(arcaneEvents);
+    assert.equal(await operation,'Finished');
+    assert.deepEqual(order,['first','second','reentrant','Finished']);
+    assert.equal(lateResponseAccepted,false);
 });
 
 test('facade routes native data operations without trimming supplied content',async t=>{
@@ -217,9 +317,48 @@ test('native transport failures retain nested error diagnostics',async t=>{
     t.after(()=>client.close());
     await assert.rejects(client.invoke('system.ping'),error=>{
         assert.equal(error.code,'ARCANE_BRIDGE_CALL_FAILED');
+        assert.equal(error.message,failure.message);
         assert.equal(error.technicalMessage,'Native bridge failed');
         assert.equal(error.stack,failure.stack);
         assert.equal(error.errors[0].message,'Complete host failure');
         return true;
     });
 });
+
+for(const adapter of ['webview2','android-webview']){
+    test(`${adapter} preserves original native error fields and supplies missing bridge context`,async function nativeErrorFields(t){
+        const failure=new Error('Complete native message\nThe moon rejected the receipt.',{
+            cause:new Error('Complete native cause')
+        });
+        Object.assign(failure,{
+            name:'MoonNativeError',code:'MOON_RECEIPT_REJECTED',
+            technicalMessage:'Complete native technical message',causeName:'MoonNativeCause',
+            diagnosticId:'moon-native-7',details:{content:'  Complete document\n🌙  '}
+        });
+        const global={console};
+        if(adapter==='webview2'){
+            global.chrome={webview:{
+                hostObjects:{arcaneBridge:{Send(){throw failure;}}},
+                addEventListener(){},removeEventListener(){}
+            }};
+        }else{
+            global.arcaneAndroid={postMessage(){throw failure;}};
+        }
+        const client=createCoreClient({global});
+        t.after(function closeClient(){client.close();});
+        await assert.rejects(client.invoke('system.ping'),function originalNativeError(error){
+            const expected=serializeCoreError(failure);
+            for(const [key,value] of Object.entries(expected))assert.deepEqual(error[key],value);
+            assert.equal(error.method,'system.ping');
+            assert.equal(error.transport,adapter);
+            return true;
+        });
+        failure.method='native.receipt';
+        failure.transport='native-owned-transport';
+        await assert.rejects(client.invoke('system.ping'),function nativeContext(error){
+            const expected=serializeCoreError(failure);
+            for(const [key,value] of Object.entries(expected))assert.deepEqual(error[key],value);
+            return true;
+        });
+    });
+}
