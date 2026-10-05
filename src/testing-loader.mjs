@@ -15,6 +15,7 @@ const MANAGED_IMPORT_MAP_BOUNDARIES=new Set(['source','dist','test']);
 
 let managedImports=null;
 let managedUrlImports=null;
+let managedScopes=[];
 
 function loaderFailure(message,code='ARCANE_IMPORT_MAP_INVALID'){
     const error=new Error(message);
@@ -109,19 +110,7 @@ function physicalManagedTarget(target,specifier,boundary,boundaryName){
     return targetURL.href;
 }
 
-export function initialize({managedImportMap}={}){
-    if(managedImportMap==null){
-        managedImports=null;
-        managedUrlImports=null;
-        return;
-    }
-    const imports=managedImportMap.imports;
-    if(managedImportMap.protocol!==MANAGED_IMPORT_MAP_PROTOCOL
-        ||!MANAGED_IMPORT_MAP_BOUNDARIES.has(managedImportMap.boundary)
-        ||imports===null||!is.object(imports)||is.array(imports)){
-        loaderFailure('Managed test import-map loader data is malformed.');
-    }
-    const boundary=physicalDirectory(managedImportMap.baseURL);
+function managedBindings(imports,boundary,boundaryName){
     const exact=new Map();
     const urls=new Map();
     for(const [specifier,target] of Object.entries(imports)){
@@ -132,7 +121,7 @@ export function initialize({managedImportMap}={}){
             target,
             specifier,
             boundary,
-            managedImportMap.boundary
+            boundaryName
         );
         exact.set(specifier,targetURL);
         if(urlLikeSpecifier(specifier)){
@@ -145,20 +134,52 @@ export function initialize({managedImportMap}={}){
             urls.set(keyURL,targetURL);
         }
     }
-    managedImports=exact;
-    managedUrlImports=urls;
+    return {exact,urls};
+}
+
+export function initialize({managedImportMap}={}){
+    if(managedImportMap==null){
+        managedImports=null;
+        managedUrlImports=null;
+        managedScopes=[];
+        return;
+    }
+    const imports=managedImportMap.imports;
+    if(managedImportMap.protocol!==MANAGED_IMPORT_MAP_PROTOCOL
+        ||!MANAGED_IMPORT_MAP_BOUNDARIES.has(managedImportMap.boundary)
+        ||imports===null||!is.object(imports)||is.array(imports)){
+        loaderFailure('Managed test import-map loader data is malformed.');
+    }
+    const boundary=physicalDirectory(managedImportMap.baseURL);
+    const bindings=managedBindings(imports,boundary,managedImportMap.boundary);
+    const scopes=Object.entries(managedImportMap.scopes??{}).map(([scope,entries])=>({
+        url:new URL(scope,boundary.url).href,
+        ...managedBindings(entries,boundary,managedImportMap.boundary)
+    })).sort((left,right)=>right.url.length-left.url.length);
+    managedImports=bindings.exact;
+    managedUrlImports=bindings.urls;
+    managedScopes=scopes;
 }
 
 function managedResolution(specifier,context){
     if(managedImports===null)return null;
-    if(managedImports.has(specifier))return managedImports.get(specifier);
+    let requested=null;
     if(urlLikeSpecifier(specifier)&&is.string(context.parentURL)){
-        let requested;
         try{requested=new URL(specifier,context.parentURL).href;}
         catch{requested=null;}
-        if(requested!==null&&managedUrlImports.has(requested)){
-            return managedUrlImports.get(requested);
+    }
+    // Match the browser's most-specific dependency scope before global imports.
+    for(const scope of managedScopes){
+        if(context.parentURL!==scope.url
+            &&!(scope.url.endsWith('/')&&context.parentURL?.startsWith(scope.url))){
+            continue;
         }
+        if(scope.exact.has(specifier))return scope.exact.get(specifier);
+        if(requested!==null&&scope.urls.has(requested))return scope.urls.get(requested);
+    }
+    if(managedImports.has(specifier))return managedImports.get(specifier);
+    if(requested!==null&&managedUrlImports.has(requested)){
+        return managedUrlImports.get(requested);
     }
     if(specifier.startsWith('arcane/')||specifier.startsWith('#arcane/')){
         loaderFailure(

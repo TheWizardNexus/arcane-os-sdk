@@ -2,7 +2,7 @@
 
 The npm package exposes a Node.js ESM control plane, the portable
 `arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`,
-`arcane-os/preference-store`, `arcane-os/speech-playback`,
+`arcane-os/preference-store`, `arcane-os/speech-playback`, `arcane-os/websocket-client`,
 `arcane-os/speech-text`, `arcane-os/ai/tool-text-stream`, `arcane-os/ai/twin-cloud`, and `arcane-os/browser-device` entrypoints, and the browser-only
 `arcane-os/pwa`, `arcane-os/ai/browser-wasm`, and
 `arcane-os/ai/browser-decisions` entrypoints. The
@@ -42,7 +42,8 @@ runtime layouts.
 | `arcane-os` | Complete high-level SDK surface. |
 | `arcane-os/toolchain` | Headless application operations. |
 | `arcane-os/events` | CLI/event reporter. |
-| `arcane-os/websocket` | Node HTTP/1.1 WebSocket Upgrade, complete messages and connection lifecycle. Browser clients use native `WebSocket`. |
+| `arcane-os/websocket` | Node HTTP/1.1 WebSocket Upgrade, complete messages and accepted connection lifecycle. |
+| `arcane-os/websocket-client` | Shared native client `WS`, one managed-connection observer and current connection snapshots through published ws-share. |
 | `arcane-os/testing` | Isolated test registration and execution. |
 | `arcane-os/targets` | Target adapters and dispatch. |
 | `arcane-os/native` | Native plan and builder protocol. |
@@ -134,6 +135,7 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | Member | Kind | Import | Group | Availability |
 | --- | --- | --- | --- | --- |
 | `acceptWebSocket()` | function | `arcane-os`, `arcane-os/websocket` | WebSocket protocol | Node; browser-native client interoperability |
+| `WS` | class | `arcane-os`, `arcane-os/websocket-client` | Shared WebSocket clients | Node and native-WebSocket browser hosts |
 | `createBrowserDecisionModel()` | function | `arcane-os/ai/browser-decisions` | Browser typed decisions | Browser module Workers and the caller-selected inference backend |
 | `fetchRequest()` | function | `arcane-os/ai/twin-cloud` | TWiN Cloud requests | Node and Browser; remote HTTPS provider |
 | `fetchSystemOneRequest()` | function | `arcane-os/ai/twin-cloud` | TWiN Cloud state-and-questions requests | Node and Browser; remote HTTPS provider |
@@ -1346,14 +1348,16 @@ The resolved result contains:
     runtimeRoot,
     documentPaths,
     documentCount,
-    documents: [{path, filePath, imports}],
+    documents: [{path, filePath, imports, scopes?}],
     committed: true
 }
 ```
 
 `documentPaths` and each `filePath` are absolute filesystem paths. Each `path`
-is relative to `documentRoot`; `imports` is the complete map rendered for that
-document. The operation inventories the runtime once, builds the shared map
+is relative to `documentRoot`; `imports` contains the global bindings rendered
+for that document. Optional `scopes` contains dependency-specific bindings;
+scope URLs and their targets are rebased with the same document base as global
+imports. The operation inventories the runtime once, builds the shared map
 once, and reads the selected documents with up to four concurrent readers.
 It renders every document before writing any of them, then writes in selected
 order. `committed: true` means all selected writes completed; the batch is not
@@ -3797,6 +3801,22 @@ async function useselectApp(...arguments_) {
 }
 ```
 
+## WS
+
+Import `WS` as the default or named binding from `arcane-os/websocket-client`,
+or as a named binding from the Node root `arcane-os`. `new WS(uri,protocols?)`
+returns the exact native socket from published ws-share, sharing a connecting
+or open socket for the same exact URI string and ordered protocol list.
+`await WS.observe()` exposes one event-pubsub observer with
+`created`/`open`/`error`/`close` lifecycle records; `WS.getConnections()` returns
+current managed-connection snapshots. Each physical connection has its own ID,
+including replacements at the same address.
+
+The [shared-client guide](websocket-client.md) covers complete record fields,
+subscribe-then-snapshot ordering, listener cleanup, shared close ownership,
+native per-socket behavior and the per-loaded-module/realm boundary. This
+client entry does not change the server-side `acceptWebSocket` contract.
+
 ## acceptWebSocket()
 
 ### Overview
@@ -3808,8 +3828,9 @@ the public `.server` / `.secureServer` of `node-http-server`. There is no
 listener creation, default port, application envelope, message persistence,
 client sharing, reconnect loop or third-party WebSocket runtime.
 
-Browser clients use native `WebSocket` directly. Node's global `WebSocket` is
-also a client, not a server. This server adapter supports version 13 over an
+Clients may use native `WebSocket` directly or the separate shared
+[`WS` client](websocket-client.md). Node's global `WebSocket` is also a client,
+not a server. This server adapter supports version 13 over an
 HTTP/1.1 `upgrade` event, including HTTP/1.1 negotiated on an HTTPS listener.
 It does not implement HTTP/2 extended CONNECT or negotiate extensions such as
 compression. TLS setup remains with the existing server owner.

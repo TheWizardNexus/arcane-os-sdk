@@ -7,7 +7,10 @@ informational notice and is not itself a grant of commercial rights.
 
 Third-party material retains its own terms:
 
-- event-pubsub 6.1.0: MIT License; see its installed `licence` file.
+- event-pubsub 6.1.1: MIT License; see browser-runtime/dependencies/event-pubsub/licence.
+- event-pubsub's strong-type 2.0.0 dependency: MIT License; see
+  browser-runtime/dependencies/event-pubsub/dependencies/strong-type/licence.
+- ws-share 3.1.0: DBAD License; see browser-runtime/dependencies/ws-share/licence.md.
 - js-queue 3.1.1: MIT License; see browser-runtime/dependencies/js-queue/licence.md.
 - js-queue's easy-stack 2.1.0 dependency: MIT License; see its installed
   `licence` file. The browser Queue entry does not import this stack module.

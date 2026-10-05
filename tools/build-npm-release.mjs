@@ -3,6 +3,7 @@ import {spawn} from 'node:child_process';
 import {appendFile,mkdir,readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {syncWebSocketBrowserDependencies} from './sync-ws-share.mjs';
 
 const is = new Is(false);
 
@@ -70,6 +71,7 @@ async function main(){
         fail(`${packageDocument.version} must publish through the npm ${channel} tag.`);
     }
     await mkdir(options.output,{recursive:true});
+    await syncWebSocketBrowserDependencies();
 
     let reports;
     try{

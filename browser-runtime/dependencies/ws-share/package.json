@@ -1,0 +1,64 @@
+{
+  "name": "ws-share",
+  "version": "3.1.0",
+  "description": "Share native WebSocket connections across Node.js modules and browser components, with optional lifecycle events.",
+  "type": "module",
+  "main": "./WS.js",
+  "browser": "./WS.js",
+  "files": [
+    "WS.js",
+    "ws-share-vanilla.js",
+    "CHANGELOG.md",
+    "licence.md"
+  ],
+  "scripts": {
+    "test": "node test/ws-share.test.js",
+    "build:browser": "node scripts/browser.js",
+    "prepack": "npm run build:browser",
+    "start": "node devServer.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RIAEvangelist/ws-share.git"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "keywords": [
+    "react",
+    "react.js",
+    "reactjs",
+    "websocket",
+    "websockets",
+    "web",
+    "socket",
+    "sockets",
+    "share",
+    "shared",
+    "sharing",
+    "ws",
+    "list",
+    "common",
+    "flux",
+    "reflux",
+    "component",
+    "components",
+    "store",
+    "stores",
+    "action",
+    "actions",
+    "vanilla"
+  ],
+  "author": "Brandon Nozaki Miller",
+  "license": "DBAD",
+  "bugs": {
+    "url": "https://github.com/RIAEvangelist/ws-share/issues"
+  },
+  "homepage": "https://riaevangelist.github.io/ws-share/",
+  "dependencies": {
+    "event-pubsub": "6.1.1"
+  },
+  "devDependencies": {
+    "vanilla-test": "2.1.3"
+  }
+}

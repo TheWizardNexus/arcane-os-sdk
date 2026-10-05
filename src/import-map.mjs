@@ -41,6 +41,7 @@ const STATIC_RUNTIME_PACKAGE_IMPORTS=new Map([
 ]);
 const SDK_BROWSER_SELF_IMPORTS=new Map([
     ['arcane-os/event-manager',SDK_BROWSER_ENTRY],
+    ['arcane-os/websocket-client','sdk/websocket-client.mjs'],
     ['arcane-os/logging','sdk/logging.mjs'],
     ['arcane-os/browser-device','sdk/browser-device.mjs'],
     ['arcane-os/pwa','sdk/pwa.mjs'],
@@ -1469,6 +1470,19 @@ function registerSpecifier(registry,specifier,target){
     registry.set(specifier,{specifier,target});
 }
 
+function translateImportMapScopes(scopes, translateUrl) {
+    if (scopes === undefined) return undefined;
+    const translated = {};
+    for (const [scope, entries] of Object.entries(scopes)) {
+        const imports = {};
+        for (const [specifier, target] of Object.entries(entries)) {
+            imports[translateUrl(specifier)] = translateUrl(target);
+        }
+        translated[translateUrl(scope)] = imports;
+    }
+    return translated;
+}
+
 function versionImportMapSpecifier(specifier,version){
     if(specifier.endsWith('/')||!/^(?:\.{1,2}\/|\/|[A-Za-z][A-Za-z0-9+.-]*:\/\/)/u.test(specifier))return specifier;
     return versionImportMapUrl(specifier,version);
@@ -1564,6 +1578,13 @@ export async function buildImportMap({files,signal,version=SDK_VERSION,encodePat
             './arcane/sdk/dependencies/event-pubsub/index.js'
         );
     }
+    if (inventory.has('sdk/dependencies/ws-share/WS.js')) {
+        registerSpecifier(
+            namedRegistry,
+            'ws-share',
+            './arcane/sdk/dependencies/ws-share/WS.js'
+        );
+    }
     for(const relative of [...inventory].sort(compareText)){
         if(JAVASCRIPT_EXTENSION.test(relative)){
             const target=runtimeTarget(relative);
@@ -1579,10 +1600,22 @@ export async function buildImportMap({files,signal,version=SDK_VERSION,encodePat
         imports[entry.specifier]=target;
         imports[versionImportMapSpecifier(entry.specifier,version)]=target;
     }
-    return {
+    const result = {
         imports,
         excludedModules:[]
     };
+    if (inventory.has('sdk/dependencies/event-pubsub/index.js')
+        && inventory.has('sdk/dependencies/event-pubsub/dependencies/strong-type/index.js')) {
+        result.scopes = {
+            './arcane/sdk/dependencies/event-pubsub/': {
+                'strong-type': versionAssetUrl(
+                    './arcane/sdk/dependencies/event-pubsub/dependencies/strong-type/index.js',
+                    version
+                )
+            }
+        };
+    }
+    return result;
 }
 
 function pathInside(root,target){
@@ -1662,8 +1695,13 @@ async function managedImportMapBuild(resolvedWorkspace,resolvedApp,signal){
             if(physicalCompatibilityUrl)imports[physicalCompatibilityUrl]=selected;
         }
         built.imports=imports;
+        if (built.scopes !== undefined) {
+            built.scopes = translateImportMapScopes(built.scopes, installedBrowserUrl);
+        }
     }
-    const json=`${JSON.stringify({imports:built.imports},null,2).replaceAll('<','\\u003c')}\n`;
+    const document = {imports:built.imports};
+    if (built.scopes !== undefined) document.scopes = built.scopes;
+    const json=`${JSON.stringify(document,null,2).replaceAll('<','\\u003c')}\n`;
     return {built,json,version};
 }
 
@@ -2615,6 +2653,7 @@ export async function createApplicationTestImportMapContext({
     applicationRoot,
     boundary='source',
     imports={},
+    scopes,
     signal
 }={}){
     if(!is.string(applicationRoot)||applicationRoot.trim()===''){
@@ -2625,6 +2664,9 @@ export async function createApplicationTestImportMapContext({
     }
     if(imports===null||!is.object(imports)||is.array(imports)){
         throw new TypeError('imports must be a plain object.');
+    }
+    if (scopes !== undefined && (scopes === null || !is.object(scopes) || is.array(scopes))) {
+        throw new TypeError('scopes must be an object.');
     }
     throwIfAborted(signal);
     const requestedApplicationRoot=path.resolve(applicationRoot);
@@ -2644,35 +2686,48 @@ export async function createApplicationTestImportMapContext({
         ||!pathInside(canonicalApplicationRoot,canonicalBase)){
         fail(`Application ${boundary} import-map base must be one physical app-owned directory.`);
     }
-    const selectedImports={};
-    for(const [specifier,target] of Object.entries(imports)){
-        throwIfAborted(signal);
-        if(!is.string(specifier)||specifier===''||!is.string(target)
-            ||!target.startsWith('./')){
-            fail(`Application test import-map entry is invalid: ${String(specifier)}.`);
+    async function selectImports(entries) {
+        const selected = {};
+        for (const [specifier, target] of Object.entries(entries)) {
+            throwIfAborted(signal);
+            if (!is.string(specifier) || specifier === '' || !is.string(target)
+                || !target.startsWith('./')) {
+                fail(`Application test import-map entry is invalid: ${String(specifier)}.`);
+            }
+            const relative = safeRelativePath(
+                decodeURIComponent(target.slice(2).split(/[?#]/u)[0]),
+                `application test import-map target for ${specifier}`
+            );
+            if (boundary === 'source' && /^(?:dist|test)\//u.test(relative)) {
+                fail(`Source import-map target selects another application boundary: ${specifier}.`);
+            }
+            const candidate = path.resolve(canonicalBase, ...relative.split('/'));
+            const targetInfo = await lstat(candidate);
+            const canonicalTarget = await realpath(candidate);
+            if (targetInfo.isSymbolicLink() || !targetInfo.isFile()
+                || !samePath(candidate, canonicalTarget) || !pathInside(canonicalBase, canonicalTarget)) {
+                fail(`Application test import-map target leaves its physical ${boundary} directory: ${specifier}.`);
+            }
+            selected[specifier] = target;
         }
-        const relative=safeRelativePath(
-            decodeURIComponent(target.slice(2).split(/[?#]/u)[0]),
-            `application test import-map target for ${specifier}`
-        );
-        if(boundary==='source'&&/^(?:dist|test)\//u.test(relative)){
-            fail(`Source import-map target selects another application boundary: ${specifier}.`);
-        }
-        const candidate=path.resolve(canonicalBase,...relative.split('/'));
-        const targetInfo=await lstat(candidate);
-        const canonicalTarget=await realpath(candidate);
-        if(targetInfo.isSymbolicLink()||!targetInfo.isFile()
-            ||!samePath(candidate,canonicalTarget)||!pathInside(canonicalBase,canonicalTarget)){
-            fail(`Application test import-map target leaves its physical ${boundary} directory: ${specifier}.`);
-        }
-        selectedImports[specifier]=target;
+        return selected;
     }
-    return {
+    const result = {
         protocol:'arcane-test-import-map/1',
         boundary,
         baseURL:pathToFileURL(`${canonicalBase}${path.sep}`).href,
-        imports:selectedImports
+        imports:await selectImports(imports)
     };
+    if (scopes !== undefined) {
+        result.scopes = {};
+        for (const [scope, entries] of Object.entries(scopes)) {
+            if (scope === '' || entries === null || !is.object(entries) || is.array(entries)) {
+                fail(`Application test import-map scope is invalid: ${scope}.`);
+            }
+            result.scopes[scope] = await selectImports(entries);
+        }
+    }
+    return result;
 }
 
 export async function readApplicationTestImportMapContext({
@@ -2717,16 +2772,20 @@ export async function readApplicationTestImportMapContext({
         fail('Application test import-map artifact must contain an imports object.');
     }
     const installed=await readInstalledSdkLayout(resolvedWorkspaceRoot);
-    const imports=installed?Object.fromEntries(Object.entries(document.imports).map(
+    function installedApplicationTestUrl(value) {
+        return installed && is.string(value) && value.startsWith('./')
+            ? `./${installedRuntimeTarget(value.slice(2), installed)}` : value;
+    }
+    const imports=Object.fromEntries(Object.entries(document.imports).map(
         function installedApplicationTestTarget([specifier,target]){
-            return [specifier,is.string(target)&&target.startsWith('./')
-                ?`./${installedRuntimeTarget(target.slice(2),installed)}`:target];
+            return [specifier,installedApplicationTestUrl(target)];
         }
-    )):document.imports;
+    ));
     return createApplicationTestImportMapContext({
         applicationRoot:resolvedWorkspaceRoot,
         boundary:'source',
         imports,
+        scopes:translateImportMapScopes(document.scopes, installedApplicationTestUrl),
         signal
     });
 }
@@ -2798,7 +2857,7 @@ function documentRelativeUrl(target, base) {
     return `${pathname}${target.search}${target.hash}`;
 }
 
-function documentImports(imports, context, baseHref, relative) {
+function documentImportMap(importMap, context, baseHref, relative) {
     const documentUrl = new URL(encodedUrlPath(relative), context.deployment);
     // Match URL parser normalization only for resolving the base; preserve authored HTML.
     const baseAddress = (baseHref ?? '').replace(/[\t\r\n]/gu, '').replace(
@@ -2834,16 +2893,20 @@ function documentImports(imports, context, baseHref, relative) {
         return value;
     }
     const rebased = {};
-    for (const [specifier, target] of Object.entries(imports)) {
+    for (const [specifier, target] of Object.entries(importMap.imports)) {
         rebased[rebaseUrl(specifier)] = rebaseUrl(target);
     }
-    return rebased;
+    const result = {imports:rebased};
+    if (importMap.scopes !== undefined) {
+        result.scopes = translateImportMapScopes(importMap.scopes, rebaseUrl);
+    }
+    return result;
 }
 
-function renderDocumentImportMap(html, imports, state) {
+function renderDocumentImportMap(html, importMap, state) {
     const {structure, managed, firstLoad, base} = state;
     const newline = html.includes('\r\n') ? '\r\n' : '\n';
-    const json = JSON.stringify({imports}, null, 2).replaceAll('<', '\\u003c');
+    const json = JSON.stringify(importMap, null, 2).replaceAll('<', '\\u003c');
     const block = `<script type="importmap" ${MANAGED_IMPORT_MAP_ATTRIBUTE}>${newline}${json}${newline}</script>`;
     const firstManaged = managed[0];
     const replaceInPlace = firstManaged
@@ -2980,13 +3043,15 @@ export async function generateDocumentImportMaps({
     const rendered = documentStates.map(
         function renderSelectedDocument(document) {
             throwIfAborted(signal);
-            const imports = documentImports(built.imports, context, document.state.base?.href, document.path);
-            return {
+            const importMap = documentImportMap(built, context, document.state.base?.href, document.path);
+            const result = {
                 path:document.path,
                 filePath:document.filePath,
-                imports,
-                html:renderDocumentImportMap(document.html, imports, document.state)
+                imports:importMap.imports,
+                html:renderDocumentImportMap(document.html, importMap, document.state)
             };
+            if (importMap.scopes !== undefined) result.scopes = importMap.scopes;
+            return result;
         }
     );
     const paths = [];
@@ -3010,11 +3075,13 @@ export async function generateDocumentImportMaps({
         documentCount:documentPaths.length,
         documents:rendered.map(
             function documentResult(document) {
-                return {
+                const result = {
                     path:document.path,
                     filePath:document.filePath,
                     imports:document.imports
                 };
+                if (document.scopes !== undefined) result.scopes = document.scopes;
+                return result;
             }
         ),
         committed:true
@@ -3125,6 +3192,7 @@ async function generateImportMapUnlocked({
         excludedModules:built.excludedModules,
         committed:true
     };
+    if (built.scopes !== undefined) result.scopes = built.scopes;
     const completedEventError=await emit(onEvent,{
         type:'import-map.completed',
         appId,

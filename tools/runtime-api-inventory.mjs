@@ -20,6 +20,7 @@ const missingStrongTypePath=path.join(
 );
 const runtimePackageImports=new Map([
     ['arcane-os/event-manager',path.join(repositoryRoot,'src','event-manager.mjs')],
+    ['arcane-os/websocket-client',path.join(repositoryRoot,'browser-runtime','websocket-client.mjs')],
     ['arcane-os/speech-text',path.join(repositoryRoot,'browser-runtime','speech-text.mjs')],
     [
         'arcane-os/ai/tool-text-stream',
@@ -34,7 +35,7 @@ const runtimePackageImports=new Map([
         path.join(repositoryRoot,'browser-runtime','ai','browser-speech.mjs')
     ]
 ]);
-const runtimeExternalImports=new Set(['event-pubsub','strong-type']);
+const runtimeExternalImports=new Set(['event-pubsub','strong-type','ws-share']);
 function portablePath(filePath){
     return path.relative(repositoryRoot,filePath).split(path.sep).join('/');
 }

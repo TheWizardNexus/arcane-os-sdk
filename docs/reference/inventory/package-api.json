@@ -6,12 +6,26 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 225,
+  "memberCount": 226,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
   },
   "members": [
+    {
+      "id": "root:WS",
+      "name": "WS",
+      "displayName": "WS",
+      "kind": "class",
+      "signature": "new WS(uri,protocols?)",
+      "entrypoints": ["arcane-os", "arcane-os/websocket-client"],
+      "primaryImport": "arcane-os/websocket-client",
+      "group": "Shared WebSocket clients",
+      "summary": "Published ws-share constructor with shared native sockets, one lifecycle observer and current connection snapshots.",
+      "availability": "Node and browser hosts with native WebSocket; browser use requires the focused managed module entry",
+      "protocol": "Native WebSocket per-socket events plus event-pubsub created/open/error/close and wildcard lifecycle records",
+      "normalization": "Exact native socket and complete messages; URI plus ordered requested protocols select the per-loaded-module pool"
+    },
     {
       "id": "browser-decisions:createBrowserDecisionModel",
       "name": "createBrowserDecisionModel",

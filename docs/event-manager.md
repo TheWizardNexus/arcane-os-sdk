@@ -253,10 +253,13 @@ other privileged effects.
 ## Browser delivery boundary
 
 The package entry point works directly in Node and through browser bundlers.
-The npm artifact bundles the exact `event-pubsub` and `strong-type` pair because
-`event-pubsub@6.1.0` uses a sibling-relative runtime import. Unbundled browser
-use must preserve that physical sibling layout and provide import-map entries
-for the public SDK entry and `event-pubsub`.
+The npm artifact retains its bundled `event-pubsub` and `strong-type`
+dependencies. `event-pubsub@6.1.1` resolves its declared `strong-type@2.0.0`
+through the package boundary, while the SDK's direct version remains 2.0.1.
+Unbundled browser use provides mappings for the public SDK entry and
+`event-pubsub`, plus the event package's scoped strong-type mapping. The
+canonical browser projection generator copies those installed runtime files
+unchanged; managed physical and installed-package maps preserve their scope.
 
 The managed Arcane browser runtime ships the focused entry and its
 dependency closure. Its import map resolves `arcane-os/event-manager` exactly;

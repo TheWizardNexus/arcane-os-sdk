@@ -115,7 +115,8 @@ async function readManagedImportMapContext(source,signal,testFile){
         protocol:MANAGED_IMPORT_MAP_PROTOCOL,
         boundary:context.boundary,
         baseURL:pathToFileURL(`${canonicalBase}${path.sep}`).href,
-        imports:{...context.imports}
+        imports:{...context.imports},
+        scopes:context.scopes??{}
     };
 }
 

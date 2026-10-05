@@ -476,7 +476,7 @@ renaming any preceding entry changes the physical contract.
 
 The map derives its complete entries from the selected runtime graph;
 application source imports do not select a fixed entry count. The operation
-result reports `imports`, `documentCount`, and `excludedModules`; reached-file
+result reports `imports`, optional dependency `scopes`, `documentCount`, and `excludedModules`; reached-file
 traversal remains internal. The
 managed graph exposes `arcane-os/event-manager`, `arcane-os/ai/browser-wasm`,
 `arcane-os/ai/browser-speech`, `arcane-os/preference-store`, and
@@ -488,6 +488,8 @@ The focused physical targets remain stable when their bindings are reached:
 | Browser specifier | Physical target |
 | --- | --- |
 | `arcane-os/event-manager` | `./arcane/sdk/event-manager.mjs` |
+| `arcane-os/websocket-client` | `./arcane/sdk/websocket-client.mjs` |
+| `ws-share` | `./arcane/sdk/dependencies/ws-share/WS.js` |
 | `arcane-os/ai/browser-wasm` | `./arcane/sdk/ai/browser-wasm.mjs` |
 | `arcane-os/ai/browser-speech` | `./arcane/sdk/ai/browser-speech.mjs` |
 | `arcane-os/speech-text` | `./arcane/sdk/speech-text.mjs` |
@@ -496,6 +498,16 @@ The focused physical targets remain stable when their bindings are reached:
 | `event-pubsub` | `./arcane/sdk/dependencies/event-pubsub/index.js` |
 | `strong-type` | `./arcane/dependencies/strong-type/index.js` |
 | `./node_modules/strong-type/index.js` | `./arcane/dependencies/strong-type/index.js` |
+
+When the selected runtime contains event-pubsub's own dependency projection,
+the `./arcane/sdk/dependencies/event-pubsub/` scope maps `strong-type` to
+`./arcane/sdk/dependencies/event-pubsub/dependencies/strong-type/index.js`.
+This keeps its published 2.0.0 selection separate from the global SDK 2.0.1
+binding. Scope keys and targets follow installed-package and document-base
+translation together. Older inventories without that nested projection retain
+their existing map shape. Internal managed test contexts accept and preserve
+optional `scopes` alongside `imports`; their loader selects the most-specific
+matching importer scope before the global map.
 
 Direct installed routes translate these targets to their actual npm destinations,
 including aliases. There is no `arcane-os` package-root mapping or catch-all
