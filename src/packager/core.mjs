@@ -20,6 +20,7 @@ import {
     applyPwaEntryReferences,
     inspectImportMapHtml,
     readWorkspaceAssetVersion,
+    removePwaEntryReferences,
     resolveAssetReference,
     rewriteAssetReferences,
     versionAssetUrl
@@ -920,6 +921,51 @@ async function packageWithContext(context,options={}){
             await copyBase();
         }
         let files=await listOutputFiles(stagingRoot,{signal});
+        const entryUrl=new URL(packageResourceUrl(entryPath),'http://arcane.invalid/');
+        const selectedFiles=new Set(files);
+        const explicitDocumentPaths=context.config.documents===undefined?null:new Set(
+            inspected.browserDocuments.map(function selectedDocumentPath(document){return document.packagePath;})
+        );
+        const pwaDocumentPaths=new Set(explicitDocumentPaths??[entryPath]);
+        for(const selected of explicitDocumentPaths===null?context.config.include:[]){
+            const selectedPath=appPackagePath(context,selected);
+            if(/\.html?$/iu.test(selected)&&selectedFiles.has(selectedPath))pwaDocumentPaths.add(selectedPath);
+        }
+        for(const document of inspected.browserDocuments){
+            const appDocument=context.config.include.some(function includesAppDocument(selected){
+                return sameOrDescendant(document.path,selected);
+            });
+            if(appDocument&&(appPath===''||document.managedMaps.length>0)&&selectedFiles.has(document.packagePath)){
+                pwaDocumentPaths.add(document.packagePath);
+            }
+        }
+        if (!pwaEnabled) {
+            // Remove source-generated registration before native processing can follow it.
+            const removals = await Promise.allSettled(
+                [...pwaDocumentPaths].map(
+                    async function removeStagedPwaReferences(documentPath) {
+                        throwIfAborted(signal);
+                        const filePath = path.join(stagingRoot, ...documentPath.split('/'));
+                        const source = await readFile(filePath, 'utf8');
+                        const content = removePwaEntryReferences(
+                            source,
+                            {
+                                documentUrl: new URL(packageResourceUrl(documentPath), entryUrl.origin),
+                                manifestUrl: new URL(`/${PWA_MANIFEST_NAME}`, entryUrl.origin)
+                            }
+                        );
+                        if (content !== source) await writeFile(filePath, content, 'utf8');
+                    }
+                )
+            );
+            // Settle every stage write before a failure can trigger stage cleanup.
+            const errors = [];
+            for (const removal of removals) {
+                if (removal.status === 'rejected') errors.push(removal.reason);
+            }
+            if (errors.length === 1) throw errors[0];
+            if (errors.length > 1) throw new AggregateError(errors, 'Selected PWA reference removal failed.');
+        }
         if(moduleFormat==='native'){
             files=await materializeNativeModules({
                 stagingRoot,
@@ -937,27 +983,10 @@ async function packageWithContext(context,options={}){
         const inventory=new Set(files);
         const offlineInventory=pwaEnabled?new Set(selectPwaFiles(files,context.config.pwa,appPath)):null;
         const offlineReferences=new Set();
-        const entryUrl=new URL(packageResourceUrl(entryPath),'http://arcane.invalid/');
         const pwaDocumentSources=new Map();
-        const explicitDocumentPaths=context.config.documents===undefined?null:new Set(
-            inspected.browserDocuments.map(function selectedDocumentPath(document){return document.packagePath;})
-        );
         if(pwaEnabled){
-            const documentPaths=new Set(explicitDocumentPaths??[entryPath]);
-            for(const selected of explicitDocumentPaths===null?context.config.include:[]){
-                const selectedPath=appPackagePath(context,selected);
-                if(/\.html?$/iu.test(selected)&&inventory.has(selectedPath))documentPaths.add(selectedPath);
-            }
-            for(const document of inspected.browserDocuments){
-                const appDocument=context.config.include.some(function includesAppDocument(selected){
-                    return sameOrDescendant(document.path,selected);
-                });
-                if(appDocument&&(appPath===''||document.managedMaps.length>0)&&inventory.has(document.packagePath)){
-                    documentPaths.add(document.packagePath);
-                }
-            }
             await Promise.all(
-                [...documentPaths].map(
+                [...pwaDocumentPaths].map(
                     async function readPwaDocument(documentPath) {
                         const source = await readFile(
                             path.join(stagingRoot, ...documentPath.split('/')),

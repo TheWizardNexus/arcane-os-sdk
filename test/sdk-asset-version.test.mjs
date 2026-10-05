@@ -9,6 +9,7 @@ import {
     createApplicationTestImportMapContext,
     generateImportMap,
     readWorkspaceAssetVersion,
+    removePwaEntryReferences,
     rewriteAssetReferences,
     scanModuleImports,
     versionAssetUrl
@@ -504,6 +505,64 @@ test('PWA entry references retain inactive content, other attributes and script 
     const slashValue=applyPwaEntryReferences('<link rel="manifest" href="old"><script data-arcane-pwa src="old.mjs" data-name=kept/></script>',options);
     assert.ok(slashValue.includes('data-name=kept/ type="module" async>'));
 });
+
+test(
+    'disabled PWA references preserve authored links, script order and inactive HTML',
+    function inactivePwaEntryReferences() {
+        const inactive = [
+            '<!-- <link rel="manifest" href="/arcane.webmanifest"><script data-arcane-pwa>comment()</script> -->',
+            '<template><link rel="manifest" href="/arcane.webmanifest"><script data-arcane-pwa>template()</script></template>',
+            '<textarea><link rel="manifest" href="/arcane.webmanifest"><script data-arcane-pwa>text()</script></textarea>',
+            '<script>const sample="<link rel=manifest href=/arcane.webmanifest>";</script>',
+            '<noscript><link rel="manifest" href="/arcane.webmanifest"><script data-arcane-pwa>fallback()</script></noscript>'
+        ].join('\r\n');
+        const cases = [
+            {document: '/index.html', base: '', href: './arcane.webmanifest?mode=offline&amp;v=4#install'},
+            {document: '/pages/settings.html', base: '', href: '../arcane.webmanifest'},
+            {document: '/apps/moon/pages/settings.html', base: '<base href="../../../">', href: './arcane.webmanifest'},
+            {document: '/apps/moon/index.html', base: '<base target="_self"><base href="../../">', href: '/arcane.webmanifest'}
+        ];
+        for (const selected of cases) {
+            const generatedManifest = `<link REL="manifest" href="${selected.href}">`;
+            const generatedBootstrap = '<script type="module" async data-arcane-pwa src="/arcane-pwa.mjs"></script>';
+            const duplicateBootstrap = '<script DATA-ARCANE-PWA>generatedRegistration()</script>';
+            const mixedLink = '<link rel="icon man&#105;fest" href="/arcane.webmanifest" data-author="kept">';
+            const source = [
+                '<!doctype html><head>',
+                selected.base,
+                inactive,
+                generatedManifest,
+                mixedLink,
+                '<link rel="manifest" href="./author.webmanifest">',
+                '<link rel="manifest" href="https://other.example/arcane.webmanifest">',
+                '<link rel="manifest" href="/content/arcane.webmanifest">',
+                '<script type="module" async src="./first.mjs"></script>',
+                generatedBootstrap,
+                duplicateBootstrap,
+                '<script type="module" defer src="./last.mjs"></script>',
+                '</head><body>  Complete moon census.  </body>\r\n'
+            ].join('\r\n');
+            const options = {
+                documentUrl: new URL(selected.document, 'https://package.example'),
+                manifestUrl: 'https://package.example/arcane.webmanifest'
+            };
+            const expected = source.replace(generatedManifest, '')
+                .replace(generatedBootstrap, '').replace(duplicateBootstrap, '')
+                .replace(mixedLink, '<link rel="icon " href="/arcane.webmanifest" data-author="kept">');
+            const output = removePwaEntryReferences(source, options);
+            assert.equal(output, expected, selected.document);
+            assert.equal(removePwaEntryReferences(output, options), output);
+        }
+        const remote = '<base href="https://author.example/"><link rel="manifest" href="arcane.webmanifest">';
+        assert.equal(
+            removePwaEntryReferences(
+                remote,
+                {documentUrl: 'https://package.example/index.html', manifestUrl: '/arcane.webmanifest'}
+            ),
+            remote
+        );
+    }
+);
 
 test('PWA import-map generation uses clean URLs without changing shared runtime source',async function pwaWorkspaceProjection(t){
     const workspace=await temporaryDirectory(t);

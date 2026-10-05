@@ -902,8 +902,12 @@ const release = await packageApp({
 The override uses the same workspace-relative destination and staged replacement
 rules as the saved field. It replaces only `dist/extension/app`, leaving its
 extension-root siblings and an existing browser output intact. `browserPwa:false`
-omits generated PWA artifacts for this invocation; it does not change the app's
-saved PWA configuration. The app owns extension metadata, permissions and toolbar
+omits generated PWA artifacts and removes their active references from selected
+output documents before native-module processing. This removes SDK-marked
+`data-arcane-pwa` scripts and manifest relationships resolving to the package's
+`arcane.webmanifest`, preserving unrelated authored links and inactive HTML.
+It does not change source documents or the app's saved PWA configuration.
+The app owns extension metadata, permissions and toolbar
 launch behavior. This API builds the application directory, not an extension
 manifest or an operating-system launcher. Native-mode dry runs report selected
 input files; generated script/context files are included in the completed

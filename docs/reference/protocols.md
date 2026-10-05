@@ -236,6 +236,12 @@ For an extension, select `browserPwa:false` for that artifact and place the
 complete SDK-produced app beneath the app-owned extension root. The application
 owns its manifest, toolbar/background launcher and permissions. Ordinary browser
 PWA configuration and generated browser output remain independently available.
+Before native-module processing, the stage removes active `data-arcane-pwa`
+scripts and manifest relationships targeting the package's `arcane.webmanifest`
+from the existing selected PWA document set. Authored bases resolve those links;
+unrelated manifest URLs, other link relationships, comments, templates and other
+inactive HTML retain their content. Source documents and saved PWA settings
+remain unchanged; the operation does not sweep every packaged HTML file.
 
 ## Installed-package browser routes
 

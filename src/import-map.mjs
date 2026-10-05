@@ -2089,6 +2089,66 @@ function scanHtmlStructure(html){
     return {scripts,links,bases,metas,elements,styles,headClose,bodyClose};
 }
 
+/** Remove generated PWA references from a selected output document without changing authored content. */
+export function removePwaEntryReferences(html, {documentUrl, manifestUrl} = {}) {
+    if (!is.string(html)) throw new TypeError('PWA entry HTML must be a string.');
+    const structure = scanHtmlStructure(html);
+    const manifest = new URL(manifestUrl, documentUrl);
+    const base = structure.bases.find(
+        function baseWithHref(element) {
+            return parseTagAttributes(element.open).has('href');
+        }
+    );
+    const baseHref = base ? structuralAttribute(parseTagAttributes(base.open), 'href', 'base') : null;
+    const resourceBase = baseHref ? new URL(baseHref, documentUrl) : documentUrl;
+    const edits = [];
+    for (const link of structure.links) {
+        const attributes = parseTagAttributes(link.open);
+        const href = htmlAttributeView(attributes.get('href') ?? '');
+        const rel = htmlAttributeView(attributes.get('rel') ?? '');
+        if (!href?.decoded || !rel) continue;
+        let target;
+        try {
+            target = new URL(href.decoded, resourceBase);
+        } catch (error) {
+            // An unrelated non-URL reference stays under its authored owner.
+            continue;
+        }
+        if (target.origin !== manifest.origin || target.pathname !== manifest.pathname) continue;
+        const tokens = [...rel.decoded.matchAll(/[^\t\n\f\r ]+/gu)];
+        const manifestTokens = tokens.filter(
+            function manifestRelationship(token) {
+                return asciiLower(token[0]) === 'manifest';
+            }
+        );
+        if (manifestTokens.length === 0) continue;
+        if (manifestTokens.length === tokens.length) {
+            edits.push(
+                {start: link.start, end: link.end, value: ''}
+            );
+            continue;
+        }
+        const position = attributes.positions.get('rel');
+        for (const token of manifestTokens) {
+            edits.push(
+                {
+                    start: link.start + position.start + rel.positions[token.index],
+                    end: link.start + position.start + rel.positions[token.index + token[0].length],
+                    value: ''
+                }
+            );
+        }
+    }
+    for (const script of structure.scripts) {
+        if (parseTagAttributes(script.open).has('data-arcane-pwa')) {
+            edits.push(
+                {start: script.start, end: script.end, value: ''}
+            );
+        }
+    }
+    return applyReferenceEdits(html, edits);
+}
+
 /** Update only active PWA entry references; registration never orders application startup. */
 export function applyPwaEntryReferences(html,{manifestUrl,bootstrapUrl}={}){
     if(!is.string(html))throw new TypeError('PWA entry HTML must be a string.');

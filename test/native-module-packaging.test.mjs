@@ -129,6 +129,66 @@ test('native packaging emits local module references and complete external compo
     assert.equal(verified.outputRoot,release.outputRoot);
 });
 
+test(
+    'native packaging removes source-generated PWA references before processing selected documents',
+    async function nativeWithoutPwaReferences(context) {
+        const selected = await fixture(
+            context,
+            {secondDocument: true}
+        );
+        const config = JSON.parse(await readFile(path.join(selected.workspaceRoot, 'arcane-package.json'), 'utf8'));
+        config.pwa = {enabled: true};
+        await selected.json('arcane-package.json', config);
+        const savedConfig = await readFile(path.join(selected.workspaceRoot, 'arcane-package.json'), 'utf8');
+        const references = '<link rel="manifest" href="./arcane.webmanifest">\n'
+            + '<script type="module" async data-arcane-pwa src="./arcane-pwa.mjs"></script>\n'
+            + '<script data-arcane-pwa>globalThis.unwantedPwaRegistration=true;</script>\n';
+        const originals = new Map();
+        for (const file of ['index.html', 'second.html']) {
+            const original = await readFile(path.join(selected.workspaceRoot, file), 'utf8');
+            const source = original.replace('<base href="./">', '<base href="./">\n' + references);
+            originals.set(file, source);
+            await selected.write(file, source);
+        }
+        const inactive = '<template>' + references + '</template>';
+        const supplied = selected.content + references + inactive;
+        await selected.write('content/original.html', supplied);
+        const release = await packageApp(
+            {
+                workspaceRoot: selected.workspaceRoot,
+                appId: 'native-example',
+                outputDirectory: 'dist/extension/app',
+                moduleFormat: 'native',
+                browserPwa: false
+            }
+        );
+        for (const [file, source] of originals) {
+            const output = await readFile(path.join(release.outputRoot, file), 'utf8');
+            assert.equal(output.includes('arcane.webmanifest'), false, file);
+            assert.equal(output.includes('data-arcane-pwa'), false, file);
+            assert.equal(output.includes('type="importmap"'), false, file);
+            assert.equal(await readFile(path.join(selected.workspaceRoot, file), 'utf8'), source);
+        }
+        for (const file of release.files) {
+            if (!/\.arcane-script-\d+\.[cm]?js$/u.test(file)) continue;
+            const script = await readFile(path.join(release.outputRoot, file), 'utf8');
+            assert.equal(script.includes('unwantedPwaRegistration'), false, file);
+        }
+        for (const file of ['arcane.webmanifest', 'arcane-pwa.mjs', 'arcane-sw.js', 'arcane-offline.json']) {
+            assert.equal(release.files.includes(file), false, file);
+        }
+        assert.equal(
+            await readFile(path.join(release.outputRoot, 'content/original.html'), 'utf8'),
+            supplied
+        );
+        assert.equal(await readFile(path.join(selected.workspaceRoot, 'arcane-package.json'), 'utf8'), savedConfig);
+        const verified = await verifyApp(
+            {workspaceRoot: selected.workspaceRoot, appId: 'native-example', outputDirectory: 'dist/extension/app'}
+        );
+        assert.equal(verified.outputRoot, release.outputRoot);
+    }
+);
+
 test('different document maps keep distinct cyclic graphs and share equal dependencies',async function nativeContexts(t){
     const selected=await fixture(t,{secondDocument:true});
     const release=await packageApp({

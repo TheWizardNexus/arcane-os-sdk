@@ -675,17 +675,36 @@ test(
     'native package selection and disabled PWA retain stable resource URLs',
     async function inactivePwaPackages(context) {
         const native = await workspaceFixture(context);
-        const nativeResult = await packageApp(
-            {workspaceRoot: native.workspaceRoot, appId: 'pwa-app', browserPwa: false}
-        );
         const disabled = await workspaceFixture(
             context,
             {enabled: false}
         );
-        const disabledResult = await packageApp(
-            {workspaceRoot: disabled.workspaceRoot, appId: 'pwa-app'}
-        );
-        for (const result of [nativeResult, disabledResult]) {
+        for (const [fixture, options] of [[native, {browserPwa: false}], [disabled, {}]]) {
+            const sources = new Map();
+            for (const [file, prefix] of [
+                ['index.html', './'],
+                ['about.html', '../../'],
+                ['pages/settings.html', './'],
+                ['pages/help.html', '../../../']
+            ]) {
+                const source = await readFile(path.join(fixture.appRoot, file), 'utf8');
+                const references = `<link rel="manifest" href="${prefix}arcane.webmanifest?mode=offline#app">`
+                    + `<script type="module" async data-arcane-pwa src="${prefix}arcane-pwa.mjs"></script>`;
+                const authored = source.replace('</head>', references + '</head>');
+                sources.set(file, authored);
+                await writeText(fixture.appRoot, file, authored);
+            }
+            const inert = '<!-- <script data-arcane-pwa src="/arcane-pwa.mjs"></script> -->'
+                + '<template><link rel="manifest" href="/arcane.webmanifest"></template>';
+            const supplied = CORPUS_HTML
+                + '<link rel="manifest" href="/arcane.webmanifest">'
+                + '<script data-arcane-pwa src="/arcane-pwa.mjs"></script>'
+                + inert;
+            await writeText(fixture.appRoot, 'content/document.html', supplied);
+            const savedConfig = await readFile(path.join(fixture.appRoot, 'arcane-package.json'), 'utf8');
+            const result = await packageApp(
+                {workspaceRoot: fixture.workspaceRoot, appId: 'pwa-app', ...options}
+            );
             assert.equal(
                 result.files.includes('arcane-sw.js'),
                 false
@@ -703,6 +722,20 @@ test(
                 false
             );
             assert.equal(html.includes('arcaneVersion='), false);
+            for (const [file, source] of sources) {
+                const output = await readFile(path.join(result.outputRoot, 'apps/pwa-app', file), 'utf8');
+                assert.equal(output.includes('arcane.webmanifest'), false, file);
+                assert.equal(output.includes('data-arcane-pwa'), false, file);
+                if (file !== 'about.html') {
+                    assert.ok(output.includes('<link rel="manifest" href="manifest.json">'), file);
+                }
+                assert.equal(await readFile(path.join(fixture.appRoot, file), 'utf8'), source);
+            }
+            assert.equal(
+                await readFile(path.join(result.outputRoot, 'apps/pwa-app/content/document.html'), 'utf8'),
+                supplied
+            );
+            assert.equal(await readFile(path.join(fixture.appRoot, 'arcane-package.json'), 'utf8'), savedConfig);
             const importMap = JSON.parse(await readFile(
                 path.join(result.outputRoot, 'apps/pwa-app/modules/arcane.importmap.json'),
                 'utf8'
