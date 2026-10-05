@@ -33,8 +33,8 @@ function platformArguments(command,args,platform=process.platform){
     return [cliPath,...args];
 }
 
-function appendOutput(current,chunk){
-    return current+chunk.toString('utf8');
+function appendOutput(current,text){
+    return current+text;
 }
 
 async function emitLines(events,type,text){
@@ -45,9 +45,9 @@ async function emitLines(events,type,text){
     }
 }
 
-function deliverChunk(stream,events,type,chunk){
+function deliverChunk(stream,events,type,text){
     stream.pause();
-    return emitLines(events,type,chunk.toString('utf8')).catch(()=>{
+    return emitLines(events,type,text).catch(()=>{
         // The queue owns and propagates the first callback failure.
     }).finally(()=>{
         if(!stream.destroyed){
@@ -263,6 +263,10 @@ export async function runProcess(command,args=[],{
             return;
         }
 
+        // Each readable retains split UTF-8 sequences and flushes at EOF.
+        // Capture and events consume the same decoded text.
+        child.stdout.setEncoding('utf8');
+        child.stderr.setEncoding('utf8');
         child.stdout.on('data',chunk=>{
             stdout=appendOutput(stdout,chunk);
             ownDelivery(child.stdout,'process.stdout',chunk);

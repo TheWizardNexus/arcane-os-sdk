@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
-import {Writable} from 'node:stream';
+import childProcess from 'node:child_process';
+import {EventEmitter} from 'node:events';
+import {syncBuiltinESMExports} from 'node:module';
+import {PassThrough,Writable} from 'node:stream';
+import {finished} from 'node:stream/promises';
 import test from '../src/testing.mjs';
 import {arcaneEvents,createEventManager} from '../src/event-manager.mjs';
 import {createEventQueue} from '../src/event-queue.mjs';
@@ -158,6 +162,169 @@ test('process events are serialized and drained before successful settlement',as
     assert.equal(delivered.filter(type=>type==='process.stdout').length,2);
     assert.equal(delivered.filter(type=>type==='process.stderr').length,2);
 });
+
+async function runOutputFixture(fragments, {code = 0, ...options} = {}) {
+    const originalSpawn = childProcess.spawn;
+    const child = new EventEmitter();
+    child.stdin = new PassThrough();
+    child.stdout = new PassThrough();
+    child.stderr = new PassThrough();
+    let signalStarted;
+    const started = new Promise(
+        function observeFixtureSpawn(resolve) {
+            signalStarted = resolve;
+        }
+    );
+    const ended = Promise.allSettled(
+        [
+            finished(
+                child.stdout,
+                {cleanup: true}
+            ),
+            finished(
+                child.stderr,
+                {cleanup: true}
+            )
+        ]
+    );
+    childProcess.spawn = function spawnOutputFixture() {
+        signalStarted();
+        return child;
+    };
+    syncBuiltinESMExports();
+    let outcome;
+    try {
+        outcome = runProcess(
+            'utf8-fixture',
+            [],
+            options
+        ).then(
+            function processResolved(value) { return {value}; },
+            function processRejected(error) { return {error}; }
+        );
+        const first = await Promise.race(
+            [started, outcome]
+        );
+        if (first?.error) throw first.error;
+        for (const [stream, fragment] of fragments) {
+            child[stream].write(Buffer.from(fragment));
+            // Supply separate readable chunks without operating-system pipe timing.
+            await delay(0);
+        }
+        child.stdout.end();
+        child.stderr.end();
+        for (const completion of await ended) {
+            if (completion.status === 'rejected') throw completion.reason;
+        }
+        child.emit('close', code, null);
+        const result = await outcome;
+        if (result.error) throw result.error;
+        return result.value;
+    } finally {
+        try {
+            signalStarted();
+            child.stdin.destroy();
+            child.stdout.destroy();
+            child.stderr.destroy();
+            child.emit('close', code, null);
+            await ended;
+            await outcome;
+            child.removeAllListeners();
+            child.stdin.removeAllListeners();
+            child.stdout.removeAllListeners();
+            child.stderr.removeAllListeners();
+        } finally {
+            childProcess.spawn = originalSpawn;
+            syncBuiltinESMExports();
+        }
+    }
+}
+
+test(
+    'process output decodes split UTF-8 once per independent stream',
+    async function splitProcessUtf8() {
+        const captured = {stdout: '', stderr: ''};
+        const delivered = [];
+        const result = await runOutputFixture(
+            [
+                ['stdout', [0xc3]],
+                ['stderr', [0xe2, 0x82]],
+                ['stdout', [0xa9, 0xf0, 0x9f]],
+                ['stderr', [0xac, 0xf0, 0x9f]],
+                ['stdout', [0x8c, 0x95]],
+                ['stderr', [0x9a, 0x80]]
+            ],
+            {
+                async onEvent(event) {
+                    await delay(5);
+                    if (event.type === 'process.stdout') captured.stdout += event.data.line;
+                    if (event.type === 'process.stderr') captured.stderr += event.data.line;
+                    delivered.push(event.type);
+                }
+            }
+        );
+        assert.equal(result.stdout, 'é🌕');
+        assert.equal(result.stderr, '€🚀');
+        assert.deepEqual(
+            captured,
+            {stdout: result.stdout, stderr: result.stderr}
+        );
+        assert.equal(delivered.at(-1), 'process.completed');
+    }
+);
+
+test(
+    'process EOF flush reaches captured text and callbacks before settlement',
+    async function processUtf8FinalFlush() {
+        const captured = {stdout: '', stderr: ''};
+        const delivered = [];
+        const result = await runOutputFixture(
+            [['stdout', [0xe2, 0x82]], ['stderr', [0xf0, 0x9f]]],
+            {
+                code: 7,
+                allowNonzero: true,
+                async onEvent(event) {
+                    await delay(5);
+                    if (event.type === 'process.stdout') captured.stdout += event.data.line;
+                    if (event.type === 'process.stderr') captured.stderr += event.data.line;
+                    delivered.push(event.type);
+                }
+            }
+        );
+        assert.equal(result.code, 7);
+        assert.equal(result.stdout, '\uFFFD');
+        assert.equal(result.stderr, '\uFFFD');
+        assert.deepEqual(
+            captured,
+            {stdout: result.stdout, stderr: result.stderr}
+        );
+        assert.equal(delivered.at(-1), 'process.completed');
+    }
+);
+
+test(
+    'process nonzero rejection retains complete decoded output in error details',
+    async function processUtf8NonzeroDetails() {
+        await assert.rejects(
+            runOutputFixture(
+                [
+                    ['stdout', [0xc3]],
+                    ['stderr', [0xe2, 0x82]],
+                    ['stdout', [0xa9]],
+                    ['stderr', [0xac]]
+                ],
+                {code: 7}
+            ),
+            function completeProcessError(error) {
+                assert.equal(error.code, 'ARCANE_OPERATION_FAILED');
+                assert.equal(error.details.stdout, 'é');
+                assert.equal(error.details.stderr, '€');
+                assert.equal(error.details.code, 7);
+                return true;
+            }
+        );
+    }
+);
 
 test('repository status keeps its three process producers serialized',async()=>{
     let active=0;
