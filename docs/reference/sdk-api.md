@@ -49,6 +49,11 @@ runtime layouts.
 | `arcane-os/native` | Native plan and builder protocol. |
 | `arcane-os/native-provider` | SDK portable default and explicit checkout provider loader. |
 | `arcane-os/native/portable-provider` | Node-only portable payload provider and explicit app-service composition; not an executable host. |
+| `arcane-os/core/client` | Browser-safe Core RPC client, application facade, readiness and request cancellation. |
+| `arcane-os/core/contracts` | Shared Core protocol, frame, method and diagnostic error contracts. |
+| `arcane-os/core/classic-source` | Node generator for the canonical classic-script Core client projection. |
+| `arcane-os/core/runtime` | App-neutral native Core dispatcher and service lifecycle. |
+| `arcane-os/core/stdio` | Framed Node stdio transport with graceful runtime drain. |
 | `arcane-os/core/host` | Node-only reusable Core host lifecycle with explicitly supplied services. |
 | `arcane-os/integrated-provider` | Fixed integrated shared-development provider. |
 | `arcane-os/packager` | Low-level browser app packager. |
@@ -348,6 +353,24 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `isArcaneEventOccurrence()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
 | `parseEventStack()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Node and browser/bundler |
 | `projectArcaneDOMEvent()` | function | `arcane-os/event-manager` | Central events, time travel, and DOM instrumentation | Browser DOM or a DOM-compatible test host |
+| `CORE_PROTOCOL` | constant | `arcane-os/core/contracts` | Core protocol contracts | Node and browser/bundler |
+| `CORE_READY_EVENTS` | constant | `arcane-os/core/contracts` | Core protocol contracts | Node and browser/bundler |
+| `CORE_FRAME_CONTRACTS` | constant | `arcane-os/core/contracts` | Core protocol contracts | Node and browser/bundler |
+| `CORE_METHOD_CONTRACTS` | constant | `arcane-os/core/contracts` | Core protocol contracts | Node and browser/bundler |
+| `CoreError` | class | `arcane-os/core/contracts` | Core protocol contracts | Node and browser/bundler |
+| `serializeCoreError()` | function | `arcane-os/core/contracts` | Core protocol contracts | Node and browser/bundler |
+| `createCoreClient()` | function | `arcane-os/core/client` | Core browser client | Browser and native WebView JavaScript hosts |
+| `createCoreFacade()` | function | `arcane-os/core/client` | Core browser client | Browser and native WebView JavaScript hosts |
+| `installCoreClient()` | function | `arcane-os/core/client` | Core browser client | Browser and native WebView JavaScript hosts |
+| `createCoreClassicSource()` | function | `arcane-os/core/classic-source` | Core classic client projection | Node; generated source runs in browser and native WebView renderers |
+| `createCoreRuntime()` | function | `arcane-os/core/runtime` | Native Core runtime | Node on Windows, Linux and macOS native hosts; Android requires host adaptation |
+| `encodeCoreFrame()` | function | `arcane-os/core/stdio` | Native Core stdio transport | Node |
+| `createCoreFrameDecoder()` | function | `arcane-os/core/stdio` | Native Core stdio transport | Node |
+| `startCoreStdio()` | function | `arcane-os/core/stdio` | Native Core stdio transport | Node |
+| `createPortableNativeProvider()` | function | `arcane-os/native/portable-provider` | Portable native provider | Node; produces a portable payload rather than an executable host |
+| `arcaneNativeBuilderProvider` | singleton | `arcane-os/native/portable-provider` | Portable native provider | Node; produces a portable payload rather than an executable host |
+| `arcaneNativeBuilderProvider default export` | singleton | `arcane-os/native/portable-provider` | Portable native provider | Node; produces a portable payload rather than an executable host |
+| `startCoreHost()` | function | `arcane-os/core/host` | Native Core host composition | Node with readable input and writable output streams |
 | `MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
 | `MAIL_OUTBOX_PROTOCOL` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
 | `MAIL_OUTBOX_STATES` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
@@ -6403,6 +6426,705 @@ import {parseEventStack} from 'arcane-os/event-manager';
 
 const stack = parseEventStack(serialized);
 console.log(stack.sessionId, stack.events.length);
+```
+
+# Core client and native runtime
+
+The focused Core entrypoints share the `arcane/1` wire contract while retaining
+separate owners for renderer RPC, native dispatch and stdio framing. Start with
+the complete [Core browser client](core-client.md) and
+[native Core runtime](core-runtime.md) guides for lifecycle and composition.
+
+## CORE_PROTOCOL
+
+### Overview
+
+Protocol identifier shared by Core requests, responses, events and controls.
+The identifier describes the wire contract; it does not grant a method,
+transport, service or model capability.
+
+### Value and import
+
+```text
+const CORE_PROTOCOL = 'arcane/1'
+```
+
+Import it from `arcane-os/core/contracts`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** The exported value is the exact protocol string
+used in every Core frame.
+
+### Example
+
+```javascript
+import {CORE_PROTOCOL} from 'arcane-os/core/contracts';
+
+const request = {
+    protocol: CORE_PROTOCOL,
+    type: 'request',
+    id: 'moon-cheese-1',
+    method: 'catalog.read',
+    parameters: {name: 'Lunar cheddar'}
+};
+```
+
+## CORE_READY_EVENTS
+
+### Overview
+
+Names the two events the browser client retains as durable completions:
+`transport.ready` and `core.ready`. Transport connection and dispatcher
+readiness remain distinct from application-service, repository and model
+readiness.
+
+### Value and import
+
+```text
+const CORE_READY_EVENTS
+```
+
+Import it from `arcane-os/core/contracts`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** These names define the events accepted by
+`client.events.when()` and reported by `client.events.completed()`.
+
+### Example
+
+```javascript
+import {CORE_READY_EVENTS} from 'arcane-os/core/contracts';
+
+console.log(CORE_READY_EVENTS.includes('core.ready')); // true
+```
+
+## CORE_FRAME_CONTRACTS
+
+### Overview
+
+Describes the public fields for request, response, event, single-request
+cancellation and all-request cancellation frames. These are wire descriptions,
+not application validation or method admission.
+
+### Value and import
+
+```text
+const CORE_FRAME_CONTRACTS
+```
+
+Import it from `arcane-os/core/contracts`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** Each record names its frame type and required,
+success, failure or optional fields without starting a transport.
+
+### Example
+
+```javascript
+import {CORE_FRAME_CONTRACTS} from 'arcane-os/core/contracts';
+
+console.log(CORE_FRAME_CONTRACTS.response.failure); // ['error']
+```
+
+## CORE_METHOD_CONTRACTS
+
+### Overview
+
+Describes existing Core method input and output shapes plus semantic distinctions
+that callers must preserve. The active host and its registered services remain
+the authority for actual method availability.
+
+### Value and import
+
+```text
+const CORE_METHOD_CONTRACTS
+```
+
+Import it from `arcane-os/core/contracts`.
+
+### Availability and normalization
+
+**Node and browser/bundler.** Reading the metadata starts no request and grants
+no host capability.
+
+### Example
+
+```javascript
+import {CORE_METHOD_CONTRACTS} from 'arcane-os/core/contracts';
+
+console.log(CORE_METHOD_CONTRACTS['system.ping'].meaning);
+```
+
+## CoreError
+
+### Overview
+
+Common Core error class for complete service, transport and host diagnostics.
+It retains supplied own fields, stack and cause while filling absent Arcane
+error metadata with ordinary defaults.
+
+### Constructor and result
+
+```text
+new CoreError(value)
+```
+
+Import it from `arcane-os/core/contracts`. The instance exposes its supplied
+fields plus normalized `name`, `code`, `message`, `resolution`, `diagnosticId`,
+`technicalMessage`, `hresult` and `causeName` values.
+
+### Availability and normalization
+
+**Node and browser/bundler.** Native bridge codes and messages remain available
+when supplied; normalized defaults fill only absent fields.
+
+### Example
+
+```javascript
+import {CoreError} from 'arcane-os/core/contracts';
+
+const error = new CoreError({
+    code: 'MOON_CHEESE_MISSING',
+    message: 'The emergency lunar cheddar is missing.',
+    diagnosticId: 'catalog-7'
+});
+console.log(error.code, error.diagnosticId);
+```
+
+## serializeCoreError()
+
+### Overview
+
+Projects an error into the plain diagnostic record used by Core responses and
+events. It retains own properties and the ordinary name, message, stack and
+cause fields, recursively including Error causes and AggregateError members.
+
+### Signature and result
+
+```text
+serializeCoreError(error)
+```
+
+Import it from `arcane-os/core/contracts`. The result is a plain object suitable
+for the selected transport's JSON encoding.
+
+### Availability and normalization
+
+**Node and browser/bundler.** Missing error metadata receives explicit ordinary
+defaults; complete supplied diagnostic fields remain present.
+
+### Example
+
+```javascript
+import {serializeCoreError} from 'arcane-os/core/contracts';
+
+const record = serializeCoreError(new AggregateError([
+    new Error('The moon vault door jammed.'),
+    new Error('The backup raccoon lost the key.')
+], 'Catalog startup failed.'));
+console.log(record.errors.map(error => error.message));
+```
+
+## createCoreClient()
+
+### Overview
+
+Creates one correlated renderer RPC client. It owns pending requests,
+cancellation, timeouts, durable readiness events and one source in the shared
+SDK event authority. Native host execution and service policy remain outside
+the client.
+
+### Signature and result
+
+```text
+createCoreClient({global=globalThis, transport=null, eventOwner=arcaneEvents, eventOwnerReady, autoConnect=true, onError}={})
+```
+
+Import it from `arcane-os/core/client`. The result exposes `invoke`, `receive`,
+`connect`, `close`, `cancelAll`, `events`, `eventsReady`, `runtime.current()`,
+`uuid`, `protocol` and `Error`. A supplied transport must provide callable
+`send(frame)`; an invalid transport stays disconnected and reports
+`ARCANE_TRANSPORT_INVALID`. Optional `subscribe(receive)` may return its cleanup
+function.
+
+`invoke(method, parameters, {signal, timeoutMs})` preserves complete supplied
+parameters and resolves the correlated response result. A send failure rejects
+its still-pending request; a failure arriving after response, cancellation or
+timeout reaches `onError`. Deferred event-owner connection preserves the FIFO
+order of queued frames and subscription actions, including reentrant delivery.
+
+### Availability and normalization
+
+**Browser and native WebView JavaScript hosts.** Built-in transports select
+WebView2, WebKitGTK, Android WebView or an explicitly enabled development HTTP
+bridge. An ordinary browser remains disconnected. Full lifecycle guidance:
+[Core browser client](core-client.md).
+
+### Example
+
+```javascript
+import {createCoreClient} from 'arcane-os/core/client';
+import {CORE_PROTOCOL} from 'arcane-os/core/contracts';
+
+let outbound;
+const client = createCoreClient({
+    transport: {
+        name: 'moon-wire',
+        send(frame) { outbound = frame; }
+    }
+});
+const operation = client.invoke('catalog.read', {name: 'Lunar cheddar'});
+client.receive({
+    protocol: CORE_PROTOCOL,
+    type: 'response',
+    id: outbound.id,
+    ok: true,
+    result: {found: true, location: 'Vault 7'}
+});
+console.log(await operation);
+client.close();
+```
+
+## createCoreFacade()
+
+### Overview
+
+Projects a Core client into the established application-facing Arcane namespace.
+The facade retains the existing method names, operation-specific parameters,
+timeouts, streaming correlations and cancellation while the selected host owns
+their implementations and availability.
+
+### Signature and result
+
+```text
+createCoreFacade(client)
+```
+
+Import it from `arcane-os/core/client`. The result includes `runtime`, `events`,
+`Error` and the existing `ai`, `environment`, `mail`, `speech`, `localAI`,
+`ollama`, application, platform, storage and other host namespaces.
+
+### Availability and normalization
+
+**Browser and native WebView JavaScript hosts with a Core client.** Creating the
+facade starts no service and grants no method capability. Full method routing is
+documented in the [Core browser client guide](core-client.md).
+
+### Example
+
+```javascript
+import {createCoreClient, createCoreFacade} from 'arcane-os/core/client';
+
+const client = createCoreClient({autoConnect: false});
+const Arcane = createCoreFacade(client);
+console.log(Arcane.protocol, Arcane.runtime.current());
+client.close();
+```
+
+## installCoreClient()
+
+### Overview
+
+Installs one synchronous `globalThis.Arcane` facade and native
+`__arcaneReceive` callback. Repeated installation returns the same client for
+that global lifetime.
+
+### Signature and result
+
+```text
+installCoreClient(global=globalThis, options={})
+```
+
+Import it from `arcane-os/core/client`. The returned client is the same contract
+as `createCoreClient()`. Closing it releases subscriptions, native callbacks,
+timers and pending renderer requests; it does not kill Core.
+
+### Availability and normalization
+
+**Browser and native WebView JavaScript hosts.** Installation makes synchronous
+facade and current-state shapes available even while the selected transport is
+disconnected. Service readiness remains separately host-owned.
+
+### Example
+
+```javascript
+import {installCoreClient} from 'arcane-os/core/client';
+
+const client = installCoreClient();
+try {
+    console.log(globalThis.Arcane.runtime.current());
+} finally {
+    client.close();
+}
+```
+
+## createCoreClassicSource()
+
+### Overview
+
+Generates the native host's classic script from the installed canonical ESM
+client and contracts. It creates no copied client implementation or bundler.
+
+### Signature and result
+
+```text
+async createCoreClassicSource({eventOwnerModuleURL}={})
+```
+
+Import it from `arcane-os/core/classic-source`. Supply the actual served URL for
+the selected SDK event-manager module. The promise resolves to the complete
+classic-script source.
+
+### Availability and normalization
+
+**Node; generated source runs in browser and native WebView renderers.** The
+facade and native receive callback install synchronously. Only the shared event
+owner import waits for document parsing when needed, while queued event frames,
+subscription actions and final responses retain FIFO order. See
+[classic native-host injection](core-client.md#classic-native-host-injection).
+
+### Example
+
+```javascript
+import {createCoreClassicSource} from 'arcane-os/core/classic-source';
+
+const source = await createCoreClassicSource({
+    eventOwnerModuleURL: '/arcane/sdk/event-manager.mjs'
+});
+nativeHost.setDocumentCreatedScript(source);
+```
+
+## createCoreRuntime()
+
+### Overview
+
+Creates the app-neutral native dispatcher. The composing host supplies its
+application identity, version and explicit services; product data, prompts,
+privileges and persistence remain with those owners.
+
+### Signature and result
+
+```text
+createCoreRuntime({application, version, services=[]}={})
+```
+
+Import it from `arcane-os/core/runtime`. The runtime exposes `current()`,
+`subscribe()`, `onFrame()`, `emit()`, `registerService()`, `start()`, `handle()`
+and idempotent `close()`.
+
+Services start independently. Request-lifetime work receives cooperative
+cancellation; accepted `lifetime:'service'` work survives renderer cancellation.
+Shutdown stops admission, waits accepted responses, then runs each service's
+startup, drain and dispose in order while independent services close
+concurrently.
+
+### Availability and normalization
+
+**Node on Windows, Linux and macOS native hosts; Android requires its native host
+adaptation.** Request parameters, results, correlations and serialized errors
+remain complete. The runtime uses the shared SDK event authority and never exits
+the host. Full contract: [native Core runtime](core-runtime.md).
+
+### Example
+
+```javascript
+import {createCoreRuntime} from 'arcane-os/core/runtime';
+
+const runtime = createCoreRuntime({
+    application: {id: 'moon-catalog', name: 'Moon Cheese Catalog'},
+    version: '1.0.0',
+    services: [{
+        name: 'catalog',
+        methods: {
+            'catalog.read': parameters => ({found: true, name: parameters.name})
+        }
+    }]
+});
+runtime.start();
+const response = await runtime.handle({
+    protocol: 'arcane/1',
+    type: 'request',
+    id: 'catalog-1',
+    method: 'catalog.read',
+    parameters: {name: 'Lunar cheddar'}
+});
+console.log(response.result);
+await runtime.close();
+```
+
+## encodeCoreFrame()
+
+### Overview
+
+Encodes one Core frame as UTF-8 JSON preceded by the native transport's
+`Content-Length` header. The length is transport framing only, never
+application policy or capability admission.
+
+### Signature and result
+
+```text
+encodeCoreFrame(frame)
+```
+
+Import it from `arcane-os/core/stdio`. The result is one Node `Buffer` ready for
+the selected writable stream.
+
+### Availability and normalization
+
+**Node.** JSON encoding preserves the supplied frame fields supported by JSON.
+The helper neither writes the buffer nor starts a runtime. See
+[stdio transport](core-runtime.md#stdio-transport).
+
+### Example
+
+```javascript
+import {encodeCoreFrame} from 'arcane-os/core/stdio';
+
+const encoded = encodeCoreFrame({
+    protocol: 'arcane/1',
+    type: 'control',
+    control: 'requests.cancelAll'
+});
+output.write(encoded);
+```
+
+## createCoreFrameDecoder()
+
+### Overview
+
+Creates the incremental decoder for fragmented or consecutive native Core
+frames.
+
+### Signature and result
+
+```text
+createCoreFrameDecoder(onFrame)
+```
+
+Import it from `arcane-os/core/stdio`. The result exposes `push(chunk)` and
+`finish()`. `push()` calls `onFrame` once for each complete parsed JSON value in
+arrival order. `finish()` reports an incomplete final header or body instead of
+dropping it.
+
+### Availability and normalization
+
+**Node.** Malformed framing, UTF-8 and JSON remain observable at their owning
+parser. Full transport lifecycle: [stdio transport](core-runtime.md#stdio-transport).
+
+### Example
+
+```javascript
+import {createCoreFrameDecoder, encodeCoreFrame} from 'arcane-os/core/stdio';
+
+const frames = [];
+const decoder = createCoreFrameDecoder(frame => frames.push(frame));
+decoder.push(encodeCoreFrame({
+    protocol: 'arcane/1',
+    type: 'event',
+    event: 'moon.opened',
+    data: {vault: 7}
+}));
+decoder.finish();
+console.log(frames[0].data.vault);
+```
+
+## startCoreStdio()
+
+### Overview
+
+Attaches an existing runtime to framed input and output, then starts that
+runtime. Requests dispatch concurrently while outgoing frames retain queued
+writable-callback order.
+
+### Signature and result
+
+```text
+startCoreStdio({runtime, input=process.stdin, output=process.stdout, onError}={})
+```
+
+Import it from `arcane-os/core/stdio`. The result is
+`{runtime, closed, close}`. EOF or input close starts graceful shutdown;
+`closed` settles only after accepted runtime work and queued output settle.
+
+### Availability and normalization
+
+**Node with readable input and writable output streams.** Parser, input, output
+and shutdown failures reach `onError` and reject `closed`. The transport pauses
+and detaches input without ending caller-owned output or exiting the host. See
+[stdio transport](core-runtime.md#stdio-transport).
+
+### Example
+
+```javascript
+import {createCoreRuntime} from 'arcane-os/core/runtime';
+import {startCoreStdio} from 'arcane-os/core/stdio';
+
+const runtime = createCoreRuntime({
+    application: {id: 'moon-catalog'},
+    version: '1.0.0'
+});
+const transport = startCoreStdio({runtime});
+await transport.closed;
+```
+
+## createPortableNativeProvider()
+
+### Overview
+
+Creates the SDK-owned native builder for one portable Core payload. The caller
+selects application service modules already present in the app release. The
+provider does not load Arcane OS source, choose a model, download a runtime,
+compile an executable or substitute for an unavailable platform host.
+
+### Signature and result
+
+```text
+createPortableNativeProvider({services=[]}={})
+```
+
+Import it from `arcane-os/native/portable-provider`. Each service selection is
+`{module, options}`. The returned `arcane-native-builder/1` provider exposes
+`describe()`, `doctor()`, `prepare()`, `build()`, `verify()` and `run()`.
+`describe()` and successful payload results report `executable:false`; `run()`
+reports `ARCANE_NATIVE_RUN_UNSUPPORTED`.
+
+`build()` copies the complete selected app and dependency releases, the
+published SDK/runtime dependencies and the canonical Core entry/client into a
+fresh output directory. Service factories are imported only when a real native
+host later launches the generated Core entry, never during packaging.
+
+### Availability and normalization
+
+**Node; produces a portable payload rather than an executable host.** Existing
+outputs remain untouched, cancellation removes only the incomplete new output,
+and verification reads the semantic manifest and listed files without executing
+a host. Full ownership and layout contract:
+[portable Core packaging](core-native-packaging.md).
+
+### Example
+
+```javascript
+import {createPortableNativeProvider} from 'arcane-os/native/portable-provider';
+
+const provider = createPortableNativeProvider({
+    services: [{
+        module: 'native/moon-ledger.mjs',
+        options: {ledgerName: 'Cheese debts'}
+    }]
+});
+console.log(await provider.describe());
+```
+
+## arcaneNativeBuilderProvider
+
+### Overview
+
+Package-owned portable provider with no preconfigured application services. It
+is the named binding for the same object exposed as this subpath's default.
+
+### Value and import
+
+```text
+const arcaneNativeBuilderProvider
+```
+
+Import it from `arcane-os/native/portable-provider`.
+
+### Availability and normalization
+
+**Node; produces a portable payload rather than an executable host.** The
+singleton retains the complete `arcane-native-builder/1` portable-provider
+contract described by `createPortableNativeProvider()`.
+
+### Example
+
+```javascript
+import {arcaneNativeBuilderProvider} from 'arcane-os/native/portable-provider';
+
+const description = await arcaneNativeBuilderProvider.describe();
+console.log(description.targets, description.executable);
+```
+
+## arcaneNativeBuilderProvider default export
+
+### Overview
+
+Default package binding for the same object exposed as
+`arcaneNativeBuilderProvider`.
+
+### Value and import
+
+```text
+default as arcaneNativeBuilderProvider
+```
+
+Import it from `arcane-os/native/portable-provider`.
+
+### Availability and normalization
+
+**Node; produces a portable payload rather than an executable host.** The
+default and named bindings have exact object identity and the same lifecycle.
+
+### Example
+
+```javascript
+import portableProvider, {
+    arcaneNativeBuilderProvider
+} from 'arcane-os/native/portable-provider';
+
+console.log(portableProvider === arcaneNativeBuilderProvider); // true
+```
+
+## startCoreHost()
+
+### Overview
+
+Composes explicitly supplied application services with the shared Core runtime
+and stdio transport. It is a lifecycle helper for a host-owned Node process,
+not an executable host or another dispatcher implementation.
+
+### Signature and result
+
+```text
+startCoreHost({application, version, services=[], input, output, onError, signal}={})
+```
+
+Import it from `arcane-os/core/host`. The result is the existing stdio owner
+`{runtime, closed, close}`. An optional abort signal invokes that same
+idempotent `close()` and its graceful drain.
+
+Dispatcher readiness does not wait for service or model readiness. Renderer
+cancellation reaches request-lifetime work, while accepted
+`lifetime:'service'` work survives and settles before service drain, disposal
+and final output completion.
+
+### Availability and normalization
+
+**Node with readable input and writable output streams.** Errors remain
+observable through `onError` and `closed`. The helper never kills or exits the
+process and does not end caller-owned output. See
+[portable Core packaging](core-native-packaging.md#explicit-application-services)
+and the [native Core runtime](core-runtime.md).
+
+### Example
+
+```javascript
+import {startCoreHost} from 'arcane-os/core/host';
+
+const host = startCoreHost({
+    application: {id: 'moon-catalog', name: 'Moon Cheese Catalog'},
+    version: '1.0.0',
+    services: [{
+        name: 'catalog',
+        methods: {
+            'catalog.read': parameters => ({found: true, name: parameters.name})
+        }
+    }]
+});
+await host.closed;
 ```
 
 ## BROWSER_WASM_RUNTIME_AUTHORITY
