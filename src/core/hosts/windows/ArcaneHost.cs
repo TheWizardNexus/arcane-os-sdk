@@ -1,0 +1,695 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Web.Script.Serialization;
+using System.Windows.Forms;
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.WinForms;
+
+namespace Arcane.Core.Hosts.Windows
+{
+    /// <summary>Selected by the application launcher; no OS layout is inferred.</summary>
+    public sealed class ArcaneHostOptions
+    {
+        public string ApplicationRoot { get; set; }
+        public string StartPath { get; set; }
+        public string OriginHost { get; set; }
+        public string ProfileDirectory { get; set; }
+        public string Title { get; set; }
+        public string ClassicClientSource { get; set; }
+        public string CoreExecutable { get; set; }
+        public string CoreArguments { get; set; }
+        public string CoreWorkingDirectory { get; set; }
+    }
+
+    public static class ArcaneHost
+    {
+        /// <summary>
+        /// Called by an STA launcher after it resolves its own launch context.
+        /// The message loop remains active while accepted Core work drains.
+        /// </summary>
+        public static void Run(ArcaneHostOptions options, Action<string> onDiagnostic,
+            Action<Exception> onError = null)
+        {
+            if (Thread.CurrentThread.GetApartmentState() != ApartmentState.STA)
+                throw new InvalidOperationException("The Windows WebView2 host requires an STA entry point.");
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            using (ArcaneHostForm window = new ArcaneHostForm(options, onDiagnostic, onError))
+            {
+                Application.Run(window);
+                // FormClosing keeps the loop alive until this drain is complete.
+                window.Completion.GetAwaiter().GetResult();
+            }
+        }
+
+        internal static JavaScriptSerializer Serializer()
+        {
+            return new JavaScriptSerializer { MaxJsonLength = Int32.MaxValue, RecursionLimit = Int32.MaxValue };
+        }
+
+        internal static object ErrorRecord(Exception error, string code)
+        {
+            Dictionary<string, object> record = new Dictionary<string, object>
+            {
+                { "code", code }, { "name", error.GetType().FullName },
+                { "message", error.Message }, { "stack", error.StackTrace },
+                { "technicalMessage", error.ToString() }, { "hresult", error.HResult }
+            };
+            if (error.InnerException != null) record["cause"] = ErrorRecord(error.InnerException, code);
+            AggregateException aggregate = error as AggregateException;
+            if (aggregate != null)
+            {
+                List<object> errors = new List<object>();
+                foreach (Exception inner in aggregate.InnerExceptions) errors.Add(ErrorRecord(inner, code));
+                record["errors"] = errors;
+            }
+            if (error.Data.Count != 0)
+            {
+                List<object> entries = new List<object>();
+                foreach (DictionaryEntry entry in error.Data)
+                    entries.Add(new Dictionary<string, object> { { "key", entry.Key }, { "value", entry.Value } });
+                record["data"] = entries;
+            }
+            return record;
+        }
+    }
+
+    /// <summary>
+    /// Owns one window and Core child. Call CloseAsync rather than disposing an
+    /// active window. Diagnostics receive complete stderr and frames belonging
+    /// to retired documents; errors stay outside ordinary application content.
+    /// Callbacks must not synchronously wait for Ready, Completion or CloseAsync.
+    /// </summary>
+    public sealed class ArcaneHostForm : Form
+    {
+        private const string CancelRendererRequests = "{\"protocol\":\"arcane/1\",\"type\":\"control\",\"control\":\"requests.cancelAll\"}";
+        private readonly ArcaneHostOptions options;
+        private readonly Action<string> onDiagnostic;
+        private readonly Action<Exception> onError;
+        private readonly WebView2 webView;
+        private readonly object stateLock = new object();
+        private readonly Queue<CoreDelivery> pending = new Queue<CoreDelivery>();
+        private readonly Dictionary<string, long> requestGenerations = new Dictionary<string, long>();
+        private readonly List<Exception> failures = new List<Exception>();
+        private readonly List<Task> failureNotifications = new List<Task>();
+        private readonly TaskCompletionSource<object> ready = new TaskCompletionSource<object>();
+        private readonly TaskCompletionSource<object> initialized = new TaskCompletionSource<object>();
+        private readonly TaskCompletionSource<object> completion = new TaskCompletionSource<object>();
+        private ArcaneCoreProcess core;
+        private ArcaneBridge bridge;
+        private ArcaneBridge activeBridge;
+        private Task initialization;
+        private Task coreLifetime;
+        private Task shutdown;
+        private string injectedScript;
+        private Exception transportFailure;
+        private long generation;
+        private long nextGeneration;
+        private long registeredGeneration;
+        private long failureNotifiedGeneration = -1;
+        private ulong navigationId;
+        private bool started;
+        private bool documentReady;
+        private bool deliveryScheduled;
+        private bool closing;
+        private bool closeAllowed;
+
+        public ArcaneHostForm(ArcaneHostOptions options, Action<string> onDiagnostic,
+            Action<Exception> onError = null)
+        {
+            if (options == null) throw new ArgumentNullException("options");
+            if (onDiagnostic == null) throw new ArgumentNullException("onDiagnostic");
+            this.options = options;
+            this.onDiagnostic = onDiagnostic;
+            this.onError = onError;
+            ready.Task.ContinueWith(ObserveReportedFailure, TaskContinuationOptions.OnlyOnFaulted);
+            completion.Task.ContinueWith(ObserveReportedFailure, TaskContinuationOptions.OnlyOnFaulted);
+            Text = options.Title;
+            AutoScaleMode = AutoScaleMode.Dpi;
+            webView = new WebView2 { Dock = DockStyle.Fill };
+            Controls.Add(webView);
+        }
+
+        /// <summary>First document navigation completed; not model readiness.</summary>
+        public Task Ready { get { return ready.Task; } }
+        public Task Completion { get { return completion.Task; } }
+
+        protected override void OnLoad(EventArgs args)
+        {
+            base.OnLoad(args);
+            if (started || closing) return;
+            started = true;
+            initialization = InitializeAsync();
+            initialization.ContinueWith(ObserveUnexpectedFailure, TaskContinuationOptions.OnlyOnFaulted);
+        }
+
+        private async Task InitializeAsync()
+        {
+            try
+            {
+                if (String.IsNullOrWhiteSpace(options.ApplicationRoot)) throw new ArgumentException("Select the application root.");
+                if (String.IsNullOrWhiteSpace(options.ProfileDirectory)) throw new ArgumentException("Select the WebView2 profile directory.");
+                if (String.IsNullOrWhiteSpace(options.OriginHost)) throw new ArgumentException("Select the application's stable virtual origin host.");
+                if (String.IsNullOrEmpty(options.StartPath)) throw new ArgumentException("Select the application start path.");
+                if (String.IsNullOrEmpty(options.ClassicClientSource)) throw new ArgumentException("Supply the SDK-generated classic Core client.");
+                string applicationRoot = Path.GetFullPath(options.ApplicationRoot);
+                if (!Directory.Exists(applicationRoot)) throw new DirectoryNotFoundException(applicationRoot);
+                string profile = Path.GetFullPath(options.ProfileDirectory);
+                Uri origin = new UriBuilder(Uri.UriSchemeHttps, options.OriginHost).Uri;
+                Uri start = new Uri(origin, options.StartPath);
+                core = ArcaneCoreProcess.Start(options.CoreExecutable, options.CoreArguments,
+                    options.CoreWorkingDirectory, ReceiveCoreMessage, DeliverDiagnostic, CoreFailed);
+                coreLifetime = ObserveCoreLifetimeAsync();
+                CoreWebView2Environment environment = await CoreWebView2Environment.CreateAsync(null, profile);
+                if (closing) return;
+                await webView.EnsureCoreWebView2Async(environment);
+                if (closing) return;
+                CoreWebView2 browser = webView.CoreWebView2;
+                browser.SetVirtualHostNameToFolderMapping(options.OriginHost, applicationRoot,
+                    CoreWebView2HostResourceAccessKind.Allow);
+                InstallDocumentBridge(generation);
+                // The selected generator uses replayRuntimeState:true. Both RPC
+                // installation and the shared event owner remain SDK-owned.
+                injectedScript = await browser.AddScriptToExecuteOnDocumentCreatedAsync(options.ClassicClientSource);
+                if (closing) return;
+                browser.NavigationStarting += NavigationStarting;
+                browser.NavigationCompleted += NavigationCompleted;
+                browser.ProcessFailed += BrowserProcessFailed;
+                browser.Navigate(start.AbsoluteUri);
+            }
+            catch (Exception error)
+            {
+                Report(error);
+                ready.TrySetException(error);
+                BeginClose();
+            }
+            finally { initialized.TrySetResult(null); }
+        }
+
+        private void NavigationStarting(object sender, CoreWebView2NavigationStartingEventArgs args)
+        {
+            if (nextGeneration != 0 && navigationId == args.NavigationId) return;
+            navigationId = args.NavigationId;
+            if (!closing)
+            {
+                // An attempted navigation can be cancelled while the original
+                // document survives. Its captured bridge remains usable until
+                // the next document's SDK client actually connects.
+                try { InstallDocumentBridge(++nextGeneration); }
+                catch (Exception error) { CoreFailed(error); }
+            }
+        }
+
+        private void InstallDocumentBridge(long documentGeneration)
+        {
+            if (bridge != null)
+            {
+                if (bridge != activeBridge)
+                    bridge.Stop(new OperationCanceledException("The pending document navigation was replaced."));
+                webView.CoreWebView2.RemoveHostObjectFromScript("arcaneBridge");
+            }
+            bridge = new ArcaneBridge(delegate(string json) { return SendDocumentMessage(documentGeneration, json); }, CoreFailed,
+                delegate { DocumentConnected(documentGeneration); });
+            registeredGeneration = documentGeneration;
+            if (transportFailure != null) bridge.Stop(transportFailure);
+            webView.CoreWebView2.AddHostObjectToScript("arcaneBridge", bridge);
+        }
+
+        private Task SendDocumentMessage(long documentGeneration, string json)
+        {
+            Dictionary<string, object> envelope = ReadEnvelope(json);
+            string requestId = EnvelopeString(envelope, "type") == "request" ? EnvelopeString(envelope, "id") : null;
+            lock (stateLock)
+            {
+                if (documentGeneration != generation || closing)
+                    throw new InvalidOperationException("The requesting document is no longer connected.");
+                Task accepted = core.SendAsync(json);
+                // Hold the same lock used by the reader so an immediate response
+                // cannot overtake its accepted transport correlation record.
+                if (requestId != null && !accepted.IsFaulted && !accepted.IsCanceled)
+                    requestGenerations[requestId] = documentGeneration;
+                return accepted;
+            }
+        }
+
+        private void DocumentConnected(long documentGeneration)
+        {
+            ArcaneBridge previous;
+            lock (stateLock)
+            {
+                if (closing) return;
+                if (documentGeneration == generation && documentReady) return;
+                if (documentGeneration != registeredGeneration) return;
+                previous = activeBridge;
+                generation = documentGeneration;
+                activeBridge = bridge;
+                documentReady = true;
+            }
+            if (previous != null && previous != activeBridge)
+            {
+                previous.Stop(new OperationCanceledException("The previous document has navigated away."));
+                if (transportFailure == null)
+                {
+                    try { ObserveSend(core.SendAsync(CancelRendererRequests)); }
+                    catch (Exception error) { CoreFailed(error); }
+                }
+            }
+            // The canonical client attaches its message listener before its
+            // first Send, even if the transport rejects that send. Listener
+            // readiness is independent of write acceptance and page load.
+            // WebView2 invokes its host objects on the owning UI thread.
+            DrainRetiredFrames();
+            ScheduleDelivery();
+            if (transportFailure != null) NotifyTransportFailure();
+        }
+
+        private void NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs args)
+        {
+            if (navigationId != args.NavigationId) return;
+            if (!args.IsSuccess)
+            {
+                if (activeBridge != null && bridge != activeBridge)
+                {
+                    // No new SDK connection superseded the surviving document.
+                    // Restore its registration without invalidating its existing
+                    // JavaScript reference or changing its request generation.
+                    try
+                    {
+                        bridge.Stop(new OperationCanceledException("The pending document navigation did not complete."));
+                        webView.CoreWebView2.RemoveHostObjectFromScript("arcaneBridge");
+                        bridge = activeBridge;
+                        registeredGeneration = generation;
+                        webView.CoreWebView2.AddHostObjectToScript("arcaneBridge", bridge);
+                    }
+                    catch (Exception restoreError) { CoreFailed(restoreError); }
+                }
+                IOException error = new IOException("Application navigation failed: " + args.WebErrorStatus + ".");
+                Report(error);
+                ready.TrySetException(error);
+                return;
+            }
+            ready.TrySetResult(null);
+        }
+
+        private void BrowserProcessFailed(object sender, CoreWebView2ProcessFailedEventArgs args)
+        {
+            CoreWebView2ProcessFailedKind kind = args.ProcessFailedKind;
+            Exception error = new IOException("WebView2 process failed: " + kind + ".");
+            try
+            {
+                // Read platform properties on their UI thread while this
+                // notification is active. Do not retain a live COM wrapper in
+                // an error that will later cross the JSON transport boundary.
+                JavaScriptSerializer serializer = ArcaneHost.Serializer();
+                error.Data["webView2ProcessFailure"] = serializer.DeserializeObject(serializer.Serialize(args));
+            }
+            catch (Exception diagnosticError)
+            {
+                error = new AggregateException("Reading WebView2 process-failure diagnostics failed.", error, diagnosticError);
+            }
+            // Only loss of the browser or top-level renderer ends this bridge.
+            // GPU/utility/plugin helpers recover independently; subframe loss,
+            // unresponsiveness and unspecified failures remain full diagnostics.
+            if (kind == CoreWebView2ProcessFailedKind.BrowserProcessExited
+                || kind == CoreWebView2ProcessFailedKind.RenderProcessExited) CoreFailed(error);
+            else Report(error);
+        }
+
+        private void ReceiveCoreMessage(string json)
+        {
+            Dictionary<string, object> envelope = ReadEnvelope(json);
+            lock (stateLock)
+            {
+                long targetGeneration = generation;
+                if (EnvelopeString(envelope, "type") == "response")
+                {
+                    string requestId = EnvelopeString(envelope, "id");
+                    if (requestId == null || !requestGenerations.TryGetValue(requestId, out targetGeneration))
+                        targetGeneration = -1;
+                    else requestGenerations.Remove(requestId);
+                }
+                pending.Enqueue(new CoreDelivery(targetGeneration, json));
+            }
+            ScheduleDelivery();
+        }
+
+        private static Dictionary<string, object> ReadEnvelope(string json)
+        {
+            try { return ArcaneHost.Serializer().DeserializeObject(json) as Dictionary<string, object>; }
+            catch (Exception error)
+            {
+                error.Data["coreMessage"] = json;
+                throw;
+            }
+        }
+
+        private static string EnvelopeString(Dictionary<string, object> envelope, string name)
+        {
+            object value;
+            return envelope != null && envelope.TryGetValue(name, out value) ? value as string : null;
+        }
+
+        private void ScheduleDelivery()
+        {
+            lock (stateLock)
+            {
+                if (deliveryScheduled || pending.Count == 0 || (!documentReady && !closing)) return;
+                deliveryScheduled = true;
+            }
+            PostToUi(DrainDeliveries);
+        }
+
+        private void DrainDeliveries()
+        {
+            while (true)
+            {
+                CoreDelivery delivery;
+                bool current;
+                lock (stateLock)
+                {
+                    if (pending.Count == 0 || (!documentReady && !closing))
+                    {
+                        deliveryScheduled = false;
+                        return;
+                    }
+                    delivery = pending.Dequeue();
+                    current = delivery.Generation == generation && !closing && transportFailure == null;
+                }
+                if (!current) { DeliverDiagnostic(delivery.Json); continue; }
+                try { webView.CoreWebView2.PostWebMessageAsJson(delivery.Json); }
+                catch (Exception error)
+                {
+                    error.Data["coreMessage"] = delivery.Json;
+                    CoreFailed(error);
+                }
+            }
+        }
+
+        private void DrainRetiredFrames()
+        {
+            while (true)
+            {
+                CoreDelivery delivery;
+                lock (stateLock)
+                {
+                    if (pending.Count == 0 || pending.Peek().Generation == generation) return;
+                    delivery = pending.Dequeue();
+                }
+                DeliverDiagnostic(delivery.Json);
+            }
+        }
+
+        private void CoreFailed(Exception error)
+        {
+            Report(error);
+            lock (stateLock)
+            {
+                if (transportFailure == null) transportFailure = error;
+            }
+            PostToUi(HandleTransportFailure);
+        }
+
+        private void HandleTransportFailure()
+        {
+            if (IsDisposed) return;
+            if (bridge != null) bridge.Stop(transportFailure);
+            if (activeBridge != null) activeBridge.Stop(transportFailure);
+            NotifyTransportFailure();
+            if (core != null) core.CloseAsync();
+            ScheduleDelivery();
+        }
+
+        private void NotifyTransportFailure()
+        {
+            if (!documentReady || webView.CoreWebView2 == null || transportFailure == null || closing) return;
+            if (failureNotifiedGeneration == generation) return;
+            failureNotifiedGeneration = generation;
+            Task failureNotification = NotifyTransportFailureAsync(transportFailure);
+            failureNotifications.Add(failureNotification);
+            failureNotification.ContinueWith(ObserveUnexpectedFailure, TaskContinuationOptions.OnlyOnFaulted);
+        }
+
+        private async Task NotifyTransportFailureAsync(Exception error)
+        {
+            string record = ArcaneHost.Serializer().Serialize(ArcaneHost.ErrorRecord(error, "ARCANE_NATIVE_TRANSPORT_FAILED"));
+            // This callback is installed by the canonical client, which owns
+            // rejection of pending requests and complete transport diagnostics.
+            string result = await webView.CoreWebView2.ExecuteScriptAsync(
+                "(function(){if(typeof globalThis.__arcaneTransportFailed!=='function')return false;"
+                + "globalThis.__arcaneTransportFailed(" + record + ");return true;})()");
+            if (result != "true")
+                throw new InvalidOperationException("The injected SDK client has no transport-failure callback.", error);
+        }
+
+        private async Task ObserveCoreLifetimeAsync()
+        {
+            try { await core.Completion.ConfigureAwait(false); }
+            catch (Exception error) { CoreFailed(error); }
+        }
+
+        private void ObserveSend(Task send)
+        {
+            send.ContinueWith(ObserveSendFailure, TaskContinuationOptions.OnlyOnFaulted);
+        }
+
+        private void ObserveSendFailure(Task send) { CoreFailed(send.Exception); }
+
+        public Task CloseAsync()
+        {
+            PostToUi(BeginClose);
+            return Completion;
+        }
+
+        private void BeginClose()
+        {
+            if (closing) return;
+            lock (stateLock) closing = true;
+            if (!started) initialized.TrySetResult(null);
+            if (bridge != null) bridge.Stop(new InvalidOperationException("The application window is closing."));
+            if (activeBridge != null) activeBridge.Stop(new InvalidOperationException("The application window is closing."));
+            shutdown = DrainAndCloseAsync();
+            shutdown.ContinueWith(ObserveUnexpectedFailure, TaskContinuationOptions.OnlyOnFaulted);
+        }
+
+        private async Task DrainAndCloseAsync()
+        {
+            await initialized.Task;
+            if (core != null)
+            {
+                Task cancellation = Task.FromResult<object>(null);
+                try
+                {
+                    if (transportFailure == null) cancellation = core.SendAsync(CancelRendererRequests);
+                }
+                catch (Exception error) { Report(error); }
+                try { core.CloseAsync(); }
+                catch (Exception error) { Report(error); }
+                Task settled = Task.WhenAll(cancellation, core.Completion);
+                try { await settled; }
+                catch (Exception error) { ReportTaskFailure(settled, error); }
+                if (coreLifetime != null)
+                {
+                    try { await coreLifetime; }
+                    catch (Exception error) { ReportTaskFailure(coreLifetime, error); }
+                }
+            }
+            Task notifications = Task.WhenAll(failureNotifications);
+            try { await notifications; }
+            catch (Exception error) { ReportTaskFailure(notifications, error); }
+            DrainDeliveries();
+            // Cancellation does not release correlations: an accepted service
+            // request can still finish after its renderer has gone away. All
+            // remaining IDs belong to the child lifetime that just drained.
+            lock (stateLock) requestGenerations.Clear();
+            ready.TrySetCanceled();
+            try
+            {
+                if (webView.CoreWebView2 != null)
+                {
+                    webView.CoreWebView2.RemoveHostObjectFromScript("arcaneBridge");
+                    if (injectedScript != null) webView.CoreWebView2.RemoveScriptToExecuteOnDocumentCreated(injectedScript);
+                }
+            }
+            catch (Exception error) { Report(error); }
+            closeAllowed = true;
+            // Defer the final Close so a synchronous drain never recursively
+            // closes the form inside its original FormClosing notification.
+            try
+            {
+                if (IsHandleCreated) BeginInvoke(new Action(CloseDrainedWindow));
+                else CloseDrainedWindow();
+            }
+            catch (Exception error) { Report(error); CompleteWindow(); }
+        }
+
+        private void CloseDrainedWindow()
+        {
+            try { Close(); }
+            catch (Exception error) { Report(error); CompleteWindow(); }
+            if (IsDisposed) CompleteWindow();
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs args)
+        {
+            base.OnFormClosing(args);
+            if (args.Cancel) return;
+            if (closeAllowed) return;
+            args.Cancel = true;
+            BeginClose();
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs args)
+        {
+            base.OnFormClosed(args);
+            CompleteWindow();
+        }
+
+        private void CompleteWindow()
+        {
+            Exception[] errors;
+            lock (stateLock) errors = failures.ToArray();
+            if (errors.Length == 0) completion.TrySetResult(null);
+            else completion.TrySetException(new AggregateException("The Windows Core host closed with errors.", errors));
+        }
+
+        private void PostToUi(Action action)
+        {
+            if (IsDisposed) return;
+            try
+            {
+                if (InvokeRequired) BeginInvoke(new Action(delegate { InvokeUiAction(action); }));
+                else InvokeUiAction(action);
+            }
+            catch (Exception error) { Report(error); }
+        }
+
+        private void InvokeUiAction(Action action)
+        {
+            try { action(); }
+            catch (Exception error) { Report(error); }
+        }
+
+        private void DeliverDiagnostic(string text)
+        {
+            try { onDiagnostic(text); }
+            catch (Exception error)
+            {
+                IOException failure = new IOException("The host diagnostic callback failed.", error);
+                failure.Data["diagnostic"] = text;
+                Report(failure);
+            }
+        }
+
+        private void Report(Exception error)
+        {
+            lock (stateLock)
+            {
+                if (failures.Contains(error)) return;
+                failures.Add(error);
+            }
+            if (onError == null) return;
+            try { onError(error); }
+            catch (Exception callbackError)
+            {
+                lock (stateLock) failures.Add(callbackError);
+            }
+        }
+
+        private void ObserveUnexpectedFailure(Task failed) { Report(failed.Exception); }
+        private static void ObserveReportedFailure(Task failed) { failed.Exception.Handle(error => true); }
+
+        private void ReportTaskFailure(Task task, Exception caught)
+        {
+            // Await reports one failure; retain every sibling task failure.
+            // A cancelled task has no Exception and still needs observation.
+            if (task.Exception == null) { Report(caught); return; }
+            foreach (Exception error in task.Exception.InnerExceptions) Report(error);
+        }
+
+        private sealed class CoreDelivery
+        {
+            internal readonly long Generation;
+            internal readonly string Json;
+            internal CoreDelivery(long generation, string json) { Generation = generation; Json = json; }
+        }
+    }
+
+    [ComVisible(true)]
+    [ClassInterface(ClassInterfaceType.AutoDual)]
+    public sealed class ArcaneBridge
+    {
+        private readonly Func<string, Task> send;
+        private readonly Action<Exception> onFailure;
+        private readonly Action onConnected;
+        private Exception stopped;
+
+        internal ArcaneBridge(Func<string, Task> send, Action<Exception> onFailure, Action onConnected)
+        {
+            this.send = send;
+            this.onFailure = onFailure;
+            this.onConnected = onConnected;
+        }
+
+        internal void Stop(Exception reason) { Interlocked.CompareExchange(ref stopped, reason, null); }
+
+        public string Send(string json)
+        {
+            try
+            {
+                // Calling Send proves the SDK listener is installed. Publish
+                // that boundary even when Core failed before the first write,
+                // so the client can observe the complete transport failure.
+                onConnected();
+                Exception unavailable = Volatile.Read(ref stopped);
+                if (unavailable != null) return Rejected(unavailable);
+                Task accepted = send(json);
+                if (accepted.IsFaulted)
+                {
+                    Stop(accepted.Exception);
+                    onFailure(accepted.Exception);
+                    return Rejected(accepted.Exception);
+                }
+                if (accepted.IsCanceled)
+                {
+                    OperationCanceledException error = new OperationCanceledException("The Core transport write was cancelled.");
+                    Stop(error);
+                    onFailure(error);
+                    return Rejected(error);
+                }
+                accepted.ContinueWith(SendCompleted, TaskScheduler.Default);
+                // This acknowledges the ordered write queue, not RPC success.
+                return "{\"accepted\":true}";
+            }
+            catch (Exception error)
+            {
+                Stop(error);
+                onFailure(error);
+                return Rejected(error);
+            }
+        }
+
+        private void SendCompleted(Task sent)
+        {
+            if (sent.IsFaulted) { Stop(sent.Exception); onFailure(sent.Exception); }
+            else if (sent.IsCanceled)
+            {
+                OperationCanceledException error = new OperationCanceledException("The Core transport write was cancelled.");
+                Stop(error);
+                onFailure(error);
+            }
+        }
+
+        private static string Rejected(Exception error)
+        {
+            return ArcaneHost.Serializer().Serialize(new Dictionary<string, object>
+            {
+                { "accepted", false }, { "error", ArcaneHost.ErrorRecord(error, "ARCANE_BRIDGE_WRITE_FAILED") }
+            });
+        }
+    }
+}
