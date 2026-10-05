@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.57.0
+
+- Add local model chat through explicit llama.cpp/Ollama runtime requirements,
+  reusable installation and bundling, a retained Core local-AI service, and an
+  optional browser-to-Core provider. Preserve complete requests and streamed
+  responses, model readiness, cancellation and owned process shutdown. Apps own
+  model selection and defaults; preparation does not block ordinary page startup.
+- Add authored Core service selection and launch context. Factories receive
+  authored options and the separate app-root/runtime context; explicit launch
+  context overrides remain supported. Portable packages can bundle explicitly
+  selected local-AI runtimes without changing browser-only output.
+- Add Windows x64 executable packaging through the public Windows native
+  provider and the matching release's retained WebView2/Node SEA host asset.
+  Client injection precedes app scripts, service requests retain complete JSON,
+  and accepted service work drains before the owned Core process exits.
+- Add `runProcess` cancellation mode `close-input` for owned graceful shutdown;
+  the existing `terminate-tree` default remains unchanged. Includes separately
+  delivered macOS process source, without claiming a complete macOS host.
+- Correct the documented Node document-library subpath and lexical-search
+  example. No preferences service, Nemotron diarization, native ONNX, native
+  Kokoro or local image generation is introduced in this release.
+
 ## 0.56.0
 
 - Add explicit `package.nativeResources` selection for native-only application
