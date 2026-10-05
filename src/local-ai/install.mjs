@@ -17,7 +17,7 @@ function selectRuntimes(runtimes){
     }
     const selected=new Map();
     for(const runtime of runtimes){
-        if(!runtime||!['llama.cpp','ollama'].includes(runtime.id)){
+        if(!runtime||!['llama.cpp','ollama','nemo-speech'].includes(runtime.id)){
             throw new ArcaneError(ERROR_CODES.targetUnavailable,`Local AI runtime installation is unavailable for ${String(runtime?.id)}.`);
         }
         const prior=selected.get(runtime.id);
@@ -43,6 +43,15 @@ function selectedDirectory(directory){
 }
 
 function releaseAssetNames(id,version,platform,architecture){
+    if(id==='nemo-speech'){
+        if(!['x64','arm64'].includes(architecture))return [];
+        const arch=architecture==='x64'?'x86_64':'aarch64';
+        const name=`nemo-speech-${version.replace(/^v/u,'')}`;
+        if(platform==='win32'&&architecture==='x64')return [`${name}-windows-${arch}-cpu.zip`];
+        if(platform==='linux')return [`${name}-linux-${arch}-cpu.tar.gz`];
+        if(platform==='darwin')return [`${name}-macos-${arch}-cpu.tar.gz`];
+        return [];
+    }
     if(id==='ollama'){
         if(platform==='darwin'&&['x64','arm64'].includes(architecture))return ['ollama-darwin.tgz'];
         const arch=architecture==='x64'?'amd64':architecture;
@@ -74,9 +83,10 @@ async function selectRelease(runtime,platform,architecture,signal){
         const name=path.posix.basename(new URL(runtime.url).pathname);
         return {version:runtime.version??'custom',url:runtime.url,name};
     }
-    const repository=runtime.id==='llama.cpp'?'ggml-org/llama.cpp':'ollama/ollama';
-    const selected=runtime.version&&runtime.version!=='latest'
-        ?`tags/${encodeURIComponent(runtime.id==='ollama'&&!runtime.version.startsWith('v')?`v${runtime.version}`:runtime.version)}`
+    const repository=runtime.id==='nemo-speech'?'NVIDIA/NeMo-Speech.cpp':runtime.id==='llama.cpp'?'ggml-org/llama.cpp':'ollama/ollama';
+    const version=runtime.version??(runtime.id==='nemo-speech'?'0.2.0':undefined);
+    const selected=version&&version!=='latest'
+        ?`tags/${encodeURIComponent(runtime.id!=='llama.cpp'&&!version.startsWith('v')?`v${version}`:version)}`
         :'latest';
     let release=await (await upstreamResponse(`https://api.github.com/repos/${repository}/releases/${selected}`,signal)).json();
     if(runtime.id==='llama.cpp'){
@@ -118,6 +128,16 @@ async function installedRuntime(base,runtime,platform,architecture,signal){
         const record=installation.runtime;
         if(record?.id!==runtime.id||record.platform!==platform||record.architecture!==architecture)continue;
         try{
+            if(runtime.id==='nemo-speech'){
+                const directories=[record.root,record.includeDirectory,record.libraryDirectory,record.binaryDirectory,record.cmakeDirectory];
+                if(directories.some(function missingDirectory(directory){return !is.string(directory);}))continue;
+                const files=[path.join(record.includeDirectory,'nemo_speech','diar.h'),path.join(record.includeDirectory,'nemo_speech','asr.h'),path.join(record.cmakeDirectory,'NeMoSpeechConfig.cmake')];
+                const entries=await Promise.all([...directories,...files].map(function inspectRuntimePath(location){return stat(location);}));
+                if(entries.every(function runtimePathPresent(info,index){return index<directories.length?info.isDirectory():info.isFile();})){
+                    return {...record,...(runtime.version?{requestedVersion:runtime.version}:{})};
+                }
+                continue;
+            }
             if((await stat(record.executable)).isFile())return {...record,...(runtime.version?{requestedVersion:runtime.version}:{})};
         }catch(error){
             if(error.code!=='ENOENT')throw error;
@@ -141,6 +161,49 @@ async function runtimeExecutable(root,id,platform,signal){
     throw new ArcaneError(ERROR_CODES.operationFailed,`The ${id} archive does not contain ${filename}.`);
 }
 
+async function nemoRuntimeDirectories(root,signal){
+    const directories=[root];
+    for(const directory of directories){
+        throwIfAborted(signal);
+        const entries=await readdir(directory,{withFileTypes:true});
+        for(const entry of entries){
+            if(entry.isDirectory())directories.push(path.join(directory,entry.name));
+        }
+        if(path.basename(directory)!=='nemo_speech'||path.basename(path.dirname(directory))!=='include')continue;
+        const headers=['diar.h','asr.h'];
+        if(!headers.every(function headerPresent(name){
+            return entries.some(function matchingHeader(entry){return entry.name===name&&(entry.isFile()||entry.isSymbolicLink());});
+        }))continue;
+        const includeDirectory=path.dirname(directory);
+        const prefix=path.dirname(includeDirectory);
+        const children=await readdir(prefix,{withFileTypes:true});
+        const binaryDirectory=path.join(prefix,'bin');
+        if(!(await stat(binaryDirectory)).isDirectory()){
+            throw new ArcaneError(ERROR_CODES.operationFailed,'The NeMo Speech archive does not contain its installed binary directory.');
+        }
+        const candidates=children.filter(function libraryDirectory(entry){
+            return ['lib','lib64'].includes(entry.name)&&(entry.isDirectory()||entry.isSymbolicLink());
+        }).map(function librarySearch(entry){
+            const libraryDirectory=path.join(prefix,entry.name);
+            return {directory:libraryDirectory,libraryDirectory};
+        });
+        for(const candidate of candidates){
+            throwIfAborted(signal);
+            const entries=await readdir(candidate.directory,{withFileTypes:true});
+            if(entries.some(function packageConfiguration(entry){
+                return entry.name==='NeMoSpeechConfig.cmake'&&(entry.isFile()||entry.isSymbolicLink());
+            })){
+                return {includeDirectory,libraryDirectory:candidate.libraryDirectory,binaryDirectory,cmakeDirectory:candidate.directory};
+            }
+            for(const entry of entries){
+                if(entry.isDirectory())candidates.push({directory:path.join(candidate.directory,entry.name),libraryDirectory:candidate.libraryDirectory});
+            }
+        }
+        throw new ArcaneError(ERROR_CODES.operationFailed,'The NeMo Speech archive does not contain its installed NeMoSpeech CMake package.');
+    }
+    throw new ArcaneError(ERROR_CODES.operationFailed,'The NeMo Speech archive does not contain include/nemo_speech/diar.h and asr.h.');
+}
+
 async function installRuntime(runtime,{directory,platform,architecture,signal,onEvent}){
     const base=path.join(directory,runtime.id,`${platform}-${architecture}`,encodeURIComponent(runtime.version??'default'));
     await onEvent({type:'local-ai.install.starting',message:`Preparing ${runtime.id} for ${platform}/${architecture}.`,data:{id:runtime.id,platform,architecture}});
@@ -162,8 +225,10 @@ async function installRuntime(runtime,{directory,platform,architecture,signal,on
         await pipeline(Readable.fromWeb(response.body),createWriteStream(archive,{flags:'wx'}),{signal});
         await onEvent({type:'local-ai.install.extracting',message:`Extracting ${runtime.id} ${release.version}.`,data:{id:runtime.id,version:release.version}});
         await extractLocalAIArchive({archive,directory:root,signal,onEvent});
-        const executable=await runtimeExecutable(root,runtime.id,platform,signal);
-        const record={id:runtime.id,version:release.version,platform,architecture,root,executable,...(runtime.version?{requestedVersion:runtime.version}:{})};
+        const locations=runtime.id==='nemo-speech'
+            ?await nemoRuntimeDirectories(root,signal)
+            :{executable:await runtimeExecutable(root,runtime.id,platform,signal)};
+        const record={id:runtime.id,version:release.version,platform,architecture,root,...locations,...(runtime.version?{requestedVersion:runtime.version}:{})};
         throwIfAborted(signal);
         await unlink(archive);
         await writeFile(path.join(attempt,'installation.json'),`${JSON.stringify({requestVersion:runtime.version??null,requestUrl:runtime.url??null,runtime:record},null,2)}\n`,{flag:'wx',signal});
@@ -272,8 +337,8 @@ export async function ensureLocalAIRuntimes({runtimes=[],directory,platform=proc
     },5000);
     heartbeat.unref?.();
     try{
-        // There is one job per selected runtime, at most one llama.cpp and one
-        // Ollama job. Independent runtimes download and extract concurrently.
+        // There is one job per selected runtime. Independent runtime archives
+        // download and extract concurrently; matching requests share that job.
         const outcomes=await Promise.allSettled(selected.map(function prepareRuntime(runtime){
             return shareInstallation(runtime,{directory:root,platform,architecture,signal:operationSignal,onEvent:events.send});
         }));
@@ -332,7 +397,12 @@ export async function bundleLocalAIRuntimes({runtimes=[],directory,outputRoot,pl
         const relative=`runtime/local-ai/${runtime.id}`;
         const destination=path.join(root,relative);
         await copyRuntimeTree(runtime.root,destination,root,files,signal);
-        return {runtime:{...runtime,root:relative,executable:`${relative}/${path.relative(runtime.root,runtime.executable).split(path.sep).join('/')}`},files};
+        const bundled={...runtime,root:relative};
+        for(const field of ['executable','includeDirectory','libraryDirectory','binaryDirectory','cmakeDirectory']){
+            if(runtime[field]===undefined)continue;
+            bundled[field]=path.posix.join(relative,path.relative(runtime.root,runtime[field]).split(path.sep).join('/'));
+        }
+        return {runtime:bundled,files};
     }));
     const failures=outcomes.filter(function failedBundle(outcome){return outcome.status==='rejected';});
     if(failures.length===1)throw failures[0].reason;

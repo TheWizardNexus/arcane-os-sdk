@@ -191,7 +191,28 @@ Architectures are `x64` or `arm64`. Availability depends on the upstream
 runtime's published platform assets; Ollama has no official Android runtime
 archive in this installer.
 
-Ensure returns absolute `{id,version,platform,architecture,root,executable}`
-records. Bundle returns `{runtimes,files}`, with artifact-relative runtime paths
-and a complete emitted file inventory. Bundling requires a fresh native staging
-destination, preserving existing completed outputs.
+Ensure returns absolute `{id,version,platform,architecture,root}` records.
+Server runtimes also include `executable`. Bundle returns `{runtimes,files}`,
+with artifact-relative runtime paths and a complete emitted file inventory.
+Bundling requires a fresh native staging destination, preserving existing
+completed outputs.
+
+### NeMo Speech library runtime
+
+The runtime helpers also accept `{id: 'nemo-speech', version: '0.2.0'}` to
+prepare NVIDIA's official CPU library distribution. An omitted NeMo version
+selects `0.2.0`. Its published targets are Windows `x64`, Linux `x64`/`arm64`,
+and macOS `x64`/`arm64`.
+
+NeMo records include `includeDirectory`, `libraryDirectory`, `binaryDirectory`,
+and `cmakeDirectory`; they have no server `executable`. The complete upstream
+tree remains under `root`, including any archive prefix directory. Use the
+returned `cmakeDirectory` as `NeMoSpeech_DIR` when calling
+`find_package(NeMoSpeech CONFIG REQUIRED COMPONENTS Diarization)`, then link
+the upstream `NeMoSpeech::Diarization` target. Bundling preserves the complete
+tree and makes all these paths relative to the native artifact root.
+
+This helper installs the library. The application configuration and development
+CLI currently select only the llama.cpp and Ollama services described above;
+NeMo model selection and a native diarization helper belong to their owning
+integration.
