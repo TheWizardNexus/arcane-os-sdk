@@ -65,6 +65,7 @@ export {
     TIME_TRAVEL_SEEK_EVENT
 } from './event-manager.mjs';
 export {runProcess} from './process.mjs';
+export {createGitTextSnapshot} from './git-text-snapshot.mjs';
 export {
     DEFAULT_TEST_TIMEOUT_MS,
     registeredTestCount,

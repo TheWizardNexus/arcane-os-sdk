@@ -284,6 +284,7 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `runApplication()` | function | `arcane-os` | Headless toolchain operations | Node; selected operation may produce browser or native output |
 | `runDoctor()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node |
 | `runProcess()` | function | `arcane-os` | Events, processes, and testing | Node |
+| `createGitTextSnapshot()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node with Git |
 | `runRegisteredTests()` | function | `arcane-os` | Events, processes, and testing | Node |
 | `runRepositoryAction()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node |
 | `runTarget()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
@@ -5104,6 +5105,45 @@ import {registeredTestCount} from 'arcane-os';
 console.log(registeredTestCount());
 ```
 
+## createGitTextSnapshot()
+
+### Overview
+
+Reads complete application-selected UTF-8 text from one fetched revision using
+a dedicated bare Git cache. It does not create or alter a working checkout.
+
+### Signature, lifecycle, and result
+
+```text
+createGitTextSnapshot({cacheDirectory,remote,ref,selectPath,onEvent,run=runProcess}={})
+```
+
+Import from `arcane-os`. The application owns the cache location, remote, ref,
+path predicate and service factory. The returned `refresh({signal}={})` returns
+`{revision,files:[{path,content}]}` in Git tree order. Concurrent calls share work;
+unchanged fetched revisions reuse completed text retrieval. Caller cancellation
+ends only that wait. `close()`, `drain()` and `dispose()` stop acceptance and
+await accepted refresh/process cleanup. Errors remain observable instead of
+returning stale or partial success. See [Git text snapshots](git-text-snapshot.md)
+for complete inputs, text semantics, errors, events and Core service composition.
+
+### Example
+
+```js
+import {createGitTextSnapshot} from 'arcane-os';
+
+const dispatches = createGitTextSnapshot({
+    cacheDirectory: applicationCacheDirectory,
+    remote: applicationRepository,
+    ref: applicationRef,
+    selectPath: function selectDispatch(filename) {
+        return filename.startsWith('dispatches/') && filename.endsWith('.md');
+    }
+});
+const snapshot = await dispatches.refresh({signal});
+await dispatches.close();
+```
+
 ## runProcess()
 
 ### Overview
@@ -5114,7 +5154,7 @@ events, heartbeats, and explicitly selected process cancellation behavior.
 ### Signature, parameters, and result
 
 ```text
-async runProcess(command, args=[], { cwd, env, signal, onEvent, heartbeatMs=5000, terminationGraceMs=DEFAULT_TERMINATION_GRACE_MS, allowNonzero=false, input, cancellationMode='terminate-tree' }={})
+async runProcess(command, args=[], { cwd, env, signal, onEvent, onOutput, captureOutput=true, emitOutputEvents=true, outputEncoding='utf8', heartbeatMs=5000, terminationGraceMs=DEFAULT_TERMINATION_GRACE_MS, allowNonzero=false, input, cancellationMode='terminate-tree' }={})
 ```
 
 Import it from `arcane-os`. `command` is executed directly with `shell:false`;
@@ -5126,6 +5166,24 @@ immediately. With `cancellationMode:'close-input'`, optional input is written
 once and stdin remains open until cancellation or a callback/input failure
 requests shutdown. On Microsoft NT, `npm` and `npx` are normalized to their Node
 CLI entrypoints.
+
+An `AsyncIterable` input instead feeds stdin with awaited writes and closes it
+when the producer finishes. Its `return()` must cooperate with cancellation of
+an outstanding `next()`; the process owner drains both input and output work.
+`onOutput({stream,chunk})` receives complete ordered chunks and is awaited with
+backpressure for each stream. UTF-8 decoding retains split characters. The
+default capture and nonempty-line events remain unchanged; line events are not
+a substitute for lossless chunk delivery.
+
+`captureOutput` and `emitOutputEvents` accept booleans or per-stream selections,
+for example `{stdout:false}` while stderr retains its default. A stream with
+capture disabled returns `null` and requires an `onOutput` consumer.
+`outputEncoding` defaults to `'utf8'`; explicitly selecting `null`, globally or
+per stream such as `{stdout:null}`, delivers native `Buffer` chunks unchanged.
+A raw stream requires capture and line events explicitly disabled for that
+stream plus an `onOutput` owner. It is never decoded or sent as text implicitly.
+Complete failed chunks, original callback failures, process diagnostics and
+exit results remain available through the normal error record after drain.
 
 `onEvent` is awaited in order for `process.starting`, nonempty
 `process.stdout`/`process.stderr` lines, coalesced `process.heartbeat`, and the

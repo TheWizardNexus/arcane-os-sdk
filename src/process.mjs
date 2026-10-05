@@ -49,15 +49,24 @@ function outputSelected(option,stream){
     return is.boolean(option)?option:option?.[stream]??true;
 }
 
-function deliverChunk(stream,events,type,text,{onOutput,emitOutput,onFailure}){
+function outputEncodingSelected(option,stream){
+    const selected=option!==null&&is.object(option)?option[stream]:option;
+    const encoding=selected===undefined?'utf8':selected;
+    if(encoding!=='utf8'&&encoding!==null){
+        throw new TypeError(`The ${stream} outputEncoding must be 'utf8' or null.`);
+    }
+    return encoding;
+}
+
+function deliverChunk(stream,events,type,chunk,{onOutput,emitOutput,onFailure}){
     stream.pause();
     return (async function deliverOutput(){
         try{
-            if(onOutput)await onOutput({stream:type==='process.stdout'?'stdout':'stderr',chunk:text});
+            if(onOutput)await onOutput({stream:type==='process.stdout'?'stdout':'stderr',chunk});
         }catch(error){
             onFailure(error);
         }
-        if(emitOutput)await emitLines(events,type,text);
+        if(emitOutput)await emitLines(events,type,chunk);
     })().catch(()=>{
         // The event queue separately owns and propagates observer failures.
     }).finally(()=>{
@@ -135,6 +144,7 @@ export async function runProcess(command,args=[],{
     onOutput,
     captureOutput=true,
     emitOutputEvents=true,
+    outputEncoding='utf8',
     heartbeatMs=5000,
     terminationGraceMs=DEFAULT_TERMINATION_GRACE_MS,
     allowNonzero=false,
@@ -144,6 +154,17 @@ export async function runProcess(command,args=[],{
     throwIfAborted(signal);
     if(onOutput!==undefined&&!is.function(onOutput)){
         throw new TypeError('onOutput must be a function.');
+    }
+    const outputEncodings={
+        stdout:outputEncodingSelected(outputEncoding,'stdout'),
+        stderr:outputEncodingSelected(outputEncoding,'stderr')
+    };
+    for(const stream of ['stdout','stderr']){
+        if(outputEncodings[stream]===null&&(!onOutput
+            ||outputSelected(captureOutput,stream)!==false
+            ||outputSelected(emitOutputEvents,stream)!==false)){
+            throw new TypeError(`Raw ${stream} requires onOutput, captureOutput:false and emitOutputEvents:false for that stream.`);
+        }
     }
     if(!onOutput&&(!outputSelected(captureOutput,'stdout')||!outputSelected(captureOutput,'stderr'))){
         throw new TypeError('Uncaptured process output requires an onOutput consumer.');
@@ -175,8 +196,8 @@ export async function runProcess(command,args=[],{
     throwIfAborted(signal);
 
     return new Promise((resolve,reject)=>{
-        let stdout=outputSelected(captureOutput,'stdout')?'':null;
-        let stderr=outputSelected(captureOutput,'stderr')?'':null;
+        let stdout=outputEncodings.stdout!==null&&outputSelected(captureOutput,'stdout')?'':null;
+        let stderr=outputEncodings.stderr!==null&&outputSelected(captureOutput,'stderr')?'':null;
         let childClosed=false;
         let closedResult=null;
         let settlementStarted=false;
@@ -199,7 +220,7 @@ export async function runProcess(command,args=[],{
             const name=type==='process.stdout'?'stdout':'stderr';
             const delivery=deliverChunk(stream,events,type,chunk,{
                 onOutput,
-                emitOutput:outputSelected(emitOutputEvents,name),
+                emitOutput:outputEncodings[name]!==null&&outputSelected(emitOutputEvents,name),
                 onFailure:function outputFailed(error){
                     // Preserve complete failed callback input even when the
                     // caller elected not to retain successful protocol output.
@@ -363,10 +384,10 @@ export async function runProcess(command,args=[],{
             return;
         }
 
-        // Each readable retains split UTF-8 sequences and flushes at EOF.
-        // Capture and events consume the same decoded text.
-        child.stdout.setEncoding('utf8');
-        child.stderr.setEncoding('utf8');
+        // Text streams retain split UTF-8 sequences and flush at EOF. Explicit
+        // raw streams bypass decoding and deliver native Buffers only to onOutput.
+        if(outputEncodings.stdout!==null)child.stdout.setEncoding(outputEncodings.stdout);
+        if(outputEncodings.stderr!==null)child.stderr.setEncoding(outputEncodings.stderr);
         child.stdout.on('data',chunk=>{
             if(stdout!==null)stdout=appendOutput(stdout,chunk);
             ownDelivery(child.stdout,'process.stdout',chunk);
