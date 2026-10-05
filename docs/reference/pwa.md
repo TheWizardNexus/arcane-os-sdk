@@ -206,6 +206,23 @@ manifest carries release information. Non-PWA and native packaging use the same
 [clean local resource URLs](asset-versioning.md). Native packaging does not
 generate the browser PWA worker, installation manifest or registration bootstrap.
 
+## Package without browser PWA output
+
+Select `browserPwa:false` for an artifact, such as an application directory
+inside an extension-owned root. The package omits `arcane.webmanifest`,
+`arcane-offline.json`, `arcane-sw.js`, and `arcane-pwa.mjs`. Before native-module
+processing, it removes active SDK-marked `data-arcane-pwa` scripts and manifest
+relationships that resolve to that package's `arcane.webmanifest` from the
+selected application document set.
+
+This is a package-output choice, not a source or saved-setting change. It
+preserves unrelated manifest links and link relationships, comments, templates,
+other inactive HTML, unselected documents, and authored PWA configuration. The
+application remains responsible for any extension manifest, permissions,
+background process, toolbar launcher, or other outer host. See the
+[native-module output contract](protocols.md#native-module-package-output) and
+[`packageApp()` options](sdk-api.md#packageapp) for the complete boundary.
+
 ## Development and hosting
 
 Use the ordinary `arcane dev --app <id>` command after editing the selected

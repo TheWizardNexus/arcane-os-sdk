@@ -13,10 +13,10 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Progressive web applications</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="progressive-web-applications">Progressive web applications</h1><p class="doc-lead">An application supplies its installation identity and offline resource selection. The SDK generates the Web App Manifest, offline inventory, service worker and nonblocking registration module. Its shared installation owner and dismissible component expose the browser&#39;s available install action. Native packages keep their existing lifecycle.</p><div class="doc-meta"><span>SDK 0.51.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Progressive web applications</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="progressive-web-applications">Progressive web applications</h1><p class="doc-lead">An application supplies its installation identity and offline resource selection. The SDK generates the Web App Manifest, offline inventory, service worker and nonblocking registration module. Its shared installation owner and dismissible component expose the browser&#39;s available install action. Native packages keep their existing lifecycle.</p><div class="doc-meta"><span>SDK 0.55.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
-      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/pwa.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#application-configuration">Application configuration</a><a href="#generated-output">Generated output</a><a href="#development-and-hosting">Development and hosting</a><a href="#updates-and-stored-data">Updates and stored data</a><a href="#installation-component">Installation component</a><a href="#getpwainstall">getPwaInstall()</a><a href="#mountpwainstallprompt">mountPwaInstallPrompt()</a><a href="#registerpwa">registerPwa()</a></nav></details><p>An application supplies its installation identity and offline resource selection.
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/pwa.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#application-configuration">Application configuration</a><a href="#generated-output">Generated output</a><a href="#package-without-browser-pwa-output">Package without browser PWA output</a><a href="#development-and-hosting">Development and hosting</a><a href="#updates-and-stored-data">Updates and stored data</a><a href="#installation-component">Installation component</a><a href="#getpwainstall">getPwaInstall()</a><a href="#mountpwainstallprompt">mountPwaInstallPrompt()</a><a href="#registerpwa">registerPwa()</a></nav></details><p>An application supplies its installation identity and offline resource selection.
 The SDK generates the Web App Manifest, offline inventory, service worker and
 nonblocking registration module. Its shared installation owner and dismissible
 component expose the browser&#39;s available install action. Native packages keep
@@ -66,6 +66,24 @@ The source root defaults its installation ID to <code>/apps/&lt;id&gt;/</code> t
 previous source identity while its start URL and scope move to the root. An
 authored <code>manifest.id</code> remains authoritative. Packaged default identity remains
 <code>./</code>. App identity and saved application data remain unchanged.</p>
+<h3 id="application-pages-and-preserved-html-resources">Application pages and preserved HTML resources</h3>
+<p>Optional <code>package.documents</code> in <code>arcane-app.json</code> selects the app-root-relative
+<code>.html</code>/<code>.htm</code> pages that receive managed import maps and PWA links/bootstrap.
+Its schema-1 projection is <code>arcane-package.json</code>&#39;s top-level <code>documents</code>.
+For example, <code>&quot;documents&quot;: [&quot;index.html&quot;]</code> selects the entry while other
+included HTML documents retain their exact content. The entry is always selected;
+<code>[]</code> also selects only the entry. Omitting the property preserves automatic
+discovery of the entry and included secondary pages with an active <code>&lt;base&gt;</code>.
+Selected pages retain the existing path-correct base requirement.</p>
+<p>This declaration does not add or remove resources from <code>package.include</code>,
+<code>package.exclude</code>, serving, packaging or the offline inventory. Included
+originals remain available and can be cached under the normal offline selection,
+including when a selected page displays them in an iframe. With an explicit
+list, those unselected documents are not scanned as application pages or given
+managed import maps, base handling or PWA injection. HTML-import components and
+shared runtime-resource traversal keep their existing processing. See
+<a href="../protocols/#application-document-selection">application document selection</a>
+for ordering and the complete declaration contract.</p>
 <h3 id="root-generated-output">Root generated output</h3>
 <p>For a standalone application, <code>appsRoot: &quot;.&quot;</code> places the app at its repository
 root. Import-map refresh, <code>arcane dev</code>, package inspection/dry run and browser
@@ -87,6 +105,34 @@ does not delete existing files, stored application data, or worker caches.</li>
 committed files rather than generating them. Actual multi-app workspaces keep
 their explicit <code>appsRoot: &quot;apps&quot;</code> layout. This source/package contract does not
 establish any particular installed application&#39;s browser lifecycle.</p>
+<h3 id="authored-host-root-and-app-entry">Authored host root and app entry</h3>
+<p>An authored <code>index.html</code> at the source host root keeps <code>/</code> separate from the
+selected application entry. Root import-map generation and development PWA
+generation omit the <code>/</code>-to-entry navigation alias whenever that file exists,
+including when it is outside <code>package.include</code> or the offline selection.
+Development serving answers <code>/</code> with that host index. An index outside the app&#39;s
+selected source mapping is served unchanged through this exact-root route;
+<code>/index.html</code> and other resource URLs retain their existing selection rules.
+A selected index follows its existing managed-document classification. Root
+presence alone adds no page or assets to the application or offline inventory
+and adds no managed maps or PWA bootstrap. The host owns a root response outside
+the worker&#39;s selected offline resources. With no host index, development retains
+its app-entry redirect.</p>
+<p>Packaging considers the selected output instead of unrelated source-host files.
+A selected authored output-root <code>index.html</code> is preserved and suppresses the
+deployment-root navigation alias. When selected content supplies no output-root
+index, the package retains its generated launcher and app-entry alias. An
+authored source root excluded from the package does not replace that launcher.
+Only when selected records supply an authored output-root index does packaging
+write <code>app.rootDocument: &quot;./index.html&quot;</code> in <code>ARCANE_APP_RELEASE.json</code>.
+Packaged preview uses that generated field to serve the authored document at
+<code>/</code>; it does not inspect HTML to infer root ownership. Without the field,
+including older releases and generated-launcher packages, preview retains its
+<code>302</code> redirect to <code>app.start</code> (or the older <code>app.entry</code> fallback), preserving the
+request query. The startup URL remains the selected app launch URL.</p>
+<p>This behavior requires no new setting. The application entry, default install
+start URL, manifest identity and scope, worker registration scope, cache
+identity, and saved application data keep their existing contracts.</p>
 <h3 id="offline-resource-selection">Offline resource selection</h3>
 <p><code>offline.include</code> and <code>offline.exclude</code> select literal paths or directory
 prefixes from the selected emitted inventory. An omitted or empty include list
@@ -152,19 +198,35 @@ manifest and worker. It distinguishes separately generated outputs even when
 their app and SDK versions match. It is not a content measurement.</p>
 <p>The package owns its selected inventory once, after any app adapter finishes.
 It follows actual resource references to include meaningful query variants.
-Generated application pages receive a manifest link and an <code>async</code> module
+Selected application pages receive a manifest link and an <code>async</code> module
 marked <code>data-arcane-pwa</code>. Existing application scripts retain their order.
 PWA registration does not wait for models, storage, preferences or page rendering.
 The same bootstrap starts one initially hidden <code>pwa-install.html</code> component with
 the generated manifest&#39;s app name. Component loading and worker registration
 proceed independently.</p>
-<p>All SDK browser-resource delivery removes only SDK-owned <code>arcaneVersion</code> fields
-from actual local resource references, including the managed import map. Authored
-fields such as <code>v</code>, encoded and repeated fields, empty query segments, fragments,
+<p>SDK processing of selected application pages, components and runtime resources
+removes only SDK-owned <code>arcaneVersion</code> fields from actual local resource references,
+including the managed import map. Explicitly unselected HTML documents keep their
+exact content. Authored fields such as <code>v</code>, encoded and repeated fields, empty
+query segments, fragments,
 source spelling and unrelated payloads are preserved. The offline
 manifest carries release information. Non-PWA and native packaging use the same
 <a href="../asset-versioning/">clean local resource URLs</a>. Native packaging does not
 generate the browser PWA worker, installation manifest or registration bootstrap.</p>
+<h2 id="package-without-browser-pwa-output">Package without browser PWA output</h2>
+<p>Select <code>browserPwa:false</code> for an artifact, such as an application directory
+inside an extension-owned root. The package omits <code>arcane.webmanifest</code>,
+<code>arcane-offline.json</code>, <code>arcane-sw.js</code>, and <code>arcane-pwa.mjs</code>. Before native-module
+processing, it removes active SDK-marked <code>data-arcane-pwa</code> scripts and manifest
+relationships that resolve to that package&#39;s <code>arcane.webmanifest</code> from the
+selected application document set.</p>
+<p>This is a package-output choice, not a source or saved-setting change. It
+preserves unrelated manifest links and link relationships, comments, templates,
+other inactive HTML, unselected documents, and authored PWA configuration. The
+application remains responsible for any extension manifest, permissions,
+background process, toolbar launcher, or other outer host. See the
+<a href="../protocols/#native-module-package-output">native-module output contract</a> and
+<a href="../sdk-api/#packageapp"><code>packageApp()</code> options</a> for the complete boundary.</p>
 <h2 id="development-and-hosting">Development and hosting</h2>
 <p>Use the ordinary <code>arcane dev --app &lt;id&gt;</code> command after editing the selected
 app&#39;s <code>arcane-app.json</code>. Startup refreshes that app&#39;s generated
@@ -190,9 +252,9 @@ If <code>package.pwa.offline.include</code> is nonempty, the resource must also
 match that offline selection and must not match <code>offline.exclude</code>. Adding a
 path only to the offline selection does not add it to the app&#39;s resources.
 The running source server reads changed app descriptors before the next app,
-root-navigation or generated-PWA request. Include/exclude rules, the entry and
-PWA settings share the current selection; no restart or package projection
-write is needed. Edits to selected source files are picked up by the next due
+root-navigation or generated-PWA request. Include/exclude rules, the entry,
+document selection and PWA settings share the current selection; no restart or
+package projection write is needed. Edits to selected source files are picked up by the next due
 page-load check while the server remains running.</p>
 <p>For an enabled application, <code>arcane dev</code> serves the generated PWA files at the
 origin root and starts at the selected app entry: <code>/index.html</code> for a standalone
@@ -310,8 +372,10 @@ The SDK does not change certificates or browser permissions.</p>
 therefore matters even when an offline cache exists. Updating files in place
 while installation fetches them is not an atomic release snapshot; the host owns
 consistent deployment of the selected output.</p>
-<p>An offline navigation alias redirects to its selected entry page, preserving the
-document URL used to resolve relative modules and styles.</p>
+<p>Where an app-entry navigation alias remains, it redirects to the selected entry
+page, preserving the document URL used to resolve relative modules and styles.
+An authored host root suppresses that alias as described above; merely retaining
+an old cached root resource does not add it to the current offline selection.</p>
 <p>For a same-origin navigation to a selected static <code>.html</code> or <code>.htm</code> document,
 the worker can reuse that document&#39;s cached body while leaving the complete
 query and fragment in the browser&#39;s navigation URL. Pages such as
@@ -323,6 +387,13 @@ request goes to the network unchanged; its response is not saved over the plain
 document. This does not change query matching for assets, API calls, ordinary
 fetch requests, unselected documents or other origins. Cache refresh and the
 Update prompt keep their existing lifecycle.</p>
+<p>For a same-origin directory navigation without an app-entry alias, the worker
+can likewise reuse that directory&#39;s <code>index.html</code> body only when the index is
+already in the current offline selection and has a retained cached response.
+The directory URL and its query remain unchanged, including beneath a deployment
+subpath. An exact query-specific selected resource takes precedence. Otherwise,
+the original request passes to the host unchanged. This adds no page or asset to
+the inventory and does not save a host response over the selected index.</p>
 <p>Browser storage eviction can remove an offline cache. A missing release cache
 entry falls back to the network, so offline availability still depends on the
 browser retaining the selected resources.</p>
@@ -585,9 +656,9 @@ observable in state and through its returned promise. <code>dispose()</code> rem
 page-owned listeners and subscriptions without unregistering the persistent
 worker or deleting stored data.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#application-configuration">Application configuration</a><a href="#generated-output">Generated output</a><a href="#development-and-hosting">Development and hosting</a><a href="#updates-and-stored-data">Updates and stored data</a><a href="#installation-component">Installation component</a><a href="#getpwainstall">getPwaInstall()</a><a href="#mountpwainstallprompt">mountPwaInstallPrompt()</a><a href="#registerpwa">registerPwa()</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#application-configuration">Application configuration</a><a href="#generated-output">Generated output</a><a href="#package-without-browser-pwa-output">Package without browser PWA output</a><a href="#development-and-hosting">Development and hosting</a><a href="#updates-and-stored-data">Updates and stored data</a><a href="#installation-component">Installation component</a><a href="#getpwainstall">getPwaInstall()</a><a href="#mountpwainstallprompt">mountPwaInstallPrompt()</a><a href="#registerpwa">registerPwa()</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.51.1, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.55.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

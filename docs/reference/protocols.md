@@ -88,9 +88,11 @@ Explicit host document lists use the separate root-exported
 described below; they do not enter app discovery.
 
 The application dependency boundary is conditional. Only an application that
-actually consumes Arcane declares one exact published `arcane-os` version in
-its own `package.json` and resolves it through that project's normal install
-into its own `node_modules`. An application that does not currently consume
+actually consumes Arcane declares `arcane-os` in its own `package.json` and
+resolves it through that project's normal install into its own `node_modules`.
+During development the declaration tracks `latest`; the lockfile and installed
+package record the exact selected version. An explicitly selected production
+build may declare an exact version. An application that does not currently consume
 Arcane adds no `arcane-os` dependency solely because of this rule; the user or
 governing task may direct that application to adopt Arcane later, at which point
 the same app-owned package, install, projection, and artifact boundary applies.
@@ -381,10 +383,11 @@ layouts; the default nested scaffold continues to use its development dependency
 ## Installed SDK runtime materialization
 
 `materializeInstalledSdkRuntime()` is the Node entrypoint for refreshing one
-external workspace's checked-in `arcane/` projection from its one exact
-installed SDK declaration. Import the function through the dependency key that
+external workspace's checked-in `arcane/` projection from its one declared and
+installed SDK dependency. Import the function through the dependency key that
 the workspace actually declares: `arcane-os` for the canonical package name or,
-for example, `arcane-sdk` for the exact `npm:arcane-os@<version>` alias. No
+for example, `arcane-sdk` for the development alias `npm:arcane-os@latest`. The
+lockfile and installed package retain the exact resolved version. No
 application- or Arcane OS-local copier owns this operation.
 
 The operation resolves that declaration while holding the shared
@@ -563,8 +566,8 @@ exactly `dependencyName`, `packageSource`,
 `canonicalPackageRoot`, `packageName`, `packageVersion`, `runtimeRoot`,
 and `browserRuntimeRoot`. A
 workspace may use the canonical dependency name or one npm alias such as
-`npm:arcane-os@0.51.1`; the installed package manifest identifies `arcane-os`
-and supplies its actual version. The resolver requires one declaration and a
+`npm:arcane-os@latest`; the installed package manifest identifies `arcane-os`
+and supplies its actual exact version. The resolver requires one declaration and a
 direct physical installation with runtime and browser-runtime directories.
 The application's normal npm declaration and lockfile own version selection.
 
@@ -999,9 +1002,12 @@ reachable.
 
 ### macOS
 
-No macOS target, native bridge, Core host, artifact, or run contract is exposed
-by this SDK version. A browser may still run browser-only application code, but
-that does not create a native Arcane host or satisfy a native capability.
+No macOS executable target, native bridge, platform host, artifact, or run
+contract is exposed by this SDK version. A browser may still run browser-only
+application code. A separately composed macOS host may use the reusable Node
+Core runtime, framed stdio transport, host composition, and portable payload,
+but those SDK primitives do not create a native bridge or executable host and
+do not by themselves satisfy a native capability.
 
 ## Development and remote HTTP transport
 
@@ -1083,8 +1089,11 @@ The common contract ends where platform truth must remain different:
   artifact kind, and some diagnostic/result fields remain platform-specific;
 - unsupported platforms fail or return a documented unsupported state; they do
   not run an unrelated browser implementation as a substitute;
-- this SDK version requires a selected checkout and Core to provide the current
-  native plan's protocol, version, feature, capability, method, and provider;
+- the portable target defaults to the installed SDK provider and assembles a
+  non-executable payload without an Arcane OS checkout;
+- executable native targets require their explicit checkout/provider, and the
+  composed host must supply the protocol, version, features, capabilities,
+  methods, and services that its application contract requires;
 - that current-build compatibility does not promise that a future SDK will accept
   this Core or that this SDK will accept a future Core.
 

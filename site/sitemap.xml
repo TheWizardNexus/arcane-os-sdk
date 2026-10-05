@@ -14,6 +14,7 @@
   <!-- generated:reference-routes:start -->
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-decisions/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-speech/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-wasm/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/twin-cloud/</loc></url>
@@ -22,6 +23,9 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/availability-and-normalization/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/behavioral-testing/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/cli/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core-client/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core-native-packaging/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core-runtime/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-ai-contracts/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-api/</loc></url>
@@ -87,6 +91,7 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/document-navigation/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/errors/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/gif-encoder/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/html-import-script/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/html-import/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/in-memory-communication-provider/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/isolated-model-question-runner/</loc></url>
@@ -139,6 +144,7 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/wait-for-component/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/you-tube-media/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/sdk-api/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/websocket-client/</loc></url>
 <!-- generated:reference-routes:end -->
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/architecture/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/compatibility/</loc></url>

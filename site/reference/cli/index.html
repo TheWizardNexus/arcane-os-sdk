@@ -13,9 +13,9 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane CLI reference</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-cli-reference">Arcane CLI reference</h1><p class="doc-lead">The arcane and arcane-os executables invoke the same headless SDK toolchain. Use the command name that is unambiguous in the current project; project-local scripts should resolve the exact package version pinned by the app&#39;s lockfile.</p><div class="doc-meta"><span>SDK 0.51.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane CLI reference</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-cli-reference">Arcane CLI reference</h1><p class="doc-lead">The arcane and arcane-os executables invoke the same headless SDK toolchain. Use the command name that is unambiguous in the current project; project-local scripts should resolve the exact package version pinned by the app&#39;s lockfile.</p><div class="doc-meta"><span>SDK 0.55.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
-      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="./" aria-current="page">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-speech/">Browser speech</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="./" aria-current="page">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/cli.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#command-inventory">Command inventory</a><a href="#parser-wide-options">Parser-wide options</a><a href="#output-and-exit-contract">Output and exit contract</a><a href="#arcane-new">arcane new</a><a href="#arcane-init">arcane init</a><a href="#arcane-doctor">arcane doctor</a><a href="#arcane-import-map">arcane import-map</a><a href="#arcane-upgrade">arcane upgrade</a><a href="#arcane-dev">arcane dev</a><a href="#arcane-test">arcane test</a><a href="#arcane-check">arcane check</a><a href="#arcane-package">arcane package</a><a href="#arcane-verify">arcane verify</a><a href="#arcane-bundle">arcane bundle</a><a href="#arcane-verify-bundle">arcane verify-bundle</a><a href="#arcane-native-doctor">arcane native-doctor</a><a href="#arcane-native-prepare">arcane native-prepare</a><a href="#arcane-build">arcane build</a><a href="#arcane-run">arcane run</a><a href="#arcane-update-check">arcane update-check</a><a href="#arcane-targets">arcane targets</a><a href="#arcane-repo">arcane repo</a><a href="#arcane-mail">arcane mail</a><a href="#machine-output">Machine output</a><a href="#programmatic-only-operation-names">Programmatic-only operation names</a></nav></details><p>The <code>arcane</code> and <code>arcane-os</code> executables invoke the same headless SDK toolchain.
 Use the command name that is unambiguous in the current project; project-local
 scripts should resolve the exact package version pinned by the app&#39;s lockfile.</p>
@@ -388,19 +388,23 @@ failure into a failed doctor result.</p>
 </code></pre></div>
 <h2 id="arcane-import-map"><code>arcane import-map</code></h2>
 <h3 id="overview-3">Overview</h3>
-<p>Refreshes one selected application&#39;s browser runtime map, generates
-its standard browser import map, discovers every directly navigable
-<code>.html</code>/<code>.htm</code> document admitted by the selected descriptor&#39;s existing
-include/exclude rules, and prepares the map artifact plus those managed documents
-before writing them in order. A directly navigable entry document declares exactly
-one <code>&lt;meta name=&quot;arcane-app-id&quot; content=&quot;&lt;selected-id&gt;&quot;&gt;</code>; an unmarked secondary
-document may instead carry an active <code>&lt;base&gt;</code>.
-Wrong or duplicate explicit app identity fails. The renderer then requires one
-path-correct base for every selected document. Included HTML files with neither
-the identity marker nor an active base are component fragments: they remain
-package files and are not rewritten with a document-level import map.
-Packaging and development use the same discovery owner. Packaging consumes
-the saved managed import maps in directly navigable source pages.</p>
+<p>Refreshes one selected application&#39;s browser runtime map, generates its standard
+browser import map, and prepares the map artifact plus the selected managed
+<code>.html</code>/<code>.htm</code> documents before writing them in order. Optional
+<code>package.documents</code> in <code>arcane-app.json</code> selects literal app-root-relative HTML
+paths that are already included and not excluded. The entry is always first;
+<code>[]</code> selects only the entry. Omitting the field retains automatic selection of
+the entry and included secondary pages with an active <code>&lt;base&gt;</code>. An app identity
+meta tag does not select a page. The renderer requires one path-correct active
+base for each selected document.</p>
+<p>The schema-1 package projection carries this field as <code>documents</code>, preserving
+the distinction between omission and <code>[]</code>. With explicit selection, other
+included HTML documents keep their exact content, including originals referenced
+through iframes. Selection does not change serving, packaging or offline resource
+membership; component processing and shared runtime-resource traversal retain
+their existing behavior. Inspection, packaging and development use the same
+<a href="../protocols/#application-document-selection">document-selection contract</a>.
+Packaging consumes the saved managed import maps in selected source pages.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane import-map [--workspace &lt;directory&gt;] [--app &lt;id&gt;]
 </code></pre></div>
 <p><code>--workspace</code> defaults to the current directory. <code>--app</code> selects one app when
@@ -424,6 +428,11 @@ projection. App and installation identity, saved data, and selected authored
 files remain unchanged. The same layout applies to <code>arcane dev</code> and
 <code>arcane package</code>. Generated and offline app files are committed; GitHub Actions
 consume those committed files. See <a href="../pwa/#root-generated-output">root generated output</a>.</p>
+<p>An existing authored source-host <code>index.html</code> suppresses the generated <code>/</code>
+navigation alias even when the page is outside the application or offline
+selection. It is not automatically added to either inventory or given managed
+maps or PWA bootstrap. The selected app entry and installation identity remain
+unchanged; see <a href="../pwa/#authored-host-root-and-app-entry">authored host roots</a>.</p>
 <p>The supported physical layout preserves its route count and ordered include
 list. External and modern integrated physical routes require <code>components</code>, <code>css</code>,
 <code>dependencies</code>, <code>entities</code>, <code>img</code>, <code>modules</code>, and <code>sdk</code>; a physical workspace
@@ -457,11 +466,12 @@ and explicitly selected nested scaffolds remain supported.</p>
     }
 };
 </code></pre></div>
-<p>For the direct CLI command, <code>documentPaths</code> contains the configured entry first
-and every other descriptor-selected HTML/HTM document afterward in
-deterministic order. The generated artifact is written first, followed by the
-selected documents. A write failure or cancellation can leave earlier writes
-in place; the operation does not restore them automatically. After successful
+<p>For the direct CLI command, <code>documentPaths</code> contains the configured entry first.
+Other selected paths follow in deterministic lexical order without duplicates.
+The authored <code>documents</code> declaration remains as supplied, including <code>[]</code>.
+The generated artifact is written first, followed by the selected documents.
+A write failure or cancellation can leave earlier writes in place; the operation
+does not restore them automatically. After successful
 writes, an observer failure preserves delivery with
 <code>eventDelivery.status === &#39;degraded&#39;</code> and <code>ARCANE_EVENT_DELIVERY_FAILED</code>; it
 does not roll back complete application content.</p>
@@ -521,6 +531,15 @@ starts. Package-only apps retain their existing manifest. This operation does
 not package the app or produce <code>dist</code> output. With PWA enabled, the server
 generates the installation and offline manifests directly; see
 <a href="../pwa/#development-and-hosting">PWA development and versioning</a>.</p>
+<p>The startup URL remains the selected app entry. At <code>/</code>, the server serves an
+existing authored host-root <code>index.html</code> and suppresses the app-entry redirect
+and PWA alias. A root outside the selected app mapping is served unchanged only
+through this exact-root route; <code>/index.html</code> and other resource URLs retain their
+existing selection rules. A selected root follows its existing document
+classification. Root presence does not expand either inventory or cause
+bootstrap injection. With no host index, the app-entry redirect remains.
+Root-file creation or removal is reflected in subsequent root-navigation and
+generated-PWA requests without a restart or a descriptor edit.</p>
 <p>The command reports acceptance before bind/start work, emits the final URL,
 owns the server until cancellation, and restores failure to the process exit.
 The default host is <code>127.0.0.1</code>. <code>--public</code> selects <code>0.0.0.0</code> (all IPv4
@@ -660,8 +679,11 @@ defaulting to <code>dist/&lt;id&gt;/</code>, and preserves the prior output unti
 is complete. It consumes saved source and managed
 import maps, keeps standalone app files at the output root, and retains the
 configured shared route destinations. Explicit multi-app workspaces retain
-their selected app beneath <code>apps/&lt;id&gt;/</code>. When selected shared content supplies no root
-<code>index.html</code>, the SDK generates one that opens the selected app entry.
+their selected app beneath <code>apps/&lt;id&gt;/</code>. A selected authored output-root
+<code>index.html</code> is preserved and suppresses the deployment-root PWA navigation
+alias. When selected content supplies no root index, the SDK generates a launcher
+and retains the app-entry alias. An excluded source-host root does not change
+that package selection.
 Source document bases and resource URLs therefore retain their development
 layout. Packaging does not run tests or checks automatically.</p>
 <p>Set <code>&quot;outputDirectory&quot;: &quot;ai&quot;</code> in the selected app&#39;s <code>arcane-package.json</code>
@@ -687,6 +709,10 @@ and the default packaged installation identity remain unchanged.</p>
 the package launch URL in <code>app.start</code>: <code>./index.html</code> for a root app with that
 entry, or <code>./apps/hello-world/index.html</code> for a nested app. The complete file
 inventory follows the selected layout and includes the root <code>index.html</code>.
+Only selected records supplying an authored output-root index add
+<code>app.rootDocument: &quot;./index.html&quot;</code>. This optional generated release fact selects
+root-document serving in preview; it is not an app configuration or CLI option
+and does not change <code>app.start</code>.
 <code>--dry-run</code> plans the package without refreshing source, running tests, or
 replacing output.</p>
 <h3 id="example-8">Example</h3>
@@ -736,9 +762,11 @@ inventory structure.</p>
 </code></pre></div>
 <h2 id="arcane-native-doctor"><code>arcane native-doctor</code></h2>
 <h3 id="overview-12">Overview</h3>
-<p>Loads one fixed native provider from one explicit Arcane OS checkout and
-diagnoses the selected target/host prerequisites without building an app.</p>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane native-doctor --target &lt;native-target&gt; --arcane-root &lt;directory&gt;
+<p>Loads the SDK package provider for portable by default, or the fixed provider
+from an explicitly selected Arcane OS checkout. It diagnoses the selected
+provider prerequisites without building an app. Executable targets still
+require <code>--arcane-root</code> and their platform toolchains.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane native-doctor --target &lt;native-target&gt; [--arcane-root &lt;directory&gt;]
 </code></pre></div>
 <h3 id="availability-1">Availability</h3>
 <p>This is a <strong>Node</strong> orchestration command with <strong>Native</strong> provider behavior. The
@@ -754,7 +782,7 @@ is unavailable; it never returns a browser package as a substitute.</p>
 <p>Runs the provider&#39;s standalone toolchain preparation diagnostic for one target.
 It is not a prerequisite command to repeat immediately before <code>build</code>; <code>build</code>
 prepares its own selected toolchain state.</p>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane native-prepare --target &lt;native-target&gt; --arcane-root &lt;directory&gt;
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">arcane native-prepare --target &lt;native-target&gt; [--arcane-root &lt;directory&gt;]
 </code></pre></div>
 <h3 id="example-13">Example</h3>
 <div class="code-block reference-code"><div class="code-bar"><span>bash</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-bash">npm exec -- arcane native-prepare \
@@ -771,6 +799,12 @@ prepares its own selected toolchain state.</p>
 profile, and output root. Current providers emit a portable directory,
 Windows x64 EXE bundle, Linux x64/ARM64 DEB, or development-signed Android APK.
 The output remains target-specific inside the common plan contract.
+Portable uses the SDK package without an OS checkout, copies complete selected
+app/dependency payloads and generates the Core entry/classic client source.
+It adds no executable platform host or automatically discovered app services.
+An explicit <code>--arcane-root</code> continues to select the checkout provider.
+Integrated builds retain an output root outside the OS checkout; only an
+explicit checkout provider must share the workspace root.
 The app&#39;s <code>outputDirectory</code> selects its packaged browser-content input;
 native <code>--output-root</code> independently selects native build output.
 <code>--dry-run</code> is implemented for the browser build path. Native builds reject it
@@ -788,6 +822,11 @@ rather than returning a fictional native artifact plan.</p>
 does not package, rebuild, test, check, or verify that release automatically.
 It opens the release manifest&#39;s <code>app.start</code> URL. Older flat releases without
 that field continue to open their <code>app.entry</code> path.
+Requests to <code>/</code> serve the explicit <code>app.rootDocument</code> when that generated
+release field is present. With no field, including older releases and app-only
+packages with a generated launcher, <code>/</code> retains its <code>302</code> redirect to
+<code>app.start</code> or the older <code>app.entry</code> fallback, preserving the request query.
+Preview does not infer root ownership from HTML content.
 The preview always uses HTTPS with the workspace certificate pair. Supply
 <code>--cert &lt;file&gt; --key &lt;file&gt;</code> together to use another pair; see
 <a href="#development-https-setup">development HTTPS setup</a>.
@@ -1082,6 +1121,6 @@ parser&#39;s recognized option set.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#command-inventory">Command inventory</a><a href="#parser-wide-options">Parser-wide options</a><a href="#output-and-exit-contract">Output and exit contract</a><a href="#arcane-new">arcane new</a><a href="#arcane-init">arcane init</a><a href="#arcane-doctor">arcane doctor</a><a href="#arcane-import-map">arcane import-map</a><a href="#arcane-upgrade">arcane upgrade</a><a href="#arcane-dev">arcane dev</a><a href="#arcane-test">arcane test</a><a href="#arcane-check">arcane check</a><a href="#arcane-package">arcane package</a><a href="#arcane-verify">arcane verify</a><a href="#arcane-bundle">arcane bundle</a><a href="#arcane-verify-bundle">arcane verify-bundle</a><a href="#arcane-native-doctor">arcane native-doctor</a><a href="#arcane-native-prepare">arcane native-prepare</a><a href="#arcane-build">arcane build</a><a href="#arcane-run">arcane run</a><a href="#arcane-update-check">arcane update-check</a><a href="#arcane-targets">arcane targets</a><a href="#arcane-repo">arcane repo</a><a href="#arcane-mail">arcane mail</a><a href="#machine-output">Machine output</a><a href="#programmatic-only-operation-names">Programmatic-only operation names</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.51.1, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.55.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

@@ -17,8 +17,13 @@ high-level page links to the relevant deep section instead of repeating it.
 Install the SDK in your application:
 
 ```sh
-npm install --save-exact arcane-os@latest
+npm pkg set dependencies.arcane-os=latest
+npm install
 ```
+
+The development declaration tracks the current `latest` channel. The lockfile
+and installed package record the exact version actually selected for the
+workspace.
 
 For your first AI call, follow the [TWiN Cloud quick start](ai/twin-cloud.md).
 For local models, native browser voices or cloud speech, follow the [browser speech guide](ai/browser-speech.md)
@@ -38,14 +43,19 @@ alone does not make bare module names resolve in a browser.
 | Use the `arcane` command | [CLI reference](cli.md) |
 | Install an app and cache selected resources offline | [Progressive web applications](pwa.md) |
 | Generate named browser imports or inspect the selected physical runtime | [`arcane import-map`](cli.md#arcane-import-map) and [browser runtime delivery](protocols.md#browser-runtime-delivery) |
+| Connect an application through the shared WebSocket transport | [Shared WebSocket clients](websocket-client.md) |
 | Choose browser, native, cloud, or cross-host behavior | [Availability and normalization](availability-and-normalization.md) |
 | Import a shipped renderer module | [Runtime module catalog](runtime-modules.md) |
 | Use a shared entity | [Runtime entity modules](runtime-entities.md) and [exact export contracts](core/arcane-entities.md) |
 | Load a reusable HTML component | [Runtime component catalog](runtime-components.md) |
 | Submit complete speech parts immediately and play them in order | [`SpeechPlayback`](runtime-modules.md#speechplaybackjs) and the [basic browser example](ai/browser-speech.md#play-a-complete-array-with-speechplayback) |
 | Call `globalThis.Arcane` | [Arcane Core API](core/arcane-api.md) |
+| Connect a browser to one Core transport | [Core browser client](core-client.md) |
+| Compose native Core dispatch, service lifecycle, and stdio hosting | [Native Core runtime](core-runtime.md) |
+| Build an installed-SDK portable Core payload | [Portable Core packaging](core-native-packaging.md) |
 | Subscribe to native events | [Arcane event reference](core/arcane-events.md) |
 | Use provider-neutral AI lifecycle, chat, speech, persistence, or document context | [Normalized AI](#normalized-ai) |
+| Choose a normalized typed browser decision surface | [Browser typed decisions](ai/browser-decisions.md) |
 | Run a caller-selected local LLM in the browser | [Browser-WASM local AI](ai/browser-wasm.md) |
 | Run caller-selected Whisper/Kokoro, native browser recognition/voices or cloud TTS | [Browser speech providers](ai/browser-speech.md) |
 | Send TWiN chat, System One state/questions or image requests | [TWiN Cloud guide](ai/twin-cloud.md) |

@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="arcane-os/ai/browser-decisions owns browser-local Laya typed-decisions FP16 and Julia-1 FP32 inference. It is separate from chat and speech because these models score caller-supplied options instead of generating conversational text. Applications supply the model repository, state, questions, option meanings and policy; the SDK owns the reusable tokenizer, tensors, inference and lifecycle.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-decisions/"><link rel="icon" type="image/png" href="../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../styles.css"><link rel="stylesheet" href="../../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Browser typed decisions · Arcane OS SDK"><meta property="og:description" content="arcane-os/ai/browser-decisions owns browser-local Laya typed-decisions FP16 and Julia-1 FP32 inference. It is separate from chat and speech because these models score caller-supplied options instead of generating conversational text. Applications supply the model repository, state, questions, option meanings and policy; the SDK owns the reusable tokenizer, tensors, inference and lifecycle."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/ai/browser-decisions/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Browser typed decisions · Arcane OS SDK"><meta name="twitter:description" content="arcane-os/ai/browser-decisions owns browser-local Laya typed-decisions FP16 and Julia-1 FP32 inference. It is separate from chat and speech because these models score caller-supplied options instead of generating conversational text. Applications supply the model repository, state, questions, option meanings and policy; the SDK owns the reusable tokenizer, tensors, inference and lifecycle."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Browser typed decisions | Arcane OS SDK</title><script src="../../../app.js" defer></script><script src="../../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../examples/">Hello World</a><a href="../../../guides/">Guides</a><a href="../../sdk-api/">API</a><a href="../../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">Browser typed decisions</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="browser-typed-decisions">Browser typed decisions</h1><p class="doc-lead">arcane-os/ai/browser-decisions owns browser-local Laya typed-decisions FP16 and Julia-1 FP32 inference. It is separate from chat and speech because these models score caller-supplied options instead of generating conversational text. Applications supply the model repository, state, questions, option meanings and policy; the SDK owns the reusable tokenizer, tensors, inference and lifecycle.</p><div class="doc-meta"><span>SDK 0.55.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../">Normalized AI</a><a href="../twin-cloud/">TWiN Cloud quick start</a><a href="../browser-wasm/">Browser-WASM AI</a><a href="./" aria-current="page">Browser typed decisions</a><a href="../browser-speech/">Browser speech</a><a href="../../websocket-client/">Shared WebSocket clients</a><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../core/">Core map</a><a href="../../core-client/">Core browser client</a><a href="../../core-runtime/">Native Core runtime</a><a href="../../core-native-packaging/">Portable Core packaging</a><a href="../../core/arcane-api/">Arcane API</a><a href="../../core/capabilities/">Capabilities and admission</a><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../../core/arcane-events/">Events</a><a href="../../core/arcane-ai-contracts/">AI contracts</a><a href="../../core/arcane-entities/">Entity exports</a><a href="../../core/ollama-module/">Ollama internals (advanced)</a><a href="../../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/ai/browser-decisions.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#explicit-use">Explicit use</a><a href="#configuration-and-upstream-delivery">Configuration and upstream delivery</a><a href="#complete-rows-and-results">Complete rows and results</a><a href="#lifecycle-events-and-cancellation">Lifecycle, events and cancellation</a><a href="#model-limits-and-evidence">Model limits and evidence</a></nav></details><p><code>arcane-os/ai/browser-decisions</code> owns browser-local Laya typed-decisions FP16
+and Julia-1 FP32 inference. It is separate from chat and speech because these
+models score caller-supplied options instead of generating conversational text.
+Applications supply the model repository, state, questions, option meanings and
+policy; the SDK owns the reusable tokenizer, tensors, inference and lifecycle.</p>
+<h2 id="explicit-use">Explicit use</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createBrowserDecisionModel} from &#39;arcane-os/ai/browser-decisions&#39;;
+
+const model = createBrowserDecisionModel(
+    {
+        family: &#39;laya&#39;,
+        model: &#39;onnx-community/laya-typed-decisions-ONNX&#39;,
+        revision: &#39;main&#39;,
+        device: &#39;webgpu&#39;
+    }
+);
+
+const unsubscribe = model.subscribe(
+    function showModelStatus(state) {
+        status.textContent = state.progress?.phase ?? state.state;
+    }
+);
+
+runButton.addEventListener(
+    &#39;click&#39;,
+    async function decideDragonTea() {
+        try {
+            const result = await model.evaluate(
+                [
+                    {
+                        state: &#39;A sleeping dragon blocks the kitchen. The kettle whistles.&#39;,
+                        question: &#39;What should the tea robot do?&#39;,
+                        options: [&#39;Wait quietly&#39;, &#39;Boil the kettle&#39;]
+                    }
+                ]
+            );
+            output.textContent = result.decisions[0].value;
+        } catch (error) {
+            console.error(&#39;The decision request failed.&#39;, error);
+            status.textContent = &#39;The decision could not be completed.&#39;;
+        }
+    }
+);
+</code></pre></div>
+<p>Here <code>status</code>, <code>runButton</code> and <code>output</code> are application DOM elements. Changing
+the state, question or options changes the actual model request. Importing the
+module and constructing the client start no Worker or download. Only explicit
+<code>load()</code> or <code>evaluate()</code> use loads the selected runtime and model. Concurrent
+requests share the same activation; ready inference reuses that model session.</p>
+<p>For Julia, select <code>family: &#39;julia&#39;</code> and
+<code>model: &#39;SupersonicLabs/Julia-1-ONNX&#39;</code>. This selects the official FP32 graph;
+it does not substitute a quantized graph or another model.</p>
+<h2 id="configuration-and-upstream-delivery">Configuration and upstream delivery</h2>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>family</code></td>
+<td>Required <code>laya</code> or <code>julia</code>; chooses the model&#39;s encoding and graph layout.</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td>Required upstream repository/base URL accepted by Transformers.js. The application owns its selection.</td>
+</tr>
+<tr>
+<td><code>revision</code></td>
+<td>Upstream revision, default <code>main</code>; select a stable revision when repeatable model selection is needed.</td>
+</tr>
+<tr>
+<td><code>device</code></td>
+<td>Transformers.js backend, default <code>webgpu</code>; an explicit supported alternative is caller-owned. No automatic backend fallback.</td>
+</tr>
+<tr>
+<td><code>runtime.moduleUrl</code></td>
+<td>Defaults to the self-contained CDN entry <code>https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.min.js</code>. The <code>.web.js</code> build expects a bundler to resolve its bare ONNX Runtime import and is unsuitable for a native module Worker. An explicit compatible public runtime URL may be supplied.</td>
+</tr>
+<tr>
+<td><code>runtime.wasmPaths</code></td>
+<td>Optional upstream ONNX WASM location passed to the selected runtime&#39;s public environment API.</td>
+</tr></tbody>
+</table>
+</div>
+<p>The runtime, tokenizer and weights use normal upstream loading and caching;
+the SDK does not redistribute them or create a second model store. Browser
+network, cross-origin and backend availability still apply. WebGPU needs a
+compatible browser/device context. Unsupported precision or backend errors
+are returned, not replaced with a different model, backend or precision.</p>
+<p>Laya selects <code>dtype: &#39;fp16&#39;</code>, loading <code>onnx/model_fp16.onnx</code> and its
+<code>model_fp16.onnx_data</code> companion through Transformers.js. The published mixed
+precision graph retains selected operations/outputs in FP32; FP16 selection
+does not claim every graph operation runs in half precision.</p>
+<p>Julia selects <code>dtype: &#39;fp32&#39;</code>, loading root <code>model.onnx</code> with the exact
+<code>model.onnx.data</code> external-data name. Its custom five-input graph is loaded
+through the public generic <code>PreTrainedModel</code> API, not a text-generation
+pipeline. Existing Wllama, cloud, speech and chat APIs are unchanged.</p>
+<h2 id="complete-rows-and-results">Complete rows and results</h2>
+<p><code>evaluate(rows, {signal})</code> accepts an array in caller order. Each row has
+string <code>state</code>, string <code>question</code>, string-array <code>options</code>, and optional
+<code>type</code> defaulting to <code>choice</code>. Additional row fields remain in the returned
+row without affecting inference. Neither strings nor option arrays are
+trimmed, rewritten, clipped or capped by the SDK.</p>
+<p>The model&#39;s required token framing puts the complete type/question header,
+option markers/options and state into <code>input_ids</code>; accompanying inputs are
+<code>attention_mask</code>, <code>marker_pos</code>, <code>marker_mask</code> and <code>qtype</code>. Right padding aligns
+rows in a batch. Literal marker text inside supplied content remains content;
+option positions identify only markers inserted by the encoding owner.
+Tokenizer encoding is called without special-token insertion and without
+the upstream batch-tokenizer truncation path.</p>
+<p>The result is <code>{decisions, outputs}</code>. <code>decisions</code> follows input order and each
+entry contains the original row record, option <code>logits</code>, unrounded raw-softmax
+<code>probabilities</code>, the highest-logit <code>answerIndex</code>, and <code>value</code>:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Type</th>
+<th><code>value</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>choice</code></td>
+<td>The complete selected option string.</td>
+</tr>
+<tr>
+<td><code>score</code></td>
+<td>Raw-softmax weighted zero-based option index. Applications map this to their own score scale.</td>
+</tr>
+<tr>
+<td><code>noul</code></td>
+<td>Probability of option 1; supply exactly <code>[falseOption, trueOption]</code> in that order.</td>
+</tr></tbody>
+</table>
+</div>
+<p>If the actual graph supplies <code>act_logits</code>, the entry additionally includes
+complete <code>actionLogits</code>, unrounded <code>actionProbabilities</code>, and raw-softmax
+<code>actProbability</code> at index 0. Julia&#39;s
+published ONNX export has no action head; the SDK does not invent one.</p>
+<p><code>outputs</code> preserves every returned graph tensor, including padding and extra
+named outputs, as <code>{type, dims, data}</code> with complete copied typed data. This
+keeps model results available for explicit application interpretation and
+diagnostics. Probabilities are raw model scores, not claimed calibrated
+confidence, probabilities rounded to two decimal places, or policy decisions.
+No result is inserted into chat history, memory extraction or DBOPFS.</p>
+<h2 id="lifecycle-events-and-cancellation">Lifecycle, events and cancellation</h2>
+<p><code>status()</code> returns <code>{family, model, revision, device, dtype, state, loaded, busy, activeRequests, progress, error}</code>. States are <code>unloaded</code>, <code>loading</code>,
+<code>ready</code>, <code>error</code> and <code>disposed</code>. <code>subscribe(listener, {emitCurrent: true, signal})</code> observes the owning Arcane event source, replays current state by
+default and returns an unsubscribe function. Successful rows and graph results
+return to the calling operation rather than lifecycle notifications. Complete
+errors, including graph diagnostics when decoding fails, remain available in
+<code>error</code>; they belong in developer diagnostics, not ordinary status text.</p>
+<p>Work is acknowledged synchronously before loading/inference waits. Progress
+reports real semantic phases such as <code>waiting-for-model</code>, <code>loading-runtime</code>, <code>loading-tokenizer</code>,
+<code>loading-model</code>, <code>ready</code>, <code>evaluating</code> and <code>complete</code>; it is not a synthetic
+percentage. Loading the model and tokenizer proceeds concurrently. Repeated
+identical state text is tokenized once per batch. Independent requests are
+accepted concurrently; the selected backend still owns its execution ordering.</p>
+<p><code>load({signal})</code> explicitly prepares the shared activation. <code>evaluate()</code> also
+loads on its first explicit use. An <code>AbortSignal</code>, <code>unload()</code> or <code>dispose()</code>
+terminates the client&#39;s dedicated Worker and rejects all its outstanding
+operations. Cancellation is client-wide because the model session and GPU
+work belong to that Worker. Use separate clients when independent cancellation
+is required. <code>unload()</code> permits later explicit reactivation; <code>dispose()</code> is
+terminal. Old Worker replies cannot affect a replacement activation.</p>
+<p>A Worker operation failure releases the failed activation and rejects its
+waiting calls. The next explicit use starts a fresh Worker rather than reusing
+an upstream inference queue that may remain rejected after a backend failure.
+Error records preserve the original
+name, message, stack, code, cause and available custom fields across the Worker
+boundary. Applications keep technical diagnostics out of ordinary user status.</p>
+<h2 id="model-limits-and-evidence">Model limits and evidence</h2>
+<p>The published Laya and Julia families advertise an 8192-token native context.
+Their reference wrappers apply smaller budgets and, for Julia, a documented
+2–20-option interface. The SDK does not reproduce those wrapper clipping or
+rounding policies or claim arbitrary lengths are supported by the graph.
+Actual model/backend failures remain observable. Long-input quality and
+option-count behavior must be established for the application&#39;s selected
+model; no hidden windowing or result aggregation is performed.</p>
+<p>Julia&#39;s Transformers.js tokenizer route exists in the official browser
+adapter, alongside a Rust tokenizer. Repeated-space/Metaspace segmentation can
+differ between those tokenizer implementations. Complete text is preserved at
+the tokenizer boundary, and Python/Rust token-ID or numerical parity is not
+claimed. Applications needing that parity must use an established compatible
+tokenizer contract rather than silently rewriting text.</p>
+<p>Upstream graph/loading contracts were reviewed from primary source. Browser
+model loading, FP16/FP32 inference, cancellation and numerical behavior require
+selected-output verification; static compatibility review alone is not a
+runtime pass.</p>
+<p>Primary references: <a href="https://huggingface.co/onnx-community/laya-typed-decisions-ONNX" target="_blank" rel="noreferrer">Laya ONNX</a>,
+<a href="https://github.com/NandhaKishorM/laya" target="_blank" rel="noreferrer">Laya reference</a>,
+<a href="https://huggingface.co/SupersonicLabs/Julia-1-ONNX" target="_blank" rel="noreferrer">Julia-1 ONNX</a>,
+<a href="https://github.com/huggingface/transformers.js/tree/4.3.0/packages/transformers" target="_blank" rel="noreferrer">Transformers.js 4.3.0</a>.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#explicit-use">Explicit use</a><a href="#configuration-and-upstream-delivery">Configuration and upstream delivery</a><a href="#complete-rows-and-results">Complete rows and results</a><a href="#lifecycle-events-and-cancellation">Lifecycle, events and cancellation</a><a href="#model-limits-and-evidence">Model limits and evidence</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.55.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

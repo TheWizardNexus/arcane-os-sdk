@@ -3,16 +3,16 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.51.1",
+    "sdk": "0.55.0",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
   "counts": {
-    "markdownPages": 30,
+    "markdownPages": 35,
     "collectionPages": 2,
-    "generatedPages": 94,
-    "runtimeModulePages": 92,
-    "htmlPages": 126,
+    "generatedPages": 95,
+    "runtimeModulePages": 93,
+    "htmlPages": 132,
     "inventories": 4
   },
   "pages": [
@@ -21,6 +21,12 @@
       "output": "site/reference/ai/index.html",
       "route": "reference/ai/",
       "kind": "generated"
+    },
+    {
+      "source": "docs/reference/ai/browser-decisions.md",
+      "output": "site/reference/ai/browser-decisions/index.html",
+      "route": "reference/ai/browser-decisions/",
+      "kind": "markdown"
     },
     {
       "source": "docs/reference/ai/browser-speech.md",
@@ -68,6 +74,24 @@
       "source": "docs/reference/cli.md",
       "output": "site/reference/cli/index.html",
       "route": "reference/cli/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core-client.md",
+      "output": "site/reference/core-client/index.html",
+      "route": "reference/core-client/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core-native-packaging.md",
+      "output": "site/reference/core-native-packaging/index.html",
+      "route": "reference/core-native-packaging/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core-runtime.md",
+      "output": "site/reference/core-runtime/index.html",
+      "route": "reference/core-runtime/",
       "kind": "markdown"
     },
     {
@@ -824,6 +848,21 @@
         "exports": 3,
         "reviewedCallables": 2,
         "publicMembers": 2,
+        "literalCustomEvents": 0,
+        "directCodedFailures": 0,
+        "exportedErrorSubclasses": 0
+      }
+    },
+    {
+      "source": "runtime/arcane/modules/HTMLImportScript.js",
+      "output": "site/reference/runtime-modules/html-import-script/index.html",
+      "route": "reference/runtime-modules/html-import-script/",
+      "kind": "runtime-module",
+      "moduleClassification": "public-first-party",
+      "contractCounts": {
+        "exports": 1,
+        "reviewedCallables": 0,
+        "publicMembers": 0,
         "literalCustomEvents": 0,
         "directCodedFailures": 0,
         "exportedErrorSubclasses": 0
@@ -1598,6 +1637,12 @@
       "source": "docs/reference/sdk-api.md",
       "output": "site/reference/sdk-api/index.html",
       "route": "reference/sdk-api/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/websocket-client.md",
+      "output": "site/reference/websocket-client/index.html",
+      "route": "reference/websocket-client/",
       "kind": "markdown"
     }
   ],

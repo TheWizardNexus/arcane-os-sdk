@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="arcane-os/native/portable-provider owns the portable native payload in the SDK package. It does not load Arcane OS source, choose models, download a runtime, or compile an executable. Windows, Linux and macOS hosts may compose this Node-based payload; Android needs its separate native host adaptation. The current CLI&#39;s portable platform selections remain Windows and Linux. A portable artifact is not a Windows executable, Linux package or Android application.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core-native-packaging/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Portable Core packaging · Arcane OS SDK"><meta property="og:description" content="arcane-os/native/portable-provider owns the portable native payload in the SDK package. It does not load Arcane OS source, choose models, download a runtime, or compile an executable. Windows, Linux and macOS hosts may compose this Node-based payload; Android needs its separate native host adaptation. The current CLI&#39;s portable platform selections remain Windows and Linux. A portable artifact is not a Windows executable, Linux package or Android application."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core-native-packaging/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Portable Core packaging · Arcane OS SDK"><meta name="twitter:description" content="arcane-os/native/portable-provider owns the portable native payload in the SDK package. It does not load Arcane OS source, choose models, download a runtime, or compile an executable. Windows, Linux and macOS hosts may compose this Node-based payload; Android needs its separate native host adaptation. The current CLI&#39;s portable platform selections remain Windows and Linux. A portable artifact is not a Windows executable, Linux package or Android application."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Portable Core packaging | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Portable Core packaging</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="portable-core-packaging">Portable Core packaging</h1><p class="doc-lead">arcane-os/native/portable-provider owns the portable native payload in the SDK package. It does not load Arcane OS source, choose models, download a runtime, or compile an executable. Windows, Linux and macOS hosts may compose this Node-based payload; Android needs its separate native host adaptation. The current CLI&#39;s portable platform selections remain Windows and Linux. A portable artifact is not a Windows executable, Linux package or Android application.</p><div class="doc-meta"><span>SDK 0.55.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="./" aria-current="page">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/core-native-packaging.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#provider-and-selected-input">Provider and selected input</a><a href="#output-and-host-contract">Output and host contract</a><a href="#explicit-application-services">Explicit application services</a></nav></details><p><code>arcane-os/native/portable-provider</code> owns the portable native payload in the SDK
+package. It does not load Arcane OS source, choose models, download a runtime,
+or compile an executable. Windows, Linux and macOS hosts may compose this
+Node-based payload; Android needs its separate native host adaptation. The
+current CLI&#39;s portable platform selections remain Windows and Linux. A portable
+artifact is not a Windows executable, Linux package or Android application.</p>
+<p><code>loadArcaneNativeProvider({target:&#39;portable&#39;})</code> selects the installed SDK provider
+without an <code>arcaneRoot</code>. Supplying an explicit <code>arcaneRoot</code> retains the existing
+checkout-provider route. Other native targets remain with their actual platform
+providers; the loader does not substitute this payload for an unavailable host.</p>
+<h2 id="provider-and-selected-input">Provider and selected input</h2>
+<p>The default export and <code>arcaneNativeBuilderProvider</code> are the same provider.
+<code>createPortableNativeProvider({services:[]})</code> creates one with application-owned
+service configuration. All implement <code>arcane-native-builder/1</code>:</p>
+<ul>
+<li><code>describe()</code> identifies the portable target and <code>executable:false</code>.</li>
+<li><code>doctor({targetRequest, signal, onEvent})</code> reports missing SDK Core source files.</li>
+<li><code>prepare({targetRequest, signal, onEvent})</code> returns the selected SDK version and
+package root. Neither operation builds or imports application services.</li>
+<li><code>build(request)</code> assembles one selected release and its explicit dependencies.</li>
+<li><code>verify({artifact, targetRequest, signal, onEvent})</code> explicitly reads its semantic
+manifest and observes that the listed output files exist. It does not execute
+a host or establish native behavior. Build does not implicitly run verification.</li>
+<li><code>run()</code> reports <code>ARCANE_NATIVE_RUN_UNSUPPORTED</code>; portable is not an executable.</li>
+</ul>
+<p>Use the existing <code>createNativeBuildPlan()</code> / <code>executeNativeBuildPlan()</code> public
+contract. Build receives <code>appDescriptor</code>, <code>appReleaseRoot</code>, <code>release</code>,
+<code>readReleaseFile</code>, <code>dependencies</code>, <code>minimumCoreVersion</code>, <code>protectedRoots</code>,
+<code>outputRoot</code>, <code>targetRequest</code>, <code>selectedSdk</code>, <code>signal</code> and <code>onEvent</code>. Dependencies provide their
+<code>appId</code>, <code>releaseRoot</code>, <code>release</code> and <code>readReleaseFile</code>. The selected release&#39;s
+<code>files</code> inventory is copied completely through its supplied reader. Direct
+callers may supply the release root for ordinary file reads instead.</p>
+<p>Both the current flat signing selection and the CLI&#39;s nested signing selection
+are accepted by the planning boundary. Portable assembly adds no signing,
+receipts, hashes, content limits or security policy. The package-relative source
+root comes from the provider module&#39;s own location, not <code>toolchainRoot</code> or an
+Arcane OS machine bundle.</p>
+<h2 id="output-and-host-contract">Output and host contract</h2>
+<p>Each build creates a fresh <code>arcane-portable-*</code> directory beneath <code>outputRoot</code>.
+The result is <code>{app, target, manifest}</code>, with its actual directory at
+<code>target.rootDir</code>. Existing artifacts are preserved. Cancellation or a failed
+assembly removes only that build&#39;s newly created directory. Source/release roots
+cannot be overwritten with generated output.</p>
+<p>The selected app is copied unchanged under <code>app/</code>. Dependencies are copied
+unchanged under <code>dependencies/&lt;index&gt;/</code>; the manifest relates each directory to
+its actual app identifier and selected release. No HTML, payload, line ending,
+application import, or base URL is rewritten by this provider. Dependency
+navigation and service imports remain explicit host/application composition;
+the payload does not invent cross-app routes.</p>
+<p><code>node_modules/arcane-os/</code> contains the SDK consumer source, runtime, schemas,
+commands, package metadata and legal files. Its installed published runtime
+dependency tree is included with licenses and actual nested dependency
+resolution. The generated Core entry uses the ordinary public
+<code>arcane-os/core/host</code> import. Application service modules can use those public
+SDK exports through Node&#39;s normal package resolution. Existing app-owned
+<code>node_modules</code> content remains authoritative where the selected app supplies it;
+its own dependency completeness remains part of that app&#39;s selected release.
+For the direct installed browser layout, the ordinary native selection also
+supplies <code>selectedSdk:{packageRoot,packageSource}</code> from the application&#39;s actual
+installed SDK. Assembly completes its browser-only package directory with
+missing files and dependencies from that selected package, preserving every
+selected file. It never fills an older projection with the builder&#39;s newer
+package metadata. An already-supplied <code>package.json</code> remains app-owned, without
+replacement or automatic completion. <code>manifest.appSdk</code> identifies this app
+package separately from the builder SDK. Low-level callers composing services
+with a partial direct SDK projection must supply the actual selected package
+source; a file inventory alone does not identify its version or Node exports.
+No dependency installer or package script runs. No OS model, Shell, Provisioner,
+catalog, prompt, or native compiler is added.</p>
+<p>The semantic <code>arcane-native.json</code> names the web root, selected start URL, Node
+Core entry, classic client, dependencies and complete file inventory. A native
+host must:</p>
+<ol>
+<li>Mount <code>app/</code> at the root of its local application URL origin, preserving the
+selected start path and all navigable documents.</li>
+<li>Inject <code>runtime/arcane-api.js</code> at document creation. It is produced by the
+canonical <code>createCoreClassicSource()</code> generator, not a copied OS client.</li>
+<li>Start <code>runtime/arcane-core.mjs</code> with the host&#39;s supported Node runtime and
+connect the existing framed stdin/stdout transport.</li>
+<li>Close input and await Core&#39;s drain before terminating the child process.</li>
+</ol>
+<p>The selected release must contain one shared <code>sdk/event-manager.mjs</code> path,
+possibly nested under its SDK payload directory, or the direct installed
+<code>node_modules/&lt;package-or-alias&gt;/browser-runtime/event-manager.mjs</code> path.
+The classic client imports that
+same owner with an origin-root URL, including on nested pages. It does not create
+a second event implementation. A plain file-URL launch without this host mapping
+is not the native serving contract. No host is launched during packaging.</p>
+<h2 id="explicit-application-services">Explicit application services</h2>
+<p>Pass native service modules already included in the selected app release:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createPortableNativeProvider} from &#39;arcane-os/native/portable-provider&#39;;
+
+const nativeBuilder = createPortableNativeProvider({
+    services: [{module:&#39;native/moon-ledger.mjs&#39;, options:{ledgerName:&#39;Cheese debts&#39;}}]
+});
+</code></pre></div>
+<p>Each module default-exports a synchronous factory returning the existing Core
+service definition. Its options must be JSON-serializable data. Module imports
+and factories run only when the generated Core entry is launched, never during
+packaging. Put asynchronous initialization in <code>start()</code>, not a top-level await
+or asynchronous factory, so unrelated services and dispatcher readiness remain
+independent. Factories own product configuration and any service dependencies;
+the packager does not discover, install or execute them.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">// native/moon-ledger.mjs, owned by the application
+export default function createMoonLedger({ledgerName}) {
+    return {
+        name: &#39;moon-ledger&#39;,
+        methods: {
+            &#39;moon.describe&#39;: function describeLedger() {
+                return {name:ledgerName, message:&#39;The cheese debts are astronomical.&#39;};
+            }
+        }
+    };
+}
+</code></pre></div>
+<p><code>startCoreHost({application, version, services, input, output, onError, signal})</code>
+is also available directly from <code>arcane-os/core/host</code>. It returns the existing
+stdio owner&#39;s <code>{runtime, closed, close}</code> without another lifecycle controller.
+An optional abort signal invokes that same idempotent drain. Dispatcher readiness
+does not wait for service/model readiness. Accepted <code>lifetime:&#39;service&#39;</code> work
+survives renderer cancellation and is drained before shutdown. Errors remain
+observable through <code>onError</code> and <code>closed</code>; no process is killed or forcibly exited.
+See <a href="../core-runtime/">the Core runtime contract</a> for request and service lifetime
+details and <a href="../core-client/">the client contract</a> for native bridge integration.</p>
+<p>This source increment supplies portable assembly and service composition.
+Desktop WebView executables, platform child-process ownership, Android dispatch
+and executable build toolchains require their own completed adapters. Published
+consumers must adopt the numeric package that includes this increment; a source
+checkout or a successful source push is not that public package authority.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#provider-and-selected-input">Provider and selected input</a><a href="#output-and-host-contract">Output and host contract</a><a href="#explicit-application-services">Explicit application services</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.55.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

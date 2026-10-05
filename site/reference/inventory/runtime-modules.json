@@ -8,9 +8,9 @@
     "sdkVersion": "0.51.1",
     "protocol": "arcane/1"
   },
-  "artifactCount": 92,
-  "javascriptArtifactCount": 90,
-  "esmExportCount": 372,
+  "artifactCount": 93,
+  "javascriptArtifactCount": 91,
+  "esmExportCount": 373,
   "artifacts": [
     {
       "file": "runtime/arcane/modules/AI.js",
@@ -719,11 +719,24 @@
       "exports": [
         "default"
       ],
-      "summary": "Defines the same-origin `<html-import>` loader with open shadow root, inline script execution, and readiness/error events.",
+      "summary": "Defines the same-origin `<html-import>` loader with open shadow root, inline or packaged external script execution, and readiness/error events.",
       "availability": "Browser / native WebView",
       "protocol": "Same-origin fetch + DOM",
       "normalization": "Public error detail normalized; fetch/DOM failure preserved.",
       "surface": "default `HTMLImport`; registers `html-import`; `connectedCallback()` and `ready`."
+    },
+    {
+      "file": "runtime/arcane/modules/HTMLImportScript.js",
+      "name": "HTMLImportScript.js",
+      "kind": "esm",
+      "exports": [
+        "createHTMLImportScript"
+      ],
+      "summary": "Renders the complete classic-script host wrapper shared by HTMLImport and native-module packaging.",
+      "availability": "Cross-host",
+      "protocol": "In-process only",
+      "normalization": "Complete source retained with a terminating newline before the wrapper closes.",
+      "surface": "`createHTMLImportScript(source)` returns the script text without executing it."
     },
     {
       "file": "runtime/arcane/modules/InMemoryCommunicationProvider.js",

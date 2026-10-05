@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="The SDK owns the reusable native dispatcher and framed stdio transport. The composing application or native host supplies its identity, version and services. Product prompts, model selections, filesystem locations, host privileges and application policy remain with that owner.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core-runtime/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Native Core runtime · Arcane OS SDK"><meta property="og:description" content="The SDK owns the reusable native dispatcher and framed stdio transport. The composing application or native host supplies its identity, version and services. Product prompts, model selections, filesystem locations, host privileges and application policy remain with that owner."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core-runtime/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Native Core runtime · Arcane OS SDK"><meta name="twitter:description" content="The SDK owns the reusable native dispatcher and framed stdio transport. The composing application or native host supplies its identity, version and services. Product prompts, model selections, filesystem locations, host privileges and application policy remain with that owner."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Native Core runtime | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native Core runtime</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-core-runtime">Native Core runtime</h1><p class="doc-lead">The SDK owns the reusable native dispatcher and framed stdio transport. The composing application or native host supplies its identity, version and services. Product prompts, model selections, filesystem locations, host privileges and application policy remain with that owner.</p><div class="doc-meta"><span>SDK 0.55.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="./" aria-current="page">Native Core runtime</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/core-runtime.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#registration-and-startup">Registration and startup</a><a href="#state-and-frames">State and frames</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#stdio-transport">Stdio transport</a><a href="#platform-and-delivery-boundary">Platform and delivery boundary</a></nav></details><p>The SDK owns the reusable native dispatcher and framed stdio transport.
+The composing application or native host supplies its identity, version and
+services. Product prompts, model selections, filesystem locations, host
+privileges and application policy remain with that owner.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createCoreRuntime} from &#39;arcane-os/core/runtime&#39;;
+import {startCoreStdio} from &#39;arcane-os/core/stdio&#39;;
+import catalogStore from &#39;./catalog-store.mjs&#39;;
+
+const runtime = createCoreRuntime({
+    application: {id: &#39;moon-cheese-catalog&#39;, name: &#39;Moon Cheese Catalog&#39;},
+    version: &#39;1.0.0&#39;,
+    services: [{
+        name: &#39;catalog&#39;,
+        methods: {
+            &#39;catalog.save&#39;: {
+                lifetime: &#39;service&#39;,
+                async handle(record) {
+                    // catalogStore is supplied by this application&#39;s native owner.
+                    return catalogStore.save(record);
+                }
+            }
+        },
+        async drain() {
+            await catalogStore.flush();
+        },
+        async dispose() {
+            await catalogStore.close();
+        }
+    }]
+});
+
+const transport = startCoreStdio({runtime});
+await transport.closed;
+</code></pre></div>
+<p>The example&#39;s store is an application dependency, not an SDK-created database.
+The runtime passes each request&#39;s <code>parameters</code> to its registered handler
+unchanged. It preserves complete results and diagnostic errors; it neither
+selects product data nor supplies replacement results.</p>
+<h2 id="registration-and-startup">Registration and startup</h2>
+<p><code>createCoreRuntime({application, version, services})</code> creates a dispatcher.
+Supply the application&#39;s real descriptor and host release version. The built-in
+<code>app.current</code> and <code>version.current</code> methods return those values; <code>system.ping</code>
+returns <code>{ok:true}</code>. A ping establishes dispatcher responsiveness, not model,
+service or application readiness.</p>
+<p><code>runtime.registerService({name, methods, start, drain, dispose})</code> registers one
+native service. Method names are complete RPC names, such as <code>catalog.save</code>.
+A method is either a handler function or <code>{handle, lifetime}</code>. A handler function
+has request lifetime by default. Duplicate service or method names, including
+the three built-in methods, are reported rather than replacing another owner.
+Registration is a native composition API, not a browser command.</p>
+<p>Registration returns <code>{ready, current}</code>. Reading <code>ready</code> starts that service and
+returns its shared startup promise; <code>current()</code> exposes its state and actual
+error. <code>runtime.start()</code> starts all registered services independently and returns
+the current dispatcher state without waiting for them. A service registered
+after startup starts independently as well. A method waits only for its own
+service&#39;s startup before invoking its handler. State errors use the shared
+complete diagnostic serialization; the startup promise retains its original
+rejection value.</p>
+<p>Each lifecycle hook receives <code>{application, service, emit}</code>. Each request handler
+receives <code>(parameters, {application, service, emit, requestId, signal})</code>, with
+<code>this</code> bound to its service definition. A hook or handler may publish a complete
+service-owned event through <code>emit(event, data)</code>.</p>
+<h2 id="state-and-frames">State and frames</h2>
+<p><code>runtime.current()</code> returns dispatcher state, application, version, per-service
+state/errors and active request identities, methods and lifetimes.
+<code>runtime.subscribe(listener, {emitCurrent:true, signal})</code> immediately replays the
+current state and then observes changes through the canonical SDK event owner.
+It returns an unsubscribe function. <code>runtime.onFrame(listener, {signal})</code>
+observes outgoing protocol frames and also returns an unsubscribe function.
+Attach transport listeners before starting the runtime to observe initial frames.</p>
+<p>The shared <code>arcane-os/core/contracts</code> module owns <code>CORE_PROTOCOL</code> (<code>arcane/1</code>),
+<code>CoreError</code> and <code>serializeCoreError</code>. Requests are:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const result = {
+    protocol: &#39;arcane/1&#39;,
+    type: &#39;request&#39;,
+    id: &#39;request-1&#39;,
+    method: &#39;catalog.save&#39;,
+    parameters: {name: &#39;Lunar cheddar&#39;, notes: &#39;Keep the complete supplied text.&#39;}
+};
+</code></pre></div>
+<p><code>await runtime.handle(frame)</code> returns and emits the correlated response:
+<code>{protocol, type:&#39;response&#39;, id, ok:true, result, time}</code> or
+<code>{protocol, type:&#39;response&#39;, id, ok:false, error, time}</code>. Framing and method
+availability errors remain observable; unavailable services are not replaced
+with browser behavior.</p>
+<p>Events have <code>{protocol, type:&#39;event&#39;, event, data, time}</code>:</p>
+<ul>
+<li><code>core.ready</code>: the dispatcher is connected; service/model readiness is separate.</li>
+<li><code>core.state</code>: the current complete runtime state.</li>
+<li><code>core.service.state</code>: a service&#39;s name, state and serialized error when present.</li>
+<li><code>core.error</code>: a lifecycle or transport diagnostic.</li>
+</ul>
+<p>Service states are <code>registered</code>, <code>starting</code>, <code>ready</code>, <code>failed</code>, <code>draining</code> and
+<code>closed</code>. Dispatcher states are <code>created</code>, <code>ready</code>, <code>draining</code> and <code>closed</code>.
+Complete diagnostics belong in the host&#39;s developer-facing error handling, not
+in ordinary chat history or a fabricated conversation turn.</p>
+<h2 id="cancellation-and-shutdown">Cancellation and shutdown</h2>
+<p>The <code>request.cancel</code> control names <code>requestId</code>; <code>requests.cancelAll</code> applies to
+active request-lifetime operations. Cancellation is cooperative. The handler&#39;s
+signal is aborted. An otherwise successful cancelled operation returns
+<code>REQUEST_ABORTED</code> after its owned work settles; a handler&#39;s own rejection remains
+the actual reported error. If startup is still pending, cancellation is checked before
+the handler runs. A service that does not finish or respond to cancellation is
+still unfinished; the SDK does not report a forced timeout as successful cleanup.</p>
+<p>Use <code>lifetime:&#39;service&#39;</code> for accepted work, such as a save, that must survive a
+renderer cancellation or disconnect. These operations are not aborted by the
+request cancellation controls or by normal Core shutdown. The service still
+owns its persistence, queueing and failure semantics.</p>
+<p><code>runtime.close()</code> is idempotent and retains the same completion promise. It stops
+accepting new requests, cancels request-lifetime operations, waits for accepted
+responses, then drains and disposes services. Independent services close
+concurrently; each service&#39;s startup, drain and dispose remain ordered.
+Shutdown errors remain complete and reject the close promise. A failed drain
+does not prevent the service&#39;s dispose hook from running.</p>
+<p>The final closed state is published before event subscriptions are released.
+<code>current()</code> remains available afterward; the disposed runtime is not restarted.
+The host must observe completion before terminating Core. The SDK does not call
+<code>process.exit()</code>, kill a host or claim durability after an operating-system crash
+or a host-forced termination.</p>
+<h2 id="stdio-transport">Stdio transport</h2>
+<p><code>startCoreStdio({runtime, input, output, onError})</code> attaches a runtime and starts
+it. Streams default to <code>process.stdin</code> and <code>process.stdout</code>; diagnostics default
+to <code>console.error</code>, leaving stdout for protocol frames. It returns
+<code>{runtime, closed, close}</code>. Observe <code>closed</code> for final completion or failure.</p>
+<p>Frames use the existing <code>Content-Length</code> header followed by UTF-8 JSON. Length
+is transport-local framing only. <code>encodeCoreFrame(frame)</code> and
+<code>createCoreFrameDecoder(onFrame)</code> are also exported for host adapters. The
+decoder accepts fragmented or multiple frames through <code>push(chunk)</code>;
+<code>finish()</code> reports an incomplete final frame rather than dropping it.</p>
+<p>Requests dispatch concurrently. Outgoing frames preserve their queued order and
+wait for each writable-stream callback. Input EOF starts runtime shutdown, waits
+for accepted service work and queued output, and resolves <code>closed</code> afterward.
+An input stream closed without its normal EOF event also initiates this drain;
+an already ended or destroyed input is handled when attached. Transport failures
+reach <code>onError</code> and reject <code>closed</code>. The transport detaches
+its listeners and pauses its input; it does not end caller-owned output streams
+or take ownership of the host process.</p>
+<h2 id="platform-and-delivery-boundary">Platform and delivery boundary</h2>
+<p>These modules use portable Node and JavaScript facilities for Windows, Linux
+and macOS native hosts. Android requires its native transport/host adaptation;
+the module is not a Node runtime embedded inside a WebView. Browser callers use
+the separate <a href="../core-client/">Core client</a>.</p>
+<p>The dispatcher/transport sources are one part of Core extraction. They do not
+by themselves replace existing native host bundles, platform adapters, provider
+loading, packaging or OS composition. Those owners must adopt the selected
+published SDK boundary and preserve their real shutdown and service lifecycles.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#registration-and-startup">Registration and startup</a><a href="#state-and-frames">State and frames</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#stdio-transport">Stdio transport</a><a href="#platform-and-delivery-boundary">Platform and delivery boundary</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.55.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

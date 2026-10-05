@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="arcane-os/websocket-client exposes the published ws-share constructor as both default and WS. Node also exports the same WS binding from arcane-os. Browser modules use the focused entry through the generated SDK import map. These entries reuse the upstream implementation rather than creating another pool or event bus.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/websocket-client/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Shared WebSocket clients · Arcane OS SDK"><meta property="og:description" content="arcane-os/websocket-client exposes the published ws-share constructor as both default and WS. Node also exports the same WS binding from arcane-os. Browser modules use the focused entry through the generated SDK import map. These entries reuse the upstream implementation rather than creating another pool or event bus."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/websocket-client/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Shared WebSocket clients · Arcane OS SDK"><meta name="twitter:description" content="arcane-os/websocket-client exposes the published ws-share constructor as both default and WS. Node also exports the same WS binding from arcane-os. Browser modules use the focused entry through the generated SDK import map. These entries reuse the upstream implementation rather than creating another pool or event bus."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Shared WebSocket clients | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Shared WebSocket clients</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="shared-websocket-clients">Shared WebSocket clients</h1><p class="doc-lead">arcane-os/websocket-client exposes the published ws-share constructor as both default and WS. Node also exports the same WS binding from arcane-os. Browser modules use the focused entry through the generated SDK import map. These entries reuse the upstream implementation rather than creating another pool or event bus.</p><div class="doc-meta"><span>SDK 0.55.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="./" aria-current="page">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/websocket-client.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#observe-all-managed-connections">Observe all managed connections</a><a href="#ownership-and-lifetime">Ownership and lifetime</a><a href="#runtime-and-package-delivery">Runtime and package delivery</a></nav></details><p><code>arcane-os/websocket-client</code> exposes the published <code>ws-share</code> constructor as
+both <code>default</code> and <code>WS</code>. Node also exports the same <code>WS</code> binding from
+<code>arcane-os</code>. Browser modules use the focused entry through the generated SDK
+import map. These entries reuse the upstream implementation rather than
+creating another pool or event bus.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import WS from &#39;arcane-os/websocket-client&#39;;
+
+const airlock=new WS(&#39;wss://moon.example/airlock&#39;,[&#39;moon-control&#39;]);
+const oxygenPanel=new WS(&#39;wss://moon.example/airlock&#39;,[&#39;moon-control&#39;]);
+console.log(airlock===oxygenPanel); // true while connecting or open
+
+function showAirlockMessage(event){
+    console.log(event.data);
+}
+airlock.addEventListener(&#39;message&#39;,showAirlockMessage);
+
+// When this panel goes away, release only its listener.
+function disposePanel(){
+    airlock.removeEventListener(&#39;message&#39;,showAirlockMessage);
+}
+</code></pre></div>
+<p>Replace the example URL with your application&#39;s WebSocket endpoint. The exact
+URI string and ordered protocol list select a shared connection. Repeated
+construction reuses a connecting or open socket. A closing or closed socket
+gets a new physical connection and a new ID; the predecessor&#39;s eventual close
+cannot remove its replacement.</p>
+<p>The returned object is the native <code>WebSocket</code>, with its native <code>send</code>,
+<code>close</code>, <code>binaryType</code>, properties and per-socket events. Complete messages pass
+through unchanged. Upstream <code>on</code>/<code>off</code> and <code>addListener</code>/<code>removeListener</code>
+aliases retain native listener semantics, rather than Node EventEmitter
+semantics. Importing the SDK entry starts no connection and does not replace
+<code>globalThis.WebSocket</code>.</p>
+<h2 id="observe-all-managed-connections">Observe all managed connections</h2>
+<p><code>await WS.observe()</code> returns one lazy <code>event-pubsub</code> observer per loaded
+implementation. Repeated or concurrent calls return that same observer.
+Enabling observation opens no socket. Register handlers after the await, then
+read <code>WS.getConnections()</code> synchronously without another await between them.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {WS} from &#39;arcane-os/websocket-client&#39;;
+
+const events=await WS.observe();
+const liveConnections=new Map();
+
+function trackConnection(type,connection){
+    if(type===&#39;close&#39;)liveConnections.delete(connection.id);
+    else liveConnections.set(connection.id,connection);
+    console.log(type,connection.id,connection.url,connection.readyState);
+}
+
+events.on(&#39;*&#39;,trackConnection);
+for(const connection of WS.getConnections()){
+    liveConnections.set(connection.id,connection);
+}
+
+function disposeConnectionPanel(){
+    events.off(&#39;*&#39;,trackConnection);
+}
+</code></pre></div>
+<p>The typed events <code>created</code>, <code>open</code>, <code>error</code> and <code>close</code> each receive one record.
+The wildcard handler receives <code>(type,record)</code>. Each record contains:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>Numeric physical-connection identity within this loaded implementation.</td>
+</tr>
+<tr>
+<td><code>socket</code></td>
+<td>The exact native socket.</td>
+</tr>
+<tr>
+<td><code>url</code></td>
+<td>The native socket&#39;s URL.</td>
+</tr>
+<tr>
+<td><code>protocols</code></td>
+<td>A fresh copy of the requested, normalized protocol list.</td>
+</tr>
+<tr>
+<td><code>readyState</code></td>
+<td>Native state when the record is produced.</td>
+</tr>
+<tr>
+<td><code>event</code></td>
+<td>Original native event; <code>created</code> has <code>undefined</code>.</td>
+</tr></tbody>
+</table>
+</div>
+<p><code>WS.getConnections()</code> returns fresh records with the first five fields. It
+includes tracked sockets until their native close event, including a closing
+predecessor after its replacement exists. Records are snapshots; the <code>socket</code>
+remains live. Read a new snapshot when current state is needed.</p>
+<p><code>created</code> is queued in a microtask only when observation was enabled at
+construction. Reusing a connection emits no second <code>created</code> event. A snapshot
+can include a connection before its queued <code>created</code> notification arrives, so
+reconcile by <code>id</code> rather than appending duplicates. Native close removes the
+connection and its internal lifecycle listeners before global close handlers
+run. Applications may still use native socket listeners alongside the global
+observer; there is no second per-socket event bus.</p>
+<h2 id="ownership-and-lifetime">Ownership and lifetime</h2>
+<p>Every caller shares the same socket, including changes to <code>binaryType</code>, a
+property handler, or a call to <code>close()</code>. A component that only owns a listener
+removes that exact listener. The application decides when the shared socket
+should close; construction does not acquire an independent reference-counted
+lifetime. Remove only your own observer handlers instead of resetting the
+shared observer. Observe asynchronous handler failures at their owning caller.</p>
+<p>All modules that should share connections use the same SDK module URL in
+their realm. Separate package copies, browser realms, Workers, processes, and
+upstream classic-script versus ESM loads have separate pools. The observer
+reports actual native lifecycle events; it provides no closed-event history
+or delivery after the realm/process ends. It adds no automatic reconnect,
+heartbeat, message envelope, storage, or application routing.</p>
+<h2 id="runtime-and-package-delivery">Runtime and package delivery</h2>
+<p>The SDK&#39;s Node baseline supplies native <code>WebSocket</code>; browsers need their native
+WebSocket capability. The focused entry is portable JavaScript, with the host
+owning networking and native errors. Browser Workers need module resolution
+provided by their host because document import maps do not apply to Workers.</p>
+<p>The SDK selects <code>ws-share@3.1.0</code> and <code>event-pubsub@6.1.1</code>. npm resolves the
+latter&#39;s <code>strong-type@2.0.0</code>, while the SDK&#39;s own direct <code>strong-type@2.0.1</code>
+remains unchanged. The canonical browser projection generator copies the
+installed public runtime files unchanged. Managed maps resolve the shared
+constructor and event package to one URL each, and a dependency scope selects
+the event package&#39;s own strong-type version. Physical, direct-installed,
+packaged-document and managed test maps preserve that scope. Applications
+regenerate their managed maps/runtime through the ordinary public SDK flow;
+they do not copy the upstream implementation into application source.</p>
+<p><code>acceptWebSocket</code> remains the separate Node server-side API at
+<code>arcane-os/websocket</code>. It owns accepted server connections, not this client
+pool. Existing native clients and server Upgrade handling remain available.</p>
+<p>Upstream details: <a href="https://github.com/RIAEvangelist/ws-share/releases/tag/3.1.0" target="_blank" rel="noreferrer">ws-share 3.1.0 release</a>
+and <a href="https://riaevangelist.github.io/ws-share/#observe" target="_blank" rel="noreferrer">observer documentation</a>.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#observe-all-managed-connections">Observe all managed connections</a><a href="#ownership-and-lifetime">Ownership and lifetime</a><a href="#runtime-and-package-delivery">Runtime and package delivery</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.55.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

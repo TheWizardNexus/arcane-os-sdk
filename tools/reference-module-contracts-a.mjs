@@ -707,5 +707,20 @@ component.setAttribute('href','./component.html');
 component.addEventListener('html-import-ready',event=>console.log(event.detail),{once:true});
 component.addEventListener('html-import-error',event=>console.error(event.detail),{once:true});
 document.body.append(component);`
+    },
+    {
+        name:'HTMLImportScript.js',
+        classification:'public-first-party',
+        lifecycleSideEffects:'Importing and calling the helper execute no script and mutate no global state. Executing the returned classic script reads the current script token, resolves the shared HTMLImport host registry, binds the supplied source to that host, and stores its async completion promise.',
+        paramsResults:'createHTMLImportScript(source) preserves the complete source text, adds one terminating newline before the async wrapper closes, and returns the complete classic-script string without executing it.',
+        events:[],
+        errors:[
+            'the generated wrapper throws Error when its current script has no registered HTMLImport host binding',
+            'a failure from the supplied source rejects the binding promise'
+        ],
+        capabilitiesCore:'Cross-host source generation with no Core dependency; execution requires the browser DOM and the HTMLImport-owned host registry.',
+        example:`import {createHTMLImportScript} from '/arcane/modules/HTMLImportScript.js';
+const script=createHTMLImportScript("this.textContent='Moon cheese inventory ready.';");
+console.log(script);`
     }
 ];
