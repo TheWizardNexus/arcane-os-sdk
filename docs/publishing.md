@@ -11,8 +11,12 @@ the npm `dev` dist-tag, while bare numeric stable versions select
 
 The package version and `publishConfig.tag` must agree exactly: `-dev` uses
 `dev`, and a bare numeric stable version uses `latest`. npm is the canonical
-SDK distribution: application repositories add an exact `arcane-os` project
-dependency and invoke its local CLI with `npm exec -- arcane`. A separate
+SDK distribution: development applications declare `arcane-os` as `latest` and
+invoke its local CLI with `npm exec -- arcane`. An exact application SDK pin
+begins only when Roshi designates that application as a production build.
+Keep the lockfile and explicitly refresh and compare its resolution and the
+installed SDK with npm's published version before materializing or building;
+see [Consumer updates](consumer-updates.md). A separate
 global installer, standalone SDK executable, NuGet package, Homebrew formula,
 or OS package is not part of this release surface.
 
@@ -30,8 +34,8 @@ agreement, and required license notices. One unprivileged producer packs one
 artifact with a recorded run id, artifact id, version, and source commit. It
 does not impose byte counts, hashes, digests, provenance receipts, or unrelated
 test suites as ordinary development gates. Broader integration, regression,
-platform, browser, presentation, and documentation work remains separately
-user selected.
+and platform work remains separately user selected. Documentation and website
+updates are required post-publication follow-through as described below.
 
 `publish-dev.yml` can run only when manually dispatched from `main` in
 `TheWizardNexus/arcane-os-sdk`. Dispatch supplies the exact successful Check
@@ -59,14 +63,15 @@ The unscoped package installs both `arcane` and `arcane-os`. The short command
 is the documented default; `arcane-os` is the collision-safe fallback. npm
 package names are unique, but executable names are not globally reserved.
 
-When `npm view arcane-os@dev version` reports the package unavailable, run
-`npm run pack:local` in this SDK checkout for local development, scaffold with
-`node ./bin/arcane.mjs new ...`, and install the resulting `.tgz` into the app
+External applications consume published npm releases. An unavailable release
+does not authorize them to use an unpublished SDK checkout or tarball. Only
+tasks explicitly collaborating on an SDK update inside this project may use
+the local `npm run pack:local` workflow and its resulting `.tgz`. That local
+workflow can scaffold with `node ./bin/arcane.mjs new ...` and install the tarball
 with `npm install --save-dev --save-exact <path>`. Keep the tarball at the path
-recorded by `package-lock.json`; subsequent `npm ci` uses that declared package.
-Arcane reads the installed package's name and version against the root
-dependency declaration. A local directory `file:` install is intentionally unsupported because
-it may be linked.
+recorded by `package-lock.json` for subsequent `npm ci`. Arcane reads the installed
+package's name and version against the root dependency declaration. A local
+directory `file:` install is unsupported because it may be linked.
 
 The npm package already has its trusted-publishing relationship. Each later
 release therefore follows the same direct selected-artifact path: push the
@@ -77,9 +82,11 @@ dist-tag after publication. Never rebuild or repack the artifact under
 publication authority, and never substitute a different source revision.
 
 Generated app CI uses `npm ci --ignore-scripts`, so its lock must exist and its
-dependency source must be reachable by the runner. A sibling local tarball is a
-workstation workflow, not a portable GitHub dependency source; switch to the
-exact registry release (or deliberately vendor the tarball) before remote CI.
+dependency source must be reachable by the runner. External application CI uses
+the published registry package recorded in the committed lockfile. A locked
+install reproduces that selected version; it does not establish that the SDK is
+currently npm's `latest`. Complete the development refresh before preparing and
+committing managed application files and the updated lockfile for CI.
 
 ## Reusable application release workflow
 
@@ -111,8 +118,23 @@ GitHub release, and no release creates a Git branch for an npm dist-tag.
 
 ## Documentation publication
 
-Documentation publication occurs only when the user explicitly selects it. The
-Pages job checks out that selected `main` revision without persistent
+After every successful npm release and its applicable requester notices, the
+SDK owner updates documentation and the existing SDK website for all added,
+removed, or modified features, APIs, members, methods, and affected public
+contracts. Include the relevant signatures, inputs, outputs, defaults,
+lifecycle, errors, platform availability, and usage examples. This standing
+duty also applies when a release has no requesting applications. Record the
+actual documentation and website delivery outcomes in the release handoff and
+report any unfinished work. See [Consumer updates](consumer-updates.md) for
+request intake and notice requirements.
+
+Documentation and website content outside the selected npm payload does not
+block npm publication. Prepare and deliver those updates through the existing
+documentation/site workflow after publication; do not wait for consumer
+adoption or application tests. This duty does not authorize ChatGPT Sites or
+production-server administration.
+
+The Pages job checks out the selected `main` revision without persistent
 credentials and uploads only the static `site/` tree. It does not automatically
 run the SDK test suite, checks, generators, or repository build code.
 
@@ -128,5 +150,6 @@ One producer creates the tarball. Publication names that producer's exact Check
 run, artifact, and version and does not rebuild from a later checkout. The
 release workflow checks only the publication contract and required legal
 inventory for that selected output.
-Platform matrices, full product regressions, Pages, and broader presentation
-work remain separate user-selected operations.
+Platform matrices and full product regressions remain separate user-selected
+operations. Documentation and the existing website are required post-release
+follow-through, with their outcomes recorded separately from npm publication.

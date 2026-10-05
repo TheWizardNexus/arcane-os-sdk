@@ -45,9 +45,13 @@ settles it: an exact matching executed, declined, cancelled, or not-executed
   defers. This standing publication authority requires no repeated confirmation.
 - `dev` and `latest` are npm dist-tags selected from the strict package
   version. They are never Git branches and do not change the canonical checkout.
-- After every successful npm SDK publication, notify the existing tasks that
-  own active SDK-consuming applications, following the publication notice
-  procedure below. This applies to every release, including patches.
+- Development applications declare `arcane-os` as `latest`; pin an application
+  only when Roshi explicitly designates it as a production build. Follow
+  `docs/consumer-updates.md` for the coordinated clean refresh and comparison of
+  the installed SDK and lockfile resolution with the published `latest` version.
+- After every successful npm SDK publication, notify only requesting application
+  owners whose requests it addresses, then update the affected documentation and
+  existing SDK website. Follow the publication procedure below for every release.
 - Continuous integration and npm publication may identify the selected `main`
   commit when a release is explicitly selected. That release-only identity is
   not an ordinary application, development, package, or runtime gate.
@@ -132,33 +136,41 @@ settles it: an exact matching executed, declined, cancelled, or not-executed
   documentation or Pages checks are release-publication evidence, not ordinary
   development checkpoints.
 
-## npm publication consumer notices
+## npm publication requester notices and documentation
 
-Every new published `arcane-os` version requires a direct release notice to each
-active consuming application's existing owning task so that it can upgrade.
-Send the notices promptly after npm publication and version/channel confirmation,
-before reporting the release handoff complete. The user's standing instruction
-authorizes these task messages without another confirmation.
+Before implementing a feature request, inspect the published SDK's public API
+and documentation. If it already supports the requested functionality, tell the
+requesting application's existing owner which API and usage provide it, with
+direct documentation references. Unpublished source is not delivered support.
 
-Use current consumer declarations and task ownership to identify recipients;
-refresh the known consumer list at each publication instead of notifying only
-the application that requested the change. Respect explicit project stops,
-including Lifeline. Use existing tasks rather than creating new ones.
+After npm publication and version/channel confirmation, promptly notify the
+existing application owners whose requests the release addresses. Include every
+requesting application covered by matching, similar, or bundled requests when
+one shared feature serves them. Do not broadcast routine releases to other
+consumers. Respect explicit project stops, including Lifeline, and use existing
+tasks. The user's standing instruction authorizes these messages.
 
-Each notice must include the exact published package version and npm channel,
-the changes in that release and their relevance to the application, a release
-notes or changelog link, and any required compatibility or upgrade steps. Base
-the content on the actual published release. Distinguish publication and SDK
-verification evidence from any unverified application behavior. Tell the owner
-to advance its exact dependency pin, lockfile, and managed SDK projections
-through the normal public package workflow within its existing authority.
+Each notice includes the exact published version and npm channel, the requested
+functionality delivered and its relevance, a release-notes or changelog link,
+direct public API and usage documentation references, and required compatibility
+or adoption steps. Development applications track `latest` through their own
+public package workflow; production pins begin only on Roshi's designation.
+Distinguish publication and SDK verification from unverified application behavior.
 
-Record the version, recipient tasks, notice content, and send outcome in the
-release task's durable handoff. Avoid duplicate notices for the same version
-and recipient; resume missing deliveries after a send failure. Report any
-unreachable owner plainly. A delivered notice is not proof of adoption.
+After every release and its applicable requester notices, update documentation
+and the existing SDK website for all added, removed, or modified features, APIs,
+members, methods, and other affected public contracts. This follow-through also
+applies when there are no requesters. Follow `docs/publishing.md`; content outside
+the selected npm payload does not gate publication. This duty does not authorize
+ChatGPT Sites or production-server administration.
 
-Consumer replies, upgrade completion, application tests, and application release
-readiness remain with their owners and do not gate SDK publication. The SDK
-publisher sends the notices without editing consumer repositories or waiting
-for their upgrades.
+Record the published version/channel, relevant requesting tasks, notice content
+and send outcomes, and documentation/website delivery outcomes in the durable
+release handoff. Deduplicate notices by version and recipient, resume missing
+deliveries, and report unreachable owners or unfinished documentation/site work.
+A delivered notice is not proof of adoption.
+
+The SDK owner retains publication, applicable notices, and documentation/site
+follow-through. Consumer adoption, replies, application tests, and application
+release readiness remain independently owned and never gate SDK publication.
+Do not edit consumer repositories or wait for their upgrades to publish the SDK.
