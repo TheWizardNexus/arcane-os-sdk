@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.55.0
+
+- Add public Core client, protocol contracts and classic-script source generation
+  through `arcane-os/core/client`, `core/contracts` and `core/classic-source`.
+  Native facades install synchronously; the shared event owner retains ordered
+  early events and responses. Correlation, complete payloads and diagnostics,
+  cancellation and transport-versus-service readiness remain explicit.
+- Add app-neutral native Core runtime and stdio transport through
+  `arcane-os/core/runtime` and `core/stdio`. Hosts register services, start them
+  independently and distinguish cancellable renderer requests from accepted
+  service-lifetime work. Graceful shutdown waits for accepted responses, service
+  drain/disposal and queued transport output without terminating the host.
+- Correct disabled-PWA packaging so selected output documents lose active SDK
+  manifest and bootstrap references before native-module processing. Preserve
+  source PWA settings, unrelated authored links, inactive HTML and unselected
+  documents; enabled PWA generation keeps its existing behavior.
+- This additive release introduces reusable Core primitives, not a completed
+  native executable, platform/provider transfer or application host cutover.
+  Existing native provider checkout requirements and application composition
+  remain unchanged. No dependency, default switch or data migration is added.
+
 ## 0.54.1
 
 - Select the self-contained Transformers.js 4.3.0 browser CDN bundle for

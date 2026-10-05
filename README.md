@@ -20,7 +20,7 @@ selected SDK projection or an explicit live SDK source mount. Both profiles
 share the theme, packaging, event, cancellation,
 and browser run contracts while retaining their selected application layout.
 
-This checkout defines the `0.54.1` SDK contract. Applications pin one exact npm
+This checkout defines the `0.55.0` SDK contract. Applications pin one exact npm
 version and lockfile; registry state is deliberately not baked into application
 artifacts.
 
