@@ -48,6 +48,7 @@
           "any",
           "windows",
           "linux",
+          "macos",
           "android"
         ]
       }
@@ -73,6 +74,7 @@
           "directory",
           "portable",
           "exe",
+          "app",
           "appimage",
           "deb",
           "rpm",

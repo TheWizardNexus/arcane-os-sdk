@@ -3,7 +3,7 @@ import {cp,mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {createWorkspace} from '../src/scaffold.mjs';
-import {getTargetAdapter,listTargets} from '../src/targets/index.mjs';
+import {createNativeTargetAdapter,getTargetAdapter,listTargets} from '../src/targets/index.mjs';
 import {loadAppDescriptor,refreshAppPackageProjection,validateAppDescriptor} from '../src/app-descriptor.mjs';
 import {executeOperation,packageApplication,runApplication} from '../src/toolchain.mjs';
 import {
@@ -243,6 +243,32 @@ test('target registry distinguishes browser availability from native pairing req
     });
     for(const targetId of ['portable','windows-x64','macos-arm64','macos-x64','linux-x64','linux-arm64','android-arm64']){
         assert.equal(targets.find(target=>target.id===targetId).status,'pairing-required');
+    }
+});
+
+test('public target descriptors use the declared schema platforms and formats',async function targetSchemaAlternatives(){
+    const schema=JSON.parse(await readFile(new URL('../schemas/target-adapter.schema.json',import.meta.url),'utf8'));
+    const nativeBuilder={
+        protocol:'arcane-native-builder/1',
+        describe:async function selectedTargets(){
+            return {protocol:'arcane-native-builder/1',targets:['portable','macos-arm64','macos-x64']};
+        },
+        doctor:async function unusedDoctor(){assert.fail('No runtime diagnosis in the descriptor contract.');},
+        prepare:async function unusedPreparation(){assert.fail('No preparation in the descriptor contract.');},
+        build:async function unusedBuild(){assert.fail('No build in the descriptor contract.');},
+        verify:async function unusedVerification(){assert.fail('No artifact verification in the descriptor contract.');},
+        run:async function unusedRun(){assert.fail('No execution in the descriptor contract.');}
+    };
+    const descriptors=listTargets();
+    for(const targetId of ['portable','macos-arm64','macos-x64']){
+        descriptors.push(await createNativeTargetAdapter({targetId,nativeBuilder}).describe());
+    }
+    for(const descriptor of descriptors){
+        for(const field of ['platforms','formats']){
+            for(const value of descriptor[field]){
+                assert.ok(schema.properties[field].items.enum.includes(value),`${descriptor.id}.${field}: ${value}`);
+            }
+        }
     }
 });
 
