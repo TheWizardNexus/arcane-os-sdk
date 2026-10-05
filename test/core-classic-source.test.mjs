@@ -58,3 +58,34 @@ test('classic projection preserves its full canonical client and explicit module
     assert.equal(source.includes('node:'),false);
     await assert.rejects(createCoreClassicSource(),/event-manager module URL/u);
 });
+
+test('classic WebKit document lifetime is opt-in and preserves the ordinary reply transport', async function optionalDocumentLifetime(t) {
+    for (const webKitDocumentLifecycle of [false, true]) {
+        let announce;
+        const announced = new Promise(function awaitAnnouncement(resolve) { announce = resolve; });
+        const records = [];
+        const context = vm.createContext({arcaneEvents, console, setTimeout, clearTimeout,
+            webkit: {messageHandlers: {arcane: {postMessage(record) {
+                records.push(record);
+                announce(record);
+                return Promise.resolve({accepted: true});
+            }}}}
+        });
+        const source = await createCoreClassicSource(
+            {eventOwnerModuleURL: '/sdk/event-manager.mjs', replayRuntimeState: true, webKitDocumentLifecycle}
+        );
+        vm.runInContext(source, context);
+        const client = context[Symbol.for('arcane-os.core.client')];
+        t.after(function closeClient() { client.close(); });
+        const first = await announced;
+        if (webKitDocumentLifecycle) {
+            assert.equal(first.type, 'activate');
+            assert.equal(context.__arcaneWebKitDocumentCurrent(first.activation), true);
+        } else {
+            assert.equal(typeof first, 'string');
+            assert.deepEqual(JSON.parse(first), {protocol: 'arcane/1', type: 'control', control: 'runtime.replay'});
+            assert.equal(context.__arcaneWebKitDocumentCurrent, undefined);
+        }
+        assert.equal(typeof context.Arcane.runtime.current(), 'object');
+    }
+});

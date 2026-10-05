@@ -547,6 +547,151 @@ test('native transport failures retain nested error diagnostics',async t=>{
     });
 });
 
+function webKitDocumentFixture(t, options = {}) {
+    const records = [];
+    const waiting = [];
+    const readers = [];
+    const listeners = new Map();
+    const errors = [];
+    const global = {
+        console,
+        addEventListener(name, listener) { listeners.set(name, listener); },
+        removeEventListener(name, listener) {
+            if (listeners.get(name) === listener) listeners.delete(name);
+        },
+        webkit: {messageHandlers: {arcane: {postMessage(record) {
+            records.push(record);
+            return new Promise(
+                function awaitNativeAcceptance(resolve) {
+                    const delivery = {record, accept() { resolve({accepted: true}); }};
+                    if (readers.length) readers.shift()(delivery);
+                    else waiting.push(delivery);
+                }
+            );
+        }}}}
+    };
+    const client = installCoreClient(
+        global, {webKitDocumentLifecycle: true, onError(error) { errors.push(error); }, ...options}
+    );
+    t.after(
+        function releaseDocumentFixture() {
+            client.close();
+            for (const delivery of waiting) delivery.accept();
+        }
+    );
+    function next() {
+        if (waiting.length) return Promise.resolve(waiting.shift());
+        return new Promise(function awaitDelivery(resolve) { readers.push(resolve); });
+    }
+    function hide() { listeners.get('pagehide')({persisted: true}); }
+    function restore() { listeners.get('pageshow')({persisted: true}); }
+    return {client, global, records, errors, next, hide, restore};
+}
+
+test('WebKit retirement during native attachment cannot send a queued request into restoration', async function pendingDocument(t) {
+    const {client, global, records, next, hide, restore} = webKitDocumentFixture(t);
+    const initial = await next();
+    const oldActivation = initial.record.activation;
+    assert.equal(global.__arcaneWebKitDocumentCurrent(oldActivation), true);
+    const pending = client.invoke('application.moon.wait');
+    const cancelled = assert.rejects(pending, {name: 'AbortError', code: 'ARCANE_REQUEST_ABORTED'});
+    hide();
+    const retirement = await next();
+    assert.equal(retirement.record.type, 'retire');
+    assert.equal(retirement.record.activation, oldActivation);
+    assert.deepEqual(JSON.parse(retirement.record.json), {protocol: CORE_PROTOCOL, type: 'control', control: 'requests.cancelAll'});
+    assert.equal(global.__arcaneWebKitDocumentCurrent(oldActivation), false);
+    initial.accept();
+    retirement.accept();
+    await cancelled;
+    restore();
+    const restored = await next();
+    const activation = restored.record.activation;
+    assert.equal(restored.record.type, 'activate');
+    assert.notEqual(activation, oldActivation);
+    restored.accept();
+    const replay = await next();
+    assert.deepEqual(JSON.parse(replay.record.json), {protocol: CORE_PROTOCOL, type: 'control', control: 'runtime.replay'});
+    replay.accept();
+    assert.equal(records.some(function isRetiredRequest(record) {
+        return record.type === 'frame' && JSON.parse(record.json).type === 'request';
+    }), false);
+    assert.equal(global.__arcaneTransportFailed({message: 'Retired process delivery'}, oldActivation), false);
+    assert.equal(getInstalledCoreClient(global), client);
+    const parameters = {document: '  The moon demands its entire receipt.\n\t🌙\u0000  '};
+    const operation = client.invoke('application.moon.receipt', parameters);
+    const delivery = await next();
+    assert.equal(delivery.record.activation, activation);
+    const request = JSON.parse(delivery.record.json);
+    assert.deepEqual(request.parameters, parameters);
+    delivery.accept();
+    const response = {protocol: CORE_PROTOCOL, type: 'response', id: request.id, ok: true, result: parameters};
+    assert.equal(global.__arcaneReceive(JSON.stringify(response), oldActivation), false);
+    assert.equal(global.__arcaneReceive(JSON.stringify(response), activation), true);
+    assert.deepEqual(await operation, parameters);
+});
+
+test('WebKit cancellation during attachment never submits the cancelled save', async function cancelledBeforeAttachment(t) {
+    const {client, records, next} = webKitDocumentFixture(t);
+    const initial = await next();
+    const controller = new AbortController();
+    const save = client.invoke(
+        'application.moon.save', {document: 'This receipt was cancelled before sending.'}, {signal: controller.signal}
+    );
+    const cancelled = assert.rejects(save, {name: 'AbortError', code: 'ARCANE_REQUEST_ABORTED'});
+    controller.abort();
+    initial.accept();
+    await cancelled;
+    const cancellation = await next();
+    const control = JSON.parse(cancellation.record.json);
+    assert.equal(control.control, 'request.cancel');
+    cancellation.accept();
+    assert.equal(records.some(function isCancelledSave(record) {
+        return record.type === 'frame' && JSON.parse(record.json).type === 'request';
+    }), false);
+});
+
+test('WebKit restoration keeps registrations and ends old renderer waits before deferred event attachment', async function restoredListeners(t) {
+    let attach;
+    const eventOwnerReady = new Promise(function awaitOwner(resolve) { attach = resolve; });
+    const {client, global, next, hide, restore} = webKitDocumentFixture(
+        t, {eventOwner: null, eventOwnerReady}
+    );
+    const initial = await next();
+    const oldActivation = initial.record.activation;
+    initial.accept();
+    const values = [];
+    client.events.on('service.state', function serviceState(value) { values.push(value); });
+    const save = client.invoke('application.moon.save', {document: 'Complete saved receipt'});
+    const cancelled = assert.rejects(save, {name: 'AbortError', code: 'ARCANE_REQUEST_ABORTED'});
+    const delivery = await next();
+    const request = JSON.parse(delivery.record.json);
+    delivery.accept();
+    global.__arcaneReceive({protocol: CORE_PROTOCOL, type: 'event', event: 'service.state', data: 'retired state'}, oldActivation);
+    global.__arcaneReceive({protocol: CORE_PROTOCOL, type: 'event', event: 'core.ready', data: 'retired ready'}, oldActivation);
+    const ready = [];
+    client.events.when('core.ready', function readyState(value) { ready.push(value); });
+    global.__arcaneReceive({protocol: CORE_PROTOCOL, type: 'response', id: request.id, ok: true, result: 'retired response'}, oldActivation);
+    hide();
+    const retirement = await next();
+    retirement.accept();
+    await cancelled;
+    restore();
+    const restored = await next();
+    const activation = restored.record.activation;
+    restored.accept();
+    const replay = await next();
+    replay.accept();
+    assert.equal(global.__arcaneReceive({protocol: CORE_PROTOCOL, type: 'response', id: request.id, ok: true, result: 'late save result'}, oldActivation), false);
+    global.__arcaneReceive({protocol: CORE_PROTOCOL, type: 'event', event: 'service.state', data: 'current state'}, activation);
+    global.__arcaneReceive({protocol: CORE_PROTOCOL, type: 'event', event: 'core.ready', data: 'current ready'}, activation);
+    attach(arcaneEvents);
+    await client.eventsReady;
+    assert.deepEqual(values, ['current state']);
+    assert.deepEqual(ready, ['current ready']);
+    assert.equal(client.events.completed('core.ready'), true);
+});
+
 for(const adapter of ['webview2','android-webview']){
     test(`${adapter} preserves original native error fields and supplies missing bridge context`,async function nativeErrorFields(t){
         const failure=new Error('Complete native message\nThe moon rejected the receipt.',{

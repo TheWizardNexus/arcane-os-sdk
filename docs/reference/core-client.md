@@ -124,6 +124,86 @@ developer diagnostics, rather than ordinary
 product status surfaces. The optional `onError(error)` callback observes
 transport/event-owner failures outside individual request promises.
 
+## Optional WebKit document lifetime
+
+`webKitDocumentLifecycle:true` on `createCoreClient`, `installCoreClient` or
+`createCoreClassicSource` selects document lifetime handling for the native
+WebKit `arcane` handler with replies. It defaults to `false`; existing WebKit
+plain-JSON and alternate acknowledgement transports, WebView2, Android,
+development HTTP and supplied transports keep their existing behavior. The
+selected host must implement this contract and the existing `runtime.replay`
+control. Install the classic source at document start in the page's world.
+
+The client owns a fresh activation for the current JavaScript realm and each
+restoration from the browser's page cache. WithReply receives these transport
+records; the Core JSON string remains unchanged in its separate `json` field:
+
+| Record | Meaning |
+| --- | --- |
+| `{type:'activate', activation}` | Attach this activation before sending its Core frames. |
+| `{type:'frame', activation, json}` | Send the complete serialized Core request or control. |
+| `{type:'retire', activation, json}` | Retire this activation; `json` is the existing `requests.cancelAll` control. |
+
+Reply with `{accepted:true}` or `{accepted:false,error}` on the initiating
+WithReply promise. Frame and retirement acceptance follows the actual complete
+process write. Queue admission alone is insufficient. Activation acceptance
+follows the host's current-realm probe and any required prior-owner cancellation.
+Only this activation's outgoing frames wait for attachment; page rendering,
+facade installation and independent Core startup remain concurrent.
+An aborted, timed-out or otherwise cancelled request awaiting attachment is
+never submitted afterward; its existing cancellation control remains observable.
+
+The host calls `__arcaneWebKitDocumentCurrent(activation)` in the current main
+document's page world to probe a candidate. A token or native frame descriptor
+alone does not identify the active document. Serialize candidate probes and
+Core ingress ownership changes: finish each candidate's probe before processing
+the next announcement, and leave the current owner unchanged when a probe is
+false. Announcement arrival order cannot establish document order. A true
+probe establishes the realm at that execution instant; every later delivery
+still checks its target at execution time.
+
+Before accepting a replacement activation, write the existing
+`requests.cancelAll` control for the prior ingress owner. Do not wait for a
+retirement announcement that a destroyed document may never send. Write a
+retirement record's JSON only while that activation still owns ingress;
+reject a late retirement without cancelling the replacement's requests.
+Record request-ID-to-origin-activation correlation before submitting each
+request to Core. Responses retain that origin. Existing generic service events
+remain broadcasts to the current activation; no request association is added.
+Complete native diagnostics retain frames received while no document is active;
+restoration uses current-state replay rather than historical event delivery.
+
+Deliver through `__arcaneReceive(json, activation)` and
+`__arcaneTransportFailed(error, activation)`, passing payloads as native
+JavaScript call arguments. Both return `false` for a retired or different
+activation. Receive also returns `false` for an unrecognized frame or a
+response with no pending request; `true` means the client accepted delivery,
+which may still await its shared event owner. Failure returns `true` when it
+ends that active installation. Preserve actual evaluation failures through the
+native diagnostic owner; a `false` result is not a JavaScript exception.
+`client.acceptsNativeDelivery(activation)` exposes the same synchronous lifetime
+predicate. It accepts any activation while a client using an ordinary transport
+is live. Direct owner calls to `client.failTransport(error)` retain their
+existing terminal-failure semantics.
+
+Page hide synchronously retires the activation even with no pending requests.
+It clears completed ready state and rejects every pending renderer promise with
+the existing `ARCANE_REQUEST_ABORTED`/`AbortError`. This ends the page's wait;
+the runtime's cancellation skips service-lifetime work, so an accepted save
+continues and participates in graceful drain. Its eventual response stays with
+the retired activation and cannot settle a restored page's request. The client
+does not claim that cancellation rolled back persistence.
+
+Persisted page restoration creates a fresh activation and sends exactly one
+`runtime.replay` after native attachment. Initial attachment sends that replay
+only when `replayRuntimeState:true`. Application subscriptions survive page
+hide and restoration, including registrations awaiting the shared event owner
+and ready listeners awaiting their replay microtask. Queued deliveries from a
+retired activation are no longer applicable to those subscriptions. Replay
+supplies current Core/service state, not prior responses or request promises.
+Closing the client retires once, removes lifecycle listeners and restores its
+owned callbacks. It does not close the process or control application shutdown.
+
 ## Classic native-host injection
 
 ```js

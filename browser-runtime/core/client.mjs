@@ -14,6 +14,7 @@ export function createCoreClient({
     eventOwnerReady,
     autoConnect=true,
     replayRuntimeState=false,
+    webKitDocumentLifecycle=false,
     onError=error=>global.console?.error('Arcane Core client failed.',error)
 }={}){
     const pending=new Map();
@@ -29,6 +30,7 @@ export function createCoreClient({
     let eventOwnerFailure=null;
     let transportFailure=null;
     let transportFailureReported=false;
+    let webKitDocument=null;
 
     function report(error){
         if(error===transportFailure){
@@ -67,8 +69,13 @@ export function createCoreClient({
         report(eventOwnerFailure);
     });
 
-    function emit(event,data){
-        withEvents(()=>source.dispatch(CORE_EVENT,{event,data}));
+    function acceptsNativeDelivery(activation){
+        return !closed&&(!webKitDocument||webKitDocument.current(activation));
+    }
+    function emit(event,data,activation=webKitDocument?.activation){
+        withEvents(function deliverEvent(){
+            if(acceptsNativeDelivery(activation))source.dispatch(CORE_EVENT,{event,data});
+        });
     }
     function complete(event,data){
         if(completedEvents.has(event))return false;
@@ -110,13 +117,23 @@ export function createCoreClient({
             if(typeof listener!=='function')throw new TypeError('Arcane event listener must be a function.');
             if(!completedEvents.has(event))return events.once(event,listener);
             const value=completedEvents.get(event);
+            const activation=webKitDocument?.activation;
             let active=!closed;
-            Promise.resolve().then(function replayReadyEvent(){
-                if(!active||closed)return;
+            let dispose=null;
+            function deliverReadyEvent(ready){
+                if(!active)return;
                 active=false;
-                try{listener(value);}catch(error){report(error);}
+                dispose?.();
+                try{listener(ready);}catch(error){report(error);}
+            }
+            // A ready-state subscription survives a retirement that happens
+            // before its queued replay, just like an ordinary registration.
+            if(webKitDocument)dispose=events.once(event,deliverReadyEvent);
+            Promise.resolve().then(function replayReadyEvent(){
+                if(!active||!acceptsNativeDelivery(activation))return;
+                deliverReadyEvent(value);
             });
-            return function unsubscribe(){active=false;};
+            return function unsubscribe(){active=false;dispose?.();};
         },
         completed(event){return CORE_READY_EVENTS.includes(event)&&completedEvents.has(event);}
     };
@@ -131,8 +148,8 @@ export function createCoreClient({
         else request.resolve(result);
         return true;
     }
-    function receive(input){
-        if(closed)return false;
+    function receive(input,activation){
+        if(!acceptsNativeDelivery(activation))return false;
         let message=input;
         if(typeof message==='string'){
             try{message=JSON.parse(message);}
@@ -149,7 +166,9 @@ export function createCoreClient({
         // Final responses follow earlier event deliveries, including while a
         // classic host is connecting the shared SDK event owner. A stream's
         // completion must not remove its subscription before its chunks arrive.
-        withEvents(()=>settle(message.id,message.ok?null:new CoreError(message.error),message.result));
+        withEvents(function deliverResponse(){
+            if(acceptsNativeDelivery(activation))settle(message.id,message.ok?null:new CoreError(message.error),message.result);
+        });
         return true;
     }
     function installCallback(name,value){
@@ -182,6 +201,107 @@ export function createCoreClient({
         catch(error){record.reject(error);}
         return true;
     }
+    function createWebKitDocumentTransport(webkit) {
+        let activation = null;
+        let active = false;
+        let registration = null;
+        function current(candidate) {
+            return !closed && active && candidate === activation;
+        }
+        function inactive() {
+            return new CoreError(
+                {code: 'ARCANE_WEBKIT_DOCUMENT_INACTIVE', message: 'This document activation no longer owns the native connection.'}
+            );
+        }
+        async function post(record) {
+            parseAcknowledgement(
+                await webkit.postMessage(record), {required: true}
+            );
+        }
+        function activate(restored = false) {
+            if (closed || active) return;
+            activation = uuid();
+            active = true;
+            const candidate = activation;
+            // Only transport ingress waits for native attachment. Rendering and
+            // the synchronous facade remain independent of this acknowledgement.
+            registration = Promise.resolve().then(
+                function announceDocument() {
+                    if (!current(candidate)) throw inactive();
+                    return post(
+                        {type: 'activate', activation: candidate}
+                    );
+                }
+            );
+            complete(
+                'transport.ready', {protocol: CORE_PROTOCOL, transport: 'webkitgtk'}
+            );
+            registration.then(
+                function replayDocumentState() {
+                    if (current(candidate) && (restored || replayRuntimeState)) {
+                        sendControl(
+                            {protocol: CORE_PROTOCOL, type: 'control', control: 'runtime.replay'}
+                        );
+                    }
+                }
+            ).catch(report);
+        }
+        function retire() {
+            if (!active) return false;
+            const candidate = activation;
+            // Invalidate delivery synchronously, including callbacks queued in
+            // WebKit or waiting for the shared event owner. Subscriptions live
+            // with this document and remain registered across restoration.
+            active = false;
+            completedEvents.clear();
+            for (const [id, request] of pending) settle(id, aborted(request.method));
+            const json = JSON.stringify(
+                {protocol: CORE_PROTOCOL, type: 'control', control: 'requests.cancelAll'}
+            );
+            post(
+                {type: 'retire', activation: candidate, json}
+            ).catch(report);
+            return true;
+        }
+        function restoredDocument(event) {
+            if (event.persisted) activate(true);
+        }
+        if (typeof global.addEventListener === 'function') {
+            global.addEventListener(
+                'pageshow', restoredDocument, {capture: true}
+            );
+            cleanups.push(
+                function removeDocumentRestoration() {
+                    global.removeEventListener(
+                        'pageshow', restoredDocument, {capture: true}
+                    );
+                }
+            );
+        }
+        cleanups.push(
+            function releaseDocument() { active = false; }
+        );
+        installCallback('__arcaneWebKitDocumentCurrent', current);
+        webKitDocument = {current, activate, retire, get activation() { return active ? activation : null; }};
+        return {
+            name: 'webkitgtk',
+            async send(frame) {
+                const candidate = activation;
+                if (!current(candidate)) throw inactive();
+                const json = JSON.stringify(frame);
+                await registration;
+                // A page may retire while native attachment is pending. It
+                // must never submit its queued request after that retirement.
+                if (!current(candidate)) throw inactive();
+                // Abort, timeout or cancelAll may also end a request while
+                // this activation remains live. Unsent work stays cancelled.
+                if (frame.type === 'request' && !pending.has(frame.id)) return;
+                await post(
+                    {type: 'frame', activation: candidate, json}
+                );
+            }
+        };
+    }
     function chooseTransport(){
         const webview=global.chrome?.webview;
         if(webview?.hostObjects){
@@ -204,6 +324,12 @@ export function createCoreClient({
         const webkit=global.webkit?.messageHandlers?.arcane;
         if(typeof global.__arcaneWebKitPostMessage==='function'||webkit){
             installCallback('__arcaneReceive',receive);
+            if(webKitDocumentLifecycle){
+                if(typeof webkit?.postMessage!=='function'){
+                    throw new CoreError({code:'ARCANE_TRANSPORT_INVALID',message:'WebKit document lifecycle requires the arcane message handler with replies.'});
+                }
+                return createWebKitDocumentTransport(webkit);
+            }
             installCallback('__arcaneWebKitAcknowledge',acknowledge);
             return {name:'webkitgtk',async send(frame){
                 const serialized=JSON.stringify(frame);
@@ -293,8 +419,9 @@ export function createCoreClient({
             throw error;
         }
         if(closed)throw transportFailure??new CoreError({code:'ARCANE_CLIENT_CLOSED',message:'The Core client is closed.'});
+        if(webKitDocument)webKitDocument.activate();
         complete('transport.ready',{protocol:CORE_PROTOCOL,transport:transport.name});
-        if(replayRuntimeState&&!closed)sendControl({protocol:CORE_PROTOCOL,type:'control',control:'runtime.replay'});
+        if(replayRuntimeState&&!closed&&!webKitDocument)sendControl({protocol:CORE_PROTOCOL,type:'control',control:'runtime.replay'});
         // A native callback may close the client synchronously during replay.
         if(closed)throw transportFailure??new CoreError({code:'ARCANE_CLIENT_CLOSED',message:'The Core client is closed.'});
         return transport;
@@ -305,7 +432,7 @@ export function createCoreClient({
                 :typeof global.__arcaneWebKitPostMessage==='function'||global.webkit?.messageHandlers?.arcane?'webkitgtk'
                     :typeof global.arcaneAndroid?.postMessage==='function'?'android-webview'
                         :global.__ARCANE_DEV_HTTP__?'development-http':'standalone');
-        return {connected:transport!==null&&!closed,transport:name,
+        return {connected:transport!==null&&!closed&&(!webKitDocument||webKitDocument.activation!==null),transport:name,
             native:['webview2','webkitgtk','android-webview'].includes(name),
             managedLocalAI:['webview2','webkitgtk'].includes(name)};
     }
@@ -389,18 +516,23 @@ export function createCoreClient({
     function close(){
         if(closed)return false;
         closed=true;
-        cancelAll();
+        if(webKitDocument)webKitDocument.retire();
+        else cancelAll();
         disposeTransport(new CoreError({code:'ARCANE_CLIENT_CLOSED',message:'The Core client is closed.'}));
         return true;
     }
+    function documentHidden(){
+        if(webKitDocument)webKitDocument.retire();
+        else cancelAll();
+    }
     if(typeof global.addEventListener==='function'){
-        global.addEventListener('pagehide',cancelAll,{capture:true});
-        cleanups.push(()=>global.removeEventListener('pagehide',cancelAll,{capture:true}));
+        global.addEventListener('pagehide',documentHidden,{capture:true});
+        cleanups.push(()=>global.removeEventListener('pagehide',documentHidden,{capture:true}));
     }
     if(autoConnect){
         try{connect();}catch(error){if(error.code!=='ARCANE_TRANSPORT_UNAVAILABLE')report(error);}
     }
-    return {protocol:CORE_PROTOCOL,Error:CoreError,invoke,receive,connect,close,failTransport,cancelAll,events,eventsReady,runtime:{current:runtimeSnapshot},uuid};
+    return {protocol:CORE_PROTOCOL,Error:CoreError,invoke,receive,connect,close,failTransport,cancelAll,acceptsNativeDelivery,events,eventsReady,runtime:{current:runtimeSnapshot},uuid};
 }
 
 /** Existing namespace call shapes; method implementations remain host-owned. */
@@ -512,7 +644,10 @@ export function installCoreClient(global=globalThis,options={}){
     const previous=global.__arcaneReceive;
     global.__arcaneReceive=client.receive;
     const previousFailure=global.__arcaneTransportFailed;
-    function nativeTransportFailed(error){return client.failTransport(error);}
+    function nativeTransportFailed(error,activation){
+        if(!client.acceptsNativeDelivery(activation))return false;
+        return client.failTransport(error);
+    }
     global.__arcaneTransportFailed=nativeTransportFailed;
     const close=client.close;
     const failTransport=client.failTransport;

@@ -5,7 +5,7 @@ import {readFile} from 'node:fs/promises';
  * The two owned modules have declaration exports and two explicit imports;
  * this projection is deliberately not a general JavaScript bundler.
  */
-export async function createCoreClassicSource({eventOwnerModuleURL,replayRuntimeState=false}={}){
+export async function createCoreClassicSource({eventOwnerModuleURL,replayRuntimeState=false,webKitDocumentLifecycle=false}={}){
     if(typeof eventOwnerModuleURL!=='string'||!eventOwnerModuleURL){
         throw new TypeError('The classic Core client needs the served SDK event-manager module URL.');
     }
@@ -37,7 +37,7 @@ ${implementation}
                 },{once:true});
             })
             :loadSharedEventOwner();
-    installCoreClient(global,{eventOwner:arcaneEvents,eventOwnerReady,replayRuntimeState:${replayRuntimeState===true}});
+    installCoreClient(global,{eventOwner:arcaneEvents,eventOwnerReady,replayRuntimeState:${replayRuntimeState===true}${webKitDocumentLifecycle===true?',webKitDocumentLifecycle:true':''}});
 })(globalThis);
 `;
 }
