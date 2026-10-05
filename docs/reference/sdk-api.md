@@ -362,6 +362,7 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `createCoreClient()` | function | `arcane-os/core/client` | Core browser client | Browser and native WebView JavaScript hosts |
 | `createCoreFacade()` | function | `arcane-os/core/client` | Core browser client | Browser and native WebView JavaScript hosts |
 | `installCoreClient()` | function | `arcane-os/core/client` | Core browser client | Browser and native WebView JavaScript hosts |
+| `getInstalledCoreClient()` | function | `arcane-os/core/client` | Core browser client | Browser and native WebView JavaScript hosts |
 | `createCoreClassicSource()` | function | `arcane-os/core/classic-source` | Core classic client projection | Node; generated source runs in browser and native WebView renderers |
 | `createCoreRuntime()` | function | `arcane-os/core/runtime` | Native Core runtime | Node on Windows, Linux and macOS native hosts; Android requires host adaptation |
 | `encodeCoreFrame()` | function | `arcane-os/core/stdio` | Native Core stdio transport | Node |
@@ -6570,8 +6571,8 @@ console.log(CORE_READY_EVENTS.includes('core.ready')); // true
 ### Overview
 
 Describes the public fields for request, response, event, single-request
-cancellation and all-request cancellation frames. These are wire descriptions,
-not application validation or method admission.
+cancellation, all-request cancellation and `runtime.replay` control frames.
+These are wire descriptions, not application validation or method admission.
 
 ### Value and import
 
@@ -6705,11 +6706,11 @@ the client.
 ### Signature and result
 
 ```text
-createCoreClient({global=globalThis, transport=null, eventOwner=arcaneEvents, eventOwnerReady, autoConnect=true, onError}={})
+createCoreClient({global=globalThis, transport=null, eventOwner=arcaneEvents, eventOwnerReady, autoConnect=true, replayRuntimeState=false, onError}={})
 ```
 
 Import it from `arcane-os/core/client`. The result exposes `invoke`, `receive`,
-`connect`, `close`, `cancelAll`, `events`, `eventsReady`, `runtime.current()`,
+`connect`, `close`, `failTransport`, `cancelAll`, `events`, `eventsReady`, `runtime.current()`,
 `uuid`, `protocol` and `Error`. A supplied transport must provide callable
 `send(frame)`; an invalid transport stays disconnected and reports
 `ARCANE_TRANSPORT_INVALID`. Optional `subscribe(receive)` may return its cleanup
@@ -6720,6 +6721,21 @@ parameters and resolves the correlated response result. A send failure rejects
 its still-pending request; a failure arriving after response, cancellation or
 timeout reaches `onError`. Deferred event-owner connection preserves the FIFO
 order of queued frames and subscription actions, including reentrant delivery.
+
+`replayRuntimeState:true` sends one observed `runtime.replay` control after the
+receive listener and `transport.ready` are established, without delaying page
+startup. The default is `false`; select replay only with a supporting host.
+Repeated connection calls do not repeat that control, and send failures reach
+`onError`. The host replays actual dispatcher and service state without
+restarting services; transport, Core and service readiness remain distinct.
+
+`failTransport(error)` ends the client after an actual terminal transport
+failure. Pending RPCs and WebKit acknowledgements reject with the complete
+`CoreError`, future invocations reject with that failure, and `onError` observes
+it once. The client releases its owned listeners, callbacks and timers without
+sending cancellation frames to the failed transport. The first terminal failure
+returns `true`; an already closed client returns `false`. Ordinary `close()`
+retains its separate cancellation behavior.
 
 ### Availability and normalization
 
@@ -6794,8 +6810,8 @@ client.close();
 ### Overview
 
 Installs one synchronous `globalThis.Arcane` facade and native
-`__arcaneReceive` callback. Repeated installation returns the same client for
-that global lifetime.
+`__arcaneReceive` and `__arcaneTransportFailed` callbacks. Repeated installation
+returns the same client for that global lifetime.
 
 ### Signature and result
 
@@ -6806,6 +6822,12 @@ installCoreClient(global=globalThis, options={})
 Import it from `arcane-os/core/client`. The returned client is the same contract
 as `createCoreClient()`. Closing it releases subscriptions, native callbacks,
 timers and pending renderer requests; it does not kill Core.
+
+`__arcaneTransportFailed(error)` delegates actual terminal host failures to
+`client.failTransport(error)`. Closing or failing restores previous facade and
+callback globals only while the installation still owns them, preserving later
+replacements. `getInstalledCoreClient()` returns `null` after release, including
+before an installed terminal failure reaches `onError`.
 
 ### Availability and normalization
 
@@ -6826,6 +6848,41 @@ try {
 }
 ```
 
+## getInstalledCoreClient()
+
+### Overview
+
+Reads the existing live SDK-installed client without installing, connecting or
+replacing a facade. Applications use this accessor instead of private fields.
+
+### Signature and result
+
+```text
+getInstalledCoreClient(global=globalThis)
+```
+
+Import it from `arcane-os/core/client`. It returns the exact client installed in
+the selected global, including a classic document-created installation, or
+`null` when no live SDK installation exists. A foreign `Arcane` facade does not
+constitute an SDK installation. Close and terminal failure release the
+installation before subsequent reads.
+
+### Availability and normalization
+
+**Browser and native WebView JavaScript hosts.** This synchronous read changes
+no globals and starts no service, transport or model. The returned client's
+`runtime.current()` describes transport state; service readiness remains with
+its authoritative owner. See [Core browser client](core-client.md).
+
+### Example
+
+```javascript
+import {getInstalledCoreClient} from 'arcane-os/core/client';
+
+const client = getInstalledCoreClient();
+console.log(client ? client.runtime.current() : 'No SDK client is installed.');
+```
+
 ## createCoreClassicSource()
 
 ### Overview
@@ -6836,12 +6893,16 @@ client and contracts. It creates no copied client implementation or bundler.
 ### Signature and result
 
 ```text
-async createCoreClassicSource({eventOwnerModuleURL}={})
+async createCoreClassicSource({eventOwnerModuleURL,replayRuntimeState=false}={})
 ```
 
 Import it from `arcane-os/core/classic-source`. Supply the actual served URL for
 the selected SDK event-manager module. The promise resolves to the complete
 classic-script source.
+
+Optional `replayRuntimeState:true` forwards the current runtime-replay selection
+to the installed client. Omission retains the existing no-replay behavior; use
+`true` only when the composing host supports `runtime.replay`.
 
 ### Availability and normalization
 
@@ -6885,6 +6946,11 @@ cancellation; accepted `lifetime:'service'` work survives renderer cancellation.
 Shutdown stops admission, waits accepted responses, then runs each service's
 startup, drain and dispose in order while independent services close
 concurrently.
+
+The `runtime.replay` control publishes current dispatcher and service state
+without restarting services. Its snapshot preserves complete service errors
+and active request state; see [runtime replay](core-runtime.md#state-and-frames)
+for authoritative readiness and reentrant lifecycle ordering.
 
 ### Availability and normalization
 
