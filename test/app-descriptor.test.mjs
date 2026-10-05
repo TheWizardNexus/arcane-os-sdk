@@ -37,6 +37,21 @@ function descriptor(overrides={}){
     };
 }
 
+test('native service selection preserves complete options without loading app modules',()=>{
+    const authored=descriptor();
+    const services=[
+        {module:'server/repository-service.mjs',options:{label:'  Moon cheese 🧀\r\nAll of it.  ',nested:[null,false,0]}},
+        {module:'server/second-service.mjs',options:null}
+    ];
+    authored.native.services=services;
+    const normalized=validateAppDescriptor(authored);
+    assert.deepEqual(normalized.native.services,services);
+    assert.equal(normalized.native.services[0].options,services[0].options);
+    assert.deepEqual(projectNativeDescriptor(authored).services,services);
+    assert.equal(Object.hasOwn(projectPackageManifest(authored),'services'),false);
+    assert.equal(Object.hasOwn(validateAppDescriptor(descriptor()).native,'services'),false);
+});
+
 test('canonical descriptor projects exact browser and native compatibility inputs',()=>{
     const value=validateAppDescriptor(descriptor(),{appId:'sample-app'});
     assert.deepEqual(projectPackageManifest(value),{

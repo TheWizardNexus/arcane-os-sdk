@@ -1,10 +1,64 @@
 import assert from 'node:assert/strict';
 import {getEventListeners} from 'node:events';
+import {mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
+import path from 'node:path';
 import {PassThrough, Writable} from 'node:stream';
+import {fileURLToPath} from 'node:url';
 import test from '../src/testing.mjs';
-import {startCoreHost} from '../src/core/host.mjs';
+import {readCoreLaunchContext, startCoreHost} from '../src/core/host.mjs';
 import {createCoreFrameDecoder, encodeCoreFrame} from '../src/core/stdio.mjs';
 import {CORE_PROTOCOL} from '../browser-runtime/core/contracts.mjs';
+
+const launchFixtureDirectory = fileURLToPath(new URL('../.arcane/core-launch-context-fixtures/', import.meta.url));
+
+async function createLaunchFixture(t) {
+    await mkdir(launchFixtureDirectory, {recursive: true});
+    const root = await mkdtemp(path.join(launchFixtureDirectory, 'case-'));
+    t.after(async function removeLaunchFixture() {
+        const relative = path.relative(launchFixtureDirectory, root);
+        assert.ok(relative && !path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`));
+        await rm(root, {recursive: true, force: true});
+    });
+    return root;
+}
+
+test('Core launch context reads only an explicit file and preserves every object field', async function explicitLaunchContext(t) {
+    const root = await createLaunchFixture(t);
+    const filename = path.join(root, 'moon cheese launch.json');
+    const content = '{\r\n\t"appRoot": "  Explicit app root 🧀  ",\r\n\t"applicationURL": "https://moon.example/arrival?message=cheese",\r\n\t"unknownOwner": {"instructions": "  Café é 🦑\\r\\nFinal line.  ", "values": [null, false, 0, "", {"moon": "月"}]},\r\n\t"optional": null\r\n}\r\n';
+    await writeFile(filename, content);
+
+    assert.deepEqual(await readCoreLaunchContext({argv: []}), {});
+    assert.deepEqual(await readCoreLaunchContext({argv: [filename]}), {});
+    assert.deepEqual(await readCoreLaunchContext({argv: [`--arcane-launch-config=${filename}`]}), {});
+    const context = await readCoreLaunchContext({argv: ['--unrelated', 'untouched', '--arcane-launch-config', filename]});
+    assert.deepEqual(context, JSON.parse(content));
+    assert.equal(await readFile(filename, 'utf8'), content);
+});
+
+test('Core launch context reports missing filenames and preserves file and JSON errors', async function launchContextFailures(t) {
+    const root = await createLaunchFixture(t);
+    const missing = path.join(root, 'not-created.json');
+    for (const argv of [['--arcane-launch-config'], ['--arcane-launch-config', '']]) {
+        await assert.rejects(readCoreLaunchContext({argv}), {
+            name: 'TypeError', message: '--arcane-launch-config requires a filename.'
+        });
+    }
+    await assert.rejects(readCoreLaunchContext({argv: ['--arcane-launch-config', missing]}), function originalFileError(error) {
+        assert.equal(error.code, 'ENOENT');
+        assert.equal(error.path, missing);
+        return true;
+    });
+    const filename = path.join(root, 'launch.json');
+    await writeFile(filename, '{"complete":');
+    await assert.rejects(readCoreLaunchContext({argv: ['--arcane-launch-config', filename]}), {name: 'SyntaxError'});
+    for (const content of ['null', '[]', '"moon cheese"', '42', 'false']) {
+        await writeFile(filename, content);
+        await assert.rejects(readCoreLaunchContext({argv: ['--arcane-launch-config', filename]}), {
+            name: 'TypeError', message: 'Core launch configuration must be a JSON object.'
+        });
+    }
+});
 
 function deferred() {
     let resolve;

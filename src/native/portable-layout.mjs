@@ -149,20 +149,45 @@ export async function copyCoreRuntime(root, files, signal, {
     return metadata;
 }
 
-export function coreEntrySource(application, version, services) {
+export function coreEntrySource(application, version, services, {localAI, runtimes = []} = {}) {
     const imports = services.map(function serviceImport(service, index) {
         const specifier = '../app/' + service.module.split('/').map(encodeURIComponent).join('/');
         return `import createService${index} from ${JSON.stringify(specifier)};`;
     });
+    // JSON parsing retains authored field names that have object-literal syntax.
     const definitions = services.map(function serviceDefinition(service, index) {
-        return `    createService${index}(${JSON.stringify(service.options === undefined ? {} : service.options)})`;
+        return `    createService${index}(JSON.parse(${JSON.stringify(JSON.stringify(service.options === undefined ? {} : service.options))}), context)`;
     });
+    if (localAI !== undefined) {
+        imports.push("import {createLocalAIService} from 'arcane-os/core/local-ai';");
+        definitions.push(`    createLocalAIService(JSON.parse(${JSON.stringify(JSON.stringify(localAI))}), context)`);
+    }
     return [
-        "import {startCoreHost} from 'arcane-os/core/host';",
+        "import {fileURLToPath} from 'node:url';",
+        "import {readCoreLaunchContext, startCoreHost} from 'arcane-os/core/host';",
         ...imports,
         '',
+        ...(localAI === undefined ? [] : [
+            '// Bundled runtime paths are artifact-root-relative POSIX paths.',
+            'function runtimePath(relative) {',
+            "    return fileURLToPath(new URL('../' + relative.split('/').map(encodeURIComponent).join('/'), import.meta.url));",
+            '}',
+            ''
+        ]),
+        '// Factories share launch context as their second argument; authored options stay first.',
+        '// Explicit launch fields override artifact-relative defaults unchanged.',
+        'const context = {',
+        "    appRoot: fileURLToPath(new URL('../app/', import.meta.url)),",
+        ...(localAI === undefined ? [] : [
+            `    runtimes: JSON.parse(${JSON.stringify(JSON.stringify(runtimes))}).map(function runtimeLocation(runtime) {`,
+            '        return {...runtime, root: runtimePath(runtime.root), executable: runtimePath(runtime.executable)};',
+            '    }),'
+        ]),
+        '    ...await readCoreLaunchContext()',
+        '};',
+        '',
         'const host = startCoreHost({',
-        `    application: ${JSON.stringify(application)},`,
+        `    application: JSON.parse(${JSON.stringify(JSON.stringify(application))}),`,
         `    version: ${JSON.stringify(version)},`,
         `    services: [\n${definitions.join(',\n')}\n    ]`,
         '});',

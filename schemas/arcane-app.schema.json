@@ -119,6 +119,18 @@
           "oneOf": [{ "$ref": "#/$defs/rasterIcon" }, { "type": "null" }]
         },
         "order": { "type": "integer", "minimum": 0 },
+        "services": {
+          "description": "Explicit application-owned Core factory modules from the selected native release. Factories receive authored options first and launch context second.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["module"],
+            "properties": {
+              "module": { "$ref": "#/$defs/relativePath" },
+              "options": {}
+            }
+          }
+        },
         "localAI": { "$ref": "#/$defs/localAI" },
         "bundledApps": {
           "type": "array",

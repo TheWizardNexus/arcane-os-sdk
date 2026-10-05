@@ -4,6 +4,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from '../src/testing.mjs';
 import defaultProvider, {arcaneNativeBuilderProvider, createPortableNativeProvider} from '../src/native/portable-provider.mjs';
+import {coreEntrySource} from '../src/native/portable-layout.mjs';
 import {ERROR_CODES} from '../src/errors.mjs';
 
 const sdkRoot = fileURLToPath(new URL('../', import.meta.url));
@@ -153,7 +154,7 @@ test('portable assembly preserves complete app and dependency files and authors 
     });
     assert.deepEqual(manifest.client, {
         source: 'runtime/arcane-api.js', injection: 'document-created',
-        eventOwnerModuleURL: '/arcane%20runtime/sdk/event-manager.mjs'
+        eventOwnerModuleURL: '/arcane%20runtime/sdk/event-manager.mjs', replayRuntimeState: true
     });
     assert.deepEqual(manifest.dependencies, [{appId: 'lunar-depot', root: 'dependencies/0', release: dependencyRelease}]);
     assert.equal(manifest.minimumCoreVersion, '0.1.0');
@@ -175,13 +176,97 @@ test('portable assembly preserves complete app and dependency files and authors 
         assert.deepEqual(included, installed);
     }
     const entry = await readFile(path.join(output, 'runtime/arcane-core.mjs'), 'utf8');
-    assert.ok(entry.includes("import {startCoreHost} from 'arcane-os/core/host';"));
+    assert.ok(entry.includes("import {readCoreLaunchContext, startCoreHost} from 'arcane-os/core/host';"));
     assert.ok(entry.includes('import createService0 from "../app/services/dispatch.mjs";'));
-    assert.ok(entry.includes(`createService0(${JSON.stringify(options)})`));
+    assert.ok(entry.includes(`createService0(JSON.parse(${JSON.stringify(JSON.stringify(options))}), context)`));
     assert.ok(entry.includes('await host.closed'));
+    assert.equal(entry.includes('arcane-os/core/local-ai'), false);
+    assert.equal(entry.includes('createLocalAIService'), false);
+    await assert.rejects(readdir(path.join(output, 'runtime/local-ai')), {code: 'ENOENT'});
+    await assert.rejects(readdir(path.join(fixture.outputRoot, 'local-ai-runtimes')), {code: 'ENOENT'});
     const client = await readFile(path.join(output, 'runtime/arcane-api.js'), 'utf8');
     assert.ok(client.includes('/arcane%20runtime/sdk/event-manager.mjs'));
+    assert.ok(client.includes('installCoreClient(global,{eventOwner:arcaneEvents,eventOwnerReady,replayRuntimeState:true});'));
     assert.deepEqual(events.map(function eventType(event) { return event.type; }), ['native.payload.started', 'native.payload.completed']);
+});
+
+test('portable Core entry shares explicit launch context without changing authored service options', function serviceLaunchContext() {
+    const options = {
+        appRoot: '  Service-owned root 🧀  ',
+        nested: {content: '  Café é 🦑\r\nFinal line.  ', values: [null, false, 0]},
+        ['__proto__']: {content: '  Complete service option.\r\n最後の行  '}
+    };
+    const launchApplication = {
+        ...application,
+        ['__proto__']: {content: '  Complete application metadata.\r\n最後の行  '}
+    };
+    const services = [
+        {module: 'services/dispatch.mjs', options},
+        {module: 'services/arrival notes.mjs', options: null},
+        {module: 'services/observatory.mjs'}
+    ];
+    const entry = coreEntrySource(launchApplication, '1.2.3', services);
+    assert.ok(entry.includes("import {fileURLToPath} from 'node:url';"));
+    assert.ok(entry.includes("import {readCoreLaunchContext, startCoreHost} from 'arcane-os/core/host';"));
+    assert.ok(entry.includes([
+        'const context = {',
+        "    appRoot: fileURLToPath(new URL('../app/', import.meta.url)),",
+        '    ...await readCoreLaunchContext()',
+        '};'
+    ].join('\n')));
+    assert.ok(entry.includes(`createService0(JSON.parse(${JSON.stringify(JSON.stringify(options))}), context)`));
+    assert.ok(entry.includes('import createService1 from "../app/services/arrival%20notes.mjs";'));
+    assert.ok(entry.includes('createService1(JSON.parse("null"), context)'));
+    assert.ok(entry.includes('createService2(JSON.parse("{}"), context)'));
+    assert.ok(entry.includes(`application: JSON.parse(${JSON.stringify(JSON.stringify(launchApplication))})`));
+    assert.ok(entry.includes('await host.closed'));
+    assert.equal(services[0].options, options);
+    assert.equal(services[1].options, null);
+    assert.equal(services[2].options, undefined);
+    assert.equal(entry.includes('arcane-os/core/local-ai'), false);
+    assert.equal(entry.includes('createLocalAIService'), false);
+    assert.equal(entry.includes('runtimes:'), false);
+    assert.equal(entry.includes('runtimePath'), false);
+});
+
+test('portable Core entry composes only selected local AI with relocatable runtime defaults', function selectedLocalAILaunchContext() {
+    const options = {destination: '  月 🧀  ', content: '  Every line.\r\nFinal line.  '};
+    const localAI = {
+        runtimes: [{id: 'llama.cpp', version: 'synthetic-selection', extra: {label: '  Selected runtime 🦑  '}}],
+        llamaCpp: {model: 'models/moon cheese.gguf', arguments: ['--label', '  Café é\r\nPreserve this.  ']},
+        unknownOwner: {enabled: false, value: null},
+        ['__proto__']: {content: 'An ordinary authored JSON field.'}
+    };
+    const runtimes = [{
+        id: 'llama.cpp', version: 'synthetic-selection', platform: 'linux', architecture: 'x64',
+        root: 'runtime/local-ai/llama.cpp',
+        executable: 'runtime/local-ai/llama.cpp/bin/moon # % 🦑 server',
+        unknownOwner: {content: '  Complete bundled metadata.\n最後の行  '},
+        ['__proto__']: {content: 'Complete runtime metadata.'}
+    }];
+    const services = [{module: 'services/dispatch.mjs', options}];
+    const entry = coreEntrySource(application, '1.2.3', services, {localAI, runtimes});
+    assert.ok(entry.includes("import {createLocalAIService} from 'arcane-os/core/local-ai';"));
+    assert.ok(entry.includes(`createService0(JSON.parse(${JSON.stringify(JSON.stringify(options))}), context)`));
+    assert.ok(entry.includes(`createLocalAIService(JSON.parse(${JSON.stringify(JSON.stringify(localAI))}), context)`));
+    assert.ok(entry.includes("return fileURLToPath(new URL('../' + relative.split('/').map(encodeURIComponent).join('/'), import.meta.url));"));
+    assert.ok(entry.includes([
+        `    runtimes: JSON.parse(${JSON.stringify(JSON.stringify(runtimes))}).map(function runtimeLocation(runtime) {`,
+        '        return {...runtime, root: runtimePath(runtime.root), executable: runtimePath(runtime.executable)};',
+        '    }),',
+        '    ...await readCoreLaunchContext()'
+    ].join('\n')));
+    const unselected = coreEntrySource(application, '1.2.3', services, {runtimes});
+    assert.equal(unselected.includes('arcane-os/core/local-ai'), false);
+    assert.equal(unselected.includes('createLocalAIService'), false);
+    assert.equal(unselected.includes('runtimes:'), false);
+    assert.equal(unselected.includes('runtimePath'), false);
+    const withoutBundledRuntime = coreEntrySource(application, '1.2.3', [], {localAI});
+    assert.ok(withoutBundledRuntime.includes('runtimes: JSON.parse("[]").map(function runtimeLocation(runtime) {'));
+    assert.ok(withoutBundledRuntime.includes(`createLocalAIService(JSON.parse(${JSON.stringify(JSON.stringify(localAI))}), context)`));
+    const emptySelection = coreEntrySource(application, '1.2.3', [], {localAI: {runtimes: []}});
+    assert.ok(emptySelection.includes(`createLocalAIService(JSON.parse(${JSON.stringify('{"runtimes":[]}')}), context)`));
+    assert.ok(emptySelection.includes('runtimes: JSON.parse("[]").map(function runtimeLocation(runtime) {'));
 });
 
 test('portable assembly resolves the shared browser event module from a selected installed SDK alias', async function installedSdkAlias(t) {

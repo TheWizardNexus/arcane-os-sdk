@@ -61,7 +61,7 @@ function serviceSelection(services, release) {
         if (!is.string(service?.module) || !release.files.includes(service.module)) {
             throw new ArcaneError(ERROR_CODES.prerequisiteMissing, `The selected release does not contain service module ${String(service?.module)}.`);
         }
-        return {module: service.module, options: service.options === undefined ? {} : service.options};
+        return {...service, options: service.options === undefined ? {} : service.options};
     });
 }
 
@@ -81,7 +81,7 @@ function eventOwnerPath(release) {
 }
 
 /** Package-owned assembly; never imports an OS checkout or application service. */
-export function createPortableNativeProvider({services = []} = {}) {
+export function createPortableNativeProvider({services} = {}) {
     return {
         protocol: PROTOCOL,
         async describe() {
@@ -120,7 +120,8 @@ export function createPortableNativeProvider({services = []} = {}) {
             const {appDescriptor, release, signal, onEvent} = request;
             throwIfAborted(signal);
             const target = portableTarget(request.targetRequest);
-            const selectedServices = serviceSelection(services, release);
+            const localAI = appDescriptor.native?.localAI;
+            const selectedServices = serviceSelection(services ?? appDescriptor.native?.services ?? [], release);
             const eventOwnerModuleURL = eventOwnerPath(release);
             const output = await outputDirectory(request);
             throwIfAborted(signal);
@@ -130,7 +131,33 @@ export function createPortableNativeProvider({services = []} = {}) {
             const files = [];
             try {
                 await emit(onEvent, {type: 'native.payload.started', appId: appDescriptor.id, outputRoot: root});
-                await copyRelease({...request, releaseRoot: request.appReleaseRoot}, 'app', root, files, signal);
+                async function bundleSelectedRuntimes() {
+                    if (localAI === undefined) return {runtimes: [], files: []};
+                    const {bundleLocalAIRuntimes} = await import('../local-ai/install.mjs');
+                    return bundleLocalAIRuntimes({
+                        runtimes: localAI.runtimes,
+                        directory: path.join(output, 'local-ai-runtimes'),
+                        outputRoot: root,
+                        platform: target.platform === 'windows' ? 'win32' : target.platform,
+                        architecture: target.architecture,
+                        signal,
+                        onEvent
+                    });
+                }
+                // These outputs have separate directories. Join both owners
+                // before cleanup so neither can keep writing a removed assembly.
+                const preparation = await Promise.allSettled([
+                    copyRelease({...request, releaseRoot: request.appReleaseRoot}, 'app', root, files, signal),
+                    bundleSelectedRuntimes()
+                ]);
+                const failures = preparation.filter(function failedPreparation(result) { return result.status === 'rejected'; });
+                if (failures.length === 1) throw failures[0].reason;
+                if (failures.length > 1) {
+                    throw new AggregateError(failures.map(function preparationError(result) { return result.reason; }),
+                        'Portable application and local runtime preparation failed.');
+                }
+                const bundled = preparation[1].value;
+                files.push(...bundled.files);
                 const dependencies = [];
                 for (const [index, dependency] of (request.dependencies ?? []).entries()) {
                     const directory = `dependencies/${index}`;
@@ -155,8 +182,9 @@ export function createPortableNativeProvider({services = []} = {}) {
                     appSdk = {name: metadata.name, version: metadata.version, root: destination};
                 }
                 await writeOutput(root, 'package.json', '{"type":"module"}\n', files, signal);
-                await writeOutput(root, 'runtime/arcane-core.mjs', coreEntrySource(appDescriptor, sdk.version, selectedServices), files, signal);
-                await writeOutput(root, 'runtime/arcane-api.js', await createCoreClassicSource({eventOwnerModuleURL}), files, signal);
+                await writeOutput(root, 'runtime/arcane-core.mjs', coreEntrySource(appDescriptor, sdk.version, selectedServices,
+                    {localAI, runtimes: bundled.runtimes}), files, signal);
+                await writeOutput(root, 'runtime/arcane-api.js', await createCoreClassicSource({eventOwnerModuleURL, replayRuntimeState: true}), files, signal);
                 const manifest = {
                     schemaVersion: 1,
                     kind: 'arcane-portable-native',
@@ -166,8 +194,11 @@ export function createPortableNativeProvider({services = []} = {}) {
                     target,
                     webRoot: 'app',
                     start: release.manifest?.app?.start ?? './index.html',
-                    core: {entry: 'runtime/arcane-core.mjs', transport: 'stdio', protocol: 'arcane/1', services: selectedServices},
-                    client: {source: 'runtime/arcane-api.js', injection: 'document-created', eventOwnerModuleURL},
+                    core: {
+                        entry: 'runtime/arcane-core.mjs', transport: 'stdio', protocol: 'arcane/1', services: selectedServices,
+                        ...(localAI === undefined ? {} : {localAIRuntimes: bundled.runtimes})
+                    },
+                    client: {source: 'runtime/arcane-api.js', injection: 'document-created', eventOwnerModuleURL, replayRuntimeState: true},
                     dependencies,
                     minimumCoreVersion: request.minimumCoreVersion ?? null,
                     files: [...files, MANIFEST]

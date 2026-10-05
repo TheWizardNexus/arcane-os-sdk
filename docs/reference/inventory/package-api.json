@@ -6,7 +6,7 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 250,
+  "memberCount": 251,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
@@ -3905,14 +3905,14 @@
       "name": "createPortableNativeProvider",
       "displayName": "createPortableNativeProvider()",
       "kind": "function",
-      "signature": "createPortableNativeProvider({services=[]}={})",
+      "signature": "createPortableNativeProvider({services}={})",
       "entrypoints": ["arcane-os/native/portable-provider"],
       "primaryImport": "arcane-os/native/portable-provider",
       "group": "Portable native provider",
       "summary": "Creates the SDK-owned provider that assembles one selected app and explicit services into a portable Core payload.",
       "availability": "Node; produces a portable payload rather than an executable host",
       "protocol": "arcane-native-builder/1 portable provider",
-      "normalization": "Preserves complete selected app and dependency releases, uses explicit service module factories, reports executable:false and never substitutes for an unavailable platform host"
+      "normalization": "Preserves complete selected app and dependency releases; an explicit services selection overrides appDescriptor.native.services, otherwise the descriptor selection is used; reports executable:false and never substitutes for an unavailable platform host"
     },
     {
       "id": "native-portable-provider:arcaneNativeBuilderProvider",
@@ -3941,6 +3941,20 @@
       "availability": "Node; produces a portable payload rather than an executable host",
       "protocol": "arcane-native-builder/1 portable provider",
       "normalization": "Binding identity is exactly equal to the named arcaneNativeBuilderProvider export"
+    },
+    {
+      "id": "core-host:readCoreLaunchContext",
+      "name": "readCoreLaunchContext",
+      "displayName": "readCoreLaunchContext()",
+      "kind": "function",
+      "signature": "readCoreLaunchContext({argv=process.argv.slice(2)}={})",
+      "entrypoints": ["arcane-os/core/host"],
+      "primaryImport": "arcane-os/core/host",
+      "group": "Native Core host composition",
+      "summary": "Reads the complete JSON object explicitly selected by --arcane-launch-config for native service launch context.",
+      "availability": "Node, including the selected external-entry SEA launcher",
+      "protocol": "Explicit launch arguments and JSON configuration",
+      "normalization": "Returns an empty record without the flag; preserves every supplied field and value, surfaces file and JSON failures, and performs no configuration search, rewrite or environment mutation"
     },
     {
       "id": "core-host:startCoreHost",
