@@ -16,11 +16,15 @@ toolchain, platform, architecture, format, signing mode, declared dependency
 releases, and destination. Verification is a separate operation only when the
 user explicitly selects it for the release artifact.
 
-The portable and Windows x64 targets pair with installed SDK providers by
+The portable, Windows x64 and macOS targets pair with installed SDK providers by
 default. Windows uses the numeric SDK release's precompiled WebView2/SEA host.
-An explicit `--arcane-root` retains fixed-provider selection from an Arcane OS
-checkout; Linux and Android still require that override and their platform
-toolchains. Every native request also requires
+macOS source composition selects that version's architecture-specific AppKit,
+WebKit and bundled Node host asset; actual asset publication and Mac execution
+are separate release evidence, not implied by the target registry.
+An explicit `--arcane-root` retains fixed-provider selection for the registered
+portable, Windows, Linux and Android checkout targets. macOS uses the installed
+SDK provider and has no checkout override. Linux and Android still require that
+override and their platform toolchains. Every native request also requires
 the canonical app descriptor to declare the exact target selected on the
 command line. The SDK package does not silently search for a toolchain, infer a
 descriptor target, embed the Arcane machine bundle, or substitute browser
@@ -63,7 +67,7 @@ from its installed npm dependency. After `npm install`, run
 browser maps are present. The initial scaffold reports that map as pending while
 the SDK dependency is absent. The scaffold includes the raster icon required
 by the current native platform. Use the
-matching scaffold target (`portable`, `windows-x64`, `linux-x64`, `linux-arm64`,
+matching scaffold target (`portable`, `windows-x64`, `macos-arm64`, `macos-x64`, `linux-x64`, `linux-arm64`,
 or `android-arm64`) before running the corresponding command.
 
 `native-prepare` remains a standalone diagnostic. The normal build recipe omits
@@ -92,23 +96,25 @@ for the complete compatibility and breaking-change rule.
 | `browser` | `directory` | Available |
 | `portable` | `portable` directory | SDK package provider by default; explicit checkout override retained; not executable |
 | `windows-x64` | `exe` bundle | SDK package provider and matching precompiled release host by default; explicit checkout override retained |
+| `macos-arm64` | `.app` bundle | SDK provider source; needs a matching selected or published Apple silicon host asset |
+| `macos-x64` | `.app` bundle | SDK provider source; needs a matching selected or published Intel host asset |
 | `linux-x64` | `deb` | Available with explicit `--arcane-root`; unsigned local development only |
 | `linux-arm64` | `deb` | Available with explicit `--arcane-root` on a compatible native ARM64 toolchain; unsigned local development only |
 | `android-arm64` | `apk` | Available with explicit `--arcane-root`; development-signed, architecture-neutral, and physical/native ARM64 for run |
 
 macOS can consume browser applications and portable JavaScript capabilities
-within their declared runtimes. The current target registry has no macOS native
-package adapter, and the portable CLI request currently selects only Windows
-or Linux. macOS native packaging and Android host adaptation remain incomplete;
-the SDK portable payload does not supply executable hosts. A source-development
+within their declared runtimes. The native target registry includes separate
+Apple silicon and Intel `.app` compositions; portable CLI requests also accept
+macOS. A Mac provider preserves the complete portable payload under its bundle's
+Resources directory and composes the SDK host separately. A source-development
 native wrapper is also not an exposed `arcane dev` target. Native `run` uses the
 selected packaged application through its paired provider.
 
-The package includes Foundation-only macOS `ArcaneCoreProcess` source for
-explicit child launch, framed pipes, ordered writes and graceful input close.
-That source requires a separately composed macOS host and is not an executable
-target or an executed macOS verification result. See the
-[host source boundary](reference/core-native-packaging.md#macos-process-source).
+The package includes macOS `ArcaneCoreProcess`, `ArcaneHost` and launcher source
+for explicit child launch, framed pipes, document lifecycle and graceful drain.
+The SDK provider composes them with an explicitly selected Darwin Node runtime.
+Source availability is not evidence of Mac compilation or execution. See the
+[macOS composition boundary](reference/core-native-packaging.md#macos-application-composition).
 Windows app assembly needs the normal Node/npm toolchain and `tar`, not a C#
 compiler. Its generated executable uses bundled Node and requires .NET Framework
 4.6.2 or later plus WebView2 Runtime on the destination Windows x64 machine.

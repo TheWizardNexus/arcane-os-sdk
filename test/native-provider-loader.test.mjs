@@ -74,7 +74,10 @@ test('native provider loading preserves event and target context',async t=>{
     ]);
 });
 
-for(const [target,module] of [['portable','portable-provider.mjs'],['windows-x64','windows-provider.mjs']]){
+for(const [target,module] of [
+    ['portable','portable-provider.mjs'],['windows-x64','windows-provider.mjs'],
+    ['macos-arm64','macos-provider.mjs'],['macos-x64','macos-provider.mjs']
+]){
 test(`${target} without an override loads the installed SDK provider directly`,async()=>{
     const builder=provider();
     const providerURL=new URL(`../src/native/${module}`,import.meta.url);

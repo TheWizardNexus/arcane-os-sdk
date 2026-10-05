@@ -44,7 +44,7 @@ function validateInputs(appId,displayName){
 }
 
 function validateScaffoldTarget(target){
-    const targets=['browser','portable','windows-x64','linux-x64','linux-arm64','android-arm64'];
+    const targets=['browser','portable','windows-x64','macos-arm64','macos-x64','linux-x64','linux-arm64','android-arm64'];
     if(!targets.includes(target)){
         fail(`Invalid scaffold target: ${String(target)}. Expected one of ${targets.join(', ')}.`,'ARCANE_USAGE');
     }

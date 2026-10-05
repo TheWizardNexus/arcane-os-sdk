@@ -19,7 +19,7 @@ const DEFINITIONS=[
     },
     {
         id:'portable',displayName:'Portable native application',status:'pairing-required',
-        platforms:['windows','linux'],architectures:['x64','arm64'],formats:['portable'],
+        platforms:['windows','linux','macos'],architectures:['x64','arm64'],formats:['portable'],
         signingModes:['unsigned-local-test'],
         reason:'Portable app payloads use the SDK package provider by default; explicit provider pairing remains available.'
     },
@@ -27,6 +27,16 @@ const DEFINITIONS=[
         id:'windows-x64',displayName:'Windows x64 executable',status:'pairing-required',
         platforms:['windows'],architectures:['x64'],formats:['exe'],signingModes:['unsigned-local-test'],
         reason:'Windows output requires an Arcane OS native provider.'
+    },
+    {
+        id:'macos-arm64',displayName:'macOS Apple silicon application',status:'pairing-required',
+        platforms:['macos'],architectures:['arm64'],formats:['app'],signingModes:['unsigned-local-test'],
+        reason:'macOS output uses the SDK provider with the selected architecture host asset.'
+    },
+    {
+        id:'macos-x64',displayName:'macOS Intel application',status:'pairing-required',
+        platforms:['macos'],architectures:['x64'],formats:['app'],signingModes:['unsigned-local-test'],
+        reason:'macOS output uses the SDK provider with the selected architecture host asset.'
     },
     {
         id:'linux-x64',displayName:'Linux x64 executable',status:'pairing-required',

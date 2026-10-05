@@ -738,6 +738,16 @@ function operationOptions(command,parsed,cwd){
 }
 
 const NATIVE_REQUESTS={
+    'macos-arm64':{
+        platform:'macos',architecture:'arm64',defaultFormat:'app',formats:new Set(['app']),
+        defaultSigning:'unsigned-local-test',defaultProfileId:null,
+        signingModes:new Set(['unsigned-local-test'])
+    },
+    'macos-x64':{
+        platform:'macos',architecture:'x64',defaultFormat:'app',formats:new Set(['app']),
+        defaultSigning:'unsigned-local-test',defaultProfileId:null,
+        signingModes:new Set(['unsigned-local-test'])
+    },
     'windows-x64':{
         platform:'windows',architecture:'x64',defaultFormat:'exe',formats:new Set(['exe']),
         defaultSigning:'unsigned-local-test',defaultProfileId:null,
@@ -761,9 +771,9 @@ const NATIVE_REQUESTS={
 };
 
 function portableRequestDefinition(){
-    const platform=process.platform==='win32'?'windows':process.platform;
+    const platform=process.platform==='win32'?'windows':process.platform==='darwin'?'macos':process.platform;
     const architecture=process.arch==='x64'?'x64':process.arch==='arm64'?'arm64':process.arch;
-    if(!['windows','linux'].includes(platform)||!['x64','arm64'].includes(architecture)){
+    if(!['windows','linux','macos'].includes(platform)||!['x64','arm64'].includes(architecture)){
         throw new ArcaneError(
             ERROR_CODES.targetUnavailable,
             `The portable native provider does not support ${process.platform}/${process.arch}.`
@@ -817,7 +827,7 @@ async function pairNativeProvider(command,options,loadProvider,{signal,onEvent}=
         usage(`${command} requires one native target.`);
     }
     const targetRequest=createNativeTargetRequest(options);
-    if(!options.arcaneRoot&&!['portable','windows-x64'].includes(options.target)){
+    if(!options.arcaneRoot&&!['portable','windows-x64','macos-arm64','macos-x64'].includes(options.target)){
         usage(`${command} for target ${options.target} requires --arcane-root <directory>.`);
     }
     const loaded=await loadProvider({

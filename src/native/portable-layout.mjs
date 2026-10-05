@@ -149,7 +149,7 @@ export async function copyCoreRuntime(root, files, signal, {
     return metadata;
 }
 
-export function coreEntrySource(application, version, services, {localAI, runtimes = []} = {}) {
+export function coreEntrySource(application, version, services, {localAI, runtimes = [], packagedWeb = false} = {}) {
     const imports = services.map(function serviceImport(service, index) {
         const specifier = '../app/' + service.module.split('/').map(encodeURIComponent).join('/');
         return `import createService${index} from ${JSON.stringify(specifier)};`;
@@ -161,6 +161,10 @@ export function coreEntrySource(application, version, services, {localAI, runtim
     if (localAI !== undefined) {
         imports.push("import {createLocalAIService} from 'arcane-os/core/local-ai';");
         definitions.push(`    createLocalAIService(JSON.parse(${JSON.stringify(JSON.stringify(localAI))}), context)`);
+    }
+    if (packagedWeb) {
+        imports.push("import {createPackagedWebService} from 'arcane-os/core/packaged-web';");
+        definitions.push("    createPackagedWebService({artifactRoot: fileURLToPath(new URL('../', import.meta.url))}, context)");
     }
     return [
         "import {fileURLToPath} from 'node:url';",

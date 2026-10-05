@@ -62,6 +62,9 @@ API_AVAILABLE(macos(11.0))
 
 @property(nonatomic, readonly) WKWebView *webView;
 
+/** True after a host/window close requests the existing Core drain. */
+@property(nonatomic, readonly, getter=isClosing) BOOL closing;
+
 /** Loads the selected app URL after its serving owner is ready. */
 - (WKNavigation * _Nullable)loadApplicationURL:(NSURL *)applicationURL;
 

@@ -24,7 +24,9 @@ const FIXED_NATIVE_PROVIDER_PATHS={
 
 const SDK_NATIVE_PROVIDER_PATHS={
     portable:'./native/portable-provider.mjs',
-    'windows-x64':'./native/windows-provider.mjs'
+    'windows-x64':'./native/windows-provider.mjs',
+    'macos-arm64':'./native/macos-provider.mjs',
+    'macos-x64':'./native/macos-provider.mjs'
 };
 
 export const ARCANE_NATIVE_PROVIDER_PATHS={

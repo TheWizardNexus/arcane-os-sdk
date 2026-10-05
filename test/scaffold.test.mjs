@@ -335,11 +335,11 @@ test('explicit multi-app template lock contains only semantic SDK roots and prot
     assert.doesNotMatch(JSON.stringify(lock),/sha|digest|integrity|bytes/iu);
 });
 
-// Five complete native scaffolds are serialized here so their shared workspace
+// Complete native scaffolds are serialized here so their shared workspace
 // outputs do not collide.
 test('every native scaffold includes a real raster icon and declares browser plus its selected target',{timeout:60_000},async t=>{
     const parent=await temporaryDirectory(t);
-    for(const target of ['portable','windows-x64','linux-x64','linux-arm64','android-arm64']){
+    for(const target of ['portable','windows-x64','macos-arm64','macos-x64','linux-x64','linux-arm64','android-arm64']){
         await t.test(target,async()=>{
             const appId=`scaffold-${target}`;
             const targetPath=path.join(parent,appId);
@@ -372,7 +372,10 @@ test('every native scaffold includes a real raster icon and declares browser plu
             );
             assert.equal(packageDocument.scripts['build:browser'],'arcane build --target browser');
             assert.equal(packageDocument.scripts['run:browser'],'arcane run --target browser');
-            assert.match(readme,/npm run build -- --arcane-root/u);
+            if (target.startsWith('macos-')) {
+                assert.match(readme,/installed SDK provider/u);
+                assert.doesNotMatch(readme,/--arcane-root/u);
+            } else assert.match(readme,/npm run build -- --arcane-root/u);
         });
     }
 });

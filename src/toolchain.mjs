@@ -868,7 +868,7 @@ export function assertIntegratedNativeToolchain({
     workspaceMode,workspaceRoot,toolchainRoot,target,providerSource='arcane-checkout'
 }={}){
     if(workspaceMode!=='integrated')return;
-    if(providerSource==='sdk-package'&&(target==='portable'||target==='windows-x64'))return;
+    if(providerSource==='sdk-package'&&['portable','windows-x64','macos-arm64','macos-x64'].includes(target))return;
     if(!is.string(toolchainRoot)||!sameCanonicalPath(workspaceRoot,toolchainRoot)){
         throw new ArcaneError(
             ERROR_CODES.policyDenied,

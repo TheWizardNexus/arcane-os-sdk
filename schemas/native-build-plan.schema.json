@@ -117,7 +117,7 @@
             {
               "properties": {
                 "target": { "const": "portable" },
-                "platform": { "enum": ["windows", "linux"] },
+                "platform": { "enum": ["windows", "linux", "macos"] },
                 "architecture": { "enum": ["x64", "arm64"] },
                 "format": { "const": "portable" }
               }
@@ -159,6 +159,32 @@
                 "platform": { "const": "linux" },
                 "architecture": { "const": "arm64" },
                 "format": { "const": "deb" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/unsignedTargetRequest" },
+            {
+              "properties": {
+                "target": { "const": "macos-arm64" },
+                "platform": { "const": "macos" },
+                "architecture": { "const": "arm64" },
+                "format": { "const": "app" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/unsignedTargetRequest" },
+            {
+              "properties": {
+                "target": { "const": "macos-x64" },
+                "platform": { "const": "macos" },
+                "architecture": { "const": "x64" },
+                "format": { "const": "app" }
               }
             }
           ]

@@ -213,12 +213,16 @@ test('target registry distinguishes browser availability from native pairing req
     const targets=listTargets();
     assert.deepEqual(
         targets.map(target=>target.id),
-        ['browser','portable','windows-x64','linux-x64','linux-arm64','android-arm64']
+        ['browser','portable','windows-x64','macos-arm64','macos-x64','linux-x64','linux-arm64','android-arm64']
     );
     assert.equal(targets[0].status,'available');
     assert.equal(targets[1].status,'pairing-required');
     assert.deepEqual(targets[1].signingModes,['unsigned-local-test']);
-    assert.match(targets[1].reason,/Arcane OS native provider/);
+    assert.match(targets[1].reason,/SDK package provider/);
+    for (const target of ['macos-arm64', 'macos-x64']) {
+        assert.deepEqual(targets.find(item=>item.id===target).formats,['app']);
+        assert.deepEqual(targets.find(item=>item.id===target).platforms,['macos']);
+    }
     assert.deepEqual(targets.find(target=>target.id==='windows-x64').formats,['exe']);
     assert.deepEqual(targets.find(target=>target.id==='windows-x64').signingModes,['unsigned-local-test']);
     assert.deepEqual(targets.find(target=>target.id==='linux-x64').formats,['deb']);
@@ -237,13 +241,13 @@ test('target registry distinguishes browser availability from native pairing req
     assert.deepEqual(await getTargetAdapter('browser').prepare(),{
         target:'browser',status:'available',ready:true,required:false
     });
-    for(const targetId of ['portable','windows-x64','linux-x64','linux-arm64','android-arm64']){
+    for(const targetId of ['portable','windows-x64','macos-arm64','macos-x64','linux-x64','linux-arm64','android-arm64']){
         assert.equal(targets.find(target=>target.id===targetId).status,'pairing-required');
     }
 });
 
 test('unpaired native adapters reject plan and build without producing substitute output',async()=>{
-    for(const targetId of ['portable','windows-x64','linux-x64','linux-arm64','android-arm64']){
+    for(const targetId of ['portable','windows-x64','macos-arm64','macos-x64','linux-x64','linux-arm64','android-arm64']){
         const adapter=getTargetAdapter(targetId);
         const status=await adapter.doctor();
         assert.equal(status.status,'pairing-required');

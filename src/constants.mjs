@@ -27,6 +27,8 @@ export const TARGET_IDS=[
     'browser',
     'portable',
     'windows-x64',
+    'macos-arm64',
+    'macos-x64',
     'linux-x64',
     'linux-arm64',
     'android-arm64'

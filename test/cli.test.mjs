@@ -697,9 +697,20 @@ test('CLI creates truthful Linux ARM64 and Android native requests',()=>{
     );
 });
 
-for(const target of ['portable','windows-x64']){
-test(`CLI pairs ${target} from the SDK package by default and retains explicit checkout selection`,async()=>{
-    for(const arcaneRoot of [undefined,path.resolve('selected-arcane-os')]){
+test('CLI creates macOS app requests for both native architectures', function macOSRequests() {
+    for (const architecture of ['arm64', 'x64']) {
+        const target = `macos-${architecture}`;
+        assert.deepEqual(createNativeTargetRequest({target}), {
+            target, platform: 'macos', architecture, format: 'app',
+            signing: {mode: 'unsigned-local-test', profileId: null}
+        });
+    }
+});
+
+for(const target of ['portable','windows-x64','macos-arm64','macos-x64']){
+test(`CLI pairs ${target} from the SDK package and forwards supported checkout selection`,async()=>{
+    const roots=target.startsWith('macos-')?[undefined]:[undefined,path.resolve('selected-arcane-os')];
+    for(const arcaneRoot of roots){
         const stdout=memoryStream();
         const stderr=memoryStream();
         const providerSource=arcaneRoot?'arcane-checkout':'sdk-package';

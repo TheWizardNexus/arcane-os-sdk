@@ -6,7 +6,7 @@ executable. An application's explicit `native.localAI` selection can include
 its selected upstream runtimes through the SDK local-AI installer. Without that
 selection, assembly does no local-AI runtime preparation. Windows, Linux and macOS hosts may compose this
 Node-based payload; Android needs its separate native host adaptation. The
-current CLI's portable platform selections remain Windows and Linux. A portable
+current CLI's portable platform selections include Windows, Linux and macOS. A portable
 artifact is not a Windows executable, Linux package or Android application.
 
 `loadArcaneNativeProvider({target:'portable'})` selects the installed SDK provider
@@ -18,10 +18,14 @@ providers; the loader does not substitute this payload for an unavailable host.
 ## Provider and selected input
 
 The default export and `arcaneNativeBuilderProvider` are the same provider.
-`createPortableNativeProvider({services})` creates one with application-owned
+`createPortableNativeProvider({services,packagedWeb=false,webKitDocumentLifecycle=false})` creates one with application-owned
 service configuration. Without that override, the provider uses the selected
 app descriptor's `native.services`, or an empty selection when omitted. An
 explicit `services:[]` overrides the descriptor with no app services.
+The Mac provider selects `packagedWeb:true` to compose the SDK's packaged-web
+Core service and `webKitDocumentLifecycle:true` for the canonical classic-client
+activation/replay contract. Both default to false, preserving ordinary portable
+and Windows composition.
 All implement `arcane-native-builder/1`:
 
 - `describe()` identifies the portable target and `executable:false`.
@@ -348,6 +352,83 @@ synchronous rejection. Write completion means the frame reached stdin, not that
 the RPC succeeded. `closeInput` rejects new sends, finishes accepted writes and
 closes stdin, then keeps observing output and child exit without a forced
 termination deadline. The delegate is retained through final completion.
-This is delivered source, not a macOS WebView bridge, CLI target, executable or
-installer. Compilation and execution on macOS remain separate evidence from the
-selected Windows output.
+The AppKit `ArcaneHost` and launcher compose that source as described below.
+Compilation and execution on macOS remain separate evidence from the selected
+Windows output.
+
+## macOS application composition
+
+`arcane-os/native/macos-provider` exports
+`createMacOSNativeProvider({services,hostDirectory}={})`, its named
+`arcaneNativeBuilderProvider`, and the same provider as default. The six-method
+contract accepts `macos-arm64` or `macos-x64`, `platform:'macos'`, `format:'app'`
+and the existing unsigned local development selection. Ordinary CLI routing
+uses the SDK package, not an Arcane OS checkout:
+
+```sh
+npm exec -- arcane build --target macos-arm64
+npm exec -- arcane run --target macos-arm64
+```
+
+Select `macos-x64` for Intel. The descriptor must declare the selected target.
+Source implementation does not establish that an architecture's host artifact
+has been built, executed or published. Consumer assembly needs the exact numeric
+SDK release asset `arcane-native-macos-<architecture>.tar.gz`; unavailable assets
+produce their actual download error. SDK collaborators may select an existing
+`hostDirectory` explicitly. There is no fallback to source checkout, another
+version, another architecture or a browser-only artifact.
+
+The complete unchanged portable payload lives at
+`<app-id>.app/Contents/Resources/`. That directory remains `target.rootDir` and
+contains `arcane-native.json`, `app/`, dependency releases, installed SDK files,
+Core entry/client and `runtime/node`. The additive `bundleRoot` identifies the
+`.app` directory. `Contents/MacOS/Arcane` and `Contents/Info.plist` belong to the
+bundle rather than the web root; the Mac owner checks these separately from the
+Resources file inventory. Application identity supplies the stable bundle ID
+`org.arcane.<app-id>`. Executable permissions are preserved for the launcher and
+selected Node runtime.
+
+The launcher opens its window immediately and starts one Core child. The
+generated Core entry starts the `packaged-web` service alongside application
+services, without waiting for models. Only `core.web.ready`, emitted after the
+actual listener is ready and the initial port is saved, supplies the application
+URL to WebKit. It serves the complete `manifest.webRoot` at `/` and resolves the
+complete `manifest.start`, including query and fragment, against that origin.
+The classic client selects current-document activation and sticky state replay;
+navigation does not restart the Core service or replay retired requests.
+The host's main-thread readonly `isClosing` accessor exposes its existing close
+intent; an unsolicited Core exit is therefore reported separately from an
+ordinary user-requested drain, even when the process exits successfully.
+
+`createPackagedWebService({artifactRoot}, context={})` is available from
+`arcane-os/core/packaged-web`. It uses the existing
+`startDevServer({mode:'packaged',http:true,host:'127.0.0.1',port,releaseRoot})`
+owner and published `node-http-server`, not a second HTTP implementation.
+`context.stateRoot` takes precedence over the launcher's separate
+`--arcane-host-state-root` argument. The launcher defaults to
+`~/Library/Application Support/Arcane/<app-id>`; an explicitly supplied launch
+file remains unchanged and is forwarded to Core. The first successful listener
+stores its selected port in `packaged-web-origin.json`. Later launches reuse it;
+a port conflict or unreadable saved record is reported without changing origins
+or discarding stored state.
+
+The app's persistent default `WKWebsiteDataStore` uses its bundle identity.
+`stateRoot` selects Core state and diagnostics, not a custom WebKit profile
+directory. Browser API availability, OPFS and secure-context behavior remain
+WebKit-owned and require actual Mac verification; the SDK bypasses no browser
+policy. Startup failures use `core.service.state` for `name:'packaged-web'`;
+unexpected listener closure or failure uses `core.web.failed` with the complete
+serialized error. Native alerts show a concise outcome, with full diagnostics
+outside the conversation. Core drains accepted work and the listener before
+the native close completes. The optional runner stdin-EOF signal uses that same
+path; ordinary double-click startup does not wait on stdin.
+
+`tools/build-core-macos-host.mjs` is SDK host-release tooling, not an application
+compiler requirement. It accepts an explicit Darwin Node executable and its
+license, compiler path, `arm64` or `x64`, and output directory. It uses Objective-C
+ARC/blocks and Apple's Foundation, AppKit and WebKit frameworks. The host source
+targets macOS 11; the selected Node runtime may require a newer macOS version.
+Its actual runtime/platform/architecture and the SDK Node engine requirement
+must agree. Compiler/runtime execution and redistribution belong to the
+separately authorized selected host output. This source increment runs none of
+them and claims no Mac build or execution result.

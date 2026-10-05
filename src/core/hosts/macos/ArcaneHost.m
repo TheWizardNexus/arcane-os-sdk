@@ -154,6 +154,7 @@ static NSData *ArcaneCancelRequestsData(void) {
 }
 
 - (WKWebView *)webView { return _webView; }
+- (BOOL)isClosing { return _closing; }
 
 - (WKNavigation *)loadApplicationURL:(NSURL *)applicationURL {
     if (_closing) return nil;

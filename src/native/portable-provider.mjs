@@ -81,7 +81,7 @@ function eventOwnerPath(release) {
 }
 
 /** Package-owned assembly; never imports an OS checkout or application service. */
-export function createPortableNativeProvider({services} = {}) {
+export function createPortableNativeProvider({services, packagedWeb = false, webKitDocumentLifecycle = false} = {}) {
     return {
         protocol: PROTOCOL,
         async describe() {
@@ -138,7 +138,7 @@ export function createPortableNativeProvider({services} = {}) {
                         runtimes: localAI.runtimes,
                         directory: path.join(output, 'local-ai-runtimes'),
                         outputRoot: root,
-                        platform: target.platform === 'windows' ? 'win32' : target.platform,
+                        platform: target.platform === 'windows' ? 'win32' : target.platform === 'macos' ? 'darwin' : target.platform,
                         architecture: target.architecture,
                         signal,
                         onEvent
@@ -183,8 +183,10 @@ export function createPortableNativeProvider({services} = {}) {
                 }
                 await writeOutput(root, 'package.json', '{"type":"module"}\n', files, signal);
                 await writeOutput(root, 'runtime/arcane-core.mjs', coreEntrySource(appDescriptor, sdk.version, selectedServices,
-                    {localAI, runtimes: bundled.runtimes}), files, signal);
-                await writeOutput(root, 'runtime/arcane-api.js', await createCoreClassicSource({eventOwnerModuleURL, replayRuntimeState: true}), files, signal);
+                    {localAI, runtimes: bundled.runtimes, packagedWeb}), files, signal);
+                await writeOutput(root, 'runtime/arcane-api.js', await createCoreClassicSource({
+                    eventOwnerModuleURL, replayRuntimeState: true, webKitDocumentLifecycle
+                }), files, signal);
                 const manifest = {
                     schemaVersion: 1,
                     kind: 'arcane-portable-native',
@@ -198,7 +200,10 @@ export function createPortableNativeProvider({services} = {}) {
                         entry: 'runtime/arcane-core.mjs', transport: 'stdio', protocol: 'arcane/1', services: selectedServices,
                         ...(localAI === undefined ? {} : {localAIRuntimes: bundled.runtimes})
                     },
-                    client: {source: 'runtime/arcane-api.js', injection: 'document-created', eventOwnerModuleURL, replayRuntimeState: true},
+                    client: {
+                        source: 'runtime/arcane-api.js', injection: 'document-created', eventOwnerModuleURL, replayRuntimeState: true,
+                        ...(webKitDocumentLifecycle ? {webKitDocumentLifecycle: true} : {})
+                    },
                     dependencies,
                     minimumCoreVersion: request.minimumCoreVersion ?? null,
                     files: [...files, MANIFEST]

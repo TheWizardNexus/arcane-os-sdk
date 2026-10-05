@@ -84,7 +84,7 @@ export function workspaceTemplate({
         ||(!canonicalSpecifier&&!aliasSpecifier)){
         throw new Error('Invalid scaffold SDK installation authority.');
     }
-    const supportedTargets=['browser','portable','windows-x64','linux-x64','linux-arm64','android-arm64'];
+    const supportedTargets=['browser','portable','windows-x64','macos-arm64','macos-x64','linux-x64','linux-arm64','android-arm64'];
     if(!supportedTargets.includes(target)){
         throw new Error(`Unsupported scaffold target: ${String(target)}.`);
     }
@@ -105,17 +105,18 @@ export function workspaceTemplate({
     const packageInclude=[`${appId}.css`,'index.html'];
     if(native)packageInclude.push('img/icon.png');
     packageInclude.push('manifest.json','modules');
+    const macosTarget=target==='macos-arm64'||target==='macos-x64';
     const nativeGuide=native?`
 ## ${target} native target
 
 This scaffold declares both the browser and ${target} targets and includes the
 required raster application icon.
-Pair it with one explicit Arcane OS checkout:
+${macosTarget?'Use the installed SDK provider and its matching macOS release host asset:':'Pair it with one explicit Arcane OS checkout:'}
 
 \`\`\`sh
-npm exec -- arcane native-doctor --target ${target} --arcane-root "<path-to-Arcane-OS>"
-npm run build -- --arcane-root "<path-to-Arcane-OS>"
-${target==='portable'?'':`npm run run -- --arcane-root "<path-to-Arcane-OS>"\n`}
+npm exec -- arcane native-doctor --target ${target}${macosTarget?'':' --arcane-root "<path-to-Arcane-OS>"'}
+npm run build${macosTarget?'':' -- --arcane-root "<path-to-Arcane-OS>"'}
+${target==='portable'?'':`npm run run${macosTarget?'':' -- --arcane-root "<path-to-Arcane-OS>"'}\n`}
 \`\`\`
 
 The selected Arcane provider must support this target or the command fails without

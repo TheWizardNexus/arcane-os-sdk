@@ -5,7 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
 import {createNativeTargetAdapter} from '../src/targets/index.mjs';
-import {buildApplication} from '../src/toolchain.mjs';
+import {assertIntegratedNativeToolchain, buildApplication} from '../src/toolchain.mjs';
 import {projectPackageManifest} from '../src/app-descriptor.mjs';
 import {
     NATIVE_BUILDER_PROTOCOL,
@@ -15,6 +15,23 @@ import {
 } from '../src/native-plan.mjs';
 
 const repositoryRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+
+test('SDK macOS providers use the installed package independently of integrated checkout pairing', function macOSPairing() {
+    for (const target of ['macos-arm64', 'macos-x64']) {
+        assert.doesNotThrow(function packagedProvider() {
+            assertIntegratedNativeToolchain({
+                workspaceMode: 'integrated', workspaceRoot: '/selected-app', toolchainRoot: '/installed-sdk',
+                providerSource: 'sdk-package', target
+            });
+        });
+        assert.throws(function checkoutProvider() {
+            assertIntegratedNativeToolchain({
+                workspaceMode: 'integrated', workspaceRoot: '/selected-app', toolchainRoot: '/different-checkout',
+                providerSource: 'arcane-checkout', target
+            });
+        }, {code: 'ARCANE_POLICY_DENIED'});
+    }
+});
 
 test('paired native packaging selects app and bundled native resources without replacing browser outputs',async t=>{
     const fixtures=path.join(repositoryRoot,'.arcane','native-resource-fixtures');

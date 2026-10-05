@@ -47,15 +47,17 @@ runtime layouts.
 | `arcane-os/testing` | Isolated test registration and execution. |
 | `arcane-os/targets` | Target adapters and dispatch. |
 | `arcane-os/native` | Native plan and builder protocol. |
-| `arcane-os/native-provider` | SDK portable/Windows defaults and explicit checkout provider loader. |
+| `arcane-os/native-provider` | SDK portable/Windows/macOS defaults and registered explicit checkout provider loader. |
 | `arcane-os/native/portable-provider` | Node-only portable payload provider and explicit app-service composition; not an executable host. |
 | `arcane-os/native/windows-provider` | Selected Windows x64 executable assembly and host-owned run/drain lifecycle. |
+| `arcane-os/native/macos-provider` | Architecture-selected Mac application bundle composition and host-owned run/drain lifecycle. |
 | `arcane-os/core/client` | Browser-safe Core RPC client, application facade, readiness and request cancellation. |
 | `arcane-os/core/contracts` | Shared Core protocol, frame, method and diagnostic error contracts. |
 | `arcane-os/core/classic-source` | Node generator for the canonical classic-script Core client projection. |
 | `arcane-os/core/runtime` | App-neutral native Core dispatcher and service lifecycle. |
 | `arcane-os/core/stdio` | Framed Node stdio transport with graceful runtime drain. |
 | `arcane-os/core/host` | Node-only reusable Core host lifecycle with explicitly supplied services. |
+| `arcane-os/core/packaged-web` | Core-owned packaged web listener with a persisted loopback origin and ready/failure events. |
 | `arcane-os/core/local-ai` | Native llama.cpp and Ollama Core service, model readiness, complete streaming and owned process lifecycle. See [local AI through Core](local-ai.md). |
 | `arcane-os/local-ai` | Official runtime installation and native artifact bundling for selected llama.cpp/Ollama requirements. |
 | `arcane-os/integrated-provider` | Fixed integrated shared-development provider. |
@@ -381,6 +383,10 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `createWindowsNativeProvider()` | function | `arcane-os/native/windows-provider` | Windows native provider | Node assembly; Windows x64/WebView2 execution |
 | `arcaneNativeBuilderProvider` | singleton | `arcane-os/native/windows-provider` | Windows native provider | Node assembly; Windows x64/WebView2 execution |
 | `arcaneNativeBuilderProvider default export` | singleton | `arcane-os/native/windows-provider` | Windows native provider | Node assembly; Windows x64/WebView2 execution |
+| `createMacOSNativeProvider()` | function | `arcane-os/native/macos-provider` | macOS native provider | Node assembly; matching Darwin architecture and selected host asset |
+| `arcaneNativeBuilderProvider` | singleton | `arcane-os/native/macos-provider` | macOS native provider | Node assembly; matching Darwin architecture and selected host asset |
+| `arcaneNativeBuilderProvider default export` | singleton | `arcane-os/native/macos-provider` | macOS native provider | Node assembly; matching Darwin architecture and selected host asset |
+| `createPackagedWebService()` | function | `arcane-os/core/packaged-web` | Native packaged web serving | Node Core lifetime; actual listener readiness before navigation |
 | `createCoreLocalAIProvider()` | function | `arcane-os/ai/core-local` | Core local AI | Browser/native WebView with an available Core connection |
 | `createLocalAIService()` | function | `arcane-os/core/local-ai` | Core local AI | Node with selected llama.cpp/Ollama runtimes |
 | `createLocalAIService default export` | function | `arcane-os/core/local-ai` | Core local AI | Same native service factory |
@@ -7206,12 +7212,15 @@ without that selection, no local-AI runtime is downloaded.
 ### Signature and result
 
 ```text
-createPortableNativeProvider({services}={})
+createPortableNativeProvider({services,packagedWeb=false,webKitDocumentLifecycle=false}={})
 ```
 
 Import it from `arcane-os/native/portable-provider`. Each service selection is
 `{module, options}`. Omitted `services` uses `appDescriptor.native.services`;
 an explicit array, including `[]`, overrides the descriptor selection.
+The Mac composition selects `packagedWeb:true` for the SDK-owned serving service
+and `webKitDocumentLifecycle:true` for the canonical client projection. Defaults
+retain the existing portable and Windows behavior.
 The returned `arcane-native-builder/1` provider exposes
 `describe()`, `doctor()`, `prepare()`, `build()`, `verify()` and `run()`.
 `describe()` and successful payload results report `executable:false`; `run()`
@@ -7355,6 +7364,52 @@ const nativeBuilder = createWindowsNativeProvider({
 Pass `nativeBuilder` to the existing native build-plan contract. For the ordinary
 CLI route and the complete artifact/launch contract, see
 [Windows executable packaging](core-native-packaging.md#windows-executable).
+
+## createMacOSNativeProvider()
+
+```text
+createMacOSNativeProvider({services,hostDirectory}={})
+```
+
+Import from `arcane-os/native/macos-provider`. The named
+`arcaneNativeBuilderProvider` and default export are the same provider with
+descriptor-owned services and the exact SDK release's selected host asset.
+The six-method `arcane-native-builder/1` contract supports `macos-arm64` and
+`macos-x64`, platform `macos`, format `app`. A selected `hostDirectory` allows
+same-project collaboration on host output; otherwise assembly downloads the
+matching numeric SDK release's `arcane-native-macos-<architecture>.tar.gz`.
+Neither an available source implementation nor `doctor()` proves that the
+asset is published or its Mac runtime has been executed.
+
+Build preserves the complete portable payload inside the bundle's Resources
+directory (`target.rootDir`) and returns its `.app` location as `bundleRoot`.
+The bundle supplies the SDK launcher and selected Node runtime. `verify()`
+reads assembled files; `run()` directly launches the bundled executable only on
+the matching Darwin architecture, observes diagnostics and waits for graceful
+Core/listener drain on cancellation. See the complete
+[macOS composition and prerequisite contract](core-native-packaging.md#macos-application-composition).
+
+## createPackagedWebService()
+
+```text
+createPackagedWebService({artifactRoot}, context={})
+```
+
+Import from `arcane-os/core/packaged-web`. Returns the Core service
+`{name:'packaged-web', start, drain}`. Start reads the native manifest, serves
+its complete web root with the existing explicit HTTP packaged server on
+`127.0.0.1`, and emits `core.web.ready` with `{origin,url,port}` only after the
+actual listener is ready and its first selected port is saved. The complete
+manifest start URL is resolved against that origin.
+
+State uses `context.stateRoot` or the native launcher's separate
+`--arcane-host-state-root` argument. The saved `packaged-web-origin.json` keeps
+the same port on subsequent launches; unreadable state or port conflicts remain
+errors, with no silent new origin. Startup rejection belongs to the Core
+`core.service.state` event; an unexpected post-start close/failure emits
+`core.web.failed` with the complete serialized error. Drain owns listener close
+and lifecycle completion. No application launch payload is rewritten, no model
+is loaded, and the ordinary server's HTTPS default is unchanged.
 
 ## readCoreLaunchContext()
 

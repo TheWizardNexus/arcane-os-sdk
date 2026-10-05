@@ -12,7 +12,7 @@ export const NATIVE_BUILDER_PROTOCOL='arcane-native-builder/1';
 
 const NATIVE_TARGETS={
     portable:{
-        platforms:new Set(['windows','linux']),
+        platforms:new Set(['windows','linux','macos']),
         architectures:new Set(['x64','arm64']),
         format:'portable',
         signingMode:'unsigned-local-test',
@@ -20,6 +20,14 @@ const NATIVE_TARGETS={
     },
     'windows-x64':{
         platforms:new Set(['windows']),architectures:new Set(['x64']),format:'exe',
+        signingMode:'unsigned-local-test',signingProfileId:null
+    },
+    'macos-arm64':{
+        platforms:new Set(['macos']),architectures:new Set(['arm64']),format:'app',
+        signingMode:'unsigned-local-test',signingProfileId:null
+    },
+    'macos-x64':{
+        platforms:new Set(['macos']),architectures:new Set(['x64']),format:'app',
         signingMode:'unsigned-local-test',signingProfileId:null
     },
     'linux-x64':{
