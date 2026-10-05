@@ -6,12 +6,26 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 224,
+  "memberCount": 225,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
   },
   "members": [
+    {
+      "id": "browser-decisions:createBrowserDecisionModel",
+      "name": "createBrowserDecisionModel",
+      "displayName": "createBrowserDecisionModel()",
+      "kind": "function",
+      "signature": "createBrowserDecisionModel({family,model,revision,device,runtime})",
+      "entrypoints": ["arcane-os/ai/browser-decisions"],
+      "primaryImport": "arcane-os/ai/browser-decisions",
+      "group": "Browser typed decisions",
+      "summary": "Explicit-load Laya FP16 and Julia-1 FP32 decisions with complete inputs and graph results.",
+      "availability": "Browser module Workers and the selected Transformers.js backend; import/construction starts no model load",
+      "protocol": "Caller-owned state/question/options rows; five-input decision graph; native Worker request/result lifecycle",
+      "normalization": "Full field tokenization, raw logits and unrounded softmax; no policy thresholds, storage or precision fallback"
+    },
     {
       "id": "root:acceptWebSocket",
       "name": "acceptWebSocket",

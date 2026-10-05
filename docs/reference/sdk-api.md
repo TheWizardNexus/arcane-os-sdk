@@ -4,7 +4,8 @@ The npm package exposes a Node.js ESM control plane, the portable
 `arcane-os/event-manager`, `arcane-os/logging`, `arcane-os/mail`,
 `arcane-os/preference-store`, `arcane-os/speech-playback`,
 `arcane-os/speech-text`, `arcane-os/ai/tool-text-stream`, `arcane-os/ai/twin-cloud`, and `arcane-os/browser-device` entrypoints, and the browser-only
-`arcane-os/pwa` and `arcane-os/ai/browser-wasm` entrypoints. The
+`arcane-os/pwa`, `arcane-os/ai/browser-wasm`, and
+`arcane-os/ai/browser-decisions` entrypoints. The
 `arcane-os/ai/browser-speech` entrypoint includes local and native browser
 providers plus a cloud TTS adapter usable in Node with Fetch and Blob.
 The `arcane-os/modules/<filename>` and `arcane-os/entities/<filename>` paths
@@ -74,6 +75,7 @@ runtime layouts.
 | `arcane-os/browser-device` | Synchronous mobile or desktop identity hints for application-owned settings. |
 | `arcane-os/pwa` | Nonblocking PWA registration, worker updates, native installation state and a dismissible installation component. |
 | `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, complete DBOPFS model storage, streaming, cancellation, and structural tool-call results. |
+| `arcane-os/ai/browser-decisions` | Explicit-load Laya FP16 and Julia-1 FP32 typed decisions through the shared Transformers.js Worker owner. |
 | `arcane-os/ai/tool-text-stream` | Shared selected tool-argument text observer for provider integration. |
 | `arcane-os/ai/twin-cloud` | Stateless chat, System One state/questions and image generation with explicit key/model, complete results and operation-specific retry/cancellation. |
 | `arcane-os/ai/browser-speech` | Caller-selected Whisper/Kokoro, native browser recognition/synthesis, cloud TTS, upstream assets, role lifecycle and cancellation. |
@@ -132,6 +134,7 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | Member | Kind | Import | Group | Availability |
 | --- | --- | --- | --- | --- |
 | `acceptWebSocket()` | function | `arcane-os`, `arcane-os/websocket` | WebSocket protocol | Node; browser-native client interoperability |
+| `createBrowserDecisionModel()` | function | `arcane-os/ai/browser-decisions` | Browser typed decisions | Browser module Workers and the caller-selected inference backend |
 | `fetchRequest()` | function | `arcane-os/ai/twin-cloud` | TWiN Cloud requests | Node and Browser; remote HTTPS provider |
 | `fetchSystemOneRequest()` | function | `arcane-os/ai/twin-cloud` | TWiN Cloud state-and-questions requests | Node and Browser; remote HTTPS provider |
 | `generateImages()` | function | `arcane-os/ai/twin-cloud` | TWiN Cloud image generation | Node and Browser with Fetch and Blob; remote HTTPS provider |
@@ -6857,6 +6860,67 @@ mountPwaInstallPrompt({appName: 'Example Library'}).catch(
 See the [mounting contract](pwa.md#mountpwainstallprompt) and
 [component reference](runtime-components.md#pwa-installhtml). The browser owns
 native installation eligibility and URL-bar promotion.
+
+## createBrowserDecisionModel()
+
+### Overview
+
+Creates an explicitly loaded browser model for Laya typed decisions in FP16 or
+Julia-1 in FP32. The shared Worker owns Transformers.js loading, full-input
+encoding, batched inference, complete results, cancellation and resource lifetime.
+Applications own model selection, questions, option meanings and decision policy.
+Existing chat and speech providers are unchanged.
+
+### Signature and result
+
+```js
+import {createBrowserDecisionModel} from 'arcane-os/ai/browser-decisions';
+
+const decisions = createBrowserDecisionModel(
+    {
+        family: 'laya',
+        model: 'onnx-community/laya-typed-decisions-ONNX',
+        device: 'webgpu'
+    }
+);
+```
+
+Construction starts no model download. The returned client exposes
+`load({signal})`, `evaluate(rows, {signal})`, `status()`,
+`subscribe(listener, {emitCurrent: true, signal})`, `unload()` and `dispose()`.
+Each row contains its complete `state`, `question`, string `options`, and
+optional `type` (`choice`, `score`, or `noul`). `evaluate()` returns
+`{decisions, outputs}` with all graph outputs and raw, unrounded probabilities.
+See the [complete browser decision contract](ai/browser-decisions.md) for
+precision, tokenization, output meanings, lifecycle and model limitations.
+
+### Availability and normalization
+
+Browser module Workers plus the selected Transformers.js backend are required
+on explicit use. Import and construction do not activate a model. Laya fixes
+`dtype: 'fp16'`; Julia fixes `dtype: 'fp32'`; there is no precision fallback.
+Cancellation terminates that client's Worker and rejects its in-flight work.
+No decisions are inserted into chat history or durable storage.
+
+### Example
+
+```js
+runButton.addEventListener(
+    'click',
+    async function askTeaRobot() {
+        const result = await decisions.evaluate(
+            [
+                {
+                    state: 'The dragon is asleep. The tea robot has a very loud kettle.',
+                    question: 'Should the robot boil tea now?',
+                    options: ['Wait quietly', 'Boil the kettle']
+                }
+            ]
+        );
+        output.textContent = result.decisions[0].value;
+    }
+);
+```
 
 ## createBrowserWasmLlmProvider()
 
