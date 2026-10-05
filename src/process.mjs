@@ -45,10 +45,21 @@ async function emitLines(events,type,text){
     }
 }
 
-function deliverChunk(stream,events,type,text){
+function outputSelected(option,stream){
+    return is.boolean(option)?option:option?.[stream]??true;
+}
+
+function deliverChunk(stream,events,type,text,{onOutput,emitOutput,onFailure}){
     stream.pause();
-    return emitLines(events,type,text).catch(()=>{
-        // The queue owns and propagates the first callback failure.
+    return (async function deliverOutput(){
+        try{
+            if(onOutput)await onOutput({stream:type==='process.stdout'?'stdout':'stderr',chunk:text});
+        }catch(error){
+            onFailure(error);
+        }
+        if(emitOutput)await emitLines(events,type,text);
+    })().catch(()=>{
+        // The event queue separately owns and propagates observer failures.
     }).finally(()=>{
         if(!stream.destroyed){
             stream.resume();
@@ -121,6 +132,9 @@ export async function runProcess(command,args=[],{
     env,
     signal,
     onEvent,
+    onOutput,
+    captureOutput=true,
+    emitOutputEvents=true,
     heartbeatMs=5000,
     terminationGraceMs=DEFAULT_TERMINATION_GRACE_MS,
     allowNonzero=false,
@@ -128,6 +142,12 @@ export async function runProcess(command,args=[],{
     cancellationMode='terminate-tree'
 }={}){
     throwIfAborted(signal);
+    if(onOutput!==undefined&&!is.function(onOutput)){
+        throw new TypeError('onOutput must be a function.');
+    }
+    if(!onOutput&&(!outputSelected(captureOutput,'stdout')||!outputSelected(captureOutput,'stderr'))){
+        throw new TypeError('Uncaptured process output requires an onOutput consumer.');
+    }
     if(!is.array(args)||args.some(argument=>!is.string(argument))){
         throw new ArcaneError(ERROR_CODES.usage,'Process arguments must be a fixed array of strings.');
     }
@@ -155,8 +175,8 @@ export async function runProcess(command,args=[],{
     throwIfAborted(signal);
 
     return new Promise((resolve,reject)=>{
-        let stdout='';
-        let stderr='';
+        let stdout=outputSelected(captureOutput,'stdout')?'':null;
+        let stderr=outputSelected(captureOutput,'stderr')?'':null;
         let childClosed=false;
         let closedResult=null;
         let settlementStarted=false;
@@ -166,12 +186,28 @@ export async function runProcess(command,args=[],{
         let escalation=null;
         let spawnError=null;
         let inputError=null;
+        let inputIterator=null;
+        let inputPump=null;
+        let inputReturn=null;
+        let inputDone=false;
+        const outputErrors=[];
         let child;
         let heartbeat=null;
         const deliveries=new Set();
 
         const ownDelivery=(stream,type,chunk)=>{
-            const delivery=deliverChunk(stream,events,type,chunk);
+            const name=type==='process.stdout'?'stdout':'stderr';
+            const delivery=deliverChunk(stream,events,type,chunk,{
+                onOutput,
+                emitOutput:outputSelected(emitOutputEvents,name),
+                onFailure:function outputFailed(error){
+                    // Preserve complete failed callback input even when the
+                    // caller elected not to retain successful protocol output.
+                    outputErrors.push(new ArcaneError(ERROR_CODES.operationFailed,
+                        `The ${name} output callback failed.`,{cause:error,details:{stream:name,chunk}}));
+                    stopTree();
+                }
+            });
             deliveries.add(delivery);
             void delivery.then(()=>deliveries.delete(delivery));
         };
@@ -182,6 +218,26 @@ export async function runProcess(command,args=[],{
             }
         };
 
+        function stopInput(){
+            if(inputIterator&&!inputDone&&!inputReturn){
+                inputReturn=Promise.resolve().then(async function returnInput(){
+                    await inputIterator.return?.();
+                }).catch(function inputReturnFailed(error){
+                    inputError=inputError&&inputError!==error
+                        ?new AggregateError([inputError,error],'Process input and its cleanup failed.'):error;
+                });
+            }
+            child?.stdin.end();
+        }
+
+        async function drainInput(){
+            stopInput();
+            // AsyncIterable producers own cancellation of an outstanding next().
+            // Their return() must cooperate so owned cleanup can really finish.
+            await inputPump;
+            await inputReturn;
+        }
+
         const finish=(callback,value)=>{
             if(settlementStarted){
                 return;
@@ -191,16 +247,17 @@ export async function runProcess(command,args=[],{
             clearTimeout(escalation);
             signal?.removeEventListener('abort',abort);
             void (async()=>{
+                await drainInput();
                 let callbackFailure=null;
                 try{
                     await events.drain();
                 }catch(error){
                     callbackFailure=error;
                 }
-                if(cancellationMode==='close-input'&&closedResult){
+                if((cancellationMode==='close-input'&&closedResult)||inputIterator||onOutput){
                     const failures=[...new Set([
                         callback===reject?value:null,
-                        callbackFailure,inputError,cancellationError,spawnError
+                        callbackFailure,inputError,cancellationError,spawnError,...outputErrors
                     ].filter(error=>error!==null))];
                     if(failures.length>0){
                         const primary=failures[0];
@@ -234,10 +291,10 @@ export async function runProcess(command,args=[],{
                 return;
             }
             terminationRequested=true;
+            stopInput();
             if(cancellationMode==='close-input'){
                 // The selected host owns shutdown after EOF. Keep observing its
                 // complete output and exit; accepted durable work may outlive UI.
-                child?.stdin.end();
                 return;
             }
             terminateProcessTree(child);
@@ -311,11 +368,11 @@ export async function runProcess(command,args=[],{
         child.stdout.setEncoding('utf8');
         child.stderr.setEncoding('utf8');
         child.stdout.on('data',chunk=>{
-            stdout=appendOutput(stdout,chunk);
+            if(stdout!==null)stdout=appendOutput(stdout,chunk);
             ownDelivery(child.stdout,'process.stdout',chunk);
         });
         child.stderr.on('data',chunk=>{
-            stderr=appendOutput(stderr,chunk);
+            if(stderr!==null)stderr=appendOutput(stderr,chunk);
             ownDelivery(child.stderr,'process.stderr',chunk);
         });
         child.on('error',error=>{
@@ -335,6 +392,7 @@ export async function runProcess(command,args=[],{
             signal?.removeEventListener('abort',abort);
             clearInterval(heartbeat);
             void (async()=>{
+                await drainInput();
                 await drainDeliveries();
                 if(settlementStarted)return;
                 const result={
@@ -359,7 +417,7 @@ export async function runProcess(command,args=[],{
                         });
                     }
                     if(cancellationError)cancellationError.details=result;
-                    finish(reject,events.error??inputError??cancellationError??new ArcaneError(
+                    finish(reject,events.error??inputError??outputErrors[0]??cancellationError??new ArcaneError(
                         ERROR_CODES.operationFailed,
                         `Stopped ${command} after its event callback failed.`
                     ));
@@ -377,6 +435,10 @@ export async function runProcess(command,args=[],{
                     finish(reject,new ArcaneError(ERROR_CODES.operationFailed,
                         `Could not write ${command} input: ${inputError.message}`,
                         {cause:inputError,details:result}));
+                    return;
+                }
+                if(outputErrors.length){
+                    finish(reject,outputErrors[0]);
                     return;
                 }
                 await events.enqueue({
@@ -401,7 +463,30 @@ export async function runProcess(command,args=[],{
             abort();
         }
 
-        if(cancellationMode==='close-input'){
+        if(input&&is.function(input[Symbol.asyncIterator])){
+            child.stdin.on('error',error=>{inputError=error;stopTree();});
+            inputPump=(async function pumpInput(){
+                try{
+                    inputIterator=input[Symbol.asyncIterator]();
+                    while(!terminationRequested&&!childClosed){
+                        const next=await inputIterator.next();
+                        if(next.done){inputDone=true;break;}
+                        if(terminationRequested||childClosed)break;
+                        await new Promise(function writeChunk(resolve,reject){
+                            child.stdin.write(next.value,function written(error){
+                                if(error)reject(error);
+                                else resolve();
+                            });
+                        });
+                    }
+                    child.stdin.end();
+                }catch(error){
+                    inputError=inputError&&inputError!==error
+                        ?new AggregateError([inputError,error],'Process input failed.'):error;
+                    stopTree();
+                }
+            })();
+        }else if(cancellationMode==='close-input'){
             child.stdin.on('error',error=>{inputError=error;stopTree();});
             if(input!==undefined&&!terminationRequested)child.stdin.write(input);
         }else if(input!==undefined){
