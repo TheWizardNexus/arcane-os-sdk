@@ -191,13 +191,16 @@ redirect listener, defaulting to an OS-assigned port. Existing raw `tls` inputs
 retain their native HTTPS transport under the SDK, as described by the module's
 advanced TLS extension guidance; all content uses its public serving methods.
 
-Explicit `arcane dev --http` or source API `http:true` selects the module's
+Explicit `arcane dev --http` or API `http:true` selects the module's
 single HTTP listener on `port`. It skips certificate resolution and serves the
 same selected source mappings, generated PWA routes, and conditional responses.
+In API packaged mode, it serves the complete selected packaged web root and
+its declared application start URL instead of source mappings.
 No HTTPS listener or redirect is started in this mode. Listener readiness,
 failure, cancellation and shutdown retain the same operation owner; reported
 URLs use the actual HTTP protocol and bound port. Browser secure-context
-requirements remain browser-owned. Packaged previews retain HTTPS.
+requirements remain browser-owned. Source and packaged modes retain HTTPS
+when `http:true` is not selected; a certificate error never switches transport.
 
 Development is an intentionally fast feedback loop. Keep each increment small
 and independently understandable so its effect has one clear cause and a

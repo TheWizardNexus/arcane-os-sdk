@@ -4126,7 +4126,7 @@ Import it from `arcane-os`. Source mode accepts
 `{workspaceRoot=process.cwd(), appId, mode='source', host='127.0.0.1', port=0, httpPort=0, http=false,
 certPath, keyPath, tls, signal, onEvent}` and serves one validated
 workspace application plus its complete SDK or integrated runtime. Packaged mode uses
-`{mode:'packaged', releaseRoot, workspaceRoot, host, port, httpPort, certPath, keyPath, tls,
+`{mode:'packaged', releaseRoot, workspaceRoot, host, port, httpPort, http=false, certPath, keyPath, tls,
 signal, onEvent}` and serves the complete selected release files.
 External source mode accepts both the installed-package route layout and the
 existing physical runtime layout. Installed-package mode serves the configured
@@ -4141,8 +4141,8 @@ The SDK request hook returns `308` for HTTP with a `Location` pointing to the
 actual HTTPS port while preserving the original request path and query. Both listeners
 use the selected host.
 
-Source servers default to HTTPS, including localhost; packaged browser previews
-require HTTPS. The existing `https` option is accepted; `https:false` and
+Source servers and packaged browser previews default to HTTPS, including
+localhost. The existing `https` option is accepted; `https:false` and
 `tls:false` alone do not disable HTTPS. HTTPS startup reads `.arcane/dev/server-cert.pem` and
 `.arcane/dev/server-key.pem` relative to `workspaceRoot` unless explicit
 `certPath` and `keyPath` are supplied together; relative paths resolve from the
@@ -4154,10 +4154,15 @@ handshake; browser trust and address matching are evaluated when a client
 connects. The CLI's `--public` selects the wildcard bind;
 the API's `host` option alone changes only the bind address.
 
-Explicit `http:true` selects one HTTP content listener in source mode and skips
+Explicit `http:true` selects one HTTP content listener in source or packaged mode and skips
 certificate loading. `port` selects that listener's port, including `0` for an
-available port. The same application, runtime and generated PWA routes are
-served. `http` must be boolean; `http:true` rejects packaged mode, `https:true`,
+available port. Source mode keeps the same application, runtime and generated PWA routes.
+Packaged mode serves the complete selected `releaseRoot`; pass the artifact's
+web-root directory, not its enclosing native package directory. Its declared
+application start path, query and fragment are preserved. A caller requiring a
+stable origin must reuse its selected host and port; a bind conflict rejects
+startup rather than silently choosing another port.
+`http` must be boolean; `http:true` rejects `https:true`,
 explicit certificate/key paths, a `tls` value other than `undefined`, `null` or
 `false`, and a nonzero `httpPort`. Browser secure-context and installation
 requirements remain browser-owned; see [explicit HTTP development](cli.md#explicit-http-development).
@@ -4167,10 +4172,10 @@ The promise settles after all selected listeners are ready and resolves to
 networkUrls, httpPort, httpOrigin, httpUrl, close, closed, lifecycle}`. `server` is the raw Node
 server for application content: `Http2SecureServer` for PEM-backed HTTPS,
 `https.Server` for explicit raw `tls` options, or `http.Server` for explicit
-HTTP source mode. HTTP/2 uses Node's compatibility request/response APIs;
+HTTP mode. HTTP/2 uses Node's compatibility request/response APIs;
 callers accessing the raw server must account for its native type.
 `protocol` describes the URL scheme: `'https:'` for either negotiated HTTPS
-protocol or `'http:'` with explicit HTTP source mode.
+protocol or `'http:'` with explicit HTTP mode.
 `url` and `cleanUrl` are the same application URL. Wildcard listeners use
 `localhost` in that local URL; `host` retains the actual bound address.
 `httpPort` is the actual HTTP listener port, `httpOrigin` is its HTTP origin,

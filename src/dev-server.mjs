@@ -831,7 +831,7 @@ async function resolveDevelopmentTls({workspaceRoot,tls,certPath,keyPath,signal}
     }catch(error){
         if(error.code==='ENOENT'){
             fail(
-                `Arcane development and packaged previews require HTTPS. `
+                `Arcane development and packaged previews default to HTTPS. `
                 +`Provide a certificate at ${certificatePath} and a key at ${privateKeyPath}, `
                 +'or select existing files with --cert and --key.',
                 'ARCANE_DEV_TLS_MISSING'
@@ -873,12 +873,9 @@ async function startOwnedDevServer({
     if (!is.boolean(http)) {
         fail('http must be a boolean.', 'ARCANE_USAGE');
     }
-    if (http && mode !== 'source') {
-        fail('HTTP serving is supported only in source development mode.', 'ARCANE_USAGE');
-    }
     if (http && (requestedHttps === true || (tls !== undefined && tls !== null && tls !== false)
         || certPath !== undefined || keyPath !== undefined || httpPort !== 0)) {
-        fail('HTTP development cannot combine TLS options or a separate httpPort; select its listener with port.', 'ARCANE_USAGE');
+        fail('HTTP serving cannot combine TLS options or a separate httpPort; select its listener with port.', 'ARCANE_USAGE');
     }
     const protocol = http ? 'http:' : 'https:';
     const requestedRuntimeMode=mode==='source'&&sdkRuntimeSourceRoot!==undefined

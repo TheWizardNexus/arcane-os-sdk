@@ -985,23 +985,88 @@ test(
 );
 
 test(
-    'HTTP development rejects conflicting transport inputs and packaged mode before startup',
+    'explicit packaged HTTP preserves the selected root, start URL and stable listener lifecycle',
+    async function packagedHttpOrigin(context) {
+        const workspaceRoot = await temporaryDirectory(context, {prefix: 'arcane-http-packaged-'});
+        const releaseRoot = path.join(workspaceRoot, 'app');
+        await mkdir(path.join(releaseRoot, 'pages'), {recursive: true});
+        const content = '<!doctype html><p>  Complete packaged application content.  </p>\n';
+        const module = 'export const message = "The packaged root owns this module.";\n';
+        const start = './pages/chat.html?profile=selected#conversation';
+        await Promise.all([
+            writeFile(path.join(releaseRoot, 'pages', 'chat.html'), content),
+            writeFile(path.join(releaseRoot, 'app.mjs'), module),
+            writeFile(
+                path.join(releaseRoot, 'ARCANE_APP_RELEASE.json'),
+                JSON.stringify({app: {entry: 'pages/chat.html', start}})
+            )
+        ]);
+        const port = await availablePort();
+        const options = {mode: 'packaged', workspaceRoot, releaseRoot, http: true, host: '127.0.0.1', port};
+        const events = [];
+        const instance = await startDevServer({
+            ...options,
+            onEvent: function rememberPackagedHttpEvent(event) {events.push(event);}
+        });
+        context.after(async function closePackagedHttpFixture() {await instance.close();});
+        assert.ok(instance.server instanceof http.Server);
+        assert.equal(instance.server.listening, true);
+        assert.equal(instance.server.address().port, port);
+        assert.equal(instance.origin, `http://127.0.0.1:${port}`);
+        assert.equal(instance.url, `${instance.origin}/pages/chat.html?profile=selected#conversation`);
+        assert.equal(instance.httpOrigin, instance.origin);
+        assert.equal(instance.httpUrl, instance.url);
+        assert.equal(events.at(-1).type, 'server.started');
+        assert.equal(events.at(-1).protocol, 'http:');
+        const root = await fetch(`${instance.origin}/`, {redirect: 'manual'});
+        assert.equal(root.status, 302);
+        assert.equal(root.headers.get('location'), '/pages/chat.html?profile=selected#conversation');
+        await root.text();
+        const entry = await fetch(instance.url);
+        assert.equal(entry.status, 200);
+        assert.equal(await entry.text(), content);
+        const resource = await fetch(`${instance.origin}/app.mjs`);
+        assert.equal(resource.status, 200);
+        assert.equal(await resource.text(), module);
+        await assert.rejects(
+            readFile(path.join(workspaceRoot, '.arcane', 'dev', 'server-cert.pem')),
+            {code: 'ENOENT'}
+        );
+        await assert.rejects(startDevServer(options), {code: 'EADDRINUSE'});
+        assert.equal(instance.server.listening, true);
+        await instance.close();
+        await instance.closed;
+        await instance.lifecycle;
+        await assertPortCanBeReused(port);
+        const reopened = await startDevServer(options);
+        context.after(async function closeReopenedPackagedHttpFixture() {await reopened.close();});
+        assert.equal(reopened.origin, instance.origin);
+        assert.equal(reopened.url, instance.url);
+        await reopened.close();
+        await reopened.closed;
+        await reopened.lifecycle;
+    }
+);
+
+test(
+    'HTTP serving rejects conflicting transport inputs before startup',
     async function invalidHttpDevelopmentOptions() {
         for (const options of [
             {http: null}, {http: 1}, {http: 'true'}, {http: {}},
-            {http: true, mode: 'packaged'},
             {http: true, https: true},
             {http: true, tls: {}},
             {http: true, certPath: 'certificate.pem'},
             {http: true, keyPath: 'private-key.pem'},
             {http: true, httpPort: 8124}
         ]) {
-            await assert.rejects(
-                startDevServer(options),
-                function isHttpOptionUsageError(error) {
-                    return error.code === 'ARCANE_USAGE';
-                }
-            );
+            for (const mode of ['source', 'packaged']) {
+                await assert.rejects(
+                    startDevServer({...options, mode}),
+                    function isHttpOptionUsageError(error) {
+                        return error.code === 'ARCANE_USAGE';
+                    }
+                );
+            }
         }
     }
 );
@@ -1105,7 +1170,7 @@ test('HTTPS development reports missing certificate files without starting HTTP'
             ),
             function isMissingCertificatePair(error) {
                 assert.equal(error.code, 'ARCANE_DEV_TLS_MISSING');
-                assert.ok(error.message.includes('require HTTPS'));
+                assert.ok(error.message.includes('default to HTTPS'));
                 assert.ok(error.message.includes(path.join(workspaceRoot, '.arcane', 'dev', 'server-cert.pem')));
                 assert.ok(error.message.includes(path.join(workspaceRoot, '.arcane', 'dev', 'server-key.pem')));
                 return true;

@@ -261,11 +261,14 @@ origin root and starts at the selected app entry: `/index.html` for a standalone
 root app with that entry, or `/apps/<id>/<entry>` for a nested app. Use one
 selected app per development origin. The SDK uses `node-http-server` for source
 and packaged-preview serving, including conditional resource responses.
-Arcane development servers default to HTTPS, including localhost, and packaged
-browser previews require HTTPS. Configure the workspace certificate pair before
+Arcane development servers and packaged browser previews default to HTTPS,
+including localhost. Configure the workspace certificate pair before
 starting the ordinary command; see [development HTTPS setup](cli.md#development-https-setup).
 Explicit source-only `arcane dev --http` serves the same generated PWA routes
 without loading certificates; see [explicit HTTP development](cli.md#explicit-http-development).
+API callers may select `http:true` in packaged mode to serve the existing
+packaged web root, without generating or changing its PWA files. Browser
+secure-context and installation requirements remain browser-owned.
 `--public` selects the IPv4 wildcard bind address; it does not enable PWA
 configuration, change manifest metadata, or determine browser installability.
 

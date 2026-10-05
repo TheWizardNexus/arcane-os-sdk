@@ -131,7 +131,7 @@ each device. Keep these local files ignored by Git. The same certificate pair
 works for any selected app in that workspace. The command reports missing TLS
 files instead of starting an HTTP listener.
 
-HTTPS is the default for development and required for packaged browser previews.
+HTTPS is the default for development and packaged browser previews.
 Plain `npm run dev` binds to localhost with the same workspace certificate pair.
 An explicit `--host` overrides the bind address, and `--port` selects the HTTPS port.
 The paired HTTP listener returns 308 redirects and uses an OS-assigned port
@@ -152,6 +152,10 @@ This selects one HTTP content listener and prints HTTP network URLs. It reads
 no certificate pair and serves the same application and generated PWA routes.
 PWA and storage availability still depend on the browser's secure-context
 rules; see [HTTP development](docs/reference/cli.md#explicit-http-development).
+API callers may also explicitly select `http:true` with `mode:'packaged'` to
+serve the selected packaged web root through the same listener owner. See
+[`startDevServer()`](docs/reference/sdk-api.md#startdevserver) for readiness,
+start-URL and shutdown behavior.
 
 Open the URL printed by the server. The generated page owns its import map and
 Arcane theme; its application module is `modules/App.js` at the repository root.

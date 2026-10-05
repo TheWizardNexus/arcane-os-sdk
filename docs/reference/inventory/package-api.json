@@ -2082,7 +2082,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Workspace, doctor, repository, and server",
-      "summary": "Starts one owned browser development server with exact runtime/app route mappings and an unguessable session capability.",
+      "summary": "Starts an owned source or packaged browser server with complete selected routes, HTTPS by default, explicit HTTP selection, listener readiness and shutdown.",
       "availability": "Node control plane; browser data plane",
       "protocol": "Node ESM",
       "normalization": "SDK-normalized inputs, errors, events, and documented result"

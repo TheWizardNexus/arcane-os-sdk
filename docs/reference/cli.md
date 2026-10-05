@@ -406,7 +406,7 @@ device, since `localhost` refers to that device and `0.0.0.0` is a bind address.
 Network URLs come from one interface snapshot at startup and do not establish
 remote reachability through the machine's firewall or network.
 
-HTTPS is the default for development and required for packaged browser previews.
+HTTPS is the default for development and packaged browser previews.
 The published `node-http-server` 10.0.0 integration negotiates HTTP/2 or HTTP/1.1
 on the same HTTPS port using the configured PEM pair. Source routes, generated
 PWA resources, and conditional responses use the same serving pipeline.
@@ -447,6 +447,10 @@ close the owned HTTP listener and settle the same lifecycle.
 `--http` is supported only by `dev`. Combining it with `--https`, `--cert`,
 `--key`, or `--http-port` is a usage error. Omitting it preserves HTTPS;
 certificate errors never select HTTP automatically.
+
+The public `startDevServer()` API also accepts `http:true` in packaged mode;
+this does not add a CLI preview command or change `dev` into packaged serving.
+See [the API contract](sdk-api.md#startdevserver).
 
 A LAN HTTP origin does not receive the browser's localhost secure-context
 exception. For Chrome development, Chromium documents
