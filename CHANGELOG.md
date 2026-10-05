@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.54.0
+
+- Add `WS` through `arcane-os/websocket-client` and the Node root export,
+  using published `ws-share@3.1.0`. Compatible callers in one loaded module
+  share the exact native socket; `WS.observe()` exposes global lifecycle
+  events and `WS.getConnections()` supplies current connection records.
+  Native per-socket events, complete payloads and `acceptWebSocket` remain
+  unchanged. No automatic reconnect or cross-realm sharing is introduced.
+- Update `event-pubsub` to `6.1.1` and preserve its own `strong-type@2.0.0`
+  browser scope alongside the SDK's existing `strong-type@2.0.1`. Managed
+  maps, installed-package routes and application test contexts carry that
+  scope. Consumers regenerate their normal public SDK projections.
+- Add opt-in `moduleFormat: 'native'` application packaging with operation
+  `outputDirectory`, reachable module graphs, scoped import-map resolution,
+  complete selected assets and external HTMLImport script lifecycle. Correct
+  named-expression lexical scope without changing default import-map output.
+  This is a packaging capability, not a complete browser-extension scaffold.
+- Add `createBrowserDecisionModel` through `arcane-os/ai/browser-decisions`
+  for explicit Laya typed-decisions FP16 and Julia-1 FP32 browser operations.
+  Model activation is lazy and uses the selected upstream Transformers.js
+  runtime; complete inputs/results, ordered batches, lifecycle and cancellation
+  remain observable. No chat-provider replacement, automatic model loading,
+  precision fallback, application default switch or saved-data migration occurs.
+
 ## 0.53.0
 
 - Add `acceptWebSocket` through `arcane-os/websocket` and the Node root export.
