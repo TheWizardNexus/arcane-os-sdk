@@ -21,6 +21,8 @@ const missingStrongTypePath=path.join(
 const runtimePackageImports=new Map([
     ['arcane-os/event-manager',path.join(repositoryRoot,'src','event-manager.mjs')],
     ['arcane-os/websocket-client',path.join(repositoryRoot,'browser-runtime','websocket-client.mjs')],
+    ['arcane-os/core/client',path.join(repositoryRoot,'browser-runtime','core','client.mjs')],
+    ['arcane-os/core/contracts',path.join(repositoryRoot,'browser-runtime','core','contracts.mjs')],
     ['arcane-os/speech-text',path.join(repositoryRoot,'browser-runtime','speech-text.mjs')],
     [
         'arcane-os/ai/tool-text-stream',

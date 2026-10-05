@@ -42,6 +42,8 @@ const STATIC_RUNTIME_PACKAGE_IMPORTS=new Map([
 const SDK_BROWSER_SELF_IMPORTS=new Map([
     ['arcane-os/event-manager',SDK_BROWSER_ENTRY],
     ['arcane-os/websocket-client','sdk/websocket-client.mjs'],
+    ['arcane-os/core/client','sdk/core/client.mjs'],
+    ['arcane-os/core/contracts','sdk/core/contracts.mjs'],
     ['arcane-os/logging','sdk/logging.mjs'],
     ['arcane-os/browser-device','sdk/browser-device.mjs'],
     ['arcane-os/pwa','sdk/pwa.mjs'],
