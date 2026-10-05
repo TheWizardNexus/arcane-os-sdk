@@ -50,6 +50,7 @@
     "./native": "./src/native-plan.mjs",
     "./native-provider": "./src/native-provider-loader.mjs",
     "./native/portable-provider": "./src/native/portable-provider.mjs",
+    "./native/windows-provider": "./src/native/windows-provider.mjs",
     "./core/client": "./browser-runtime/core/client.mjs",
     "./core/contracts": "./browser-runtime/core/contracts.mjs",
     "./core/classic-source": "./src/core-classic-source.mjs",

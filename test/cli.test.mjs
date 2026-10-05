@@ -697,16 +697,17 @@ test('CLI creates truthful Linux ARM64 and Android native requests',()=>{
     );
 });
 
-test('CLI pairs portable from the SDK package by default and retains explicit checkout selection',async()=>{
+for(const target of ['portable','windows-x64']){
+test(`CLI pairs ${target} from the SDK package by default and retains explicit checkout selection`,async()=>{
     for(const arcaneRoot of [undefined,path.resolve('selected-arcane-os')]){
         const stdout=memoryStream();
         const stderr=memoryStream();
         const providerSource=arcaneRoot?'arcane-checkout':'sdk-package';
-        const nativeBuilder={selected:'portable'};
+        const nativeBuilder={selected:target};
         const toolchainRoot=arcaneRoot??path.resolve('installed-sdk');
         let loaded;
         let invocation;
-        const arguments_=['native-doctor','--target','portable','--output','json'];
+        const arguments_=['native-doctor','--target',target,'--output','json'];
         if(arcaneRoot)arguments_.push('--arcane-root',arcaneRoot);
         const exitCode=await runCliInProcess(arguments_,{
             stdout:stdout.stream,stderr:stderr.stream,
@@ -721,13 +722,14 @@ test('CLI pairs portable from the SDK package by default and retains explicit ch
         });
         assert.equal(exitCode,0,stderr.read());
         assert.equal(loaded.arcaneRoot,arcaneRoot);
-        assert.equal(loaded.target,'portable');
+        assert.equal(loaded.target,target);
         assert.equal(invocation.options.nativeBuilder,nativeBuilder);
         assert.equal(invocation.options.toolchainRoot,toolchainRoot);
         assert.equal(invocation.options.providerSource,providerSource);
         assert.deepEqual(invocation.options.targetRequest.signing,{mode:'unsigned-local-test',profileId:null});
     }
 });
+}
 
 test('CLI reports a server lifecycle event failure as one terminal failure',async()=>{
     const stdout=memoryStream();

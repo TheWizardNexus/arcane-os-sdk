@@ -11,7 +11,8 @@ artifact is not a Windows executable, Linux package or Android application.
 
 `loadArcaneNativeProvider({target:'portable'})` selects the installed SDK provider
 without an `arcaneRoot`. Supplying an explicit `arcaneRoot` retains the existing
-checkout-provider route. Other native targets remain with their actual platform
+checkout-provider route. The SDK also owns the `windows-x64` executable provider
+described below. Other native targets remain with their actual platform
 providers; the loader does not substitute this payload for an unavailable host.
 
 ## Provider and selected input
@@ -241,8 +242,92 @@ factory. Applications without that selection have no generated local-AI import
 or service. Availability of a particular engine belongs to the selected
 local-AI installer and service; a generic ONNX runtime is not a speech model.
 
-This source increment supplies portable assembly and service composition.
-Desktop WebView executables, platform child-process ownership, Android dispatch
-and executable build toolchains require their own completed adapters. Published
+## Windows executable
+
+The ordinary application command is:
+
+```sh
+npm exec -- arcane build --target windows-x64
+```
+
+`loadArcaneNativeProvider({target:'windows-x64'})` selects the SDK's own
+`arcane-os/native/windows-provider` without an OS checkout or `arcaneRoot`.
+Its default export and `arcaneNativeBuilderProvider` are the same provider;
+`createWindowsNativeProvider({services,hostDirectory})` permits explicit
+same-project composition. Service selection follows the portable provider's
+descriptor/override contract above.
+
+The provider assembles the selected app with the precompiled host asset
+`arcane-native-windows-x64.tar.gz` from the numeric GitHub release matching the
+builder's installed SDK version. The asset contains the launcher, WebView2
+support libraries, Node SEA Core executable and required license files. It does
+not select the newest host independently of that package. Downloads occur only
+during `build()`, use the caller's output directory, and are reused from
+`<outputRoot>/.arcane-native-hosts/<sdk-version>/windows-x64`. The build machine
+needs the standard `tar` command for extraction; application builds do not need
+a C# compiler, system Node installation for the generated executable, or host
+source scripts. The SDK build command itself still runs through the application's
+normal Node/npm toolchain.
+
+An explicit `hostDirectory` selects an already-built complete host tree instead
+of downloading one. This is useful for SDK collaborators verifying the next
+host output; downstream applications use the published package and matching
+release asset. `doctor()` reports the selected prerequisites and missing files;
+it does not download the host or probe the installed WebView runtime.
+
+The assembled directory contains `Arcane.exe`, the unchanged `app/` payload,
+Core runtime and semantic `arcane-native.json`. Launch `Arcane.exe` on Windows
+x64 with the Microsoft Edge WebView2 Runtime installed. It opens the selected
+app in WebView2 and owns its framed connection to the bundled Core process.
+`verify()` observes the assembled files and manifest; it does not execute the
+window or prove application behavior. `run()` launches the executable and
+observes complete diagnostics and exit. Cancelling that operation closes its
+input, allowing the window and accepted Core service work to drain without a
+forced process termination.
+
+For explicit user-selected workspace/state locations, launch:
+
+```sh
+Arcane.exe --arcane-launch-config path/to/launch.json
+```
+
+The complete JSON object reaches the service factories as their second
+argument. A supplied `stateRoot` also owns the WebView2 profile and diagnostic
+directory. Otherwise the launcher uses the current user's local application
+data under `Arcane/<app-id>`. The launcher does not invent an application
+workspace. Relative launch-file paths resolve from the invocation's working
+directory. `--close-on-stdin-eof` is an explicit process-owner option used by the
+SDK runner; an ordinary double-clicked window closes through its own UI.
+
+## Windows host source and selected output
+
+The SDK's `src/core/hosts/windows/ArcaneCoreProcess.cs` owns an explicitly
+selected executable, argument string and working directory. It reads complete
+framed Core messages and diagnostics, acknowledges ordered asynchronous writes,
+and closes stdin before awaiting accepted Core work, final output and process
+exit. It does not kill the child on an ordinary close.
+
+`ArcaneHost.cs` composes that process with a WebView2 window through
+`ArcaneHost.Run(options,onDiagnostic,onError)` or `ArcaneHostForm`. Options
+select the app root/start path, stable virtual HTTPS origin, profile directory,
+title, canonical classic-client source and Core process inputs. The form exposes
+`Ready`, `Completion` and `CloseAsync()`. Page navigation, transport connection,
+Core readiness and service readiness are separate states. Accepted work drains
+before the window closes; complete engineering errors go to the supplied
+diagnostic/error callbacks. Callbacks must not synchronously wait for the
+window's lifetime promises.
+
+`ArcaneLauncher.cs` supplies the executable entry point for that composition.
+`tools/build-core-windows-host.mjs` builds the selected SDK host output from the
+approved WebView2 package, existing .NET Framework compiler and selected Node
+SEA output. It retains complete compiler diagnostics and produces a fresh
+directory rather than overwriting an earlier artifact. The host requires
+.NET Framework 4.6.2 or later. This is SDK release tooling, not an application
+build requirement. Source compilation, selected host execution and real
+application behavior are separate evidence boundaries; an assembled app is not
+an installer or proof of its domain behavior.
+
+Linux, macOS, Android dispatch and each platform's output verification retain
+their separate delivery boundaries. Published
 consumers must adopt the numeric package that includes this increment; a source
 checkout or a successful source push is not that public package authority.

@@ -6,7 +6,7 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 251,
+  "memberCount": 254,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
@@ -3940,6 +3940,48 @@
       "summary": "Default package binding for the same portable provider exposed by arcaneNativeBuilderProvider.",
       "availability": "Node; produces a portable payload rather than an executable host",
       "protocol": "arcane-native-builder/1 portable provider",
+      "normalization": "Binding identity is exactly equal to the named arcaneNativeBuilderProvider export"
+    },
+    {
+      "id": "native-windows-provider:createWindowsNativeProvider",
+      "name": "createWindowsNativeProvider",
+      "displayName": "createWindowsNativeProvider()",
+      "kind": "function",
+      "signature": "createWindowsNativeProvider({services,hostDirectory}={})",
+      "entrypoints": ["arcane-os/native/windows-provider"],
+      "primaryImport": "arcane-os/native/windows-provider",
+      "group": "Windows native provider",
+      "summary": "Assembles selected application services and browser content with the SDK-owned Windows x64 WebView2 and SEA host.",
+      "availability": "Node for assembly; Windows x64 with WebView2 Runtime for execution",
+      "protocol": "arcane-native-builder/1 windows-x64 provider",
+      "normalization": "Uses a selected hostDirectory or the exact installed SDK version's numeric release asset; preserves complete payloads; run cancellation closes stdin and waits for host-owned graceful shutdown"
+    },
+    {
+      "id": "native-windows-provider:arcaneNativeBuilderProvider",
+      "name": "arcaneNativeBuilderProvider",
+      "displayName": "arcaneNativeBuilderProvider",
+      "kind": "singleton",
+      "signature": "const arcaneNativeBuilderProvider",
+      "entrypoints": ["arcane-os/native/windows-provider"],
+      "primaryImport": "arcane-os/native/windows-provider",
+      "group": "Windows native provider",
+      "summary": "SDK-owned Windows provider selected by the ordinary windows-x64 build command without an OS checkout.",
+      "availability": "Node for assembly; Windows x64 with WebView2 Runtime for execution",
+      "protocol": "arcane-native-builder/1 windows-x64 provider",
+      "normalization": "Uses appDescriptor.native.services and the exact SDK release host asset; binding is identical to the default export"
+    },
+    {
+      "id": "native-windows-provider:default",
+      "name": "default",
+      "displayName": "arcaneNativeBuilderProvider default export",
+      "kind": "singleton",
+      "signature": "default as arcaneNativeBuilderProvider",
+      "entrypoints": ["arcane-os/native/windows-provider"],
+      "primaryImport": "arcane-os/native/windows-provider",
+      "group": "Windows native provider",
+      "summary": "Default binding for the SDK Windows executable provider.",
+      "availability": "Node for assembly; Windows x64 with WebView2 Runtime for execution",
+      "protocol": "arcane-native-builder/1 windows-x64 provider",
       "normalization": "Binding identity is exactly equal to the named arcaneNativeBuilderProvider export"
     },
     {

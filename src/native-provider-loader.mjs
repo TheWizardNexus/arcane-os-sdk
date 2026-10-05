@@ -22,6 +22,11 @@ const FIXED_NATIVE_PROVIDER_PATHS={
     'android-arm64':providerPath('android-native-provider.mjs')
 };
 
+const SDK_NATIVE_PROVIDER_PATHS={
+    portable:'./native/portable-provider.mjs',
+    'windows-x64':'./native/windows-provider.mjs'
+};
+
 export const ARCANE_NATIVE_PROVIDER_PATHS={
     portable:[...FIXED_NATIVE_PROVIDER_PATHS.portable],
     'windows-x64':[...FIXED_NATIVE_PROVIDER_PATHS['windows-x64']],
@@ -133,10 +138,11 @@ export async function loadArcaneNativeProvider(options={}){
         target,
         message:`Loading the Arcane ${String(target)} provider.`
     });
-    const location=arcaneRoot===undefined&&target==='portable'
+    const sdkProvider=SDK_NATIVE_PROVIDER_PATHS[target];
+    const location=arcaneRoot===undefined&&sdkProvider
         ?{
             canonicalRoot:path.resolve(fileURLToPath(new URL('../',import.meta.url))),
-            providerPath:fileURLToPath(new URL('./native/portable-provider.mjs',import.meta.url)),
+            providerPath:fileURLToPath(new URL(sdkProvider,import.meta.url)),
             providerSource:'sdk-package'
         }
         :await resolveProviderLocation({arcaneRoot,target,inspect,canonicalize});

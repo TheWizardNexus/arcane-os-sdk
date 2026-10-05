@@ -94,8 +94,8 @@ namespace Arcane.Core.Hosts.Windows
                 throw failure;
             }
             // All callbacks and exit observation exist before either reader starts.
-            host.outputReader = Task.Run(host.ReadOutputAsync);
-            host.diagnosticReader = Task.Run(host.ReadDiagnosticsAsync);
+            host.outputReader = Task.Run(new Func<Task>(host.ReadOutputAsync));
+            host.diagnosticReader = Task.Run(new Func<Task>(host.ReadDiagnosticsAsync));
             host.lifetime = host.CompleteAsync();
             host.lifetime.ContinueWith(host.ObserveLifetimeFailure, CancellationToken.None,
                 TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
@@ -164,7 +164,7 @@ namespace Arcane.Core.Hosts.Windows
             {
                 if (inputClosing != null) return inputClosing;
                 accepting = false;
-                inputClosing = writes.ContinueWith(
+                inputClosing = writes.ContinueWith<Task>(
                     CloseInputAfterWritesAsync, CancellationToken.None,
                     TaskContinuationOptions.None, TaskScheduler.Default).Unwrap();
                 return inputClosing;

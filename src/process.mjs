@@ -124,11 +124,15 @@ export async function runProcess(command,args=[],{
     heartbeatMs=5000,
     terminationGraceMs=DEFAULT_TERMINATION_GRACE_MS,
     allowNonzero=false,
-    input
+    input,
+    cancellationMode='terminate-tree'
 }={}){
     throwIfAborted(signal);
     if(!is.array(args)||args.some(argument=>!is.string(argument))){
         throw new ArcaneError(ERROR_CODES.usage,'Process arguments must be a fixed array of strings.');
+    }
+    if(cancellationMode!=='terminate-tree'&&cancellationMode!=='close-input'){
+        throw new ArcaneError(ERROR_CODES.usage,'Unknown process cancellation mode.');
     }
     if(!is.integer(terminationGraceMs)||terminationGraceMs<100||terminationGraceMs>30_000){
         throw new ArcaneError(
@@ -153,12 +157,15 @@ export async function runProcess(command,args=[],{
     return new Promise((resolve,reject)=>{
         let stdout='';
         let stderr='';
+        let childClosed=false;
+        let closedResult=null;
         let settlementStarted=false;
         let cancellationRequested=false;
         let cancellationError=null;
         let terminationRequested=false;
         let escalation=null;
         let spawnError=null;
+        let inputError=null;
         let child;
         let heartbeat=null;
         const deliveries=new Set();
@@ -184,9 +191,37 @@ export async function runProcess(command,args=[],{
             clearTimeout(escalation);
             signal?.removeEventListener('abort',abort);
             void (async()=>{
+                let callbackFailure=null;
                 try{
                     await events.drain();
-                }catch(callbackFailure){
+                }catch(error){
+                    callbackFailure=error;
+                }
+                if(cancellationMode==='close-input'&&closedResult){
+                    const failures=[...new Set([
+                        callback===reject?value:null,
+                        callbackFailure,inputError,cancellationError,spawnError
+                    ].filter(error=>error!==null))];
+                    if(failures.length>0){
+                        const primary=failures[0];
+                        // Owned cancellation/exit errors already carry this exact
+                        // result. Other errors retain their identity and cause in
+                        // the complete failure record instead of being rewritten.
+                        if(failures.length===1&&primary?.details===closedResult){
+                            reject(primary);
+                            return;
+                        }
+                        const failure=new ArcaneError(
+                            primary?.code??ERROR_CODES.operationFailed,
+                            primary?.message??`Could not complete ${command}.`,
+                            {cause:primary,details:closedResult,exitCode:primary?.exitCode}
+                        );
+                        failure.errors=failures;
+                        reject(failure);
+                        return;
+                    }
+                }
+                if(callbackFailure){
                     reject(callbackFailure);
                     return;
                 }
@@ -195,10 +230,16 @@ export async function runProcess(command,args=[],{
         };
 
         const stopTree=()=>{
-            if(terminationRequested||settlementStarted){
+            if(terminationRequested||settlementStarted||childClosed){
                 return;
             }
             terminationRequested=true;
+            if(cancellationMode==='close-input'){
+                // The selected host owns shutdown after EOF. Keep observing its
+                // complete output and exit; accepted durable work may outlive UI.
+                child?.stdin.end();
+                return;
+            }
             terminateProcessTree(child);
             escalation=setTimeout(()=>{
                 if(childIsRunning(child)){
@@ -214,7 +255,7 @@ export async function runProcess(command,args=[],{
         };
 
         const abort=()=>{
-            if(cancellationRequested||settlementStarted){
+            if(cancellationRequested||settlementStarted||childClosed){
                 return;
             }
             cancellationRequested=true;
@@ -225,7 +266,9 @@ export async function runProcess(command,args=[],{
             );
             void events.enqueue({
                 type:'process.cancellation.requested',
-                message:`Stopping ${command} and its child processes.`,
+                message:cancellationMode==='close-input'
+                    ?`Closing ${command} input and waiting for its owned shutdown.`
+                    :`Stopping ${command} and its child processes.`,
                 data:{command,pid:child?.pid??null}
             });
             stopTree();
@@ -286,6 +329,10 @@ export async function runProcess(command,args=[],{
             }
         });
         child.on('close',(code,terminationSignal)=>{
+            // The child lifetime has ended even while its output/event callbacks
+            // are still draining. A later abort cannot cancel that completed work.
+            childClosed=true;
+            signal?.removeEventListener('abort',abort);
             clearInterval(heartbeat);
             void (async()=>{
                 await drainDeliveries();
@@ -299,10 +346,11 @@ export async function runProcess(command,args=[],{
                     stdout,
                     stderr
                 };
+                closedResult=result;
                 if(terminationRequested){
                     // The direct child has exited. Make one final tree-wide attempt so
                     // a descendant that ignored the graceful request cannot outlive it.
-                    terminateProcessTree(child,{force:true});
+                    if(cancellationMode!=='close-input')terminateProcessTree(child,{force:true});
                     if(cancellationRequested){
                         await events.enqueue({
                             type:'process.cancelled',
@@ -310,7 +358,8 @@ export async function runProcess(command,args=[],{
                             data:{command,code:result.code,signal:terminationSignal}
                         });
                     }
-                    finish(reject,events.error??cancellationError??new ArcaneError(
+                    if(cancellationError)cancellationError.details=result;
+                    finish(reject,events.error??inputError??cancellationError??new ArcaneError(
                         ERROR_CODES.operationFailed,
                         `Stopped ${command} after its event callback failed.`
                     ));
@@ -322,6 +371,12 @@ export async function runProcess(command,args=[],{
                         `Could not run ${command}: ${spawnError.message}`,
                         {cause:spawnError}
                     ));
+                    return;
+                }
+                if(inputError){
+                    finish(reject,new ArcaneError(ERROR_CODES.operationFailed,
+                        `Could not write ${command} input: ${inputError.message}`,
+                        {cause:inputError,details:result}));
                     return;
                 }
                 await events.enqueue({
@@ -346,7 +401,10 @@ export async function runProcess(command,args=[],{
             abort();
         }
 
-        if(input!==undefined){
+        if(cancellationMode==='close-input'){
+            child.stdin.on('error',error=>{inputError=error;stopTree();});
+            if(input!==undefined&&!terminationRequested)child.stdin.write(input);
+        }else if(input!==undefined){
             child.stdin.end(input);
         }else{
             child.stdin.end();

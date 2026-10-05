@@ -817,7 +817,7 @@ async function pairNativeProvider(command,options,loadProvider,{signal,onEvent}=
         usage(`${command} requires one native target.`);
     }
     const targetRequest=createNativeTargetRequest(options);
-    if(!options.arcaneRoot&&options.target!=='portable'){
+    if(!options.arcaneRoot&&!['portable','windows-x64'].includes(options.target)){
         usage(`${command} for target ${options.target} requires --arcane-root <directory>.`);
     }
     const loaded=await loadProvider({

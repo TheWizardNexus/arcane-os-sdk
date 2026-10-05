@@ -74,12 +74,13 @@ test('native provider loading preserves event and target context',async t=>{
     ]);
 });
 
-test('portable without an override loads the installed SDK provider directly',async()=>{
+for(const [target,module] of [['portable','portable-provider.mjs'],['windows-x64','windows-provider.mjs']]){
+test(`${target} without an override loads the installed SDK provider directly`,async()=>{
     const builder=provider();
-    const providerURL=new URL('../src/native/portable-provider.mjs',import.meta.url);
+    const providerURL=new URL(`../src/native/${module}`,import.meta.url);
     let imported;
     const pairing=await loadArcaneNativeProvider({
-        target:'portable',
+        target,
         inspect(){throw new Error('A packaged provider does not inspect an OS checkout.');},
         async importModule(specifier){
             imported=specifier;
@@ -93,6 +94,7 @@ test('portable without an override loads the installed SDK provider directly',as
     assert.equal(pairing.providerSource,'sdk-package');
     assert.equal(pairing.nativeBuilder,builder);
 });
+}
 
 test('packaged provider import errors retain their cause and never select a checkout',async()=>{
     const cause=new Error('Selected package provider import failed.');
@@ -102,8 +104,8 @@ test('packaged provider import errors retain their cause and never select a chec
     }),error=>error.code==='ARCANE_TARGET_UNAVAILABLE'&&error.cause===cause);
 });
 
-test('executable targets still require an explicit checkout and invalid overrides remain errors',async()=>{
-    for(const target of ['windows-x64','linux-x64','linux-arm64','android-arm64']){
+test('unimplemented SDK targets require an explicit checkout and invalid overrides remain errors',async()=>{
+    for(const target of ['linux-x64','linux-arm64','android-arm64']){
         await assert.rejects(()=>loadArcaneNativeProvider({target}),/requires an Arcane OS checkout/u);
     }
     await assert.rejects(()=>loadArcaneNativeProvider({target:'portable',arcaneRoot:''}),

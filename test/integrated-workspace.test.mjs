@@ -23,7 +23,7 @@ import {
 } from '../src/index.mjs';
 import {repositoryRoot,temporaryDirectory} from './helpers.mjs';
 
-test('integrated native selection distinguishes SDK portable resources from checkout providers',()=>{
+test('integrated native selection distinguishes SDK providers from checkout providers',()=>{
     const workspaceRoot=path.resolve('integrated-os');
     const toolchainRoot=path.resolve('installed-sdk');
     const selected={workspaceMode:'integrated',workspaceRoot,toolchainRoot,target:'portable'};
@@ -32,8 +32,11 @@ test('integrated native selection distinguishes SDK portable resources from chec
     assert.throws(()=>assertIntegratedNativeToolchain({...selected,providerSource:'arcane-checkout'}),
         /same Arcane OS checkout/u);
     assert.doesNotThrow(()=>assertIntegratedNativeToolchain({...selected,toolchainRoot:workspaceRoot}));
-    assert.throws(()=>assertIntegratedNativeToolchain({
+    assert.doesNotThrow(()=>assertIntegratedNativeToolchain({
         ...selected,target:'windows-x64',providerSource:'sdk-package'
+    }));
+    assert.throws(()=>assertIntegratedNativeToolchain({
+        ...selected,target:'linux-x64',providerSource:'sdk-package'
     }),/same Arcane OS checkout/u);
 });
 
