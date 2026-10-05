@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {mkdir,writeFile} from 'node:fs/promises';
+import {mkdtemp,mkdir,rm,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from '../src/testing.mjs';
 import {
@@ -8,7 +8,7 @@ import {
     projectPackageManifest,
     validateAppDescriptor
 } from '../src/app-descriptor.mjs';
-import {temporaryDirectory} from './helpers.mjs';
+import {repositoryRoot,temporaryDirectory} from './helpers.mjs';
 
 function descriptor(overrides={}){
     return {
@@ -64,6 +64,38 @@ test('canonical descriptor projects exact browser and native compatibility input
         include:['img/icon.png','index.html','manifest.json','modules']
     });
     assert.deepEqual(value.targets,['windows-x64']);
+});
+
+test('native resource projection preserves omission, empty selection and app-owned paths',async t=>{
+    const fixtures=path.join(repositoryRoot,'.arcane','native-resource-fixtures');
+    await mkdir(fixtures,{recursive:true});
+    const workspaceRoot=await mkdtemp(path.join(fixtures,'descriptor-'));
+    t.after(()=>rm(workspaceRoot,{recursive:true,force:true}));
+    const appRoot=path.join(workspaceRoot,'apps','sample-app');
+    await mkdir(appRoot,{recursive:true});
+    for(const nativeResources of [undefined,{include:[]},{include:['server','src','package.json'],exclude:['src/browser']}]){
+        const authored=descriptor();
+        if(nativeResources!==undefined)authored.package.nativeResources=nativeResources;
+        const original=structuredClone(authored);
+        const normalized=nativeResources===undefined?undefined:{exclude:[],...nativeResources};
+        const value=validateAppDescriptor(authored);
+        const manifest=projectPackageManifest(authored);
+        assert.deepEqual(value.package.nativeResources,normalized);
+        assert.deepEqual(manifest.nativeResources,normalized);
+        assert.equal(Object.hasOwn(manifest,'nativeResources'),nativeResources!==undefined);
+        assert.deepEqual(manifest.include,original.package.include);
+        assert.deepEqual(projectNativeDescriptor(authored).include,original.package.include);
+        assert.equal(Object.hasOwn(projectNativeDescriptor(authored),'nativeResources'),false);
+        assert.deepEqual(authored,original);
+        const synthesized=await loadAppDescriptor({workspaceRoot,appRoot,appId:'sample-app',packageManifest:manifest});
+        assert.equal(synthesized.source,'package-projection');
+        assert.deepEqual(synthesized.descriptor.package.nativeResources,normalized);
+        await writeFile(path.join(appRoot,'arcane-app.json'),JSON.stringify(authored));
+        const loaded=await loadAppDescriptor({workspaceRoot,appRoot,appId:'sample-app',packageManifest:manifest});
+        assert.equal(loaded.source,'authored');
+        assert.deepEqual(loaded.descriptor.package.nativeResources,normalized);
+        await rm(path.join(appRoot,'arcane-app.json'));
+    }
 });
 
 test('document selectors preserve authored omission, empty selection, and page paths through projection',async t=>{

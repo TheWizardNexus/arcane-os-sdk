@@ -13,6 +13,7 @@ import {
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {appRelativeRoot,resolveAppRoot,resolvePackageOutputRoot} from '../app-layout.mjs';
+import {TARGET_IDS} from '../constants.mjs';
 import {readInstalledSdkLayout} from '../sdk-runtime-layout.mjs';
 import {withWorkspaceOperationLock} from '../workspace-operation-lock.mjs';
 import {materializeNativeModules} from './native-modules.mjs';
@@ -320,7 +321,7 @@ function normalizeOptionalRecord(value,label){
 export function validateAppConfig(value,appId,rootConfig,configPath=path.posix.join(appRelativeRoot(rootConfig,appId),APP_CONFIG_NAME)){
     assertOnlyKeys(value,new Set([
         'schemaVersion','id','displayName','version','entry','strategy','security',
-        'localAIModelPolicy','include','exclude','shared','adapter','pwa','outputDirectory','documents'
+        'localAIModelPolicy','include','exclude','shared','adapter','pwa','outputDirectory','documents','nativeResources'
     ]),`${appId}/${APP_CONFIG_NAME}`);
     if(value.schemaVersion!==1)fail(`${appId}/${APP_CONFIG_NAME}.schemaVersion must be 1.`);
     if(!is.string(value.id)||value.id!==appId||!APP_ID_PATTERN.test(value.id)){
@@ -335,6 +336,15 @@ export function validateAppConfig(value,appId,rootConfig,configPath=path.posix.j
     );
     const include=validatePathList(value.include,`${appId}/${APP_CONFIG_NAME}.include`,{required:true});
     const exclude=validatePathList(value.exclude??[],`${appId}/${APP_CONFIG_NAME}.exclude`);
+    let nativeResources;
+    if(value.nativeResources!==undefined){
+        const label=`${appId}/${APP_CONFIG_NAME}.nativeResources`;
+        assertOnlyKeys(value.nativeResources,new Set(['include','exclude']),label);
+        nativeResources={
+            include:validatePathList(value.nativeResources.include,`${label}.include`),
+            exclude:validatePathList(value.nativeResources.exclude??[],`${label}.exclude`)
+        };
+    }
     if(include.some(allowed=>sameOrDescendant(APP_CONFIG_NAME,allowed))){
         fail(`${appId}/${APP_CONFIG_NAME}.include must not expose the authored package configuration.`);
     }
@@ -382,6 +392,7 @@ export function validateAppConfig(value,appId,rootConfig,configPath=path.posix.j
         )}),
         include,
         exclude,
+        ...(nativeResources===undefined?{}:{nativeResources}),
         shared:[...value.shared],
         ...(adapter===undefined?{}:{adapter}),
         configPath
@@ -423,7 +434,8 @@ async function assertContainedRealPath(root,candidate,label){
     }
 }
 
-async function loadContext(requestedWorkspaceRoot,appId,{outputDirectory}={}){
+async function loadContext(requestedWorkspaceRoot,appId,{outputDirectory,target='browser'}={}){
+    if(!TARGET_IDS.includes(target))fail(`Unsupported package target: ${String(target)}.`);
     const workspaceRoot=await realDirectory(normalizeWorkspaceRoot(requestedWorkspaceRoot),'Workspace root');
     const rootConfigPath=path.join(workspaceRoot,ROOT_CONFIG_NAME);
     const rootConfig=validateRootConfig(await readJson(rootConfigPath,ROOT_CONFIG_NAME),rootConfigPath);
@@ -436,14 +448,19 @@ async function loadContext(requestedWorkspaceRoot,appId,{outputDirectory}={}){
     if(outputDirectory!==undefined){
         config.outputDirectory=normalizeRelativePath(outputDirectory,'package outputDirectory');
     }
+    const outputRoot=resolvePackageOutputRoot(workspaceRoot,rootConfig,config,{target,outputDirectory});
+    if(target!=='browser'&&config.nativeResources?.include.length>0){
+        config.outputDirectory=path.relative(workspaceRoot,outputRoot).split(path.sep).join('/');
+    }
     return {
         workspaceRoot,
         rootConfig,
         appsRoot,
         appRoot,
         appId,
+        target,
         config,
-        outputRoot:resolvePackageOutputRoot(workspaceRoot,rootConfig,config)
+        outputRoot
     };
 }
 
@@ -494,6 +511,11 @@ async function assertPackageOutputLocation(context){
     for(const selected of context.config.include){
         assertSelectedInput(context.appRoot,selected,context.config.exclude,context.appId);
     }
+    if(context.target!=='browser'&&context.config.nativeResources){
+        for(const selected of context.config.nativeResources.include){
+            assertSelectedInput(context.appRoot,selected,context.config.nativeResources.exclude,`${context.appId} native`);
+        }
+    }
     for(const sharedId of context.config.shared){
         for(const route of context.rootConfig.sharedPayloads[sharedId]){
             const sourceRoot=path.resolve(context.workspaceRoot,route.source);
@@ -526,6 +548,7 @@ async function collectSelectedPath({
     reject,
     records,
     destinations,
+    coalescedRecords,
     signal,
     label,
     allowRoot=false
@@ -555,6 +578,7 @@ async function collectSelectedPath({
                 reject,
                 records,
                 destinations,
+                coalescedRecords,
                 signal,
                 label
             });
@@ -567,9 +591,15 @@ async function collectSelectedPath({
         fail(`${label} overlaps the generated release manifest.`);
     }
     const key=pathKey(normalizedDestination);
-    if(destinations.has(key))fail(`Package destination collision: ${normalizedDestination}.`);
+    if(destinations.has(key)){
+        const existing=coalescedRecords?.get(key);
+        if(existing?.source===absolute&&existing.destination===normalizedDestination)return;
+        fail(`Package destination collision: ${normalizedDestination}.`);
+    }
     destinations.add(key);
-    records.push({source:absolute,destination:normalizedDestination});
+    const record={source:absolute,destination:normalizedDestination};
+    records.push(record);
+    coalescedRecords?.set(key,record);
 }
 
 async function collectPackageRecords(context,{signal}={}){
@@ -611,6 +641,29 @@ async function collectPackageRecords(context,{signal}={}){
                     allowRoot:true
                 });
             }
+        }
+    }
+    if(context.target!=='browser'&&context.config.nativeResources){
+        const nativeRecords=[];
+        const coalescedRecords=new Map(records.map(record=>[pathKey(record.destination),record]));
+        for(const selected of context.config.nativeResources.include){
+            await collectSelectedPath({
+                sourceRoot:context.appRoot,
+                selected,
+                destination:appPackagePath(context,selected),
+                excludes:context.config.nativeResources.exclude,
+                reject:isAppSourceForbidden,
+                records:nativeRecords,
+                destinations,
+                coalescedRecords,
+                signal,
+                label:`${context.appId} nativeResources`
+            });
+        }
+        for(const record of nativeRecords){
+            record.appRelativePath=path.relative(context.appRoot,record.source).split(path.sep).join('/');
+            record.nativeOnly=true;
+            records.push(record);
         }
     }
     records.sort((left,right)=>compareText(left.destination,right.destination));
@@ -671,7 +724,7 @@ async function optionalDescriptor(context){
 
 async function inspectContext(context,{signal,records}={}){
     const selectedRecords=records??await collectPackageRecords(context,{signal});
-    const documents=await browserDocuments(selectedRecords,context.config.entry,context.config.documents);
+    const documents=await browserDocuments(selectedRecords.filter(record=>!record.nativeOnly),context.config.entry,context.config.documents);
     return {
         appId:context.appId,
         displayName:context.config.displayName,
@@ -683,6 +736,7 @@ async function inspectContext(context,{signal,records}={}){
         ...(context.config.pwa===undefined?{}:{pwa:copyJson(context.config.pwa)}),
         include:[...context.config.include],
         exclude:[...context.config.exclude],
+        ...(context.config.nativeResources===undefined?{}:{nativeResources:copyJson(context.config.nativeResources)}),
         shared:[...context.config.shared],
         ...(context.config.security===undefined?{}:{security:copyJson(context.config.security)}),
         ...(context.config.localAIModelPolicy===undefined?{}:{
@@ -724,9 +778,9 @@ export async function discoverApps({workspaceRoot:requestedWorkspaceRoot}={}){
     return apps;
 }
 
-export async function inspectApp({workspaceRoot,appId,signal}={}){
+export async function inspectApp({workspaceRoot,appId,signal,target,outputDirectory}={}){
     throwIfAborted(signal);
-    const context=await loadContext(workspaceRoot,appId);
+    const context=await loadContext(workspaceRoot,appId,{target,outputDirectory});
     return inspectContext(context,{signal});
 }
 
@@ -846,7 +900,8 @@ async function replaceDirectory(stagingRoot,outputRoot){
 }
 
 async function packageWithContext(context,options={}){
-    const {signal,onEvent,browserPwa=true,moduleFormat='import-map'}=options;
+    const {signal,onEvent,moduleFormat='import-map',browserPwa:requestedBrowserPwa=true}=options;
+    const browserPwa=context.target==='browser'&&requestedBrowserPwa;
     if(!['import-map','native'].includes(moduleFormat)){
         throw new TypeError('packageApp moduleFormat must be "import-map" or "native".');
     }
@@ -854,7 +909,9 @@ async function packageWithContext(context,options={}){
     const appPath=appRelativeRoot(context.rootConfig,context.appId);
     const entryPath=appPackagePath(context,context.config.entry);
     const records=await collectPackageRecords(context,{signal});
-    const rootDocument = records.some(
+    const browserRecords=records.filter(record=>!record.nativeOnly);
+    const nativeRecords=records.filter(record=>record.nativeOnly);
+    const rootDocument = browserRecords.some(
         function selectedRootIndex(record) {
             return record.destination === 'index.html';
         }
@@ -901,7 +958,7 @@ async function packageWithContext(context,options={}){
     let promoted=false;
     try{
         async function copyBase() {
-            await copyRecords(records,stagingRoot,{signal,onEvent});
+            await copyRecords(browserRecords,stagingRoot,{signal,onEvent});
             if (!rootDocument) {
                 await writePackageLauncher(context, stagingRoot);
             }
@@ -913,6 +970,8 @@ async function packageWithContext(context,options={}){
                 workspaceRoot:context.workspaceRoot,
                 appRoot:context.appRoot,
                 outputRoot:stagingRoot,
+                target:context.target,
+                browserPwa,
                 copyBase,
                 signal,
                 onEvent
@@ -971,7 +1030,7 @@ async function packageWithContext(context,options={}){
                 stagingRoot,
                 files,
                 documents:inspected.browserDocuments.map(function documentPath(document){return document.packagePath;}),
-                sharedFiles:records.filter(function sharedRecord(record){return record.appRelativePath===undefined;})
+                sharedFiles:browserRecords.filter(function sharedRecord(record){return record.appRelativePath===undefined;})
                     .map(function sharedPath(record){return record.destination;}),
                 signal,
                 onEvent
@@ -1007,8 +1066,8 @@ async function packageWithContext(context,options={}){
         const documentUrl=entryDocument?.bases[0]?.href
             ?new URL(entryDocument.bases[0].href,entryUrl):entryUrl;
         const pending=[{file:entryPath,documentUrl}];
-        const sharedFiles=new Set(records.filter(record=>record.appRelativePath===undefined).map(record=>record.destination));
-        const applicationFiles=new Set(records.filter(function applicationRecord(record){
+        const sharedFiles=new Set(browserRecords.filter(record=>record.appRelativePath===undefined).map(record=>record.destination));
+        const applicationFiles=new Set(browserRecords.filter(function applicationRecord(record){
             return record.appRelativePath!==undefined;
         }).map(function applicationDestination(record){return record.destination;}));
         for(const file of files){
@@ -1132,6 +1191,17 @@ async function packageWithContext(context,options={}){
             }
             files.sort(compareText);
         }
+        // Native resources bypass browser rewriting, module projection and PWA generation.
+        // The app's browser selection remains authoritative wherever both select a file.
+        const finalDestinations=new Set(files.map(pathKey));
+        for(const record of nativeRecords){
+            if(finalDestinations.has(pathKey(record.destination))){
+                fail(`Native resource overlaps generated package content: ${record.destination}.`);
+            }
+        }
+        await copyRecords(nativeRecords,stagingRoot,{signal,onEvent});
+        files.push(...nativeRecords.map(record=>record.destination));
+        files.sort(compareText);
         const manifest=releaseManifest(context,files,pwaArtifacts,rootDocument);
         await writeFile(
             path.join(stagingRoot,RELEASE_MANIFEST_NAME),

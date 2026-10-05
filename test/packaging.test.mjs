@@ -3,6 +3,7 @@ import {lstat,mkdtemp,mkdir,readdir,readFile,rm,writeFile} from 'node:fs/promise
 import os from 'node:os';
 import path from 'node:path';
 import test from '../src/testing.mjs';
+import {repositoryRoot} from './helpers.mjs';
 import {
     RELEASE_MANIFEST_NAME,
     discoverApps,
@@ -61,6 +62,119 @@ async function workspaceFixture(t,{security,appsRoot='apps',outputDirectory}={})
     ]);
     return {workspaceRoot,appRoot,html,document,module};
 }
+
+async function nativeResourceFixture(t,appsRoot='.'){
+    const fixtures=path.join(repositoryRoot,'.arcane','native-resource-fixtures');
+    await mkdir(fixtures,{recursive:true});
+    const workspaceRoot=await mkdtemp(path.join(fixtures,'package-'));
+    t.after(()=>rm(workspaceRoot,{recursive:true,force:true}));
+    const appRoot=appsRoot==='.'?workspaceRoot:path.join(workspaceRoot,'apps','dragon-desk');
+    const appPrefix=appsRoot==='.'?'':'apps/dragon-desk/';
+    await Promise.all([
+        mkdir(path.join(appRoot,'server','drafts'),{recursive:true}),
+        mkdir(path.join(appRoot,'src'),{recursive:true}),
+        mkdir(path.join(workspaceRoot,'runtime'),{recursive:true})
+    ]);
+    const config={schemaVersion:1,id:'dragon-desk',displayName:'Dragon Desk',version:'1.0.0',
+        entry:'index.html',strategy:'static',include:['index.html','browser.mjs'],
+        exclude:['server','src'],shared:['runtime'],outputDirectory:'public-site',
+        nativeResources:{include:['server','src','package.json','browser.mjs'],exclude:['server/drafts','browser.mjs']}};
+    const service="import {CORE_PROTOCOL} from 'arcane-os/core/contracts';\r\n"
+        +"import {repository} from '../src/repository.mjs';\r\n"
+        +"export const greeting = '  Dragon repository 🐉  ';\r\n";
+    const document='<base href="./"><script type="importmap">{"imports":{"dragon":"./dragon.mjs"}}</script>'
+        +'<script type="module" src="./dragon.mjs?arcaneVersion=keep"></script>\r\n<p>完整内容 </p>\r\n';
+    const payload='First dragon\r\n  Second dragon with trailing space \r\n';
+    const packageSource='{\n  "name": "dragon-service", "type": "module", "custom": "  retained  "\n}\n';
+    await Promise.all([
+        writeJson(path.join(workspaceRoot,'arcane-packager.json'),{schemaVersion:1,appsRoot,distRoot:'dist',
+            sharedPayloads:{runtime:[{source:'runtime',destination:'arcane',include:['shared.mjs'],exclude:[]}]}}),
+        writeJson(path.join(appRoot,'arcane-package.json'),config),
+        writeFile(path.join(appRoot,'index.html'),`<!doctype html><base href="${appsRoot==='.'?'./':'../../'}">`
+            +`<script type="module" src="./${appPrefix}browser.mjs"></script><p>Dragon desk</p>\n`),
+        writeFile(path.join(appRoot,'browser.mjs'),'export const browserReady=true;\n'),
+        writeFile(path.join(appRoot,'server','RepositoryService.mjs'),service),
+        writeFile(path.join(appRoot,'server','reference.html'),document),
+        writeFile(path.join(appRoot,'server','records.dragon'),payload),
+        writeFile(path.join(appRoot,'server','drafts','scratch.txt'),'Unselected draft\n'),
+        writeFile(path.join(appRoot,'src','repository.mjs'),'export const repository="complete repository";\n'),
+        writeFile(path.join(appRoot,'package.json'),packageSource),
+        writeFile(path.join(workspaceRoot,'runtime','shared.mjs'),'export const shared=true;\n')
+    ]);
+    return {workspaceRoot,appRoot,appPrefix,config,service,document,payload,packageSource};
+}
+
+test('native selection preserves complete resources and previously emitted browser output in both layouts',async t=>{
+    for(const appsRoot of ['.','apps']){
+        const fixture=await nativeResourceFixture(t,appsRoot);
+        const request={workspaceRoot:fixture.workspaceRoot,appId:'dragon-desk'};
+        const browser=await packageApp({...request,moduleFormat:'native'});
+        const browserContent=new Map(await Promise.all([...browser.files,RELEASE_MANIFEST_NAME].map(async file=>[
+            file,await readFile(path.join(browser.outputRoot,file),'utf8')
+        ])));
+        assert.equal(browser.output,'public-site');
+        assert.equal(browser.files.some(file=>file.includes('/server/')||file.startsWith('server/')),false);
+        const inspected=await inspectApp({...request,target:'portable'});
+        assert.equal(inspected.output,'dist/.native/portable/dragon-desk');
+        assert.equal(inspected.outputDirectory,inspected.output);
+        assert.deepEqual(inspected.browserDocuments.map(document=>document.path),['index.html']);
+        const native=await packageApp({...request,target:'portable',moduleFormat:'native'});
+        assert.equal(native.output,inspected.output);
+        for(const [file,content] of [
+            ['server/RepositoryService.mjs',fixture.service],['server/reference.html',fixture.document],
+            ['server/records.dragon',fixture.payload],['package.json',fixture.packageSource]
+        ]){
+            assert.equal(await readFile(path.join(native.outputRoot,fixture.appPrefix+file),'utf8'),content);
+            assert.equal(await readFile(path.join(fixture.appRoot,file),'utf8'),content);
+        }
+        assert.ok(native.files.includes(fixture.appPrefix+'src/repository.mjs'));
+        assert.ok(native.files.includes(fixture.appPrefix+'browser.mjs'));
+        assert.equal(native.files.filter(file=>file===fixture.appPrefix+'browser.mjs').length,1);
+        assert.equal(native.files.includes(fixture.appPrefix+'server/drafts/scratch.txt'),false);
+        for(const [file,content] of browserContent){
+            assert.equal(await readFile(path.join(browser.outputRoot,file),'utf8'),content);
+        }
+        const verified=await verifyApp({...request,outputDirectory:native.output});
+        assert.deepEqual(verified.files,native.files);
+    }
+});
+
+test('native target context preserves explicit output overrides and omitted or empty selection',async t=>{
+    const fixture=await nativeResourceFixture(t);
+    const request={workspaceRoot:fixture.workspaceRoot,appId:'dragon-desk',target:'portable'};
+    assert.equal((await inspectApp({...request,outputDirectory:'selected-native'})).output,'selected-native');
+    for(const nativeResources of [undefined,{include:[]}]){
+        const config={...fixture.config};
+        if(nativeResources===undefined)delete config.nativeResources;
+        else config.nativeResources=nativeResources;
+        await writeJson(path.join(fixture.appRoot,'arcane-package.json'),config);
+        const inspected=await inspectApp(request);
+        assert.equal(inspected.output,'public-site');
+        assert.equal(inspected.files.includes('server/RepositoryService.mjs'),false);
+    }
+    await writeJson(path.join(fixture.appRoot,'arcane-package.json'),fixture.config);
+    await assert.rejects(inspectApp({...request,outputDirectory:'server/output'}),/overlaps selected/u);
+});
+
+test('package adapters receive the actual target and effective PWA choice without transforming native resources',async t=>{
+    const fixture=await nativeResourceFixture(t);
+    await mkdir(path.join(fixture.appRoot,'scripts'));
+    await writeFile(path.join(fixture.appRoot,'scripts','package.mjs'),
+        "import {writeFile} from 'node:fs/promises';\nimport path from 'node:path';\n"
+        +"export async function buildArcanePackage({copyBase,outputRoot,target,browserPwa}){\n"
+        +"  await copyBase();\n  await writeFile(path.join(outputRoot,'adapter-context.json'),JSON.stringify({target,browserPwa}));\n}\n");
+    await writeJson(path.join(fixture.appRoot,'arcane-package.json'),{
+        ...fixture.config,strategy:'adapter',adapter:'scripts/package.mjs'
+    });
+    const request={workspaceRoot:fixture.workspaceRoot,appId:'dragon-desk'};
+    const browser=await packageApp({...request,browserPwa:false});
+    assert.deepEqual(JSON.parse(await readFile(path.join(browser.outputRoot,'adapter-context.json'),'utf8')),
+        {target:'browser',browserPwa:false});
+    const native=await packageApp({...request,target:'portable',browserPwa:true});
+    assert.deepEqual(JSON.parse(await readFile(path.join(native.outputRoot,'adapter-context.json'),'utf8')),
+        {target:'portable',browserPwa:false});
+    assert.equal(await readFile(path.join(native.outputRoot,'server/RepositoryService.mjs'),'utf8'),fixture.service);
+});
 
 test('selected static package carries one release through entry, modules, Worker and CSS references',async t=>{
     const selected=await workspaceFixture(t);

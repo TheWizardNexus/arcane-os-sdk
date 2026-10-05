@@ -48,6 +48,16 @@
         "pwa": { "$ref": "#/$defs/pwa" },
         "include": { "$ref": "#/$defs/nonemptyPathList" },
         "exclude": { "$ref": "#/$defs/pathList" },
+        "nativeResources": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["include"],
+          "description": "Additional literal application-relative paths for a selected nonbrowser target. Exclude applies only to this additional selection. Native-only files retain their complete original content and do not enter browser document or PWA processing. Omission or an empty include preserves existing selection and output behavior.",
+          "properties": {
+            "include": { "$ref": "#/$defs/pathList" },
+            "exclude": { "$ref": "#/$defs/pathList" }
+          }
+        },
         "shared": {
           "type": "array",
           "minItems": 1,

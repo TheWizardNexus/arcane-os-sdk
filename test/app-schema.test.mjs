@@ -117,6 +117,34 @@ function runtimeAccepts(value){
     }
 }
 
+test('descriptor and package schemas accept explicit native resource selection',async()=>{
+    const [appSchema,packageSchema]=await Promise.all([
+        readFile(path.join(repositoryRoot,'schemas','arcane-app.schema.json'),'utf8'),
+        readFile(path.join(repositoryRoot,'schemas','arcane-package.schema.json'),'utf8')
+    ]).then(sources=>sources.map(source=>JSON.parse(source)));
+    for(const [nativeResources,expected] of [
+        [undefined,true], [{include:[]},true],
+        [{include:['server','src','package.json'],exclude:['server/drafts']},true],
+        [null,false], [{},false], [{include:'server'},false],
+        [{include:['server/*.mjs']},false], [{include:['../server']},false],
+        [{include:['server'],exclude:'server/drafts'},false]
+    ]){
+        const authored=descriptor();
+        const manifest=projectPackageManifest(authored);
+        if(nativeResources!==undefined){
+            authored.package.nativeResources=nativeResources;
+            manifest.nativeResources=nativeResources;
+        }
+        assert.equal(matchesSchema(appSchema,authored),expected);
+        assert.equal(runtimeAccepts(authored),expected);
+        assert.equal(matchesSchema(packageSchema,manifest),expected);
+        const validate=()=>validateAppConfig(manifest,'sample-app',{sharedPayloads:{'browser-runtime':[]}});
+        if(expected){
+            assert.deepEqual(validate().nativeResources,nativeResources===undefined?undefined:{exclude:[],...nativeResources});
+        }else assert.throws(validate);
+    }
+});
+
 test('descriptor and package schemas accept optional literal HTML document selectors',async()=>{
     const [appSchema,packageSchema]=await Promise.all([
         readFile(path.join(repositoryRoot,'schemas','arcane-app.schema.json'),'utf8'),

@@ -3,13 +3,52 @@ import {mkdtemp, mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from '../src/testing.mjs';
+import {repositoryRoot} from './helpers.mjs';
 import {loadAppDescriptor, projectNativeDescriptor, projectPackageManifest} from '../src/app-descriptor.mjs';
 import {packageApp} from '../src/packager/core.mjs';
-import {createPwaArtifacts, normalizePwaConfig, selectPwaFiles} from '../src/pwa.mjs';
+import {createPwaArtifacts, normalizePwaConfig, selectPwaFiles, PWA_WORKER_NAME} from '../src/pwa.mjs';
 
 const CORPUS_HTML = '<base href="./"><script src="./payload.js?v=old"></script>'
     + '<p>Complete supplied document and trailing space </p>\n';
 const COMPONENT_HTML = '<base href="./"><p>Reusable component</p>\n';
+
+test('opting into native resources leaves browser PWA selection and existing output unchanged',async t=>{
+    const fixtures=path.join(repositoryRoot,'.arcane','native-resource-fixtures');
+    await mkdir(fixtures,{recursive:true});
+    const workspaceRoot=await mkdtemp(path.join(fixtures,'pwa-'));
+    t.after(()=>rm(workspaceRoot,{recursive:true,force:true}));
+    const config={schemaVersion:1,id:'dragon-pwa',displayName:'Dragon PWA',version:'1.0.0',
+        entry:'index.html',strategy:'static',include:['index.html','modules'],exclude:[],
+        shared:['browser-runtime'],pwa:{enabled:true},outputDirectory:'browser-public'};
+    const server="export const note='Entire dragon service stays native 🐉';\r\n";
+    await Promise.all([
+        writeJson(workspaceRoot,'arcane-packager.json',{schemaVersion:1,appsRoot:'.',distRoot:'dist',
+            sharedPayloads:{'browser-runtime':[{source:'runtime',destination:'arcane',include:['sdk'],exclude:[]}]}}),
+        writeJson(workspaceRoot,'arcane.lock.json',{sdk:{version:'1.0.0'}}),
+        writeJson(workspaceRoot,'arcane-package.json',config),
+        writeText(workspaceRoot,'index.html','<!doctype html><base href="./">'
+            +'<script type="module" src="./modules/App.mjs"></script><p>Dragon PWA</p>\n'),
+        writeText(workspaceRoot,'modules/App.mjs','export const ready=true;\n'),
+        writeText(workspaceRoot,'runtime/sdk/pwa.mjs','export function registerPwa(){}\n'),
+        writeText(workspaceRoot,'server/RepositoryService.mjs',server)
+    ]);
+    const request={workspaceRoot,appId:'dragon-pwa'};
+    const baseline=await packageApp(request);
+    const original=new Map(await Promise.all([...baseline.files,'ARCANE_APP_RELEASE.json'].map(async file=>[
+        file,await readFile(path.join(baseline.outputRoot,file),'utf8')
+    ])));
+    await writeJson(workspaceRoot,'arcane-package.json',{...config,nativeResources:{include:['server']}});
+    const browser=await packageApp(request);
+    assert.deepEqual(browser.files,baseline.files);
+    for(const [file,content] of original)assert.equal(await readFile(path.join(browser.outputRoot,file),'utf8'),content);
+    const native=await packageApp({...request,target:'portable'});
+    assert.equal(native.output,'dist/.native/portable/dragon-pwa');
+    assert.equal(native.manifest.app.pwa,undefined);
+    assert.equal(native.files.includes(PWA_WORKER_NAME),false);
+    assert.equal(await readFile(path.join(native.outputRoot,'server/RepositoryService.mjs'),'utf8'),server);
+    for(const [file,content] of original)assert.equal(await readFile(path.join(browser.outputRoot,file),'utf8'),content);
+    assert.equal(browser.files.includes('server/RepositoryService.mjs'),false);
+});
 
 async function writeText(root, relative, content) {
     const destination = path.join(root, relative);

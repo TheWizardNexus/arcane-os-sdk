@@ -111,13 +111,21 @@ function validateLocalAIModelPolicy(value,label){
 
 function validatePackage(value,appId){
     assertOnlyKeys(value,new Set([
-        'entry','strategy','include','exclude','shared','adapter','localAIModelPolicy','pwa','documents'
+        'entry','strategy','include','exclude','shared','adapter','localAIModelPolicy','pwa','documents','nativeResources'
     ]),'descriptor.package');
     const entry=normalizeRelativePath(value.entry,'descriptor.package.entry');
     const documents=normalizeAppDocuments(value.documents,'descriptor.package.documents');
     if(!['static','adapter'].includes(value.strategy))fail('descriptor.package.strategy must be static or adapter.');
     const include=relativePaths(value.include,'descriptor.package.include',{required:true});
     const exclude=relativePaths(value.exclude??[],'descriptor.package.exclude');
+    let nativeResources;
+    if(value.nativeResources!==undefined){
+        assertOnlyKeys(value.nativeResources,new Set(['include','exclude']),'descriptor.package.nativeResources');
+        nativeResources={
+            include:relativePaths(value.nativeResources.include,'descriptor.package.nativeResources.include'),
+            exclude:relativePaths(value.nativeResources.exclude??[],'descriptor.package.nativeResources.exclude')
+        };
+    }
     if(!include.some(candidate=>entry===candidate||entry.startsWith(`${candidate}/`))){
         fail('descriptor.package.entry must be covered by descriptor.package.include.');
     }
@@ -140,6 +148,7 @@ function validatePackage(value,appId){
         strategy:value.strategy,
         include,
         exclude,
+        ...(nativeResources===undefined?{}:{nativeResources}),
         shared,
         ...(value.pwa===undefined?{}:{pwa:normalizePwaConfig(value.pwa)}),
         ...(adapter?{adapter}:{}),
@@ -331,6 +340,10 @@ export function projectPackageManifest(descriptor){
         ...(value.package.pwa===undefined?{}:{pwa:value.package.pwa}),
         include:[...value.package.include],
         exclude:[...value.package.exclude],
+        ...(value.package.nativeResources===undefined?{}:{nativeResources:{
+            include:[...value.package.nativeResources.include],
+            exclude:[...value.package.nativeResources.exclude]
+        }}),
         shared:[...value.package.shared],
         ...(value.package.adapter?{adapter:value.package.adapter}:{})
     };
@@ -391,6 +404,10 @@ function synthesizedDescriptor(packageManifest,nativeDescriptor){
             ...(packageManifest.pwa===undefined?{}:{pwa:packageManifest.pwa}),
             include:[...packageManifest.include],
             exclude:[...(packageManifest.exclude??[])],
+            ...(packageManifest.nativeResources===undefined?{}:{nativeResources:{
+                include:[...packageManifest.nativeResources.include],
+                exclude:[...(packageManifest.nativeResources.exclude??[])]
+            }}),
             shared:[...packageManifest.shared],
             ...(packageManifest.adapter?{adapter:packageManifest.adapter}:{})
         },

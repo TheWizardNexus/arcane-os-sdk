@@ -9,8 +9,12 @@ export function resolveAppRoot(workspaceRoot, config, appId) {
     return path.resolve(workspaceRoot, appRelativeRoot(config, appId));
 }
 
-export function resolvePackageOutputRoot(workspaceRoot, config, app) {
-    return path.resolve(workspaceRoot, app.outputDirectory ?? `${config.distRoot}/${app.id}`);
+export function resolvePackageOutputRoot(workspaceRoot, config, app, {target='browser', outputDirectory}={}) {
+    const nativeSelection=target!=='browser'&&app.nativeResources?.include.length>0;
+    const selectedDirectory=outputDirectory??(nativeSelection
+        ?`${config.distRoot}/.native/${target}/${app.id}`
+        :app.outputDirectory??`${config.distRoot}/${app.id}`);
+    return path.resolve(workspaceRoot,selectedDirectory);
 }
 
 export function appBaseHref(workspaceRoot, appRoot, document = 'index.html') {

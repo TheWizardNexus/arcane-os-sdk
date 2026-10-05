@@ -5,6 +5,8 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
 import {createNativeTargetAdapter} from '../src/targets/index.mjs';
+import {buildApplication} from '../src/toolchain.mjs';
+import {projectPackageManifest} from '../src/app-descriptor.mjs';
 import {
     NATIVE_BUILDER_PROTOCOL,
     createNativeBuildPlan,
@@ -13,6 +15,79 @@ import {
 } from '../src/native-plan.mjs';
 
 const repositoryRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+
+test('paired native packaging selects app and bundled native resources without replacing browser outputs',async t=>{
+    const fixtures=path.join(repositoryRoot,'.arcane','native-resource-fixtures');
+    await mkdir(fixtures,{recursive:true});
+    const root=await mkdtemp(path.join(fixtures,'paired-'));
+    t.after(()=>rm(root,{recursive:true,force:true}));
+    const workspaceRoot=path.join(root,'workspace');
+    async function write(relative,content){
+        const location=path.join(workspaceRoot,relative);
+        await mkdir(path.dirname(location),{recursive:true});
+        await writeFile(location,content);
+    }
+    const sharedDirectories=['components','css','dependencies','entities','img','modules','sdk'];
+    await Promise.all(sharedDirectories.map(directory=>mkdir(path.join(workspaceRoot,'arcane',directory),{recursive:true})));
+    await mkdir(path.join(workspaceRoot,'arcane','dependencies','strong-type'));
+    await Promise.all([
+        write('package.json',JSON.stringify({name:'arcane-os',type:'module',private:true})),
+        write('arcane-packager.json',JSON.stringify({schemaVersion:1,appsRoot:'apps',distRoot:'dist',
+            sharedPayloads:{'browser-runtime':[{source:'arcane',destination:'arcane',include:sharedDirectories,exclude:[]}]}})),
+        write('arcane/css/theme.css',':root{color:rgb(10,20,30)}\n'),
+        write('arcane/modules/ThemeBootstrap.js','export const themeReady=true;\n'),
+        write('browser-public/kept.txt','Existing browser publication stays complete.\n')
+    ]);
+    const contents=new Map();
+    for(const id of ['dragon-desk','dragon-library']){
+        const service=`export const app='${id}';\r\nexport const text='  complete 🐉  ';\r\n`;
+        contents.set(id,service);
+        const descriptor={schemaVersion:2,id,displayName:id,description:'Dragon service composition.',version:'1.0.0',
+            publisher:{id:'dragon-publisher',name:'Dragon Publisher'},
+            package:{entry:'index.html',strategy:'static',include:['index.html','modules','img'],exclude:[],
+                shared:['browser-runtime'],nativeResources:{include:['server'],exclude:[]},pwa:{enabled:true}},
+            native:{type:'app',icon:'img/icon.png',order:0,bundledApps:id==='dragon-desk'?['dragon-library']:[]},
+            requirements:{arcaneProtocol:'arcane/1',minimumCoreVersion:'0.8.12',features:[]},targets:['browser','portable']};
+        await Promise.all([
+            write(`apps/${id}/arcane-app.json`,JSON.stringify(descriptor)),
+            // A shared browser destination would collide if native preflight used browser output paths.
+            write(`apps/${id}/arcane-package.json`,JSON.stringify({...projectPackageManifest(descriptor),outputDirectory:'browser-public'})),
+            write(`apps/${id}/index.html`,`<!doctype html><meta name="arcane-app-id" content="${id}">`
+                +'<base href="../../"><link rel="stylesheet" href="./arcane/css/theme.css">'
+                +'<script type="module" src="./arcane/modules/ThemeBootstrap.js"></script>'
+                +`<script type="module" src="./apps/${id}/modules/App.js"></script>`),
+            write(`apps/${id}/modules/App.js`,'export const ready=true;\n'),
+            write(`apps/${id}/img/icon.png`,'Synthetic icon input'),
+            write(`apps/${id}/server/RepositoryService.mjs`,service)
+        ]);
+    }
+    let captured;
+    const provider={protocol:NATIVE_BUILDER_PROTOCOL,
+        describe:async()=>({protocol:NATIVE_BUILDER_PROTOCOL,targets:['portable']}),
+        doctor:async()=>({ready:true}),prepare:async()=>({version:'development'}),
+        async build(request){
+            captured=request;
+            return {outputRoot:request.outputRoot,files:[]};
+        },
+        verify(){throw new Error('Packaging must not invoke provider verification.');},
+        run(){throw new Error('Packaging must not launch app services.');}
+    };
+    const result=await buildApplication({workspaceRoot,appId:'dragon-desk',target:'portable',nativeBuilder:provider,
+        toolchainRoot:workspaceRoot,outputRoot:path.join(root,'native-output'),targetRequest:{
+            target:'portable',platform:'linux',architecture:'x64',format:'portable',signing:'unsigned-local-test'
+        }});
+    assert.equal(result.plan.nativeBuilder,provider);
+    assert.equal(result.release.output,'dist/.native/portable/dragon-desk');
+    assert.equal(result.dependencyReleases[0].release.output,'dist/.native/portable/dragon-library');
+    assert.equal(captured.appReleaseRoot,path.join(workspaceRoot,'dist','.native','portable','dragon-desk'));
+    assert.equal(captured.dependencies[0].releaseRoot,path.join(workspaceRoot,'dist','.native','portable','dragon-library'));
+    assert.equal((await captured.readReleaseFile('apps/dragon-desk/server/RepositoryService.mjs')).toString('utf8'),contents.get('dragon-desk'));
+    assert.equal((await captured.dependencies[0].readReleaseFile('apps/dragon-library/server/RepositoryService.mjs')).toString('utf8'),contents.get('dragon-library'));
+    assert.deepEqual(captured.release.manifest,result.release.manifest);
+    assert.deepEqual(captured.dependencies[0].release.manifest,result.dependencyReleases[0].release.manifest);
+    assert.equal(captured.release.manifest.app.pwa,undefined);
+    assert.equal(await readFile(path.join(workspaceRoot,'browser-public/kept.txt'),'utf8'),'Existing browser publication stays complete.\n');
+});
 
 test('native plan passes complete release content through direct structural values',async t=>{
     const root=await mkdtemp(path.join(os.tmpdir(),'arcane-native-content-'));

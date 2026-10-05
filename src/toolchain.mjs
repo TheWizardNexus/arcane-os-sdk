@@ -996,12 +996,14 @@ function pathsOverlap(left,right){
 async function packageNativeRelease(prepared,app,{
     workspaceOperationLease,
     selectedSdk,
+    target,
     signal,
     onEvent
 }={}){
     const release=await packageApp({
         workspaceRoot:prepared.workspaceRoot,
         appId:app.appId,
+        target,
         browserPwa:false,
         workspaceOperationLease,
         signal,
@@ -1065,7 +1067,7 @@ async function executePairedNativeBuild(options,adapter,{
     const packageOutputs=[];
     for(const app of [prepared.validation.app,...dependencyApps]){
         const releaseRoot=resolvePackageOutputRoot(
-            prepared.workspaceRoot,prepared.validation.config,app.manifest
+            prepared.workspaceRoot,prepared.validation.config,app.manifest,{target}
         );
         if(pathsOverlap(releaseRoot,outputRoot)
             ||packageOutputs.some(existing=>pathsOverlap(existing,releaseRoot))){
@@ -1084,13 +1086,13 @@ async function executePairedNativeBuild(options,adapter,{
         descriptorSource:prepared.validation.app.descriptorSource,
         descriptorPath:prepared.validation.app.descriptorPath,
         validation:prepared.validation
-    },{workspaceOperationLease,selectedSdk,signal,onEvent});
+    },{workspaceOperationLease,selectedSdk,target,signal,onEvent});
     const dependencyReleases=[];
     for(const dependency of dependencyApps){
         dependencyReleases.push(await packageNativeRelease(
             prepared,
             dependency,
-            {workspaceOperationLease,selectedSdk,signal,onEvent}
+            {workspaceOperationLease,selectedSdk,target,signal,onEvent}
         ));
     }
     const toolchain=await adapter.prepare({
