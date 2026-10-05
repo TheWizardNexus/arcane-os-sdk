@@ -1,8 +1,8 @@
 import Is from 'strong-type';
-import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import vm from 'node:vm';
 import {fileURLToPath,pathToFileURL} from 'node:url';
+import {createReferenceInputs} from './reference-inputs.mjs';
 
 const is = new Is(false);
 
@@ -1670,7 +1670,7 @@ function equalNames(left,right){
         &&left.every((value,index)=>value===right[index]);
 }
 
-async function runtimeNamespaces(repositoryRoot,files){
+async function runtimeNamespaces(repositoryRoot,files,inputs){
     if(!is.function(vm.SourceTextModule)
         ||!is.function(vm.SyntheticModule)){
         throw new Error(
@@ -1698,7 +1698,7 @@ async function runtimeNamespaces(repositoryRoot,files){
     const moduleRecord=async filePath=>{
         const normalized=path.normalize(filePath);
         if(modules.has(normalized))return modules.get(normalized);
-        const source=await readFile(normalized,'utf8');
+        const source=await inputs.readText(path.relative(repositoryRoot,normalized));
         const identifier=pathToFileURL(normalized).href;
         const module=new vm.SourceTextModule(source,{context,identifier});
         const record={filePath:normalized,module};
@@ -1737,16 +1737,16 @@ async function runtimeNamespaces(repositoryRoot,files){
 export async function extractRuntimeReferenceContracts({
     repositoryRoot=path.resolve(
         path.dirname(fileURLToPath(import.meta.url)),'..'
-    )
+    ),
+    sourceRef,
+    inputs:providedInputs
 }={}){
-    const inventoryPath=path.join(
-        repositoryRoot,'docs','reference','inventory','runtime-modules.json'
-    );
-    const inventory=JSON.parse(await readFile(inventoryPath,'utf8'));
+    const inputs=providedInputs??await createReferenceInputs({repositoryRoot,sourceRef});
+    const inventory=JSON.parse(await inputs.readText('docs/reference/inventory/runtime-modules.json'));
     const selected=inventory.artifacts;
     const modules=[];
     for(const record of selected){
-        const source=await readFile(path.join(repositoryRoot,record.file),'utf8');
+        const source=await inputs.readText(record.file);
         const contract=extractModuleContract(source,{
             file:record.file,
             kind:record.kind,
@@ -1775,10 +1775,9 @@ export async function verifyRuntimeReferenceContracts(options={}){
         path.dirname(fileURLToPath(import.meta.url)),'..'
     );
     const requireVm=options.requireVm??true;
-    const first=await extractRuntimeReferenceContracts({repositoryRoot});
-    const inventory=JSON.parse(await readFile(path.join(
-        repositoryRoot,'docs','reference','inventory','runtime-modules.json'
-    ),'utf8'));
+    const inputs=options.inputs??await createReferenceInputs({repositoryRoot,sourceRef:options.sourceRef});
+    const first=await extractRuntimeReferenceContracts({repositoryRoot,inputs});
+    const inventory=JSON.parse(await inputs.readText('docs/reference/inventory/runtime-modules.json'));
     const esmRecords=inventory.artifacts.filter(record=>record.kind==='esm');
     const vmAvailable=is.function(vm.SourceTextModule)
         &&is.function(vm.SyntheticModule);
@@ -1789,7 +1788,7 @@ export async function verifyRuntimeReferenceContracts(options={}){
     }
     if(vmAvailable){
         const namespaces=await runtimeNamespaces(
-            repositoryRoot,esmRecords.map(record=>record.file)
+            repositoryRoot,esmRecords.map(record=>record.file),inputs
         );
         for(const record of esmRecords){
             const contract=first.modules.find(module=>module.file===record.file);

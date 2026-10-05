@@ -11,22 +11,14 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {verifyRuntimeReferenceContracts} from './reference-contract-extractor.mjs';
 import {createReferenceModuleContractMap} from './reference-module-contracts.mjs';
+import {createReferenceInputs} from './reference-inputs.mjs';
 
 const is = new Is(false);
 
 const scriptPath=fileURLToPath(import.meta.url);
 const repositoryRoot=path.resolve(path.dirname(scriptPath),'..');
-const referenceSourceRoot=path.join(repositoryRoot,'docs','reference');
 const referenceOutputRoot=path.join(repositoryRoot,'site','reference');
 const canonicalRoot='https://thewizardnexus.github.io/arcane-os-sdk/';
-const packageDocument = JSON.parse(
-    await readFile(path.join(repositoryRoot, 'package.json'), 'utf8')
-);
-const publishedVersions={
-    sdk:packageDocument.version,
-    runtime:'0.8.12',
-    protocol:'arcane/1'
-};
 const manifestOutput='site/reference/reference-manifest.json';
 const referenceCssOutput='site/reference/reference.css';
 const referenceScriptOutput='site/reference/reference.js';
@@ -38,13 +30,13 @@ const authoredVersionPages = [
     'site/guides/native-builds/index.html'
 ];
 
-function currentPackageVersionText(contents) {
+function currentPackageVersionText(contents, sdkVersion) {
     // These authored guides describe the current SDK. Historical release records
     // remain in Markdown and are never rewritten by this presentation update.
     const versioned = contents.replace(
         /(arcane-os(?:@| )|Published SDK · |version <code>)\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/gu,
         function replaceCurrentVersion(match, prefix) {
-            return `${prefix}${publishedVersions.sdk}`;
+            return `${prefix}${sdkVersion}`;
         }
     );
     return versioned;
@@ -1425,7 +1417,8 @@ function renderPage({
     body,
     tableOfContents,
     targets,
-    kind='markdown'
+    kind='markdown',
+    publishedVersions
 }){
     const siteHome=relativeOutputHref(output,'site/index.html');
     const referenceHome=relativeOutputHref(output,'site/reference/index.html');
@@ -2037,43 +2030,40 @@ function outputRecord({source,output,route,kind}){
     };
 }
 
-async function collectInputs(){
-    const markdownFiles=await filesUnder(
-        referenceSourceRoot,
-        file=>file.endsWith('.md')
-    );
-    const inventoryFiles=await filesUnder(
-        path.join(referenceSourceRoot,'inventory'),
-        file=>file.endsWith('.json')
-    );
+async function collectInputs(inputs){
+    const referenceFiles = await inputs.listFiles('docs/reference');
+    const selectedFiles = referenceFiles.filter(function referenceInput(file) {
+        return file.endsWith('.md')
+            || (file.startsWith('docs/reference/inventory/') && file.endsWith('.json'));
+    });
     const markdownInputs=[];
-    for(const file of markdownFiles){
-        const source=repositoryRelative(file);
-        const markdown=await readFile(file,'utf8');
-        markdownInputs.push({
-            source,
-            output:outputForReferenceSource(source),
-            route:referenceRouteForSource(source),
-            markdown
-        });
-    }
     const inventoryInputs=[];
-    for(const file of inventoryFiles){
-        const source=repositoryRelative(file);
-        const output=`site/reference/inventory/${path.posix.basename(source)}`;
-        const contents=await readFile(file,'utf8');
-        inventoryInputs.push({
-            source,
-            output,
-            route:routeForOutput(output),
-            contents
-        });
+    // Different documents may be read concurrently; keep Git process fan-out bounded.
+    for (let index = 0; index < selectedFiles.length; index += 4) {
+        const batch = selectedFiles.slice(index, index + 4);
+        const contents = await Promise.all(batch.map(inputs.readText));
+        for (const [offset, source] of batch.entries()) {
+            if (source.endsWith('.md')) {
+                markdownInputs.push({
+                    source,
+                    output:outputForReferenceSource(source),
+                    route:referenceRouteForSource(source),
+                    markdown:contents[offset]
+                });
+            } else {
+                const output=`site/reference/inventory/${path.posix.basename(source)}`;
+                inventoryInputs.push({source,output,route:routeForOutput(output),contents:contents[offset]});
+            }
+        }
     }
     return {markdownInputs,inventoryInputs};
 }
 
-export async function createReferenceSite(){
-    const {markdownInputs,inventoryInputs}=await collectInputs();
+export async function createReferenceSite({sourceRef} = {}){
+    const inputs = await createReferenceInputs({repositoryRoot, sourceRef});
+    const packageDocument = JSON.parse(await inputs.readText('package.json'));
+    const publishedVersions = {sdk:packageDocument.version,runtime:'0.8.12',protocol:'arcane/1'};
+    const {markdownInputs,inventoryInputs}=await collectInputs(inputs);
     const runtimeModuleInventoryInput=inventoryInputs.find(input=>
         input.source==='docs/reference/inventory/runtime-modules.json'
     );
@@ -2087,7 +2077,8 @@ export async function createReferenceSite(){
     }
     const runtimeContracts=await verifyRuntimeReferenceContracts({
         repositoryRoot,
-        requireVm:false
+        requireVm:false,
+        inputs
     });
     const semanticContracts=createReferenceModuleContractMap(runtimeModuleRecords);
     const sourceContracts=new Map(runtimeContracts.modules.map(contract=>[
@@ -2138,6 +2129,7 @@ export async function createReferenceSite(){
             ?[{id:'runtime-module-directory',label:`Search all ${String(runtimeModuleRecords.length)} runtime artifacts`},...rendered.tableOfContents]
             :rendered.tableOfContents;
         const html=renderPage({
+            publishedVersions,
             output:input.output,
             route:input.route,
             source:input.source,
@@ -2163,6 +2155,7 @@ export async function createReferenceSite(){
         const sourceContract=sourceContracts.get(record.name);
         const semanticContract=semanticContracts.get(record.name);
         const html=renderPage({
+            publishedVersions,
             output,
             route:routeForOutput(output),
             source:record.file,
@@ -2211,6 +2204,7 @@ export async function createReferenceSite(){
     const aiOutput=targets.get('@reference/ai');
     const aiSource='tools/build-reference-site.mjs#normalized-ai-guide';
     const aiHtml=renderPage({
+        publishedVersions,
         output:aiOutput,
         route:routeForOutput(aiOutput),
         source:aiSource,
@@ -2243,6 +2237,7 @@ export async function createReferenceSite(){
     const capabilitiesOutput=targets.get('@reference/core/capabilities');
     const capabilitiesSource='tools/build-reference-site.mjs#capability-policy';
     const capabilitiesHtml=renderPage({
+        publishedVersions,
         output:capabilitiesOutput,
         route:routeForOutput(capabilitiesOutput),
         source:capabilitiesSource,
@@ -2276,6 +2271,7 @@ export async function createReferenceSite(){
         inventoryInputs
     });
     const inventoryCollectionHtml=renderPage({
+        publishedVersions,
         output:inventoryCollectionOutput,
         route:routeForOutput(inventoryCollectionOutput),
         source:inventoryCollectionSource,
@@ -2305,6 +2301,7 @@ export async function createReferenceSite(){
         'site/reference/core/reference/arcane-api/index.html';
     const coreCollectionSource='docs/reference/core/reference/arcane-api/';
     const coreCollectionHtml=renderPage({
+        publishedVersions,
         output:coreCollectionOutput,
         route:routeForOutput(coreCollectionOutput),
         source:coreCollectionSource,
@@ -2341,8 +2338,8 @@ export async function createReferenceSite(){
     expectedFiles.set(referenceCssOutput,referenceCss);
     expectedFiles.set(referenceScriptOutput,referenceScript);
     for (const output of authoredVersionPages) {
-        const contents = await readFile(safeRepositoryPath(output), 'utf8');
-        expectedFiles.set(output, currentPackageVersionText(contents));
+        const contents = await inputs.readText(output);
+        expectedFiles.set(output, currentPackageVersionText(contents, publishedVersions.sdk));
     }
     const assets=[outputRecord({
         source:'tools/build-reference-site.mjs#reference-css',
@@ -2355,7 +2352,7 @@ export async function createReferenceSite(){
     })];
 
     const landingOutput='site/reference/index.html';
-    const landingSource=await readFile(safeRepositoryPath(landingOutput),'utf8');
+    const landingSource=await inputs.readText(landingOutput);
     const landingBody=`<section id="modules"><h2>Every runtime module</h2><p>Search the entire shipped module directory here, or open the <a href="runtime-modules/">full module index</a>. Each result leads to a first-party page with exact load form, bindings, callable signatures and parameters, lifecycle, literal public events and coded failures, availability, normalization, a copyable contract example, and related Arcane surfaces.</p>${moduleDirectoryBody({records:runtimeModuleRecords,output:landingOutput,targets,compact:true,idPrefix:'reference-module-directory'})}</section>`;
     const landingContents=replaceGeneratedRegion(
         landingSource,
@@ -2368,7 +2365,7 @@ export async function createReferenceSite(){
     pages.sort((left,right)=>left.route.localeCompare(right.route));
     inventories.sort((left,right)=>left.route.localeCompare(right.route));
     const sitemapOutput='site/sitemap.xml';
-    const sitemapSource=await readFile(safeRepositoryPath(sitemapOutput),'utf8');
+    const sitemapSource=await inputs.readText(sitemapOutput);
     const referenceRoutes=[
         'reference/',
         ...pages.map(page=>page.route)
@@ -2470,8 +2467,8 @@ async function removeEmptyParents(file){
     }
 }
 
-export async function writeReferenceSite(){
-    const plan=await createReferenceSite();
+export async function writeReferenceSite(options={}){
+    const plan=await createReferenceSite(options);
     for(const output of await unexpectedManagedFiles(plan.expectedFiles)){
         const file=safeRepositoryPath(output);
         await unlink(file);
@@ -2487,12 +2484,13 @@ export async function writeReferenceSite(){
 
 async function main(){
     const [mode,...extra]=process.argv.slice(2);
-    if(extra.length||mode!=='--write'){
+    if(mode!=='--write'||(extra.length!==0&&(extra.length!==2||extra[0]!=='--source-ref'))){
         throw new Error(
-            'Usage: node tools/build-reference-site.mjs --write'
+            'Usage: node tools/build-reference-site.mjs --write [--source-ref <commit>]'
         );
     }
-    const summary=await writeReferenceSite();
+    process.stdout.write('Generating the selected reference site.\n');
+    const summary=await writeReferenceSite({sourceRef:extra[1]});
     process.stdout.write(
         `Wrote ${String(summary.htmlPages)} reference pages, `+
         `${String(summary.inventories)} inventories, and `+

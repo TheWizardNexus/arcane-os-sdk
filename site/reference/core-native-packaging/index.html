@@ -13,10 +13,10 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Portable Core packaging</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="portable-core-packaging">Portable Core packaging</h1><p class="doc-lead">arcane-os/native/portable-provider owns the portable native payload in the SDK package. It does not load Arcane OS source, choose models, download a runtime, or compile an executable. Windows, Linux and macOS hosts may compose this Node-based payload; Android needs its separate native host adaptation. The current CLI&#39;s portable platform selections remain Windows and Linux. A portable artifact is not a Windows executable, Linux package or Android application.</p><div class="doc-meta"><span>SDK 0.55.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Portable Core packaging</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="portable-core-packaging">Portable Core packaging</h1><p class="doc-lead">arcane-os/native/portable-provider owns the portable native payload in the SDK package. It does not load Arcane OS source, choose models, download a runtime, or compile an executable. Windows, Linux and macOS hosts may compose this Node-based payload; Android needs its separate native host adaptation. The current CLI&#39;s portable platform selections remain Windows and Linux. A portable artifact is not a Windows executable, Linux package or Android application.</p><div class="doc-meta"><span>SDK 0.56.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="./" aria-current="page">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/core-native-packaging.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#provider-and-selected-input">Provider and selected input</a><a href="#output-and-host-contract">Output and host contract</a><a href="#explicit-application-services">Explicit application services</a></nav></details><p><code>arcane-os/native/portable-provider</code> owns the portable native payload in the SDK
+      <article class="prose reference-prose" data-reference-source="docs/reference/core-native-packaging.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#provider-and-selected-input">Provider and selected input</a><a href="#native-only-application-resources">Native-only application resources</a><a href="#output-and-host-contract">Output and host contract</a><a href="#explicit-application-services">Explicit application services</a></nav></details><p><code>arcane-os/native/portable-provider</code> owns the portable native payload in the SDK
 package. It does not load Arcane OS source, choose models, download a runtime,
 or compile an executable. Windows, Linux and macOS hosts may compose this
 Node-based payload; Android needs its separate native host adaptation. The
@@ -53,6 +53,38 @@ are accepted by the planning boundary. Portable assembly adds no signing,
 receipts, hashes, content limits or security policy. The package-relative source
 root comes from the provider module&#39;s own location, not <code>toolchainRoot</code> or an
 Arcane OS machine bundle.</p>
+<h2 id="native-only-application-resources">Native-only application resources</h2>
+<p>Select application service modules and their complete local source closure in
+the authored schema-2 descriptor&#39;s <code>package.nativeResources</code>, separately from
+its browser <code>include</code>/<code>exclude</code> selection:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>json</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-json">{
+  &quot;package&quot;: {
+    &quot;nativeResources&quot;: {
+      &quot;include&quot;: [&quot;native&quot;, &quot;src&quot;, &quot;package.json&quot;],
+      &quot;exclude&quot;: [&quot;native/drafts&quot;]
+    }
+  }
+}
+</code></pre></div>
+<p>This is a descriptor excerpt for the app-owned service example below. The
+projected schema-1 field is top-level <code>nativeResources</code>. Paths are literal and
+app-relative; directories include descendants. Omission or an empty include
+keeps previous selection and output behavior. The app supplies every required
+source file explicitly; packaging does not discover or execute services.</p>
+<p>Paired <code>buildApplication()</code> passes the actual native target to the selected app
+and every explicitly bundled app. With a nonempty native include list, their
+input releases use <code>dist/.native/&lt;target&gt;/&lt;app-id&gt;</code> instead of the saved browser
+output, preserving existing browser/PWA artifacts. Each app&#39;s own selection is
+applied; complete releases and actual roots are forwarded to the provider.
+The provider then copies them unchanged into its artifact layout described below.</p>
+<p>At the low-level <code>packageApp()</code> boundary, <code>target</code> defaults to <code>&#39;browser&#39;</code> and
+is independent of <code>moduleFormat</code>. Nonbrowser selection disables generated PWA
+content. Native-only files bypass browser document/module/asset transformations;
+a file also in the ordinary browser selection retains that existing processing.
+An explicit low-level <code>outputDirectory</code> still wins. Inspect the emitted input
+with <code>verifyApp({workspaceRoot,appId,outputDirectory:release.output})</code>; neither
+that inventory verification nor packaging launches the service or platform host.
+See <a href="../protocols/#native-only-application-resources">the complete selection contract</a>.</p>
 <h2 id="output-and-host-contract">Output and host contract</h2>
 <p>Each build creates a fresh <code>arcane-portable-*</code> directory beneath <code>outputRoot</code>.
 The result is <code>{app, target, manifest}</code>, with its actual directory at
@@ -146,9 +178,9 @@ and executable build toolchains require their own completed adapters. Published
 consumers must adopt the numeric package that includes this increment; a source
 checkout or a successful source push is not that public package authority.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#provider-and-selected-input">Provider and selected input</a><a href="#output-and-host-contract">Output and host contract</a><a href="#explicit-application-services">Explicit application services</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#provider-and-selected-input">Provider and selected input</a><a href="#native-only-application-resources">Native-only application resources</a><a href="#output-and-host-contract">Output and host contract</a><a href="#explicit-application-services">Explicit application services</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.55.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.56.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="./" aria-current="page">API</a><a href="../">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane, the portable arcane-os/event-manager, arcane-os/logging, arcane-os/mail, arcane-os/preference-store, arcane-os/speech-playback, arcane-os/websocket-client, arcane-os/speech-text, arcane-os/ai/tool-text-stream, arcane-os/ai/twin-cloud, and arcane-os/browser-device entrypoints, and the browser-only arcane-os/pwa, arcane-os/ai/browser-wasm, and arcane-os/ai/browser-decisions entrypoints. The arcane-os/ai/browser-speech entrypoint includes local and native browser providers plus a cloud TTS adapter usable in Node with Fetch and Blob. The arcane-os/modules/ and arcane-os/entities/ paths resolve directly to the existing runtime files, with their actual extension. They are public Node package exports and managed browser keys, without a wrapper. For example, import.meta.resolve(&#39;arcane-os/modules/WaitForComponent.js&#39;) retains the module directory needed to resolve ../components/modal.html. Lowercase runtime subpaths also expose existing module namespaces through both Node package exports and managed browser imports, as listed below. Established browser names such as arcane/AIProviderRuntime, arcane/AIRuntimeState, and arcane/ThemeBootstrap remain compatibility names in physical/nested maps; direct-installed root maps use the package namespace instead. Applications call globalThis.Arcane for capability-gated host behavior.</p><div class="doc-meta"><span>SDK 0.55.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane, the portable arcane-os/event-manager, arcane-os/logging, arcane-os/mail, arcane-os/preference-store, arcane-os/speech-playback, arcane-os/websocket-client, arcane-os/speech-text, arcane-os/ai/tool-text-stream, arcane-os/ai/twin-cloud, and arcane-os/browser-device entrypoints, and the browser-only arcane-os/pwa, arcane-os/ai/browser-wasm, and arcane-os/ai/browser-decisions entrypoints. The arcane-os/ai/browser-speech entrypoint includes local and native browser providers plus a cloud TTS adapter usable in Node with Fetch and Blob. The arcane-os/modules/ and arcane-os/entities/ paths resolve directly to the existing runtime files, with their actual extension. They are public Node package exports and managed browser keys, without a wrapper. For example, import.meta.resolve(&#39;arcane-os/modules/WaitForComponent.js&#39;) retains the module directory needed to resolve ../components/modal.html. Lowercase runtime subpaths also expose existing module namespaces through both Node package exports and managed browser imports, as listed below. Established browser names such as arcane/AIProviderRuntime, arcane/AIRuntimeState, and arcane/ThemeBootstrap remain compatibility names in physical/nested maps; direct-installed root maps use the package namespace instead. Applications call globalThis.Arcane for capability-gated host behavior.</p><div class="doc-meta"><span>SDK 0.56.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="./" aria-current="page">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/sdk-api.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a><a href="#core-client-and-native-runtime">Core client and native runtime</a><a href="#browser-speech-providers">Browser speech providers</a><a href="#portable-mail">Portable Mail</a><a href="#shared-logging">Shared logging</a></nav></details><p>The npm package exposes a Node.js ESM control plane, the portable
@@ -2265,7 +2265,7 @@ console.log(incrementSemver(&#39;1.2.3&#39;, &#39;minor&#39;));
 <p>Loads one validated packager app plan, including the shared directly navigable
 descriptor-selected browser document inventory.</p>
 <h4 id="signature-and-result-4">Signature and result</h4>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async inspectApp({workspaceRoot, appId, signal}={})
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async inspectApp({workspaceRoot, appId, signal, target, outputDirectory}={})
 </code></pre></div>
 <p>Import it from <code>arcane-os</code> or <code>arcane-os/packager</code>. The result includes the
 configured <code>entry</code>, <code>include</code>, and <code>exclude</code> values, the optional <code>documents</code>
@@ -2288,9 +2288,17 @@ directory. Each browser document also reports <code>packagePath</code>, the emit
 such as <code>apps/hello-world/index.html</code>. The complete <code>files</code> inventory uses
 package-relative paths and includes the root <code>index.html</code>. Shared
 files retain their configured route destinations.</p>
-<p><code>output</code> is the selected workspace-relative final package directory. It uses
-the app&#39;s optional <code>arcane-package.json</code> <code>outputDirectory</code> directly, or
-<code>dist/&lt;app-id&gt;</code> when omitted; the SDK appends no app ID to an explicit value.</p>
+<p><code>target</code> defaults to <code>&#39;browser&#39;</code>. A selected nonbrowser target adds the app&#39;s
+explicit <code>nativeResources</code> to <code>files</code>, without adding those native-only paths
+to <code>browserDocuments</code>. The optional normalized <code>nativeResources</code> record is
+returned when authored. This inspection copies or executes no resources.</p>
+<p><code>output</code> is the selected workspace-relative final package directory. An explicit
+operation <code>outputDirectory</code> wins. Otherwise, a nonbrowser target with a nonempty
+native include list uses <code>dist/.native/&lt;target&gt;/&lt;app-id&gt;</code>; the app&#39;s saved browser
+destination remains separate. Browser selection, omitted native resources and
+an empty native include list use the app&#39;s saved <code>outputDirectory</code> or
+<code>dist/&lt;app-id&gt;</code>. The SDK appends no app ID to an explicit destination. See
+<a href="../protocols/#native-only-application-resources">native-only application resources</a>.</p>
 <h4 id="availability-and-normalization-14">Availability and normalization</h4>
 <p><strong>Node.</strong> Normalized SDK validation with complete canonical archive and release content. Deep protocol: <a href="../protocols/">SDK packager and deterministic bundle contract</a>.</p>
 <h4 id="example-14">Example</h4>
@@ -2315,9 +2323,10 @@ console.log(normalizeRelativePath(&#39;apps/example/index.html&#39;));
 </code></pre></div>
 <h3 id="packageapp">packageApp()</h3>
 <h4 id="overview-16">Overview</h4>
-<p>Builds one complete browser application release through the low-level packager
-API. It does not run tests or checks automatically; verification occurs only
-when explicitly requested or when required for this selected release output.</p>
+<p>Builds one complete selected application release through the low-level packager
+API, with browser selection by default. It does not run tests or checks
+automatically; verification occurs only when explicitly requested or when
+required for this selected release output.</p>
 <h4 id="signature-and-result-6">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async packageApp(options)
 </code></pre></div>
@@ -2327,6 +2336,19 @@ ordinary <code>arcane dev</code> startup before selecting output that needs upda
 The package preserves the complete selected content, applying the documented
 asset-version and enabled browser-PWA transformations to resource references.
 Malformed configuration or descriptors fail while preserving the prior output.</p>
+<p><code>target</code> defaults to <code>&#39;browser&#39;</code>; supported target names are <code>browser</code>,
+<code>portable</code>, <code>windows-x64</code>, <code>linux-x64</code>, <code>linux-arm64</code> and <code>android-arm64</code>.
+A nonbrowser target adds the app&#39;s explicit <code>nativeResources</code> selection and
+sets the effective <code>browserPwa</code> value to <code>false</code>. It does not compile or launch
+that platform. Browser calls preserve the existing <code>browserPwa</code> default and
+explicit setting. The app adapter&#39;s <code>buildArcanePackage()</code> context receives
+the actual <code>target</code> and effective <code>browserPwa</code> alongside its existing fields.
+<code>copyBase()</code> retains the browser/shared selection; native-only resources are
+copied afterward, outside browser rewriting and PWA processing.</p>
+<p><code>moduleFormat</code> controls browser module representation independently of <code>target</code>.
+In particular, <code>moduleFormat:&#39;native&#39;</code> alone remains a browser package and does
+not add native resources. The complete selection and separate-output rules are
+documented under <a href="../protocols/#native-only-application-resources">native-only application resources</a>.</p>
 <p><code>moduleFormat</code> defaults to <code>&#39;import-map&#39;</code>, preserving the ordinary browser
 package. Select <code>&#39;native&#39;</code> to resolve saved document import maps into native
 module URLs in the package stage and emit executable inline scripts as external
@@ -2362,14 +2384,20 @@ launch behavior. This API builds the application directory, not an extension
 manifest or an operating-system launcher. Native-mode dry runs report selected
 input files; generated script/context files are included in the completed
 package&#39;s full returned inventory.</p>
-<p>The app&#39;s optional schema-1 <code>outputDirectory</code> selects the final
-workspace-relative destination. For example, <code>&quot;ai&quot;</code> emits directly into
+<p>For browser selection, the app&#39;s optional schema-1 <code>outputDirectory</code> selects the
+final workspace-relative destination. For example, <code>&quot;ai&quot;</code> emits directly into
 <code>&lt;workspace&gt;/ai</code>; omission retains <code>dist/&lt;app-id&gt;</code>. The selected directory is
 wholly replaced through the existing staged swap, not merged. Changing the
 destination preserves the former output and siblings. Conflicting source,
 selected input, or required control paths fail before output writes. Source
 layout, app identity, OPFS scope, and internal package paths remain unchanged.
 See <a href="../protocols/#app-selected-package-output">app-selected package output</a>.</p>
+<p>For a nonbrowser target with a nonempty native include list, the default is
+instead <code>dist/.native/&lt;target&gt;/&lt;app-id&gt;</code>, preserving a separately emitted browser
+output even when its saved destination is custom. An explicit operation
+<code>outputDirectory</code> still wins; choose a dedicated destination because packaging
+replaces that selected directory. Omitted or empty native resources retain the
+existing destination rules.</p>
 <p>Root app files retain their paths at the output root; explicitly nested apps
 retain their <code>apps/&lt;id&gt;/</code> paths. Shared files retain their configured route
 destinations. When the selected content supplies no root <code>index.html</code>, the SDK
@@ -2489,9 +2517,14 @@ console.log(validateAppBundlePath(&#39;payload/apps/example/index.html&#39;));
 <h3 id="validateappconfig">validateAppConfig()</h3>
 <h4 id="overview-23">Overview</h4>
 <p>Validates one schema-1 packager app configuration and its relationship to the root config.</p>
-<p>Optional <code>outputDirectory</code> is the final workspace-relative package directory;
-omission preserves <code>dist/&lt;app-id&gt;</code>. It is an app package field, not a change to
-the root configuration&#39;s <code>distRoot</code> or the schema-2 app identity. Packaging
+<p>Optional <code>nativeResources</code> contains a required literal-path <code>include</code> array
+(which may be empty) and optional <code>exclude</code> array (default <code>[]</code>). It selects
+additional app-owned resources only for a nonbrowser packaging target. Ordinary
+<code>include</code>, <code>exclude</code>, shared routes and document selection remain unchanged.</p>
+<p>Optional <code>outputDirectory</code> is the saved workspace-relative browser package
+directory; omission preserves <code>dist/&lt;app-id&gt;</code>. Nonempty native selection uses
+the separate target-selected default described above. It is an app package
+field, not a change to the root configuration&#39;s <code>distRoot</code> or the schema-2 app identity. Packaging
 reports conflicting output/input selections with <code>ARCANE_PACKAGE_INVALID</code>
 before output writes. Authored-descriptor comparison treats the destination
 as package-local, and descriptor refresh preserves the existing setting.</p>
@@ -2533,21 +2566,29 @@ async function usevalidateRootConfig(...arguments_) {
 </code></pre></div>
 <h3 id="verifyapp">verifyApp()</h3>
 <h4 id="overview-25">Overview</h4>
-<p>Authenticates one existing browser app release through the low-level packager API.</p>
+<p>Reads one existing application release and compares its complete file inventory
+with its release manifest through the low-level packager API.</p>
 <h4 id="signature-and-result-12">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async verifyApp({workspaceRoot, appId, outputDirectory, signal, onEvent})
 </code></pre></div>
 <p>Import it from <code>arcane-os</code> or <code>arcane-os/packager</code>. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.</p>
 <p>Optional <code>outputDirectory</code> selects the same workspace-relative override accepted
-by <code>packageApp</code>, without changing the app&#39;s saved destination.</p>
+by <code>packageApp</code>, without changing the app&#39;s saved destination.
+For a target-selected native input release, pass the returned <code>release.output</code>
+as this override. <code>verifyApp</code> has no target option and does not infer the native
+directory or execute the application, its services or a platform host.</p>
 <h4 id="availability-and-normalization-25">Availability and normalization</h4>
 <p><strong>Node.</strong> Normalized SDK validation with complete canonical archive and release content. Deep protocol: <a href="../protocols/">SDK packager and deterministic bundle contract</a>.</p>
 <h4 id="example-25">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {verifyApp} from &#39;arcane-os&#39;;
 
-async function useverifyApp(...arguments_) {
-    return verifyApp(...arguments_);
-}
+// release is the result of packageApp() for this app and workspace.
+const inspected = await verifyApp({
+    workspaceRoot,
+    appId: &#39;moon-dashboard&#39;,
+    outputDirectory: release.output
+});
+console.log(inspected.files);
 </code></pre></div>
 <h3 id="verifyappreleasebundle">verifyAppReleaseBundle()</h3>
 <h4 id="overview-26">Overview</h4>
@@ -3220,6 +3261,12 @@ async function useprojectNativeDescriptor(...arguments_) {
 omitted and an authored empty list stays <code>[]</code>, so projection preserves automatic
 discovery versus entry-only selection. See
 <a href="../protocols/#application-document-selection">application document selection</a>.</p>
+<p>Optional <code>package.nativeResources</code> becomes top-level <code>nativeResources</code>.
+Omission remains omitted, an empty include remains <code>[]</code>, and an omitted exclude
+becomes <code>[]</code>. Package-only descriptor synthesis preserves the same selection.
+This is a packaging contract; <code>projectNativeDescriptor()</code> keeps its existing
+registry shape and ordinary include list. See
+<a href="../protocols/#native-only-application-resources">native-only application resources</a>.</p>
 <h4 id="signature-and-result-38">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">projectPackageManifest(descriptor)
 </code></pre></div>
@@ -4611,7 +4658,16 @@ console.log(validation.sdkInstallation?.packageVersion);
 <h2 id="headless-toolchain-operations">Headless toolchain operations</h2>
 <h3 id="buildapplication">buildApplication()</h3>
 <h4 id="overview-114">Overview</h4>
-<p>Builds and retained-verifies one explicitly selected native target through one paired provider.</p>
+<p>Builds one explicitly selected target through its adapter. A paired native
+builder packages the selected app and its explicit bundled-app closure, then
+passes those complete releases to the provider. Provider verification and host
+launch remain separate operations.</p>
+<p>The selected target reaches each app&#39;s packager, so every app&#39;s own
+<code>nativeResources</code> and separate native input directory apply consistently to
+both copying and output-overlap calculations. The provider receives the actual
+release roots, manifests and complete file readers. An explicit <code>nativeBuilder</code>
+retains its existing identity and contract. See
+<a href="../core-native-packaging/#native-only-application-resources">portable Core packaging</a>.</p>
 <h4 id="signature-and-result-76">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async buildApplication(options={})
 </code></pre></div>
@@ -4803,8 +4859,10 @@ described by <code>packageApp()</code>.</p>
 <p>The same low-level operation resolves the app&#39;s optional <code>outputDirectory</code>;
 there is no separate high-level destination override. <code>release.outputRoot</code>
 names the resulting complete release directory, with omitted configuration
-retaining <code>dist/&lt;app-id&gt;</code>. Browser preview, bundle creation, and native
-browser-content input use that selected root.</p>
+retaining <code>dist/&lt;app-id&gt;</code>. Browser preview and bundle creation use that selected
+root. This ordinary package operation retains browser selection; paired native
+assembly through <code>buildApplication()</code> separately passes its actual target and
+applies each app&#39;s native-resource output selection.</p>
 <p>Packaging does not automatically run tests or checks. Verification occurs only
 when explicitly requested or when required for the selected release output.
 A failure leaves the prior distribution untouched. Success returns the selected
@@ -8083,10 +8141,14 @@ const cancelled = normalizeAIRequestAbort(new DOMException(&#39;Cancelled&#39;, 
 </code></pre></div>
 <h3 id="data-export-subpaths">Data export subpaths</h3>
 <p>The package also exposes eight JSON Schemas (including <code>arcane-os/schemas/event-stack.json</code>) and its package manifest. These are data contracts, not callable JavaScript members. See <a href="../../architecture/">schema contracts</a> and the files under <code>schemas/</code>.</p>
+<p><code>arcane-os/schemas/arcane-app.json</code> describes schema-2 <code>package.nativeResources</code>;
+<code>arcane-os/schemas/arcane-package.json</code> describes the projected schema-1
+<code>nativeResources</code>. Both use the existing literal application-relative path
+contract. See <a href="../protocols/#native-only-application-resources">native-only application resources</a>.</p>
 </article>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a><a href="#core-client-and-native-runtime">Core client and native runtime</a><a href="#browser-speech-providers">Browser speech providers</a><a href="#portable-mail">Portable Mail</a><a href="#shared-logging">Shared logging</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.55.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.56.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

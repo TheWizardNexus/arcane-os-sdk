@@ -2,22 +2,23 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
-  <meta name="description" content="arcane-os/core/client is the browser-safe arcane/1 RPC owner. It exports createCoreClient, createCoreFacade and installCoreClient. arcane-os/core/contracts exports COREPROTOCOL, COREREADYEVENTS, COREFRAMECONTRACTS, COREMETHODCONTRACTS, CoreError and serializeCoreError. Contracts describe transport and existing method shapes; they do not select application policy or decide which services are installed.">
+  <meta name="description" content="arcane-os/core/client is the browser-safe arcane/1 RPC owner. It exports createCoreClient, createCoreFacade, installCoreClient and getInstalledCoreClient. arcane-os/core/contracts exports COREPROTOCOL, COREREADYEVENTS, COREFRAMECONTRACTS, COREMETHODCONTRACTS, CoreError and serializeCoreError. Contracts describe transport and existing method shapes; they do not select application policy or decide which services are installed.">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
   <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core-client/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
-  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Core browser client · Arcane OS SDK"><meta property="og:description" content="arcane-os/core/client is the browser-safe arcane/1 RPC owner. It exports createCoreClient, createCoreFacade and installCoreClient. arcane-os/core/contracts exports COREPROTOCOL, COREREADYEVENTS, COREFRAMECONTRACTS, COREMETHODCONTRACTS, CoreError and serializeCoreError. Contracts describe transport and existing method shapes; they do not select application policy or decide which services are installed."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core-client/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Core browser client · Arcane OS SDK"><meta name="twitter:description" content="arcane-os/core/client is the browser-safe arcane/1 RPC owner. It exports createCoreClient, createCoreFacade and installCoreClient. arcane-os/core/contracts exports COREPROTOCOL, COREREADYEVENTS, COREFRAMECONTRACTS, COREMETHODCONTRACTS, CoreError and serializeCoreError. Contracts describe transport and existing method shapes; they do not select application policy or decide which services are installed."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Core browser client · Arcane OS SDK"><meta property="og:description" content="arcane-os/core/client is the browser-safe arcane/1 RPC owner. It exports createCoreClient, createCoreFacade, installCoreClient and getInstalledCoreClient. arcane-os/core/contracts exports COREPROTOCOL, COREREADYEVENTS, COREFRAMECONTRACTS, COREMETHODCONTRACTS, CoreError and serializeCoreError. Contracts describe transport and existing method shapes; they do not select application policy or decide which services are installed."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core-client/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Core browser client · Arcane OS SDK"><meta name="twitter:description" content="arcane-os/core/client is the browser-safe arcane/1 RPC owner. It exports createCoreClient, createCoreFacade, installCoreClient and getInstalledCoreClient. arcane-os/core/contracts exports COREPROTOCOL, COREREADYEVENTS, COREFRAMECONTRACTS, COREMETHODCONTRACTS, CoreError and serializeCoreError. Contracts describe transport and existing method shapes; they do not select application policy or decide which services are installed."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
   <title>Core browser client | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Core browser client</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="core-browser-client">Core browser client</h1><p class="doc-lead">arcane-os/core/client is the browser-safe arcane/1 RPC owner. It exports createCoreClient, createCoreFacade and installCoreClient. arcane-os/core/contracts exports COREPROTOCOL, COREREADYEVENTS, COREFRAMECONTRACTS, COREMETHODCONTRACTS, CoreError and serializeCoreError. Contracts describe transport and existing method shapes; they do not select application policy or decide which services are installed.</p><div class="doc-meta"><span>SDK 0.55.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Core browser client</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="core-browser-client">Core browser client</h1><p class="doc-lead">arcane-os/core/client is the browser-safe arcane/1 RPC owner. It exports createCoreClient, createCoreFacade, installCoreClient and getInstalledCoreClient. arcane-os/core/contracts exports COREPROTOCOL, COREREADYEVENTS, COREFRAMECONTRACTS, COREMETHODCONTRACTS, CoreError and serializeCoreError. Contracts describe transport and existing method shapes; they do not select application policy or decide which services are installed.</p><div class="doc-meta"><span>SDK 0.56.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="./" aria-current="page">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/core-client.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#native-connection-and-explicit-adapters">Native connection and explicit adapters</a><a href="#events-and-request-lifetime">Events and request lifetime</a><a href="#classic-native-host-injection">Classic native-host injection</a></nav></details><p><code>arcane-os/core/client</code> is the browser-safe <code>arcane/1</code> RPC owner. It exports
-<code>createCoreClient</code>, <code>createCoreFacade</code> and <code>installCoreClient</code>.
+<code>createCoreClient</code>, <code>createCoreFacade</code>, <code>installCoreClient</code> and
+<code>getInstalledCoreClient</code>.
 <code>arcane-os/core/contracts</code> exports <code>CORE_PROTOCOL</code>, <code>CORE_READY_EVENTS</code>,
 <code>CORE_FRAME_CONTRACTS</code>, <code>CORE_METHOD_CONTRACTS</code>, <code>CoreError</code> and
 <code>serializeCoreError</code>. Contracts describe transport and existing method shapes;
@@ -36,6 +37,19 @@ Repeated installation returns the same client. Existing namespace method names
 remain available through this facade; their implementations and availability
 belong to the selected host. No repository, app list, model selection or service
 implementation is installed by importing this client.</p>
+<p>An application using a host-installed client can read it without installing or
+replacing anything:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {getInstalledCoreClient} from &#39;arcane-os/core/client&#39;;
+
+const client=getInstalledCoreClient();
+// null means this global has no live SDK-installed client.
+</code></pre></div>
+<p><code>getInstalledCoreClient(global=globalThis)</code> returns the exact live SDK-installed
+client, including one installed by classic document-created injection. It does
+not connect, install a client or replace an existing <code>Arcane</code> object. Applications
+need not inspect private installation fields. It returns <code>null</code> after that
+installation closes or fails. A
+foreign application&#39;s <code>Arcane</code> object is not evidence of an SDK installation.</p>
 <p>The native adapters select WebView2, WebKitGTK or Android WebView. Ordinary
 browsers remain <code>standalone</code>; they do not probe a local server. Development
 HTTP is selected only by the existing explicit <code>__ARCANE_DEV_HTTP__</code> flag.
@@ -50,6 +64,13 @@ has already settled it, <code>onError</code> observes the later send failure. A 
 without callable <code>send(frame)</code> remains disconnected and reports
 <code>ARCANE_TRANSPORT_INVALID</code>; it does not announce <code>transport.ready</code>.
 <code>autoConnect:false</code> defers connection until <code>connect()</code> or the first invocation.</p>
+<p><code>replayRuntimeState:true</code> sends one <code>runtime.replay</code> control after the transport&#39;s
+receive listener and <code>transport.ready</code> are established. The default is <code>false</code>,
+preserving existing hosts. The send is observed without delaying page startup;
+delivery errors reach <code>onError</code>. A host supporting this control supplies its
+current dispatcher and service state for a newly connected document, without
+restarting services. Repeated <code>connect()</code> calls on the same connection do not
+send another replay. See <a href="../core-runtime/#state-and-frames">runtime replay</a>.</p>
 <p><code>client.invoke(method, parameters, {signal, timeoutMs})</code> returns the actual
 response result or rejects with <code>CoreError</code>. Parameters, result fields and
 event data retain their complete supplied content. JSON encoding belongs only
@@ -79,6 +100,18 @@ to the service/runtime owner. <code>client.close()</code> releases its subscript
 native callbacks, timers and pending renderer requests; it does not kill Core.
 Call <code>stop()</code> to remove an individual subscription and <code>client.close()</code> when
 the client owner ends its lifetime.</p>
+<p>For an actual terminal child-process or transport failure, the host calls
+<code>client.failTransport(error)</code>. Installed clients also own the native callback
+<code>globalThis.__arcaneTransportFailed(error)</code>. This boundary rejects pending RPCs
+and WebKit acknowledgements with the complete actual <code>CoreError</code>, reports that
+failure once, releases callbacks/subscriptions/timers and rejects future
+invocations with the same failure. It sends no cancellation frames to a failed
+transport and does not invent response identifiers or results. A normal close
+still uses cancellation rather than reporting a transport failure.</p>
+<p>Closing or failing an installation restores its previous <code>Arcane</code> object and
+native callbacks only when those globals still belong to that installation.
+Another owner&#39;s later replacements remain unchanged. The read-only accessor
+returns <code>null</code> before the installed failure is reported to <code>onError</code>.</p>
 <p>Errors retain complete native fields, including diagnostics and stack/cause
 information. WebView2 and Android bridge failures retain native error codes,
 messages and diagnostic fields; the request method and transport are added
@@ -91,7 +124,8 @@ transport/event-owner failures outside individual request promises.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createCoreClassicSource} from &#39;arcane-os/core/classic-source&#39;;
 
 const source=await createCoreClassicSource({
-    eventOwnerModuleURL:&#39;/arcane/sdk/event-manager.mjs&#39;
+    eventOwnerModuleURL:&#39;/arcane/sdk/event-manager.mjs&#39;,
+    replayRuntimeState:true
 });
 // Supply source to the native host&#39;s existing classic-script injection owner.
 </code></pre></div>
@@ -99,7 +133,9 @@ const source=await createCoreClassicSource({
 installed SDK. It emits the same implementation as a classic script, without
 copying another client or adding a bundler. The caller supplies the actual
 served SDK event-manager URL; the example URL must match its selected layout.
-That module and its existing managed import map must be included by packaging.</p>
+That module and its existing managed import map must be included by packaging.
+Select <code>replayRuntimeState:true</code> only when composing a host with the current
+runtime replay control; omitting it preserves the existing no-replay default.</p>
 <p>The generated facade, native receive callback and current-state methods install
 synchronously. When the shared event owner already exists, it is reused
 immediately. Document-created injection can precede the page&#39;s import map, so
@@ -120,6 +156,6 @@ platform hosts and their cutover remain separately owned work.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#native-connection-and-explicit-adapters">Native connection and explicit adapters</a><a href="#events-and-request-lifetime">Events and request lifetime</a><a href="#classic-native-host-injection">Classic native-host injection</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.55.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.56.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

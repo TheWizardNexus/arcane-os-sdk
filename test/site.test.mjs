@@ -12,6 +12,7 @@ import {
 } from '../tools/build-reference-site.mjs';
 import {extractRuntimeReferenceContracts} from '../tools/reference-contract-extractor.mjs';
 import {createReferenceModuleContractMap} from '../tools/reference-module-contracts.mjs';
+import {createReferenceInputs} from '../tools/reference-inputs.mjs';
 import {
     filterModuleSearchRecords,
     moduleMatchesSearch,
@@ -754,6 +755,29 @@ test('the complete API reference is a first-party generated Pages corpus',async 
         ].includes(member.name)),false);
         assert.doesNotMatch(sdk,/id="importmapapplication"/u);
     });
+});
+
+test('committed reference generation uses complete selected inputs', async function committedReferenceInputs() {
+    const inputs = await createReferenceInputs({repositoryRoot, sourceRef: 'HEAD'});
+    const selectedPackage = JSON.parse(await inputs.readText('package.json'));
+    const selectedInventory = await inputs.readText('docs/reference/inventory/package-api.json');
+    const selectedFiles = await inputs.listFiles('docs/reference');
+    const plan = await createReferenceSite({sourceRef: 'HEAD'});
+    assert.equal(plan.manifest.versions.sdk, selectedPackage.version);
+    assert.equal(plan.expectedFiles.get('site/reference/inventory/package-api.json'), selectedInventory);
+    assert.deepEqual(
+        plan.manifest.pages.filter(function markdownPage(page) {
+            return page.kind === 'markdown';
+        }).map(function pageSource(page) {
+            return page.source;
+        }).sort(),
+        selectedFiles.filter(function markdownInput(file) {
+            return file.endsWith('.md');
+        }).sort()
+    );
+    const liveInputs = await createReferenceInputs({repositoryRoot});
+    assert.equal(await liveInputs.readText('package.json'), await readFile(path.join(repositoryRoot, 'package.json'), 'utf8'));
+    await assert.rejects(inputs.readText('docs/reference/does-not-exist.md'));
 });
 
 test('generated runtime reference contracts are exhaustive and reader-first',async t=>{

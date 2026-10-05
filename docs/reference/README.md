@@ -111,6 +111,26 @@ The [changelog](../../CHANGELOG.md) records changes by version; the
 identify the corresponding published package source. A newer website does not
 change the version installed in your application.
 
+### Generate the selected reference site
+
+The existing `node tools/build-reference-site.mjs --write` command reads the
+live checkout. For release documentation while disjoint source work continues,
+select the reviewed documentation commit explicitly:
+
+```sh
+node tools/build-reference-site.mjs --write --source-ref <documentation-commit>
+```
+
+The same option is accepted by `createReferenceSite({sourceRef})` and
+`writeReferenceSite({sourceRef})`. It reads the selected commit's package
+version, complete reference documents and inventories, inventory-selected
+runtime sources, and authored site inputs directly from Git in memory. It
+creates no checkout or export and leaves source drafts untouched. Rendering
+uses the current canonical generator and its authored semantic contracts;
+select a documentation commit whose contracts match the published package.
+Generated output still belongs to the canonical `site/` tree and requires its
+usual coordinated output ownership. Generation does not publish hosted Pages.
+
 ### Historical 0.3.4 publication record
 
 The following records describe that earlier release only. They do not identify
