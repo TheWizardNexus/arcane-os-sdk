@@ -700,10 +700,10 @@ npm exec -- arcane verify-bundle dist/hello-world-1.0.0.arcane-app.tar.gz
 
 ### Overview
 
-Loads the SDK package provider for portable by default, or the fixed provider
-from an explicitly selected Arcane OS checkout. It diagnoses the selected
-provider prerequisites without building an app. Executable targets still
-require `--arcane-root` and their platform toolchains.
+Loads the SDK package provider for `portable` or `windows-x64` by default, or
+the fixed provider from an explicitly selected Arcane OS checkout. It diagnoses
+selected prerequisites without building an app. Windows uses the matching
+precompiled SDK host; Linux and Android retain their checkout/toolchain routes.
 
 ```text
 arcane native-doctor --target <native-target> [--arcane-root <directory>]
@@ -719,8 +719,7 @@ is unavailable; it never returns a browser package as a substitute.
 
 ```bash
 npm exec -- arcane native-doctor \
-  --target windows-x64 \
-  --arcane-root "../Arcane OS"
+  --target windows-x64
 ```
 
 ## `arcane native-prepare`
@@ -762,6 +761,9 @@ The output remains target-specific inside the common plan contract.
 Portable uses the SDK package without an OS checkout, copies complete selected
 app/dependency payloads and generates the Core entry/classic client source.
 It adds no executable platform host or automatically discovered app services.
+Windows x64 uses the SDK package provider and its matching precompiled release
+asset without an OS checkout or application-side native compilation. See
+[Windows requirements and artifact layout](core-native-packaging.md#windows-executable).
 An explicit `--arcane-root` continues to select the checkout provider.
 Integrated builds retain an output root outside the OS checkout; only an
 explicit checkout provider must share the workspace root.
@@ -775,7 +777,6 @@ rather than returning a fictional native artifact plan.
 ```bash
 npm exec -- arcane build \
   --target windows-x64 \
-  --arcane-root "../Arcane OS" \
   --output-root "../arcane-native-output"
 ```
 
@@ -815,6 +816,13 @@ existing packaged release (run `arcane package` first). Windows, Linux, and
 Android providers expose supported paired native run paths. Portable output is
 a directory and intentionally cannot run. Android run requires one
 connected physical/native ARM64 device for the current target.
+
+`windows-x64` uses the package provider by default, launches `Arcane.exe`, and
+streams complete diagnostics. Its cancellation closes input and waits for the
+window/Core's accepted work to drain; it does not force-kill that host after a
+timer. WebView2 Runtime and .NET Framework 4.6.2 or later must be available on
+the Windows execution machine. Linux/Android retain their explicit provider
+requirements. Build/launch completion does not prove application domain behavior.
 
 ### Example
 

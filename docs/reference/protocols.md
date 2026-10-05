@@ -47,12 +47,14 @@ These protocols normalize orchestration and results. They do not normalize a
 Windows EXE, Linux DEB, Android APK, and portable directory into the same
 artifact kind.
 
-Portable CLI operations load the installed SDK's
-`arcane-os/native/portable-provider` by default. Explicit `--arcane-root`
-selection retains the checkout provider route; executable targets still need
-their platform provider/toolchain. `arcane-os/core/host` composes the reusable
-native runtime with explicitly supplied app services. Neither export is a
-browser import, executable host or installer. The synchronous classic facade
+Portable CLI operations load `arcane-os/native/portable-provider`; Windows x64
+loads `arcane-os/native/windows-provider`, both from the installed SDK by
+default. The Windows provider assembles the matching precompiled WebView2/SEA
+host release asset. Explicit `--arcane-root` selection retains the checkout
+route; Linux and Android still need their platform provider/toolchain.
+`arcane-os/core/host` composes the reusable native runtime with explicitly
+supplied app services. These Node entries remain separate from browser imports;
+portable itself remains a non-executable payload. The synchronous classic facade
 and browser-safe client retain their separate public entries. Integrated
 shared checks keep their existing Arcane OS development provider.
 
@@ -1047,10 +1049,15 @@ or a dependency is ready.
 
 ### Microsoft NT / WebView2
 
-The renderer uses the WebView2 host messaging surface. The host binds one app
-identity and native policy to the session before Core dispatch. Microsoft NT
-can expose managed-service and privileged platform operations that do not exist
-in an ordinary browser.
+The SDK Windows host mounts the selected app at a virtual HTTPS origin and
+injects the canonical classic facade before application scripts. Ordered
+`arcane/1` requests and complete responses cross its owned WebView2/Core bridge;
+each connected document requests authoritative runtime/service replay. Its
+selected service composition supplies the actual methods. Closing the window
+cancels renderer requests and drains accepted service work before Core exits.
+See [Windows executable packaging](core-native-packaging.md#windows-executable).
+Arcane OS can separately compose product policy and privileged services; the
+generic SDK host does not copy that product composition.
 
 ### Linux / WebKitGTK
 
@@ -1070,12 +1077,13 @@ reachable.
 
 ### macOS
 
-No macOS executable target, native bridge, platform host, artifact, or run
-contract is exposed by this SDK version. A browser may still run browser-only
-application code. A separately composed macOS host may use the reusable Node
-Core runtime, framed stdio transport, host composition, and portable payload,
-but those SDK primitives do not create a native bridge or executable host and
-do not by themselves satisfy a native capability.
+This version includes Foundation-only `ArcaneCoreProcess` source for an
+explicit executable, framed pipes and graceful child lifecycle. It supplies no
+macOS renderer bridge, executable target, artifact or run command. A separately
+composed macOS host may combine that source with the reusable Node runtime,
+stdio transport, host composition and portable payload. Source delivery does
+not establish compilation or execution on macOS. See
+[the macOS process-source contract](core-native-packaging.md#macos-process-source).
 
 ## Development and remote HTTP transport
 
@@ -1159,9 +1167,10 @@ The common contract ends where platform truth must remain different:
   not run an unrelated browser implementation as a substitute;
 - the portable target defaults to the installed SDK provider and assembles a
   non-executable payload without an Arcane OS checkout;
-- executable native targets require their explicit checkout/provider, and the
-  composed host must supply the protocol, version, features, capabilities,
-  methods, and services that its application contract requires;
+- Windows x64 defaults to the installed SDK's matching precompiled host;
+  Linux/Android retain explicit checkout/providers. Every composed host must
+  supply the protocol, version, features, capabilities, methods and services
+  that its application contract requires;
 - that current-build compatibility does not promise that a future SDK will accept
   this Core or that this SDK will accept a future Core.
 

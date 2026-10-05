@@ -52,7 +52,9 @@ alone does not make bare module names resolve in a browser.
 | Call `globalThis.Arcane` | [Arcane Core API](core/arcane-api.md) |
 | Connect a browser to one Core transport | [Core browser client](core-client.md) |
 | Compose native Core dispatch, service lifecycle, and stdio hosting | [Native Core runtime](core-runtime.md) |
+| Run application-selected llama.cpp or Ollama through Core | [Local AI through Core](local-ai.md) |
 | Build an installed-SDK portable Core payload | [Portable Core packaging](core-native-packaging.md) |
+| Build a Windows executable without an OS checkout | [Windows executable packaging](core-native-packaging.md#windows-executable) |
 | Subscribe to native events | [Arcane event reference](core/arcane-events.md) |
 | Use provider-neutral AI lifecycle, chat, speech, persistence, or document context | [Normalized AI](#normalized-ai) |
 | Choose a normalized typed browser decision surface | [Browser typed decisions](ai/browser-decisions.md) |
@@ -79,9 +81,11 @@ This repository contains explicitly versioned surfaces with different owners:
 
 Browser modules and reusable Core client/runtime/lifecycle source belong to the
 SDK. The portable provider uses this installed package by default and assembles
-an app payload with explicitly selected services; it supplies no executable
-platform host. Explicit Arcane OS provider overrides and integrated shared
-checks remain available. Arcane OS retains its product composition and policy.
+an app payload with explicitly selected services; portable itself supplies no
+executable host. The Windows provider pairs that payload with the installed
+SDK version's precompiled WebView2/SEA release asset. Explicit Arcane OS provider
+overrides and integrated shared checks remain available. Arcane OS retains its
+product composition and policy.
 The historical Core reference snapshot describes a separate host contract;
 matching a protocol name or assembling a payload alone does not establish that
 a composed host supplies every required method or service.
@@ -130,6 +134,15 @@ uses the current canonical generator and its authored semantic contracts;
 select a documentation commit whose contracts match the published package.
 Generated output still belongs to the canonical `site/` tree and requires its
 usual coordinated output ownership. Generation does not publish hosted Pages.
+
+For a selected release whose documentation correction lands after unrelated
+source, `createReferenceSite({inputs})` and `writeReferenceSite({inputs})` accept
+one explicit input owner with `readText(relativePath)` and
+`listFiles(relativeDirectory)`. It is shared with the contract extractor. Keep
+package/runtime reads and document discovery on the release commit, and overlay
+only reviewed documentation records from the correction commit. In particular,
+preserve the selected inventory's member set instead of importing later public
+APIs. Omitted `inputs` preserves the live or `sourceRef` behavior above.
 
 ### Historical 0.3.4 publication record
 
@@ -201,6 +214,7 @@ Ollama, Wllama, Whisper, Kokoro, native, or cloud transport:
 | Offer explicit selected-model start/cancel UI | [`chat.html`](runtime-components.md#chathtml), [`speech.html`](runtime-components.md#speechhtml), and [`voice-transcription.html`](runtime-components.md#voice-transcriptionhtml) | Browser/native WebView components; user activation emits a cancelable request before any LLM or STT load intent, and recording stays disabled without sticky ready STT. |
 | Use Core-normalized chat | [`globalThis.Arcane.ai`](core/arcane-ai-contracts.md) | Native/Core only when separately admitted. |
 | Run a caller-selected GGUF LLM locally | [`arcane-os/ai/browser-wasm`](ai/browser-wasm.md) | Browser secure context with WebAssembly and OPFS/DBOPFS; explicit CPU selection or WebGPU with full offload and no automatic CPU fallback. |
+| Run application-selected native llama.cpp/Ollama chat | [`arcane-os/ai/core-local`, `arcane-os/core/local-ai`](local-ai.md) | Explicit Core connection and selected native runtimes; installation, availability and loaded-model readiness remain distinct. |
 | Run caller-selected Whisper/Kokoro locally | [`arcane-os/ai/browser-speech`](ai/browser-speech.md) | Browser with DBOPFS, Web Locks, Workers and selected upstream sources; automatic WebNN NPU, WebGPU, then WASM loading, or an explicit backend. |
 | Use native browser recognition/voices or selected cloud TTS | [Speech provider choices](ai/browser-speech.md) | Native APIs depend on the browser and may use remote services; cloud TTS requires the application key and endpoint access. |
 | Send complete chat, System One or image requests without retained history | [`arcane-os/ai/twin-cloud`](ai/twin-cloud.md) | Node or browser with Fetch and explicit model/credentials; image results contain every returned image as a Blob. |

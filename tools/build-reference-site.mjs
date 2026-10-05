@@ -565,6 +565,7 @@ const navigationGroups=[
             ['Core map','docs/reference/core/README.md'],
             ['Core browser client','docs/reference/core-client.md'],
             ['Native Core runtime','docs/reference/core-runtime.md'],
+            ['Local AI through Core','docs/reference/local-ai.md'],
             ['Portable Core packaging','docs/reference/core-native-packaging.md'],
             ['Arcane API','docs/reference/core/arcane-api.md'],
             ['Capabilities and admission','@reference/core/capabilities'],
@@ -2059,8 +2060,8 @@ async function collectInputs(inputs){
     return {markdownInputs,inventoryInputs};
 }
 
-export async function createReferenceSite({sourceRef} = {}){
-    const inputs = await createReferenceInputs({repositoryRoot, sourceRef});
+export async function createReferenceSite({sourceRef, inputs:providedInputs} = {}){
+    const inputs = providedInputs ?? await createReferenceInputs({repositoryRoot, sourceRef});
     const packageDocument = JSON.parse(await inputs.readText('package.json'));
     const publishedVersions = {sdk:packageDocument.version,runtime:'0.8.12',protocol:'arcane/1'};
     const {markdownInputs,inventoryInputs}=await collectInputs(inputs);

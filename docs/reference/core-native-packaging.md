@@ -331,3 +331,23 @@ Linux, macOS, Android dispatch and each platform's output verification retain
 their separate delivery boundaries. Published
 consumers must adopt the numeric package that includes this increment; a source
 checkout or a successful source push is not that public package authority.
+
+## macOS process source
+
+`src/core/hosts/macos/ArcaneCoreProcess.h` and `.m` provide a Foundation-only
+adapter for macOS 11 or later, compiled with Objective-C ARC and blocks. A
+composing host explicitly supplies the executable URL, arguments, working
+directory and delegate; startup is asynchronous. Delegate callbacks deliver
+every raw stdout/stderr chunk and complete opaque framed JSON bodies, plus
+launch, error, exit and final completion observations. Each stream and accepted
+write retains its own order; UI dispatch belongs to the host. Callbacks must
+return normally and must not wait for another callback or completion.
+
+`sendJSONData:completion:error:` accepts an ordered write or reports a
+synchronous rejection. Write completion means the frame reached stdin, not that
+the RPC succeeded. `closeInput` rejects new sends, finishes accepted writes and
+closes stdin, then keeps observing output and child exit without a forced
+termination deadline. The delegate is retained through final completion.
+This is delivered source, not a macOS WebView bridge, CLI target, executable or
+installer. Compilation and execution on macOS remain separate evidence from the
+selected Windows output.

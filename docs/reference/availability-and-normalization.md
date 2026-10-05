@@ -58,12 +58,12 @@ false when a probe throws; SDK branching continues through its owning error path
 policy, package-owned model policy, platform support, and dependency readiness
 are independent checks.
 
-The current executable host/target matrix covers Microsoft NT, Linux, and
-Android where listed. This SDK exposes no macOS executable target, native
-bridge, artifact, or run contract; WebKitGTK availability must not be
-generalized to macOS. The reusable Node Core runtime, framed stdio transport,
-host composition, and portable payload can be used by a separately composed
-macOS host, but they do not supply that native platform host or bridge.
+Windows x64 has an SDK-owned precompiled WebView2/SEA host; Linux and Android
+retain their explicit checkout providers where listed. The SDK also includes
+macOS Foundation process-adapter source, separately from an executable target,
+renderer bridge, artifact or run command. A composed macOS host may combine that
+source with the reusable Node Core runtime, stdio transport and portable payload.
+Source availability does not establish macOS compilation or execution.
 
 ## Capability-first matrix
 
@@ -89,6 +89,8 @@ macOS host, but they do not supply that native platform host or bridge.
 | Connect browser code to an existing Core transport | `arcane-os/core/client` and `arcane-os/core/contracts` | **Browser / native WebView** with an admitted transport; explicit development HTTP remains opt-in | The reusable client owns `arcane/1` correlation, readiness, cancellation, events, facades, and complete native error fidelity. It supplies no service, policy, or host process. |
 | Compose native Core services and framed stdio hosting | `arcane-os/core/runtime`, `arcane-os/core/stdio`, and `arcane-os/core/host` | **Node** on Windows, Linux, or macOS; the composing native host supplies its process and bridge | The SDK owns reusable dispatch, per-service lifecycle, request/service work ownership, cooperative cancellation, drain, and stdio framing. Product identity, policy, privileges, models, storage, and services remain host-owned. |
 | Assemble a portable Core payload from the installed SDK | `arcane-os/native/portable-provider` | **Node**; portable platform selection is currently Windows or Linux, while separately composed hosts may use the payload | The provider copies the selected app, dependencies, installed SDK runtime, Core client/runtime, and explicit service composition into a non-executable directory. It uses no `arcaneRoot` by default and does not prove host behavior or supply a platform bridge. |
+| Assemble and run a Windows executable | [`arcane-os/native/windows-provider`](core-native-packaging.md#windows-executable) | **Node** for assembly; Windows x64, .NET Framework 4.6.2+ and WebView2 for execution | Uses the installed SDK version's precompiled release asset and explicit app services. Complete diagnostics and accepted service work drain on run cancellation; no OS checkout or application-side native compiler is required. |
+| Use application-selected llama.cpp/Ollama through Core | [`arcane-os/core/local-ai`, `arcane-os/ai/core-local`](local-ai.md) | **Node** native service; **Browser / native WebView** provider through an explicit Core connection | Independent runtime/model lifecycle, complete streaming and cancellation. Official runtime preparation follows explicit app requirements; model selection and business policy stay app-owned. |
 | Use local AI without coupling app code to Ollama HTTP | `Arcane.localAI`, `Arcane.ai`, or `/arcane/modules/Ollama.js` | Primarily **Native**; Android exposes a narrower admitted inference projection | Admission, errors, and managed-operation events are normalized. Direct Ollama response envelopes remain **Provider-native**. |
 | Use TWiN Cloud from the renderer profile | `/arcane/modules/AI.js` | **Cloud** from an allowed browser/native renderer | High-level chat behavior is normalized by the module. The TWiN access key authenticates remote LLM chat; raw provider diagnostics remain provider-specific. No automatic cloud fallback is inferred from local failure. |
 | Send one TWiN Cloud request with an explicit key and model | `fetchRequest` from `arcane-os/ai/twin-cloud` | **Node** and **Browser**, using standard Fetch and a remote HTTPS provider | Keeps complete messages and returns the full parsed provider JSON. Rejected Fetch and HTTP 529 share three retries after 3000 ms; HTTP 429 overload retains unlimited three-second retries. Optional `onRetry` reports waiting/requesting phases without blocking recovery. Shared structured-output mapping and cancellation match browser TWiN transport. No browser profile, AI/user singleton, DBOPFS, or retained request history is created. |

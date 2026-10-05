@@ -47,8 +47,9 @@ runtime layouts.
 | `arcane-os/testing` | Isolated test registration and execution. |
 | `arcane-os/targets` | Target adapters and dispatch. |
 | `arcane-os/native` | Native plan and builder protocol. |
-| `arcane-os/native-provider` | SDK portable default and explicit checkout provider loader. |
+| `arcane-os/native-provider` | SDK portable/Windows defaults and explicit checkout provider loader. |
 | `arcane-os/native/portable-provider` | Node-only portable payload provider and explicit app-service composition; not an executable host. |
+| `arcane-os/native/windows-provider` | Selected Windows x64 executable assembly and host-owned run/drain lifecycle. |
 | `arcane-os/core/client` | Browser-safe Core RPC client, application facade, readiness and request cancellation. |
 | `arcane-os/core/contracts` | Shared Core protocol, frame, method and diagnostic error contracts. |
 | `arcane-os/core/classic-source` | Node generator for the canonical classic-script Core client projection. |
@@ -375,6 +376,15 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `arcaneNativeBuilderProvider` | singleton | `arcane-os/native/portable-provider` | Portable native provider | Node; produces a portable payload rather than an executable host |
 | `arcaneNativeBuilderProvider default export` | singleton | `arcane-os/native/portable-provider` | Portable native provider | Node; produces a portable payload rather than an executable host |
 | `startCoreHost()` | function | `arcane-os/core/host` | Native Core host composition | Node with readable input and writable output streams |
+| `readCoreLaunchContext()` | function | `arcane-os/core/host` | Native Core host composition | Node; reads explicitly selected launch JSON |
+| `createWindowsNativeProvider()` | function | `arcane-os/native/windows-provider` | Windows native provider | Node assembly; Windows x64/WebView2 execution |
+| `arcaneNativeBuilderProvider` | singleton | `arcane-os/native/windows-provider` | Windows native provider | Node assembly; Windows x64/WebView2 execution |
+| `arcaneNativeBuilderProvider default export` | singleton | `arcane-os/native/windows-provider` | Windows native provider | Node assembly; Windows x64/WebView2 execution |
+| `createCoreLocalAIProvider()` | function | `arcane-os/ai/core-local` | Core local AI | Browser/native WebView with an available Core connection |
+| `createLocalAIService()` | function | `arcane-os/core/local-ai` | Core local AI | Node with selected llama.cpp/Ollama runtimes |
+| `createLocalAIService default export` | function | `arcane-os/core/local-ai` | Core local AI | Same native service factory |
+| `ensureLocalAIRuntimes()` | function | `arcane-os/local-ai` | Core local AI | Node; selected upstream platform assets |
+| `bundleLocalAIRuntimes()` | function | `arcane-os/local-ai` | Core local AI | Node; complete native runtime assembly |
 | `MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
 | `MAIL_OUTBOX_PROTOCOL` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
 | `MAIL_OUTBOX_STATES` | constant | `arcane-os/mail` | Portable Mail | Node and browser metadata |
@@ -2723,10 +2733,12 @@ async function useloadArcaneIntegratedProvider(...arguments_) {
 
 ### Overview
 
-Loads the package-owned portable provider when `arcaneRoot` is omitted and
-`target` is `portable`. An explicit root retains the fixed Arcane OS checkout
-provider route, including its errors; there is no silent fallback. Other native
-targets still require that root. Normal Node module resolution owns imports.
+Loads the package-owned provider when `arcaneRoot` is omitted and `target` is
+`portable` or `windows-x64`. Portable produces a non-executable payload; Windows
+assembles the matching precompiled SDK host. An explicit root retains the fixed
+Arcane OS checkout provider route, including its errors; there is no silent
+fallback. Other native targets still require that root. Normal Node module
+resolution owns imports.
 
 ### Signature and result
 
@@ -5096,20 +5108,24 @@ console.log(registeredTestCount());
 
 ### Overview
 
-Runs one shell-free child command with complete stdout and stderr, ordered stream events, heartbeats, and process-tree cancellation.
+Runs one shell-free child command with complete stdout and stderr, ordered stream
+events, heartbeats, and explicitly selected process cancellation behavior.
 
 ### Signature, parameters, and result
 
 ```text
-async runProcess(command, args=[], { cwd, env, signal, onEvent, heartbeatMs=5000, terminationGraceMs=DEFAULT_TERMINATION_GRACE_MS, allowNonzero=false, input }={})
+async runProcess(command, args=[], { cwd, env, signal, onEvent, heartbeatMs=5000, terminationGraceMs=DEFAULT_TERMINATION_GRACE_MS, allowNonzero=false, input, cancellationMode='terminate-tree' }={})
 ```
 
 Import it from `arcane-os`. `command` is executed directly with `shell:false`;
 `args` must be a fixed array of strings, so shell expansion, pipelines, and
 redirection never occur. `cwd` selects the child directory. `env` is shallowly
-merged over `process.env`. When supplied, `input` is written once and stdin is
-closed; otherwise stdin is closed immediately. On Microsoft NT, `npm` and `npx`
-are normalized to their Node CLI entrypoints.
+merged over `process.env`. In the default `cancellationMode:'terminate-tree'`,
+supplied `input` is written once and stdin is closed; otherwise stdin closes
+immediately. With `cancellationMode:'close-input'`, optional input is written
+once and stdin remains open until cancellation or a callback/input failure
+requests shutdown. On Microsoft NT, `npm` and `npx` are normalized to their Node
+CLI entrypoints.
 
 `onEvent` is awaited in order for `process.starting`, nonempty
 `process.stdout`/`process.stderr` lines, coalesced `process.heartbeat`, and the
@@ -5129,12 +5145,21 @@ text stream preserves its complete content. A missing executable rejects with
 and spawn/runtime failures use the normalized SDK error boundary, with the
 nonzero result retained in error details.
 
-Aborting `signal` emits cancellation-requested state, terminates the owned
-process tree, escalates to a forced tree termination after the grace interval,
-drains event delivery, and rejects with `ARCANE_CANCELLED` and exit code 130.
-An `onEvent` failure also stops the tree and rejects with that callback failure.
-Cancellation proves only that the local process tree was stopped; it cannot
-reverse external effects already performed by the command.
+Aborting `signal` emits cancellation-requested state. The default mode terminates
+the owned process tree and escalates after the grace interval. `close-input`
+instead closes only the child's stdin, with no forced termination or deadline;
+the selected child must own EOF shutdown. This lets a native host finish
+accepted service work before exiting. Both paths continue observing output and
+drain event delivery before rejection with `ARCANE_CANCELLED` and exit code 130.
+An abort after the child's close event does not cancel already completed work.
+
+An `onEvent` failure requests shutdown through the same selected mode. The
+close-input failure retains the child's complete result in `details` and
+additional failures in `errors`, with the original primary error as `cause`
+when wrapping is needed. A cancellation rejection can therefore contain a
+successful child exit code `0`; that is the child's drained result, distinct
+from the cancelled caller operation. Cancellation cannot reverse external
+effects already performed by the command.
 
 ### Availability and normalization
 
@@ -7110,17 +7135,21 @@ await transport.closed;
 
 Creates the SDK-owned native builder for one portable Core payload. The caller
 selects application service modules already present in the app release. The
-provider does not load Arcane OS source, choose a model, download a runtime,
-compile an executable or substitute for an unavailable platform host.
+provider does not load Arcane OS source, choose a model, compile an executable
+or substitute for an unavailable platform host. An explicit `native.localAI`
+selection prepares and bundles its selected official runtime distributions;
+without that selection, no local-AI runtime is downloaded.
 
 ### Signature and result
 
 ```text
-createPortableNativeProvider({services=[]}={})
+createPortableNativeProvider({services}={})
 ```
 
 Import it from `arcane-os/native/portable-provider`. Each service selection is
-`{module, options}`. The returned `arcane-native-builder/1` provider exposes
+`{module, options}`. Omitted `services` uses `appDescriptor.native.services`;
+an explicit array, including `[]`, overrides the descriptor selection.
+The returned `arcane-native-builder/1` provider exposes
 `describe()`, `doctor()`, `prepare()`, `build()`, `verify()` and `run()`.
 `describe()` and successful payload results report `executable:false`; `run()`
 reports `ARCANE_NATIVE_RUN_UNSUPPORTED`.
@@ -7156,8 +7185,10 @@ console.log(await provider.describe());
 
 ### Overview
 
-Package-owned portable provider with no preconfigured application services. It
-is the named binding for the same object exposed as this subpath's default.
+Package-owned provider with no preconfigured application services. Each native
+provider subpath exports its own singleton and exposes that same object as its
+default binding. The ordinary singleton uses the app descriptor's service
+selection.
 
 ### Value and import
 
@@ -7165,13 +7196,16 @@ is the named binding for the same object exposed as this subpath's default.
 const arcaneNativeBuilderProvider
 ```
 
-Import it from `arcane-os/native/portable-provider`.
+Import it from `arcane-os/native/portable-provider` for a non-executable payload,
+or `arcane-os/native/windows-provider` for the Windows x64 executable contract.
 
 ### Availability and normalization
 
-**Node; produces a portable payload rather than an executable host.** The
-singleton retains the complete `arcane-native-builder/1` portable-provider
-contract described by `createPortableNativeProvider()`.
+**Node for assembly.** The portable singleton retains the contract described by
+`createPortableNativeProvider()`. The Windows singleton retains
+`createWindowsNativeProvider()` and needs Windows x64/WebView2 for execution.
+The two providers are distinct objects; named/default identity holds within
+each selected subpath.
 
 ### Example
 
@@ -7195,12 +7229,14 @@ Default package binding for the same object exposed as
 default as arcaneNativeBuilderProvider
 ```
 
-Import it from `arcane-os/native/portable-provider`.
+Import it from `arcane-os/native/portable-provider` or
+`arcane-os/native/windows-provider`, selecting that subpath's provider.
 
 ### Availability and normalization
 
-**Node; produces a portable payload rather than an executable host.** The
-default and named bindings have exact object identity and the same lifecycle.
+**Node for assembly; execution depends on the selected provider.** Within each
+subpath the default and named bindings have exact object identity and the same
+lifecycle; portable remains a non-executable payload.
 
 ### Example
 
@@ -7211,6 +7247,229 @@ import portableProvider, {
 
 console.log(portableProvider === arcaneNativeBuilderProvider); // true
 ```
+
+## createWindowsNativeProvider()
+
+### Overview
+
+Creates the SDK-owned Windows x64 provider. It assembles the selected app's
+complete portable payload with the precompiled WebView2 launcher and Node SEA
+Core from the numeric release matching the installed SDK version.
+
+### Signature and result
+
+```text
+createWindowsNativeProvider({services,hostDirectory}={})
+```
+
+Import it from `arcane-os/native/windows-provider`. `services` has the same
+descriptor/explicit-array semantics as the portable provider. An optional
+`hostDirectory` selects an already-built complete host tree; otherwise `build()`
+downloads and extracts the matching `arcane-native-windows-x64.tar.gz` beneath
+the selected output root. There is no compiler or OS checkout requirement for
+application builds. The build machine needs its normal Node/npm toolchain and
+`tar`; execution needs Windows x64, .NET Framework 4.6.2 or later and WebView2.
+
+The returned `arcane-native-builder/1` provider exposes `describe`, `doctor`,
+`prepare`, `build`, `verify` and `run`. Build returns `{app,target,manifest}`
+with the actual directory at `target.rootDir`. Verification reads the artifact;
+it does not launch the window. Run launches `Arcane.exe` and observes complete
+diagnostics and exit. Cancellation closes input and waits for host-owned drain,
+including accepted service work, without a forced termination deadline. Missing
+prerequisites, download/extraction failures and host failures remain observable
+through the operation's error/event boundary.
+
+### Example
+
+```javascript
+import {createWindowsNativeProvider} from 'arcane-os/native/windows-provider';
+
+const nativeBuilder = createWindowsNativeProvider({
+    services: [{module: 'native/moon-ledger.mjs', options: {ledgerName: 'Cheese debts'}}]
+});
+```
+
+Pass `nativeBuilder` to the existing native build-plan contract. For the ordinary
+CLI route and the complete artifact/launch contract, see
+[Windows executable packaging](core-native-packaging.md#windows-executable).
+
+## readCoreLaunchContext()
+
+### Overview
+
+Reads only the complete JSON object explicitly selected by
+`--arcane-launch-config <path>`; it does not search for application configuration.
+
+### Signature and result
+
+```text
+async readCoreLaunchContext({argv=process.argv.slice(2)}={})
+```
+
+Import it from `arcane-os/core/host`. The promise resolves to `{}` when the flag
+is absent, or the complete parsed object when present. A missing flag value,
+unreadable file, malformed JSON or non-object value rejects. Relative paths use
+the process working directory. The reader does not rewrite content or mutate
+the environment.
+
+```javascript
+import {readCoreLaunchContext} from 'arcane-os/core/host';
+
+const launchContext = await readCoreLaunchContext();
+```
+
+The generated entry supplies artifact-derived `appRoot`, then applies the whole
+explicit context and passes the same object as every service factory's second
+argument. Authored service options remain the first argument. Workspace/state
+locations and additional fields belong to the launcher/application. See
+[launch-time locations](core-native-packaging.md#launch-time-locations).
+
+## createCoreLocalAIProvider()
+
+### Overview
+
+Creates a browser-safe llama.cpp LLM provider through an existing Core client.
+Construction selects no model and installs no runtime or transport.
+
+### Signature and result
+
+```text
+createCoreLocalAIProvider({client=getInstalledCoreClient(),id='llama.cpp'}={})
+```
+
+Import it from `arcane-os/ai/core-local`. The provider implements
+`arcane-ai-provider/2` and exposes `catalog`, `status`, `inspect`, `load`,
+`request`, `unload` and `dispose`. Register it with the shared AI provider runtime,
+select the exact provider/model with `localOnly:true`, and load that selection.
+Requests wait for the requested model's actual readiness, preserve complete
+payloads and parsed streaming chunks, and cancel on observed readiness loss.
+Missing Core reports unavailability; it does not choose a browser or cloud route.
+Dispose/unregister at the caller's owning lifecycle boundary.
+
+```javascript
+import {createCoreLocalAIProvider} from 'arcane-os/ai/core-local';
+import {getAIProviderRuntime} from 'arcane-os/ai-provider-runtime';
+
+const provider = createCoreLocalAIProvider();
+const unregister = getAIProviderRuntime().register(provider);
+```
+
+See [the browser provider guide](local-ai.md#browser-llamacpp-provider) for model
+selection, streaming, cancellation and primary-model reload behavior.
+
+## createLocalAIService()
+
+### Overview
+
+Composes application-selected llama.cpp and Ollama engines as a native Core
+service. Runtime installation, process availability and model readiness remain
+separate states; prompts, models and application policy remain caller-owned.
+
+### Signature and result
+
+```text
+createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent}={})
+```
+
+Import it from `arcane-os/core/local-ai`. `configuration` is the authored local-AI
+record; `appRoot` resolves its relative model paths and `runtimes` supplies
+resolved installed runtime records. It returns a Core service definition with
+`current()` and independent selected-engine startup. Compose it through the
+existing Core lifecycle. Shutdown cancels owned work and joins owned processes;
+an already running external service remains under its external owner.
+
+The service provides `localai.status`, explicit `localai.services.recover`,
+`llama.status/models/load/unload/chat`, and the documented native Ollama methods.
+`localai.state` reports runtime/model changes. `llama.chunk` and `ollama.chunk`
+carry original parsed chunks with `streamId`; terminal responses remain complete.
+There is no background health polling or implicit model choice.
+
+```javascript
+import {createLocalAIService} from 'arcane-os/core/local-ai';
+
+const service = createLocalAIService(application.native.localAI, {appRoot, runtimes});
+```
+
+See [Core service configuration, results and failures](local-ai.md#core-service)
+and [native bundling](local-ai.md#native-bundling). Native ONNX inference is a
+separate delivery boundary; this service implements llama.cpp and Ollama.
+
+## createLocalAIService default export
+
+The default binding from `arcane-os/core/local-ai` is exactly the named
+`createLocalAIService` factory above, with the same arguments, return value and
+lifecycle:
+
+```javascript
+import createLocalAIService from 'arcane-os/core/local-ai';
+```
+
+## ensureLocalAIRuntimes()
+
+### Overview
+
+Reuses matching managed runtimes or installs complete selected official
+llama.cpp/Ollama distributions in an explicitly supplied directory.
+
+### Signature and result
+
+```text
+async ensureLocalAIRuntimes({runtimes=[],directory,platform=process.platform,architecture=process.arch,signal,onEvent}={})
+```
+
+Import it from `arcane-os/local-ai`. Runtime requirements accept IDs or
+`{id,version?,url?}` records. The result is an array of absolute
+`{id,version,platform,architecture,root,executable}` records. Matching concurrent
+installs share their work. Downloads retain runtime libraries and surface
+network/archive failures; cancellation and operation events remain observable.
+Installation changes no global PATH or system service and loads no model.
+Supported assets belong to the selected upstream distribution; see
+[platform and archive requirements](local-ai.md#native-bundling).
+
+```javascript
+import {ensureLocalAIRuntimes} from 'arcane-os/local-ai';
+
+// Call explicitly when the app needs its selected official runtime installed.
+async function prepareMoonCheeseRuntime(){
+    return ensureLocalAIRuntimes({
+        runtimes: ['llama.cpp'], directory: '.arcane/local-ai/runtimes'
+    });
+}
+```
+
+## bundleLocalAIRuntimes()
+
+### Overview
+
+Prepares selected runtimes through the same installer and copies their complete
+trees into one fresh native staging destination.
+
+### Signature and result
+
+```text
+async bundleLocalAIRuntimes({runtimes=[],directory,outputRoot,platform=process.platform,architecture=process.arch,signal,onEvent}={})
+```
+
+Import it from `arcane-os/local-ai`. `directory` owns the reusable installation;
+`outputRoot` owns the fresh artifact. The promise resolves to `{runtimes,files}`:
+runtime paths are artifact-relative under `runtime/local-ai/<id>`, and `files`
+contains the complete emitted inventory. Existing runtime destinations are
+preserved and reported as a conflict. Copying settles all started work and
+reports failures/cancellation without executing app services or models.
+
+```javascript
+import {bundleLocalAIRuntimes} from 'arcane-os/local-ai';
+
+// Call explicitly with a fresh output directory for this native assembly.
+async function bundleMoonCheeseRuntime(outputRoot){
+    return bundleLocalAIRuntimes({
+        runtimes: ['llama.cpp'], directory: '.arcane/local-ai/runtimes', outputRoot
+    });
+}
+```
+
+The ordinary provider invokes this owner only for an explicit native local-AI
+selection. See [selected local-AI runtimes](core-native-packaging.md#selected-local-ai-runtimes).
 
 ## startCoreHost()
 

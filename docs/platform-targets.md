@@ -16,10 +16,11 @@ toolchain, platform, architecture, format, signing mode, declared dependency
 releases, and destination. Verification is a separate operation only when the
 user explicitly selects it for the release artifact.
 
-The portable target pairs with the installed SDK provider by default. An explicit
-`--arcane-root` retains fixed-provider selection from an Arcane OS checkout;
-Windows, Linux and Android executable targets still require that override and
-their platform toolchains. Every native request also requires
+The portable and Windows x64 targets pair with installed SDK providers by
+default. Windows uses the numeric SDK release's precompiled WebView2/SEA host.
+An explicit `--arcane-root` retains fixed-provider selection from an Arcane OS
+checkout; Linux and Android still require that override and their platform
+toolchains. Every native request also requires
 the canonical app descriptor to declare the exact target selected on the
 command line. The SDK package does not silently search for a toolchain, infer a
 descriptor target, embed the Arcane machine bundle, or substitute browser
@@ -35,8 +36,8 @@ npm exec -- arcane native-doctor --target portable
 npm exec -- arcane build --target portable
 
 # In an app scaffolded with --target windows-x64:
-npm exec -- arcane build --target windows-x64 --arcane-root "../Arcane OS"
-npm exec -- arcane run --target windows-x64 --arcane-root "../Arcane OS"
+npm exec -- arcane build --target windows-x64
+npm exec -- arcane run --target windows-x64
 
 # In an app scaffolded with --target linux-x64:
 npm exec -- arcane build --target linux-x64 --arcane-root "../Arcane OS"
@@ -72,7 +73,8 @@ The portable output is an app-scoped payload directory with complete selected
 app and dependency files, a generated Core entry and classic client source.
 It is not an executable and has no direct run operation. Explicit service
 composition uses `createPortableNativeProvider({services:[{module,options}]})`;
-the default adds no OS or application services. See
+the default uses an explicit descriptor service selection when supplied and
+does not discover or copy OS product services. See
 [Core native packaging](reference/core-native-packaging.md).
 The external workspace defaults to `build/portable/`. Integrated Arcane work
 must name an `--output-root` outside that checkout. Explicit checkout providers
@@ -89,7 +91,7 @@ for the complete compatibility and breaking-change rule.
 |---|---|---|
 | `browser` | `directory` | Available |
 | `portable` | `portable` directory | SDK package provider by default; explicit checkout override retained; not executable |
-| `windows-x64` | `exe` bundle | Available with explicit `--arcane-root`; unsigned local development only |
+| `windows-x64` | `exe` bundle | SDK package provider and matching precompiled release host by default; explicit checkout override retained |
 | `linux-x64` | `deb` | Available with explicit `--arcane-root`; unsigned local development only |
 | `linux-arm64` | `deb` | Available with explicit `--arcane-root` on a compatible native ARM64 toolchain; unsigned local development only |
 | `android-arm64` | `apk` | Available with explicit `--arcane-root`; development-signed, architecture-neutral, and physical/native ARM64 for run |
@@ -101,6 +103,15 @@ or Linux. macOS native packaging and Android host adaptation remain incomplete;
 the SDK portable payload does not supply executable hosts. A source-development
 native wrapper is also not an exposed `arcane dev` target. Native `run` uses the
 selected packaged application through its paired provider.
+
+The package includes Foundation-only macOS `ArcaneCoreProcess` source for
+explicit child launch, framed pipes, ordered writes and graceful input close.
+That source requires a separately composed macOS host and is not an executable
+target or an executed macOS verification result. See the
+[host source boundary](reference/core-native-packaging.md#macos-process-source).
+Windows app assembly needs the normal Node/npm toolchain and `tar`, not a C#
+compiler. Its generated executable uses bundled Node and requires .NET Framework
+4.6.2 or later plus WebView2 Runtime on the destination Windows x64 machine.
 
 Every native target accepts one selected app release and its complete bundled
 dependency closure through the provider boundary. The providers retain the

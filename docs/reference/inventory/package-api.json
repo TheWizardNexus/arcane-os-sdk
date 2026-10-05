@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.56.0",
+  "sdkVersion": "0.57.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
@@ -17,7 +17,7 @@
       "name": "createCoreLocalAIProvider",
       "displayName": "createCoreLocalAIProvider()",
       "kind": "function",
-      "signature": "createCoreLocalAIProvider({client,id='llama.cpp'}={})",
+      "signature": "createCoreLocalAIProvider({client=getInstalledCoreClient(),id='llama.cpp'}={})",
       "entrypoints": ["arcane-os/ai/core-local"],
       "primaryImport": "arcane-os/ai/core-local",
       "group": "Core local AI",
@@ -59,7 +59,7 @@
       "name": "ensureLocalAIRuntimes",
       "displayName": "ensureLocalAIRuntimes()",
       "kind": "function",
-      "signature": "ensureLocalAIRuntimes({runtimes=[],directory,platform,architecture,signal,onEvent}={})",
+      "signature": "async ensureLocalAIRuntimes({runtimes=[],directory,platform=process.platform,architecture=process.arch,signal,onEvent}={})",
       "entrypoints": ["arcane-os/local-ai"],
       "primaryImport": "arcane-os/local-ai",
       "group": "Core local AI",
@@ -73,7 +73,7 @@
       "name": "bundleLocalAIRuntimes",
       "displayName": "bundleLocalAIRuntimes()",
       "kind": "function",
-      "signature": "bundleLocalAIRuntimes({runtimes=[],directory,outputRoot,platform,architecture,signal,onEvent}={})",
+      "signature": "async bundleLocalAIRuntimes({runtimes=[],directory,outputRoot,platform=process.platform,architecture=process.arch,signal,onEvent}={})",
       "entrypoints": ["arcane-os/local-ai"],
       "primaryImport": "arcane-os/local-ai",
       "group": "Core local AI",
@@ -1114,7 +1114,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Targets, native plans, and providers",
-      "summary": "Loads the fixed provider for one target from an explicitly selected Arcane OS checkout and authenticates that provider generation for the current SDK process.",
+      "summary": "Loads the installed SDK provider for portable or windows-x64 when arcaneRoot is omitted, or retains the explicitly selected Arcane OS checkout provider route.",
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
       "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
@@ -1860,13 +1860,13 @@
       "name": "runProcess",
       "displayName": "runProcess()",
       "kind": "function",
-      "signature": "async runProcess(command, args=[], { cwd, env, signal, onEvent, heartbeatMs=5000, terminationGraceMs=DEFAULT_TERMINATION_GRACE_MS, allowNonzero=false, input }={})",
+      "signature": "async runProcess(command, args=[], { cwd, env, signal, onEvent, heartbeatMs=5000, terminationGraceMs=DEFAULT_TERMINATION_GRACE_MS, allowNonzero=false, input, cancellationMode='terminate-tree' }={})",
       "entrypoints": [
         "arcane-os"
       ],
       "primaryImport": "arcane-os",
       "group": "Events, processes, and testing",
-      "summary": "Runs one shell-free child command with complete stdout and stderr, ordered stream events, heartbeats, and process-tree cancellation.",
+      "summary": "Runs one shell-free child command with complete output and ordered events; default tree termination or explicit close-input cancellation waits for the selected child lifecycle.",
       "availability": "Node",
       "protocol": "Node ESM / owned process or test lifecycle",
       "normalization": "SDK event/error/report normalization"
@@ -4017,7 +4017,7 @@
       "name": "readCoreLaunchContext",
       "displayName": "readCoreLaunchContext()",
       "kind": "function",
-      "signature": "readCoreLaunchContext({argv=process.argv.slice(2)}={})",
+      "signature": "async readCoreLaunchContext({argv=process.argv.slice(2)}={})",
       "entrypoints": ["arcane-os/core/host"],
       "primaryImport": "arcane-os/core/host",
       "group": "Native Core host composition",
