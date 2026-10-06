@@ -1,7 +1,9 @@
 import {Worker} from 'node:worker_threads';
 import {isDeepStrictEqual} from 'node:util';
+import Is from 'strong-type';
 import {createArcaneEventSource} from '../event-manager.mjs';
 
+const is = new Is(false);
 const brokers = new Map();
 
 /** Share the native library owner between Core services in this host. */
@@ -82,7 +84,7 @@ export function createImageRuntime(
     }
 
     function edit({model, image, prompt, strength, parameters, signal: operationSignal, onProgress} = {}) {
-        if (typeof strength !== 'number' || !Number.isFinite(strength)) {
+        if (!is.number(strength) || !is.finite(strength)) {
             throw new TypeError('Image editing requires an explicit finite strength.');
         }
         if (strength < 0 || strength > 1) {
