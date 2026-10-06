@@ -208,17 +208,32 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
         publish();
     }
 
+    function recordOllamaModels(engine, catalog, running, revision) {
+        if (revision < engine.ollamaAppliedRevision) return;
+        engine.ollamaAppliedRevision = revision;
+        const resident = new Map((running.models ?? []).map(function residentModel(model) {
+            return [model.model ?? model.name, model];
+        }));
+        const models = new Map((catalog.models ?? []).map(function catalogModel(model) {
+            const id = model.model ?? model.name ?? model.id;
+            return [id, {...model, id, loaded: resident.has(id)}];
+        }));
+        for (const [id, model] of resident) {
+            if (!models.has(id)) models.set(id, {...model, id, loaded: true});
+        }
+        engine.models = [...models.values()];
+    }
+
     async function refreshModels(engine, signal) {
         const revision = engine.revision;
         if (engine.id === 'ollama') {
+            const observation = ++engine.ollamaRevision;
             const [catalog, running] = await Promise.all([
                 requestLocalJSON({url: engine.server.url, path: '/api/tags', signal}),
                 requestLocalJSON({url: engine.server.url, path: '/api/ps', signal})
             ]);
-            const loaded = new Set((running.models ?? []).map(function loadedId(model) { return model.model ?? model.name; }));
-            engine.models = (catalog.models ?? []).map(function ollamaModel(model) {
-                return {...model, id: model.model ?? model.name, loaded: loaded.has(model.model ?? model.name)};
-            });
+            signal?.throwIfAborted();
+            recordOllamaModels(engine, catalog, running, observation);
         } else {
             const properties = await requestLocalJSON({url: engine.server.url, path: '/props', signal});
             engine.router = properties.role === 'router';
@@ -427,6 +442,32 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
 
     async function ollamaRequest(operation, parameters = {}, request, method = 'POST') {
         const engine = await engineReady('ollama', request.signal);
+        const observation = operation === 'ps' ? ++engine.ollamaRevision : null;
+        try {
+            const result = await ollamaResponse(engine, operation, parameters, request, method);
+            if (operation === 'ps') {
+                recordOllamaModels(engine, {models: engine.models}, result, observation);
+                publish();
+            }
+            return result;
+        } catch (error) {
+            if (operation === 'ps' && !request.signal.aborted && !engine.signal.aborted) recordFailure(engine, error);
+            throw error;
+        } finally {
+            // Every owned operation that can change residency/catalog leaves
+            // a real upstream observation, including cancellation or failure.
+            if (['chat', 'generate', 'embed', 'pull', 'create', 'copy', 'delete'].includes(operation)
+                && !engine.signal.aborted) {
+                try {
+                    await refreshModels(engine, engine.signal);
+                } catch (error) {
+                    if (!engine.signal.aborted) recordFailure(engine, error);
+                }
+            }
+        }
+    }
+
+    async function ollamaResponse(engine, operation, parameters, request, method) {
         const signal = AbortSignal.any([request.signal, engine.signal]);
         const {streamId, ...payload} = parameters;
         if (payload.stream !== true) {
@@ -472,6 +513,8 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
     function startEngine(engine) {
         engine.controller = new AbortController();
         engine.signal = AbortSignal.any([lifetimeSignal, engine.controller.signal]);
+        engine.ollamaRevision = 0;
+        engine.ollamaAppliedRevision = 0;
         const signal = engine.signal;
         engine.server = createLocalAIServer({
             id: engine.id, appRoot, runtime: runtimes.find(function runtimeRecord(record) { return record.id === engine.id; }),

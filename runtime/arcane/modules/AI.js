@@ -1371,11 +1371,116 @@ class AI {
         const localOnly=providerId==='OLLAMA';
         let state='unloaded';
         let busy=false;
+        let nativeWatch=null;
+
+        function nativeOllamaReady(){
+            if(!nativeWatch
+                ||nativeWatch.ollama!==runtime.#nativeOllama()
+                ||nativeWatch.modelId!==runtime.model
+                ||nativeWatch.error){
+                return false;
+            }
+            const snapshot=nativeWatch.snapshot;
+            return snapshot?.available===true
+                &&(snapshot.models??[]).some(function selectedResident(model){
+                    return (model.id??model.model??model.name)===nativeWatch.residentId
+                        &&model.loaded===true;
+                });
+        }
+
+        function stopNativeOllamaWatch(){
+            const previous=nativeWatch;
+            nativeWatch=null;
+            previous?.unsubscribe?.();
+            return previous;
+        }
+
+        function observeNativeOllama(watch,snapshot,error=null){
+            if(nativeWatch!==watch){
+                return;
+            }
+            watch.snapshot=snapshot;
+            watch.error=error;
+            if(state==='ready'&&!nativeOllamaReady()){
+                state='unloaded';
+                runtime.#retainBuiltInLLMReadiness(
+                    runtime.#reconcileBuiltInLLMReadiness()
+                );
+            }
+        }
+
+        async function inspectNativeOllama(watch,signal){
+            if(signal?.aborted){
+                throw normalizeAIRequestAbort(signal.reason);
+            }
+            const revision=watch.revision;
+            try{
+                const running=await watch.ollama.running();
+                if(signal?.aborted){
+                    throw normalizeAIRequestAbort(signal.reason);
+                }
+                if(nativeWatch===watch&&watch.revision===revision){
+                    observeNativeOllama(watch,{
+                        available:true,
+                        models:(running.models??[]).map(function residentModel(model){
+                            return {...model,loaded:true};
+                        })
+                    });
+                }
+            }catch(error){
+                if(!signal?.aborted&&watch.revision===revision){
+                    observeNativeOllama(watch,null,error);
+                }
+                throw error;
+            }
+            if(nativeWatch!==watch||!nativeOllamaReady()){
+                throw watch.error??aiProviderError(
+                    'The selected Ollama model is not loaded.',
+                    'ARCANE_AI_ROLE_NOT_READY'
+                );
+            }
+        }
+
+        async function loadNativeOllama(context){
+            stopNativeOllamaWatch();
+            const ollama=runtime.#nativeOllama();
+            if(!is.function(ollama?.generate)||!is.function(ollama?.running)){
+                throw aiProviderError(
+                    'The native Ollama API does not expose model loading and resident status.',
+                    'AI_NATIVE_LOCAL_REQUIRED'
+                );
+            }
+            const watch={
+                ollama,modelId:context.selection.modelId,residentId:context.selection.modelId,
+                snapshot:null,error:null,revision:0,unsubscribe:null
+            };
+            nativeWatch=watch;
+            if(is.function(globalThis.Arcane?.events?.on)){
+                watch.unsubscribe=globalThis.Arcane.events.on(
+                    'localai.state',
+                    function observeNativeOllamaState(snapshot){
+                        watch.revision+=1;
+                        const engine=snapshot.ollama??snapshot.runtimes?.find(function ollamaEngine(record){
+                            return record.id==='ollama';
+                        });
+                        observeNativeOllama(watch,engine??null,engine?.error??null);
+                    }
+                );
+            }
+            // Empty generation is Ollama's public preload operation. Residency
+            // is established separately; a successful response alone is insufficient.
+            const loaded=await ollama.generate(
+                {model:watch.modelId,prompt:'',stream:false},
+                {signal:context.signal}
+            );
+            watch.residentId=loaded.model??watch.modelId;
+            await inspectNativeOllama(watch,context.signal);
+        }
 
         function statusBuiltInLLMProvider(){
             if(state==='ready'
-                &&!busy
-                &&!runtime.#builtInLLMCapability(providerId)){
+                &&((localOnly&&!nativeOllamaReady())
+                    ||(!busy&&!runtime.#builtInLLMCapability(providerId)))){
                 state='unloaded';
             }
             return completeValue({
@@ -1423,7 +1528,7 @@ class AI {
                 return runtime.#builtInLLMInspection(providerId,selection);
             },
             status:statusBuiltInLLMProvider,
-            load:function loadBuiltInLLMProvider(context={}){
+            load:async function loadBuiltInLLMProvider(context={}){
                 if(context.signal?.aborted){
                     throw normalizeAIRequestAbort(context.signal.reason);
                 }
@@ -1447,7 +1552,7 @@ class AI {
                 const inspection=assertBuiltInLLMSelection(context.selection);
                 state='loading';
                 context.progress({
-                    phase:'capability',
+                    phase:localOnly?'loading':'capability',
                     completed:0,
                     total:1,
                     unit:'items',
@@ -1457,9 +1562,18 @@ class AI {
                     state='unloaded';
                     throw normalizeAIRequestAbort(context.signal.reason);
                 }
+                if(localOnly){
+                    try{
+                        await loadNativeOllama(context);
+                    }catch(error){
+                        state='unloaded';
+                        stopNativeOllamaWatch();
+                        throw error;
+                    }
+                }
                 state='ready';
                 context.progress({
-                    phase:'capability',
+                    phase:localOnly?'loading':'capability',
                     completed:1,
                     total:1,
                     unit:'items',
@@ -1489,24 +1603,39 @@ class AI {
                     );
                 }
                 busy=true;
+                const watch=nativeWatch;
                 if(context.operation==='chat'){
-                    return Promise.resolve(
-                        runtime.#requestBuiltInLLMChat(
+                    return (async function requestLoadedBuiltInLLM(){
+                        if(localOnly){
+                            await inspectNativeOllama(watch,context.signal);
+                        }
+                        const result=await runtime.#requestBuiltInLLMChat(
                             context.payload,
                             context.signal,
                             controls.onRetry
-                        )
-                    ).finally(releaseBuiltInLLMRequest);
+                        );
+                        if(localOnly){
+                            await inspectNativeOllama(watch,context.signal);
+                        }
+                        return result;
+                    })().finally(releaseBuiltInLLMRequest);
                 }
                 if(context.operation==='stream'){
                     const handle=createBuiltInAIStreamBridge(
-                        function executeBuiltInLLMProviderStream(bridge){
-                            return runtime.#requestBuiltInLLMStream(
+                        async function executeBuiltInLLMProviderStream(bridge){
+                            if(localOnly){
+                                await inspectNativeOllama(watch,bridge.signal);
+                            }
+                            const result=await runtime.#requestBuiltInLLMStream(
                                 context.payload,
                                 bridge,
                                 controls.observeToolText,
                                 controls.onRetry
                             );
+                            if(localOnly){
+                                await inspectNativeOllama(watch,bridge.signal);
+                            }
+                            return result;
                         },
                         context.signal
                     );
@@ -1522,18 +1651,27 @@ class AI {
                     'ARCANE_AI_PROVIDER_RUNTIME_INVALID'
                 );
             },
-            unload:function unloadBuiltInLLMProvider(context={}){
+            unload:async function unloadBuiltInLLMProvider(context={}){
                 if(context.signal?.aborted){
                     throw normalizeAIRequestAbort(context.signal.reason);
                 }
+                const watch=stopNativeOllamaWatch();
+                const release=localOnly&&state==='ready';
                 state='unloaded';
                 busy=false;
+                if(release&&watch){
+                    await watch.ollama.generate(
+                        {model:watch.residentId,prompt:'',keep_alive:0,stream:false},
+                        {signal:context.signal}
+                    );
+                }
                 return statusBuiltInLLMProvider();
             },
             dispose:function disposeBuiltInLLMProvider(context={}){
                 if(context.signal?.aborted){
                     throw normalizeAIRequestAbort(context.signal.reason);
                 }
+                stopNativeOllamaWatch();
                 state='disposed';
                 busy=false;
                 return statusBuiltInLLMProvider();
@@ -2110,6 +2248,12 @@ class AI {
             return Promise.resolve(this.#providerRuntime.status('llm'));
         }
         const status=this.#providerRuntime.status('llm');
+        const provider=this.#builtInLLMProviders.get(selection.providerId)?.provider;
+        if(selection.providerId==='OLLAMA'
+            &&provider?.status().loaded!==true
+            &&(status.loaded===true||status.busy===true)){
+            return this.#providerRuntime.unload('llm');
+        }
         if(this.#builtInLLMCapability(selection.providerId)){
             if(status.state==='ready'&&status.loaded===true){
                 return Promise.resolve(status);

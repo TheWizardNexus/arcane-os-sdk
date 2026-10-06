@@ -193,6 +193,42 @@ Those methods use Ollama's native API. Streaming uses the existing
 such as selection, settings and brain creation remain with their existing
 owners; they are separate from this runtime service.
 
+### Selected Ollama model readiness
+
+The built-in `OLLAMA` LLM provider loads its selected model through Ollama's
+empty `generate` request and separately confirms that exact resolved model in
+`running()` (`/api/ps`). A model catalog entry, a connected bridge, and a
+successful preload response alone do not establish a ready model. The upstream
+preload response supplies the resolved model name, including its selected tag.
+The provider preserves Ollama's configured/default retention duration.
+
+Core refreshes and emits `localai.state` after its Ollama generation, chat,
+embedding and catalog-changing operations, including a failed or cancelled
+operation while the service remains available. Explicit `running()` inspection
+also publishes the actual resident-model snapshot. An SDK-owned process exit
+publishes its unavailable state through the existing process owner.
+
+The LLM provider subscribes before loading and retains that observation while
+loaded. An observed selected-model unload, replacement, unavailable service or
+service error revokes readiness and cancels the active request through the shared
+AI runtime. Each inference checks current residency before dispatch and again
+before accepting its terminal result. Streaming chunks still arrive immediately
+through their existing path. Explicit provider unloading sends Ollama's
+`keep_alive: 0` release request; another client can independently reload a model.
+
+Ollama's documented public API exposes resident snapshots, not an ongoing
+resident-model event subscription. Core adds no timer polling. External changes
+between observations, including idle eviction or another client's model load,
+remain unobserved until a subsequent owned operation or explicit inspection.
+There is also an upstream race between a snapshot and the following request;
+these checks do not claim an atomic reservation of the daemon's model state.
+Applications consume the shared provider lifecycle rather than treating a stale
+idle snapshot as proof for their next inference. `Ollama.readiness()` remains a
+service-connectivity result and does not establish selected-model readiness.
+
+Upstream references: [resident models](https://docs.ollama.com/api/ps),
+[preload and retention](https://docs.ollama.com/faq#how-can-i-preload-a-model-into-ollama-to-get-faster-response-times).
+
 ## Browser llama.cpp provider
 
 ```js

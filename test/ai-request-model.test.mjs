@@ -307,8 +307,16 @@ test(
 
             const nativeCalls = [];
             let nativeResponseModel;
+            let nativeResidentModel;
             globalThis.Arcane = {
                 ollama: {
+                    async generate(request) {
+                        nativeResidentModel = request.keep_alive === 0 ? null : request.model;
+                        return {model: request.model, response: '', done: true};
+                    },
+                    async running() {
+                        return {models: nativeResidentModel ? [{model: nativeResidentModel}] : []};
+                    },
                     async chat(request, options) {
                         nativeCalls.push(request);
                         if (request.stream) {
