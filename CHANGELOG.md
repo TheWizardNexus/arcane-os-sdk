@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.60.0
+
+- Add `Arcane.window.setTheme(presentation, {signal})` for the current native
+  window. Optional sRGB RGBA background/text colors, null resets and omitted
+  fields retain their explicit semantics; results distinguish accepted and
+  unsupported fields. This does not change system-wide appearance.
+- Forward application-computed theme colors without blocking rendering.
+  Observe existing theme and page lifecycles, cancel superseded requests, and
+  preserve ordinary browser behavior and native window controls.
+- Apply app-owned Windows icons to the window/taskbar and copied executable.
+  Portable Node assembly handles PNG/ICO resources without an application
+  compiler, preserving source images and other executable resources. Other
+  formats retain assembly with an explicit unsupported-branding diagnostic.
+- Windows caption/text colors use the host's supported per-window DWM
+  attributes. Using the new Windows behavior requires the matching host asset;
+  platform acceptance is reported rather than inferred from a request.
+- Include completed internal PNG-decoding and stored-model working-file
+  preparation primitives. Image-service registration and engine integration
+  remain separate work; this release does not claim app-ready image generation.
+
 ## 0.59.1
 
 - Forward the existing AI synthesis signal into native Core synthesis and
