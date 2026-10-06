@@ -1,17 +1,59 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.63.0",
+  "sdkVersion": "0.64.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 285,
+  "memberCount": 288,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
   },
   "members": [
+    {
+      "id": "local-ai-whisper:createWhisperRuntime",
+      "name": "createWhisperRuntime",
+      "displayName": "createWhisperRuntime()",
+      "kind": "function",
+      "signature": "createWhisperRuntime({runtime,prepare,modelId,temporaryDirectory,onEvent}={})",
+      "entrypoints": ["arcane-os/local-ai/whisper"],
+      "primaryImport": "arcane-os/local-ai/whisper",
+      "group": "Core native speech",
+      "summary": "Retains a selected native Whisper helper/model across complete recordings with actual correlated recovery and joined cancellation.",
+      "availability": "Node with prepared matching helper, Whisper libraries, decoder and model; Android needs host process adaptation",
+      "protocol": "Persistent first-party native helper with replaying whisper.state and complete transcription results",
+      "normalization": "Returns current/subscribe/load/transcribe/unload/close; preserves complete original media and text/segment results; one accepted transcription, exact requestId control metadata, eligible auto GPU-to-CPU recovery once, truthful unloaded recovery and terminal errors, joined decoder/helper cleanup"
+    },
+    {
+      "id": "local-ai-whisper:default",
+      "name": "default",
+      "displayName": "createWhisperRuntime default export",
+      "kind": "function",
+      "signature": "default as createWhisperRuntime",
+      "entrypoints": ["arcane-os/local-ai/whisper"],
+      "primaryImport": "arcane-os/local-ai/whisper",
+      "group": "Core native speech",
+      "summary": "Default binding for the same retained native Whisper engine factory.",
+      "availability": "Node with the matching prepared native resources",
+      "protocol": "Native Whisper engine lifecycle",
+      "normalization": "Binding identity equals the named createWhisperRuntime export"
+    },
+    {
+      "id": "local-ai-whisper-build:buildWhisperHelper",
+      "name": "buildWhisperHelper",
+      "displayName": "buildWhisperHelper()",
+      "kind": "function",
+      "signature": "async buildWhisperHelper({runtime,outputRoot,cmake='cmake',generator,cmakeArgs=[],env,signal,onEvent}={})",
+      "entrypoints": ["arcane-os/local-ai/whisper/build"],
+      "primaryImport": "arcane-os/local-ai/whisper/build",
+      "group": "Core native speech",
+      "summary": "Builds and installs the first-party persistent helper against matching prepared Whisper headers and runtime libraries.",
+      "availability": "Node with installed CMake/C++17 toolchain matching the selected platform and architecture",
+      "protocol": "Owned configure/build/install process lifecycle",
+      "normalization": "Returns platform/architecture/root/executable/runtimeDirectory and complete configure/compile/install diagnostics; preserves cancellation and process failures, installs no model or toolchain, performs no inference"
+    },
     {
       "id": "codex-app-server:createCodexAppServerSession",
       "name": "createCodexAppServerSession",

@@ -13,7 +13,7 @@ methods. Importing the module and constructing an owner perform no I/O.
 | Host | Default dataRoot | repositoriesRoot |
 |---|---|---|
 | Windows | `%LOCALAPPDATA%/ArcaneData`, or `~/AppData/Local/ArcaneData` when that variable is empty | `<dataRoot>/Repos` |
-| Linux | `$XDG_DATA_HOME/ArcaneData` when XDG_DATA_HOME is absolute, otherwise `~/.local/share/ArcaneData` | `<dataRoot>/Repos` |
+| Linux | `$XDG_DATA_HOME/ArcaneData` when `XDG_DATA_HOME` is absolute, otherwise `~/.local/share/ArcaneData` | `<dataRoot>/Repos` |
 | macOS | `~/Library/Application Support/ArcaneData` | `<dataRoot>/Repos` |
 | Android or another adapted host | Explicit `dataRoot` supplied by the host, such as its app files directory followed by `ArcaneData` | `<dataRoot>/Repos` |
 

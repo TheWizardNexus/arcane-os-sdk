@@ -47,6 +47,11 @@ four-step defaults and the advertised `txt2img` operation. Keep each model's
 supported operations distinct: selecting FLUX does not enable reference-image
 editing or imply the same input path as SD1.4 img2img.
 
+`sdxl-base-1.0` selects the complete SDXL Base checkpoint, including its text
+encoders and original VAE. Its [family guide](local-image-sdxl.md) covers the
+single model resource, 1024-by-1024 default canvas and native sampling defaults.
+It advertises `txt2img`; selecting it does not enable an editing operation.
+
 The first published distribution path selects CPU on Windows and Linux.
 On macOS, `auto` selects the same upstream universal runtime's built-in Metal
 backend, with CPU fallback; explicit `cpu` remains available. A caller-supplied

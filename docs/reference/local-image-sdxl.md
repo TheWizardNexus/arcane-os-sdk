@@ -38,7 +38,7 @@ selection alone does not establish actual execution on any device.
 ## Prepare the checkpoint and generate an image
 
 The single `model` resource is the official
-[sd_xl_base_1.0.safetensors checkpoint](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/462165984030d82259a11f4367a4eed129e94a7b/sd_xl_base_1.0.safetensors)
+[`sd_xl_base_1.0.safetensors` checkpoint](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/462165984030d82259a11f4367a4eed129e94a7b/sd_xl_base_1.0.safetensors)
 at revision `462165984030d82259a11f4367a4eed129e94a7b`. It includes the text
 encoders, denoiser and original VAE. Standalone base generation uses this one
 resource; a refiner, separate VAE, LoRA or Python converter is unnecessary for

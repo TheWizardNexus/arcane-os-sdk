@@ -1,7 +1,7 @@
 # Local AI through Core
 
-Core owns native llama.cpp and Ollama processes, ONNX worker sessions and
-selected local image generation. The browser retains its own
+Core owns native llama.cpp and Ollama processes, ONNX worker sessions,
+selected local image generation and retained Whisper transcription. The browser retains its own
 Wllama and ONNX implementations, and can also use an explicitly connected Core
 when that system service is available. Runtime installation, model loading and
 inference are separate operations.
@@ -43,7 +43,7 @@ preserved when its version cannot be established.
 
 Both public application/package schemas accept `stable-diffusion.cpp` as a
 string or runtime-record ID. Its record additionally accepts `backend`
-(`auto`, `cpu` or `metal`) and `models`, an array of `sd14`, `flux2-klein-4b` or
+(`auto`, `cpu` or `metal`) and `models`, an array of `sd14`, `flux2-klein-4b`, `sdxl-base-1.0` or
 complete model descriptors. Omitted image version selects `master-929-3f8527a`; omitted backend
 selects `auto`; omitted models leaves model selection empty. Windows/Linux
 distribution defaults use CPU; the selected universal Mac archive supports
@@ -54,6 +54,30 @@ See [image selection and model preparation](local-image-generation.md#selection-
 The [FLUX.2 Klein 4B guide](local-image-flux.md) describes its diffusion model,
 VAE and Qwen text-conditioning resources, four-step defaults and `txt2img`
 operation. Each model retains its own supported operation set.
+
+The [SDXL Base 1.0 guide](local-image-sdxl.md) describes its complete checkpoint,
+embedded text encoders and original VAE, 1024-by-1024 default canvas and
+`txt2img` operation. Selecting a family retains the shared native context,
+progress, cancellation and complete PNG result contract.
+
+For native transcription, select a `whisper.cpp` runtime record with a `models`
+array and an explicit `modelId` when selecting more than one model. For example,
+`{id: 'whisper.cpp', backend: 'auto', models: ['whisper-small'], modelId: 'whisper-small'}`
+selects the multilingual small model. Installation prepares its native
+libraries, persistent SDK helper, FFmpeg decoder and selected model files;
+loading and transcription remain separate operations. Development and native
+assembly compose it through the shared speech service without changing the
+browser's selected STT route. See [native Whisper](local-whisper.md) for the
+complete configuration, platform, media and shutdown contracts.
+
+The selected model stays loaded across recordings. An eligible native
+accelerated failure may drain that helper and retry the same complete recording
+once on the prepared CPU backend. That accepted request retains its actual
+request identity while `recovering` is unloaded and busy; new inference remains
+blocked until actual readiness. Cancellation, unload, close, replacement and
+transport loss retain their owning cancellation behavior. A terminal engine
+failure reaches the original request as its actual error rather than a
+fabricated readiness success. See [native speech reconciliation](native-speech.md).
 
 `llamaCpp` accepts `url`, `model`, `modelsDirectory`, and an `args` string array.
 `model` selects a single GGUF file; `modelsDirectory` selects llama.cpp router

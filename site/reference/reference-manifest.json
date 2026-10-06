@@ -3,16 +3,16 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.63.0",
+    "sdk": "0.64.0",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
   "counts": {
-    "markdownPages": 44,
+    "markdownPages": 47,
     "collectionPages": 2,
     "generatedPages": 95,
     "runtimeModulePages": 93,
-    "htmlPages": 141,
+    "htmlPages": 144,
     "inventories": 4
   },
   "pages": [
@@ -92,6 +92,12 @@
       "source": "docs/reference/core-preferences.md",
       "output": "site/reference/core-preferences/index.html",
       "route": "reference/core-preferences/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core-repositories.md",
+      "output": "site/reference/core-repositories/index.html",
+      "route": "reference/core-repositories/",
       "kind": "markdown"
     },
     {
@@ -239,6 +245,18 @@
       "kind": "markdown"
     },
     {
+      "source": "docs/reference/local-image-sdxl.md",
+      "output": "site/reference/local-image-sdxl/index.html",
+      "route": "reference/local-image-sdxl/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/local-whisper.md",
+      "output": "site/reference/local-whisper/index.html",
+      "route": "reference/local-whisper/",
+      "kind": "markdown"
+    },
+    {
       "source": "docs/reference/mail.md",
       "output": "site/reference/mail/index.html",
       "route": "reference/mail/",
@@ -374,8 +392,8 @@
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
-        "exports": 13,
-        "reviewedCallables": 7,
+        "exports": 14,
+        "reviewedCallables": 8,
         "publicMembers": 0,
         "literalCustomEvents": 0,
         "directCodedFailures": 1,

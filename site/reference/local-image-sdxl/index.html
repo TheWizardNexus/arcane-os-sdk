@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="The sdxl-base-1.0 model definition selects Stability AI&#39;s complete SDXL Base 1.0 checkpoint for text-to-image generation through the shared local image runtime. Applications supply their own complete prompts and own the resulting images and saved associations. The model uses the shared retained native context, progress, cancellation and complete PNG result contract.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/local-image-sdxl/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="SDXL Base 1.0 through Core · Arcane OS SDK"><meta property="og:description" content="The sdxl-base-1.0 model definition selects Stability AI&#39;s complete SDXL Base 1.0 checkpoint for text-to-image generation through the shared local image runtime. Applications supply their own complete prompts and own the resulting images and saved associations. The model uses the shared retained native context, progress, cancellation and complete PNG result contract."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/local-image-sdxl/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="SDXL Base 1.0 through Core · Arcane OS SDK"><meta name="twitter:description" content="The sdxl-base-1.0 model definition selects Stability AI&#39;s complete SDXL Base 1.0 checkpoint for text-to-image generation through the shared local image runtime. Applications supply their own complete prompts and own the resulting images and saved associations. The model uses the shared retained native context, progress, cancellation and complete PNG result contract."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>SDXL Base 1.0 through Core | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">SDXL Base 1.0 through Core</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="sdxl-base-10-through-core">SDXL Base 1.0 through Core</h1><p class="doc-lead">The sdxl-base-1.0 model definition selects Stability AI&#39;s complete SDXL Base 1.0 checkpoint for text-to-image generation through the shared local image runtime. Applications supply their own complete prompts and own the resulting images and saved associations. The model uses the shared retained native context, progress, cancellation and complete PNG result contract.</p><div class="doc-meta"><span>SDK 0.64.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="./" aria-current="page">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/local-image-sdxl.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#model-selection">Model selection</a><a href="#prepare-the-checkpoint-and-generate-an-image">Prepare the checkpoint and generate an image</a><a href="#defaults-and-operation-scope">Defaults and operation scope</a></nav></details><p>The <code>sdxl-base-1.0</code> model definition selects Stability AI&#39;s complete SDXL Base
+1.0 checkpoint for text-to-image generation through the shared
+<a href="../local-image-generation/">local image runtime</a>. Applications supply their
+own complete prompts and own the resulting images and saved associations.
+The model uses the shared retained native context, progress, cancellation
+and complete PNG result contract.</p>
+<h2 id="model-selection">Model selection</h2>
+<p>Select this runtime record under <code>native.localAI</code> in <code>arcane-app.json</code>, or
+the corresponding package projection&#39;s <code>localAI</code> record:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>json</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-json">{
+    &quot;runtimes&quot;: [
+        {
+            &quot;id&quot;: &quot;stable-diffusion.cpp&quot;,
+            &quot;version&quot;: &quot;master-929-3f8527a&quot;,
+            &quot;backend&quot;: &quot;auto&quot;,
+            &quot;models&quot;: [&quot;sdxl-base-1.0&quot;]
+        }
+    ]
+}
+</code></pre></div>
+<p>The built-in ID supplies the cohesive <code>SDXL_BASE_1_0_MODEL</code> definition from
+<code>src/local-ai/image-models/sdxl.mjs</code>. The shared service exposes its resource
+metadata through <code>image.status</code> and <code>images.inspect()</code>.</p>
+<p>Backend discovery, accelerated-device selection and CPU fallback belong to
+the shared runtime. This model definition leaves <code>context</code> empty and adds no
+device or precision override. Available acceleration depends on the selected
+runtime distribution; see the shared guide&#39;s platform availability. Model
+selection alone does not establish actual execution on any device.</p>
+<h2 id="prepare-the-checkpoint-and-generate-an-image">Prepare the checkpoint and generate an image</h2>
+<p>The single <code>model</code> resource is the official
+<a href="https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/462165984030d82259a11f4367a4eed129e94a7b/sd_xl_base_1.0.safetensors" target="_blank" rel="noreferrer"><code>sd_xl_base_1.0.safetensors</code> checkpoint</a>
+at revision <code>462165984030d82259a11f4367a4eed129e94a7b</code>. It includes the text
+encoders, denoiser and original VAE. Standalone base generation uses this one
+resource; a refiner, separate VAE, LoRA or Python converter is unnecessary for
+this selection. The upstream model carries the
+<a href="https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/462165984030d82259a11f4367a4eed129e94a7b/LICENSE.md" target="_blank" rel="noreferrer">CreativeML Open RAIL++-M license</a>.</p>
+<p>The existing DBOPFS model store owns the authoritative download. The shared
+<a href="../model-assets/">model-assets service</a> prepares complete native working files
+when the application loads the model. Installing the native runtime does not
+download a second model copy.</p>
+<p>This example extends the shared generation guide. It uses an existing <code>images</code>
+accessor, DBOPFS-backed <code>modelStore</code>, application-selected <code>workingDirectory</code>
+and request <code>signal</code>:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createBrowserModelSource} from &#39;arcane-os/ai/browser-wasm&#39;;
+import {prepareCoreModelAssets} from &#39;arcane-os/ai/core-model-assets&#39;;
+
+const selected = (await images.inspect({signal})).models.find(
+    function selectedSDXL(model) {
+        return model.id === &#39;sdxl-base-1.0&#39;;
+    }
+);
+const resource = selected.resources.model;
+const source = createBrowserModelSource({
+    id: selected.id,
+    files: [{name: resource.filename, url: resource.url}]
+});
+const stored = await modelStore.ensure(source, {signal});
+const projection = await prepareCoreModelAssets({
+    workingDirectory,
+    members: source.files.map(function workingMember(member, index) {
+        return {path: member.name, file: stored.files[index]};
+    }),
+    signal
+});
+
+try {
+    await images.load({
+        model: selected.id,
+        assetProjectionId: projection.id,
+        resourcePaths: {model: resource.filename},
+        signal
+    });
+} finally {
+    await projection.release();
+}
+
+const result = await images.generate({
+    model: selected.id,
+    prompt: &#39;An octopus librarian shelving tiny books inside a glass submarine.&#39;,
+    signal
+});
+// Display result.images using the shared guide&#39;s Blob preview example.
+</code></pre></div>
+<p>Change the prompt to request another scene. The model defaults to a
+1024-by-1024 canvas; pass <code>parameters: {width, height}</code> to select other native
+dimensions. Display or save every returned image using its actual width and
+height. Each result contains the complete PNG Blob.</p>
+<p>Successful loading retains the working projection in the native model owner.
+Releasing the caller&#39;s preparation handle preserves that native retain.
+Repeated generation reuses the loaded context; unload it when the application
+no longer needs it. Follow the shared lifecycle contract for request
+cancellation, state subscriptions, unloading and accessor closure.</p>
+<h2 id="defaults-and-operation-scope">Defaults and operation scope</h2>
+<p>Only canvas dimensions are model-specific defaults here. Sampling parameters
+remain owned by the selected native engine and can be supplied through
+<code>parameters.sample_params</code>. At <code>master-929-3f8527a</code>, SDXL resolves the native
+default sampler to Euler A and scheduler to discrete, with 20 steps and CFG 7.
+These are native defaults; Stability AI&#39;s separate base-plus-refiner example
+and Python pipeline have their own sampling configuration.</p>
+<p>The selected engine has an explicit path for SDXL&#39;s embedded original VAE,
+including its native convolution scaling. The model definition leaves that
+treatment with the engine and supplies no guessed weight-type override or
+separate VAE checkpoint. Output quality, speed and device behavior depend on
+the actual selected runtime and generation parameters.</p>
+<p>The SDK forwards the complete caller prompt to the native API. The engine
+applies its own text conditioning and prompt-weighting syntax; see the shared
+guide for native string-boundary limitations. The SDK adds no avatar wording,
+style instructions or application-specific content.</p>
+<p>This definition advertises <code>txt2img</code>. Whole-image editing, masked editing and
+reference-image editing are separate operations with their own model and
+runtime requirements. This base selection does not advertise those operations.</p>
+<p>The model resource and standalone use follow the
+<a href="https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/462165984030d82259a11f4367a4eed129e94a7b/README.md" target="_blank" rel="noreferrer">official model card</a>.
+Native defaults and embedded-VAE behavior follow the selected engine&#39;s
+<a href="https://github.com/leejet/stable-diffusion.cpp/blob/master-929-3f8527a/src/pipeline/request.cpp" target="_blank" rel="noreferrer">request implementation</a>,
+<a href="https://github.com/leejet/stable-diffusion.cpp/blob/master-929-3f8527a/src/stable-diffusion.cpp" target="_blank" rel="noreferrer">parameter initialization</a>
+and <a href="https://github.com/leejet/stable-diffusion.cpp/blob/master-929-3f8527a/src/pipeline/model_builders.cpp" target="_blank" rel="noreferrer">model construction</a>.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#model-selection">Model selection</a><a href="#prepare-the-checkpoint-and-generate-an-image">Prepare the checkpoint and generate an image</a><a href="#defaults-and-operation-scope">Defaults and operation scope</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.64.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

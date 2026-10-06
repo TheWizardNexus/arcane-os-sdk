@@ -26,6 +26,7 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core-client/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core-native-packaging/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core-preferences/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core-repositories/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core-runtime/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-ai-contracts/</loc></url>
@@ -50,6 +51,8 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/local-image-editing/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/local-image-flux/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/local-image-generation/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/local-image-sdxl/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/local-whisper/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/mail/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/model-assets/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/native-speech/</loc></url>

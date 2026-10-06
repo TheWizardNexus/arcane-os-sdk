@@ -39,6 +39,7 @@ export const RUNTIME_DOCUMENTED_CALLABLE_MEMBERS={
         'normalizeAIResponseLink','decodeHTMLCharacterReferences'
     ],
     'AIRuntimeState.js':[
+        'continuesAIRuntimeOperation',
         'getAIRuntimeState','subscribeAIRuntimeState',
         'publishAIRuntimeRoleState','publishAIRuntimeRolesState',
         'requestAIRuntimeIntent','subscribeAIRuntimeIntents','startAIRuntime'

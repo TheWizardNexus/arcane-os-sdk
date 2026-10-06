@@ -282,6 +282,19 @@ results and CPU/Metal platform boundaries.
 
 ### Injected native speech engines
 
+Selecting `whisper.cpp` in `native.localAI.runtimes` composes the SDK's retained
+Whisper engine as STT in the shared speech service. Portable assembly retains
+the selected helper, runtime variants and their libraries, FFmpeg decoder and
+configured model files under the app's native runtime tree. The executable
+host, helper, decoder and models remain separate files; selecting speech does
+not embed them inside one application executable. Runtime paths relocate with
+the payload. The default Windows x64 preparation uses the matching SDK release's
+helper plus its MSVC/OpenMP redistributable closure. Other platforms require
+their matching helper, runtime variants and decoder; the public helper builder
+uses matching Whisper headers/libraries with the caller's native toolchain.
+See [native Whisper preparation and packaging](local-whisper.md). Assembly is
+distinct from execution on the target host.
+
 An application-owned service factory can return
 `createSpeechService({stt,tts,signal})` from `arcane-os/core/speech`, supplying
 either role or both. Include that factory through the existing

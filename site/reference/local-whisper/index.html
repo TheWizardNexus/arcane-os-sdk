@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="Arcane runs whisper.cpp through a persistent native helper. A selected model stays loaded across recordings. The helper reports actual model readiness, native progress and timestamped segments, and completes cancellation before the model or recording files are reused. The browser&#39;s existing AI.fetchSTT(audioFile, signal) and Core speech.transcribe routes retain the application&#39;s selected model and cancellation signal.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/local-whisper/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Native Whisper transcription · Arcane OS SDK"><meta property="og:description" content="Arcane runs whisper.cpp through a persistent native helper. A selected model stays loaded across recordings. The helper reports actual model readiness, native progress and timestamped segments, and completes cancellation before the model or recording files are reused. The browser&#39;s existing AI.fetchSTT(audioFile, signal) and Core speech.transcribe routes retain the application&#39;s selected model and cancellation signal."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/local-whisper/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Native Whisper transcription · Arcane OS SDK"><meta name="twitter:description" content="Arcane runs whisper.cpp through a persistent native helper. A selected model stays loaded across recordings. The helper reports actual model readiness, native progress and timestamped segments, and completes cancellation before the model or recording files are reused. The browser&#39;s existing AI.fetchSTT(audioFile, signal) and Core speech.transcribe routes retain the application&#39;s selected model and cancellation signal."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Native Whisper transcription | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native Whisper transcription</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-whisper-transcription">Native Whisper transcription</h1><p class="doc-lead">Arcane runs whisper.cpp through a persistent native helper. A selected model stays loaded across recordings. The helper reports actual model readiness, native progress and timestamped segments, and completes cancellation before the model or recording files are reused. The browser&#39;s existing AI.fetchSTT(audioFile, signal) and Core speech.transcribe routes retain the application&#39;s selected model and cancellation signal.</p><div class="doc-meta"><span>SDK 0.64.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="./" aria-current="page">Native Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/local-whisper.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#select-the-runtime-and-model">Select the runtime and model</a><a href="#core-and-development-integration">Core and development integration</a><a href="#public-engine-api">Public engine API</a><a href="#explicit-runtimes-and-helper-builds">Explicit runtimes and helper builds</a></nav></details><p>Arcane runs <code>whisper.cpp</code> through a persistent native helper. A selected model
+stays loaded across recordings. The helper reports actual model readiness,
+native progress and timestamped segments, and completes cancellation before
+the model or recording files are reused. The browser&#39;s existing
+<code>AI.fetchSTT(audioFile, signal)</code> and Core <code>speech.transcribe</code> routes retain the
+application&#39;s selected model and cancellation signal.</p>
+<h2 id="select-the-runtime-and-model">Select the runtime and model</h2>
+<p>An application&#39;s <code>arcane-app.json</code> selects native speech alongside its other
+independent local runtimes:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>json</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-json">{
+  &quot;native&quot;: {
+    &quot;localAI&quot;: {
+      &quot;runtimes&quot;: [
+        {
+          &quot;id&quot;: &quot;whisper.cpp&quot;,
+          &quot;backend&quot;: &quot;auto&quot;,
+          &quot;models&quot;: [&quot;whisper-small&quot;]
+        }
+      ]
+    }
+  }
+}
+</code></pre></div>
+<p>The equivalent package configuration is <code>arcane-package.json</code>&#39;s <code>localAI</code>.
+Existing unrelated descriptor fields remain part of the application&#39;s file.
+<code>models</code> defaults to an empty array, so selecting the runtime alone acquires no
+model. A single selected model becomes <code>modelId</code>; multiple models require an
+explicit selected <code>modelId</code> before transcription. The built-in <code>whisper-small</code>
+descriptor selects the official <code>ggerganov/whisper.cpp</code> <code>ggml-small.bin</code> model.
+An explicit model descriptor is <code>{id, path}</code> or <code>{id, url, filename?}</code>.</p>
+<p>Default Windows x64 preparation acquires the selected complete upstream
+Whisper 1.9.4/b5130 CUDA 12.4 and CPU distributions, FFmpeg 9.0.2 essentials,
+the selected model, and Arcane&#39;s helper asset from the matching SDK numeric
+release. The Windows helper includes its selected Visual C++ release runtime
+DLLs beside the executable. Preparation shares matching installation jobs, observes cancellation,
+and preserves the complete selected runtime trees. Model-selection changes
+can reuse the already prepared runtime and matching models.</p>
+<p>With <code>backend: &quot;auto&quot;</code>, accelerated runtimes are attempted before CPU. Failure
+to load an accelerated runtime falls back to the prepared CPU runtime. If
+native accelerated inference fails, Arcane drains that context and retries the
+complete decoded recording once on CPU with the same model. Cancellation,
+input errors and observer errors do not trigger this retry. Explicit <code>cuda</code>,
+<code>metal</code> or <code>cpu</code> selections retain that chosen backend.</p>
+<p>During that accepted request&#39;s internal recovery, the engine reports
+<code>state: &quot;recovering&quot;</code>, <code>loaded: false</code>, and <code>busy: true</code>, with the same selected
+provider and model. It accepts no new transcription while the old context
+drains and the CPU context loads. Only actual CPU readiness restores <code>ready</code>.
+An explicitly unloaded, replaced, or closed model remains a cancellation
+boundary; internal recovery preserves the original request and its signal.</p>
+<p><code>requestedBackend</code> identifies a preference. <code>observedBackend</code> and
+<code>backendEvidence</code> report native initialization evidence when available; they
+do not claim that every computation runs on the GPU. No driver or compiler is
+installed on application startup.</p>
+<h2 id="core-and-development-integration">Core and development integration</h2>
+<p>Development and generated native Core entries compose a
+<a href="../native-speech/"><code>createSpeechService</code></a> with the selected Whisper engine.
+Speech preparation and model loading proceed independently of the page,
+chat and image services. Core publishes retained <code>speech.state</code> and per-request
+<code>speech.progress</code>; transcription availability follows the selected engine&#39;s
+actual loaded state. The shared service remains usable when only STT is
+selected, through <code>transcriptionAvailable</code> and <code>roles.stt</code>.</p>
+<p>The native bundle includes the helper, runtime libraries, decoder and selected
+model under its runtime directory beside the application executable. Those
+resources stay in the application bundle. They are not embedded into one
+Windows executable. The compiler and matching upstream headers are build-time
+requirements for the first-party helper only.</p>
+<p>Applications may continue using the existing Core call:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const transcript = await client.speech.transcribe({
+    audioBase64,
+    mimeType: &#39;audio/webm&#39;,
+    model: &#39;whisper-small&#39;
+}, {signal});
+console.log(transcript.text);
+</code></pre></div>
+<p>FFmpeg decodes the complete recorded media into mono 16 kHz PCM at the native
+transport boundary. The original recording remains untouched during the
+operation. Arcane imposes no recording-duration cap and does not trim the
+transcript. The upstream inference API&#39;s signed-integer sample argument is
+reported honestly if a recording cannot fit that native call; no audio is
+silently shortened. Complete operation files are removed only after decoder
+and native inference cleanup have completed.</p>
+<h2 id="public-engine-api">Public engine API</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createWhisperRuntime} from &#39;arcane-os/local-ai/whisper&#39;;
+
+const stt = createWhisperRuntime({
+    runtime: preparedRuntime,
+    modelId: &#39;whisper-small&#39;,
+    temporaryDirectory: applicationSpeechDirectory,
+    onEvent: reportDiagnostic
+});
+const unsubscribe = stt.subscribe(renderModelState);
+await stt.load({signal});
+try {
+    const result = await stt.transcribe({audioBase64, mimeType, model: &#39;whisper-small&#39;}, {
+        signal,
+        onProgress: renderTranscriptionProgress
+    });
+    console.log(result.text, result.segments);
+} finally {
+    unsubscribe();
+    await stt.close();
+}
+</code></pre></div>
+<p><code>createWhisperRuntime(options)</code> performs no model load. <code>options.runtime</code> is a
+prepared descriptor returned by <code>ensureLocalAIRuntimes</code>; alternatively,
+<code>options.prepare({signal, onEvent})</code> lazily returns that descriptor during
+<code>load</code>. <code>temporaryDirectory</code> is required and belongs to the application.</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Member</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>current()</code></td>
+<td>Returns <code>providerId</code>, selected <code>modelId</code>, lifecycle <code>state</code>, <code>loaded</code>, <code>busy</code>, correlated <code>requestId</code> or null, requested/observed backend, evidence and any error.</td>
+</tr>
+<tr>
+<td><code>subscribe(listener, {replay = true, signal} = {})</code></td>
+<td>Immediately replays current state by default and returns an unsubscribe function.</td>
+</tr>
+<tr>
+<td><code>load({modelId, signal} = {})</code></td>
+<td>Prepares the runtime if necessary, then waits for actual native model readiness. With no selected model it remains unloaded.</td>
+</tr>
+<tr>
+<td><code>transcribe(request, {signal, onProgress, requestId} = {})</code></td>
+<td>Consumes the complete <code>audioBase64</code> recording. Optional <code>language</code> defaults to native automatic detection; <code>translate: true</code> selects Whisper&#39;s translation operation. <code>model</code> must match the loaded model. Optional <code>requestId</code> carries the caller&#39;s existing operation identity through lifecycle snapshots as separate control information; it does not alter the recording or request payload.</td>
+</tr>
+<tr>
+<td><code>unload()</code></td>
+<td>Cancels and joins active load/transcription, releases the native context, and permits a later explicit load.</td>
+</tr>
+<tr>
+<td><code>close()</code></td>
+<td>Joins shutdown and disposes this engine permanently. Repeated calls share the same shutdown.</td>
+</tr></tbody>
+</table>
+</div>
+<p>One retained model processes one recording at a time; a simultaneous request
+receives <code>WHISPER_BUSY</code>. Model changes use <code>await stt.unload()</code> followed by
+<code>stt.load({modelId})</code>. The <code>ready</code> state remains <code>loaded: true</code> with <code>busy: true</code>
+during ordinary inference. Progress records include the native event plus
+<code>backend</code> and <code>attempt</code>, so a CPU retry remains distinguishable. Segment text
+is preserved in order. The final result is
+<code>{text, language, duration, segments: [{index, start, end, text}]}</code>; times are
+seconds and are native segment timestamps, not invented word timestamps.</p>
+<p>Full process diagnostics stay with <code>onEvent</code> and native process failures.
+Applications should use their selected inspection surface for those details
+and keep ordinary user status concise.
+An error snapshot retains the failed operation&#39;s <code>requestId</code> after <code>busy</code>
+becomes false, allowing the caller to correlate its actual pending response.
+A new request or model load supersedes that identity; unload and close clear
+it. No recording or request payload is retained by this correlation field.
+Progress callbacks may cancel through the supplied controller and return;
+they must not await the same transcription or its shutdown from inside its
+own output callback. Await those operations in the initiating owner instead.</p>
+<h2 id="explicit-runtimes-and-helper-builds">Explicit runtimes and helper builds</h2>
+<p>Windows, Linux and macOS host integration uses the same public engine and
+portable helper source. Automatic archive selection currently provides the
+Windows x64 distribution above. Other targets supply their complete selected
+runtime, decoder and compiled helper paths; their native execution requires
+verification on that actual platform. Android requires a host adapter for
+its process and library lifecycle.</p>
+<p>An explicit runtime requirement can supply:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const result = {
+    id: &#39;whisper.cpp&#39;,
+    version: &#39;1.9.4&#39;,
+    backend: &#39;auto&#39;,
+    variants: [
+        {backend: &#39;cuda&#39;, root: cudaRuntimeDirectory, libraryDirectory: cudaLibraryDirectory},
+        {backend: &#39;cpu&#39;, root: cpuRuntimeDirectory, libraryDirectory: cpuLibraryDirectory}
+    ],
+    helperExecutable,
+    helperRoot,
+    decoderExecutable,
+    decoderRoot,
+    models: [{id: &#39;whisper-small&#39;, path: selectedModelPath}],
+    modelId: &#39;whisper-small&#39;
+};
+</code></pre></div>
+<p><code>libraryDirectory</code> belongs to its complete variant root. <code>decoderExecutable</code>
+belongs to <code>decoderRoot</code> (which defaults to its containing directory).
+<code>helperExecutable</code> similarly belongs to <code>helperRoot</code>; its complete directory
+tree is retained, including app-local native dependencies.
+Preparation copies those selected resources into its owned installation, and
+native packaging projects their paths relative to the application bundle.
+<code>helperUrl</code>, <code>helperVersion</code>, and <code>decoderUrl</code> allow an explicitly selected
+published distribution instead of local paths. Dependency permissions remain
+the caller&#39;s responsibility.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {buildWhisperHelper} from &#39;arcane-os/local-ai/whisper/build&#39;;
+
+const helper = await buildWhisperHelper({
+    runtime: {directory: runtimeLibraryDirectory, sourceDirectory: matchingUpstreamSource},
+    outputRoot: helperBuildDirectory,
+    signal,
+    onEvent: reportDiagnostic
+});
+</code></pre></div>
+<p>The builder runs CMake configure/build/install against the selected matching
+public upstream headers and runtime. Optional <code>cmake</code>, <code>generator</code>,
+<code>cmakeArgs</code> and <code>env</code> select the existing toolchain. It returns the helper
+<code>executable</code>, platform, architecture, runtime directory and complete build
+diagnostics. The helper&#39;s documented process contract is in
+<code>native/README.md</code>.
+On MSVC, CMake&#39;s installed runtime-library module adds release CRT files to
+the helper&#39;s <code>bin/</code> directory. <code>-DMSVC_REDIST_DIR=...</code> selects an existing
+redistributable directory when needed. Windows provides the Universal CRT;
+compiler tools and debug runtimes stay outside the application bundle.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#select-the-runtime-and-model">Select the runtime and model</a><a href="#core-and-development-integration">Core and development integration</a><a href="#public-engine-api">Public engine API</a><a href="#explicit-runtimes-and-helper-builds">Explicit runtimes and helper builds</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.64.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

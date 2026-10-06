@@ -120,6 +120,7 @@
         "AI_RUNTIME_STARTUP_EVENT",
         "AI_RUNTIME_STATES",
         "AI_RUNTIME_STATE_EVENT",
+        "continuesAIRuntimeOperation",
         "getAIRuntimeState",
         "publishAIRuntimeRoleState",
         "publishAIRuntimeRolesState",
@@ -131,8 +132,8 @@
       "summary": "Sticky mutable LLM, speech-to-text, and text-to-speech lifecycle snapshots, intents, subscriptions, and startup-settlement barriers.",
       "availability": "Cross-host in-process state contract; actual role readiness remains provider specific",
       "protocol": "arcane-ai-runtime-state/1 over the per-realm globalThis.arcaneEvents authority",
-      "normalization": "Closed monotonic sticky role snapshots, transient lifecycle intents, synchronous current-state replay, AbortSignal cleanup, and startup settlement are normalized; events report state but grant no authority.",
-      "surface": "Protocol/event/role/state constants; snapshot, state subscribe/publish, intent request/subscribe, and `startAIRuntime({startMuted,startTranscription,signal})` returning `{barrier,settled,cancel}`."
+      "normalization": "Closed monotonic sticky role snapshots, transient lifecycle intents, synchronous current-state replay, AbortSignal cleanup, and startup settlement are normalized; unloaded recovery/error may retain the exact busy operation until settlement, without readiness for new inference.",
+      "surface": "Protocol/event/role/state constants; snapshot, state subscribe/publish, intent request/subscribe, continuesAIRuntimeOperation(previous,current,operationId) for the real continuing runtime operation, and `startAIRuntime({startMuted,startTranscription,signal})` returning `{barrier,settled,cancel}`."
     },
     {
       "file": "runtime/arcane/modules/AnsiText.js",

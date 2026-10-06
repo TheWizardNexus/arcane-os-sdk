@@ -427,6 +427,9 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `createLocalImageService()` | function | `arcane-os/core/image` | Core local images | Node Core with selected stable-diffusion.cpp requirements |
 | `createLocalImageService default export` | function | `arcane-os/core/image` | Core local images | Same native image service factory |
 | `createSpeechService()` | function | `arcane-os/core/speech` | Core native speech | Node Core with explicitly supplied speech engines |
+| `createWhisperRuntime()` | function | `arcane-os/local-ai/whisper` | Core native speech | Node with a prepared matching helper, runtime, decoder and selected model |
+| `createWhisperRuntime default export` | function | `arcane-os/local-ai/whisper` | Core native speech | Same retained native engine factory |
+| `buildWhisperHelper()` | function | `arcane-os/local-ai/whisper/build` | Core native speech | Node with installed CMake/C++17 toolchain and matching Whisper source/runtime |
 | `createSpeechService default export` | function | `arcane-os/core/speech` | Core native speech | Same shared speech service factory |
 | `prepareCoreModelAssets()` | function | `arcane-os/ai/core-model-assets` | Core model assets | Browser with complete Blob/File members and available Core service |
 | `createModelAssetService()` | function | `arcane-os/core/model-assets` | Core model assets | Node Core with an application-selected working directory |
@@ -8112,6 +8115,95 @@ selected model and native engine.
 
 The default export from `arcane-os/core/image` is the same
 `createLocalImageService` factory and lifecycle described above.
+
+## createWhisperRuntime()
+
+### Overview
+
+Creates one retained native Whisper engine from a prepared runtime or a lazy
+preparation function. Construction starts no helper, model load or inference.
+Import the named factory from `arcane-os/local-ai/whisper`.
+
+### Syntax and inputs
+
+```javascript
+createWhisperRuntime({runtime, prepare, modelId, temporaryDirectory, onEvent}={})
+```
+
+Supply `runtime` or `prepare({signal,onEvent})`, and an application-owned
+`temporaryDirectory`. `modelId` selects a model from the prepared runtime;
+omitting it uses the runtime's selected model. `onEvent` receives complete
+native preparation/process diagnostics. The runtime describes matching helper,
+Whisper backend libraries, decoder and model files; see the complete
+[native Whisper preparation contract](local-whisper.md).
+
+### Returned members and lifetime
+
+| Member | Contract |
+| --- | --- |
+| `current()` | Returns `providerId`, `modelId`, `state`, `loaded`, `busy`, `requestId`, `requestedBackend`, `observedBackend`, `backendEvidence` and `error`. State reports actual helper/model readiness. |
+| `subscribe(listener,{replay=true,signal}={})` | Observes the current snapshot immediately by default, then each state change; returns the unsubscribe closure. |
+| `load({modelId,signal}={})` | Prepares the selected runtime if necessary and retains its initialized helper/model. Same-model loading is shared; replacement remains explicit. |
+| `transcribe(request,{signal,onProgress,requestId}={})` | Accepts the complete `{audioBase64,mimeType?,model?,language?,translate?}` recording for the loaded model and returns `{text,language,duration,segments}`. `audioBase64` transports the original media; the decoder recognizes its actual format. Progress is ordered; control metadata stays outside the request. |
+| `unload()` | Cancels owned loading/transcription, joins decoder/helper work and releases the retained model before resolving its state snapshot. |
+| `close()` | Performs joined unload and disposes state observation. Repeated calls share the closing result. |
+
+The decoder consumes the complete submitted media into native 16 kHz mono PCM
+without changing the caller's recording. The result preserves the engine's
+complete text and segment order. Temporary operation files remain until decoder
+and inference settle. The engine accepts one active recording; overlapping
+requests report `WHISPER_BUSY`, and unavailable/closing/model failures retain
+their explicit diagnostics. Caller cancellation retains its supplied reason.
+
+With `backend: 'auto'`, an eligible accelerated native failure may drain that
+helper and retry the same complete recording and selected model once on the
+prepared CPU backend. Its snapshot is `recovering`, unloaded and busy during
+recovery. Cancellation, malformed input, observer/protocol failure and explicit
+backend selection do not cause that retry. `requestId` is the actual optional
+transport correlation, never a generated replacement or payload field; it
+remains through terminal error settlement and clears or changes on the next
+request/load/unload/close. The [shared speech adapter](native-speech.md) preserves
+only that continuing owned request, while new requests require actual readiness.
+
+### Availability and example
+
+Node on Windows, Linux and macOS with matching native resources; Android needs
+the corresponding host/process adaptation. Prepared files establish resource
+availability, not execution on every platform. This uses an already prepared
+runtime and the application's own temporary directory:
+
+```javascript
+import {createWhisperRuntime} from 'arcane-os/local-ai/whisper';
+import {createSpeechService} from 'arcane-os/core/speech';
+
+const stt = createWhisperRuntime({runtime, modelId: 'whisper-small', temporaryDirectory});
+const speech = createSpeechService({stt});
+// Register speech with the existing Core owner; it owns start/drain/dispose.
+```
+
+## createWhisperRuntime default export
+
+The default binding from `arcane-os/local-ai/whisper` is identical to the named
+[`createWhisperRuntime()`](#createwhisperruntime) factory and has the same inputs,
+members, readiness, cancellation and native-resource requirements.
+
+## buildWhisperHelper()
+
+`buildWhisperHelper({runtime,outputRoot,cmake='cmake',generator,cmakeArgs=[],env,
+signal,onEvent}={})` from `arcane-os/local-ai/whisper/build` builds the first-party
+persistent helper using the installed native toolchain. `runtime.directory`
+selects the prepared libraries and `runtime.sourceDirectory` selects their
+matching headers; `outputRoot` owns build/install output. Optional CMake
+arguments, generator and environment remain caller-selected.
+
+The operation runs configure, Release build and install in order. It returns
+`{platform,architecture,root,executable,runtimeDirectory,diagnostics}`, with
+complete `configure`, `compile` and `install` process results. Cancellation and
+process errors use the existing owned process lifetime. It installs neither a
+toolchain nor a model and performs no inference. Windows helper installation
+includes the selected compiler's redistributable runtime closure. Use a
+toolchain and prepared runtime matching the target platform/architecture; a
+source package alone is not a compiled helper. See the [helper build procedure](local-whisper.md).
 
 ## createSpeechService()
 

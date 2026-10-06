@@ -1742,6 +1742,14 @@ owner, and the voice control retains its state-specific labels and retry action.
 Desktop speech and the dedicated `voice-transcription.html` component retain their
 existing behavior.
 
+An already accepted file transcription retains its exact owned runtime
+operation through the same provider/model's unloaded, busy `recovering` state
+or correlated pending error. This preserves the actual RPC result or failure;
+it does not enable another recording. Unload, close, provider/model replacement,
+transport loss and caller cancellation still invalidate owned work. Native Web
+Speech microphone capture keeps its independent readiness and final/interim
+cancellation lifetime. See [native speech recovery](native-speech.md).
+
 On desktop, the Hold to talk control remains disabled unless sticky STT state
 is `ready`, the role is not busy, and microphone capture is available. For an explicitly
 selected STT route, a separate keyboard-operable control presents Start
@@ -2115,7 +2123,16 @@ Unknown provider/runtime diagnostics remain complete in the developer console
 and error events, while controls use generic visible outcomes unless the Error
 owner explicitly marks nonblank copy with `userSafe:true`.
 
-For the default manual mode, if sticky readiness is lost during microphone acquisition, capture, or the STT
+An already accepted file transcription can continue through the exact same
+provider/model/runtime operation's unloaded, busy recovery or pending-error
+state. This uses the real runtime operation ID rather than the component's local
+counter; another request supplies no continuation authority. New recording and
+transcription remain readiness-gated, and actual unload, close, replacement,
+transport loss or cancellation still ends the owned request. The same shared
+rule applies to an active continuous file-transcription job. Native Web Speech
+capture retains its separate readiness, stop/final-drain and interim ownership.
+
+Outside that exact continuing request, if sticky readiness is lost during microphone acquisition, capture, or the STT
 request, the component invalidates the session, aborts the owned request signal,
 releases media, discards late completion, and emits
 `speech-transcription-cancelled`. Its source-local reason is

@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="arcane-os/core/repositories owns a persistent native location for connected repositories, separate from application code and application preferences. Applications choose their connection names, remotes, branches, files and Core methods. Importing the module and constructing an owner perform no I/O.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core-repositories/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Native repository workspaces · Arcane OS SDK"><meta property="og:description" content="arcane-os/core/repositories owns a persistent native location for connected repositories, separate from application code and application preferences. Applications choose their connection names, remotes, branches, files and Core methods. Importing the module and constructing an owner perform no I/O."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core-repositories/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Native repository workspaces · Arcane OS SDK"><meta name="twitter:description" content="arcane-os/core/repositories owns a persistent native location for connected repositories, separate from application code and application preferences. Applications choose their connection names, remotes, branches, files and Core methods. Importing the module and constructing an owner perform no I/O."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Native repository workspaces | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native repository workspaces</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-repository-workspaces">Native repository workspaces</h1><p class="doc-lead">arcane-os/core/repositories owns a persistent native location for connected repositories, separate from application code and application preferences. Applications choose their connection names, remotes, branches, files and Core methods. Importing the module and constructing an owner perform no I/O.</p><div class="doc-meta"><span>SDK 0.64.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="./" aria-current="page">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/core-repositories.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#persistent-locations">Persistent locations</a><a href="#one-connected-working-checkout">One connected working checkout</a><a href="#ownership-concurrency-and-shutdown">Ownership, concurrency and shutdown</a><a href="#bare-snapshots-stay-separate">Bare snapshots stay separate</a></nav></details><p><code>arcane-os/core/repositories</code> owns a persistent native location for connected
+repositories, separate from application code and application preferences.
+Applications choose their connection names, remotes, branches, files and Core
+methods. Importing the module and constructing an owner perform no I/O.</p>
+<h2 id="persistent-locations">Persistent locations</h2>
+<p><code>resolveArcaneDataPaths({dataRoot}={})</code> returns absolute
+<code>{dataRoot,repositoriesRoot}</code> paths without creating directories:</p>
+<div class="table-wrap" data-columns="3" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Host</th>
+<th>Default dataRoot</th>
+<th>repositoriesRoot</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Windows</td>
+<td><code>%LOCALAPPDATA%/ArcaneData</code>, or <code>~/AppData/Local/ArcaneData</code> when that variable is empty</td>
+<td><code>&lt;dataRoot&gt;/Repos</code></td>
+</tr>
+<tr>
+<td>Linux</td>
+<td><code>$XDG_DATA_HOME/ArcaneData</code> when <code>XDG_DATA_HOME</code> is absolute, otherwise <code>~/.local/share/ArcaneData</code></td>
+<td><code>&lt;dataRoot&gt;/Repos</code></td>
+</tr>
+<tr>
+<td>macOS</td>
+<td><code>~/Library/Application Support/ArcaneData</code></td>
+<td><code>&lt;dataRoot&gt;/Repos</code></td>
+</tr>
+<tr>
+<td>Android or another adapted host</td>
+<td>Explicit <code>dataRoot</code> supplied by the host, such as its app files directory followed by <code>ArcaneData</code></td>
+<td><code>&lt;dataRoot&gt;/Repos</code></td>
+</tr></tbody>
+</table>
+</div>
+<p>An explicit <code>dataRoot</code> selects that directory directly; the SDK does not append
+another <code>ArcaneData</code>. Relative explicit paths resolve from the process working
+directory. Unsupported default platforms report <code>ARCANE_DATA_ROOT_REQUIRED</code>.
+The Android host also supplies Git/process execution through the existing
+process-adapter contract; this module does not install Git or choose shared
+Android storage.</p>
+<p>The factory&#39;s first actual operation creates necessary parent directories.
+No existing data is moved, copied, deleted, renamed or migrated. <code>appRoot</code>,
+<code>stateRoot</code>, preferences, OPFS and the existing CLI/workspace defaults remain
+independent and unchanged.</p>
+<h2 id="one-connected-working-checkout">One connected working checkout</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createRepositoryWorkspace} from &#39;arcane-os/core/repositories&#39;;
+
+const repository = createRepositoryWorkspace({
+    name: &#39;moon-cheese-dispatches&#39;,
+    remote: applicationConnection.remote,
+    branch: applicationConnection.branch
+});
+
+const opened = await repository.open({signal});
+// opened.directory is &lt;ArcaneData&gt;/Repos/moon-cheese-dispatches.
+const status = await repository.status({signal});
+await repository.close();
+</code></pre></div>
+<p><code>createRepositoryWorkspace({name,directory,dataRoot,remote,branch,onEvent,run}={})</code>
+returns <code>{directory,open,status,pull,push,close,drain,dispose}</code>. The <code>directory</code>
+property is the absolute selected working path.</p>
+<ul>
+<li>Omit <code>directory</code> to select <code>&lt;repositoriesRoot&gt;/&lt;name&gt;</code>. The application supplies
+one nonempty directory name for each distinct connection; the SDK neither
+derives it from a remote nor maintains a connection registry. Names are one
+component, excluding <code>.</code>/<code>..</code> and slash/backslash separators. Choose distinct
+names under the host filesystem&#39;s ordinary case rules.</li>
+<li>Supply <code>directory</code> to use an existing application-selected path instead.
+This takes precedence over <code>name</code> and <code>dataRoot</code>; relative paths resolve from
+the process working directory. The path is not relocated or rewritten.</li>
+<li><code>remote</code> is required only when a missing or empty destination needs cloning.
+<code>branch</code>, when supplied, is passed unchanged to Git&#39;s <code>clone --branch</code> option;
+otherwise Git selects the remote&#39;s default branch. Existing checkouts keep
+their own branch, remote, tracked files, untracked files and local changes.</li>
+<li><code>onEvent</code> and optional <code>run</code> use the existing SDK process owner. The default
+adapter is <code>runProcess</code>; Git must be available on PATH. Credentials and
+authentication remain with Git and the native host. The SDK adds no download,
+credential store, polling, network retry or process supervisor.</li>
+</ul>
+<p>All operation methods accept <code>{signal}={}</code> and return promises:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Result and side effect</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>open</code></td>
+<td>For a missing/empty destination, runs one clone and returns <code>{directory,cloned:true,stdout,stderr}</code> with complete process output. For an existing working repository root, returns <code>{directory,cloned:false}</code> after read-only inspection. Later opens on that owner reuse preparation.</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>Prepares the checkout if needed, then returns the existing <code>repositoryStatus</code> result unchanged.</td>
+</tr>
+<tr>
+<td><code>pull</code></td>
+<td>Prepares the checkout if needed, then runs the existing clean-checkout, fast-forward-only <code>repositoryPull</code> operation unchanged.</td>
+</tr>
+<tr>
+<td><code>push</code></td>
+<td>Prepares the checkout if needed, then runs the existing <code>repositoryPush</code> operation unchanged, preserving its support for unrelated uncommitted working files.</td>
+</tr>
+<tr>
+<td><code>close</code>, <code>drain</code>, <code>dispose</code></td>
+<td>The same idempotent operation: stop accepting new calls and await accepted work and its process/event cleanup. They retain the repository on disk.</td>
+</tr></tbody>
+</table>
+</div>
+<p>Opening an existing repository never pulls, switches branches, resets, changes
+its remote or rewrites files. A nonempty destination that is a bare repository,
+a subdirectory of another checkout, or ordinary non-repository data is left
+untouched and reports its Git error or <code>ARCANE_REPOSITORY_DIRECTORY_INVALID</code>.
+A failed or cancelled clone reports the actual failure; any remaining directory
+is retained for application-owned inspection. There is no automatic deletion or
+destructive retry. Filesystem failures and complete Git diagnostics propagate.</p>
+<h2 id="ownership-concurrency-and-shutdown">Ownership, concurrency and shutdown</h2>
+<p>Calls targeting the same resolved path spelling in one Node process run in
+acceptance order, including separate owners selecting that path. Windows keys
+are case-insensitive. The queue does not resolve symlink aliases or macOS case
+variants; applications use one consistent path for a shared connection.
+This prevents overlapping Git/index writes and duplicate successful cloning.
+Different directories proceed
+independently. Applications coordinate separate processes and their own direct
+file/Git writes; this module does not create a daemon or cross-process lock.</p>
+<p>A pre-aborted call starts no work. A queued aborted operation does not run when
+its turn arrives. Active cancellation reaches the existing process owner, which
+terminates its owned process tree and joins complete output/event cleanup.
+Shutdown drains accepted operations rather than deleting data or terminating
+the host early. Calls after close reject with <code>CORE_CLOSING</code>; a failed operation
+still pending when close begins rejects that drain through an <code>AggregateError</code>.
+The caller retains each operation&#39;s complete result or failure separately.</p>
+<p>The cold path is one selected connection, one parent-directory creation and one
+Git clone. Opening an existing checkout uses one read-only Git command. A
+prepared owner&#39;s status/pull/push use their existing repository operation graph.
+There is no scan across applications, connections, models or platforms. Git
+progress, process-starting/completion, heartbeat and cancellation events use
+the existing <code>onEvent</code> owner with complete output and backpressure.
+An awaited event callback must not await another operation or shutdown for the
+same directory, including calls through another workspace owner: that operation
+needs the observing callback to finish. Schedule such follow-up without awaiting
+it inside that callback, and retain/observe its promise at the application owner.</p>
+<p>Compose this owner inside an application-selected Core service. Bind only the
+application&#39;s chosen methods, pass each request&#39;s <code>context.signal</code>, and return
+<code>drain: repository.drain</code> and <code>dispose: repository.dispose</code> from that service.
+Keep initialization at the repository operation that needs it; page rendering
+and unrelated services do not wait for a clone. This module installs no browser
+RPC, chooses no application service and changes no Core launch configuration.</p>
+<h2 id="bare-snapshots-stay-separate">Bare snapshots stay separate</h2>
+<p><a href="../git-text-snapshot/"><code>createGitTextSnapshot</code></a> continues to require its explicit
+dedicated bare <code>cacheDirectory</code>. It neither becomes a working checkout nor
+changes existing callers&#39; caches. A new native caller can place that distinct
+cache under the shared location without changing the snapshot contract:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import path from &#39;node:path&#39;;
+import {createGitTextSnapshot} from &#39;arcane-os&#39;;
+import {resolveArcaneDataPaths} from &#39;arcane-os/core/repositories&#39;;
+
+const {repositoriesRoot} = resolveArcaneDataPaths();
+const snapshot = createGitTextSnapshot({
+    cacheDirectory: path.join(repositoriesRoot, &#39;moon-cheese-reader-cache&#39;),
+    remote: applicationConnection.remote,
+    ref: applicationConnection.ref,
+    selectPath: applicationSelectPath
+});
+</code></pre></div>
+<p>Never assign the same directory to a bare snapshot and a writable workspace.
+Applications retain remote/ref selection, document parsing, scores, messages,
+saved connection state and refresh policy. Existing explicit repository paths
+continue to operate where they already are.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#persistent-locations">Persistent locations</a><a href="#one-connected-working-checkout">One connected working checkout</a><a href="#ownership-concurrency-and-shutdown">Ownership, concurrency and shutdown</a><a href="#bare-snapshots-stay-separate">Bare snapshots stay separate</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.64.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

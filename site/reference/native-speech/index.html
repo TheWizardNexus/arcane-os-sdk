@@ -13,10 +13,10 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native speech service</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-speech-service">Native speech service</h1><p class="doc-lead">createSpeechService({stt, tts, signal} = {}) composes independently selected native speech engines into one Core service. It is the named and default export from arcane-os/core/speech.</p><div class="doc-meta"><span>SDK 0.63.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native speech service</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-speech-service">Native speech service</h1><p class="doc-lead">createSpeechService({stt, tts, signal} = {}) composes independently selected native speech engines into one Core service. It is the named and default export from arcane-os/core/speech.</p><div class="doc-meta"><span>SDK 0.64.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
-      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="./" aria-current="page">Native speech service</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/native-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#startup-and-status">Startup and status</a><a href="#events-and-subscriptions">Events and subscriptions</a><a href="#engine-interface">Engine interface</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a></nav></details><p><code>createSpeechService({stt, tts, signal} = {})</code> composes independently selected
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="./" aria-current="page">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/native-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#startup-and-status">Startup and status</a><a href="#events-and-subscriptions">Events and subscriptions</a><a href="#engine-interface">Engine interface</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#ai-built-in-native-speech-readiness">AI built-in native speech readiness</a></nav></details><p><code>createSpeechService({stt, tts, signal} = {})</code> composes independently selected
 native speech engines into one Core service. It is the named and default export
 from <code>arcane-os/core/speech</code>.</p>
 <p>The host supplies an STT engine, a TTS engine, or both. Construction performs no
@@ -111,8 +111,9 @@ cancelled requests publish no later progress.</p>
 function.</li>
 <li><code>load({signal})</code>, resolving only after the constructor-selected model has
 loaded. Independent engines may load concurrently.</li>
-<li><code>transcribe(request, {signal, onProgress})</code> for STT, or
-<code>synthesize(request, {signal, onProgress})</code> for TTS.</li>
+<li><code>transcribe(request, {signal, onProgress, requestId})</code> for STT, or
+<code>synthesize(request, {signal, onProgress, requestId})</code> for TTS. <code>requestId</code> is
+the actual Core request&#39;s control metadata, separate from the unchanged payload.</li>
 <li><code>close()</code>, cancelling and joining its native work and releasing its resources.</li>
 </ul>
 <p>The service forwards each complete request and result unchanged. It applies
@@ -137,10 +138,50 @@ share one shutdown promise. Actual engine cleanup failures reject with an
 <code>AggregateError</code> and remain in role diagnostics. <code>dispose()</code> additionally
 releases the service&#39;s event subscriptions. New work after shutdown begins
 rejects with <code>CORE_CLOSING</code>.</p>
+<h2 id="ai-built-in-native-speech-readiness">AI built-in native speech readiness</h2>
+<p>The <code>AI</code> module&#39;s <code>LOCAL_SPEACH</code> adapter observes <code>speech.state</code> before reading
+<code>Arcane.speech.status()</code>. A newer event takes precedence over an outstanding
+initial status response. Each role loads independently: STT does not wait for
+TTS, and unmuting waits for the selected TTS model rather than a callable facade.</p>
+<p>For this service&#39;s role snapshots, readiness requires the exact selected
+<code>modelId</code>, its engine identity, <code>loaded: true</code>, <code>available: true</code>, and a <code>ready</code>
+or <code>running</code> state. Model loading remains an ordinary cancellable waiting state.
+An engine error, unavailable role, or different selected model rejects the
+adapter load. Later readiness loss or engine/model replacement invalidates the
+AI role and cancels its queued and active requests through the existing provider
+runtime. A new explicit role load or unmute can observe the next ready state.</p>
+<p>An engine can report <code>state: &#39;recovering&#39;</code>, <code>loaded: false</code>, <code>busy: true</code>, and
+the continuing Core <code>requestId</code> while retrying an already accepted request on
+the same selected provider and model. Availability remains false. The built-in
+STT adapter preserves only its own correlated pending request through this
+state; another caller&#39;s recovery supplies no continuation authority. The real
+RPC ID comes from <code>Arcane.speech.transcribe</code>&#39;s optional <code>onRequest</code> observer.
+The engine retains that ID on a terminal error snapshot until the snapshot is
+superseded, allowing the pending RPC to deliver its actual complete failure
+rather than converting it into cancellation. True unload, close, replacement,
+transport loss and caller cancellation retain their existing ownership.</p>
+<p>The shared AI observation becomes <code>recovering</code> with <code>loaded: false</code>, <code>busy: true</code>, and its existing runtime <code>operationId</code>. An error may likewise retain
+<code>busy: true</code> until the actual operation settles. New inference still requires
+genuine loaded readiness. The STT provider request context includes a
+<code>refreshState()</code> callback which rereads that provider&#39;s status only while the
+exact request remains owned; it changes observation, not execution authority.
+Shared speech components retain their own real runtime operation through this
+recovery, keep new dispatch readiness-gated, and preserve native microphone
+capture&#39;s separate cancellation and final/interim lifetime.</p>
+<p>Older fixed-model hosts expose the published aggregate-only <code>SpeechStatus</code>
+contract instead of per-model lifecycle. The adapter preserves their independent
+health-based readiness for <code>whisper-small</code> with <code>whisper.cpp</code> and <code>kokoro</code> with
+<code>kokoro-onnx</code>, using <code>status: &#39;ok&#39;</code> and the corresponding availability boolean.
+That contract is a one-shot health observation, not evidence of a persistently
+loaded native model or a continuous lifecycle event stream.</p>
+<p>Cancellation, unload, disposal, and route retirement release adapter-owned
+subscriptions. They do not close the host&#39;s shared engines or alter complete
+speech requests and results. Browser and explicitly registered speech providers
+retain their existing lifecycle contracts.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#startup-and-status">Startup and status</a><a href="#events-and-subscriptions">Events and subscriptions</a><a href="#engine-interface">Engine interface</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#startup-and-status">Startup and status</a><a href="#events-and-subscriptions">Events and subscriptions</a><a href="#engine-interface">Engine interface</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#ai-built-in-native-speech-readiness">AI built-in native speech readiness</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.63.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.64.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

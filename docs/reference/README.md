@@ -57,12 +57,15 @@ alone does not make bare module names resolve in a browser.
 | Run application-selected llama.cpp, Ollama or ONNX through Core | [Local AI through Core](local-ai.md) |
 | Generate complete local PNG images with a retained native model | [Local image generation](local-image-generation.md) |
 | Select FLUX.2 Klein 4B and its three complementary model resources | [FLUX.2 Klein 4B through Core](local-image-flux.md) |
+| Select the complete SDXL Base 1.0 checkpoint for text-to-image generation | [SDXL Base 1.0 through Core](local-image-sdxl.md) |
 | Compose independently loaded transcription and synthesis engines | [Native speech service](native-speech.md) |
+| Keep a native Whisper model loaded across complete recordings | [Native Whisper transcription](local-whisper.md) |
 | Edit an original PNG with a complete prompt and explicit strength | [Local image editing](local-image-editing.md) |
 | Project complete stored model files into native working files | [Model assets through Core](model-assets.md) |
 | Retain a Nemotron model and diarize caller-fed audio streams | [Native speaker diarization](diarization.md) |
 | Persist application-selected preferences through Core | [Core preferences service](core-preferences.md) |
 | Read complete selected Git text without changing a checkout | [Git text snapshots](git-text-snapshot.md) |
+| Own a native working checkout under per-user ArcaneData/Repos | [Native repository workspaces](core-repositories.md) |
 | Build an installed-SDK portable Core payload | [Portable Core packaging](core-native-packaging.md) |
 | Pass host-selected state defaults and unchanged explicit launch values to services | [Launch-time locations](core-native-packaging.md#launch-time-locations) |
 | Build a Windows executable without an OS checkout | [Windows executable packaging](core-native-packaging.md#windows-executable) |
@@ -227,6 +230,7 @@ Ollama, Wllama, Whisper, Kokoro, native, or cloud transport:
 | Use Core-normalized chat | [`globalThis.Arcane.ai`](core/arcane-ai-contracts.md) | Native/Core only when separately admitted. |
 | Run a caller-selected GGUF LLM locally | [`arcane-os/ai/browser-wasm`](ai/browser-wasm.md) | Browser secure context with WebAssembly and OPFS/DBOPFS; explicit CPU selection or WebGPU with full offload and no automatic CPU fallback. |
 | Run application-selected native llama.cpp/Ollama chat | [`arcane-os/ai/core-local`, `arcane-os/core/local-ai`](local-ai.md) | Explicit Core connection and selected native runtimes; installation, availability and loaded-model readiness remain distinct. |
+| Transcribe complete recordings with a retained native Whisper model | [`arcane-os/local-ai/whisper`](local-whisper.md) and [Core speech](native-speech.md) | Matching native helper, Whisper libraries, decoder and selected model; Windows defaults and explicit other-platform distributions have distinct preparation requirements. |
 | Run a local ONNX graph with named tensors | [`arcane-os/local-ai/onnx`, `arcane-os/ai/core-onnx`](local-ai.md#native-onnx-sessions) | Retained native workers; browser access requires an available Core ONNX service. |
 | Generate local images from complete prompts and selected model resources | [`arcane-os/local-ai/image`, `arcane-os/ai/core-image`](local-image-generation.md) | Prepared native image runtime; browser access requires its Core service. CPU Windows/Linux and Mac Metal/CPU paths have distinct actual host requirements. |
 | Supply complete stored model members to a native engine | [`arcane-os/ai/core-model-assets`, `arcane-os/core/model-assets`](model-assets.md) | Available Core service; DBOPFS originals stay authoritative while native owners retain working files. |
