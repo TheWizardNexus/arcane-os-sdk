@@ -275,3 +275,106 @@ test('failed retired-client unload rejects with the actual error after provider 
     assert.equal(local.status().error, failure);
     assert.equal(local.status().available, false);
 });
+
+test('disposing configured but never-loaded local providers does not release a native model', async function disposeUnownedSelection(t) {
+    const injected = fixtureClient({installed: false});
+    const local = createCoreLocalAIProvider({client: injected.client});
+    const absent = createCoreLocalAIProvider({client: null});
+    t.after(async function closeUnownedProviders() {
+        await Promise.all([local.dispose(), absent.dispose()]);
+        injected.client.close();
+    });
+    assert.equal((await local.dispose({selection})).state, 'disposed');
+    assert.equal((await absent.dispose({selection})).state, 'disposed');
+    assert.deepEqual(injected.calls, []);
+});
+
+test('runtime-style unload then disposal releases only the actually retained local selection once', async function disposeAfterUnload(t) {
+    const injected = fixtureClient({installed: false});
+    const local = createCoreLocalAIProvider({client: injected.client});
+    t.after(async function closeReleasedProvider() { await local.dispose(); injected.client.close(); });
+    await local.load({selection});
+    await local.unload({selection});
+    assert.equal(local.status().modelId, null);
+    await local.dispose({selection: {...selection}});
+    assert.equal(injected.calls.filter(function unloadCall(call) { return call.method === 'llama.unload'; }).length, 1);
+    assert.equal(local.status().state, 'disposed');
+});
+
+test('local inspection permits explicit startup load without inventing catalog entries or readiness', async function inspectStartingLoad(t) {
+    const fixtures = [];
+    t.after(async function releaseStartingProviders() {
+        for (const {local, injected, pending} of fixtures) {
+            pending?.result.resolve({});
+            await local.dispose();
+            injected.client.close();
+        }
+    });
+    for (const state of ['starting', 'loading']) {
+        const injected = fixtureClient({installed: false, loaded: false});
+        const local = createCoreLocalAIProvider({client: injected.client});
+        const pending = injected.hold('llama.load');
+        fixtures.push({local, injected, pending});
+        Object.assign(injected.state.llama, {available: false, state, models: [], error: null});
+        const inspection = await local.inspect(selection);
+        assert.equal(inspection.available, true);
+        assert.equal(inspection.authority.modelId, selection.modelId);
+        assert.deepEqual(local.catalog(), []);
+        assert.equal(local.status().loaded, false);
+        assert.deepEqual(injected.calls.map(function method(call) { return call.method; }), ['llama.status']);
+
+        const loading = local.load({selection});
+        await pending.started.promise;
+        assert.equal(local.status().loaded, false);
+        Object.assign(injected.state.llama, {available: true, state: 'ready', models: [{id: selection.modelId, loaded: true}]});
+        injected.emit('localai.state', {runtimes: [injected.state.llama]});
+        pending.result.resolve(injected.state.llama);
+        await loading;
+        assert.equal(local.status().loaded, true);
+        await local.dispose();
+    }
+});
+
+test('released owned known models remain explicitly loadable while unavailable and unknown selections stay honest', async function inspectReleasedLoad(t) {
+    const injected = fixtureClient({installed: false});
+    const local = createCoreLocalAIProvider({client: injected.client});
+    let pending;
+    t.after(async function releaseReloadedProvider() {
+        pending?.result.resolve({});
+        await local.dispose();
+        injected.client.close();
+    });
+    await local.load({selection});
+    await local.unload({selection});
+    Object.assign(injected.state.llama, {available: false, state: 'stopped', owned: true, released: true, error: null});
+    injected.emit('localai.state', {runtimes: [injected.state.llama]});
+    const inspection = await local.inspect(selection);
+    assert.equal(inspection.available, true);
+    assert.equal(inspection.authority.modelId, selection.modelId);
+    assert.equal(local.status().loaded, false);
+    assert.equal(local.status().available, false);
+    assert.equal((await local.inspect({...selection, modelId: 'unseen-moon-model'})).available, false);
+    assert.equal(injected.calls.filter(function loadCall(call) { return call.method === 'llama.load'; }).length, 1);
+
+    for (const unavailable of [
+        {owned: false, state: 'stopped', error: null},
+        {owned: true, state: 'closed', error: null},
+        {owned: true, state: 'error', error: new Error('Complete\n release failure')}
+    ]) {
+        Object.assign(injected.state.llama, unavailable);
+        assert.equal((await local.inspect(selection)).available, false);
+        assert.equal(local.status().loaded, false);
+    }
+    Object.assign(injected.state.llama, {owned: true, state: 'stopped', error: null});
+    assert.equal((await local.inspect(selection)).available, true);
+    pending = injected.hold('llama.load');
+    const loading = local.load({selection});
+    await pending.started.promise;
+    assert.equal(local.status().loaded, false);
+    Object.assign(injected.state.llama, {available: true, state: 'ready', released: false, models: [{id: selection.modelId, loaded: true}]});
+    injected.emit('localai.state', {runtimes: [injected.state.llama]});
+    pending.result.resolve(injected.state.llama);
+    await loading;
+    assert.equal(local.status().loaded, true);
+    assert.equal(injected.calls.filter(function loadCall(call) { return call.method === 'llama.load'; }).length, 2);
+});

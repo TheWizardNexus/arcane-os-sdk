@@ -149,8 +149,13 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
         };
     }
 
+    function runtimeRecord(engine) {
+        return {...engine.state, models: [...engine.models],
+            ...(engine.id === 'llama.cpp' ? {released: engine.released === true} : {})};
+    }
+
     function snapshot() {
-        const records = [...engines.values()].map(function runtimeRecord(engine) { return {...engine.state, models: [...engine.models]}; });
+        const records = [...engines.values()].map(runtimeRecord);
         if (onnxSelected) records.push(onnxStatus());
         const ollama = records.find(function ollamaRecord(record) { return record.id === 'ollama'; });
         return {
@@ -283,7 +288,7 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
             engine.models = [...merged.values()];
         }
         publish();
-        return {...engine.state, models: [...engine.models]};
+        return runtimeRecord(engine);
     }
 
     function observeModels(engine) {
@@ -347,7 +352,7 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
         return recovering;
     }
 
-    async function engineReady(id, signal, {retryLoading = false} = {}) {
+    async function engineReady(id, signal, {retryLoading = false, resumeReleased = true} = {}) {
         signal?.throwIfAborted();
         const engine = engines.get(id);
         if (!engine) throw failure('LOCAL_AI_RUNTIME_NOT_SELECTED', `${id} is not selected in this application's localAI configuration.`);
@@ -358,11 +363,26 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
         if (retryLoading && engine.state.state === 'loading') {
             await awaitReadiness(restartEngine(engine), signal);
         }
-        if (engine.released) { engine.released = false; startEngine(engine); }
+        if (engine.released) {
+            if (!resumeReleased) return engine;
+            engine.released = false;
+            startEngine(engine);
+        }
         await awaitReadiness(engine.ready, signal);
         signal?.throwIfAborted();
         if (!engine.state.available) throw failure('LOCAL_AI_RUNTIME_UNAVAILABLE', `${id} is unavailable.`);
         return engine;
+    }
+
+    function observeLlama(signal) {
+        signal?.throwIfAborted();
+        const engine = engines.get('llama.cpp');
+        if (!engine) throw failure('LOCAL_AI_RUNTIME_NOT_SELECTED', "llama.cpp is not selected in this application's localAI configuration.");
+        // Observation neither waits for startup nor starts a released engine.
+        if (!engine.state.available || engine.released || engine.stopping || engine.recovering || engine.signal.aborted) {
+            return runtimeRecord(engine);
+        }
+        return refreshModels(engine, signal);
     }
 
     function waitForModel(engine, model, signal) {
@@ -636,17 +656,16 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
                 return snapshot();
             },
             'llama.status': async function llamaStatus(_parameters, request) {
-                const engine = await engineReady('llama.cpp', request.signal);
-                return refreshModels(engine, request.signal);
+                return observeLlama(request.signal);
             },
             'llama.models': async function llamaModels(_parameters, request) {
-                const engine = await engineReady('llama.cpp', request.signal);
-                const status = await refreshModels(engine, request.signal);
+                const status = await observeLlama(request.signal);
                 return {models: status.models};
             },
             'llama.load': loadLlama,
             'llama.unload': async function unloadLlama({model}, request) {
-                const engine = await engineReady('llama.cpp', request.signal);
+                const engine = await engineReady('llama.cpp', request.signal, {resumeReleased: false});
+                if (engine.released) return {...engine.state, models: [...engine.models], released: true, unloaded: true};
                 engine.loadControllers.get(model)?.abort(failure('LOCAL_AI_MODEL_UNLOADED', `The application unloaded ${model}.`));
                 if (engine.loads.has(model)) await Promise.allSettled([engine.loads.get(model)]);
                 if (!engine.router) {

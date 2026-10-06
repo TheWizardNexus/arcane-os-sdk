@@ -175,7 +175,13 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
             const current = await invokeOwned(core, 'llama.status', {}, signal);
             assertCurrentConnection(currentConnection);
             if (lifecycleRevision === statusRevision) acceptRuntime(current);
-            if (runtime?.available !== true) {
+            const knownModel = models.some(function matchesModel(model) { return model.id === value.modelId; });
+            // Inspection describes an explicit load capability, never readiness.
+            // Core still verifies the exact model at the actual load boundary.
+            const starting = !runtime?.error && ['starting', 'loading'].includes(runtime?.state);
+            const released = !runtime?.error && runtime?.released === true && runtime.owned === true
+                && runtime.state === 'stopped' && knownModel;
+            if (runtime?.error || (runtime?.available !== true && !starting && !released)) {
                 return {
                     available: false,
                     code: 'ARCANE_AI_PROVIDER_UNAVAILABLE',
@@ -183,7 +189,7 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
                     error: runtime?.error ?? null
                 };
             }
-            if (!models.some(function matchesModel(model) { return model.id === value.modelId; })) {
+            if (!starting && !knownModel) {
                 return {
                     available: false,
                     code: 'ARCANE_AI_MODEL_UNAVAILABLE',
@@ -354,7 +360,8 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
         return pending.result;
     }
 
-    async function unload({selection: value = selection, signal} = {}) {
+    async function unload({signal} = {}) {
+        const value = selection;
         const core = requireClient();
         const currentConnection = connection;
         if (signal?.aborted) throw cancelled(signal.reason);
@@ -393,9 +400,12 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
         }
     }
 
-    function dispose({selection: value = selection, signal} = {}) {
+    function dispose({signal} = {}) {
         if (disposing) return disposing;
-        const core = value === selection ? selectionConnection?.client ?? client : client;
+        // The runtime also supplies its configured selection after unload.
+        // Only this provider's retained selection owns a native release.
+        const value = selection;
+        const core = selectionConnection?.client;
         disposed = true;
         loading = false;
         unloading = false;

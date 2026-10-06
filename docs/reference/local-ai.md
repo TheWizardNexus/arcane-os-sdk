@@ -226,6 +226,14 @@ background health polling.
 | `llama.unload` | `{model}` | Current state after release |
 | `llama.chat` | `{model,payload,stream?,streamId?}` | Complete OpenAI-shaped completion |
 
+`llama.status` and `llama.models` observe the selected service without loading,
+restarting or waiting for it. Starting, loading, stopped and failed services
+return their retained state/catalog; an available service supplies a fresh
+catalog observation. The llama.cpp runtime record includes `released: true`
+only after Core successfully closes its owned single-model server. Explicit
+load, inference or recovery can resume that engine; observation cannot.
+Status observation adds no background polling.
+
 The `payload` is the complete request. SDK option names are translated only at
 the upstream protocol boundary; messages, tool definitions and documents remain
 unchanged. An explicit `payload.model` selects that request's model. Core waits
@@ -241,7 +249,8 @@ observe load, sleep and unload changes. Direct servers expose readiness at
 request boundaries; they do not offer the router's passive model event stream.
 
 Unloading a model from an owned single-model server closes that owned process;
-a subsequent load can start it again. Releasing an externally owned direct
+a subsequent load can start it again. Repeating that unload returns the released
+state without restarting the process. Releasing an externally owned direct
 server returns `released: true, unloaded: false`, retaining the real catalog
 and leaving that server running.
 
@@ -330,10 +339,22 @@ the selection against the replacement client before inference. Passing a
 does not provide a provider-state subscription, so this installation handling
 alone does not update an idle AI runtime's retained role state. The provider
 runtime still reconciles the provider at its existing operation boundaries.
+`inspect()` reports whether an explicit load can proceed, separately from
+`status().loaded`. A genuine `starting` or `loading` service without an error
+permits that load preflight even before its catalog arrives; Core's `llama.load`
+waits for startup and verifies the exact requested model. An owned, successfully
+released service permits loading only a model retained in its actual catalog.
+An available service still requires that catalog membership. These observations
+do not fabricate model records or readiness, and unavailable external services,
+closed services and actual errors remain unavailable.
+
 `dispose()` removes installation and service subscriptions and cancels owned
-operations synchronously, then attempts the selected model's release through
-its captured client. A failed release rejects with the actual error even though
-the provider is disposed; disposal does not establish successful native unload.
+operations synchronously, then attempts its actually retained model's release
+through its captured client. A configured selection alone does not own a native
+model: disposing before load or after successful unload sends no native release,
+including when the caller explicitly supplied `client: null`. A failed release
+rejects with the actual error even though the provider is disposed; disposal
+does not establish successful native unload.
 It never unloads a retired selection through a replacement client or closes the
 shared Core client.
 
