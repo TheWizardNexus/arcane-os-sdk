@@ -1,6 +1,8 @@
 import Is from 'strong-type';
 import {createCoreRuntime} from '../core/runtime.mjs';
 import {createLocalAIService} from '../core/services/local-ai.mjs';
+import {createLocalImageService} from '../core/services/image.mjs';
+import {createModelAssetService} from '../core/services/model-assets.mjs';
 import {CORE_PROTOCOL, CoreError, serializeCoreError} from '../../browser-runtime/core/contracts.mjs';
 import {normalizeLocalAIConfig} from './config.mjs';
 import {discoverLocalAIRuntimes} from './discover.mjs';
@@ -81,6 +83,8 @@ export function createDevelopmentLocalAI({config, appRoot, directory, applicatio
     const incoming = new Set();
     let runtime;
     let service;
+    let imageService;
+    let modelAssets;
     let stopFrames;
     let preparationError = null;
     let closing = null;
@@ -157,17 +161,49 @@ export function createDevelopmentLocalAI({config, appRoot, directory, applicatio
         writeFrame(connection, event('core.state', current));
         for (const record of current.services) writeFrame(connection, event('core.service.state', record));
         writeFrame(connection, event('localai.state', service.current()));
+        if (imageService) writeFrame(connection, event('image.state', imageService.current()));
+        if (modelAssets) writeFrame(connection, event('modelAssets.state', modelAssets.current()));
     }
 
-    const ready = Promise.resolve().then(async function prepareLocalAI() {
+    const ready = Promise.resolve().then(function prepareLocalAI() {
         operationSignal.throwIfAborted();
-        const discovered = await discoverLocalAIRuntimes({config: selected, appRoot, signal: operationSignal});
-        operationSignal.throwIfAborted();
-        const installed = await ensureLocalAIRuntimes({runtimes: discovered.missing, directory, signal: operationSignal, onEvent});
-        const runtimes = [...discovered.available, ...installed];
-        operationSignal.throwIfAborted();
-        service = createLocalAIService(selected, {appRoot, runtimes, signal: operationSignal, onEvent});
-        runtime = createCoreRuntime({application, version, services: [service]});
+        const localConfig = {
+            ...selected,
+            runtimes: selected.runtimes.filter(function selectedChatRuntime(requirement) {
+                return requirement.id !== 'stable-diffusion.cpp';
+            })
+        };
+        service = createLocalAIService(
+            localConfig,
+            {
+                appRoot, signal: operationSignal, onEvent,
+                async prepare({signal, onEvent: report}) {
+                    const discovered = await discoverLocalAIRuntimes({config: localConfig, appRoot, signal});
+                    const installed = await ensureLocalAIRuntimes({runtimes: discovered.missing, directory, signal, onEvent: report});
+                    return [...discovered.available, ...installed];
+                }
+            }
+        );
+        const services = [service];
+        if (selected.runtimes.some(function selectedImageRuntime(requirement) {
+            return requirement.id === 'stable-diffusion.cpp';
+        })) {
+            modelAssets = createModelAssetService({appRoot});
+            imageService = createLocalImageService(
+                selected,
+                {
+                    appRoot, modelAssets, signal: operationSignal, onEvent,
+                    async prepare({requirement, signal, onEvent: report}) {
+                        const installed = await ensureLocalAIRuntimes(
+                            {runtimes: [requirement], directory, signal, onEvent: report}
+                        );
+                        return installed[0];
+                    }
+                }
+            );
+            services.push(modelAssets, imageService);
+        }
+        runtime = createCoreRuntime({application, version, services});
         stopFrames = runtime.onFrame(routeFrame);
         runtime.start();
         return runtime;
@@ -350,7 +386,8 @@ export function createDevelopmentLocalAI({config, appRoot, directory, applicatio
     function current() {
         return {state: closed ? 'closed' : preparationError ? 'error' : runtime ? 'ready' : 'preparing',
             error: preparationError ? serializeCoreError(preparationError) : null,
-            core: runtime?.current() ?? null, localAI: service?.current() ?? null};
+            core: runtime?.current() ?? null, localAI: service?.current() ?? null,
+            image: imageService?.current() ?? null};
     }
 
     function close() {

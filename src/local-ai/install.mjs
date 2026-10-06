@@ -9,6 +9,7 @@ import {ArcaneError,ERROR_CODES,normalizeError,throwIfAborted} from '../errors.m
 import {createEventQueue} from '../event-queue.mjs';
 import {runProcess} from '../process.mjs';
 import {extractLocalAIArchive} from './archive.mjs';
+import {normalizeImageRuntimeRequirement} from './config.mjs';
 
 const is=new Is(false);
 const installations=new Map();
@@ -19,12 +20,13 @@ function selectRuntimes(runtimes){
     }
     const selected=new Map();
     for(const item of runtimes){
-        const runtime=is.string(item)?{id:item}:item;
-        if(!runtime||!['llama.cpp','ollama','nemo-speech','onnx'].includes(runtime.id)){
+        const requirement=is.string(item)?{id:item}:item;
+        const runtime=requirement?.id==='stable-diffusion.cpp'?normalizeImageRuntimeRequirement(requirement):requirement;
+        if(!runtime||!['llama.cpp','ollama','nemo-speech','onnx','stable-diffusion.cpp'].includes(runtime.id)){
             throw new ArcaneError(ERROR_CODES.targetUnavailable,`Local AI runtime installation is unavailable for ${String(runtime?.id)}.`);
         }
         const prior=selected.get(runtime.id);
-        if(prior&&(prior.version!==runtime.version||prior.url!==runtime.url)){
+        if(prior&&(prior.version!==runtime.version||prior.url!==runtime.url||(runtime.id==='stable-diffusion.cpp'&&prior.backend!==runtime.backend))){
             throw new ArcaneError(ERROR_CODES.usage,`Select one ${runtime.id} runtime version and URL for this operation.`);
         }
         if(runtime.version!==undefined&&(!is.string(runtime.version)||!runtime.version)){
@@ -82,6 +84,9 @@ async function upstreamResponse(url,signal){
 }
 
 async function selectRelease(runtime,platform,architecture,signal){
+    if (runtime.id === 'stable-diffusion.cpp') {
+        return selectImageRelease(runtime, platform, architecture, signal);
+    }
     if(runtime.url){
         const name=path.posix.basename(new URL(runtime.url).pathname);
         return {version:runtime.version??'custom',url:runtime.url,name};
@@ -109,6 +114,243 @@ async function selectRelease(runtime,platform,architecture,signal){
     return {version:release.tag_name,url:asset.browser_download_url,name:asset.name};
 }
 
+async function imageBackendCandidate(backend, platform, signal) {
+    if (backend !== 'auto') return backend;
+    if (platform === 'darwin') return 'metal';
+    // This selects a distribution candidate. The worker probes actual devices.
+    return 'cpu';
+}
+
+function imageAssetSuffix(platform, architecture, backend) {
+    if (platform === 'win32' && architecture === 'x64') {
+        if (backend === 'cpu') return '-bin-win-cpu-x64.zip';
+    }
+    if (platform === 'linux' && architecture === 'x64') {
+        if (backend === 'cpu') return '-bin-Linux-Ubuntu-24.04-x86_64.zip';
+    }
+    if (platform === 'darwin' && ['x64', 'arm64'].includes(architecture) && ['metal', 'cpu'].includes(backend)) {
+        // This upstream archive contains the universal arm64/x86_64 build.
+        return '-bin-Darwin-macOS-26.6.2-arm64.zip';
+    }
+    return null;
+}
+
+async function selectImageRelease(runtime, platform, architecture, signal) {
+    const backend = runtime.url ? runtime.backend : await imageBackendCandidate(runtime.backend, platform, signal);
+    if (runtime.url) {
+        return {
+            version: runtime.version,
+            backend: runtime.backend,
+            assets: [
+                {
+                    backend,
+                    url: runtime.url,
+                    name: path.posix.basename(new URL(runtime.url).pathname)
+                }
+            ],
+            sharedCPU: backend === 'auto'
+        };
+    }
+    const selection = runtime.version === 'latest' ? 'latest' : `tags/${encodeURIComponent(runtime.version)}`;
+    const response = await upstreamResponse(`https://api.github.com/repos/leejet/stable-diffusion.cpp/releases/${selection}`, signal);
+    const release = await response.json();
+    const backends = backend === 'cpu' || platform === 'darwin' ? [backend] : [backend, 'cpu'];
+    const assets = backends.map(
+        function selectImageArchive(selectedBackend) {
+            const suffix = imageAssetSuffix(platform, architecture, selectedBackend);
+            const asset = suffix && release.assets?.find(
+                function matchingImageArchive(candidate) {
+                    return candidate.name.endsWith(suffix);
+                }
+            );
+            if (!asset) {
+                throw new ArcaneError(ERROR_CODES.targetUnavailable, `stable-diffusion.cpp ${release.tag_name} has no selected ${platform}/${architecture} ${selectedBackend} archive.`);
+            }
+            const selected = {backend: selectedBackend, url: asset.browser_download_url, name: asset.name};
+            return selected;
+        }
+    );
+    return {version: release.tag_name, backend: runtime.backend, assets, sharedCPU: backend === 'metal'};
+}
+
+async function imageLibraryPath(root, platform, signal) {
+    const filename = platform === 'win32' ? 'stable-diffusion.dll' : platform === 'darwin' ? 'libstable-diffusion.dylib' : 'libstable-diffusion.so';
+    const directories = [root];
+    for (const directory of directories) {
+        throwIfAborted(signal);
+        const entries = await readdir(
+            directory,
+            {withFileTypes: true}
+        );
+        for (const entry of entries) {
+            const selected = path.join(directory, entry.name);
+            if (entry.name === filename && (entry.isFile() || entry.isSymbolicLink())) return selected;
+            if (entry.isDirectory()) directories.push(selected);
+        }
+    }
+    throw new ArcaneError(ERROR_CODES.operationFailed, `The stable-diffusion.cpp archive does not contain ${filename}.`);
+}
+
+async function extractImageAsset(asset, root, signal, onEvent) {
+    const parent = path.dirname(root);
+    const archive = path.join(parent, asset.name);
+    await onEvent(
+        {
+            type: 'local-ai.install.downloading',
+            message: `Downloading ${asset.name}.`,
+            data: {id: 'stable-diffusion.cpp', asset: asset.name}
+        }
+    );
+    const response = await upstreamResponse(asset.url, signal);
+    await pipeline(
+        Readable.fromWeb(response.body),
+        createWriteStream(
+            archive,
+            {flags: 'wx'}
+        ),
+        {signal}
+    );
+    await onEvent(
+        {
+            type: 'local-ai.install.extracting',
+            message: `Extracting ${asset.name}.`,
+            data: {id: 'stable-diffusion.cpp', asset: asset.name}
+        }
+    );
+    await extractLocalAIArchive(
+        {archive, directory: root, signal, onEvent}
+    );
+    await unlink(archive);
+}
+
+async function installImageBinding(root, directory, platform, architecture, signal, onEvent) {
+    const prefix = path.join(root, 'binding');
+    await mkdir(
+        prefix,
+        {recursive: true}
+    );
+    await writeFile(
+        path.join(prefix, 'package.json'),
+        '{"private":true}\n',
+        {flag: 'wx', signal}
+    );
+    await onEvent(
+        {
+            type: 'local-ai.install.installing',
+            message: `Installing koffi 3.3.2 for ${platform}/${architecture}.`,
+            data: {id: 'stable-diffusion.cpp', package: 'koffi', version: '3.3.2', platform, architecture}
+        }
+    );
+    await runProcess(
+        'npm',
+        [
+            'install', '--prefix', prefix, '--global=false', '--save-exact',
+            '--omit=dev', '--include=optional', '--ignore-scripts', '--no-audit', '--no-fund',
+            '--registry=https://registry.npmjs.org/', '--cache', path.join(directory, 'npm-cache'),
+            `--os=${platform}`, `--cpu=${architecture}`, 'koffi@3.3.2'
+        ],
+        {cwd: prefix, signal, onEvent}
+    );
+    const packagePath = path.join(prefix, 'package.json');
+    const bindingModulePath = createRequire(packagePath).resolve('koffi');
+    const platformPackagePath = path.join(prefix, 'node_modules', '@koromix', `koffi-${platform}-${architecture}`, 'package.json');
+    await stat(platformPackagePath);
+    return bindingModulePath;
+}
+
+async function installImageDistribution(release, {root, directory, platform, architecture, signal, onEvent}) {
+    await mkdir(
+        root,
+        {recursive: true}
+    );
+    const jobs = release.assets.map(
+        async function prepareImageVariant(asset) {
+            const variantRoot = path.join(root, asset.backend);
+            await extractImageAsset(asset, variantRoot, signal, onEvent);
+            const libraryPath = await imageLibraryPath(variantRoot, platform, signal);
+            return {backend: asset.backend, root: variantRoot, libraryPath};
+        }
+    );
+    const bindingJob = installImageBinding(root, directory, platform, architecture, signal, onEvent);
+    jobs.push(bindingJob);
+    const outcomes = await Promise.allSettled(jobs);
+    const failures = outcomes.filter(
+        function imagePreparationFailed(outcome) {
+            return outcome.status === 'rejected';
+        }
+    );
+    if (failures.length === 1) throw failures[0].reason;
+    if (failures.length > 1) {
+        throw new AggregateError(
+            failures.map(
+                function imagePreparationError(outcome) {
+                    return outcome.reason;
+                }
+            ),
+            'Local image runtime preparation failed.'
+        );
+    }
+    const bindingModulePath = outcomes.pop().value;
+    const variants = outcomes.map(
+        function preparedImageVariant(outcome) {
+            return outcome.value;
+        }
+    );
+    if (release.sharedCPU) {
+        variants.push(
+            {...variants[0], backend: 'cpu'}
+        );
+    }
+    return {
+        version: release.version,
+        backend: release.backend,
+        libraryPath: variants[0].libraryPath,
+        bindingModulePath,
+        variants
+    };
+}
+
+function imageModelRecords(models) {
+    return models.map(
+        function preparedImageModel(model) {
+            const resources = {};
+            for (const [role, resource] of Object.entries(model.resources)) {
+                const location = is.string(resource) ? resource : resource?.path;
+                resources[role] = is.string(location) ? path.resolve(location) : resource;
+            }
+            return {...model, resources};
+        }
+    );
+}
+
+function bundledImagePath(location, runtimeRoot, relativeRoot) {
+    const relative = path.relative(runtimeRoot, location);
+    if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+        // The model resource owner reports external-path incompatibility.
+        return location;
+    }
+    return path.posix.join(relativeRoot, relative.split(path.sep).join('/'));
+}
+
+function bundledImageModelResource(resource, descriptor, model, role, runtimeRoot, relativeRoot) {
+    if (descriptor && !is.string(descriptor) && is.string(descriptor.url)) {
+        // A portable descriptor selects its original URL for post-launch asset
+        // preparation rather than carrying this host's working projection.
+        const portable = {...descriptor};
+        delete portable.path;
+        return portable;
+    }
+    if (!is.string(resource)) return resource;
+    const bundled = bundledImagePath(resource, runtimeRoot, relativeRoot);
+    if (bundled === resource) {
+        throw new ArcaneError(
+            ERROR_CODES.usage,
+            `Image model ${model.id} resource ${role} is an external native working path and is not portable in this runtime bundle. Prepare it through modelAssets after launch or include it through the explicit nativeResources workflow.`
+        );
+    }
+    return bundled;
+}
+
 async function installedRuntime(base,runtime,platform,architecture,signal){
     let entries;
     try{
@@ -117,6 +359,9 @@ async function installedRuntime(base,runtime,platform,architecture,signal){
         if(error.code==='ENOENT')return null;
         throw error;
     }
+    const imageBackend = runtime.id === 'stable-diffusion.cpp' && !runtime.url
+        ? await imageBackendCandidate(runtime.backend, platform, signal)
+        : runtime.backend;
     for(const entry of entries){
         throwIfAborted(signal);
         if(!entry.isDirectory())continue;
@@ -128,9 +373,38 @@ async function installedRuntime(base,runtime,platform,architecture,signal){
             throw error;
         }
         if(installation.requestVersion!==(runtime.version??null)||installation.requestUrl!==(runtime.url??null))continue;
+        if (runtime.id === 'stable-diffusion.cpp' && installation.requestBackend !== runtime.backend) continue;
         const record=installation.runtime;
         if(record?.id!==runtime.id||record.platform!==platform||record.architecture!==architecture)continue;
         try{
+            if (runtime.id === 'stable-diffusion.cpp') {
+                const locations = [record.libraryPath, record.bindingModulePath];
+                if (!Array.isArray(record.variants) || record.variants.length === 0) continue;
+                if (record.variants[0].backend !== imageBackend) continue;
+                for (const variant of record.variants) locations.push(variant.libraryPath);
+                const missingLocation = locations.some(
+                    function missingImageLocation(location) {
+                        return !is.string(location);
+                    }
+                );
+                if (missingLocation) continue;
+                const platformPackagePath = path.join(record.root, 'binding', 'node_modules', '@koromix', `koffi-${platform}-${architecture}`, 'package.json');
+                locations.push(platformPackagePath);
+                const entries = await Promise.all(
+                    locations.map(
+                        function inspectImageLocation(location) {
+                            return stat(location);
+                        }
+                    )
+                );
+                const filesPresent = entries.every(
+                    function imageFilePresent(info) {
+                        return info.isFile();
+                    }
+                );
+                if (filesPresent) return record;
+                continue;
+            }
             if(runtime.id==='onnx'){
                 if(!is.string(record.root)||!is.string(record.modulePath))continue;
                 const locations=await onnxRuntimeModule(record.root,platform,architecture,signal);
@@ -242,7 +516,8 @@ async function installONNXPackage(runtime,{root,directory,platform,architecture,
 }
 
 async function installRuntime(runtime,{directory,platform,architecture,signal,onEvent}){
-    const base=path.join(directory,runtime.id,`${platform}-${architecture}`,encodeURIComponent(runtime.version??'default'));
+    const runtimeBase=path.join(directory,runtime.id,`${platform}-${architecture}`,encodeURIComponent(runtime.version??'default'));
+    const base=runtime.id==='stable-diffusion.cpp'?path.join(runtimeBase,runtime.backend):runtimeBase;
     await onEvent({type:'local-ai.install.starting',message:`Preparing ${runtime.id} for ${platform}/${architecture}.`,data:{id:runtime.id,platform,architecture}});
     const installed=await installedRuntime(base,runtime,platform,architecture,signal);
     if(installed){
@@ -257,12 +532,17 @@ async function installRuntime(runtime,{directory,platform,architecture,signal,on
     await mkdir(base,{recursive:true});
     const attempt=await mkdtemp(path.join(base,'install-'));
     const root=path.join(attempt,'runtime');
-    const archive=release?path.join(attempt,release.name):null;
+    const archive=release&&runtime.id!=='stable-diffusion.cpp'?path.join(attempt,release.name):null;
     let completed=false;
     try{
         let locations;
         if(runtime.id==='onnx'){
             locations=await installONNXPackage(runtime,{root,directory,platform,architecture,signal,onEvent});
+        } else if (runtime.id === 'stable-diffusion.cpp') {
+            locations = await installImageDistribution(
+                release,
+                {root, directory, platform, architecture, signal, onEvent}
+            );
         }else{
             await onEvent({type:'local-ai.install.downloading',message:`Downloading ${runtime.id} ${release.version}.`,data:{id:runtime.id,version:release.version,platform,architecture}});
             const response=await upstreamResponse(release.url,signal);
@@ -276,7 +556,7 @@ async function installRuntime(runtime,{directory,platform,architecture,signal,on
         const record={id:runtime.id,platform,architecture,root,...locations,...(runtime.version?{requestedVersion:runtime.version}:{})};
         throwIfAborted(signal);
         if(archive)await unlink(archive);
-        await writeFile(path.join(attempt,'installation.json'),`${JSON.stringify({requestVersion:runtime.version??null,requestUrl:runtime.url??null,runtime:record},null,2)}\n`,{flag:'wx',signal});
+        await writeFile(path.join(attempt,'installation.json'),`${JSON.stringify({requestVersion:runtime.version??null,requestUrl:runtime.url??null,...(runtime.id==='stable-diffusion.cpp'?{requestBackend:runtime.backend}:{}),runtime:record},null,2)}\n`,{flag:'wx',signal});
         completed=true;
         await onEvent({type:'local-ai.install.completed',message:`${runtime.id} ${record.version} is available.`,data:record});
         return record;
@@ -296,7 +576,7 @@ async function installRuntime(runtime,{directory,platform,architecture,signal,on
 
 function shareInstallation(runtime,options){
     throwIfAborted(options.signal);
-    const key=JSON.stringify([options.directory,options.platform,options.architecture,runtime.id,runtime.version??null,runtime.url??null]);
+    const key=JSON.stringify([options.directory,options.platform,options.architecture,runtime.id,runtime.version??null,runtime.url??null,runtime.id==='stable-diffusion.cpp'?runtime.backend:null]);
     let entry=installations.get(key);
     if(entry?.controller.signal.aborted){
         // The prior cancelled attempt owns its cleanup. A later request waits
@@ -392,7 +672,11 @@ export async function ensureLocalAIRuntimes({runtimes=[],directory,platform=proc
         if(failures.length===1)throw failures[0].reason;
         if(failures.length>1)throw new AggregateError(failures.map(function runtimeFailure(outcome){return outcome.reason;}),'Local AI runtime preparation failed.');
         throwIfAborted(operationSignal);
-        return outcomes.map(function completedRuntime(outcome){return outcome.value;});
+        return outcomes.map(function completedRuntime(outcome,index){
+            const record=outcome.value;
+            if(record.id==='stable-diffusion.cpp')return {...record,models:imageModelRecords(selected[index].models)};
+            return record;
+        });
     }finally{
         clearInterval(heartbeat);
         await events.drain();
@@ -441,12 +725,44 @@ export async function bundleLocalAIRuntimes({runtimes=[],directory,outputRoot,pl
         const files=[];
         const relative=`runtime/local-ai/${runtime.id}`;
         const destination=path.join(root,relative);
-        await copyRuntimeTree(runtime.root,destination,root,files,signal);
         const bundled={...runtime,root:relative};
-        for(const field of ['executable','modulePath','includeDirectory','libraryDirectory','binaryDirectory','cmakeDirectory']){
+        for(const field of ['executable','modulePath','includeDirectory','libraryDirectory','binaryDirectory','cmakeDirectory','libraryPath','bindingModulePath']){
             if(runtime[field]===undefined)continue;
             bundled[field]=path.posix.join(relative,path.relative(runtime.root,runtime[field]).split(path.sep).join('/'));
         }
+        if (runtime.id === 'stable-diffusion.cpp') {
+            const requirement = selected.find(
+                function selectedImageRequirement(candidate) {
+                    return candidate.id === runtime.id;
+                }
+            );
+            bundled.variants = runtime.variants.map(
+                function bundledImageVariant(variant) {
+                    return {
+                        ...variant,
+                        root: bundledImagePath(variant.root, runtime.root, relative),
+                        libraryPath: bundledImagePath(variant.libraryPath, runtime.root, relative)
+                    };
+                }
+            );
+            bundled.models = runtime.models.map(
+                function bundledImageModel(model, index) {
+                    const resources = {};
+                    for (const [role, resource] of Object.entries(model.resources)) {
+                        resources[role] = bundledImageModelResource(
+                            resource,
+                            requirement.models[index].resources[role],
+                            model,
+                            role,
+                            runtime.root,
+                            relative
+                        );
+                    }
+                    return {...model, resources};
+                }
+            );
+        }
+        await copyRuntimeTree(runtime.root,destination,root,files,signal);
         return {runtime:bundled,files};
     }));
     const failures=outcomes.filter(function failedBundle(outcome){return outcome.status==='rejected';});

@@ -150,6 +150,9 @@ export async function copyCoreRuntime(root, files, signal, {
 }
 
 export function coreEntrySource(application, version, services, {localAI, runtimes = [], packagedWeb = false} = {}) {
+    const imageSelected = localAI?.runtimes?.some(function selectedImage(requirement) {
+        return (typeof requirement === 'string' ? requirement : requirement.id) === 'stable-diffusion.cpp';
+    }) ?? false;
     const imports = services.map(function serviceImport(service, index) {
         const specifier = '../app/' + service.module.split('/').map(encodeURIComponent).join('/');
         return `import createService${index} from ${JSON.stringify(specifier)};`;
@@ -159,8 +162,20 @@ export function coreEntrySource(application, version, services, {localAI, runtim
         return `    createService${index}(JSON.parse(${JSON.stringify(JSON.stringify(service.options === undefined ? {} : service.options))}), context)`;
     });
     if (localAI !== undefined) {
+        const chatConfiguration = {
+            ...localAI,
+            runtimes: localAI.runtimes.filter(function selectedChat(requirement) {
+                return (typeof requirement === 'string' ? requirement : requirement.id) !== 'stable-diffusion.cpp';
+            })
+        };
         imports.push("import {createLocalAIService} from 'arcane-os/core/local-ai';");
-        definitions.push(`    createLocalAIService(JSON.parse(${JSON.stringify(JSON.stringify(localAI))}), context)`);
+        definitions.push(`    createLocalAIService(JSON.parse(${JSON.stringify(JSON.stringify(chatConfiguration))}), context)`);
+    }
+    if (imageSelected) {
+        imports.push("import {createLocalImageService} from 'arcane-os/core/image';");
+        imports.push("import {createModelAssetService} from 'arcane-os/core/model-assets';");
+        definitions.push('    modelAssets');
+        definitions.push(`    createLocalImageService(JSON.parse(${JSON.stringify(JSON.stringify(localAI))}), {...context, modelAssets})`);
     }
     if (packagedWeb) {
         imports.push("import {createPackagedWebService} from 'arcane-os/core/packaged-web';");
@@ -185,15 +200,26 @@ export function coreEntrySource(application, version, services, {localAI, runtim
         ...(localAI === undefined ? [] : [
             `    runtimes: JSON.parse(${JSON.stringify(JSON.stringify(runtimes))}).map(function runtimeLocation(runtime) {`,
             '        const resolved = {...runtime};',
-            "        for (const field of ['root', 'executable', 'modulePath', 'includeDirectory', 'libraryDirectory', 'binaryDirectory', 'cmakeDirectory']) {",
+            "        for (const field of ['root', 'executable', 'modulePath', 'includeDirectory', 'libraryDirectory', 'binaryDirectory', 'cmakeDirectory', 'libraryPath', 'bindingModulePath']) {",
             '            if (runtime[field] !== undefined) resolved[field] = runtimePath(runtime[field]);',
             '        }',
+            '        if (runtime.variants) resolved.variants = runtime.variants.map(function nativeVariant(variant) {',
+            '            return {...variant, root: runtimePath(variant.root), libraryPath: runtimePath(variant.libraryPath)};',
+            '        });',
+            '        if (runtime.models) resolved.models = runtime.models.map(function nativeModel(model) {',
+            '            const resources = {};',
+            '            for (const [role, resource] of Object.entries(model.resources)) {',
+            "                resources[role] = typeof resource === 'string' ? runtimePath(resource) : resource;",
+            '            }',
+            '            return {...model, resources};',
+            '        });',
             '        return resolved;',
             '    }),'
         ]),
         '    ...await readCoreLaunchContext()',
         '};',
         '',
+        ...(imageSelected ? ['const modelAssets = createModelAssetService({appRoot: context.appRoot});', ''] : []),
         'const host = startCoreHost({',
         `    application: JSON.parse(${JSON.stringify(JSON.stringify(application))}),`,
         `    version: ${JSON.stringify(version)},`,

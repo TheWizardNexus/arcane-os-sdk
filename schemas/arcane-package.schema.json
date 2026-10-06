@@ -156,12 +156,12 @@
           "type": "array",
           "items": {
             "oneOf": [
-              { "enum": ["llama.cpp", "ollama", "onnx"] },
+              { "enum": ["llama.cpp", "ollama", "onnx", "stable-diffusion.cpp"] },
               {
                 "type": "object",
                 "required": ["id"],
                 "properties": {
-                  "id": { "enum": ["llama.cpp", "ollama", "onnx"] },
+                  "id": { "enum": ["llama.cpp", "ollama", "onnx", "stable-diffusion.cpp"] },
                   "version": { "type": "string" },
                   "url": { "type": "string" }
                 }

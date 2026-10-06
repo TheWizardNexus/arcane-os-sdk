@@ -121,7 +121,7 @@ function collectCompletion(completion, chunk) {
 }
 
 /** Core owns native processes; applications own runtime and model selection. */
-export function createLocalAIService(configuration, {appRoot, runtimes = [], signal, onEvent} = {}) {
+export function createLocalAIService(configuration, {appRoot, runtimes = [], signal, onEvent, prepare} = {}) {
     const config = normalizeLocalAIConfig(configuration) ?? {runtimes: []};
     const lifetime = new AbortController();
     const lifetimeSignal = signal ? AbortSignal.any([signal, lifetime.signal]) : lifetime.signal;
@@ -136,7 +136,7 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
     let onnxRecoveryError;
     let stopONNXSubscription;
     const onnxSelected = config.runtimes.some(function selectedONNX(requirement) { return requirement.id === 'onnx'; });
-    const onnxRecord = runtimes.find(function installedONNX(runtime) { return runtime.id === 'onnx'; });
+    let onnxRecord = runtimes.find(function installedONNX(runtime) { return runtime.id === 'onnx'; });
 
     function onnxStatus() {
         const current = onnx?.current();
@@ -493,8 +493,13 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
     const service = {
         name: 'local-ai',
         current: snapshot,
-        start(currentContext) {
+        async start(currentContext) {
             context = currentContext;
+            if (prepare) {
+                runtimes = await prepare({signal: lifetimeSignal, onEvent});
+                lifetimeSignal.throwIfAborted();
+                onnxRecord = runtimes.find(function installedONNX(runtime) { return runtime.id === 'onnx'; });
+            }
             for (const requirement of config.runtimes) {
                 if (!['llama.cpp', 'ollama', 'onnx'].includes(requirement.id)) {
                     throw failure('LOCAL_AI_RUNTIME_UNAVAILABLE', `Core runtime ${requirement.id} is not available in this service.`);

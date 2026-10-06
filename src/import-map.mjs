@@ -51,6 +51,8 @@ const SDK_BROWSER_SELF_IMPORTS=new Map([
     ['arcane-os/ai/browser-wasm',SDK_BROWSER_AI_ENTRY],
     ['arcane-os/ai/core-local','sdk/ai/core-local.mjs'],
     ['arcane-os/ai/core-onnx','sdk/ai/core-onnx.mjs'],
+    ['arcane-os/ai/core-image','sdk/ai/core-image.mjs'],
+    ['arcane-os/ai/core-model-assets','sdk/ai/core-model-assets.mjs'],
     ['arcane-os/ai/browser-decisions','sdk/ai/browser-decisions.mjs'],
     ['arcane-os/ai/tool-text-stream','sdk/ai/tool-text-stream.mjs'],
     ['arcane-os/ai/twin-cloud','sdk/ai/twin-cloud.mjs'],
