@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.59.0
+
+- Reconcile marked generated PWA references when a root application's PWA is
+  disabled. Add explicit `importMap({retireGeneratedPwa:true})` retirement for
+  the caller-confirmed generated root manifest reference and four standard PWA
+  output files. Ordinary disabled refresh preserves unmarked references and
+  files; authored content, unselected pages and browser storage remain intact.
+- Forward the native host's selected state directory to Core service factories
+  as a launch-context default. Every explicit launch JSON field takes precedence
+  unchanged. Windows launcher source now supplies the same separate argument;
+  using that launcher correction requires the matching rebuilt host archive.
+- Forward optional `Arcane.speech.synthesize(request, {signal})` cancellation
+  through the existing request lifetime, preserving complete payloads and the
+  180,000 ms default. Actual engine interruption remains service-owned; no new
+  speech engine, runtime dependency or data migration is introduced.
+
 ## 0.58.0
 
 - Add native ONNX sessions through `arcane-os/local-ai/onnx` and browser Core
