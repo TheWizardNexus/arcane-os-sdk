@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.66.0
+
+- Add `readGitIdentity` from `arcane-os/core/repositories` for separate global,
+  repository-local and effective Git configuration observations. Preserve full
+  name/email/githubUser values, empty versus unset fields, configured includes,
+  joined cancellation and complete process/observer failures.
+- Add optional construction-time `gitIdentity: {name, email, username}` to
+  repository workspaces and bare text snapshots. Explicit author fields apply
+  only to child Git configuration/environment; omitted fields retain ordinary
+  inheritance. Username is a credential hint, not authenticated-account proof.
+- Preserve complete selected text, existing clone/pull/commit/push behavior,
+  ordered workspace operations and shared snapshot acquisition. No Git config
+  file, remote, credentials, application preferences or data is rewritten.
+- Keep the dependency tree unchanged. Native Laya and target-bound repository
+  publication remain separate work. Retained compatible native assets continue
+  to use matching numeric-release routes; optional NPU upload follow-through
+  remains separately tracked.
+
 ## 0.65.0
 
 - Add optional precompiled Windows x64 Intel NPU encoding for native Whisper
