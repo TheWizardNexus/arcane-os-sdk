@@ -20,7 +20,7 @@ selected SDK projection or an explicit live SDK source mount. Both profiles
 share the theme, packaging, event, cancellation,
 and browser run contracts while retaining their selected application layout.
 
-This checkout defines the `0.70.0` SDK contract. Development applications declare
+This checkout defines the `0.71.0` SDK contract. Development applications declare
 `arcane-os` as `latest` and retain their lockfile. Exact SDK pins begin when Roshi
 designates a production build. Follow [Consumer updates](docs/consumer-updates.md)
 to refresh and compare the installed SDK and lockfile with the published channel;

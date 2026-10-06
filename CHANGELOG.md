@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.71.0
+
+- Add public theme-switcher CSS properties for group radius, option radius,
+  option font and group background. Applications can select modest rounded
+  rectangles and ordinary labels through the shared component while retaining
+  its existing literal defaults, complete labels, wrapping, native-button
+  targets, selected hover, keyboard focus, disabled state and theme persistence.
+
 ## 0.70.0
 
 - Add app-scoped DBOPFS committed-change subscriptions through the existing
