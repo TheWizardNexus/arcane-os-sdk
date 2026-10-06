@@ -4,11 +4,22 @@ import {createArcaneEventSource} from '../event-manager.mjs';
 import {runProcess} from '../process.mjs';
 
 const is = new Is(false);
-const eventNames = [
-    'status', 'message', 'notification', 'stderr', 'process', 'error',
-    'serverRequest', 'serverRequestResponded', 'serverRequestResolved',
-    'turnAccepted', 'delta', 'item', 'turn', 'observerError'
-];
+const eventTypes = {
+    status: 'arcane.codex.app-server.status',
+    message: 'arcane.codex.app-server.message',
+    notification: 'arcane.codex.app-server.notification',
+    stderr: 'arcane.codex.app-server.stderr',
+    process: 'arcane.codex.app-server.process',
+    error: 'arcane.codex.app-server.error',
+    serverRequest: 'arcane.codex.app-server.server-request',
+    serverRequestResponded: 'arcane.codex.app-server.server-request-responded',
+    serverRequestResolved: 'arcane.codex.app-server.server-request-resolved',
+    turnAccepted: 'arcane.codex.app-server.turn-accepted',
+    delta: 'arcane.codex.app-server.delta',
+    item: 'arcane.codex.app-server.item',
+    turn: 'arcane.codex.app-server.turn',
+    observerError: 'arcane.codex.app-server.observer-error'
+};
 
 /**
  * Own one explicitly selected native Codex App Server process. Construction has
@@ -55,17 +66,13 @@ export function createCodexAppServerSession({
         session,
         {
             source: 'codex.app-server',
-            eventTypes: eventNames.map(eventType)
+            eventTypes: Object.values(eventTypes)
         }
     );
     return session;
 
-    function eventType(name) {
-        return `arcane.codex.app-server.${name}`;
-    }
-
     function emit(name, detail) {
-        events.dispatch(eventType(name), detail);
+        events.dispatch(eventTypes[name], detail);
     }
 
     function observe(listener, detail, name) {
@@ -98,7 +105,7 @@ export function createCodexAppServerSession({
 
     function subscribe(name, listener, options = {}) {
         const unsubscribe = events.subscribe(
-            eventType(name),
+            eventTypes[name],
             function deliver(occurrence) {
                 observe(listener, occurrence.detail, name);
             },

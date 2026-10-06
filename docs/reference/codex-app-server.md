@@ -17,6 +17,13 @@ uses `initialize` followed by `initialized`; `turn/start` acceptance is distinct
 from the terminal `turn/completed` notification. This transport is separate from
 Core's Content-Length-framed `arcane/1` connection.
 
+The source baseline is the current, unversioned official App Server page read
+on October 6, 2026, specifically its Protocol, Initialization, Threads, Events
+and approval/request sections. This adapter does not claim a pinned Codex CLI
+release or generated-schema revision. The documentation describes schema
+generation as specific to the CLI version used; no CLI or schema generator was
+executed to establish this source contract.
+
 ## Open an explicitly selected connection
 
 ```javascript
@@ -166,7 +173,20 @@ Session event names are `status`, `message`, `notification`, `stderr`, `process`
 `error`, `serverRequest`, `serverRequestResponded`, `serverRequestResolved`,
 `turnAccepted`, `delta`, `item`, `turn` and `observerError`. Listener arguments
 are detail objects directly, not DOM events. Shared semantic event names use
-the `arcane.codex.app-server.` prefix.
+the `arcane.codex.app-server.` prefix and lowercase hyphen-separated suffixes.
+The public subscription aliases retain their original spelling:
+
+| Session alias | Shared semantic event |
+| --- | --- |
+| `serverRequest` | `arcane.codex.app-server.server-request` |
+| `serverRequestResponded` | `arcane.codex.app-server.server-request-responded` |
+| `serverRequestResolved` | `arcane.codex.app-server.server-request-resolved` |
+| `turnAccepted` | `arcane.codex.app-server.turn-accepted` |
+| `observerError` | `arcane.codex.app-server.observer-error` |
+
+The other aliases are already lowercase and are appended unchanged to the
+prefix. Declaration, subscription and publication share this same mapping;
+native Codex wire method names and payload fields are unchanged.
 
 `message` exposes every complete decoded JSONL envelope; `notification` exposes
 all native notification methods. `stderr` preserves complete `{stream,chunk}`

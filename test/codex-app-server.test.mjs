@@ -1,6 +1,61 @@
 import assert from 'node:assert/strict';
 import test from '../src/testing.mjs';
 import {createCodexAppServerSession, openCodexAppServerSession} from '../src/codex/app-server.mjs';
+import {arcaneEvents} from '../src/event-manager.mjs';
+
+test(
+    'Codex factory registers lowercase semantic names and preserves public subscription aliases',
+    async function factoryEventNames() {
+        const session = createCodexAppServerSession();
+        const failure = new Error('Codex factory observer fixture');
+        const publicErrors = [];
+        const semanticErrors = [];
+        const aliases = [
+            'status', 'message', 'notification', 'stderr', 'process', 'error',
+            'serverRequest', 'serverRequestResponded', 'serverRequestResolved',
+            'turnAccepted', 'delta', 'item', 'turn', 'observerError'
+        ];
+        const stopSemantic = arcaneEvents.subscribe(
+            'arcane.codex.app-server.observer-error',
+            function semanticError(occurrence) {
+                if (occurrence.detail.error.message === failure.message) {
+                    semanticErrors.push(occurrence);
+                }
+            }
+        );
+        try {
+            assert.equal(session.status.state, 'disconnected');
+            for (const alias of aliases) {
+                const unsubscribe = session.subscribe(
+                    alias,
+                    function observeAlias() {}
+                );
+                unsubscribe();
+            }
+            session.subscribe(
+                'observerError',
+                function publicError(detail) {
+                    publicErrors.push(detail);
+                }
+            );
+            session.subscribe(
+                'status',
+                function failInitialObservation(detail) {
+                    if (detail.state === 'disconnected') {
+                        throw failure;
+                    }
+                }
+            );
+            assert.equal(publicErrors.length, 1);
+            assert.strictEqual(publicErrors[0].error, failure);
+            assert.equal(semanticErrors.length, 1);
+            assert.equal(semanticErrors[0].type, 'arcane.codex.app-server.observer-error');
+        } finally {
+            stopSemantic();
+            await session.dispose();
+        }
+    }
+);
 
 // This synthetic JSONL peer exercises the SDK's actual process owner. It neither
 // imports nor executes Codex, and lives entirely in the test owner.
