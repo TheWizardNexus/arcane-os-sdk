@@ -564,7 +564,7 @@ defaulting.
 
 ### Speech transcription request
 
-`Arcane.speech.transcribe(request)` accepts an exact
+`Arcane.speech.transcribe(request, options?)` accepts an exact
 `SpeechTranscriptionRequest`.
 
 | Field | Type | Required | Constraints / default | Description |
@@ -572,6 +572,19 @@ defaulting.
 | `audioBase64` | `string` | Yes | Canonical base64; encoded at most 8 MiB; decoded 1 byte through 6 MiB | Media bytes labeled as WebM. The bridge validates encoding and bounds, while the fixed speech service parses the container. |
 | `mimeType` | `string` | No | Default `"audio/webm"`; base type must be `audio/webm` | Media type; codec parameters may follow. |
 | `model` | `string` | No | Default `"whisper-small"`; `whisper(?:[._-][a-z0-9]+)*` | Whisper identifier. The fixed service rejects unsupported variants. |
+
+### Speech transcription controls
+
+The optional second argument is `SpeechTranscriptionControls`:
+
+| Field | Type | Required | Default | Description |
+|---|---|---:|---|---|
+| `signal` | `AbortSignal` | No | No caller signal | Cancels this request through Core. The facade forwards it separately from the complete audio request; the registered service owns actual engine interruption. |
+
+Existing one-argument calls retain their behavior. The facade's request timeout
+remains 180 seconds. A pre-aborted signal dispatches no request, and an
+in-flight abort cancels the request and suppresses late responses. Other
+properties of this controls record are unused; they do not enter the payload.
 
 ### Speech transcription result
 

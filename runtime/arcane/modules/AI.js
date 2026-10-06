@@ -4084,11 +4084,19 @@ class AI {
             if(signal?.aborted){
                 throw normalizeAIRequestAbort(signal.reason);
             }
-            const response=await nativeSpeech.transcribe({
-                audioBase64:this.#arrayBufferToBase64(audioBytes),
-                mimeType,
-                model
-            });
+            let response;
+            try{
+                response=await nativeSpeech.transcribe({
+                    audioBase64:this.#arrayBufferToBase64(audioBytes),
+                    mimeType,
+                    model
+                },{signal});
+            }catch(error){
+                if(isAIRequestAbort(error,signal)){
+                    throw normalizeAIRequestAbort(error);
+                }
+                throw error;
+            }
             if(signal?.aborted){
                 throw normalizeAIRequestAbort(signal.reason);
             }

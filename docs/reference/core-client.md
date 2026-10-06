@@ -84,6 +84,13 @@ signal sends no synthesis request; an in-flight abort sends `request.cancel`
 and suppresses late responses. Actual synthesis interruption depends on the
 registered speech service and its engine; the facade supplies no speech engine.
 
+`Arcane.speech.transcribe(request, {signal})` forwards cancellation through the
+same request lifetime and retains its 180,000 ms timeout and complete request.
+`AI.fetchSTT(audio, signal)` carries that signal into the native call. A
+pre-aborted signal sends no transcription request; an in-flight abort sends
+`request.cancel` and suppresses late responses. The registered transcription
+service owns interruption and release of its actual engine operation.
+
 ## Events and request lifetime
 
 `events.on(name, listener)`, `once(name, listener)` and

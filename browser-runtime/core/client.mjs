@@ -569,7 +569,7 @@ export function createCoreFacade(client){
         mail:{send:request=>invoke('mail.send',request??{},{timeoutMs:450000})},
         speech:{status:()=>invoke('speech.status',{},{timeoutMs:10000}),
             synthesize:(request,options)=>invoke('speech.synthesize',request??{},{timeoutMs:180000,signal:options?.signal}),
-            transcribe:request=>invoke('speech.transcribe',request??{},{timeoutMs:180000})},
+            transcribe:(request,options)=>invoke('speech.transcribe',request??{},{timeoutMs:180000,signal:options?.signal})},
         localAI:{status:()=>invoke('localai.status',{},{timeoutMs:15000}),
             ensurePlatform:()=>invoke('localai.platform.ensure',{},long),recover:request=>invoke('localai.services.recover',request??{},long),
             setParallelRequests:request=>invoke('localai.parallel.requests.set',request??{},long),

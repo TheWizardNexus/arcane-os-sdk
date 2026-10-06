@@ -703,7 +703,7 @@ console.info(result.contentType, result.audioBase64.length);
 
 ### Overview
 
-`Arcane.speech.transcribe(request)` sends bounded caller-supplied audio bytes,
+`Arcane.speech.transcribe(request, options?)` sends bounded caller-supplied audio bytes,
 labeled as WebM, to the fixed local transcription service. Use it after local
 capture permission and recording have succeeded; the method itself does not
 capture audio or grant microphone permission.
@@ -739,18 +739,21 @@ work after `ANDROID_SPEECH_QUEUE_FULL`.
 ### Streaming, cancellation, and events
 
 Transcription resolves one complete text result and emits no method event. The
-wrapper timeout is 180 seconds and no signal is exposed. Core and Android do
-not promise cancellation when the renderer stops waiting.
+wrapper timeout remains 180 seconds. Optional `{signal}` controls the Core
+request lifetime separately from the complete audio payload. Pre-abort sends
+no request; in-flight abort cancels that request and suppresses late responses.
+The registered native service owns actual inference interruption and resource
+release. `AI.fetchSTT(audio, signal)` forwards its signal through this call.
 
 ### Example
 
 ```javascript
-async function transcribeRecordedWebM(audioBase64) {
+async function transcribeRecordedWebM(audioBase64, signal) {
     const result = await globalThis.Arcane.speech.transcribe({
         audioBase64: audioBase64,
         mimeType: 'audio/webm',
         model: 'whisper-small'
-    });
+    }, {signal});
     return result.text;
 }
 ```
