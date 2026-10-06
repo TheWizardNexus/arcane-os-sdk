@@ -667,19 +667,21 @@ export function createDbopfsModelStore({
     }
   }
 
-  function createDownloadProgressReporter(members, onProgress, retainFailure) {
+  function createModelProgressReporter(members, onProgress, retainFailure) {
     const shards = members.map(function initialMemberProgress(member) {
       return {name: member.name, completed: 0, total: null, unit: 'shards'};
     });
     let completed = 0;
+    let phase = "cache-check";
     let activeTransfers = 0;
     let transferMode = members.length === 1 ? "probing" : "files";
     let timer = null;
     let lastPublishedAt = 0;
+    let progressFailure = null;
 
     function progressRecord() {
       return completeValue({
-        phase: "download",
+        phase,
         completed,
         total: members.length,
         unit: "files",
@@ -713,18 +715,28 @@ export function createDbopfsModelStore({
         return true;
       } catch (error) {
         stopTimer();
+        progressFailure ??= error;
         retainFailure(error);
         return false;
       }
     }
 
+    function assertProgress() {
+      if (progressFailure !== null) throw progressFailure;
+    }
+
     return completeValue({
       reportShards(memberIndex, value) {
+        assertProgress();
         shards[memberIndex] = {...value, name: members[memberIndex].name};
+        if (value.phase === "download" || activeTransfers > 0) phase = "download";
+        else if (value.phase === "load") phase = "load";
         publishSafely({force: true});
+        if (value.phase === "load") assertProgress();
       },
       beginTransfer() {
         activeTransfers += 1;
+        phase = "download";
         publishSafely({ force: true });
       },
       completeMember() {
@@ -745,14 +757,17 @@ export function createDbopfsModelStore({
         publishSafely({ force: true });
       },
       restoreMember(memberIndex) {
-        shards[memberIndex] = {...shards[memberIndex], state: 'cached'};
+        assertProgress();
+        shards[memberIndex] = {...shards[memberIndex], phase: 'load', cached: true, state: 'cached'};
+        if (activeTransfers === 0) phase = "load";
         completed += 1;
         publishSafely({ force: true });
+        assertProgress();
       },
       start() {
         if (!publishSafely({ force: true })) return;
         if (onProgress !== null && timer === null) {
-          timer = setInterval(function publishDownloadProgressTick() {
+          timer = setInterval(function publishModelProgressTick() {
             publishSafely();
           }, MODEL_DOWNLOAD_PROGRESS_INTERVAL_MS);
         }
@@ -795,6 +810,9 @@ export function createDbopfsModelStore({
     const partFiles = new Array(ranges.length);
     const pendingRangeIndexes = [];
     let completedParts = 0;
+    progress?.reportShards(memberIndex, {
+      phase: 'load', completed: 0, total: ranges.length, unit: 'shards', cached: true,
+    });
     for (let rangeIndex = 0; rangeIndex < ranges.length; rangeIndex += 1) {
       throwIfAborted(signal, "install");
       const range = ranges[rangeIndex];
@@ -804,15 +822,20 @@ export function createDbopfsModelStore({
       if (partFile?.size === expected) {
         partFiles[rangeIndex] = partFile;
         completedParts += 1;
+        progress?.reportShards(memberIndex, {
+          phase: 'load', completed: completedParts, total: ranges.length, unit: 'shards', cached: true,
+        });
       } else {
         if (partFile) await removeEntry(partName);
         pendingRangeIndexes.push(rangeIndex);
       }
     }
     progress?.reportShards(memberIndex, {
+      phase: 'load',
       completed: completedParts,
       total: ranges.length,
-      unit: 'shards'
+      unit: 'shards',
+      cached: true,
     });
     const linked = linkAbortSignal(signal);
     const downloadSignal = linked.controller.signal;
@@ -868,6 +891,7 @@ export function createDbopfsModelStore({
           throwIfAborted(downloadSignal, "install");
           completedParts += 1;
           progress?.reportShards(memberIndex, {
+            phase: 'download',
             completed: completedParts,
             total: ranges.length,
             unit: 'shards'
@@ -1120,13 +1144,27 @@ export function createDbopfsModelStore({
     });
   }
 
-  async function availableModelFiles(names, signal) {
+  async function availableModelFiles(names, signal, progress) {
     const modelFiles = [];
-    for (const entry of names.models) {
+    for (let memberIndex = 0; memberIndex < names.models.length; memberIndex += 1) {
+      const entry = names.models[memberIndex];
       throwIfAborted(signal, "install");
       // Existing whole-file caches remain readable; new downloads use parts.
-      const modelFile = await parts.read(entry.name, {signal}) ?? await file(entry.name);
+      let modelFile = await parts.read(entry.name, {
+        signal,
+        onProgress: function reportStoredShards(value) {
+          progress?.reportShards(memberIndex, value);
+        },
+      });
+      if (!modelFile) {
+        modelFile = await file(entry.name);
+        if (modelFile) progress?.reportShards(memberIndex, {
+          phase: 'load', completed: 1, total: 1, unit: 'shards', cached: true,
+        });
+      }
       modelFiles.push(modelFile);
+      if (modelFile) progress?.restoreMember(memberIndex);
+      throwIfAborted(signal, "install");
     }
     return modelFiles;
   }
@@ -1136,9 +1174,16 @@ export function createDbopfsModelStore({
     ranges,
     signal,
     availableNames = null,
+    onProgress = null,
   ) {
     const partFiles = [];
     let lastModified = 0;
+    function reportStoredRange() {
+      throwIfAborted(signal, "install");
+      onProgress?.({phase: 'load', completed: partFiles.length,
+        total: ranges.length, unit: 'shards', cached: true});
+    }
+    reportStoredRange();
     for (const range of ranges) {
       throwIfAborted(signal, "install");
       const partName = rangePartName(modelName, range);
@@ -1151,10 +1196,12 @@ export function createDbopfsModelStore({
         return null;
       }
       partFiles.push(partFile);
+      reportStoredRange();
       if (is.finite(partFile.lastModified)) {
         lastModified = Math.max(lastModified, partFile.lastModified);
       }
     }
+    throwIfAborted(signal, "install");
     return completeValue({
       file: new Blob(partFiles, { type: "application/octet-stream" }),
       lastModified,
@@ -1168,6 +1215,7 @@ export function createDbopfsModelStore({
     total,
     signal,
     availableNames = null,
+    onProgress = null,
   ) {
     const ranges = rangePlanForInstall(total, signal);
     return storedRangeCandidateForPlan(
@@ -1175,10 +1223,11 @@ export function createDbopfsModelStore({
       ranges,
       signal,
       availableNames,
+      onProgress,
     );
   }
 
-  async function storedRangeMember(member, modelName, signal) {
+  async function storedRangeMember(member, modelName, signal, onProgress) {
     const names = await memberRangePartNames(modelName);
     const availableNames = names === null ? null : new Set(names);
     const declaredTotal = is.safeInteger(member.bytes) && member.bytes > 0
@@ -1190,6 +1239,7 @@ export function createDbopfsModelStore({
         declaredTotal,
         signal,
         availableNames,
+        onProgress,
       );
       if (declared) {
         await removeStaleRangePartsAfterCompletion(
@@ -1214,6 +1264,7 @@ export function createDbopfsModelStore({
         total,
         signal,
         availableNames,
+        onProgress,
       );
       if (
         candidate
@@ -1224,16 +1275,20 @@ export function createDbopfsModelStore({
       ) selected = candidate;
     }
     if (selected === null) return null;
+    throwIfAborted(signal, "install");
     await removeStaleRangePartsAfterCompletion(
       modelName,
       selected.ranges,
     );
+    onProgress?.({phase: 'load', completed: selected.ranges.length,
+      total: selected.ranges.length, unit: 'shards', cached: true});
+    throwIfAborted(signal, "install");
     return selected.file;
   }
 
-  async function availableResumableModelFiles(source, names, signal) {
+  async function availableResumableModelFiles(source, names, signal, progress) {
     const members = sourceMetadata(source).files;
-    const modelFiles = await availableModelFiles(names, signal);
+    const modelFiles = await availableModelFiles(names, signal, progress);
     await removeRangePartsBehindWholeFiles(members, names, modelFiles);
     for (let memberIndex = 0; memberIndex < modelFiles.length; memberIndex += 1) {
       if (modelFiles[memberIndex]) continue;
@@ -1241,20 +1296,40 @@ export function createDbopfsModelStore({
         members[memberIndex],
         names.models[memberIndex].name,
         signal,
+        function reportStoredRangeShards(value) {
+          progress?.reportShards(memberIndex, value);
+        },
       );
+      if (modelFiles[memberIndex]) progress?.restoreMember(memberIndex);
+      throwIfAborted(signal, "install");
     }
     return modelFiles;
   }
 
   async function openCached(source, {
     signal,
+    onProgress = null,
   } = {}) {
     const names = storageName(source);
-    const modelFiles = await availableResumableModelFiles(source, names, signal);
-    if (!modelFiles.every(Boolean)) return null;
-    return completeValue({
-      files: completeValue(modelFiles),
+    let failure = null;
+    const progress = createModelProgressReporter(sourceMetadata(source).files, onProgress, function retainProgressFailure(error) {
+      failure ??= error;
     });
+    try {
+      progress.start();
+      if (failure !== null) throw failure;
+      const modelFiles = await availableResumableModelFiles(source, names, signal, progress);
+      if (failure !== null) throw failure;
+      if (!modelFiles.every(Boolean)) return null;
+      progress.finish();
+      if (failure !== null) throw failure;
+      throwIfAborted(signal, "install");
+      return completeValue({files: completeValue(modelFiles)});
+    } catch (error) {
+      throw failure ?? error;
+    } finally {
+      progress.dispose();
+    }
   }
 
   async function install(source, { signal, onProgress = null } = {}) {
@@ -1263,7 +1338,7 @@ export function createDbopfsModelStore({
     }
     const names = storageName(source);
     const members = sourceMetadata(source).files;
-    const modelFiles = await availableResumableModelFiles(source, names, signal);
+    let modelFiles;
     const linked = linkAbortSignal(signal);
     const downloadSignal = linked.controller.signal;
     let nextMemberIndex = 0;
@@ -1273,7 +1348,7 @@ export function createDbopfsModelStore({
       if (failure === null) failure = error;
     }
 
-    const progress = createDownloadProgressReporter(members, onProgress, retainFailure);
+    const progress = createModelProgressReporter(members, onProgress, retainFailure);
 
     async function installMember(memberIndex) {
       let modelFile = null;
@@ -1338,12 +1413,14 @@ export function createDbopfsModelStore({
 
     try {
       progress.start();
+      if (failure !== null) throw failure;
+      modelFiles = await availableResumableModelFiles(source, names, downloadSignal, progress);
+      if (failure !== null) throw failure;
       let pendingMembers = members.length;
       for (let memberIndex = 0; memberIndex < modelFiles.length; memberIndex += 1) {
         const modelFile = modelFiles[memberIndex];
         if (!modelFile) continue;
         pendingMembers -= 1;
-        progress.restoreMember(memberIndex);
       }
       const workers = [];
       const workerCount = Math.min(workerLimit, pendingMembers);
@@ -1392,10 +1469,11 @@ export function createDbopfsModelStore({
       unit: "files",
       heartbeat: false,
     }));
-    const cached = await openCached(source, { signal });
+    const cached = await openCached(source, { signal, onProgress });
     if (cached) {
       const storage = await storagePolicy({ cached: true });
       onCapabilityPolicy?.(storage);
+      throwIfAborted(signal, "install");
       return completeValue({ ...cached, cache: "cached", storage });
     }
     if (offline) {

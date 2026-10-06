@@ -178,13 +178,20 @@ export function createDbopfsModelPartStore({dbopfs, tableName}) {
             throw error;
         }
     }
-    async function assemble(record, signal) {
+    async function assemble(record, signal, onProgress) {
         const parts = [];
+        function reportStoredPart() {
+            throwIfModelAborted(signal);
+            onProgress?.({phase: 'load', message: 'Reading stored model resource',
+                completed: parts.length, total: record.parts.length, unit: 'shards', cached: true});
+        }
+        reportStoredPart();
         for (const name of record.parts) {
             throwIfModelAborted(signal);
             const part = await file(name);
             if (!part) return null;
             parts.push(part);
+            reportStoredPart();
         }
         throwIfModelAborted(signal);
         return new Blob(parts);
@@ -209,18 +216,18 @@ export function createDbopfsModelPartStore({dbopfs, tableName}) {
             return readState(name);
         }, signal);
     }
-    function read(name, {signal} = {}) {
+    function read(name, {signal, onProgress} = {}) {
         return locked(name, async function readCompleteModelParts() {
             throwIfModelAborted(signal);
             const record = await readState(name);
-            return record?.complete ? assemble(record, signal) : null;
+            return record?.complete ? assemble(record, signal, onProgress) : null;
         }, signal);
     }
-    function readPartial(name, {signal} = {}) {
+    function readPartial(name, {signal, onProgress} = {}) {
         return locked(name, async function readClosedModelParts() {
             throwIfModelAborted(signal);
             const record = await readState(name);
-            return record ? assemble(record, signal) : null;
+            return record ? assemble(record, signal, onProgress) : null;
         }, signal);
     }
     function remove(name, {signal} = {}) {

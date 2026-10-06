@@ -93,11 +93,8 @@ export function createDbopfsResourceStore({dbopfs, tableName, fetchImpl = global
             const reusable = request.method === 'GET' && !request.headers.has('range')
                 && !['reload', 'no-cache', 'no-store'].includes(request.cache);
             if (reusable && entry.metadata?.status === 200) {
-                const file = await parts.read(entry.name, {signal});
+                const file = await parts.read(entry.name, {signal, onProgress: reportResourceProgress});
                 if (file) {
-                    const state = await parts.state(entry.name, {signal});
-                    onProgress?.({phase: 'load', message: 'Reading stored model resource', completed: state.parts.length,
-                        total: state.parts.length, unit: 'shards', cached: true, url: request.url});
                     return {...entry.metadata, file};
                 }
             }
@@ -111,7 +108,7 @@ export function createDbopfsResourceStore({dbopfs, tableName, fetchImpl = global
             const encoding = previousHeaders.get('content-encoding');
             const partial = reusable && entry.metadata?.status === 200
                 && (!encoding || encoding === 'identity')
-                ? await parts.readPartial(entry.name, {signal}) : null;
+                ? await parts.readPartial(entry.name, {signal, onProgress: reportResourceProgress}) : null;
             try {
                 if (partial?.size) {
                     const headers = new Headers(request.headers);

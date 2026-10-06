@@ -186,15 +186,47 @@ test('stored resource progress reports a cache read without another network down
     });
     assert.equal(await stored.file.text(), 'Every moon raccoon voice sample.');
     assert.equal(networkRequests, 1);
-    assert.deepEqual(progress, [{
-        phase: 'load',
-        message: 'Reading stored model resource',
-        completed: 1,
-        total: 1,
-        unit: 'shards',
-        cached: true,
-        url,
-    }]);
+    assert.deepEqual(progress, [0, 1].map(function expectedStoredRead(completed) {
+        return {
+            phase: 'load',
+            message: 'Reading stored model resource',
+            completed,
+            total: 1,
+            unit: 'shards',
+            cached: true,
+            url,
+        };
+    }));
+});
+
+test('stored parts report each known shard and preserve cancellation and observer failures', async function storedPartProgress() {
+    const fixture = memoryStorage();
+    const store = createDbopfsModelPartStore({dbopfs: fixture.dbopfs, tableName: 'models'});
+    const names = ['dragon-one', 'dragon-two', 'dragon-three'];
+    fixture.files.set('dragon.arcane-parts.json', new Blob([JSON.stringify({parts: names, complete: true})]));
+    for (const name of names) fixture.files.set(name, new Blob([`  ${name}\n`]));
+    const progress = [];
+    const stored = await store.read('dragon', {
+        onProgress: function observePart(value) { progress.push(value); },
+    });
+    assert.equal(await stored.text(), names.map(function partContent(name) { return `  ${name}\n`; }).join(''));
+    assert.deepEqual(progress.map(function count(value) { return value.completed; }), [0, 1, 2, 3]);
+    assert.ok(progress.every(function knownCachePlan(value) {
+        return value.phase === 'load' && value.total === 3 && value.unit === 'shards' && value.cached === true;
+    }));
+    const controller = new AbortController();
+    const reason = new Error('The dragon reader changed its selection.');
+    await assert.rejects(store.read('dragon', {
+        signal: controller.signal,
+        onProgress: function cancelAfterFirstPart(value) {
+            if (value.completed === 1) controller.abort(reason);
+        },
+    }), function sameCancellation(error) { return error === reason; });
+    const observerFailure = new Error('The dragon progress observer failed.');
+    await assert.rejects(store.read('dragon', {
+        onProgress: function failObserver() { throw observerFailure; },
+    }), function sameFailure(error) { return error === observerFailure; });
+    assert.equal(await (await store.read('dragon')).text(), await stored.text());
 });
 
 test('honest HTTP error responses preserve interrupted successful resource parts', async function failedResourceResponse() {

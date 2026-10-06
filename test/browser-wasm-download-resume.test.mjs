@@ -396,13 +396,24 @@ test(
             true
         );
 
+        const cachedProgress = [];
+        const requestsBeforeCache = requests.length;
         const cached = await store.ensure(
             source,
             {
-                offline: true
+                offline: true,
+                onProgress(value) { cachedProgress.push(value); },
             }
         );
         assert.equal(cached.cache, 'cached');
+        assert.equal(requests.length, requestsBeforeCache);
+        assert.equal(cachedProgress.some(function wronglyDownloads(value) { return value.phase === 'download'; }), false);
+        assert.ok(cachedProgress.some(function readsStoredRange(value) {
+            return value.phase === 'load' && value.members[0].completed === 1
+                && value.members[0].total === 10 && value.members[0].cached === true;
+        }));
+        assert.equal(cachedProgress.at(-1).completed, 1);
+        assert.equal(cachedProgress.at(-1).members[0].completed, 10);
     }
 );
 
@@ -479,7 +490,7 @@ test(
         }
         assert.equal(
             retryProgress.some(function observedRestoredShardProgress(progress) {
-                return progress.phase === 'download'
+                return progress.phase === 'load'
                     && progress.completed === 3
                     && progress.members.filter(function cachedMember(member) {
                         return member.state === 'cached';
@@ -536,8 +547,35 @@ test(
         assert.equal(final.members[0].total, partNames.length);
         assert.equal(final.members[0].unit, 'shards');
         assert.equal('loadedBytes' in final, false);
-        const cached = await store.ensure(source, {offline: true});
+        const cacheProgress = [];
+        const cached = await store.ensure(source, {
+            offline: true,
+            onProgress(value) { cacheProgress.push(value); },
+        });
         assert.equal(await cached.files[0].text(), first + last);
+        assert.equal(cacheProgress.some(function downloadDuringCache(value) { return value.phase === 'download'; }), false);
+        assert.ok(cacheProgress.some(function intermediateStoredPart(value) {
+            return value.phase === 'load' && value.members[0].completed === 1
+                && value.members[0].total === partNames.length && value.members[0].cached === true;
+        }));
+        assert.equal(cacheProgress.at(-1).members[0].completed, partNames.length);
+        assert.equal(cacheProgress.at(-1).completed, 1);
+        const controller = new AbortController();
+        await assert.rejects(store.ensure(source, {
+            offline: true,
+            signal: controller.signal,
+            onProgress(value) {
+                if (value.phase === 'load' && value.completed === 1) controller.abort();
+            },
+        }), {code: 'ARCANE_AI_REQUEST_ABORTED'});
+        const observerFailure = new Error('The stored moon-model progress observer failed.');
+        await assert.rejects(store.ensure(source, {
+            offline: true,
+            onProgress(value) {
+                if (value.phase === 'load') throw observerFailure;
+            },
+        }), function sameObserverFailure(error) { return error === observerFailure; });
+        assert.equal(await (await store.ensure(source, {offline: true})).files[0].text(), first + last);
         assert.equal(requests.length, 1);
         await store.remove(source);
         assert.deepEqual(directory.names(), []);

@@ -115,13 +115,17 @@ The controller emits `statechange` and `progress` through
 current mutable status snapshot. Provider states are `unloaded`, `loading`, `ready`,
 `unloading`, and `error`.
 
-Browser-WASM model loads report `cache-check`, `download`, and `initialize`
-phases. Download records preserve the ordered model-file fields `completed`,
+Browser-WASM model loads report `cache-check`, `load`, `download`, and `initialize`
+phases. Cache-read and download records preserve the ordered model-file fields `completed`,
 `total`, and `unit:'files'`. Their ordered `members` records contain each file's
 `name`, committed-part `completed`, `total`, and `unit:'shards'`. A streaming
 response has `total:null` until its end is observed; completion then supplies
-the actual committed-part count. Previously complete members identify
-`state:'cached'`. `activeTransfers` is the current transfer-worker count,
+the actual committed-part count. Reading saved parts reports `phase:'load'`,
+`cached:true`, and the known saved-part total before the first read and after
+each part is opened. An existing HTTP Range plan likewise supplies its actual
+shard total. Previously complete members identify `state:'cached'`; their
+per-member records remain cache reads even if another member is downloading.
+A fully cached activation emits no download phase. `activeTransfers` is the current transfer-worker count,
 `transferLimit` is the selected concurrency, and `transferMode` identifies
 `probing`, `files`, `ranges`, or `single`. No byte progress, rate, or estimated
 completion time is produced. Closed-part and lifecycle changes publish promptly;
@@ -136,7 +140,7 @@ These messages do not change the runtime's log level or replace its complete
 diagnostic output.
 
 Initialization has `total:null` and omits `completed` and `unit`, so its progress
-bar is indeterminate. Downloaded-file completion is not activation completion.
+bar is indeterminate. Cached or downloaded file completion is not activation completion.
 The metadata tensor count and GPU layer assignment are descriptive only:
 upstream reports assigned layers before model-weight loading has finished.
 The pinned runtime does not expose a measured overall initialization fraction
@@ -658,10 +662,13 @@ contains `kind`, `tableName`, `downloadConcurrency`, the original `adapter`,
 and `ready`, `install`, `ensure`, `remove`, and `fetchResource`. `ensure()` preserves the complete
 ordered model set and reports whether it was cached or installed.
 `install(source,{signal,onProgress})` and
-`ensure(source,{signal,onProgress,offline})` publish `cache-check` and
-`download` records using ordered file counts and per-member closed-part progress
+`ensure(source,{signal,onProgress,offline})` publish `cache-check`, cache-reading
+`load`, and actual network `download` records using ordered file counts and per-member closed-part progress
 when `onProgress` is supplied. Each member reports `completed`, `total`, and
-`unit:'shards'`; streaming totals remain `null` until completion. Records retain
+`unit:'shards'`; streaming totals remain `null` until completion. Cache reads
+publish the known stored-part plan from zero through each opened part, with
+`cached:true`; the existing Range plan supplies known totals during resume.
+No model length is converted into product progress. Records retain
 `activeTransfers`, `transferLimit`, and `transferMode`, with prompt part/lifecycle
 updates and an existing 250 ms heartbeat. They contain no transfer rate or ETA.
 Multi-file sources use up to that many concurrent member workers
@@ -693,8 +700,12 @@ loaders share this owner for actual configuration, tokenizer, graph,
 external-data and support-file requests. Complete successful GET resources may
 be reused. Cancellation joins reader/writer cleanup and preserves closed parts
 for supported HTTP resume; a full response restarts that resource without
-duplicating its saved prefix. Resource progress uses `unit:'shards'` with
-`total:null` until completion. Independent resource requests remain concurrent.
+duplicating its saved prefix. Resource progress uses `unit:'shards'`. A network
+response without a known shard plan retains `total:null` until completion;
+opening a saved complete or partial resource reports `phase:'load'`,
+`cached:true`, and the known number of stored parts before and during the read.
+The resource URL accompanies every update. These counts describe resource
+preparation, never engine activation. Independent resource requests remain concurrent.
 
 ### Availability and normalization
 
