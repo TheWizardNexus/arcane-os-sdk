@@ -13,6 +13,12 @@
 - Preserve complete selected text, existing clone/pull/commit/push behavior,
   ordered workspace operations and shared snapshot acquisition. No Git config
   file, remote, credentials, application preferences or data is rewritten.
+- Preserve original process errors when an observer failure is already included,
+  and report non-UTF-8 Git identity output with its complete raw diagnostics
+  instead of returning substituted identity text.
+- Honor an explicit browser decision `dtype` while preserving the existing
+  Laya FP16 and Julia FP32 defaults. Share the complete tensor-record preparation
+  with the separately developing native owner; this does not deliver native Laya.
 - Keep the dependency tree unchanged. Native Laya and target-bound repository
   publication remain separate work. Retained compatible native assets continue
   to use matching numeric-release routes; optional NPU upload follow-through
