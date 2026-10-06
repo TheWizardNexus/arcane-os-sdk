@@ -7,7 +7,8 @@ import Is from 'strong-type';
 import {ArcaneError, ERROR_CODES, throwIfAborted} from '../errors.mjs';
 import {runProcess} from '../process.mjs';
 import {createPortableNativeProvider} from './portable-provider.mjs';
-import {writeOutput} from './portable-layout.mjs';
+import {outputFile, writeOutput} from './portable-layout.mjs';
+import {createWindowsApplicationIcon} from './windows-icon.mjs';
 
 const is = new Is(false);
 const PROTOCOL = 'arcane-native-builder/1';
@@ -151,6 +152,61 @@ async function copyHostAssets(source, root, files, signal, relative = '', ancest
     }
 }
 
+async function applyApplicationIcon(request, root, files) {
+    const {appDescriptor, release, signal, onEvent} = request;
+    const icon = appDescriptor.native?.icon;
+    if (!icon) return {};
+    // The release owns the app's actual position. A nested entry's directory
+    // alone is not the app root; remove its complete app-relative entry.
+    const entry = release.manifest?.app?.entry ?? appDescriptor.package?.entry;
+    const start = release.manifest?.app?.start;
+    const startPath = start ? decodeURIComponent(new URL(start, 'https://arcane.invalid/').pathname).replace(/^\//u, '') : '';
+    const appDirectory = entry && startPath.endsWith(entry) ? startPath.substring(0, startPath.length - entry.length) : '';
+    const selected = `app/${appDirectory}${icon}`;
+    const source = await readFile(
+        outputFile(root, selected),
+        {signal}
+    );
+    throwIfAborted(signal);
+    const executable = path.join(root, 'Arcane.exe');
+    let branded;
+    try {
+        const launcher = await readFile(
+            executable,
+            {signal}
+        );
+        branded = await createWindowsApplicationIcon(
+            {source, extension: path.posix.extname(icon), executable: launcher}
+        );
+    } catch (error) {
+        if (error.code !== 'ARCANE_WINDOWS_ICON_UNSUPPORTED') throw error;
+        // Other descriptor formats retain ordinary assembly. The running
+        // Windows host may support the source image independently of PE icons.
+        await emit(
+            onEvent,
+            {
+                type: 'native.icon.unsupported', target: 'windows-x64', appId: appDescriptor.id,
+                icon, code: error.code, message: error.message, executable: false
+            }
+        );
+        throwIfAborted(signal);
+        return {icon: selected, executableIcon: false};
+    }
+    throwIfAborted(signal);
+    const generated = 'runtime/arcane-app.ico';
+    await writeOutput(root, generated, branded.icon, files, signal);
+    await writeFile(
+        executable, branded.executable,
+        {signal}
+    );
+    await emit(
+        onEvent,
+        {type: 'native.icon.completed', target: 'windows-x64', appId: appDescriptor.id, icon, executable: true}
+    );
+    throwIfAborted(signal);
+    return {icon: generated, executableIcon: true};
+}
+
 /** Compose app-owned services with the SDK's precompiled Windows host. */
 export function createWindowsNativeProvider({services, hostDirectory} = {}) {
     const portable = createPortableNativeProvider(services === undefined ? {} : {services});
@@ -213,6 +269,7 @@ export function createWindowsNativeProvider({services, hostDirectory} = {}) {
                 const host = selectedHost ?? await releasedHostDirectory(path.resolve(request.outputRoot), artifact.manifest.sdk.version, {signal, onEvent});
                 const files = [...artifact.manifest.files];
                 await copyHostAssets(host, root, files, signal);
+                const branding = await applyApplicationIcon(request, root, files);
                 const manifest = {
                     ...artifact.manifest,
                     kind: 'arcane-windows-native',
@@ -221,7 +278,8 @@ export function createWindowsNativeProvider({services, hostDirectory} = {}) {
                         executable: 'Arcane.exe',
                         platform: 'windows', architecture: 'x64', runtime: 'webview2',
                         coreExecutable: 'runtime/ArcaneCore.exe',
-                        coreLoader: 'runtime/arcane-core-loader.cjs'
+                        coreLoader: 'runtime/arcane-core-loader.cjs',
+                        ...branding
                     },
                     files
                 };

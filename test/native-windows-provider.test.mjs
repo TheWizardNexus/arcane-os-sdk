@@ -227,3 +227,67 @@ test('Windows download failures preserve complete upstream diagnostics and selec
     assert.deepEqual(await readdir(path.join(fixture.outputRoot, '.arcane-native-hosts', metadata.version)), []);
     await assertContents(fixture.appReleaseRoot, fixture.contents);
 });
+
+test(
+    'Windows branding resolves nested app icons and preserves other image formats through a developer event',
+    async function preserveNestedIcon(t) {
+        const fixture = await createFixture(t);
+        const icon = 'assets/cheese 🧀.svg';
+        const selectedIcon = `apps/moon-cheese-hotline/${icon}`;
+        const iconSource = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><title>  Moon cheese 🧀\nKeep the complete original.  </title></svg>\n');
+        const nestedEntry = 'apps/moon-cheese-hotline/pages/dispatch.html';
+        const contents = new Map(fixture.contents);
+        contents.set(selectedIcon, iconSource);
+        contents.set(nestedEntry, Buffer.from('<!doctype html><title>Nested cheese dispatch</title>'));
+        await writeContents(fixture.appReleaseRoot, contents);
+        const events = [];
+        const provider = createWindowsNativeProvider(
+            {hostDirectory: fixture.hostDirectory}
+        );
+        const artifact = await provider.build(
+            {
+                ...fixture.request,
+                appDescriptor: {
+                    ...fixture.request.appDescriptor,
+                    package: {entry: 'pages/dispatch.html'},
+                    native: {...fixture.request.appDescriptor.native, icon}
+                },
+                release: {
+                    files: [...contents.keys()],
+                    manifest: {
+                        app: {
+                            entry: 'pages/dispatch.html',
+                            start: './apps/moon-cheese-hotline/pages/dispatch.html'
+                        }
+                    }
+                },
+                onEvent: function observeIconEvent(event) {
+                    events.push(event);
+                }
+            }
+        );
+        assert.equal(artifact.manifest.host.icon, `app/${selectedIcon}`);
+        assert.equal(artifact.manifest.host.executableIcon, false);
+        const unsupported = events.filter(
+            function unsupportedIcon(event) {
+                return event.type === 'native.icon.unsupported';
+            }
+        );
+        assert.equal(unsupported.length, 1);
+        assert.equal(unsupported[0].icon, icon);
+        assert.equal(unsupported[0].code, 'ARCANE_WINDOWS_ICON_UNSUPPORTED');
+        assert.match(unsupported[0].message, /\.svg/u);
+        assert.equal(unsupported[0].executable, false);
+        assert.ok(
+            events.some(
+                function completed(event) {
+                    return event.type === 'native.payload.completed';
+                }
+            )
+        );
+        await assertContents(path.join(artifact.target.rootDir, 'app'), contents);
+        await assertContents(artifact.target.rootDir, fixture.assets);
+        await assertContents(fixture.appReleaseRoot, contents);
+        await assertContents(fixture.hostDirectory, fixture.assets);
+    }
+);

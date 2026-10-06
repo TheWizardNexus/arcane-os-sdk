@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -20,6 +21,7 @@ namespace Arcane.Core.Hosts.Windows
         public string OriginHost { get; set; }
         public string ProfileDirectory { get; set; }
         public string Title { get; set; }
+        public string IconPath { get; set; }
         public string ClassicClientSource { get; set; }
         public string CoreExecutable { get; set; }
         public string CoreArguments { get; set; }
@@ -106,6 +108,8 @@ namespace Arcane.Core.Hosts.Windows
         private Task initialization;
         private Task coreLifetime;
         private Task shutdown;
+        private Task iconLoading;
+        private Icon applicationIcon;
         private string injectedScript;
         private Exception transportFailure;
         private long generation;
@@ -162,6 +166,8 @@ namespace Arcane.Core.Hosts.Windows
                 string profile = Path.GetFullPath(options.ProfileDirectory);
                 Uri origin = new UriBuilder(Uri.UriSchemeHttps, options.OriginHost).Uri;
                 Uri start = new Uri(origin, options.StartPath);
+                iconLoading = LoadApplicationIconAsync();
+                iconLoading.ContinueWith(ObserveUnexpectedFailure, TaskContinuationOptions.OnlyOnFaulted);
                 core = ArcaneCoreProcess.Start(options.CoreExecutable, options.CoreArguments,
                     options.CoreWorkingDirectory, ReceiveCoreMessage, DeliverDiagnostic, CoreFailed);
                 coreLifetime = ObserveCoreLifetimeAsync();
@@ -228,6 +234,18 @@ namespace Arcane.Core.Hosts.Windows
             {
                 if (documentGeneration != generation || closing)
                     throw new InvalidOperationException("The requesting document is no longer connected.");
+                if (requestId != null && EnvelopeString(envelope, "protocol") == "arcane/1"
+                    && EnvelopeString(envelope, "method") == "window.setTheme")
+                {
+                    // This method belongs to this exact window, not the Core
+                    // child or a machine-wide appearance service.
+                    string response = WindowThemeResponse(envelope, requestId);
+                    pending.Enqueue(
+                        new CoreDelivery(documentGeneration, response)
+                    );
+                    ScheduleDelivery();
+                    return Task.FromResult<object>(null);
+                }
                 Task accepted = core.SendAsync(json);
                 // Hold the same lock used by the reader so an immediate response
                 // cannot overtake its accepted transport correlation record.
@@ -236,6 +254,181 @@ namespace Arcane.Core.Hosts.Windows
                 return accepted;
             }
         }
+
+        private async Task LoadApplicationIconAsync()
+        {
+            if (String.IsNullOrEmpty(options.IconPath)) return;
+            try
+            {
+                Icon loaded = await Task.Run(ReadApplicationIcon);
+                if (closing)
+                {
+                    loaded.Dispose();
+                    return;
+                }
+                applicationIcon = loaded;
+                Icon = loaded;
+            }
+            catch (Exception error)
+            {
+                // Image codec availability is separate from application
+                // execution. Preserve ordinary startup and complete diagnostics.
+                object record = ArcaneHost.ErrorRecord(error, "ARCANE_WINDOW_ICON_UNAVAILABLE");
+                string diagnostic = ArcaneHost.Serializer().Serialize(record);
+                DeliverDiagnostic(diagnostic + Environment.NewLine);
+            }
+        }
+
+        private Icon ReadApplicationIcon()
+        {
+            string extension = Path.GetExtension(options.IconPath);
+            if (String.Equals(extension, ".ico", StringComparison.OrdinalIgnoreCase))
+                return new Icon(options.IconPath);
+            using (Bitmap bitmap = new Bitmap(options.IconPath))
+            {
+                IntPtr handle = bitmap.GetHicon();
+                try
+                {
+                    using (Icon borrowed = System.Drawing.Icon.FromHandle(handle))
+                    {
+                        return (Icon)borrowed.Clone();
+                    }
+                }
+                finally
+                {
+                    DestroyIcon(handle);
+                }
+            }
+        }
+
+        private string WindowThemeResponse(Dictionary<string, object> request, string id)
+        {
+            Dictionary<string, object> applied = new Dictionary<string, object>();
+            List<string> unsupported = new List<string>();
+            Dictionary<string, object> response = new Dictionary<string, object>
+            {
+                { "protocol", "arcane/1" },
+                { "type", "response" },
+                { "id", id }
+            };
+            try
+            {
+                object parameters;
+                Dictionary<string, object> presentation = request.TryGetValue("parameters", out parameters)
+                    ? parameters as Dictionary<string, object> : null;
+                if (presentation == null) throw new ArgumentException("Window presentation must be an object.");
+                ApplyWindowColor(presentation, "backgroundColor", 35, applied, unsupported);
+                ApplyWindowColor(presentation, "textColor", 36, applied, unsupported);
+                response["ok"] = true;
+                response["result"] = new Dictionary<string, object>
+                {
+                    { "platform", "windows" },
+                    { "supported", applied.Count != 0 },
+                    { "applied", applied },
+                    { "unsupported", unsupported }
+                };
+            }
+            catch (Exception error)
+            {
+                Dictionary<string, object> record = (Dictionary<string, object>)ArcaneHost.ErrorRecord(error,
+                    error is ArgumentException ? "INVALID_ARGUMENT" : "ARCANE_WINDOW_THEME_FAILED");
+                record["details"] = new Dictionary<string, object>
+                {
+                    { "applied", applied },
+                    { "unsupported", unsupported }
+                };
+                response["ok"] = false;
+                response["error"] = record;
+            }
+            return ArcaneHost.Serializer().Serialize(response);
+        }
+
+        private void ApplyWindowColor(Dictionary<string, object> presentation, string field, int attribute,
+            Dictionary<string, object> applied, List<string> unsupported)
+        {
+            object supplied;
+            if (!presentation.TryGetValue(field, out supplied)) return;
+            uint nativeColor = UInt32.MaxValue;
+            object accepted = null;
+            double alpha = 1;
+            if (supplied != null)
+            {
+                Dictionary<string, object> color = supplied as Dictionary<string, object>;
+                if (color == null) throw new ArgumentException(field + " must be an RGBA record or null.");
+                int red = (int)Math.Round(
+                    ColorChannel(color, "red", 255),
+                    MidpointRounding.AwayFromZero
+                );
+                int green = (int)Math.Round(
+                    ColorChannel(color, "green", 255),
+                    MidpointRounding.AwayFromZero
+                );
+                int blue = (int)Math.Round(
+                    ColorChannel(color, "blue", 255),
+                    MidpointRounding.AwayFromZero
+                );
+                alpha = ColorChannel(color, "alpha", 1);
+                nativeColor = (uint)(red | green << 8 | blue << 16);
+                accepted = new Dictionary<string, object>
+                {
+                    { "red", red },
+                    { "green", green },
+                    { "blue", blue },
+                    { "alpha", alpha }
+                };
+            }
+            if (alpha != 1 || !WindowColorsSupported())
+            {
+                unsupported.Add(field);
+                return;
+            }
+            int result = DwmSetWindowAttribute(Handle, attribute, ref nativeColor, sizeof(uint));
+            if (result < 0) throw new COMException("Applying window " + field + " failed.", result);
+            applied[field] = accepted;
+        }
+
+        private static double ColorChannel(Dictionary<string, object> color, string name, double maximum)
+        {
+            object value;
+            if (!color.TryGetValue(name, out value)
+                || !(value is int || value is long || value is double || value is decimal))
+                throw new ArgumentException("Window color " + name + " must be numeric.");
+            double number = Convert.ToDouble(value);
+            if (Double.IsNaN(number) || Double.IsInfinity(number) || number < 0 || number > maximum)
+                throw new ArgumentException("Window color " + name + " is outside its color-channel range.");
+            return number;
+        }
+
+        private static bool WindowColorsSupported()
+        {
+            WindowsVersion version = new WindowsVersion();
+            version.StructureSize = (uint)Marshal.SizeOf(typeof(WindowsVersion));
+            int result = RtlGetVersion(ref version);
+            if (result != 0) throw new ExternalException("Reading the Windows version failed.", result);
+            return version.Major > 10 || (version.Major == 10 && version.Build >= 22000);
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct WindowsVersion
+        {
+            internal uint StructureSize;
+            internal uint Major;
+            internal uint Minor;
+            internal uint Build;
+            internal uint Platform;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+            internal string ServicePack;
+        }
+
+        [DllImport("ntdll.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+        private static extern int RtlGetVersion(ref WindowsVersion version);
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref uint value, int valueSize);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool DestroyIcon(IntPtr icon);
 
         private void DocumentConnected(long documentGeneration)
         {
@@ -498,6 +691,19 @@ namespace Arcane.Core.Hosts.Windows
                     catch (Exception error) { ReportTaskFailure(coreLifetime, error); }
                 }
             }
+            // Joining the independent image owner belongs after Core input has
+            // closed; image I/O must never delay accepted service work draining.
+            if (iconLoading != null)
+            {
+                try
+                {
+                    await iconLoading;
+                }
+                catch (Exception error)
+                {
+                    ReportTaskFailure(iconLoading, error);
+                }
+            }
             Task notifications = Task.WhenAll(failureNotifications);
             try { await notifications; }
             catch (Exception error) { ReportTaskFailure(notifications, error); }
@@ -546,6 +752,11 @@ namespace Arcane.Core.Hosts.Windows
         protected override void OnFormClosed(FormClosedEventArgs args)
         {
             base.OnFormClosed(args);
+            if (applicationIcon != null)
+            {
+                applicationIcon.Dispose();
+                applicationIcon = null;
+            }
             CompleteWindow();
         }
 

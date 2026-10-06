@@ -51,6 +51,10 @@ namespace Arcane.Core.Hosts.Windows
                 string appId = RequiredString(app, "id");
                 object title;
                 string name = app.TryGetValue("displayName", out title) && title is string ? (string)title : appId;
+                object hostValue;
+                object iconValue;
+                Dictionary<string, object> host = manifest.TryGetValue("host", out hostValue) ? hostValue as Dictionary<string, object> : null;
+                string icon = host != null && host.TryGetValue("icon", out iconValue) ? iconValue as string : null;
 
                 // Core rereads this exact selected file. Do not normalize,
                 // rewrite, filter or copy the application's launch record.
@@ -67,6 +71,7 @@ namespace Arcane.Core.Hosts.Windows
                     OriginHost = "arcane.local",
                     ProfileDirectory = Path.Combine(profileParent, "WebView2"),
                     Title = name,
+                    IconPath = String.IsNullOrEmpty(icon) ? null : Path.Combine(directory, icon),
                     ClassicClientSource = File.ReadAllText(Path.Combine(directory, RequiredString(client, "source"))),
                     CoreExecutable = Path.Combine(directory, "runtime", "ArcaneCore.exe"),
                     // Forward the actual host selection separately; Core keeps

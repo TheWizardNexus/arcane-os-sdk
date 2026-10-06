@@ -303,6 +303,70 @@ observes complete diagnostics and exit. Cancelling that operation closes its
 input, allowing the window and accepted Core service work to drain without a
 forced process termination.
 
+### Application icon and window colors
+
+`appDescriptor.native.icon` selects the application's existing app-relative
+image. Windows assembly converts PNG images, including a 512-pixel source,
+into a derived `runtime/arcane-app.ico` with 16, 32, 48 and 256-pixel images.
+Aspect ratio and transparency are preserved. An ICO selection keeps its
+authored image set. The original application asset remains unchanged.
+
+The provider embeds the selected images in the copied `Arcane.exe` and records
+`manifest.host.icon` and `manifest.host.executableIcon:true`. It replaces the
+executable's main icon group while preserving other groups, languages, resources
+and file content. Conversion uses Node standard capabilities on every assembly
+platform; it adds no application compiler, image library or Windows-only build
+step. The selected host cache and Core executable remain unchanged.
+
+JPEG/JPG, WebP and other existing descriptor formats retain ordinary assembly.
+They currently report `native.icon.unsupported` through the builder's `onEvent`
+callback, as does a selected executable whose PE layout cannot accommodate the
+derived icon. The event identifies the app, icon, target, code and complete
+message; `manifest.host.executableIcon:false` reports that the executable keeps
+its prior icon. `host.icon` then points to the original selected image. This is
+an explicit unsupported branding result, not a claim that a generic icon was
+replaced. Unreadable files and malformed supported image data report their
+ordinary filesystem or image-parser error.
+
+The matching Windows launcher reads `host.icon` and loads it independently of
+Core and page startup. ICO and standard Windows image codecs supply the window
+and taskbar icon; JPEG/JPG can therefore work at runtime even while executable
+embedding is unsupported. WebP is outside the host's standard image codecs;
+runtime support is not promised. A runtime icon error preserves ordinary startup
+and reaches complete developer diagnostics as `ARCANE_WINDOW_ICON_UNAVAILABLE`.
+Hosts built before this option was introduced do not read the new icon field.
+
+`Arcane.window.setTheme(presentation,{signal}?)` changes only the requesting
+native window's chrome. The shared ThemeBootstrap supplies computed application
+background and text colors without delaying application CSS or rendering.
+Direct callers may supply `backgroundColor` and `textColor`, each either
+`{red,green,blue,alpha}` or `null` to restore the platform default. RGB channels
+are finite numbers from 0 through 255 and alpha is from 0 through 1. Omitted
+fields remain unchanged. The complete presentation follows the existing Core
+request transport; the window host handles `window.setTheme` before forwarding
+other methods to Core. No system appearance setting changes.
+
+Windows 11 build 22000 and later support titlebar background and text colors
+through DWM. The normal titlebar and window controls remain in place. DWM accepts
+opaque colors, so alpha values other than exactly 1 report that field as
+unsupported. RGB values round to the nearest integer, with midpoint values
+rounded upward. Older Windows versions report the requested fields unsupported.
+
+The result is `{platform:'windows',supported,applied,unsupported}`. `applied`
+contains only fields accepted during that call, including rounded channels or
+`null` for a successful default reset. `supported` is true when at least one
+field applied; `unsupported` lists requested fields the platform could not
+apply. These results report platform acceptance rather than measured pixels.
+An invalid argument uses `INVALID_ARGUMENT`; a platform API failure uses
+`ARCANE_WINDOW_THEME_FAILED`, preserving complete native details and any
+earlier changes in `error.details.applied` and `error.details.unsupported`.
+The call is not atomic across fields. Existing request cancellation and document
+lifetime semantics remain in effect; an already accepted native color change
+is not rolled back by later cancellation. See [the Core client](core-client.md)
+for the facade and browser behavior.
+
+### Launch configuration
+
 For explicit user-selected workspace/state locations, launch:
 
 ```sh
@@ -331,8 +395,8 @@ exit. It does not kill the child on an ordinary close.
 `ArcaneHost.cs` composes that process with a WebView2 window through
 `ArcaneHost.Run(options,onDiagnostic,onError)` or `ArcaneHostForm`. Options
 select the app root/start path, stable virtual HTTPS origin, profile directory,
-title, canonical classic-client source and Core process inputs. The form exposes
-`Ready`, `Completion` and `CloseAsync()`. Page navigation, transport connection,
+title, optional `IconPath`, canonical classic-client source and Core process
+inputs. The form exposes `Ready`, `Completion` and `CloseAsync()`. Page navigation, transport connection,
 Core readiness and service readiness are separate states. Accepted work drains
 before the window closes; complete engineering errors go to the supplied
 diagnostic/error callbacks. Callbacks must not synchronously wait for the
