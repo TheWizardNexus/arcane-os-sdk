@@ -8357,7 +8357,8 @@ mediaType}` and copies the supplied view at acceptance. Its explicit finite
 `strength` is from `0` through `1`, takes precedence over model/parameter
 defaults and is never clamped. It decodes in the existing worker and uses the
 same selected context, queue, progress, cancellation and complete result
-contract. SD1.4 advertises `txt2img` and `img2img`. See the
+contract. SD1.4 and [SDXL Base 1.0](local-image-sdxl.md#edit-a-whole-image)
+advertise `txt2img` and whole-image `img2img`. See the
 [editing contract](local-image-editing.md#core-and-native-request) for supported
 PNG input, native preprocessing, alpha and strength-zero semantics; the
 original file remains unchanged.
