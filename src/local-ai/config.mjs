@@ -4,6 +4,7 @@ import Is from 'strong-type';
 import {ArcaneError, ERROR_CODES, throwIfAborted} from '../errors.mjs';
 import {SD14_MODEL} from './image-models/sd14.mjs';
 import {FLUX2_KLEIN_4B_MODEL} from './image-models/flux.mjs';
+import {SDXL_BASE_1_0_MODEL} from './image-models/sdxl.mjs';
 
 const is = new Is(false);
 export const LOCAL_AI_RUNTIME_IDS = ['llama.cpp', 'ollama', 'onnx', 'stable-diffusion.cpp'];
@@ -20,9 +21,10 @@ export function normalizeImageRuntimeRequirement(record) {
     const models = (record.models ?? []).map(
         function selectedImageModel(value) {
             const model = value === 'sd14' ? SD14_MODEL
-                : value === 'flux2-klein-4b' ? FLUX2_KLEIN_4B_MODEL : value;
+                : value === 'flux2-klein-4b' ? FLUX2_KLEIN_4B_MODEL
+                : value === 'sdxl-base-1.0' ? SDXL_BASE_1_0_MODEL : value;
             if (!model || !is.object(model) || is.array(model) || !is.string(model.id) || !model.id) {
-                throw new ArcaneError(ERROR_CODES.usage, 'An image model needs a descriptor with an id, or a built-in model ID (sd14 or flux2-klein-4b).');
+                throw new ArcaneError(ERROR_CODES.usage, 'An image model needs a descriptor with an id, or a built-in model ID (sd14, flux2-klein-4b, or sdxl-base-1.0).');
             }
             if (!model.resources || !is.object(model.resources) || is.array(model.resources)) {
                 throw new ArcaneError(ERROR_CODES.usage, `Image model ${model.id} needs resources keyed by model role.`);
