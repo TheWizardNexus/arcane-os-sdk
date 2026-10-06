@@ -58,7 +58,7 @@ name to `decisions`. It exposes `load`, `evaluate`, `classify` (an alias for
 | Method | Parameters and result |
 | --- | --- |
 | `decisions.status` | Current lifecycle snapshot; does not load anything. |
-| `decisions.load` | Explicit activation; returns the ready lifecycle snapshot. The request signal cancels activation. |
+| `decisions.load` | `{executionTarget?}`, where the target is `{deviceId:string}` or `null`; explicit activation or target replacement, returning the ready lifecycle snapshot. The request signal cancels activation. |
 | `decisions.evaluate` | `{rows, runOptions?}`; returns `{decisions, outputs}`. The request signal cancels the active model operation. |
 | `decisions.unload` | Releases the activation. Service-lifetime cleanup continues after the caller disconnects. |
 
@@ -111,12 +111,66 @@ is loaded by this API.
 This graph selection requires `dtype:'fp32'`, which is also the default; another
 dtype reports the incompatible selection rather than substituting a graph.
 `sessionOptions` and `runOptions` pass to the existing native ONNX API unchanged.
-`executionPreference` defaults to `gpu` here: actual advertised native GPU
-provider creation is attempted, followed by an honest CPU fallback. Explicit
-`sessionOptions.executionProviders` takes precedence. The underlying generic
-ONNX factory continues to default to CPU. Accepted provider configuration is
-not evidence that GPU nodes executed. Full provider-attempt diagnostics remain
-in `execution`; see [native ONNX sessions](local-ai.md#native-onnx-sessions).
+With no `executionTarget` selection, `executionPreference` defaults to `gpu`
+here: actual advertised native GPU provider creation is attempted, followed by
+an honest CPU fallback. Explicit `sessionOptions.executionProviders` takes
+precedence on that unchanged path. The underlying generic ONNX factory
+continues to default to CPU. Accepted provider configuration is not evidence
+that GPU nodes executed. Full provider-attempt diagnostics remain in
+`execution`; see [native ONNX sessions](local-ai.md#native-onnx-sessions).
+
+## Select an activation's execution device
+
+Both factories accept `executionTarget: {deviceId:string}` or `null` in their
+configuration. Direct model and service calls accept
+`load({executionTarget, signal})`; the Core `decisions.load` method carries the
+same target in its parameters. Use an actual stable ID from the shared
+[physical device catalog](execution-devices.md), or the documented whole-host
+CPU ID:
+
+```js
+await decisions.load({executionTarget: {deviceId: 'cpu'}});
+// A different explicit selection drains the current activation and replaces it.
+await decisions.load({executionTarget: null});
+```
+
+Omitting `executionTarget`, or supplying `undefined`, retains the most recent
+explicit selection, initially the factory's selection. When neither supplies a
+target, existing constructor, session-option and provider-default behavior
+remains unchanged. Explicit `null` requests automatic device resolution at the
+new activation boundary. It remains distinct from omission. The selection
+stays available for a later explicit load after unloading or a failed load;
+the SDK creates no preference store and does not change application preferences.
+
+The decision owner forwards the target to its existing ONNX owner. That owner
+resolves the physical ID, supported provider and provider-specific address.
+An unavailable or unsupported explicit target reports its actual failure; it
+does not silently select another adapter or a cloud provider. GPU selection
+does not require every graph node to execute on the GPU: supported CPU graph
+partitioning remains an engine concern. See the native ONNX contract for exact
+target routing and automatic-selection behavior.
+
+The existing `current().execution` field remains the complete ONNX session load
+record for that activation. Its `execution` member carries `requestedTarget`,
+`resolvedDevice`, `resolution`, `configuredTarget` and `observedTarget`, alongside
+provider-attempt diagnostics. These distinguish requested selection, physical
+resolution, accepted configuration and actual execution evidence. An unknown
+`observedTarget` remains `null`; successful configuration alone does not establish
+which device executed graph nodes.
+
+`pendingActivation` is separately `null` or `{executionTarget}` while a load or
+replacement is pending; its `executionTarget` property is omitted at JSON
+transport when the selection is `undefined`. A pending target never overwrites the previous
+activation's `execution` record. The old record remains attributable to the
+retiring activation until its cleanup completes, then the new activation owns
+its own record. A request is not a claim that the requested device is running.
+
+Concurrent loads for the same target share their pending activation. A
+different target supersedes the earlier pending request, which rejects with
+cancellation instead of returning another target's ready result. Replacement
+joins this model's actual tokenizer/native cleanup before creating its
+successor. Independent model owners retain their independent workers and
+lifetimes; there is no all-model loading barrier or trial inference.
 
 ## Complete inputs and outputs
 
@@ -148,14 +202,15 @@ runtime; sharing the encoding implementation alone does not establish it.
 ## Lifetime and cancellation
 
 `current()` returns `{family, model, revision, dtype, state, loaded, busy,
-activeRequests, progress, error, execution}`. States include `unloaded`,
+activeRequests, progress, error, execution, pendingActivation}`. States include
+`unloaded`,
 `loading`, `ready`, `unloading`, `disposing`, `disposed` and `error`. Semantic
 progress includes model preparation, tokenization and evaluation; downloaded
 members report files, not byte progress. Complete technical errors belong in
 developer diagnostics, while the application owns its user-facing status.
 
-Concurrent callers share one explicit activation. Cancelling a load or
-evaluation cancels that activation and its outstanding operations, because the
+Concurrent callers selecting the same target share one explicit activation.
+Cancelling a load or evaluation cancels that activation and its outstanding operations, because the
 native session and tokenizer have one owner. Use separately owned models when
 independent cancellation is required. The construction `signal` governs the
 whole model lifetime. `unload()` permits another explicit load after successful

@@ -32,6 +32,16 @@ export const CORE_METHOD_CONTRACTS={
     'preferences.set':{input:'{key,value}',output:'{key,value}'},
     'preferences.setMany':{input:'{entries}',output:'preference-batch-result'},
     'preferences.delete':{input:'{key}',output:'{key,deleted}'},
+    'localai.devices': {
+        input: '{refresh?}',
+        output: '{platform,state,devices,issues}',
+        meaning: 'Physical host inventory, independent of model startup. Presence does not establish engine support or observed execution.'
+    },
+    'localai.resolveTarget': {
+        input: '{executionTarget:{deviceId}|null,refresh?}',
+        output: '{requestedTarget,resolvedDevice,resolution,reason}',
+        meaning: 'Resolve a saved physical identity. Explicit null selects engine-owned automatic resolution; it does not claim a configured or observed device.'
+    },
     'window.setTheme': {
         input: '{backgroundColor?,textColor?}: null reset or {red,green,blue,alpha}',
         output: '{platform,supported,applied,unsupported}',

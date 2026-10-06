@@ -2,6 +2,7 @@ import {Worker} from 'node:worker_threads';
 import Is from 'strong-type';
 import {createArcaneEventSource} from '../event-manager.mjs';
 import {createEventQueue} from '../event-queue.mjs';
+import {createExecutionDeviceCatalog} from './execution-devices.mjs';
 
 const is=new Is(false);
 
@@ -46,12 +47,16 @@ function waitForRelease(task,signal){
     });
 }
 
-export function createONNXRuntime({modulePath,onEvent,signal}={}){
+export function createONNXRuntime({modulePath,onEvent,signal,executionDevices:suppliedExecutionDevices}={}){
     const owner={};
     const events=createArcaneEventSource(owner,{source:'local-ai.onnx',eventTypes:['onnx.state']});
     const diagnosticFailures=[];
     const diagnostics=createEventQueue(deliverDiagnostic,{onFailure:reportBackgroundError});
     const sessions=new Map();
+    const ownsExecutionDevices = suppliedExecutionDevices === undefined;
+    const executionDevices = ownsExecutionDevices ? createExecutionDeviceCatalog(
+        {signal}
+    ) : suppliedExecutionDevices;
     let nextRequestId=0;
     let closing=false;
     let closed=false;
@@ -150,24 +155,25 @@ export function createONNXRuntime({modulePath,onEvent,signal}={}){
     }
 
     function stopSession(entry,reason,failed=false){
+        if(failed)entry.terminalError??=reason;
         if(entry.stopTask)return entry.stopTask;
-        if(entry.exited)return Promise.resolve(structuredClone(entry.state));
         const active=Boolean(entry.active);
         const worker=entry.worker;
         entry.stopping=true;
-        if(failed)entry.terminalError??=reason;
         entry.stopTask=Promise.resolve().then(async function releaseSession(){
             let terminationError;
             try{
-                if(active||failed||entry.terminalError){
-                    entry.terminationRequested=true;
-                    await worker.terminate();
-                }else{
-                    try{worker.postMessage({operation:'unload',requestId:++nextRequestId});}
-                    catch(error){
-                        entry.releaseError=error;
+                if(!entry.exited){
+                    if(active||failed||entry.terminalError){
                         entry.terminationRequested=true;
                         await worker.terminate();
+                    }else{
+                        try{worker.postMessage({operation:'unload',requestId:++nextRequestId});}
+                        catch(error){
+                            entry.releaseError=error;
+                            entry.terminationRequested=true;
+                            await worker.terminate();
+                        }
                     }
                 }
             }catch(error){
@@ -177,6 +183,7 @@ export function createONNXRuntime({modulePath,onEvent,signal}={}){
             // Failed termination is not actual worker exit. Keep native file
             // ownership until exit and complete output delivery have settled.
             await entry.exit;
+            if (entry.preparation) await Promise.allSettled([entry.preparation]);
             const outputResults=await Promise.allSettled(entry.outputTasks);
             const failures=[entry.releaseError,terminationError].filter(function present(error){return error!==null&&error!==undefined;});
             for(const result of outputResults)if(result.status==='rejected')failures.push(result.reason);
@@ -184,11 +191,54 @@ export function createONNXRuntime({modulePath,onEvent,signal}={}){
             if(failures.length)throw failures[0];
             return structuredClone(entry.state);
         });
+        entry.controller.abort(reason);
         // A native call has no AbortSignal. Stop delivery immediately, retain
         // unloading state, and join actual worker exit before reporting release.
         rejectOperations(entry,reason);
-        setState(entry,entry.terminalError?'error':'unloading',entry.state.loaded,entry.terminalError);
+        if(!entry.exited)setState(entry,entry.terminalError?'error':'unloading',entry.state.loaded,entry.terminalError);
         return entry.stopTask;
+    }
+
+    async function prepareTarget(entry, operation) {
+        const operationSignal = operation.signal
+            ? AbortSignal.any([entry.controller.signal, operation.signal]) : entry.controller.signal;
+        const {executionTarget, executionPreference, sessionOptions} = operation.payload;
+        const targetResolution = await executionDevices.resolveTarget(
+            {executionTarget, signal: operationSignal}
+        );
+        operationSignal.throwIfAborted();
+        const selectProviders = sessionOptions === undefined
+            || (sessionOptions !== null && is.object(sessionOptions) && sessionOptions.executionProviders === undefined);
+        const deviceInventory = executionTarget === null && executionPreference === 'gpu' && selectProviders
+            ? await executionDevices.devices(
+                {signal: operationSignal}
+            ) : undefined;
+        operationSignal.throwIfAborted();
+        if (entry.stopping || entry.exited || entry.active !== operation) return;
+        operation.payload = {...operation.payload, targetResolution, deviceInventory};
+        entry.state.execution = {...entry.state.execution, ...targetResolution};
+        publish(entry);
+        postOperation(entry, operation);
+    }
+
+    function postOperation(entry, operation) {
+        if (closing || entry.stopping || entry.exited || entry.active !== operation) return;
+        if (operation.signal?.aborted) {
+            operation.cancel();
+            return;
+        }
+        try {
+            entry.worker.postMessage(
+                {requestId: operation.requestId, operation: operation.kind, ...operation.payload}
+            );
+        } catch (error) {
+            if (operation.kind === 'load') observeStop(entry, error, true);
+            else {
+                settle(entry, operation, error);
+                setState(entry, 'error', entry.state.loaded, error);
+                dispatchNext(entry);
+            }
+        }
     }
 
     function dispatchNext(entry){
@@ -201,16 +251,16 @@ export function createONNXRuntime({modulePath,onEvent,signal}={}){
             return;
         }
         entry.active=operation;
-        try{
-            entry.worker.postMessage({requestId:operation.requestId,operation:operation.kind,...operation.payload});
-        }catch(error){
-            if(operation.kind==='load')observeStop(entry,error,true);
-            else{
-                settle(entry,operation,error);
-                setState(entry,'error',entry.state.loaded,error);
-                dispatchNext(entry);
-            }
+        if (operation.kind === 'load' && operation.payload.executionTarget !== undefined) {
+            entry.preparation = prepareTarget(entry, operation);
+            void entry.preparation.catch(
+                function targetPreparationFailed(error) {
+                    if (!entry.stopping && !entry.exited) observeStop(entry, error, true);
+                }
+            );
+            return;
         }
+        postOperation(entry, operation);
     }
 
     function enqueue(entry,kind,payload,operationSignal,deferred=false){
@@ -244,6 +294,7 @@ export function createONNXRuntime({modulePath,onEvent,signal}={}){
         if(operation.signal?.aborted){operation.cancel();return;}
         if(message.error){
             const error=restoreError(message.error);
+            if (operation.kind === 'load' && error.execution) entry.state.execution = error.execution;
             if(operation.kind==='load')observeStop(entry,error,true);
             else{
                 settle(entry,operation,error);
@@ -269,11 +320,12 @@ export function createONNXRuntime({modulePath,onEvent,signal}={}){
             rejectOperations(entry,entry.terminalError);
         }
         const error=entry.releaseError??entry.terminalError;
+        if(!entry.stopTask)observeStop(entry,error,Boolean(error));
         try{setState(entry,error?'error':'unloaded',false,error);}
         finally{entry.resolveExit(code);}
     }
 
-    async function load({id,model,sessionOptions,executionPreference,signal:operationSignal}={}){
+    async function load({id,model,sessionOptions,executionPreference,executionTarget,signal:operationSignal}={}){
         assertOpen(operationSignal);
         if(!is.string(id)||!is.string(model))throw new TypeError('ONNX load requires a session id and model path.');
         const previous=sessions.get(id);
@@ -293,7 +345,11 @@ export function createONNXRuntime({modulePath,onEvent,signal}={}){
             throw failure('LOCAL_AI_SESSION_EXISTS',`ONNX session ${String(id)} already exists. Unload it before loading a replacement.`);
         }
         const entry={
-            state:{id,model,state:'loading',loaded:false,error:null,inputNames:[],outputNames:[],inputMetadata:[],outputMetadata:[]},
+            state:{id,model,state:'loading',loaded:false,error:null,inputNames:[],outputNames:[],inputMetadata:[],outputMetadata:[],
+                execution: {requestedTarget: executionTarget ?? null, resolvedDevice: null,
+                    resolution: executionTarget === undefined || executionTarget === null ? 'automatic' : null,
+                    reason: 'session-loading', configuredTarget: null, observedTarget: null}},
+            controller: new AbortController(), preparation: null,
             worker:null,active:null,queue:[],stopping:false,exited:false,stopTask:null,terminalError:null,releaseError:null,terminationRequested:false,outputTasks:[]
         };
         entry.exit=new Promise(function workerExit(resolve){entry.resolveExit=resolve;});
@@ -309,10 +365,7 @@ export function createONNXRuntime({modulePath,onEvent,signal}={}){
             entry.worker.on('message',function workerMessage(message){receiveResult(entry,message);});
             entry.worker.on('messageerror',function workerMessageError(error){observeStop(entry,error,true);});
             entry.worker.on('error',function workerError(error){
-                entry.terminalError=error;
-                entry.stopping=true;
-                rejectOperations(entry,error);
-                setState(entry,'error',entry.state.loaded,error);
+                observeStop(entry,error,true);
             });
             entry.worker.once('exit',function workerExit(code){workerExited(entry,code);});
         }catch(error){
@@ -323,7 +376,7 @@ export function createONNXRuntime({modulePath,onEvent,signal}={}){
         }
         // Queue load before publishing readiness so a synchronous subscriber
         // can enqueue inference or request release without racing ownership.
-        const task=enqueue(entry,'load',{model,sessionOptions,executionPreference},operationSignal,true);
+        const task=enqueue(entry,'load',{model,sessionOptions,executionPreference,executionTarget},operationSignal,true);
         publish(entry);
         dispatchNext(entry);
         return task;
@@ -364,6 +417,13 @@ export function createONNXRuntime({modulePath,onEvent,signal}={}){
             try{await diagnostics.drain();}
             catch(error){failures.push(error);}
             failures.push(...diagnosticFailures);
+            if (closed && ownsExecutionDevices) {
+                try {
+                    await executionDevices.dispose();
+                } catch (error) {
+                    failures.push(error);
+                }
+            }
             if(closed)events.dispose();
             if(failures.length)throw new AggregateError(failures,'The ONNX runtime closed with errors.');
             return current();

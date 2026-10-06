@@ -195,6 +195,8 @@ test('portable assembly preserves complete app and dependency files and authors 
         'package.json', 'LICENSE', 'COMMERCIAL-LICENSE.md', 'NOTICE',
         'README.md', 'CHANGELOG.md', 'bin/arcane.mjs', 'src/core/runtime.mjs',
         'src/core/host.mjs', 'browser-runtime/core/client.mjs',
+        'src/core/services/execution-devices.mjs', 'src/local-ai/execution-devices.mjs',
+        'src/local-ai/execution-devices-windows.ps1',
         'runtime/arcane/modules/DBOPFS.js', 'schemas/arcane-app.schema.json'
     ]) {
         assert.deepEqual(await readFile(path.join(packagedSdk, relative)), await readFile(path.join(sdkRoot, relative)), relative);
@@ -211,6 +213,8 @@ test('portable assembly preserves complete app and dependency files and authors 
     assert.ok(entry.includes('await host?.closed'));
     assert.equal(entry.includes('arcane-os/core/local-ai'), false);
     assert.equal(entry.includes('createLocalAIService'), false);
+    assert.equal(entry.includes('execution-devices'), false);
+    assert.equal(entry.includes('executionDevices'), false);
     await assert.rejects(readdir(path.join(output, 'runtime/local-ai')), {code: 'ENOENT'});
     await assert.rejects(readdir(path.join(fixture.outputRoot, 'local-ai-runtimes')), {code: 'ENOENT'});
     const client = await readFile(path.join(output, 'runtime/arcane-api.js'), 'utf8');
@@ -277,11 +281,35 @@ test('portable Core entry composes only selected local AI with relocatable runti
     const entry = coreEntrySource(application, '1.2.3', services, {localAI, runtimes});
     assert.ok(entry.includes('import("arcane-os/core/local-ai")'));
     assert.ok(entry.includes(`createService0(JSON.parse(${JSON.stringify(JSON.stringify(options))}), context)`));
-    assert.ok(entry.includes(`createLocalAIService(JSON.parse(${JSON.stringify(JSON.stringify(localAI))}), context)`));
+    assert.ok(entry.includes(`createLocalAIService(JSON.parse(${JSON.stringify(JSON.stringify(localAI))}), {...context, executionDevices})`));
     assert.ok(entry.includes("return fileURLToPath(new URL('../' + relative.split('/').map(encodeURIComponent).join('/'), import.meta.url));"));
     assert.ok(entry.includes([
         `    runtimes: JSON.parse(${JSON.stringify(JSON.stringify(runtimes))}).map(function runtimeLocation(runtime) {`,
-        '        return {...runtime, root: runtimePath(runtime.root), executable: runtimePath(runtime.executable)};',
+        '        const resolved = {...runtime};',
+        "        for (const field of ['root', 'executable', 'modulePath', 'includeDirectory', 'libraryDirectory', 'binaryDirectory', 'cmakeDirectory', 'libraryPath', 'bindingModulePath', 'helperExecutable', 'helperRoot', 'decoderExecutable', 'decoderRoot']) {",
+        '            if (runtime[field] !== undefined) resolved[field] = runtimePath(runtime[field]);',
+        '        }',
+        '        if (runtime.variants) resolved.variants = runtime.variants.map(function nativeVariant(variant) {',
+        '            const resolvedVariant = {...variant};',
+        "            for (const field of ['root', 'libraryPath', 'libraryDirectory', 'executable']) {",
+        '                if (variant[field] !== undefined) resolvedVariant[field] = runtimePath(variant[field]);',
+        '            }',
+        '            return resolvedVariant;',
+        '        });',
+        '        if (runtime.models) resolved.models = runtime.models.map(function nativeModel(model) {',
+        '            const resolvedModel = {...model};',
+        "            for (const field of ['path', 'encoderPath', 'encoderDataPath']) {",
+        '                if (model[field] !== undefined) resolvedModel[field] = runtimePath(model[field]);',
+        '            }',
+        '            if (model.resources !== undefined) {',
+        '                resolvedModel.resources = {};',
+        '                for (const [role, resource] of Object.entries(model.resources)) {',
+        "                    resolvedModel.resources[role] = typeof resource === 'string' ? runtimePath(resource) : resource;",
+        '                }',
+        '            }',
+        '            return resolvedModel;',
+        '        });',
+        '        return resolved;',
         '    }),',
         '    ...await readCoreLaunchContext()'
     ].join('\n')));
@@ -292,10 +320,36 @@ test('portable Core entry composes only selected local AI with relocatable runti
     assert.equal(unselected.includes('runtimePath'), false);
     const withoutBundledRuntime = coreEntrySource(application, '1.2.3', [], {localAI});
     assert.ok(withoutBundledRuntime.includes('runtimes: JSON.parse("[]").map(function runtimeLocation(runtime) {'));
-    assert.ok(withoutBundledRuntime.includes(`createLocalAIService(JSON.parse(${JSON.stringify(JSON.stringify(localAI))}), context)`));
+    assert.ok(withoutBundledRuntime.includes(`createLocalAIService(JSON.parse(${JSON.stringify(JSON.stringify(localAI))}), {...context, executionDevices})`));
     const emptySelection = coreEntrySource(application, '1.2.3', [], {localAI: {runtimes: []}});
-    assert.ok(emptySelection.includes(`createLocalAIService(JSON.parse(${JSON.stringify('{"runtimes":[]}')}), context)`));
+    assert.ok(emptySelection.includes(`createLocalAIService(JSON.parse(${JSON.stringify('{"runtimes":[]}')}), {...context, executionDevices})`));
     assert.ok(emptySelection.includes('runtimes: JSON.parse("[]").map(function runtimeLocation(runtime) {'));
+});
+
+test('portable local-AI hosts compose one lazy execution-device catalog with an independent service', function selectedExecutionDeviceOwner() {
+    for (const selection of [[], ['llama.cpp'], [{id: 'onnx'}], ['onnx', 'stable-diffusion.cpp', 'whisper.cpp']]) {
+        const entry = coreEntrySource(application, '1.2.3', [], {localAI: {runtimes: selection}});
+        assert.equal([...entry.matchAll(/import\("arcane-os\/local-ai\/execution-devices"\)/g)].length, 1);
+        assert.equal([...entry.matchAll(/import\("arcane-os\/core\/execution-devices"\)/g)].length, 1);
+        assert.equal([...entry.matchAll(/const executionDevices = createExecutionDeviceCatalog\(/g)].length, 1);
+        assert.equal([...entry.matchAll(/register\(createExecutionDeviceService\(\{catalog: executionDevices\}\)\);/g)].length, 1);
+        assert.ok(entry.includes('const executionDevices = createExecutionDeviceCatalog({signal: context.signal});'));
+        const factory = entry.indexOf('async function createServices(register) {');
+        const catalog = entry.indexOf('const executionDevices = createExecutionDeviceCatalog(');
+        const inventory = entry.indexOf('register(createExecutionDeviceService({catalog: executionDevices}));');
+        const localAI = entry.indexOf('register(createLocalAIService(');
+        const factoryEnd = entry.indexOf('\n}\nconst application = ');
+        assert.ok(factory !== -1 && factory < catalog && catalog < inventory && inventory < localAI && localAI < factoryEnd);
+        assert.match(entry, /register\(createLocalAIService\([^\n]+, \{\.\.\.context, executionDevices\}\)\);/);
+        assert.equal(entry.includes('executionDevices.devices('), false);
+        assert.equal(entry.includes('executionDevices.resolveTarget('), false);
+        assert.ok(entry.includes('configure(runtime) { return createServices(function register(service) { runtime.registerService(service); }); }'));
+    }
+    const unselected = coreEntrySource(application, '1.2.3', []);
+    assert.equal(unselected.includes('execution-devices'), false);
+    assert.equal(unselected.includes('createExecutionDeviceCatalog'), false);
+    assert.equal(unselected.includes('createExecutionDeviceService'), false);
+    assert.equal(unselected.includes('executionDevices'), false);
 });
 
 test('portable Core shares one model-assets owner for ONNX and image selections', function selectedModelAssetOwner() {

@@ -121,7 +121,7 @@ function collectCompletion(completion, chunk) {
 }
 
 /** Core owns native processes; applications own runtime and model selection. */
-export function createLocalAIService(configuration, {appRoot, runtimes = [], signal, onEvent, prepare} = {}) {
+export function createLocalAIService(configuration, {appRoot, runtimes = [], signal, onEvent, prepare, executionDevices} = {}) {
     const config = normalizeLocalAIConfig(configuration) ?? {runtimes: []};
     const lifetime = new AbortController();
     const lifetimeSignal = signal ? AbortSignal.any([signal, lifetime.signal]) : lifetime.signal;
@@ -173,7 +173,9 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
 
     function startONNX() {
         if (!onnxRecord?.modulePath) return;
-        onnx = createONNXRuntime({modulePath: onnxRecord.modulePath, signal: lifetimeSignal, onEvent});
+        onnx = createONNXRuntime(
+            {modulePath: onnxRecord.modulePath, signal: lifetimeSignal, onEvent, executionDevices}
+        );
         stopONNXSubscription = onnx.subscribe(function onnxChanged() { publish(); });
     }
 
@@ -630,9 +632,14 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
                 return snapshot();
             },
             'onnx.status': function currentONNX() { return onnxStatus(); },
-            'onnx.load': function loadONNX({id, model, sessionOptions}, request) {
-                return requireONNX().load({id, model: path.resolve(appRoot ?? process.cwd(), model), sessionOptions,
-                    signal: AbortSignal.any([lifetimeSignal, request.signal])});
+            'onnx.load': function loadONNX({id, model, sessionOptions, executionPreference, executionTarget}, request) {
+                return requireONNX().load(
+                    {
+                        id, model: path.resolve(appRoot ?? process.cwd(), model), sessionOptions,
+                        executionPreference, executionTarget,
+                        signal: AbortSignal.any([lifetimeSignal, request.signal])
+                    }
+                );
             },
             'onnx.run': async function runONNX({id, feeds, fetches, runOptions}, request) {
                 const outputs = await requireONNX().run({id, feeds: decodeTensorMap(feeds),

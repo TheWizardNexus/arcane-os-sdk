@@ -178,7 +178,9 @@ export function coreEntrySource(application, version, services, {localAI, runtim
             })
         };
         imports.push({binding: '{createLocalAIService}', specifier: 'arcane-os/core/local-ai'});
-        definitions.push(`    register(createLocalAIService(JSON.parse(${JSON.stringify(JSON.stringify(chatConfiguration))}), context));`);
+        imports.push({binding: '{createExecutionDeviceCatalog}', specifier: 'arcane-os/local-ai/execution-devices'});
+        imports.push({binding: '{createExecutionDeviceService}', specifier: 'arcane-os/core/execution-devices'});
+        definitions.push(`    register(createLocalAIService(JSON.parse(${JSON.stringify(JSON.stringify(chatConfiguration))}), {...context, executionDevices}));`);
     }
     if (modelAssetsSelected) {
         imports.push({binding: '{createModelAssetService}', specifier: 'arcane-os/core/model-assets'});
@@ -259,6 +261,11 @@ export function coreEntrySource(application, version, services, {localAI, runtim
             function separateImport(line, index) { return line + (index < imports.length - 1 ? ',' : ''); }
         ),
         '    ]);',
+        ...(localAI === undefined ? [] : [
+            '    // One lazy inventory owner per Core host; no model startup dependency.',
+            '    const executionDevices = createExecutionDeviceCatalog({signal: context.signal});',
+            '    register(createExecutionDeviceService({catalog: executionDevices}));'
+        ]),
         ...(modelAssetsSelected ? ['    const modelAssets = createModelAssetService({appRoot: context.appRoot});', '    register(modelAssets);'] : []),
         ...(whisperSelected ? [
             '    const stt = createWhisperRuntime(',

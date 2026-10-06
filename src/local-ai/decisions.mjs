@@ -13,6 +13,10 @@ function cancellation(message) {
 
 function reportCleanupFailure(error) { console.error('Native decision cleanup failed.', error); }
 
+function sameExecutionTarget(left, right) {
+    return left === right || (left != null && right != null && left.deviceId !== undefined && left.deviceId === right.deviceId);
+}
+
 /**
  * One explicitly activated Laya FP32 model using an existing native ONNX owner.
  * It does not create another inference runtime or load on construction.
@@ -20,7 +24,7 @@ function reportCleanupFailure(error) { console.error('Native decision cleanup fa
 export function createNativeDecisionModel({
     onnx, modelAssets, workingDirectory, paths,
     model = 'onnx-community/laya-typed-decisions-ONNX', revision = 'main',
-    dtype = 'fp32', sessionOptions, executionPreference = 'gpu', signal
+    dtype = 'fp32', sessionOptions, executionPreference = 'gpu', executionTarget, signal
 } = {}) {
     if (dtype !== 'fp32') throw new TypeError('This native Laya graph selection requires dtype fp32.');
     const owner = {};
@@ -33,14 +37,18 @@ export function createNativeDecisionModel({
     let progress = null;
     let lastError = null;
     let execution = null;
+    let selectedTarget = executionTarget;
+    let pendingActivation;
 
     function current() {
+        const pending = pendingActivation && (state !== 'ready' || pendingActivation.entry !== activation) ? pendingActivation : null;
         return {
             family: 'laya', model, revision, dtype, state,
-            loaded: state === 'ready', busy: state === 'loading' || Boolean(activation?.jobs.size),
+            loaded: state === 'ready', busy: state === 'loading' || Boolean(pending) || Boolean(activation?.jobs.size),
             activeRequests: activation?.jobs.size ?? 0, progress,
             error: lastError ? serializeCoreError(lastError) : null,
-            execution
+            execution,
+            pendingActivation: pending ? {executionTarget: pending.executionTarget} : null
         };
     }
 
@@ -141,8 +149,8 @@ export function createNativeDecisionModel({
         return {model: files['onnx/model.onnx'], tokenizer: files['tokenizer.json'], tokenizerConfig: files['tokenizer_config.json']};
     }
 
-    function beginActivation() {
-        const entry = {id: randomUUID(), controller: new AbortController(), jobs: new Set(), prepared: false, onnxLoadStarted: false};
+    function beginActivation(target) {
+        const entry = {id: randomUUID(), controller: new AbortController(), jobs: new Set(), prepared: false, onnxLoadStarted: false, executionTarget: target};
         activation = entry;
         state = 'loading';
         progress = {phase: 'preparing-model'};
@@ -161,7 +169,7 @@ export function createNativeDecisionModel({
             });
             entry.onnxLoadStarted = true;
             const loaded = onnx.load({
-                id: entry.id, model: files.model, sessionOptions, executionPreference,
+                id: entry.id, model: files.model, sessionOptions, executionPreference, executionTarget: entry.executionTarget,
                 signal: entry.controller.signal
             });
             const results = await Promise.allSettled([loaded, entry.tokenizer.ready]);
@@ -193,17 +201,74 @@ export function createNativeDecisionModel({
         return entry;
     }
 
-    async function load({signal: operationSignal} = {}) {
-        assertOpen(operationSignal);
-        if (releaseTask && !activation) await releaseTask;
-        assertOpen(operationSignal);
-        const entry = activation ?? beginActivation();
+    async function awaitActivation(entry, operationSignal) {
         const detach = observeCancellation(entry, operationSignal);
         try {
             await entry.loading;
             entry.controller.signal.throwIfAborted();
+            if (activation !== entry) throw cancellation('The decision activation was replaced.');
             return current();
         } finally { detach(); }
+    }
+
+    function observeLoad(request, operationSignal) {
+        function abort() { request.controller.abort(operationSignal.reason); }
+        operationSignal?.addEventListener('abort', abort, {once: true});
+        if (operationSignal?.aborted) abort();
+        return request.task.then(function loadedActivation() {
+            request.controller.signal.throwIfAborted();
+            request.entry.controller.signal.throwIfAborted();
+            if (activation !== request.entry) throw cancellation('The decision activation was replaced.');
+            return current();
+        }).finally(function detachLoadCaller() { operationSignal?.removeEventListener('abort', abort); });
+    }
+
+    async function load({signal: operationSignal, executionTarget: requestedTarget} = {}) {
+        assertOpen(operationSignal);
+        const target = requestedTarget === undefined ? selectedTarget : requestedTarget;
+        if (pendingActivation && !pendingActivation.controller.signal.aborted && sameExecutionTarget(pendingActivation.executionTarget, target)) {
+            return observeLoad(pendingActivation, operationSignal);
+        }
+        if (!pendingActivation && activation && sameExecutionTarget(activation.executionTarget, target)) {
+            return awaitActivation(activation, operationSignal);
+        }
+        const previous = pendingActivation;
+        const request = {executionTarget: target, controller: new AbortController()};
+        let precedingRelease;
+        // Retain the replacement before synchronous abort/state observers run.
+        // Only this model's retiring activation must finish before its successor.
+        request.task = Promise.resolve().then(async function loadSelectedTarget() {
+            request.controller.signal.throwIfAborted();
+            if (precedingRelease) await precedingRelease;
+            assertOpen(request.controller.signal);
+            if (pendingActivation !== request) throw cancellation('The decision activation request was replaced.');
+            request.entry ??= activation ?? beginActivation(request.executionTarget);
+            return awaitActivation(request.entry, request.controller.signal);
+        });
+        function settled(error) {
+            request.detach?.();
+            if (pendingActivation !== request) return;
+            pendingActivation = undefined;
+            if (!request.entry && !activation && !disposed && state === 'loading') {
+                state = request.controller.signal.aborted ? 'unloaded' : 'error';
+                progress = null;
+                lastError = request.controller.signal.aborted ? null : error;
+            }
+            publish();
+        }
+        request.task.then(function loaded() { settled(); }, function loadFailed(error) { settled(error); }).catch(reportCleanupFailure);
+        pendingActivation = request;
+        selectedTarget = target;
+        const reason = cancellation('The decision execution target was replaced.');
+        previous?.controller.abort(reason);
+        if (activation && !sameExecutionTarget(activation.executionTarget, target)) stop(activation, reason);
+        precedingRelease = !activation ? releaseTask : undefined;
+        if (!activation && !precedingRelease) {
+            request.entry = beginActivation(target);
+            request.detach = observeCancellation(request.entry, request.controller.signal);
+        }
+        publish();
+        return observeLoad(request, operationSignal);
     }
 
     async function evaluate(rows, {signal: operationSignal, runOptions} = {}) {
@@ -247,21 +312,34 @@ export function createNativeDecisionModel({
     }
 
     function unload() {
-        return activation ? stop(activation, cancellation('The native decision model was unloaded.'))
-            : releaseTask ?? Promise.resolve(current());
+        const reason = cancellation('The native decision model was unloaded.');
+        const pending = pendingActivation;
+        pending?.controller.abort(reason);
+        const release = activation ? stop(activation, reason) : releaseTask ?? Promise.resolve(current());
+        if (!pending) return release;
+        return Promise.allSettled([release, pending.task]).then(function releasedActivation(results) {
+            if (results[0].status === 'rejected') throw results[0].reason;
+            return current();
+        });
     }
 
     function dispose() {
         if (disposal) return disposal;
         disposed = true;
         signal?.removeEventListener('abort', lifetimeAborted);
+        const pending = pendingActivation;
+        const reason = cancellation('The native decision model was disposed.');
         let release;
         disposal = Promise.resolve().then(async function disposeNativeModel() {
-            try { await release; }
+            try {
+                const results = await Promise.allSettled([release, pending?.task]);
+                if (results[0].status === 'rejected') throw results[0].reason;
+            }
             finally { state = 'disposed'; publish(); events.dispose(); }
             return current();
         });
-        release = activation ? stop(activation, cancellation('The native decision model was disposed.')) : releaseTask;
+        pending?.controller.abort(reason);
+        release = activation ? stop(activation, reason) : releaseTask;
         if (!activation && !release) { state = 'disposed'; publish(); }
         return disposal;
     }

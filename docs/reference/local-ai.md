@@ -169,6 +169,10 @@ process between requests, and joins cleanup during disposal.
 Optional `prepare({signal,onEvent})` returns resolved runtime records before
 this service starts its selected engines. The managed development owner uses
 that callback without delaying the HTTP listener or independent services.
+Optional `executionDevices` supplies the shared execution-device catalog to
+the ONNX owner. Development and generated native composition share one catalog
+per Core lifetime with the independent `execution-devices` service. The ONNX
+owner does not dispose an injected catalog; the composing owner retains it.
 This factory accepts chat/ONNX requirements; the separate
 [`createLocalImageService()`](local-image-generation.md#core-service-and-transport)
 owns image requirements. The development and generated native composition
@@ -384,8 +388,8 @@ try {
 }
 ```
 
-The factory accepts `{modulePath,signal?,onEvent?}` and starts no worker until
-`load({id,model,sessionOptions?,executionPreference?,signal?})`. The model path is absolute for this
+The factory accepts `{modulePath,signal?,onEvent?,executionDevices?}` and starts no worker until
+`load({id,model,sessionOptions?,executionPreference?,executionTarget?,signal?})`. The model path is absolute for this
 direct Node API. Session creation defaults to the CPU execution provider;
 explicit native session options remain caller-owned. The returned session
 record contains `id`, `model`, `state`, `loaded`, `error`, input/output names and
@@ -400,7 +404,7 @@ A recoverable run error keeps `stopping:false` and the loaded session usable.
 rejected load or inference. Unload joins worker exit and output delivery even
 when requesting termination fails; complete cleanup errors remain observable.
 
-Select `executionPreference: 'gpu'` to try the installed runtime's advertised
+With `executionTarget` omitted, select `executionPreference: 'gpu'` to try the installed runtime's advertised
 CUDA, TensorRT, DirectML, CoreML and WebGPU providers in that order, followed by
 CPU when no accelerator session can be created. Discovery runs once per load;
 each advertised candidate receives one actual session-creation attempt with CPU
@@ -413,17 +417,105 @@ DirectML attempts default `enableMemPattern` to `false` and `executionMode` to
 `'sequential'` as required by that provider; explicit caller values remain
 unchanged, including on the final CPU attempt.
 
-Automatic GPU selection adds an `execution` record to the loaded session and
-its ordinary state events: `preference`, complete `supportedBackends`,
+Every loaded session includes an `execution` record in its ordinary state
+events: `preference`, `requestedTarget`, `resolvedDevice`, `resolution`,
+`reason`, `configuredTarget`, `observedTarget`, complete `supportedBackends`,
 `selectedProviders`, ordered `attempts` with their full errors, `fallback`, and
-`discoveryError`. Each attempt records `executionProviders`, `status`
-(`configured` or `failed`), and `error`. `fallback: true` means the SDK created
+`discoveryError`. Each attempt records provider names in `executionProviders`,
+its requested `configuredTarget`, `status` (`configured` or `failed`), and
+`error`. The accepted top-level `configuredTarget` is
+`{source,executionProviders}`; it retains the complete provider options,
+including native numeric `deviceId` values. Its `source` is `cpu-default`,
+`session-options`, `gpu-preference`, `execution-target`, or
+`automatic-physical-target`. It remains `null` until session creation succeeds.
+`fallback: true` means the SDK attempted
 the final CPU session after GPU preference, including when no GPU candidate was
-advertised. Successful creation establishes an accepted provider configuration;
+advertised; `loaded` establishes whether creation succeeded. Successful creation establishes an accepted provider configuration;
 it does not establish that a GPU executed any graph nodes. If every attempt
 fails, the load error retains the complete attempt errors and `execution`
 record. Inference failures retain their existing behavior and do not replay
 inference on another provider.
+
+### Physical execution targets
+
+`executionTarget: {deviceId}` selects a physical identifier returned by the
+[execution-device catalog](execution-devices.md). The identifier is separate
+from an ONNX provider's numeric device ordinal. `executionTarget: null` requests
+automatic selection for this new session. Omission keeps the previous provider
+selection and exact explicit `sessionOptions` behavior described above.
+Generic ONNX sessions still require unloading a live ID before replacement;
+passing another target cannot silently replace that running session.
+
+The current physical routes are the catalog's whole-host CPU (`deviceId: 'cpu'`)
+and GPUs with an actual `addresses.dxgiAdapterIndex` when the installed ONNX
+binding advertises DirectML. DirectML receives
+`{name: 'dml', deviceId: dxgiAdapterIndex}` and retains CPU participation for
+unsupported graph operators. The index comes from DXGI enumeration joined to
+the physical device; a display order, DXCore order or CUDA ordinal is not
+substituted. No CPU socket/core affinity, physical CUDA mapping or NPU provider
+support is inferred from inventory.
+
+An explicit physical target gets one configuration attempt. Missing hardware,
+unsupported provider mapping and contradictory explicit session options report
+`LOCAL_AI_EXECUTION_TARGET_UNAVAILABLE`,
+`LOCAL_AI_EXECUTION_TARGET_UNSUPPORTED`, or
+`LOCAL_AI_EXECUTION_TARGET_CONFLICT`, respectively. An explicit provider list
+must already select the mapped target; it is not overwritten. An automatic
+target conflicts with a fixed provider `deviceId` in explicit session options.
+Matching DirectML options retain caller-authored values and receive only the
+omitted `enableMemPattern: false` and `executionMode: 'sequential'` defaults.
+Native session-creation failures preserve their original errors. The SDK does
+not retry a physical target on another adapter or provider.
+
+For `executionTarget: null` with `executionPreference: 'gpu'` and no explicit
+provider list, automatic selection chooses the largest known positive
+`dedicatedMemoryMiB` among present hardware GPUs with a stable ID and actual
+DirectML mapping, when that provider is advertised. An integrated GPU remains
+eligible when it meets those same conditions. Once selected, that adapter
+gets one attempt. If no such candidate is established, the existing ordered
+provider attempts remain available and report their unresolved physical
+identity honestly. Omitted targets keep their existing selection behavior.
+
+```js
+await onnx.load({
+  id: 'cheese-radar',
+  model: absoluteModelPath,
+  executionPreference: 'gpu',
+  executionTarget: null
+});
+```
+
+`requestedTarget` preserves the requested physical record, or `null` for no
+explicit physical choice. `resolvedDevice` is the matched catalog record or
+`null`; `resolution` describes physical resolution, not engine compatibility.
+During initial physical discovery it is `null`; the resolver then supplies
+`matched`, `automatic`, `unavailable` or `unsupported`. `reason` explains the
+selection or inability. `observedTarget` remains `null`: ONNX Runtime Node
+exposes no actual physical placement observation here, including after a
+successful run. Accepted GPU configuration does not establish that every node
+ran on that GPU.
+
+The runtime creates a lazy catalog only when `executionDevices` is omitted and
+disposes only that owned catalog at close. Catalog preparation belongs to the
+loading session, follows its cancellation and is joined during release. It
+does not serialize independent sessions or delay browser rendering.
+
+### What Settings can know before loading
+
+`localai.devices` and `localai.resolveTarget` belong to the independent
+`execution-devices` service and do not load a model or wait for model-runtime
+preparation. They establish detected hardware and physical identity only.
+Settings can show those records and retain an application-owned preference
+keyed by provider/model. A matched physical ID is not a confirmed selectable
+target for every engine.
+
+The current ONNX binding's compiled-provider discovery runs in the session
+worker at an explicit load. There is no model-free ONNX capability query in
+this interface. Before that observation, engine compatibility is unknown;
+do not label every enumerated GPU or NPU supported. An advertised provider
+still does not establish usable provider libraries, model compatibility or
+actual execution. Consume the explicit load's configuration or complete
+failure, and keep observed placement unknown when it is not supplied.
 
 `run({id,feeds,fetches?,runOptions?,signal?})` returns the complete output-name
 map of `{type,dims,data}` tensors. Input records use that same shape with native
@@ -456,7 +548,7 @@ Other sessions retain their own lifetimes.
 | Core method | Parameters | Result |
 | --- | --- | --- |
 | `onnx.status` | `{}` | Runtime availability and current `models` session records |
-| `onnx.load` | `{id,model,sessionOptions?}` | Loaded session; relative model paths resolve from `appRoot` |
+| `onnx.load` | `{id,model,sessionOptions?,executionPreference?,executionTarget?}` | Loaded session; relative model paths resolve from `appRoot` |
 | `onnx.run` | `{id,feeds,fetches?,runOptions?}` | Complete encoded tensor output map |
 | `onnx.unload` | `{id}` | Released session record |
 
@@ -477,7 +569,9 @@ onnx.close();
 
 The accessor exposes `load`, `run`, `unload`, `inspect`, `current`, `subscribe`
 and `close`. Request methods accept `signal` and optional `timeoutMs` (default
-`0`, no elapsed-time cutoff). It preserves full typed tensor values, including
+`0`, no elapsed-time cutoff). Load forwards `executionPreference` and preserves
+the native load's distinction between omitted and null `executionTarget`.
+Tensor transport preserves full typed tensor values, including
 64-bit integers, floating-point special values and strings, through the
 transport codec. `current()` adds `busy` and `closed` to its latest Core state.
 Closing the accessor cancels its requests and subscriptions; model unloading

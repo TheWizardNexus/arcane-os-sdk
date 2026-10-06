@@ -106,9 +106,13 @@ export function createCoreONNXRuntime({client: suppliedClient} = {}) {
         }
     }
 
-    async function load({id, model, sessionOptions, signal, timeoutMs} = {}) {
+    async function load({id, model, sessionOptions, executionPreference, executionTarget, signal, timeoutMs} = {}) {
         const currentConnection = connection;
-        const result = await invoke('onnx.load', {id, model, sessionOptions}, {signal, timeoutMs});
+        const result = await invoke(
+            'onnx.load',
+            {id, model, sessionOptions, executionPreference, executionTarget},
+            {signal, timeoutMs}
+        );
         currentConnection.controller.signal.throwIfAborted();
         return result;
     }

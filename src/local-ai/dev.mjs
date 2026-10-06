@@ -4,19 +4,23 @@ import {createLocalAIService} from '../core/services/local-ai.mjs';
 import {createLocalImageService} from '../core/services/image.mjs';
 import {createModelAssetService} from '../core/services/model-assets.mjs';
 import {createSpeechService} from '../core/services/speech.mjs';
+import {createExecutionDeviceService} from '../core/services/execution-devices.mjs';
 import {normalizeLocalAIConfig} from './config.mjs';
 import {discoverLocalAIRuntimes} from './discover.mjs';
 import {ensureLocalAIRuntimes} from './install.mjs';
 import {createWhisperRuntime} from './whisper/index.mjs';
+import {createExecutionDeviceCatalog} from './execution-devices.mjs';
 
 /** Local engines share the ordinary app-service development transport. */
 export function createDevelopmentLocalAI({
     config, appRoot, directory, application, version, signal, onEvent,
     services = [], serviceModules = [], context = {}
 } = {}) {
+    const selected = normalizeLocalAIConfig(config) ?? {runtimes: []};
     const lifetime = new AbortController();
     signal = signal ? AbortSignal.any([signal, lifetime.signal]) : lifetime.signal;
-    const selected = normalizeLocalAIConfig(config) ?? {runtimes: []};
+    // Discovery starts on demand, independently of model runtime preparation.
+    const executionDevices = createExecutionDeviceCatalog({signal});
     const localConfig = {
         ...selected,
         runtimes: selected.runtimes.filter(function selectedChatRuntime(requirement) {
@@ -26,7 +30,7 @@ export function createDevelopmentLocalAI({
     const service = createLocalAIService(
         localConfig,
         {
-            appRoot, signal, onEvent,
+            appRoot, signal, onEvent, executionDevices,
             async prepare({signal, onEvent: report}) {
                 const discovered = await discoverLocalAIRuntimes({config: localConfig, appRoot, signal});
                 const installed = await ensureLocalAIRuntimes(
@@ -36,7 +40,7 @@ export function createDevelopmentLocalAI({
             }
         }
     );
-    const definitions = [service, ...services];
+    const definitions = [createExecutionDeviceService({catalog: executionDevices}), service, ...services];
     let modelAssets;
     let imageService;
     let speechService;

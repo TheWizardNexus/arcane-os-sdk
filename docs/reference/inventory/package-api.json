@@ -6,25 +6,53 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 299,
+  "memberCount": 301,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
   },
   "members": [
     {
+      "id": "local-ai-execution-devices:createExecutionDeviceCatalog",
+      "name": "createExecutionDeviceCatalog",
+      "displayName": "createExecutionDeviceCatalog()",
+      "kind": "function",
+      "signature": "createExecutionDeviceCatalog({signal}={})",
+      "entrypoints": ["arcane-os/local-ai/execution-devices"],
+      "primaryImport": "arcane-os/local-ai/execution-devices",
+      "group": "Physical execution devices",
+      "summary": "Owns lazy physical-device discovery and saved device-ID resolution independently of models and inference.",
+      "availability": "Node; Windows discovery is implemented, while other platforms return an unavailable inventory without changing existing AI behavior",
+      "protocol": "Physical inventory {platform,state,devices,issues}; target resolution {requestedTarget,resolvedDevice,resolution,reason}",
+      "normalization": "Returns async devices({refresh=false,signal}={}), async resolveTarget({executionTarget=null,refresh=false,signal}={}) and dispose(). Construction performs no discovery I/O; calls share cached/coalesced discovery and refresh explicitly requests a new observation. Complete records and issues distinguish ready, partial and unavailable discovery. A saved deviceId resolves as matched, unavailable or unsupported; null returns automatic/engine-default-required without discovery, and a non-null target without a nonempty string deviceId throws TypeError. Physical presence never proves engine support or actual execution. Request cancellation rejects AbortError/ARCANE_CANCELLED and the last departing caller stops the query; retained dispose() joins owned discovery shutdown, and constructor-signal abort disposes the catalog. The direct caller owns disposal; no polling, model loading, preference writes or silent target substitution. See execution-devices.md for all record fields and reasons."
+    },
+    {
+      "id": "core-execution-devices:createExecutionDeviceService",
+      "name": "createExecutionDeviceService",
+      "displayName": "createExecutionDeviceService()",
+      "kind": "function",
+      "signature": "createExecutionDeviceService({catalog=createExecutionDeviceCatalog()}={})",
+      "entrypoints": ["arcane-os/core/execution-devices"],
+      "primaryImport": "arcane-os/core/execution-devices",
+      "group": "Physical execution devices",
+      "summary": "Registers physical-device discovery as an independent Core service with catalog lifetime ownership.",
+      "availability": "Node Core; available independently of selected or loaded model runtimes, with discovery support reported by the catalog",
+      "protocol": "arcane/1 localai.devices and localai.resolveTarget",
+      "normalization": "Returns the execution-devices service with localai.devices({refresh=false}) and localai.resolveTarget({executionTarget=null,refresh=false}); both forward the Core request signal and return the catalog's complete result. Registration performs no discovery or model work. dispose() owns disposal of the supplied or default catalog; other services may borrow that same catalog without owning it."
+    },
+    {
       "id": "local-ai-decisions:createNativeDecisionModel",
       "name": "createNativeDecisionModel",
       "displayName": "createNativeDecisionModel()",
       "kind": "function",
-      "signature": "createNativeDecisionModel({onnx,modelAssets,workingDirectory,paths,model='onnx-community/laya-typed-decisions-ONNX',revision='main',dtype='fp32',sessionOptions,executionPreference='gpu',signal}={})",
+      "signature": "createNativeDecisionModel({onnx,modelAssets,workingDirectory,paths,model='onnx-community/laya-typed-decisions-ONNX',revision='main',dtype='fp32',sessionOptions,executionPreference='gpu',executionTarget,signal}={})",
       "entrypoints": ["arcane-os/local-ai/decisions"],
       "primaryImport": "arcane-os/local-ai/decisions",
       "group": "Native typed decisions",
       "summary": "Explicit native Laya FP32 option scoring through an existing ONNX owner and a tokenizer Worker.",
       "availability": "Node on Windows/Linux/macOS with selected ONNX Runtime and model files; Android needs host adaptation",
       "protocol": "Shared browser/native decision encoding with native named tensor results",
-      "normalization": "Returns load/evaluate/classify/current/status/subscribe/unload/dispose; preserves complete separate state/question/options/type and original rows, raw scores and every graph output. Explicit load prepares selected upstream files or uses caller-owned paths; GPU preference attempts advertised providers then CPU. Cancellation retires the shared activation; files remain retained through actual ONNX and tokenizer Worker exit. No chat history or duplicate inference engine."
+      "normalization": "Returns load/evaluate/classify/current/status/subscribe/unload/dispose; preserves complete separate state/question/options/type and original rows, raw scores and every graph output. Explicit load prepares selected upstream files or uses caller-owned paths. load({executionTarget,signal}) retains the latest selected target when omitted or undefined, initially the factory selection; null requests automatic resolution, while {deviceId} forwards the saved physical selection to the existing ONNX owner. With no target selection, GPU preference still attempts advertised providers then CPU and explicit session providers retain precedence. Same-target loads share activation; a changed target cancels the earlier request and joins its actual ONNX/tokenizer cleanup before replacement. pendingActivation reports the requested replacement separately; current().execution remains the complete ONNX load record, with requested/resolved/configured/observed target diagnostics in current().execution.execution. Configuration alone does not prove physical execution. Cancellation retires the shared activation; files remain retained through actual ONNX and tokenizer Worker exit. No preference writes, chat history or duplicate inference engine."
     },
     {
       "id": "core-decisions:createNativeDecisionService",
@@ -38,7 +66,7 @@
       "summary": "Renderer-independent native Laya service reusing the registered local-AI and model-assets owners.",
       "availability": "Node Core with selected native ONNX and model files",
       "protocol": "arcane/1 decisions.status/load/evaluate/unload and decisions.state",
-      "normalization": "Registration starts no model or tokenizer. Explicit load obtains dependency-ready same-process owners and reacquires getONNXRuntime after recovery. Native load/evaluate/classify/current/subscribe/unload/dispose preserve complete results; RPC uses the existing tensor codec. Unload has accepted service lifetime; host shutdown cancels request-lifetime load/evaluation."
+      "normalization": "Registration starts no model or tokenizer. Explicit load obtains dependency-ready same-process owners and reacquires getONNXRuntime after recovery. Factory configuration accepts executionTarget; direct load({executionTarget,signal}) and Core decisions.load({executionTarget}) preserve omitted/undefined selection and explicit null automatic selection. Same-target loads coalesce; changed targets cancel pending work and join the prior model's disposal before replacement. pendingActivation remains separate from the full activation execution record and its nested execution diagnostics. Native load/evaluate/classify/current/subscribe/unload/dispose preserve complete results; RPC uses the existing tensor codec. Unload has accepted service lifetime; host shutdown cancels request-lifetime load/evaluation."
     },
     {
       "id": "core-decisions:default",
@@ -353,14 +381,14 @@
       "name": "createONNXRuntime",
       "displayName": "createONNXRuntime()",
       "kind": "function",
-      "signature": "createONNXRuntime({modulePath,signal,onEvent}={})",
+      "signature": "createONNXRuntime({modulePath,onEvent,signal,executionDevices}={})",
       "entrypoints": ["arcane-os/local-ai/onnx"],
       "primaryImport": "arcane-os/local-ai/onnx",
       "group": "Core local AI",
       "summary": "Owns explicitly loaded ONNX graphs and complete named tensor inference in retained native workers.",
       "availability": "Node on Windows/Linux/macOS x64/arm64 with prepared onnxruntime-node; Android needs host adaptation",
       "protocol": "Per-session worker lifecycle with structured-clone tensors and replaying state",
-      "normalization": "Returns load/run/unload/current/subscribe/close; load accepts executionPreference gpu for advertised provider creation attempts then CPU, while explicit sessionOptions.executionProviders takes precedence. Complete execution diagnostics distinguish configured providers from physical acceleration. stopping revokes new runs while exited records actual Worker exit; recoverable run errors preserve the session. Cleanup joins exit and output delivery even when termination fails."
+      "normalization": "Returns load/run/unload/current/subscribe/close. load({id,model,sessionOptions,executionPreference,executionTarget,signal}) preserves existing behavior when executionTarget is omitted: gpu preference tries advertised providers then CPU, while explicit sessionOptions.executionProviders takes precedence. Explicit null requests automatic selection; with gpu preference and no explicit providers it prefers the highest dedicatedMemoryMiB among mapped hardware GPUs, including integrated hardware, then uses existing provider selection when no eligible mapping exists. A saved {deviceId} selects whole-host CPU or an established DirectML adapter mapping; unavailable, unsupported or conflicting targets report LOCAL_AI_EXECUTION_TARGET_UNAVAILABLE, LOCAL_AI_EXECUTION_TARGET_UNSUPPORTED or LOCAL_AI_EXECUTION_TARGET_CONFLICT without silently replacing the selection. Every loaded session reports requestedTarget, resolvedDevice, resolution/reason and configuredTarget {source,executionProviders}; observedTarget remains null because configuration does not prove physical execution. SDK-selected GPU configurations retain CPU operator support. A supplied executionDevices catalog is borrowed; otherwise the runtime owns its lazy catalog. stopping revokes new runs while exited records actual Worker exit; recoverable run errors preserve the session. Cleanup cancels target discovery and joins preparation, exit and output delivery even when termination fails."
     },
     {
       "id": "core-onnx:createCoreONNXRuntime",
@@ -374,7 +402,7 @@
       "summary": "Accesses local system ONNX through an existing Core client with complete tensor transport.",
       "availability": "Browser with available Core ONNX service; construction installs no runtime or model",
       "protocol": "arcane/1 onnx.status/load/run/unload and localai.state",
-      "normalization": "Returns load/run/unload/inspect/current/subscribe/close; omitted client follows late installation/replacement/retirement and reads current status, while explicit client including null stays fixed. Retirement clears readiness and cancels owned work; late old-client results are suppressed. Preserves typed and string tensors; close removes subscriptions and cancels requests without closing shared Core or implicitly unloading shared models"
+      "normalization": "Returns load/run/unload/inspect/current/subscribe/close; load({id,model,sessionOptions,executionPreference,executionTarget,signal,timeoutMs}) forwards provider preference and physical selection while preserving omitted-versus-null target semantics. Complete native execution diagnostics distinguish requested, resolved and configured targets from unobserved physical execution. Omitted client follows late installation/replacement/retirement and reads current status, while explicit client including null stays fixed. Retirement clears readiness and cancels owned work; late old-client results are suppressed. Preserves typed and string tensors; close removes subscriptions and cancels requests without closing shared Core or implicitly unloading shared models"
     },
     {
       "id": "root:createGitTextSnapshot",
@@ -465,14 +493,14 @@
       "name": "createLocalAIService",
       "displayName": "createLocalAIService()",
       "kind": "function",
-      "signature": "createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent,prepare}={})",
+      "signature": "createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent,prepare,executionDevices}={})",
       "entrypoints": ["arcane-os/core/local-ai"],
       "primaryImport": "arcane-os/core/local-ai",
       "group": "Core local AI",
       "summary": "Composes selected native llama.cpp, Ollama and ONNX engines as a Core service with retained process/worker ownership and model lifecycle.",
       "availability": "Node with selected upstream runtime distributions or available configured system services",
       "protocol": "arcane/1 methods and events; llama.cpp OpenAI HTTP/SSE, Ollama native HTTP/NDJSON and ONNX tensor transport",
-      "normalization": "Application-owned runtime and model requirements; optional prepare supplies installed records during this service startup. getONNXRuntime() returns the actual prepared ONNX owner for native composition after context.getService('local-ai'); callers reacquire after recovery and retain the acquired handle for cleanup. llama.status/models observe without starting or restarting an engine. Independent services, complete responses and exact owned-process cleanup remain unchanged."
+      "normalization": "Application-owned runtime and model requirements; optional prepare supplies installed records during this service startup. Optional executionDevices supplies a borrowed catalog to ONNX; its supplying owner retains catalog disposal responsibility. onnx.load forwards executionPreference and executionTarget with existing model-path resolution, cancellation and omitted-target behavior. getONNXRuntime() returns the actual prepared ONNX owner for native composition after context.getService('local-ai'); callers reacquire after recovery and retain the acquired handle for cleanup. llama.status/models observe without starting or restarting an engine. Independent services, complete responses and exact owned-process cleanup remain unchanged."
     },
     {
       "id": "core-local-ai:default",
@@ -4192,7 +4220,7 @@
       "summary": "Describes existing Core method input, output and semantic shapes.",
       "availability": "Node and browser/bundler",
       "protocol": "arcane/1 method descriptions",
-      "normalization": "Descriptive data only; the active host and its registered services remain the authority for method availability"
+      "normalization": "Descriptive data only, including independent localai.devices inventory and localai.resolveTarget physical-selection records; presence does not establish engine support or observed execution. The active host and its registered services remain the authority for method availability"
     },
     {
       "id": "core-contracts:CoreError",

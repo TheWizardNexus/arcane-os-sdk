@@ -20,13 +20,15 @@ async function createSession(request) {
     const selectProviders = supplied === undefined
         || (supplied !== null && is.object(supplied) && supplied.executionProviders === undefined);
     const options = selectProviders ? {...supplied, executionProviders: ['cpu']} : supplied;
-    if (request.executionPreference !== 'gpu' || !selectProviders) {
-        session = await ort.InferenceSession.create(request.model, options);
-        return undefined;
-    }
-
     const execution = {
-        preference: 'gpu',
+        preference: request.executionPreference ?? 'cpu',
+        requestedTarget: request.executionTarget ?? null,
+        resolvedDevice: null,
+        resolution: 'automatic',
+        reason: selectProviders ? 'engine-default-required' : 'caller-session-options',
+        ...request.targetResolution,
+        configuredTarget: null,
+        observedTarget: null,
         supportedBackends: [],
         selectedProviders: [],
         attempts: [],
@@ -34,19 +36,153 @@ async function createSession(request) {
         discoveryError: null
     };
     const failures = [];
+
+    function targetFailure(code, reason, message) {
+        execution.reason = reason;
+        const error = new Error(message);
+        error.code = code;
+        error.execution = execution;
+        return error;
+    }
+
+    function providerName(provider) {
+        return is.string(provider) ? provider : provider?.name;
+    }
+
+    async function configure(selectedOptions, source, finalAttempt = true) {
+        const executionProviders = selectedOptions?.executionProviders ?? null;
+        const names = is.array(executionProviders) ? executionProviders.map(providerName) : [];
+        const configuredTarget = {source, executionProviders};
+        const attempt = {executionProviders: names, configuredTarget, status: 'loading', error: null};
+        execution.attempts.push(attempt);
+        try {
+            session = await ort.InferenceSession.create(request.model, selectedOptions);
+            attempt.status = 'configured';
+            execution.selectedProviders = names;
+            execution.configuredTarget = configuredTarget;
+            // Session creation accepts configuration. Node exposes no physical
+            // placement observation; GPU and CPU graph partitioning may coexist.
+            return execution;
+        } catch (error) {
+            attempt.status = 'failed';
+            const record = describeError(error);
+            attempt.error = record;
+            if (finalAttempt) {
+                // Preserve primitive and non-extensible provider failures while
+                // adding SDK diagnostics without mutating the provider's value.
+                throw Object.assign(new Error(record.message, {cause: record.cause}), record, {execution});
+            }
+            throw error;
+        }
+    }
+
+    function hasBackend(name) {
+        return execution.supportedBackends.some(
+            function supportedBackend(backend) { return backend.name === name; }
+        );
+    }
+
+    function physicalOptions(device) {
+        let provider;
+        if (device.kind === 'cpu' && device.deviceId === 'cpu') {
+            provider = 'cpu';
+        } else if (device.kind === 'gpu' && hasBackend('dml')
+            && is.integer(device.addresses?.dxgiAdapterIndex) && device.addresses.dxgiAdapterIndex >= 0) {
+            provider = {name: 'dml', deviceId: device.addresses.dxgiAdapterIndex};
+        } else {
+            throw targetFailure(
+                'LOCAL_AI_EXECUTION_TARGET_UNSUPPORTED', 'provider-device-mapping-unavailable',
+                'The installed ONNX binding cannot map this physical device to a supported execution provider.'
+            );
+        }
+        if (!selectProviders) {
+            const providers = supplied?.executionProviders;
+            if (!is.array(providers) || providers.length === 0) {
+                throw targetFailure(
+                    'LOCAL_AI_EXECUTION_TARGET_CONFLICT', 'session-options-do-not-select-target',
+                    'The explicit session options do not select the requested physical execution target.'
+                );
+            }
+            const expectedName = providerName(provider);
+            const primary = providers[0];
+            const matches = providerName(primary) === expectedName
+                && (expectedName === 'cpu' || (primary?.deviceId ?? 0) === provider.deviceId)
+                && providers.every(
+                    function compatibleProvider(value, index) { return index === 0 || providerName(value) === 'cpu'; }
+                );
+            if (!matches) {
+                throw targetFailure(
+                    'LOCAL_AI_EXECUTION_TARGET_CONFLICT', 'session-options-target-conflict',
+                    'The explicit execution providers conflict with the physical target or have no established mapping to it.'
+                );
+            }
+        }
+        const selectedOptions = selectProviders ? {
+            ...supplied,
+            executionProviders: provider === 'cpu' ? ['cpu'] : [provider, 'cpu']
+        } : {...supplied};
+        if (providerName(provider) === 'dml') {
+            if (selectedOptions.enableMemPattern === undefined) selectedOptions.enableMemPattern = false;
+            if (selectedOptions.executionMode === undefined) selectedOptions.executionMode = 'sequential';
+        }
+        return selectedOptions;
+    }
+
+    const explicitDevice = request.executionTarget !== undefined && request.executionTarget !== null;
+    if (explicitDevice && (execution.resolution !== 'matched' || !execution.resolvedDevice)) {
+        throw targetFailure(
+            execution.resolution === 'unsupported' ? 'LOCAL_AI_EXECUTION_TARGET_UNSUPPORTED' : 'LOCAL_AI_EXECUTION_TARGET_UNAVAILABLE',
+            execution.reason ?? 'physical-device-unavailable',
+            'The requested physical execution device could not be resolved.'
+        );
+    }
+    if (request.executionTarget === null && !selectProviders
+        && is.array(supplied?.executionProviders) && supplied.executionProviders.some(
+            function fixedDevice(provider) { return !is.string(provider) && provider?.deviceId !== undefined; }
+        )) {
+        throw targetFailure(
+            'LOCAL_AI_EXECUTION_TARGET_CONFLICT', 'automatic-target-fixed-session-device',
+            'An automatic execution target conflicts with an explicit provider deviceId in session options.'
+        );
+    }
+    if (explicitDevice && execution.resolvedDevice.kind === 'cpu') {
+        return configure(physicalOptions(execution.resolvedDevice), 'execution-target');
+    }
+    if (!explicitDevice && (request.executionPreference !== 'gpu' || !selectProviders)) {
+        return configure(options, selectProviders ? 'cpu-default' : 'session-options');
+    }
     try {
         execution.supportedBackends = ort.listSupportedBackends();
     } catch (error) {
         execution.discoveryError = describeError(error);
         failures.push(error);
     }
+    if (explicitDevice) {
+        return configure(physicalOptions(execution.resolvedDevice), 'execution-target');
+    }
+    if (request.executionTarget === null && hasBackend('dml')) {
+        const candidates = (request.deviceInventory?.devices ?? []).filter(
+            function supportedPhysicalGPU(device) {
+                return device.kind === 'gpu' && device.present === true && device.isHardware === true
+                    && is.string(device.deviceId) && is.finite(device.dedicatedMemoryMiB)
+                    && device.dedicatedMemoryMiB > 0 && is.integer(device.addresses?.dxgiAdapterIndex)
+                    && device.addresses.dxgiAdapterIndex >= 0;
+            }
+        );
+        candidates.sort(
+            function largestDedicatedMemory(first, second) { return second.dedicatedMemoryMiB - first.dedicatedMemoryMiB; }
+        );
+        if (candidates.length) {
+            execution.resolvedDevice = candidates[0];
+            execution.reason = 'largest-supported-dedicated-memory-gpu';
+            return configure(physicalOptions(execution.resolvedDevice), 'automatic-physical-target');
+        }
+    }
     // The inventory advertises compiled support. `bundled` describes packaging,
     // not whether an installed provider library or physical device can load.
     const candidates = ['cuda', 'tensorrt', 'dml', 'coreml', 'webgpu'].filter(
         function advertisedProvider(name) {
-            return execution.supportedBackends.some(
-                function supportedBackend(backend) { return backend.name === name; }
-            );
+            return hasBackend(name);
         }
     );
     candidates.push('cpu');
@@ -59,19 +195,13 @@ async function createSession(request) {
             if (selectedOptions.enableMemPattern === undefined) selectedOptions.enableMemPattern = false;
             if (selectedOptions.executionMode === undefined) selectedOptions.executionMode = 'sequential';
         }
-        const attempt = {executionProviders, status: 'loading', error: null};
-        execution.attempts.push(attempt);
         execution.fallback = provider === 'cpu';
         try {
-            session = await ort.InferenceSession.create(request.model, selectedOptions);
-            attempt.status = 'configured';
-            execution.selectedProviders = executionProviders;
-            // Successful creation proves this session configuration was accepted.
-            // ORT can assign graph nodes to CPU; it does not prove GPU execution.
-            return execution;
+            // Keep intermediate native errors untouched: a provider may reuse
+            // one Error object for multiple attempts. The final failure owns
+            // the execution record after every attempt has been described.
+            return await configure(selectedOptions, 'gpu-preference', false);
         } catch (error) {
-            attempt.status = 'failed';
-            attempt.error = describeError(error);
             failures.push(error);
         }
     }
