@@ -8,20 +8,35 @@ function sameExecutionTarget(left, right) {
     return left === right || (left != null && right != null && left.deviceId !== undefined && left.deviceId === right.deviceId);
 }
 
+function sameActivation(left, right) {
+    if (!left || !right || !sameExecutionTarget(left.executionTarget, right.executionTarget) || left.assetProjectionId !== right.assetProjectionId) return false;
+    if (left.resourcePaths === right.resourcePaths) return true;
+    if (!left.resourcePaths || !right.resourcePaths) return false;
+    const entries = Object.entries(left.resourcePaths);
+    return entries.length === Object.keys(right.resourcePaths).length
+        && entries.every(function sameResource([role, member]) { return right.resourcePaths[role] === member; });
+}
+
 /** App-owned selection; shared typed-decision execution, without a renderer. */
 export function createNativeDecisionService(configuration = {}, {appRoot = process.cwd()} = {}) {
     const events = createArcaneEventSource({}, {source: 'core-decisions', eventTypes: ['decisions.state']});
     const lifetime = new AbortController();
+    const loads = new Set();
+    const provisionalCleanupFailures = [];
     let context;
+    let modelAssetOwner;
     let model;
     let loading;
     let loadController;
     let releasing;
     let closing;
     let unsubscribe;
-    let selectedTarget = configuration.executionTarget;
-    let loadingTarget;
-    let loadedTarget;
+    let selectedActivation = {
+        executionTarget: configuration.executionTarget,
+        ...(configuration.assetProjectionId == null ? {} : {assetProjectionId: configuration.assetProjectionId, resourcePaths: configuration.resourcePaths && {...configuration.resourcePaths}})
+    };
+    let loadingActivation;
+    let loadedActivation;
 
     function current() {
         const snapshot = model?.current() ?? {
@@ -30,10 +45,10 @@ export function createNativeDecisionService(configuration = {}, {appRoot = proce
             state: closing ? 'disposed' : 'unloaded', loaded: false, busy: Boolean(loading),
             activeRequests: 0, progress: null, error: null, execution: null
         };
-        const pending = Boolean(loading) && (!snapshot.loaded || !sameExecutionTarget(loadedTarget, loadingTarget));
+        const pending = Boolean(loading) && (!snapshot.loaded || !sameActivation(loadedActivation, loadingActivation));
         return {
             ...snapshot, busy: snapshot.busy || pending,
-            pendingActivation: pending ? {executionTarget: loadingTarget} : snapshot.pendingActivation ?? null
+            pendingActivation: pending ? {...loadingActivation} : snapshot.pendingActivation ?? null
         };
     }
 
@@ -51,57 +66,92 @@ export function createNativeDecisionService(configuration = {}, {appRoot = proce
 
     function operationSignal(signal) { return signal ? AbortSignal.any([signal, lifetime.signal]) : lifetime.signal; }
 
-    function load({signal, executionTarget: requestedTarget} = {}) {
+    function load({signal, executionTarget: requestedTarget, assetProjectionId: requestedProjection, resourcePaths: requestedPaths} = {}) {
         operationSignal(signal).throwIfAborted();
         if (!context) throw new CoreError({code: 'CORE_NOT_READY', message: 'Register and start the decision service with Core before loading.'});
-        const target = requestedTarget === undefined ? selectedTarget : requestedTarget;
-        if (loading && !loadController.signal.aborted && sameExecutionTarget(loadingTarget, target)) return observeLoad(loading, loadController, signal);
-        if (!loading && model?.current().loaded && sameExecutionTarget(loadedTarget, target)) return Promise.resolve(current());
+        const projection = requestedProjection === undefined ? selectedActivation.assetProjectionId : requestedProjection;
+        const mapping = requestedPaths === undefined ? selectedActivation.resourcePaths : requestedPaths;
+        const selection = {
+            executionTarget: requestedTarget === undefined ? selectedActivation.executionTarget : requestedTarget,
+            ...(projection == null ? {} : {assetProjectionId: projection, resourcePaths: mapping && typeof mapping === 'object' && !Array.isArray(mapping) ? {...mapping} : mapping})
+        };
+        if (loading && !loadController.signal.aborted && sameActivation(loadingActivation, selection)) return observeLoad(loading, loadController, signal);
+        if (!loading && model?.current().loaded && sameActivation(loadedActivation, selection)) return Promise.resolve(current());
         const previousLoad = loading;
         const previousController = loadController;
         const controller = new AbortController();
         const selectedSignal = AbortSignal.any([lifetime.signal, controller.signal]);
         const precedingRelease = releasing;
+        let retained;
+        let retainError;
         const task = Promise.resolve().then(async function loadSelectedModel() {
-            selectedSignal.throwIfAborted();
-            if (precedingRelease) await precedingRelease;
-            if (previousLoad) await Promise.allSettled([previousLoad]);
-            selectedSignal.throwIfAborted();
-            if (model) await model.dispose();
-            selectedSignal.throwIfAborted();
-            unsubscribe?.();
-            // Only the explicit load waits for its native dependencies. Merely
-            // registering this service does not download a model or delay UI.
-            const [localAI, modelAssets] = await Promise.all([
-                context.getService('local-ai'),
-                configuration.paths ? undefined : context.getService('model-assets')
-            ]);
-            selectedSignal.throwIfAborted();
-            const paths = configuration.paths && Object.fromEntries(
-                Object.entries(configuration.paths).map(function nativePath([name, value]) { return [name, path.resolve(appRoot, value)]; })
-            );
-            model = createNativeDecisionModel({
-                ...configuration, paths, onnx: localAI.getONNXRuntime(), modelAssets, executionTarget: target,
-                signal: lifetime.signal
-            });
-            unsubscribe = model.subscribe(function modelStateChanged() { publish(); });
-            const result = await model.load({signal: selectedSignal});
-            selectedSignal.throwIfAborted();
-            loadedTarget = target;
-            return result;
+            const replaced = new CoreError({name: 'AbortError', code: 'ARCANE_AI_REQUEST_ABORTED', message: 'The native decision activation request was replaced.'});
+            try {
+                if (retainError) throw retainError;
+                selectedSignal.throwIfAborted();
+                if (loading !== task) throw replaced;
+                // Only explicit load waits for these owners. A provisional use
+                // protects incoming files while the preceding model retires.
+                const [localAI, modelAssets] = await Promise.all([
+                    context.getService('local-ai'),
+                    configuration.paths && selection.assetProjectionId === undefined ? undefined : context.getService('model-assets')
+                ]);
+                selectedSignal.throwIfAborted();
+                if (loading !== task) throw replaced;
+                if (modelAssets) modelAssetOwner = modelAssets;
+                if (selection.assetProjectionId !== undefined && !retained) retained = modelAssets.retain(selection.assetProjectionId);
+                selectedSignal.throwIfAborted();
+                if (loading !== task) throw replaced;
+                previousController?.abort(replaced);
+                if (precedingRelease) await precedingRelease;
+                if (previousLoad) await Promise.allSettled([previousLoad]);
+                selectedSignal.throwIfAborted();
+                if (loading !== task) throw replaced;
+                if (model) await model.dispose();
+                selectedSignal.throwIfAborted();
+                if (loading !== task) throw replaced;
+                unsubscribe?.();
+                const paths = configuration.paths && Object.fromEntries(
+                    Object.entries(configuration.paths).map(function nativePath([name, value]) { return [name, path.resolve(appRoot, value)]; })
+                );
+                model = createNativeDecisionModel({
+                    ...configuration, paths, onnx: localAI.getONNXRuntime(), modelAssets,
+                    executionTarget: selection.executionTarget, assetProjectionId: selection.assetProjectionId,
+                    resourcePaths: selection.resourcePaths, signal: lifetime.signal
+                });
+                unsubscribe = model.subscribe(function modelStateChanged() { publish(); });
+                const result = await model.load({signal: selectedSignal});
+                selectedSignal.throwIfAborted();
+                loadedActivation = selection;
+                return result;
+            } finally {
+                previousController?.abort(replaced);
+                try { await retained?.release(); }
+                catch (error) {
+                    provisionalCleanupFailures.push(error);
+                    throw error;
+                }
+            }
         });
         function settled() {
+            loads.delete(task);
             if (loading !== task) return;
             loading = undefined;
             loadController = undefined;
             publish();
         }
         task.then(settled, settled).catch(function reportStateFailure(error) { console.error('Native decision state publication failed.', error); });
+        loads.add(task);
         loading = task;
         loadController = controller;
-        loadingTarget = target;
-        selectedTarget = target;
-        previousController?.abort(new CoreError({name: 'AbortError', code: 'ARCANE_AI_REQUEST_ABORTED', message: 'The native decision activation request was replaced.'}));
+        loadingActivation = selection;
+        selectedActivation = selection;
+        // A pending predecessor may hold the final native use while its workers
+        // exit. Take our use before making that predecessor's cleanup runnable.
+        if (selection.assetProjectionId !== undefined && modelAssetOwner) {
+            try { retained = modelAssetOwner.retain(selection.assetProjectionId); }
+            catch (error) { retainError = error; }
+        }
         publish();
         return observeLoad(task, controller, signal);
     }
@@ -133,9 +183,12 @@ export function createNativeDecisionService(configuration = {}, {appRoot = proce
         // rather than wait for it to download and activate first.
         loadController?.abort(new CoreError({name: 'AbortError', code: 'ARCANE_AI_REQUEST_ABORTED', message: 'The native decision load was cancelled.'}));
         const task = model?.unload() ?? Promise.resolve();
-        const acceptedLoad = loading;
+        const acceptedLoads = [...loads];
         releasing = Promise.resolve().then(async function releaseSelectedModel() {
-            const results = await Promise.allSettled([task, acceptedLoad]);
+            const results = await Promise.allSettled([task, ...acceptedLoads]);
+            if (provisionalCleanupFailures.length) throw new AggregateError([
+                ...(results[0].status === 'rejected' ? [results[0].reason] : []), ...provisionalCleanupFailures
+            ], 'Releasing native decision resources failed.');
             if (results[0].status === 'rejected') throw results[0].reason;
             return current();
         });
@@ -149,7 +202,8 @@ export function createNativeDecisionService(configuration = {}, {appRoot = proce
         const reason = new CoreError({name: 'AbortError', code: 'ARCANE_AI_REQUEST_ABORTED', message: 'The native decision service is closing.'});
         closing = Promise.resolve().then(async function closeDecisionService() {
             const failures = [];
-            try { await loading; } catch (error) { if (!lifetime.signal.aborted) failures.push(error); }
+            await Promise.allSettled([...loads]);
+            failures.push(...provisionalCleanupFailures);
             try { await model?.dispose(); } catch (error) { failures.push(error); }
             unsubscribe?.();
             publish();
@@ -165,7 +219,12 @@ export function createNativeDecisionService(configuration = {}, {appRoot = proce
         start(serviceContext) { context = serviceContext; },
         methods: {
             'decisions.status': current,
-            'decisions.load': function loadRequest(parameters, request) { return load({executionTarget: parameters?.executionTarget, signal: request.signal}); },
+            'decisions.load': function loadRequest(parameters, request) {
+                return load({
+                    executionTarget: parameters?.executionTarget, assetProjectionId: parameters?.assetProjectionId,
+                    resourcePaths: parameters?.resourcePaths, signal: request.signal
+                });
+            },
             'decisions.evaluate': async function evaluateRequest({rows, runOptions}, request) {
                 const result = await evaluate(rows, {runOptions, signal: request.signal});
                 // Typed arrays retain their complete values through Core's

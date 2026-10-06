@@ -58,7 +58,7 @@ name to `decisions`. It exposes `load`, `evaluate`, `classify` (an alias for
 | Method | Parameters and result |
 | --- | --- |
 | `decisions.status` | Current lifecycle snapshot; does not load anything. |
-| `decisions.load` | `{executionTarget?}`, where the target is `{deviceId:string}` or `null`; explicit activation or target replacement, returning the ready lifecycle snapshot. The request signal cancels activation. |
+| `decisions.load` | `{assetProjectionId?, resourcePaths?, executionTarget?}`; explicit activation or source/device replacement, returning the ready lifecycle snapshot. The request signal cancels activation. A target is `{deviceId:string}` or `null`. |
 | `decisions.evaluate` | `{rows, runOptions?}`; returns `{decisions, outputs}`. The request signal cancels the active model operation. |
 | `decisions.unload` | Releases the activation. Service-lifetime cleanup continues after the caller disconnects. |
 
@@ -99,6 +99,76 @@ caller-owned files. For SDK-prepared files, the default selected upstream is
 
 - `onnx/model.onnx` and `onnx/model.onnx_data`;
 - `tokenizer.json` and `tokenizer_config.json`.
+
+## Load complete files already stored in DBOPFS
+
+Use the existing [model-assets projection](model-assets.md) for complete files
+already obtained through the application's DBOPFS model store. Pass every
+original member, including `onnx/model.onnx_data`, to `prepareCoreModelAssets`.
+The original relative paths and complete content remain unchanged:
+
+```js
+import {prepareCoreModelAssets} from 'arcane-os/ai/core-model-assets';
+
+const projection = await prepareCoreModelAssets({
+    client,
+    workingDirectory: selectedWorkingDirectory,
+    members: [
+        {path: 'onnx/model.onnx', file: storedGraph},
+        {path: 'onnx/model.onnx_data', file: storedGraphData},
+        {path: 'tokenizer.json', file: storedTokenizer},
+        {path: 'tokenizer_config.json', file: storedTokenizerConfig}
+    ],
+    signal
+});
+try {
+    await client.invoke('decisions.load', {
+        assetProjectionId: projection.id,
+        resourcePaths: {
+            model: 'onnx/model.onnx',
+            tokenizer: 'tokenizer.json',
+            tokenizerConfig: 'tokenizer_config.json'
+        },
+        executionTarget: {deviceId: 'cpu'}
+    }, {signal, timeoutMs: 0});
+} finally {
+    // The native activation owns a separate retain handle after loading.
+    await projection.release();
+}
+```
+
+Here the four `stored*` values are the complete original Blob/File members
+from the application's existing store. This projects those files; it performs
+no model download. The decision service must already be registered as above.
+After loading, invoke `decisions.evaluate` with the complete `rows`, then
+`decisions.unload` when that native activation is no longer needed.
+
+Direct model and service calls accept
+`load({assetProjectionId, resourcePaths, executionTarget, signal})`; their
+factory configuration accepts the same source selection. A direct model needs
+the existing `modelAssets` owner when selecting a projection. `resourcePaths`
+maps all three roles (`model`, `tokenizer`, `tokenizerConfig`) to exact
+`member.path` values in a ready projection. Additional companion members stay
+in its retained directory; the graph finds its external data under the exact
+relative filename it references. The SDK does not rename or reconstruct them.
+
+A supplied projection is retained and used directly. It takes precedence over
+configured `paths` and upstream settings and never invokes upstream preparation
+or retries with downloaded files. Missing, unfinished or released projections,
+and missing mapped resources, report their actual failure.
+
+Omitted or `undefined` source fields retain the selected source and mappings.
+`assetProjectionId: null` returns to the factory's configured `paths`, or its
+existing upstream preparation when no paths were configured. Selecting another
+projection or changing any resource mapping replaces the activation even when
+the execution target stays the same. Equal source, mapping and device selections
+coalesce. The incoming retain is acquired before the prior activation retires,
+so device replacement can reuse a projection after the caller has released its
+preparation ownership. Superseded pending retains are released as their cleanup
+settles. Unload ends the native use; if no preparation or other use remains,
+create a fresh projection from the stored originals before loading again.
+
+## Existing upstream preparation
 
 `model` selects the upstream Hugging Face repository and `revision` its
 revision. Native preparation performs normal upstream fetches only during
@@ -160,13 +230,14 @@ which device executed graph nodes.
 
 `pendingActivation` is separately `null` or `{executionTarget}` while a load or
 replacement is pending; its `executionTarget` property is omitted at JSON
-transport when the selection is `undefined`. A pending target never overwrites the previous
+transport when the selection is `undefined`. A projected selection also includes
+`assetProjectionId` and its complete `resourcePaths` mapping. A pending target never overwrites the previous
 activation's `execution` record. The old record remains attributable to the
 retiring activation until its cleanup completes, then the new activation owns
 its own record. A request is not a claim that the requested device is running.
 
-Concurrent loads for the same target share their pending activation. A
-different target supersedes the earlier pending request, which rejects with
+Concurrent loads for the same source, resource mapping and target share their
+pending activation. A different selection supersedes the earlier pending request, which rejects with
 cancellation instead of returning another target's ready result. Replacement
 joins this model's actual tokenizer/native cleanup before creating its
 successor. Independent model owners retain their independent workers and
@@ -209,7 +280,7 @@ progress includes model preparation, tokenization and evaluation; downloaded
 members report files, not byte progress. Complete technical errors belong in
 developer diagnostics, while the application owns its user-facing status.
 
-Concurrent callers selecting the same target share one explicit activation.
+Concurrent callers selecting the same source, mapping and target share one explicit activation.
 Cancelling a load or evaluation cancels that activation and its outstanding operations, because the
 native session and tokenizer have one owner. Use separately owned models when
 independent cancellation is required. The construction `signal` governs the
@@ -219,7 +290,8 @@ cleanup; `dispose()` is terminal. Readiness is revoked as disposal begins.
 Retained model files remain owned until the ONNX and tokenizer Workers really
 exit. A rejected load, inference or termination request alone does not permit
 file deletion. Cleanup joins active operations and native output delivery,
-preserves cleanup errors, then releases only its working projection. It never
+preserves cleanup errors, then releases its native-use handle. Preparation
+ownership of a supplied projection remains with its caller. It never
 deletes supplied `paths`. A failed ordinary row does not destroy a healthy
 loaded session or cancel sibling evaluations. The ONNX owner's `stopping:true`
 retires decision readiness immediately on terminal Worker failure or shutdown,

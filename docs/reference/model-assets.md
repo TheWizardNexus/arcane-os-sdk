@@ -168,6 +168,39 @@ Closing a browser accessor does not by itself establish native unload.
 Explicitly release unused prepared projections. Core disposal also releases
 preparation ownership and cleans up after retained engine uses end.
 
+### Native Laya decisions
+
+The existing native decision owner also consumes ready projections through
+`decisions.load({assetProjectionId, resourcePaths, executionTarget?})` over Core,
+or the direct/service `load` method with an optional `signal`. Supply all three
+resource roles with exact projection member paths:
+
+```js
+try {
+    await client.invoke('decisions.load', {
+        assetProjectionId: projection.id,
+        resourcePaths: {
+            model: 'onnx/model.onnx',
+            tokenizer: 'tokenizer.json',
+            tokenizerConfig: 'tokenizer_config.json'
+        }
+    }, {signal, timeoutMs: 0});
+} finally {
+    await projection.release();
+}
+```
+
+The complete projection must also retain the graph's companion files, including
+`onnx/model.onnx_data` for the selected Laya FP32 graph. The native owner resolves
+the three roles from `retain(id).members` and uses those files directly without
+calling `prepare` or downloading again. It releases its native use only after
+actual ONNX and tokenizer exit; it never releases the caller's preparation
+ownership. Replacement acquires incoming ownership before retiring the prior
+activation, including when only its device changes. Unavailable or incomplete
+selections report their errors without an upstream fallback. See
+[native decisions](native-decisions.md#load-complete-files-already-stored-in-dbopfs)
+for source selection, cancellation and complete row/output contracts.
+
 `current()` returns `{closing,projections}`. Each projection reports its `id`,
 `directory`, `state`, ordered `members`, `preparationOwned`, number of native
 `uses`, and `error`. Core emits `modelAssets.state` for lifecycle changes.

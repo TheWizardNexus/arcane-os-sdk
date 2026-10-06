@@ -17,18 +17,29 @@ function sameExecutionTarget(left, right) {
     return left === right || (left != null && right != null && left.deviceId !== undefined && left.deviceId === right.deviceId);
 }
 
+function sameActivation(left, right) {
+    if (!sameExecutionTarget(left.executionTarget, right.executionTarget) || left.assetProjectionId !== right.assetProjectionId) return false;
+    if (left.resourcePaths === right.resourcePaths) return true;
+    if (!left.resourcePaths || !right.resourcePaths) return false;
+    const entries = Object.entries(left.resourcePaths);
+    return entries.length === Object.keys(right.resourcePaths).length
+        && entries.every(function sameResource([role, member]) { return right.resourcePaths[role] === member; });
+}
+
 /**
  * One explicitly activated Laya FP32 model using an existing native ONNX owner.
  * It does not create another inference runtime or load on construction.
  */
 export function createNativeDecisionModel({
-    onnx, modelAssets, workingDirectory, paths,
+    onnx, modelAssets, workingDirectory, paths, assetProjectionId, resourcePaths,
     model = 'onnx-community/laya-typed-decisions-ONNX', revision = 'main',
     dtype = 'fp32', sessionOptions, executionPreference = 'gpu', executionTarget, signal
 } = {}) {
     if (dtype !== 'fp32') throw new TypeError('This native Laya graph selection requires dtype fp32.');
     const owner = {};
     const events = createArcaneEventSource(owner, {source: 'native-decisions', eventTypes: [STATE_EVENT]});
+    const loads = new Set();
+    const provisionalCleanupFailures = [];
     let activation;
     let releaseTask;
     let disposal;
@@ -37,7 +48,10 @@ export function createNativeDecisionModel({
     let progress = null;
     let lastError = null;
     let execution = null;
-    let selectedTarget = executionTarget;
+    let selectedActivation = {
+        executionTarget,
+        ...(assetProjectionId == null ? {} : {assetProjectionId, resourcePaths: resourcePaths && {...resourcePaths}})
+    };
     let pendingActivation;
 
     function current() {
@@ -48,7 +62,7 @@ export function createNativeDecisionModel({
             activeRequests: activation?.jobs.size ?? 0, progress,
             error: lastError ? serializeCoreError(lastError) : null,
             execution,
-            pendingActivation: pending ? {executionTarget: pending.executionTarget} : null
+            pendingActivation: pending ? {...pending.selection} : null
         };
     }
 
@@ -131,6 +145,22 @@ export function createNativeDecisionModel({
     }
 
     async function prepareFiles(entry) {
+        if (entry.selection.assetProjectionId !== undefined) {
+            const mapping = entry.selection.resourcePaths;
+            if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) {
+                throw new TypeError('Projected decisions require resourcePaths for model, tokenizer and tokenizerConfig.');
+            }
+            const files = {};
+            for (const role of ['model', 'tokenizer', 'tokenizerConfig']) {
+                const member = entry.retained.members.find(function selectedMember(value) { return value.path === mapping[role]; });
+                if (!member) throw new CoreError({
+                    code: 'ARCANE_DECISION_RESOURCE_UNAVAILABLE',
+                    message: `The retained decision projection has no member ${String(mapping[role])} for ${role}.`
+                });
+                files[role] = member.nativePath;
+            }
+            return files;
+        }
         if (paths) return paths;
         if (!modelAssets) throw new CoreError({code: 'ARCANE_DECISION_ASSETS_UNAVAILABLE', message: 'Native decisions need prepared paths or the Core model-assets owner.'});
         const base = `https://huggingface.co/${model}/resolve/${encodeURIComponent(revision)}/`;
@@ -149,8 +179,13 @@ export function createNativeDecisionModel({
         return {model: files['onnx/model.onnx'], tokenizer: files['tokenizer.json'], tokenizerConfig: files['tokenizer_config.json']};
     }
 
-    function beginActivation(target) {
-        const entry = {id: randomUUID(), controller: new AbortController(), jobs: new Set(), prepared: false, onnxLoadStarted: false, executionTarget: target};
+    function beginActivation(request) {
+        const entry = {
+            id: randomUUID(), controller: new AbortController(), jobs: new Set(), prepared: false, onnxLoadStarted: false,
+            selection: request.selection, executionTarget: request.selection.executionTarget, retained: request.retained
+        };
+        request.retained = undefined;
+        request.entry = entry;
         activation = entry;
         state = 'loading';
         progress = {phase: 'preparing-model'};
@@ -223,33 +258,49 @@ export function createNativeDecisionModel({
         }).finally(function detachLoadCaller() { operationSignal?.removeEventListener('abort', abort); });
     }
 
-    async function load({signal: operationSignal, executionTarget: requestedTarget} = {}) {
+    async function load({signal: operationSignal, executionTarget: requestedTarget, assetProjectionId: requestedProjection, resourcePaths: requestedPaths} = {}) {
         assertOpen(operationSignal);
-        const target = requestedTarget === undefined ? selectedTarget : requestedTarget;
-        if (pendingActivation && !pendingActivation.controller.signal.aborted && sameExecutionTarget(pendingActivation.executionTarget, target)) {
+        const projection = requestedProjection === undefined ? selectedActivation.assetProjectionId : requestedProjection;
+        const mapping = requestedPaths === undefined ? selectedActivation.resourcePaths : requestedPaths;
+        const selection = {
+            executionTarget: requestedTarget === undefined ? selectedActivation.executionTarget : requestedTarget,
+            ...(projection == null ? {} : {assetProjectionId: projection, resourcePaths: mapping && typeof mapping === 'object' && !Array.isArray(mapping) ? {...mapping} : mapping})
+        };
+        if (pendingActivation && !pendingActivation.controller.signal.aborted && sameActivation(pendingActivation.selection, selection)) {
             return observeLoad(pendingActivation, operationSignal);
         }
-        if (!pendingActivation && activation && sameExecutionTarget(activation.executionTarget, target)) {
+        if (!pendingActivation && activation && sameActivation(activation.selection, selection)) {
             return awaitActivation(activation, operationSignal);
         }
         const previous = pendingActivation;
-        const request = {executionTarget: target, controller: new AbortController()};
+        const request = {selection, controller: new AbortController()};
         let precedingRelease;
         // Retain the replacement before synchronous abort/state observers run.
         // Only this model's retiring activation must finish before its successor.
         request.task = Promise.resolve().then(async function loadSelectedTarget() {
-            request.controller.signal.throwIfAborted();
-            if (precedingRelease) await precedingRelease;
-            assertOpen(request.controller.signal);
-            if (pendingActivation !== request) throw cancellation('The decision activation request was replaced.');
-            request.entry ??= activation ?? beginActivation(request.executionTarget);
-            return awaitActivation(request.entry, request.controller.signal);
+            try {
+                if (request.error) throw request.error;
+                request.controller.signal.throwIfAborted();
+                if (precedingRelease) await precedingRelease;
+                assertOpen(request.controller.signal);
+                if (pendingActivation !== request) throw cancellation('The decision activation request was replaced.');
+                request.entry ??= activation ?? beginActivation(request);
+                return await awaitActivation(request.entry, request.controller.signal);
+            } finally {
+                // A superseded request may own files without ever starting workers.
+                try { await request.retained?.release(); }
+                catch (error) {
+                    provisionalCleanupFailures.push(error);
+                    throw error;
+                } finally { request.retained = undefined; }
+            }
         });
         function settled(error) {
+            loads.delete(request.task);
             request.detach?.();
             if (pendingActivation !== request) return;
             pendingActivation = undefined;
-            if (!request.entry && !activation && !disposed && state === 'loading') {
+            if (!request.entry && !activation && !disposed && (state === 'loading' || request.error)) {
                 state = request.controller.signal.aborted ? 'unloaded' : 'error';
                 progress = null;
                 lastError = request.controller.signal.aborted ? null : error;
@@ -257,14 +308,24 @@ export function createNativeDecisionModel({
             publish();
         }
         request.task.then(function loaded() { settled(); }, function loadFailed(error) { settled(error); }).catch(reportCleanupFailure);
+        loads.add(request.task);
         pendingActivation = request;
-        selectedTarget = target;
-        const reason = cancellation('The decision execution target was replaced.');
+        selectedActivation = selection;
+        try {
+            if (selection.assetProjectionId !== undefined) {
+                if (!modelAssets) throw new CoreError({code: 'ARCANE_DECISION_ASSETS_UNAVAILABLE', message: 'Projected decisions require the Core model-assets owner.'});
+                // retain is synchronous at the model-assets public boundary.
+                // Acquire before retiring the last native use of these files.
+                request.retained = modelAssets.retain(selection.assetProjectionId);
+            }
+        } catch (error) { request.error = error; }
+        const reason = cancellation('The decision activation was replaced.');
+        if (pendingActivation !== request) request.controller.abort(reason);
         previous?.controller.abort(reason);
-        if (activation && !sameExecutionTarget(activation.executionTarget, target)) stop(activation, reason);
+        if (!request.error && !request.controller.signal.aborted && activation && !sameActivation(activation.selection, selection)) stop(activation, reason);
         precedingRelease = !activation ? releaseTask : undefined;
-        if (!activation && !precedingRelease) {
-            request.entry = beginActivation(target);
+        if (!request.error && !request.controller.signal.aborted && !activation && !precedingRelease) {
+            request.entry = beginActivation(request);
             request.detach = observeCancellation(request.entry, request.controller.signal);
         }
         publish();
@@ -316,8 +377,11 @@ export function createNativeDecisionModel({
         const pending = pendingActivation;
         pending?.controller.abort(reason);
         const release = activation ? stop(activation, reason) : releaseTask ?? Promise.resolve(current());
-        if (!pending) return release;
-        return Promise.allSettled([release, pending.task]).then(function releasedActivation(results) {
+        if (!loads.size && !provisionalCleanupFailures.length) return release;
+        return Promise.allSettled([release, ...loads]).then(function releasedActivation(results) {
+            if (provisionalCleanupFailures.length) throw new AggregateError([
+                ...(results[0].status === 'rejected' ? [results[0].reason] : []), ...provisionalCleanupFailures
+            ], 'Releasing native decision resources failed.');
             if (results[0].status === 'rejected') throw results[0].reason;
             return current();
         });
@@ -332,7 +396,10 @@ export function createNativeDecisionModel({
         let release;
         disposal = Promise.resolve().then(async function disposeNativeModel() {
             try {
-                const results = await Promise.allSettled([release, pending?.task]);
+                const results = await Promise.allSettled([release, ...loads]);
+                if (provisionalCleanupFailures.length) throw new AggregateError([
+                    ...(results[0].status === 'rejected' ? [results[0].reason] : []), ...provisionalCleanupFailures
+                ], 'Releasing native decision resources failed.');
                 if (results[0].status === 'rejected') throw results[0].reason;
             }
             finally { state = 'disposed'; publish(); events.dispose(); }

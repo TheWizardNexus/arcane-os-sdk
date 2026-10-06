@@ -169,15 +169,22 @@ function fakeONNX({outputs = graphOutputs(), loadError, unloadError, runError, r
     return {owner, calls, outputs, runStarted, unloadStarted, failWorker};
 }
 
-function fakeAssets(files) {
-    const records = new Map();
+function fakeAssets(files, projections = []) {
+    const records = new Map(projections.map(function readyProjection(projection) {
+        return [projection.id, {
+            state: 'ready', preparationOwned: true, retained: false, uses: 0,
+            members: ['onnx/model.onnx', 'onnx/model.onnx_data', 'tokenizer.json', 'tokenizer_config.json'].map(function member(pathname) {
+                return {path: pathname, nativePath: path.join(files.root, pathname)};
+            }), ...projection
+        }];
+    }));
     const calls = {prepare: [], retain: [], release: [], releaseRetain: []};
     const owner = {
         async prepare(options) {
             calls.prepare.push(options);
             options.signal.throwIfAborted();
             const record = {
-                id: options.id, preparationOwned: true, retained: false,
+                id: options.id, state: 'ready', preparationOwned: true, retained: false, uses: 0,
                 members: options.members.map(function preparedMember(member) {
                     return {...member, nativePath: path.join(files.root, member.path)};
                 })
@@ -188,16 +195,26 @@ function fakeAssets(files) {
         retain(id) {
             calls.retain.push(id);
             const record = records.get(id);
+            if (!record || record.state === 'released') throw Object.assign(new Error('The requested projection is unavailable.'), {code: 'MODEL_ASSET_PROJECTION_UNAVAILABLE'});
+            if (record.state !== 'ready') throw Object.assign(new Error('The complete projection is not ready.'), {code: 'MODEL_ASSET_PROJECTION_NOT_READY'});
+            record.uses += 1;
             record.retained = true;
-            return {release() {
+            let released;
+            return {id, directory: files.root, members: record.members, release() {
+                if (released) return released;
                 calls.releaseRetain.push(id);
-                record.retained = false;
-                return Promise.resolve();
+                record.uses -= 1;
+                record.retained = record.uses > 0;
+                if (!record.preparationOwned && !record.retained) record.state = 'released';
+                released = Promise.resolve();
+                return released;
             }};
         },
         release(id) {
             calls.release.push(id);
-            records.get(id).preparationOwned = false;
+            const record = records.get(id);
+            record.preparationOwned = false;
+            if (!record.retained) record.state = 'released';
             return Promise.resolve();
         }
     };
@@ -339,6 +356,230 @@ test('immediate Core load then unload cancels before dependency lookup without a
     assert.equal(service.current().loaded, false);
     assert.equal(service.current().busy, false);
 });
+
+for (const route of ['direct', 'Core']) {
+    const resourcePaths = {model: 'onnx/model.onnx', tokenizer: 'tokenizer.json', tokenizerConfig: 'tokenizer_config.json'};
+
+    function projectedOwner(files, native, assets, configuration = {}) {
+        const decisions = files.own(route === 'direct'
+            ? createNativeDecisionModel({...configuration, onnx: native.owner, modelAssets: assets.owner})
+            : createNativeDecisionService(configuration, {appRoot: files.root}));
+        if (route === 'Core') decisions.start({
+            getService(name) {
+                assert.ok(['local-ai', 'model-assets'].includes(name));
+                return name === 'local-ai' ? {getONNXRuntime() { return native.owner; }} : assets.owner;
+            },
+            emit() {}
+        });
+        return decisions;
+    }
+
+    function loadProjection(decisions, options = {}, signal) {
+        return route === 'Core'
+            ? decisions.methods['decisions.load'](options, {signal})
+            : decisions.load({...options, signal});
+    }
+
+    test(`${route} retained projections preserve all 160 rows and graph outputs without preparing upstream files`, async function completeProjectedBatch(t) {
+        const files = await fixture(t);
+        const completeRows = Array.from({length: 160}, function originalRow(_, index) {
+            return {...rows[index % rows.length], applicationRecord: {index, note: '  Entire moon record.\r\n雪 🐙  '}};
+        });
+        const originalRows = structuredClone(completeRows);
+        const outputs = {
+            ...graphOutputs(),
+            logits: {type: 'float32', dims: [160, 3], data: new Float32Array(completeRows.flatMap(function rowScores() { return [0, 1, 2]; }))},
+            act_logits: {type: 'float32', dims: [160, 2], data: new Float32Array(completeRows.flatMap(function actionScores() { return [1, 0]; }))}
+        };
+        const assets = fakeAssets(files, [{id: 'saved-moon'}]);
+        const native = fakeONNX({outputs, beforeLoad() { assert.ok(assets.records.get('saved-moon').uses > 0); }});
+        const sessionOptions = {graphOptimizationLevel: 'all'};
+        const executionTarget = {deviceId: 'cpu'};
+        const decisions = projectedOwner(files, native, assets, {sessionOptions, paths: files.paths, assetProjectionId: 'saved-moon', resourcePaths});
+        assert.deepEqual(assets.calls, {prepare: [], retain: [], release: [], releaseRetain: []});
+        assert.equal(native.calls.load.length, 0);
+        await loadProjection(decisions, {executionTarget}, t.signal);
+        assert.equal(native.calls.load[0].model, files.paths.model);
+        assert.equal(native.calls.load[0].sessionOptions, sessionOptions);
+        assert.equal(native.calls.load[0].executionTarget, executionTarget);
+        assert.equal(assets.calls.prepare.length, 0);
+        assert.equal(assets.calls.release.length, 0, 'The decision owner never releases caller preparation ownership.');
+        assert.equal(assets.records.get('saved-moon').uses, 1);
+        assert.deepEqual(assets.records.get('saved-moon').members.map(function member(value) { return value.path; }),
+            ['onnx/model.onnx', 'onnx/model.onnx_data', 'tokenizer.json', 'tokenizer_config.json']);
+        await assets.owner.release('saved-moon');
+        const runOptions = {tag: 'Every moon decision'};
+        const result = route === 'Core'
+            ? await decisions.methods['decisions.evaluate']({rows: completeRows, runOptions}, {signal: t.signal})
+            : await decisions.evaluate(completeRows, {signal: t.signal, runOptions});
+        assert.equal(native.calls.run.length, 1);
+        assert.equal(native.calls.run[0].feeds.input_ids.dims[0], 160);
+        assert.equal(native.calls.run[0].feeds.qtype.data.length, 160);
+        assert.equal(native.calls.run[0].runOptions, runOptions);
+        assert.equal(result.decisions.length, 160);
+        for (const [index, decision] of result.decisions.entries()) {
+            assert.equal(decision.row, completeRows[index]);
+            assert.deepEqual(decision.row, originalRows[index]);
+        }
+        assert.deepEqual(completeRows, originalRows);
+        assert.deepEqual(route === 'Core' ? decodeTensorMap(result.outputs) : result.outputs, outputs);
+        await loadProjection(decisions, {assetProjectionId: undefined, resourcePaths: undefined, executionTarget: undefined});
+        assert.equal(native.calls.load.length, 1);
+        await decisions.unload();
+        assert.equal(assets.records.get('saved-moon').uses, 0);
+        assert.equal(assets.records.get('saved-moon').state, 'released');
+    });
+
+    test(`${route} projection and resource changes replace equal-target activations while equal selections coalesce`, async function projectedSelection(t) {
+        const files = await fixture(t);
+        const assets = fakeAssets(files, [{id: 'first-moon'}, {id: 'second-moon'}]);
+        assets.records.get('second-moon').members.push({path: 'alternate/model.onnx', nativePath: files.paths.model});
+        const native = fakeONNX();
+        const decisions = projectedOwner(files, native, assets, {paths: files.paths});
+        await Promise.all([
+            loadProjection(decisions, {assetProjectionId: 'first-moon', resourcePaths}),
+            loadProjection(decisions, {assetProjectionId: 'first-moon', resourcePaths: {...resourcePaths}})
+        ]);
+        assert.equal(native.calls.load.length, 1);
+        await loadProjection(decisions, {assetProjectionId: 'second-moon'});
+        assert.equal(native.calls.load.length, 2);
+        assert.equal(assets.records.get('first-moon').uses, 0);
+        assert.equal(assets.records.get('first-moon').preparationOwned, true);
+        await loadProjection(decisions, {resourcePaths: {...resourcePaths, model: 'alternate/model.onnx'}});
+        assert.equal(native.calls.load.length, 3);
+        assert.equal(assets.calls.prepare.length, 0);
+        await loadProjection(decisions, {assetProjectionId: null});
+        assert.equal(native.calls.load.length, 4);
+        assert.equal(native.calls.load[3].model, files.paths.model);
+        assert.equal(assets.records.get('second-moon').uses, 0);
+        assert.equal(assets.calls.prepare.length, 0, 'Null restores the configured caller-owned paths.');
+        await loadProjection(decisions);
+        assert.equal(native.calls.load.length, 4);
+    });
+
+    test(`${route} target replacement retains the incoming projection before predecessor exit and drops superseded pending uses`, async function retainedReplacement(t) {
+        const files = await fixture(t);
+        const exitGate = files.gate();
+        const assets = fakeAssets(files, [{id: 'shared-moon'}]);
+        const native = fakeONNX({exitGate, beforeLoad() {
+            assert.equal(assets.records.get('shared-moon').state, 'ready');
+            for (const session of native.owner.current().sessions) assert.equal(session.exited, true);
+        }});
+        const decisions = projectedOwner(files, native, assets);
+        await loadProjection(decisions, {assetProjectionId: 'shared-moon', resourcePaths, executionTarget: {deviceId: 'first-moon-device'}});
+        await assets.owner.release('shared-moon');
+        const intermediate = loadProjection(decisions, {executionTarget: {deviceId: 'intermediate-moon-device'}});
+        const rejected = assert.rejects(intermediate, {code: 'ARCANE_AI_REQUEST_ABORTED'});
+        await native.unloadStarted.promise;
+        assert.ok(assets.records.get('shared-moon').uses >= 2);
+        const latestTarget = {deviceId: 'last-moon-device'};
+        const latest = loadProjection(decisions, {executionTarget: latestTarget});
+        assert.equal(native.calls.load.length, 1);
+        exitGate.resolve();
+        await Promise.all([rejected, latest]);
+        assert.equal(native.calls.load.length, 2);
+        assert.equal(native.calls.load[1].executionTarget, latestTarget);
+        assert.equal(assets.records.get('shared-moon').uses, 1);
+        assert.equal(assets.records.get('shared-moon').state, 'ready');
+        assert.equal(assets.calls.prepare.length, 0);
+        await decisions.unload();
+        assert.equal(assets.records.get('shared-moon').uses, 0);
+        assert.equal(assets.records.get('shared-moon').state, 'released');
+    });
+
+    test(`${route} supplied projection failures surface without upstream preparation or native startup`, async function unavailableProjection(t) {
+        for (const selection of [
+            {id: 'missing-moon', code: 'MODEL_ASSET_PROJECTION_UNAVAILABLE'},
+            {id: 'unfinished-moon', state: 'preparing', code: 'MODEL_ASSET_PROJECTION_NOT_READY'},
+            {id: 'missing-tokenizer', mapping: {...resourcePaths, tokenizer: 'absent/tokenizer.json'}, code: 'ARCANE_DECISION_RESOURCE_UNAVAILABLE'}
+        ]) {
+            const files = await fixture(t);
+            const native = fakeONNX();
+            const assets = fakeAssets(files, selection.id === 'missing-moon' ? [] : [{id: selection.id, state: selection.state ?? 'ready'}]);
+            const decisions = projectedOwner(files, native, assets);
+            await assert.rejects(loadProjection(decisions, {assetProjectionId: selection.id, resourcePaths: selection.mapping ?? resourcePaths}), {code: selection.code});
+            await decisions.unload();
+            assert.equal(native.calls.load.length, 0);
+            assert.equal(assets.calls.prepare.length, 0);
+            assert.equal(assets.calls.release.length, 0);
+            if (assets.records.has(selection.id)) {
+                assert.equal(assets.records.get(selection.id).uses, 0);
+                assert.equal(assets.records.get(selection.id).preparationOwned, true);
+            }
+        }
+    });
+
+    test(`${route} cancellation retains supplied files until actual native exit`, async function cancelledProjection(t) {
+        const files = await fixture(t);
+        const runGate = files.gate();
+        const exitGate = files.gate();
+        const assets = fakeAssets(files, [{id: 'cancelled-moon'}]);
+        const native = fakeONNX({runGate, exitGate});
+        const decisions = projectedOwner(files, native, assets);
+        await loadProjection(decisions, {assetProjectionId: 'cancelled-moon', resourcePaths});
+        await assets.owner.release('cancelled-moon');
+        const cancellation = new AbortController();
+        const reason = new Error('The entire moon request was cancelled.\nOriginal reason.');
+        const evaluating = decisions.evaluate(rows, {signal: cancellation.signal});
+        const rejected = assert.rejects(evaluating, function actualReason(error) { return error === reason; });
+        const request = await native.runStarted.promise;
+        cancellation.abort(reason);
+        await native.unloadStarted.promise;
+        await rejected;
+        assert.equal(request.signal.aborted, true);
+        assert.equal(assets.records.get('cancelled-moon').uses, 1);
+        assert.equal(assets.records.get('cancelled-moon').state, 'ready');
+        const releasing = decisions.unload();
+        exitGate.resolve();
+        await releasing;
+        assert.equal(assets.records.get('cancelled-moon').uses, 0);
+        assert.equal(assets.records.get('cancelled-moon').state, 'released');
+        assert.equal(assets.calls.prepare.length, 0);
+    });
+
+    test(`${route} lifecycle preserves provisional release failures after the load has settled`, async function failedProvisionalRelease(t) {
+        const files = await fixture(t);
+        const native = fakeONNX();
+        const assets = fakeAssets(files, [{id: 'cleanup-moon'}]);
+        const error = new Error('The unused projection could not be removed.\nComplete cleanup failure.');
+        error.code = 'FIXTURE_PROJECTION_RELEASE_FAILED';
+        function actualCleanupFailure(failure) {
+            assert.ok(failure instanceof AggregateError);
+            assert.ok(failure.errors.includes(error));
+            return true;
+        }
+        const decisions = route === 'direct'
+            ? createNativeDecisionModel({onnx: native.owner, modelAssets: assets.owner})
+            : createNativeDecisionService({}, {appRoot: files.root});
+        if (route === 'Core') decisions.start({
+            getService(name) { return name === 'local-ai' ? {getONNXRuntime() { return native.owner; }} : assets.owner; },
+            emit() {}
+        });
+        files.own({async dispose() { await assert.rejects(decisions.dispose(), actualCleanupFailure); }});
+        const retain = assets.owner.retain;
+        let rejectedUnload;
+        let releasedPreparation;
+        assets.owner.retain = function cancelBeforeWorkerOwnership(id) {
+            const use = retain(id);
+            releasedPreparation = assets.owner.release(id);
+            rejectedUnload = assert.rejects(decisions.unload(), actualCleanupFailure);
+            return {...use, async release() {
+                await use.release();
+                assets.records.get(id).state = 'error';
+                throw error;
+            }};
+        };
+        await assert.rejects(loadProjection(decisions, {assetProjectionId: 'cleanup-moon', resourcePaths}), function originalCleanupError(failure) {
+            return failure === error;
+        });
+        await Promise.all([rejectedUnload, releasedPreparation]);
+        assert.equal(native.calls.load.length, 0);
+        assert.equal(assets.calls.prepare.length, 0);
+        assert.deepEqual(assets.calls.releaseRetain, ['cleanup-moon']);
+        await assert.rejects(decisions.unload(), actualCleanupFailure);
+        await assert.rejects(decisions.dispose(), actualCleanupFailure);
+    });
+}
 
 for (const route of ['direct', 'Core']) {
     test(`${route} decisions retain the selected target, distinguish automatic selection and coalesce equal targets`, async function selectedDecisionTarget(t) {
