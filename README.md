@@ -2,6 +2,11 @@
 
 # Arcane OS SDK
 
+[![Check](https://github.com/TheWizardNexus/arcane-os-sdk/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/TheWizardNexus/arcane-os-sdk/actions/workflows/check.yml?query=branch%3Amain)
+[![npm version](https://img.shields.io/npm/v/arcane-os.svg)](https://www.npmjs.com/package/arcane-os)
+[![npm downloads](https://img.shields.io/npm/dm/arcane-os.svg)](https://www.npmjs.com/package/arcane-os)
+[![license](https://img.shields.io/github/license/TheWizardNexus/arcane-os-sdk.svg)](LICENSE)
+
 <p align="center">
   <strong>Build, test, package, and manage Arcane applications inside or outside Arcane OS.</strong><br>
   Keep proprietary source in its own repository while using the same headless workflow for apps and shared runtime work in the Arcane checkout.
