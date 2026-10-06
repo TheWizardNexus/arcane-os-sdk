@@ -1688,6 +1688,7 @@ export class AIProviderRuntime {
     #speechDesiredMuted = true;
     #speechTransition = Promise.resolve();
     #speechTransitionOwners = 0;
+    #speechActivation = null;
     #unsubscribeIntents = null;
     #closed = false;
     #closing = false;
@@ -2784,6 +2785,11 @@ export class AIProviderRuntime {
         }
         if (slot.loadPromise) {
             if (this.#sameSelection(slot.selection, targetSelection)) {
+                const activation = this.#speechActivation;
+                if (role === 'tts' && activation?.loadPromise === slot.loadPromise
+                    && signal !== activation.controller.signal) {
+                    return this.#observeSpeechActivation(activation, signal);
+                }
                 return slot.loadPromise;
             }
             return Promise.reject(
@@ -2957,6 +2963,10 @@ export class AIProviderRuntime {
             }
         );
         slot.loadPromise = loadOperation;
+        if (role === 'tts' && this.#speechActivation
+            && signal === this.#speechActivation.controller.signal) {
+            this.#speechActivation.loadPromise = loadOperation;
+        }
         publishAIRuntimeRoleState(
             role,
             roleRecord(
@@ -4270,19 +4280,34 @@ export class AIProviderRuntime {
         return true;
     }
 
-    async setSpeechMuted(muted) {
+    async setSpeechMuted(muted, {signal = null} = {}) {
         arcaneLogging.debug('[Arcane speech runtime] setSpeechMuted', muted);
         this.#assertOpen();
         this.#assertNotConfiguring();
         if (!is.boolean(muted)) {
             fail('AI speech muted state must be a boolean.');
         }
+        assertAbortSignal(signal);
+        if (signal?.aborted) throw normalizedAbort(signal.reason);
+        if (!muted && !this.#speechDesiredMuted && this.#speechActivation
+            && !this.#speechActivation.controller.signal.aborted) {
+            return this.#observeSpeechActivation(this.#speechActivation, signal);
+        }
         this.#speechDesiredMuted = muted;
         if (muted) {
             this.#speechMuted = true;
+            this.#speechActivation?.controller.abort();
             this.#slots.tts.loadController?.abort();
             this.cancel('tts');
         }
+        const activation = muted ? null : {
+            controller: new AbortController(),
+            interests: new Set(),
+            promise: null,
+            loadPromise: null,
+            settled: false
+        };
+        this.#speechActivation = activation;
         const runtime = this;
         this.#speechTransitionOwners += 1;
         const transition = this.#speechTransition.catch(
@@ -4290,6 +4315,9 @@ export class AIProviderRuntime {
         ).then(
             async function reconcileLatestAISpeechPreference() {
                 while (true) {
+                    if (activation?.controller.signal.aborted) {
+                        throw normalizedAbort(activation.controller.signal.reason);
+                    }
                     const desiredMuted = runtime.#speechDesiredMuted;
                     if (desiredMuted) {
                         runtime.cancel('tts');
@@ -4306,7 +4334,11 @@ export class AIProviderRuntime {
                         if (runtime.#speechDesiredMuted) {
                             continue;
                         }
-                        await runtime.load('tts');
+                        const currentActivation = runtime.#speechActivation;
+                        if (currentActivation?.controller.signal.aborted) {
+                            throw normalizedAbort(currentActivation.controller.signal.reason);
+                        }
+                        await runtime.load('tts', {signal: currentActivation?.controller.signal ?? null});
                     }
                     if (runtime.#speechDesiredMuted === desiredMuted) {
                         runtime.#speechMuted = desiredMuted;
@@ -4318,10 +4350,52 @@ export class AIProviderRuntime {
         ).finally(
             function releaseAIProviderSpeechTransitionOwnership() {
                 runtime.#speechTransitionOwners -= 1;
+                if (activation) {
+                    activation.settled = true;
+                    if (runtime.#speechActivation === activation) {
+                        runtime.#speechActivation = null;
+                    }
+                }
             }
         );
         this.#speechTransition = transition;
-        return transition;
+        if (!activation) return transition;
+        activation.promise = transition;
+        return this.#observeSpeechActivation(activation, signal);
+    }
+
+    #observeSpeechActivation(activation, signal) {
+        return new Promise(function observeAIProviderSpeechActivation(resolve, reject) {
+            const interest = {};
+            let settled = false;
+            activation.interests.add(interest);
+            function releaseSpeechActivationInterest() {
+                activation.interests.delete(interest);
+                signal?.removeEventListener('abort', cancelSpeechActivationInterest);
+            }
+            function cancelSpeechActivationInterest() {
+                if (settled) return;
+                settled = true;
+                releaseSpeechActivationInterest();
+                if (!activation.settled && activation.interests.size === 0) {
+                    activation.controller.abort(signal?.reason);
+                }
+                reject(normalizedAbort(signal?.reason));
+            }
+            signal?.addEventListener('abort', cancelSpeechActivationInterest, {once: true});
+            activation.promise.then(function speechActivationReady(status) {
+                if (settled) return;
+                settled = true;
+                releaseSpeechActivationInterest();
+                resolve(status);
+            }, function speechActivationFailed(error) {
+                if (settled) return;
+                settled = true;
+                releaseSpeechActivationInterest();
+                reject(error);
+            });
+            if (signal?.aborted) cancelSpeechActivationInterest();
+        });
     }
 
     #providerFor(slot) {

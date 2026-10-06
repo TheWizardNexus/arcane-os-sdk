@@ -1182,7 +1182,6 @@ class AI {
     #speechJobSequence=0;
     #stopOllamaReady=null;
     #ttsSegmentation={...DEFAULT_TTS_SEGMENTATION};
-    #preparedSpeechReadiness = null;
     #preparedSpeechPlaybacks = new Set();
     #nativeSpeechPlaybacks = new Set();
     #speechUnlockContext = null;
@@ -4394,7 +4393,7 @@ class AI {
                     runtime.#browserSpeechTransition,activation.controller.signal
                 );
                 activation.controller.signal.throwIfAborted();
-                await runtime.#providerRuntime.setSpeechMuted(false);
+                await runtime.#providerRuntime.setSpeechMuted(false, {signal: activation.controller.signal});
                 if(runtime.#speechActivation!==activation)return false;
                 const status=runtime.#providerRuntime.status('tts');
                 runtime.muted=status.state!=='ready'||status.loaded!==true;
@@ -6409,22 +6408,7 @@ class AI {
             if(selected) {
                 const status = runtime.#providerRuntime.status('tts');
                 if(status.state !== 'ready' || status.loaded !== true) {
-                    if(!runtime.#preparedSpeechReadiness) {
-                        const readiness = runtime.#providerRuntime.setSpeechMuted(false);
-                        runtime.#preparedSpeechReadiness = readiness;
-                        readiness.finally(
-                            function releasePreparedSpeechReadiness() {
-                                if(runtime.#preparedSpeechReadiness === readiness) {
-                                    runtime.#preparedSpeechReadiness = null;
-                                }
-                            }
-                        ).catch(
-                            function reportPreparedSpeechReadinessFailure(error) {
-                                runtime.#traceSpeech('prepareTTS.readiness.error', {error});
-                            }
-                        );
-                    }
-                    await runtime.#preparedSpeechReadiness;
+                    await runtime.#providerRuntime.setSpeechMuted(false, {signal: requestSignal});
                     assertPreparedSpeechSelection();
                 }
             }

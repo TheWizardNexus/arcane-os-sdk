@@ -842,6 +842,14 @@ cancellation signal. Cancelling one handle detaches that caller; the shared
 preparation is aborted only when its last pending caller cancels. Different AI
 instances do not share an in-flight synthesis operation. Complete stored
 results remain reusable through the same application storage.
+
+Missing audio participates in the provider runtime's shared TTS activation with
+the preparation's cancellation signal. Cancelling the final pending interest
+aborts that activation; another preparation, explicit playback activation, or
+direct TTS load joining it keeps the load alive. Cancellation does not unload a
+model whose activation has already completed. A complete audio-cache hit never
+requests model activation. Provider cancellation and cleanup remain cooperative;
+an aborted caller wait alone is not evidence that native work has stopped.
 After a durable preparation completes, a later preparation call rereads its
 manifest and saved-file presence, regenerating only missing segments. A
 completed preparation without storage reuses its retained Blobs.
@@ -874,9 +882,10 @@ The supplied signal observes preparation until `ready` settles. Manual
 handle. If a raw audio write has already begun when cancellation arrives,
 its metadata transaction finishes so that successful audio can be reused;
 no later queued write starts for that cancelled preparation.
-Cancelling preparation prevents later synthesis, but the existing shared
-provider load/unmute operation has no per-preparation signal and may finish.
-Cancellation does not claim to stop an already-started shared model load.
+Cancelling preparation prevents later synthesis and releases its pending
+activation interest. Other pending interests retain the shared load; cancelling
+the final interest forwards abort to its provider-owned activation. Actual
+provider cleanup remains observable through that operation's settlement.
 
 ### Playback controls and independent lifetimes
 

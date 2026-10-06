@@ -477,6 +477,13 @@ the caller's ready DBOPFS instance; the separate JSON-compatible `identity`
 adds application-owned semantic context. Reuse compares complete inputs rather
 than an SDK version alone.
 
+Only missing audio joins TTS activation. Each preparation supplies its own
+cancellation lifetime to the existing provider runtime. The last pending
+activation interest cancels the owned load; other preparation/playback or
+joining direct-load interests preserve it. Cache-only preparation never loads
+the model, and cancelling after activation does not unload an already-ready
+model. Provider work owns actual cancellation and cleanup completion.
+
 `state` is `queued`, `preparing`, `ready`, `error`, or `cancelled`.
 `onState({state,completed,total,segments,error})` synchronously observes
 preparation progress. `ready` resolves the complete record after every segment
@@ -486,8 +493,8 @@ the retained MIME type. Preparation failure rejects; cancellation rejects as
 `AbortError` and preserves successfully stored segments. Matching pending
 requests share synthesis only on the same AI instance and storage group;
 cancelling one handle does not cancel another active matching caller.
-Preparation cancellation prevents later synthesis, but an already-started
-shared provider load/unmute has no per-preparation signal and may finish.
+Preparation cancellation prevents later synthesis and releases its activation
+interest. The provider's operation remains responsible for actual cleanup.
 
 `playPreparedTTS(prepared,{signal,onState})` can attach immediately. Its returned
 `{state,error,finished,pause(),resume(),stop()}` handle schedules segments in
@@ -1024,8 +1031,19 @@ The singleton exposes read-only `protocol`, `configured`, and `speechMuted`;
 `supportsTranscriptionCapture(providerId=null)`;
 `createTranscriptionCapture(options={})`;
 `synthesize(payload,options={},preparation={})`; and
-`setSpeechMuted(muted)`. Provider payloads must be data-only; callbacks,
+`setSpeechMuted(muted,{signal}={})`. Provider payloads must be data-only; callbacks,
 accessors, symbols, and cycles are rejected at the provider boundary.
+
+`setSpeechMuted(false,{signal})` shares pending activation while retaining an
+independent interest for each caller. Aborting one signal rejects only that
+caller's wait. When no pending interests remain, abort reaches the owned load.
+No-signal callers and direct `load('tts',...)` calls joining that activation
+also retain it. A rejected load preserves its complete error for the remaining
+callers. An already-aborted signal rejects before changing mute intent.
+Explicit `setSpeechMuted(true)` still cancels shared activation and unloads TTS;
+once accepted, that mute cleanup runs to completion rather than being undone
+by cancellation of its caller's signal. Completed activation is not unloaded
+merely because a former observer later aborts.
 
 Selection options admit `localOnly=false`; inspection admits
 `{localOnly=false,signal=null}`; startup admits

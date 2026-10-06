@@ -120,6 +120,8 @@ test(
         const preparations = [];
         const instances = [];
         const stores = [];
+        const loadGates = [];
+        const pendingLoadGates = [];
         let providerState = 'unloaded';
         let loads = 0;
         let ai;
@@ -181,6 +183,7 @@ test(
                 try {
                     for(const preparation of preparations) preparation.cancel();
                     for(const store of stores) store.releaseWrites();
+                    for(const gate of loadGates) gate.released.resolve();
                     for(const response of responses.values()) {
                         response.release();
                         response.decodeGate?.resolve();
@@ -247,8 +250,29 @@ test(
             status() {
                 return {state: providerState, loaded: providerState === 'ready', busy: false};
             },
-            async load() {
+            async load(context) {
                 loads += 1;
+                const gate = pendingLoadGates.shift();
+                if(gate) {
+                    const cancelled = deferred();
+                    providerState = 'loading';
+                    gate.context = context;
+                    function cancelFixtureLoad() {
+                        gate.aborted.resolve();
+                        cancelled.reject(context.signal.reason);
+                    }
+                    context.signal.addEventListener('abort', cancelFixtureLoad, {once: true});
+                    if(context.signal.aborted) cancelFixtureLoad();
+                    gate.started.resolve();
+                    try {
+                        await Promise.race([gate.released.promise, cancelled.promise]);
+                    } catch(error) {
+                        providerState = 'unloaded';
+                        throw error;
+                    } finally {
+                        context.signal.removeEventListener('abort', cancelFixtureLoad);
+                    }
+                }
                 providerState = 'ready';
             },
             async request(context) {
@@ -303,6 +327,13 @@ test(
             const store = createFakeStorage(key);
             stores.push(store);
             return store;
+        }
+
+        function holdNextLoad() {
+            const gate = {started: deferred(), released: deferred(), aborted: deferred(), context: null};
+            loadGates.push(gate);
+            pendingLoadGates.push(gate);
+            return gate;
         }
 
         await t.test(
@@ -699,6 +730,145 @@ test(
                 } finally {
                     ai.configureTTSSegmentation(segmentation);
                 }
+            }
+        );
+
+        await t.test(
+            'cancelled activation interests do not begin a cold load',
+            async function testCancelledActivationBeforeLoad() {
+                await ai.setSpeechMuted(true);
+                const before = loads;
+                const alreadyCancelled = new AbortController();
+                alreadyCancelled.abort();
+                await assert.rejects(
+                    ai.providerRuntime.setSpeechMuted(false, {signal: alreadyCancelled.signal}),
+                    {name: 'AbortError'}
+                );
+                assert.equal(ai.providerRuntime.speechMuted, true);
+                const cancelled = new AbortController();
+                const activation = ai.providerRuntime.setSpeechMuted(false, {signal: cancelled.signal});
+                cancelled.abort();
+                await assert.rejects(activation, {name: 'AbortError'});
+                await ai.setSpeechMuted(true);
+                assert.equal(loads, before);
+            }
+        );
+
+        await t.test(
+            'cancelling a cold preparation retires its otherwise-unneeded activation',
+            async function testCancelledPreparationActivation() {
+                await ai.setSpeechMuted(true);
+                const gate = holdNextLoad();
+                const controller = new AbortController();
+                const before = requests.length;
+                const prepared = prepare({parts: ['Cancelled cold preview.'], signal: controller.signal});
+                await gate.started.promise;
+                controller.abort();
+                await assert.rejects(prepared.ready, {name: 'AbortError'});
+                await gate.aborted.promise;
+                assert.equal(gate.context.signal.aborted, true);
+                assert.equal(requests.length, before);
+                await ai.setSpeechMuted(true);
+                assert.equal(providerState, 'unloaded');
+            }
+        );
+
+        await t.test(
+            'another preparation keeps shared cold activation alive',
+            async function testSharedPreparationActivation() {
+                const gate = holdNextLoad();
+                const controller = new AbortController();
+                const secondPreparing = deferred();
+                const before = loads;
+                const first = prepare({parts: ['Cancelled first preview.'], signal: controller.signal});
+                const response = responseFor('surviving-preview');
+                const second = prepare({
+                    parts: ['Surviving second preview.'],
+                    onState(state) { if(state.state === 'preparing') secondPreparing.resolve(); }
+                });
+                await Promise.all([gate.started.promise, secondPreparing.promise]);
+                controller.abort();
+                await assert.rejects(first.ready, {name: 'AbortError'});
+                assert.equal(gate.context.signal.aborted, false);
+                gate.released.resolve();
+                await response.requested.promise;
+                assert.equal(response.request.payload.input, 'Surviving second preview.');
+                response.release();
+                await second.ready;
+                assert.equal(loads, before + 1);
+                await ai.setSpeechMuted(true);
+            }
+        );
+
+        await t.test(
+            'explicit playback activation survives cancellation of a joining preview',
+            async function testPlaybackActivationInterest() {
+                const gate = holdNextLoad();
+                const playbackActivation = ai.setSpeechMuted(false);
+                await gate.started.promise;
+                const controller = new AbortController();
+                const preparing = deferred();
+                const before = requests.length;
+                const preview = prepare({
+                    parts: ['Cancelled alongside playback.'], signal: controller.signal,
+                    onState(state) { if(state.state === 'preparing') preparing.resolve(); }
+                });
+                await preparing.promise;
+                controller.abort();
+                await assert.rejects(preview.ready, {name: 'AbortError'});
+                assert.equal(gate.context.signal.aborted, false);
+                gate.released.resolve();
+                assert.equal(await playbackActivation, true);
+                assert.equal(requests.length, before);
+                assert.equal(providerState, 'ready');
+                await ai.setSpeechMuted(true);
+            }
+        );
+
+        await t.test(
+            'a direct TTS load joining preview activation owns a separate interest',
+            async function testDirectLoadActivationInterest() {
+                const gate = holdNextLoad();
+                const controller = new AbortController();
+                const preview = prepare({parts: ['Preview yields to explicit load.'], signal: controller.signal});
+                await gate.started.promise;
+                const explicitLoad = ai.providerRuntime.load('tts');
+                controller.abort();
+                await assert.rejects(preview.ready, {name: 'AbortError'});
+                assert.equal(gate.context.signal.aborted, false);
+                gate.released.resolve();
+                assert.equal((await explicitLoad).loaded, true);
+                await ai.setSpeechMuted(true);
+            }
+        );
+
+        await t.test(
+            'shared activation preserves complete load failures and explicit mute overrides every interest',
+            async function testActivationFailureAndMute() {
+                const failedLoad = holdNextLoad();
+                const first = ai.providerRuntime.setSpeechMuted(false);
+                const second = ai.providerRuntime.setSpeechMuted(false);
+                await failedLoad.started.promise;
+                const failure = new Error('Synthetic complete cold-load failure.');
+                const firstFailure = assert.rejects(first, function firstLoadFailure(error) { return error === failure; });
+                const secondFailure = assert.rejects(second, function secondLoadFailure(error) { return error === failure; });
+                failedLoad.released.reject(failure);
+                await Promise.all([firstFailure, secondFailure]);
+                await ai.setSpeechMuted(true);
+
+                const mutedLoad = holdNextLoad();
+                const firstUnmute = ai.providerRuntime.setSpeechMuted(false);
+                const secondUnmute = ai.providerRuntime.setSpeechMuted(false);
+                await mutedLoad.started.promise;
+                const firstAbort = assert.rejects(firstUnmute, {name: 'AbortError'});
+                const secondAbort = assert.rejects(secondUnmute, {name: 'AbortError'});
+                const muteSignal = new AbortController();
+                const mute = ai.providerRuntime.setSpeechMuted(true, {signal: muteSignal.signal});
+                muteSignal.abort();
+                await mutedLoad.aborted.promise;
+                await Promise.all([firstAbort, secondAbort, mute]);
+                assert.equal(providerState, 'unloaded');
+                assert.equal(ai.providerRuntime.speechMuted, true);
             }
         );
     }
