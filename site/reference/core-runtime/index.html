@@ -13,9 +13,9 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native Core runtime</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-core-runtime">Native Core runtime</h1><p class="doc-lead">The SDK owns the reusable native dispatcher and framed stdio transport. The composing application or native host supplies its identity, version and services. Product prompts, model selections, filesystem locations, host privileges and application policy remain with that owner.</p><div class="doc-meta"><span>SDK 0.84.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native Core runtime</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-core-runtime">Native Core runtime</h1><p class="doc-lead">The SDK owns the reusable native dispatcher and framed stdio transport. The composing application or native host supplies its identity, version and services. Product prompts, model selections, filesystem locations, host privileges and application policy remain with that owner.</p><div class="doc-meta"><span>SDK 0.85.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
-      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="./" aria-current="page">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="./" aria-current="page">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/core-runtime.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#registration-and-startup">Registration and startup</a><a href="#state-and-frames">State and frames</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#stdio-transport">Stdio transport</a><a href="#platform-and-delivery-boundary">Platform and delivery boundary</a></nav></details><p>The SDK owns the reusable native dispatcher and framed stdio transport.
 The composing application or native host supplies its identity, version and
 services. Product prompts, model selections, filesystem locations, host
@@ -75,7 +75,7 @@ service&#39;s startup before invoking its handler. State errors use the shared
 complete diagnostic serialization; the startup promise retains its original
 rejection value.</p>
 <p>Each lifecycle hook receives <code>{application, service, emit, getService}</code>. Each request handler
-receives <code>(parameters, {application, service, emit, getService, requestId, coreRequestId, signal})</code>, with
+receives <code>(parameters, {application, service, emit, getService, requestId, clientRequestId, coreRequestId, signal})</code>, with
 <code>this</code> bound to its service definition. A hook or handler may publish a complete
 service-owned event through <code>emit(event, data)</code>.</p>
 <p>A request handler&#39;s <code>emit</code> places its owning request ID in the event frame&#39;s
@@ -129,16 +129,38 @@ Attach transport listeners before starting the runtime to observe initial frames
 availability errors remain observable; unavailable services are not replaced
 with browser behavior.</p>
 <p>A transport that assigns internal dispatch IDs may call
-<code>runtime.handle(frame, {contextRequestId})</code>. This optional nonempty string sets
-only the service handler&#39;s <code>context.requestId</code>. <code>context.coreRequestId</code> always
-exposes the actual <code>frame.id</code>; it distinguishes simultaneous requests whose
-clients selected equal IDs. The supplied <code>frame.id</code> still
-owns active-request state, cancellation lookup, response correlation and the
-request event&#39;s top-level envelope. Parameters and event data remain unchanged.
-Ordinary <code>handle(frame)</code> keeps its existing behavior: <code>context.requestId</code> equals
-<code>frame.id</code>, and <code>coreRequestId</code> equals that same ID. Stdio and
-the borrowed IPC listener use this metadata to preserve the original client ID
-in service-facing data while their transport owner routes unique dispatch IDs.</p>
+<code>runtime.handle(frame, {contextRequestId, contextClientRequestId})</code>. Each supplied
+metadata value must be a nonempty string. Handler identities are:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>requestId</code></td>
+<td><code>contextRequestId ?? frame.id</code>, preserving the transport&#39;s established handler contract</td>
+</tr>
+<tr>
+<td><code>clientRequestId</code></td>
+<td><code>contextClientRequestId ?? contextRequestId ?? frame.id</code>, exposing the actual incoming client identity</td>
+</tr>
+<tr>
+<td><code>coreRequestId</code></td>
+<td><code>frame.id</code>, the actual internal dispatch identity</td>
+</tr></tbody>
+</table>
+</div>
+<p>Ordinary <code>handle(frame)</code> exposes all three equal to <code>frame.id</code>. Existing callers
+that supply only <code>contextRequestId</code> also receive that value as <code>clientRequestId</code>.
+Stdio and both IPC listener forms always supply the actual client ID separately.
+Stdio and the borrowed listener preserve it as <code>requestId</code> too; the owning
+shared-host adapter retains its established internal <code>requestId</code> contract.</p>
+<p>The supplied <code>frame.id</code> still owns active-request state, cancellation lookup,
+response correlation and the request event&#39;s top-level envelope. It distinguishes
+simultaneous requests whose clients selected equal IDs. Parameters, results and
+event data remain unchanged; these identity fields are separate context metadata.</p>
 <p>A request with no registered handler retains code <code>METHOD_NOT_ALLOWED</code> and
 adds the exact <code>method</code>, its first dotted <code>namespace</code>, and a <code>reason</code>.
 <code>core-namespace-unavailable</code> means the dispatcher has neither a service with
@@ -243,6 +265,6 @@ published SDK boundary and preserve their real shutdown and service lifecycles.<
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#registration-and-startup">Registration and startup</a><a href="#state-and-frames">State and frames</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#stdio-transport">Stdio transport</a><a href="#platform-and-delivery-boundary">Platform and delivery boundary</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.84.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.85.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

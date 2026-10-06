@@ -571,6 +571,7 @@ const navigationGroups=[
             ['Codex App Server','docs/reference/codex-app-server.md','',true],
             ['MCP STDIO server','docs/reference/mcp-stdio.md','',true],
             ['Local AI through Core','docs/reference/local-ai.md'],
+            ['Existing model observation','docs/reference/model-observation.md'],
             ['Physical execution devices','docs/reference/execution-devices.md'],
             ['Native typed decisions','docs/reference/native-decisions.md','',true],
             ['FLUX.2 Klein 4B','docs/reference/local-image-flux.md'],

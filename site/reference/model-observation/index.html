@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="Model observation reads the existing renderer and Core owners selected by the application. It exposes their current lifecycle, progress, retained errors and actual operation identities to an explicitly selected developer observer. Model loading, inference, selection, cancellation and saved application state remain with those owners. Observation creates no model, accessor or Core runtime.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/model-observation/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Existing model observation · Arcane OS SDK"><meta property="og:description" content="Model observation reads the existing renderer and Core owners selected by the application. It exposes their current lifecycle, progress, retained errors and actual operation identities to an explicitly selected developer observer. Model loading, inference, selection, cancellation and saved application state remain with those owners. Observation creates no model, accessor or Core runtime."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/model-observation/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Existing model observation · Arcane OS SDK"><meta name="twitter:description" content="Model observation reads the existing renderer and Core owners selected by the application. It exposes their current lifecycle, progress, retained errors and actual operation identities to an explicitly selected developer observer. Model loading, inference, selection, cancellation and saved application state remain with those owners. Observation creates no model, accessor or Core runtime."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Existing model observation | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Existing model observation</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="existing-model-observation">Existing model observation</h1><p class="doc-lead">Model observation reads the existing renderer and Core owners selected by the application. It exposes their current lifecycle, progress, retained errors and actual operation identities to an explicitly selected developer observer. Model loading, inference, selection, cancellation and saved application state remain with those owners. Observation creates no model, accessor or Core runtime.</p><div class="doc-meta"><span>SDK 0.85.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="./" aria-current="page">Existing model observation</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/model-observation.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#compose-the-existing-core">Compose the existing Core</a><a href="#attach-existing-renderer-owners">Attach existing renderer owners</a><a href="#read-or-subscribe-from-an-existing-client">Read or subscribe from an existing client</a><a href="#fixed-transport-and-correlation">Fixed transport and correlation</a><a href="#evidence-and-lifecycle-limits">Evidence and lifecycle limits</a></nav></details><p>Model observation reads the existing renderer and Core owners selected by the
+application. It exposes their current lifecycle, progress, retained errors and
+actual operation identities to an explicitly selected developer observer.
+Model loading, inference, selection, cancellation and saved application state
+remain with those owners. Observation creates no model, accessor or Core runtime.</p>
+<h2 id="compose-the-existing-core">Compose the existing Core</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createModelObservationService} from &#39;arcane-os/core/model-observation&#39;;
+
+const observation = createModelObservationService({
+    runtime: host.runtime,
+    localAI: existingLocalAIService,
+    image: existingImageService,
+    decisions: existingDecisionService
+});
+host.runtime.registerService(observation);
+</code></pre></div>
+<p><code>host</code> and the three services in this example are the application&#39;s existing
+instances. <code>localAI</code>, <code>image</code> and <code>decisions</code> are optional and default to <code>null</code>.
+Supply their actual service definitions, including <code>current()</code> and <code>methods</code>.
+The constructor neither looks up nor starts a service. Registration can follow
+<code>startCoreHost()</code> on its returned runtime, before opening an additional listener;
+it requires no model readiness barrier.</p>
+<p>The service is named <code>model-observation</code> and exposes <code>current()</code>, <code>dispose()</code> and
+the fixed Core methods below. <code>dispose()</code> retires only its observation requests
+and subscriptions. The host continues to own the Core and model services.</p>
+<p>An external local caller can connect through the explicitly selected
+<a href="../core-shared-host/"><code>startCoreListener</code></a> endpoint on that same runtime.
+For a packaged window, <code>native.launchContext.coreListener: {endpoint}</code> selects
+that same-runtime listener. Before binding it, the generated Core entry registers
+<code>model-observation</code> with the actual existing <code>services</code> definitions that expose
+<code>localai.status</code>, <code>image.status</code> and <code>decisions.status</code>; absent owners are <code>null</code>.
+The observer reuses those model-service owners and creates no accessor or model.
+The application supplies its renderer attachment separately.
+The observation module does not discover endpoints, launch a host, reconnect,
+change a profile, or create a second runtime. Native DOM inspection and actions
+retain their separate <a href="../native-app-control/">app-control contract</a>.</p>
+<h2 id="attach-existing-renderer-owners">Attach existing renderer owners</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import * as aiRuntimeState from &#39;arcane-os/ai-runtime-state&#39;;
+import {attachModelObservation} from &#39;arcane-os/ai/model-observation&#39;;
+
+const attachment = attachModelObservation({
+    client: existingCoreClient,
+    aiRuntimeState,
+    imageRuntime: existingImageAccessor,
+    decisionModel: existingBrowserDecisionModel,
+    modelController: existingModelController,
+    signal: pageLifetime.signal,
+    onError: function reportObservationFailure(error) {
+        developerDiagnostics.report(error);
+    }
+});
+await attachment.ready;
+</code></pre></div>
+<p>Each optional owner defaults to <code>null</code>. Pass the instances already used by the
+application. Creating another image accessor would describe that new accessor&#39;s
+requests rather than the existing work. The supported owner methods are:</p>
+<div class="table-wrap" data-columns="3" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Read</th>
+<th>Subscribe</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>aiRuntimeState</code></td>
+<td><code>getAIRuntimeState()</code></td>
+<td><code>subscribeAIRuntimeState()</code></td>
+</tr>
+<tr>
+<td><code>imageRuntime</code></td>
+<td><code>current()</code></td>
+<td><code>subscribe()</code></td>
+</tr>
+<tr>
+<td><code>decisionModel</code></td>
+<td><code>status()</code></td>
+<td><code>subscribe()</code></td>
+</tr>
+<tr>
+<td><code>modelController</code></td>
+<td><code>status()</code></td>
+<td><code>on(&#39;statechange&#39;)</code>, <code>on(&#39;progress&#39;)</code></td>
+</tr></tbody>
+</table>
+</div>
+<p>The attachment returns <code>{ready, closed, current, close}</code>. <code>ready</code> resolves with
+<code>{attachmentRequestId, coreRequestId}</code> after Core acknowledges the attachment.
+<code>current()</code> returns the latest complete renderer snapshot read by this
+attachment, or <code>null</code> when it was cancelled before reading. Subscriptions begin
+after acknowledgement; the attachment then reads and publishes current state
+again to cover changes during that handshake.</p>
+<p>Caller abort, <code>pagehide</code>, retirement of the exact installed Core client,
+transport failure, or <code>close()</code> removes the observation subscriptions and
+cancels only this attachment&#39;s observation RPCs. A supplied client remains
+caller-owned. The attachment never follows a replacement client or automatically
+reattaches. Native document retirement also cancels its long-lived Core request.
+Core then removes the renderer record; late publication to that retired
+attachment fails honestly. Detachment does not unload or cancel a model.</p>
+<p><code>close()</code> returns <code>closed</code>, which settles after the attachment&#39;s observation
+RPC promises settle locally. It does not claim that a remote model or host has
+closed. Transport and observation errors remain available through <code>onError</code>
+and the rejected public promises. With <code>onError</code> omitted they reach the developer
+console. Normal cancellation, including cancellation initiated by the existing
+client or native document owner, closes observation without a model error. When
+cancellation precedes acknowledgement, <code>ready</code> rejects with the cancellation
+while <code>closed</code> resolves after the observation RPCs settle.</p>
+<h2 id="read-or-subscribe-from-an-existing-client">Read or subscribe from an existing client</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {subscribeModelObservation} from &#39;arcane-os/ai/model-observation&#39;;
+
+const current = await client.invoke(&#39;model.observation.current&#39;, {}, {signal});
+const observation = subscribeModelObservation({
+    client,
+    signal,
+    onState: function showRetainedOwners(snapshot) {
+        developerDiagnostics.show(snapshot);
+    },
+    onDiagnostic: function showModelFailure(record) {
+        developerDiagnostics.report(record);
+    },
+    onError: function showObservationFailure(error) {
+        developerDiagnostics.report(error);
+    }
+});
+await observation.ready;
+</code></pre></div>
+<p><code>onState</code> is required. The returned <code>{ready, closed, current, close}</code> has the same
+observation-only lifecycle as the renderer attachment. <code>ready</code> resolves with
+the first current-state replay; <code>current()</code> holds the latest complete snapshot,
+initially <code>null</code>. <code>onDiagnostic</code> explicitly selects live correlated Core model
+failure frames. Omitting it requests state observation only. Callback failures
+close that observation and reach <code>onError</code>; callback promises remain
+caller-owned and may await <code>close()</code> without becoming its completion barrier.</p>
+<p>Every snapshot is:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const result = {
+    core: existingCoreRuntime.current(),
+    native: {localAI, image, decisions},
+    renderers: [{attachmentRequestId, coreRequestId, owners: {
+        aiRuntimeState, imageRuntime, decisionModel, modelController
+    }}]
+};
+</code></pre></div>
+<p>The values represent complete supplied-owner snapshots. Absent optional owners
+are <code>null</code>; absent renderer attachments produce an empty array. Core state also
+contains its real active observation requests, identified by their actual
+methods, alongside other active requests. Observation does not relabel them as
+model work. Snapshots are current observations of independent owners, rather
+than an atomic transaction across all owners.</p>
+<h2 id="fixed-transport-and-correlation">Fixed transport and correlation</h2>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method/event</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>model.observation.current</code></td>
+<td>Empty parameters; returns the current snapshot without model refresh or readiness waits.</td>
+</tr>
+<tr>
+<td><code>model.observation.watch</code></td>
+<td><code>{diagnostics:false}</code> by default; remains pending until cancellation.</td>
+</tr>
+<tr>
+<td><code>model.observation.state</code></td>
+<td>Targeted watch event <code>{watchRequestId,snapshot}</code>; the first event acknowledges the watch and replays current state.</td>
+</tr>
+<tr>
+<td><code>model.observation.error</code></td>
+<td>Targeted diagnostic <code>{watchRequestId,source:&#39;core&#39;,method,frame}</code> preserving the complete original failed response frame.</td>
+</tr>
+<tr>
+<td><code>model.observation.renderer.attach</code></td>
+<td><code>{snapshot}</code>; remains pending to own the renderer publication lifetime.</td>
+</tr>
+<tr>
+<td><code>model.observation.renderer.attached</code></td>
+<td>Targeted acknowledgement <code>{attachmentRequestId,coreRequestId}</code>.</td>
+</tr>
+<tr>
+<td><code>model.observation.renderer.publish</code></td>
+<td><code>{attachmentRequestId,coreRequestId,snapshot}</code>; replaces that attachment&#39;s current snapshot and returns both attachment identities.</td>
+</tr></tbody>
+</table>
+</div>
+<p>Both helpers register listeners before invoking. Existing
+<a href="../core-client/"><code>client.invoke</code></a> supplies <code>onRequest({requestId})</code> before send;
+long-lived observation requests use <code>timeoutMs:0</code>. Their acknowledgement is a
+targeted request event, while the invocation promise remains pending.</p>
+<p><code>attachmentRequestId</code> and <code>watchRequestId</code> are the actual client-visible Core
+request identities supplied by service context <code>clientRequestId</code>.
+<code>coreRequestId</code> is the actual internal Core frame identity;
+renderer attachments are keyed by that value so clients with identical local
+request IDs cannot collide. The renderer echoes both values when publishing.
+<code>snapshot.core.activeRequests[].id</code> and diagnostic <code>frame.id</code> use internal Core
+identities. They can differ from client-visible IDs under connection routing.
+None of these observation/transport IDs is a model-operation ID.</p>
+<p>Core supplies both metadata fields for direct runtime calls, stdio connections,
+<code>startCoreListener()</code> connections and the existing <code>startSharedCoreHost()</code> path.
+Each connection preserves the original incoming request ID as <code>clientRequestId</code>
+independently of its established <code>requestId</code> mapping. Direct calls use the
+incoming frame ID for both identities. Observation requires these actual
+context fields; it does not infer them from <code>requestId</code> or rewrite event
+payloads to manufacture correlation.</p>
+<p>The exact <code>methods</code> keys on the supplied native service definitions select the
+Core operations whose live failures can be observed. The observer tracks their
+actual active request IDs while a watch exists. Core publishes request removal
+before emitting its response; the observer retains that correlation until the
+response arrives, then removes it. Removing the final watcher releases frame
+observation and remaining transient correlation. It retains no failure history.</p>
+<h2 id="evidence-and-lifecycle-limits">Evidence and lifecycle limits</h2>
+<ul>
+<li>AIRuntimeState exposes its existing llm/stt/tts records, including the reported
+operation ID. Its retained errors contain only code/message. Concurrent role
+work is not a complete request enumeration in this snapshot.</li>
+<li>The existing image accessor exposes its own active method, stream ID, status
+and progress records. Its retained error is preserved; that error has no
+reliable explicit stream association. Constructor-only diagnostic callbacks
+cannot be retroactively attached through this API.</li>
+<li>Browser and native decision snapshots retain their existing errors and active
+request counts. A count does not supply missing per-evaluation IDs.</li>
+<li>ModelController status exposes its existing state/progress and code/message
+error. Its load/unload event IDs are not retained by <code>status()</code>, and are not
+presented as inference IDs or reconstructed history here.</li>
+<li>Core supplies its real active request identities and complete live failed
+response frames. A watch cannot recover responses that settled before it
+observed them. Retained owner errors remain available in current snapshots.</li>
+</ul>
+<p>Renderer <code>Error</code> values in owner error fields use the existing Core error
+serializer at the JSON boundary; other owner fields remain unchanged. A value
+the selected transport cannot encode fails through the observation error path
+rather than being replaced with shortened or invented content. Observation
+does not alter model inputs, outputs, prompts or their persistence policy.</p>
+<p>The shared JavaScript contract is portable wherever the existing Core client
+and supplied owners are available. Endpoint and native-host availability belong
+to their documented adapters. Developer observation remains separate from
+ordinary user status, app-owned stage/avatar association and actual model
+execution verification. This capability does not establish that an inference
+failure has been corrected.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#compose-the-existing-core">Compose the existing Core</a><a href="#attach-existing-renderer-owners">Attach existing renderer owners</a><a href="#read-or-subscribe-from-an-existing-client">Read or subscribe from an existing client</a><a href="#fixed-transport-and-correlation">Fixed transport and correlation</a><a href="#evidence-and-lifecycle-limits">Evidence and lifecycle limits</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.85.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>
