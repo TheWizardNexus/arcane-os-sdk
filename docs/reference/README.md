@@ -56,6 +56,7 @@ alone does not make bare module names resolve in a browser.
 | Compose native Core dispatch, service lifecycle, and stdio hosting | [Native Core runtime](core-runtime.md) |
 | Run application-selected llama.cpp, Ollama or ONNX through Core | [Local AI through Core](local-ai.md) |
 | Generate complete local PNG images with a retained native model | [Local image generation](local-image-generation.md) |
+| Edit an original PNG with a complete prompt and explicit strength | [Local image editing](local-image-editing.md) |
 | Project complete stored model files into native working files | [Model assets through Core](model-assets.md) |
 | Retain a Nemotron model and diarize caller-fed audio streams | [Native speaker diarization](diarization.md) |
 | Persist application-selected preferences through Core | [Core preferences service](core-preferences.md) |

@@ -7789,11 +7789,22 @@ supply complete model descriptors with actual native resource paths. The
 factory installs no software and starts its worker when an operation needs it.
 
 It returns `load({model,context?,signal?})`, `generate({model,prompt,parameters?,
-signal?,onProgress?})`, `unload({signal?})`, `current()`,
+signal?,onProgress?})`, `edit({model,image,prompt,strength,parameters?,signal?,onProgress?})`,
+`unload({signal?})`, `current()`,
 `subscribe(listener,{replay=true})` and asynchronous `close()`. A model ID uses
 its supplied descriptor; a complete descriptor may be passed directly.
 Generation returns all PNG results as `images: [{data,mediaType,width,height}]`
 with native result metadata. Prompts and parameters remain complete.
+
+`edit()` accepts the original complete PNG as `image: {data: Uint8Array,
+mediaType}` and copies the supplied view at acceptance. Its explicit finite
+`strength` is from `0` through `1`, takes precedence over model/parameter
+defaults and is never clamped. It decodes in the existing worker and uses the
+same selected context, queue, progress, cancellation and complete result
+contract. SD1.4 advertises `txt2img` and `img2img`. See the
+[editing contract](local-image-editing.md#core-and-native-request) for supported
+PNG input, native preprocessing, alpha and strength-zero semantics; the
+original file remains unchanged.
 
 Accessors for the same library share its worker and selected context. Competing
 native operations are ordered at that owner; unrelated services remain
@@ -7808,7 +7819,7 @@ browser accessor's detach-only ownership below. See the
 ## createCoreImageRuntime()
 
 `createCoreImageRuntime({client=getInstalledCoreClient(),signal?,onEvent?})`
-from `arcane-os/ai/core-image` returns immediately with `load`, `generate`,
+from `arcane-os/ai/core-image` returns immediately with `load`, `generate`, `edit`,
 `unload`, `inspect`, `current`, `subscribe` and `close`. It subscribes before
 requesting an initial status snapshot so newer lifecycle events win. It opens
 no connection and installs or selects no model.
@@ -7822,6 +7833,15 @@ transient `Thinking` synchronously and returns complete
 `inspect({signal?})` reads authoritative state without waiting for preparation.
 All request methods use `timeoutMs:0`. `current()` includes transient requests,
 status, busy and closed state; no prompt or image history is saved.
+
+`edit({model,image,prompt,strength,parameters?,assetProjectionId?,resourcePaths?,
+signal?,onProgress?})` accepts the original PNG Blob or File and returns the
+same complete Blob result shape. It publishes `Thinking` before reading that
+input, preserves its complete encoded content through Core, and performs no
+browser drawing, re-encoding, resizing or saving. The request signal covers
+input preparation and native cancellation; an in-flight `Blob.arrayBuffer()`
+finishes before cancellation can be observed. No aborted result or late
+progress reaches the caller. See [full editing usage and format limits](local-image-editing.md).
 
 `subscribe(listener,{replay=true,signal?})` returns an unsubscribe function.
 `close()` cancels and joins only this accessor's requests and subscriptions,
@@ -7840,12 +7860,21 @@ from `arcane-os/core/image` returns a Core service with `current()`, replaying
 installed image-runtime record. Startup retains this preparation in the
 background; `image.status` and unrelated services remain responsive.
 
-The service owns `image.status/load/generate/unload` and
+The service owns `image.status/load/generate/edit/unload` and
 `image.state/progress`. Pass the same `createModelAssetService()` instance that
 Core exposes when using `assetProjectionId` and `resourcePaths`. It retains
 prepared model files through actual native completion, replacement, unload and
 shutdown. PNG base64 is transport-only framing; the complete result is decoded
 by the browser accessor. See [parameters, results and ownership](local-image-generation.md#core-service-and-transport).
+
+`image.edit` takes `{model,image,prompt,strength,parameters?,streamId?,
+assetProjectionId?,resourcePaths?}`. Only the Core JSON boundary encodes the
+input as `{data: completeBase64PNG,encoding:'base64',mediaType}`. The service
+acknowledges accepted work through `image.progress`, preserves the original
+prompt and complete image, and retains existing model-assets ownership through
+native completion. Its complete encoded PNG result has the same shape as
+`image.generate`; [editing semantics](local-image-editing.md) remain with the
+selected model and native engine.
 
 ## createLocalImageService default export
 

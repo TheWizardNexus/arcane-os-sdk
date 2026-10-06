@@ -5,6 +5,12 @@ retained native context. The browser uses Core for model lifecycle and complete
 PNG results. Applications own image prompts, style choices, character identity,
 associations and saved results.
 
+The same public runtime also exposes whole-image `edit()` for an original PNG,
+complete prompt and explicit strength. It reuses this model/context lifecycle;
+applications retain the original and choose whether to save the separate
+result. See [local image editing](local-image-editing.md) for supported inputs,
+lossless transport, native preprocessing and cancellation.
+
 Runtime installation, model asset preparation, model loading and image
 generation are separate operations. The service starts promptly and retains
 runtime preparation in the background. `image.status` remains callable during

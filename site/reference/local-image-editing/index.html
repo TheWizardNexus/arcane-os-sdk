@@ -2,25 +2,122 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
-  <meta name="description" content="The SDK input decoder prepares a PNG raster for the shared native image runtime. Decoding does not load a model or perform inference. The runtime owns model selection, supported editing operations, native calls and their complete results. Applications retain the original image and decide whether to save a newly generated result.">
+  <meta name="description" content="createCoreImageRuntime() exposes whole-image img2img through edit(), using the same retained native context as generation. The selected SD1.4 model advertises txt2img and img2img. Applications supply the original PNG, the complete prompt and explicit strength, retain the original, and decide whether to save the separate generated result.">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
   <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/local-image-editing/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
-  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Local image edit inputs · Arcane OS SDK"><meta property="og:description" content="The SDK input decoder prepares a PNG raster for the shared native image runtime. Decoding does not load a model or perform inference. The runtime owns model selection, supported editing operations, native calls and their complete results. Applications retain the original image and decide whether to save a newly generated result."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/local-image-editing/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Local image edit inputs · Arcane OS SDK"><meta name="twitter:description" content="The SDK input decoder prepares a PNG raster for the shared native image runtime. Decoding does not load a model or perform inference. The runtime owns model selection, supported editing operations, native calls and their complete results. Applications retain the original image and decide whether to save a newly generated result."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <title>Local image edit inputs | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Local image editing through Core · Arcane OS SDK"><meta property="og:description" content="createCoreImageRuntime() exposes whole-image img2img through edit(), using the same retained native context as generation. The selected SD1.4 model advertises txt2img and img2img. Applications supply the original PNG, the complete prompt and explicit strength, retain the original, and decide whether to save the separate generated result."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/local-image-editing/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Local image editing through Core · Arcane OS SDK"><meta name="twitter:description" content="createCoreImageRuntime() exposes whole-image img2img through edit(), using the same retained native context as generation. The selected SD1.4 model advertises txt2img and img2img. Applications supply the original PNG, the complete prompt and explicit strength, retain the original, and decide whether to save the separate generated result."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Local image editing through Core | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Local image edit inputs</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="local-image-edit-inputs">Local image edit inputs</h1><p class="doc-lead">The SDK input decoder prepares a PNG raster for the shared native image runtime. Decoding does not load a model or perform inference. The runtime owns model selection, supported editing operations, native calls and their complete results. Applications retain the original image and decide whether to save a newly generated result.</p><div class="doc-meta"><span>SDK 0.61.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Local image editing through Core</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="local-image-editing-through-core">Local image editing through Core</h1><p class="doc-lead">createCoreImageRuntime() exposes whole-image img2img through edit(), using the same retained native context as generation. The selected SD1.4 model advertises txt2img and img2img. Applications supply the original PNG, the complete prompt and explicit strength, retain the original, and decide whether to save the separate generated result.</p><div class="doc-meta"><span>SDK 0.62.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/local-image-editing.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#decoder-contract">Decoder contract</a><a href="#execution-and-cancellation">Execution and cancellation</a><a href="#editing-semantics-at-the-native-owner">Editing semantics at the native owner</a></nav></details><p>The SDK input decoder prepares a PNG raster for the shared native image
-runtime. Decoding does not load a model or perform inference. The runtime owns
-model selection, supported editing operations, native calls and their complete
-results. Applications retain the original image and decide whether to save a
-newly generated result.</p>
+      <article class="prose reference-prose" data-reference-source="docs/reference/local-image-editing.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#browser-accessor">Browser accessor</a><a href="#core-and-native-request">Core and native request</a><a href="#decoder-contract">Decoder contract</a><a href="#execution-and-cancellation">Execution and cancellation</a><a href="#editing-semantics-at-the-native-owner">Editing semantics at the native owner</a></nav></details><p><code>createCoreImageRuntime()</code> exposes whole-image img2img through <code>edit()</code>, using
+the same retained native context as generation. The selected SD1.4 model
+advertises <code>txt2img</code> and <code>img2img</code>. Applications supply the original PNG, the
+complete prompt and explicit strength, retain the original, and decide whether
+to save the separate generated result.</p>
+<h2 id="browser-accessor">Browser accessor</h2>
+<p>Prepare and load the selected model using the
+<a href="../local-image-generation/">shared generation and model-asset lifecycle</a>.
+Then pass a generated PNG Blob or a supported PNG File directly:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createCoreImageRuntime} from &#39;arcane-os/ai/core-image&#39;;
+
+const images = createCoreImageRuntime({signal: page.signal});
+images.subscribe(function showImageStatus(snapshot) {
+    statusElement.textContent = snapshot.status ?? snapshot.state;
+});
+
+const result = await images.edit({
+    model: &#39;sd14&#39;,
+    image: originalPNG,
+    prompt: &#39;A dignified raccoon astronaut wearing a purple knitted helmet, holding a tiny moon cactus.&#39;,
+    strength: 0.6,
+    parameters: {
+        width: 512,
+        height: 512,
+        sample_params: {sample_steps: 20}
+    },
+    signal: page.signal,
+    onProgress(progress) {
+        console.log(progress);
+    }
+});
+
+const editedPNG = result.images[0].blob;
+</code></pre></div>
+<p>The example uses the application&#39;s existing <code>page</code> AbortController,
+<code>statusElement</code> and original <code>originalPNG</code> Blob or File. It assumes that the
+selected model has already been loaded. <code>edit()</code> can also prepare a selected
+model on demand using the same <code>assetProjectionId</code> and <code>resourcePaths</code> fields
+as <code>generate()</code>.</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Member or field</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>edit({model, image, prompt, strength, parameters?, assetProjectionId?, resourcePaths?, signal?, onProgress?})</code></td>
+<td>Returns the complete result with <code>images: [{blob, mediaType, width, height}]</code>, preserving additional runtime result metadata.</td>
+</tr>
+<tr>
+<td><code>image</code></td>
+<td>Original complete PNG <code>Blob</code> or <code>File</code>, with <code>image/png</code> or an empty declared media type. Supported PNG encodings are listed below.</td>
+</tr>
+<tr>
+<td><code>prompt</code></td>
+<td>Complete caller-authored string, passed unchanged. Native C-string incompatibilities retain the generation error contract.</td>
+</tr>
+<tr>
+<td><code>strength</code></td>
+<td>Explicit finite number from <code>0</code> through <code>1</code>, mapped to native img2img strength. It takes precedence over a model default or <code>parameters.strength</code>; it is never clamped.</td>
+</tr>
+<tr>
+<td><code>parameters</code></td>
+<td>Native generation options, including canvas dimensions, seed, sampling and <code>image_preprocess</code>. The top-level image supplies native <code>init_image</code>; the top-level strength supplies native <code>strength</code>. Other options retain the generation contract.</td>
+</tr></tbody>
+</table>
+</div>
+<p><code>Thinking</code> is published synchronously when the browser accepts the edit, before
+reading the Blob, sending the request, preparing the runtime or loading the
+model. Native sampling progress uses the existing progress surface. Complete
+PNG results arrive after native completion; the SDK fabricates no image chunks
+or assistant turns. Closing the accessor cancels and joins its requests while
+preserving the shared Core client and model ownership.</p>
+<p>The original encoded input is preserved through lossless Core JSON framing.
+The browser does not decode, draw, re-encode, resize, crop, composite or save it.
+The request signal reaches input preparation, worker decoding and cooperative
+native cancellation. Cancellation during <code>Blob.arrayBuffer()</code> is observed
+after that platform operation completes. An aborted edit produces no late
+success or progress callback. Request invocation retains <code>timeoutMs: 0</code>.</p>
+<h2 id="core-and-native-request">Core and native request</h2>
+<p>The <code>arcane-os/core/image</code> service adds <code>image.edit</code> with
+<code>{model, image, prompt, strength, parameters?, streamId?, assetProjectionId?, resourcePaths?}</code>.
+At this JSON boundary only, <code>image</code> is
+<code>{data: completeBase64PNG, encoding: &#39;base64&#39;, mediaType}</code>. The service emits
+the existing accepted <code>image.progress</code> event before preparation, then forwards
+the decoded transport content to the shared image worker. Results use the
+same complete PNG transport records as <code>image.generate</code>.</p>
+<p>The native runtime&#39;s <code>edit()</code> takes the same operation fields, with
+<code>image: {data: Uint8Array, mediaType}</code> and no Core projection arguments.
+It copies the supplied data view at acceptance so caller reuse cannot change
+an input waiting behind another operation.
+The worker decodes once, loads or reuses the exact selected context, and passes
+the raster as native <code>init_image</code> with explicit <code>strength</code>. The existing native
+binding retains input memory through completion and copies complete output
+rasters before native cleanup. The same queue, cancellation, unload and close
+owners serve generation and editing; no second engine or model store is created.</p>
+<p>Unreadable or unsupported input rejects the edit without substituting an
+image. Errors retain their complete details on rejected promises and diagnostic
+events. Applications keep those engineering diagnostics outside ordinary status
+surfaces and durable chat history. No prompt, input or result is persisted by
+this operation.</p>
 <h2 id="decoder-contract">Decoder contract</h2>
 <p><code>src/local-ai/image-editing.mjs</code> exports the internal worker function
 <code>decodeImage({data, mediaType, signal})</code>.</p>
@@ -76,29 +173,28 @@ scanlines. Node zlib failures retain their complete original errors, and
 cancellation retains the owning signal&#39;s reason or Node <code>AbortError</code>. A decode
 failure never returns partial imagery or substitutes a different image.</p>
 <h2 id="editing-semantics-at-the-native-owner">Editing semantics at the native owner</h2>
-<p>Whole-image img2img uses an initial image, prompt and strength. Masked editing
-adds a separate mask; instruction/reference editing uses a model that supports
-reference conditioning. These are distinct operations and must be advertised
-only when the selected model and native path implement them. Ordinary img2img
-does not require LoRA training. The candidate engine documents this directly
-with its base SD1.4 model in the
+<p>Whole-image img2img uses an initial image, prompt and strength. This <code>edit()</code>
+contract selects that operation. Masked and reference editing require their
+own model-specific contracts and are outside this PNG img2img operation.
+Ordinary img2img does not require LoRA training. The selected engine documents
+this directly with its base SD1.4 model in the
 <a href="https://github.com/leejet/stable-diffusion.cpp/blob/master-929-3f8527a/docs/sd.md#img2img-example" target="_blank" rel="noreferrer">tagged img2img example</a>.</p>
 <p>Source dimensions are decoder output, not an implicit request to change the
-generation dimensions. The model owner documents its actual canvas adaptation
-and reports actual output dimensions. In the candidate engine, temporary
-initial images use model preprocessing while caller images remain unchanged;
+generation dimensions. The engine center-crops and resizes temporary initial
+images to the selected canvas by default and reports actual output dimensions.
+Caller images remain unchanged;
 even <code>mode=none</code> does not suppress all later model adaptation. See the
 <a href="https://github.com/leejet/stable-diffusion.cpp/blob/master-929-3f8527a/docs/image_preprocessing.md" target="_blank" rel="noreferrer">native preprocessing contract</a>.</p>
-<p>An RGB-only model such as the selected SD1.4 candidate consumes the stored RGB
+<p>An RGB-only model such as the selected SD1.4 consumes the stored RGB
 and does not preserve alpha. The SDK must not silently choose a compositing
 background or claim that passing RGBA preserves its displayed appearance.
 Strength zero is also not an exact-copy operation: native img2img still uses
 the model&#39;s encode, sampling and decode path. These model behaviors are
 separate from the decoder preserving the original input.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#decoder-contract">Decoder contract</a><a href="#execution-and-cancellation">Execution and cancellation</a><a href="#editing-semantics-at-the-native-owner">Editing semantics at the native owner</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#browser-accessor">Browser accessor</a><a href="#core-and-native-request">Core and native request</a><a href="#decoder-contract">Decoder contract</a><a href="#execution-and-cancellation">Execution and cancellation</a><a href="#editing-semantics-at-the-native-owner">Editing semantics at the native owner</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.61.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.62.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>
