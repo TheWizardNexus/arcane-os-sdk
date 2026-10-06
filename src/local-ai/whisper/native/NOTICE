@@ -1,0 +1,18 @@
+Arcane Whisper native helper
+Copyright (c) The Wizard Nexus and contributors.
+
+The first-party helper source is licensed under AGPL-3.0-only; see LICENSE.
+Matching source and build instructions are included in source/ and in the
+corresponding Arcane SDK numeric release.
+
+This Windows helper distribution includes unmodified Microsoft Visual C++
+release runtime libraries from the installed Visual Studio 2022 Redistributable
+tree. Those files retain Microsoft's terms. Their published distribution list
+and application-local deployment documentation are available at:
+https://learn.microsoft.com/en-us/visualstudio/releases/2022/redistribution
+https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files
+
+The helper uses the public whisper.cpp and GGML interfaces. Their MIT license
+is included as licenses/whisper-LICENSE. The upstream runtime archives, model
+and FFmpeg decoder are acquired separately through their selected upstream
+distribution routes; they are not included in this helper archive.

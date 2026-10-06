@@ -73,6 +73,8 @@
     "./local-ai": "./src/local-ai/install.mjs",
     "./local-ai/onnx": "./src/local-ai/onnx.mjs",
     "./local-ai/image": "./src/local-ai/image-runtime.mjs",
+    "./local-ai/whisper": "./src/local-ai/whisper/index.mjs",
+    "./local-ai/whisper/build": "./src/local-ai/whisper/build.mjs",
     "./integrated-provider": "./src/integrated-provider-loader.mjs",
     "./packager": "./src/packager/core.mjs",
     "./release-bundle": "./src/release-bundle.mjs",

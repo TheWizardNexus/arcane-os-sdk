@@ -10,6 +10,8 @@ import {createEventQueue} from '../event-queue.mjs';
 import {runProcess} from '../process.mjs';
 import {extractLocalAIArchive} from './archive.mjs';
 import {normalizeImageRuntimeRequirement} from './config.mjs';
+import {normalizeWhisperRuntimeRequirement} from './whisper/config.mjs';
+import {bundledWhisperRuntime, installedWhisperRuntime, installWhisperDistribution, whisperRuntimeSelection} from './whisper/install.mjs';
 
 const is=new Is(false);
 const installations=new Map();
@@ -21,11 +23,15 @@ function selectRuntimes(runtimes){
     const selected=new Map();
     for(const item of runtimes){
         const requirement=is.string(item)?{id:item}:item;
-        const runtime=requirement?.id==='stable-diffusion.cpp'?normalizeImageRuntimeRequirement(requirement):requirement;
-        if(!runtime||!['llama.cpp','ollama','nemo-speech','onnx','stable-diffusion.cpp'].includes(runtime.id)){
+        const runtime=requirement?.id==='stable-diffusion.cpp'?normalizeImageRuntimeRequirement(requirement)
+            :requirement?.id==='whisper.cpp'?normalizeWhisperRuntimeRequirement(requirement):requirement;
+        if(!runtime||!['llama.cpp','ollama','nemo-speech','onnx','stable-diffusion.cpp','whisper.cpp'].includes(runtime.id)){
             throw new ArcaneError(ERROR_CODES.targetUnavailable,`Local AI runtime installation is unavailable for ${String(runtime?.id)}.`);
         }
         const prior=selected.get(runtime.id);
+        if(prior&&runtime.id==='whisper.cpp'&&whisperRuntimeSelection(prior)!==whisperRuntimeSelection(runtime)){
+            throw new ArcaneError(ERROR_CODES.usage,'Select one complete whisper.cpp runtime and model requirement for this operation.');
+        }
         if(prior&&(prior.version!==runtime.version||prior.url!==runtime.url||(runtime.id==='stable-diffusion.cpp'&&prior.backend!==runtime.backend))){
             throw new ArcaneError(ERROR_CODES.usage,`Select one ${runtime.id} runtime version and URL for this operation.`);
         }
@@ -351,7 +357,7 @@ function bundledImageModelResource(resource, descriptor, model, role, runtimeRoo
     return bundled;
 }
 
-async function installedRuntime(base,runtime,platform,architecture,signal){
+async function installedRuntime(base,runtime,platform,architecture,signal,reuseWhisper=false){
     let entries;
     try{
         entries=await readdir(base,{withFileTypes:true});
@@ -374,9 +380,19 @@ async function installedRuntime(base,runtime,platform,architecture,signal){
         }
         if(installation.requestVersion!==(runtime.version??null)||installation.requestUrl!==(runtime.url??null))continue;
         if (runtime.id === 'stable-diffusion.cpp' && installation.requestBackend !== runtime.backend) continue;
+        let whisperRequirement;
+        if (runtime.id === 'whisper.cpp') {
+            if (!installation.requestWhisper) continue;
+            whisperRequirement = JSON.parse(installation.requestWhisper);
+            if (whisperRuntimeSelection(whisperRequirement, !reuseWhisper) !== whisperRuntimeSelection(runtime, !reuseWhisper)) continue;
+        }
         const record=installation.runtime;
         if(record?.id!==runtime.id||record.platform!==platform||record.architecture!==architecture)continue;
         try{
+            if(runtime.id==='whisper.cpp'){
+                if(await installedWhisperRuntime(record,signal,!reuseWhisper))return reuseWhisper?{runtime:record,requirement:whisperRequirement}:record;
+                continue;
+            }
             if (runtime.id === 'stable-diffusion.cpp') {
                 const locations = [record.libraryPath, record.bindingModulePath];
                 if (!Array.isArray(record.variants) || record.variants.length === 0) continue;
@@ -524,10 +540,11 @@ async function installRuntime(runtime,{directory,platform,architecture,signal,on
         await onEvent({type:'local-ai.install.available',message:`${runtime.id} ${installed.version} is already installed.`,data:installed});
         return installed;
     }
+    const reusableWhisper=runtime.id==='whisper.cpp'?await installedRuntime(base,runtime,platform,architecture,signal,true):null;
     if(runtime.id==='onnx'&&(!['win32','linux','darwin'].includes(platform)||!['x64','arm64'].includes(architecture))){
         throw new ArcaneError(ERROR_CODES.targetUnavailable,`onnxruntime-node has no supported ${platform}/${architecture} CPU runtime.`);
     }
-    const release=runtime.id==='onnx'?null:await selectRelease(runtime,platform,architecture,signal);
+    const release=['onnx','whisper.cpp'].includes(runtime.id)?null:await selectRelease(runtime,platform,architecture,signal);
     throwIfAborted(signal);
     await mkdir(base,{recursive:true});
     const attempt=await mkdtemp(path.join(base,'install-'));
@@ -538,6 +555,8 @@ async function installRuntime(runtime,{directory,platform,architecture,signal,on
         let locations;
         if(runtime.id==='onnx'){
             locations=await installONNXPackage(runtime,{root,directory,platform,architecture,signal,onEvent});
+        } else if (runtime.id === 'whisper.cpp') {
+            locations = await installWhisperDistribution(runtime, {root, directory, platform, architecture, signal, onEvent, upstreamResponse, reusable: reusableWhisper});
         } else if (runtime.id === 'stable-diffusion.cpp') {
             locations = await installImageDistribution(
                 release,
@@ -556,7 +575,7 @@ async function installRuntime(runtime,{directory,platform,architecture,signal,on
         const record={id:runtime.id,platform,architecture,root,...locations,...(runtime.version?{requestedVersion:runtime.version}:{})};
         throwIfAborted(signal);
         if(archive)await unlink(archive);
-        await writeFile(path.join(attempt,'installation.json'),`${JSON.stringify({requestVersion:runtime.version??null,requestUrl:runtime.url??null,...(runtime.id==='stable-diffusion.cpp'?{requestBackend:runtime.backend}:{}),runtime:record},null,2)}\n`,{flag:'wx',signal});
+        await writeFile(path.join(attempt,'installation.json'),`${JSON.stringify({requestVersion:runtime.version??null,requestUrl:runtime.url??null,...(runtime.id==='stable-diffusion.cpp'?{requestBackend:runtime.backend}:{}),...(runtime.id==='whisper.cpp'?{requestWhisper:whisperRuntimeSelection(runtime)}:{}),runtime:record},null,2)}\n`,{flag:'wx',signal});
         completed=true;
         await onEvent({type:'local-ai.install.completed',message:`${runtime.id} ${record.version} is available.`,data:record});
         return record;
@@ -576,7 +595,7 @@ async function installRuntime(runtime,{directory,platform,architecture,signal,on
 
 function shareInstallation(runtime,options){
     throwIfAborted(options.signal);
-    const key=JSON.stringify([options.directory,options.platform,options.architecture,runtime.id,runtime.version??null,runtime.url??null,runtime.id==='stable-diffusion.cpp'?runtime.backend:null]);
+    const key=JSON.stringify([options.directory,options.platform,options.architecture,runtime.id,runtime.version??null,runtime.url??null,runtime.id==='stable-diffusion.cpp'?runtime.backend:null,runtime.id==='whisper.cpp'?whisperRuntimeSelection(runtime):null]);
     let entry=installations.get(key);
     if(entry?.controller.signal.aborted){
         // The prior cancelled attempt owns its cleanup. A later request waits
@@ -725,7 +744,7 @@ export async function bundleLocalAIRuntimes({runtimes=[],directory,outputRoot,pl
         const files=[];
         const relative=`runtime/local-ai/${runtime.id}`;
         const destination=path.join(root,relative);
-        const bundled={...runtime,root:relative};
+        const bundled=runtime.id==='whisper.cpp'?bundledWhisperRuntime(runtime,relative):{...runtime,root:relative};
         for(const field of ['executable','modulePath','includeDirectory','libraryDirectory','binaryDirectory','cmakeDirectory','libraryPath','bindingModulePath']){
             if(runtime[field]===undefined)continue;
             bundled[field]=path.posix.join(relative,path.relative(runtime.root,runtime[field]).split(path.sep).join('/'));

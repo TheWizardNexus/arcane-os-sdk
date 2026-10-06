@@ -153,6 +153,9 @@ export function coreEntrySource(application, version, services, {localAI, runtim
     const imageSelected = localAI?.runtimes?.some(function selectedImage(requirement) {
         return (typeof requirement === 'string' ? requirement : requirement.id) === 'stable-diffusion.cpp';
     }) ?? false;
+    const whisperSelected = localAI?.runtimes?.some(function selectedWhisper(requirement) {
+        return (typeof requirement === 'string' ? requirement : requirement.id) === 'whisper.cpp';
+    }) ?? false;
     const imports = services.map(function serviceImport(service, index) {
         const specifier = '../app/' + service.module.split('/').map(encodeURIComponent).join('/');
         return `import createService${index} from ${JSON.stringify(specifier)};`;
@@ -165,7 +168,8 @@ export function coreEntrySource(application, version, services, {localAI, runtim
         const chatConfiguration = {
             ...localAI,
             runtimes: localAI.runtimes.filter(function selectedChat(requirement) {
-                return (typeof requirement === 'string' ? requirement : requirement.id) !== 'stable-diffusion.cpp';
+                const id = typeof requirement === 'string' ? requirement : requirement.id;
+                return id !== 'stable-diffusion.cpp' && id !== 'whisper.cpp';
             })
         };
         imports.push("import {createLocalAIService} from 'arcane-os/core/local-ai';");
@@ -176,6 +180,12 @@ export function coreEntrySource(application, version, services, {localAI, runtim
         imports.push("import {createModelAssetService} from 'arcane-os/core/model-assets';");
         definitions.push('    modelAssets');
         definitions.push(`    createLocalImageService(JSON.parse(${JSON.stringify(JSON.stringify(localAI))}), {...context, modelAssets})`);
+    }
+    if (whisperSelected) {
+        imports.push("import path from 'node:path';");
+        imports.push("import {createSpeechService} from 'arcane-os/core/speech';");
+        imports.push("import {createWhisperRuntime} from 'arcane-os/local-ai/whisper';");
+        definitions.push('    createSpeechService({stt, signal: context.signal})');
     }
     if (packagedWeb) {
         imports.push("import {createPackagedWebService} from 'arcane-os/core/packaged-web';");
@@ -200,18 +210,26 @@ export function coreEntrySource(application, version, services, {localAI, runtim
         ...(localAI === undefined ? [] : [
             `    runtimes: JSON.parse(${JSON.stringify(JSON.stringify(runtimes))}).map(function runtimeLocation(runtime) {`,
             '        const resolved = {...runtime};',
-            "        for (const field of ['root', 'executable', 'modulePath', 'includeDirectory', 'libraryDirectory', 'binaryDirectory', 'cmakeDirectory', 'libraryPath', 'bindingModulePath']) {",
+            "        for (const field of ['root', 'executable', 'modulePath', 'includeDirectory', 'libraryDirectory', 'binaryDirectory', 'cmakeDirectory', 'libraryPath', 'bindingModulePath', 'helperExecutable', 'helperRoot', 'decoderExecutable', 'decoderRoot']) {",
             '            if (runtime[field] !== undefined) resolved[field] = runtimePath(runtime[field]);',
             '        }',
             '        if (runtime.variants) resolved.variants = runtime.variants.map(function nativeVariant(variant) {',
-            '            return {...variant, root: runtimePath(variant.root), libraryPath: runtimePath(variant.libraryPath)};',
+            '            const resolvedVariant = {...variant};',
+            "            for (const field of ['root', 'libraryPath', 'libraryDirectory', 'executable']) {",
+            '                if (variant[field] !== undefined) resolvedVariant[field] = runtimePath(variant[field]);',
+            '            }',
+            '            return resolvedVariant;',
             '        });',
             '        if (runtime.models) resolved.models = runtime.models.map(function nativeModel(model) {',
-            '            const resources = {};',
-            '            for (const [role, resource] of Object.entries(model.resources)) {',
-            "                resources[role] = typeof resource === 'string' ? runtimePath(resource) : resource;",
+            '            const resolvedModel = {...model};',
+            '            if (model.path !== undefined) resolvedModel.path = runtimePath(model.path);',
+            '            if (model.resources !== undefined) {',
+            '                resolvedModel.resources = {};',
+            '                for (const [role, resource] of Object.entries(model.resources)) {',
+            "                    resolvedModel.resources[role] = typeof resource === 'string' ? runtimePath(resource) : resource;",
+            '                }',
             '            }',
-            '            return {...model, resources};',
+            '            return resolvedModel;',
             '        });',
             '        return resolved;',
             '    }),'
@@ -220,6 +238,18 @@ export function coreEntrySource(application, version, services, {localAI, runtim
         '};',
         '',
         ...(imageSelected ? ['const modelAssets = createModelAssetService({appRoot: context.appRoot});', ''] : []),
+        ...(whisperSelected ? [
+            'const stt = createWhisperRuntime(',
+            '    {',
+            '        runtime: context.runtimes.find(function selectedWhisperRuntime(runtime) {',
+            "            return runtime.id === 'whisper.cpp';",
+            '        }),',
+            "        temporaryDirectory: path.join(context.stateRoot ?? path.join(context.appRoot, '.arcane'), 'speech', 'whisper'),",
+            '        onEvent: context.onEvent',
+            '    }',
+            ');',
+            ''
+        ] : []),
         'const host = startCoreHost({',
         `    application: JSON.parse(${JSON.stringify(JSON.stringify(application))}),`,
         `    version: ${JSON.stringify(version)},`,

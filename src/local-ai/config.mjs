@@ -5,9 +5,10 @@ import {ArcaneError, ERROR_CODES, throwIfAborted} from '../errors.mjs';
 import {SD14_MODEL} from './image-models/sd14.mjs';
 import {FLUX2_KLEIN_4B_MODEL} from './image-models/flux.mjs';
 import {SDXL_BASE_1_0_MODEL} from './image-models/sdxl.mjs';
+import {normalizeWhisperRuntimeRequirement} from './whisper/config.mjs';
 
 const is = new Is(false);
-export const LOCAL_AI_RUNTIME_IDS = ['llama.cpp', 'ollama', 'onnx', 'stable-diffusion.cpp'];
+export const LOCAL_AI_RUNTIME_IDS = ['llama.cpp', 'ollama', 'onnx', 'stable-diffusion.cpp', 'whisper.cpp'];
 
 /** Image requirements describe assets without acquiring or loading a model. */
 export function normalizeImageRuntimeRequirement(record) {
@@ -61,6 +62,7 @@ export function normalizeLocalAIConfig(value) {
             throw new ArcaneError(ERROR_CODES.usage, `Unknown local AI runtime: ${String(record?.id ?? item)}.`);
         }
         if (record.id === 'stable-diffusion.cpp') return normalizeImageRuntimeRequirement(record);
+        if (record.id === 'whisper.cpp') return normalizeWhisperRuntimeRequirement(record);
         return {...record};
     });
     return {...value, runtimes};

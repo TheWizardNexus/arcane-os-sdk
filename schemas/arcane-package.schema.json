@@ -156,7 +156,7 @@
           "type": "array",
           "items": {
             "oneOf": [
-              { "enum": ["llama.cpp", "ollama", "onnx", "stable-diffusion.cpp"] },
+              { "enum": ["llama.cpp", "ollama", "onnx", "stable-diffusion.cpp", "whisper.cpp"] },
               {
                 "type": "object",
                 "required": ["id"],
@@ -165,7 +165,8 @@
                   "version": { "type": "string" },
                   "url": { "type": "string" }
                 }
-              }
+              },
+              { "$ref": "#/$defs/whisperRuntime" }
             ]
           }
         },
@@ -184,6 +185,56 @@
             "url": { "type": "string" },
             "modelsDirectory": { "type": "string" },
             "args": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "whisperRuntime": {
+      "type": "object",
+      "required": ["id"],
+      "description": "Native Whisper transcription. Models are explicitly selected; describing a runtime acquires nothing. Automatic Windows x64 preparation selects intact CUDA and CPU distributions, an SDK helper, and FFmpeg. Other hosts supply their selected complete runtime and decoder trees.",
+      "properties": {
+        "id": { "const": "whisper.cpp" },
+        "version": { "type": "string", "default": "1.9.4" },
+        "backend": { "enum": ["auto", "cuda", "metal", "cpu"], "default": "auto" },
+        "helperRoot": { "type": "string", "description": "Complete helper directory copied into the native runtime, including its app-local libraries. Defaults to the directory containing helperExecutable." },
+        "helperExecutable": { "type": "string" },
+        "helperUrl": { "type": "string" },
+        "helperVersion": { "type": "string" },
+        "decoderRoot": { "type": "string" },
+        "decoderExecutable": { "type": "string" },
+        "decoderUrl": { "type": "string" },
+        "modelId": { "type": "string" },
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["backend"],
+            "properties": {
+              "backend": { "enum": ["cuda", "metal", "cpu"] },
+              "root": { "type": "string" },
+              "url": { "type": "string" },
+              "libraryDirectory": { "type": "string" }
+            }
+          }
+        },
+        "models": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "oneOf": [
+              { "const": "whisper-small" },
+              {
+                "type": "object",
+                "required": ["id"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "path": { "type": "string" },
+                  "url": { "type": "string" },
+                  "filename": { "type": "string" }
+                }
+              }
+            ]
           }
         }
       }

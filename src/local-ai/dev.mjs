@@ -1,12 +1,15 @@
+import path from 'node:path';
 import Is from 'strong-type';
 import {createCoreRuntime} from '../core/runtime.mjs';
 import {createLocalAIService} from '../core/services/local-ai.mjs';
 import {createLocalImageService} from '../core/services/image.mjs';
 import {createModelAssetService} from '../core/services/model-assets.mjs';
+import {createSpeechService} from '../core/services/speech.mjs';
 import {CORE_PROTOCOL, CoreError, serializeCoreError} from '../../browser-runtime/core/contracts.mjs';
 import {normalizeLocalAIConfig} from './config.mjs';
 import {discoverLocalAIRuntimes} from './discover.mjs';
 import {ensureLocalAIRuntimes} from './install.mjs';
+import {createWhisperRuntime} from './whisper/index.mjs';
 
 const is = new Is(false);
 
@@ -84,6 +87,7 @@ export function createDevelopmentLocalAI({config, appRoot, directory, applicatio
     let runtime;
     let service;
     let imageService;
+    let speechService;
     let modelAssets;
     let stopFrames;
     let preparationError = null;
@@ -162,6 +166,7 @@ export function createDevelopmentLocalAI({config, appRoot, directory, applicatio
         for (const record of current.services) writeFrame(connection, event('core.service.state', record));
         writeFrame(connection, event('localai.state', service.current()));
         if (imageService) writeFrame(connection, event('image.state', imageService.current()));
+        if (speechService) writeFrame(connection, event('speech.state', speechService.current()));
         if (modelAssets) writeFrame(connection, event('modelAssets.state', modelAssets.current()));
     }
 
@@ -170,7 +175,7 @@ export function createDevelopmentLocalAI({config, appRoot, directory, applicatio
         const localConfig = {
             ...selected,
             runtimes: selected.runtimes.filter(function selectedChatRuntime(requirement) {
-                return requirement.id !== 'stable-diffusion.cpp';
+                return requirement.id !== 'stable-diffusion.cpp' && requirement.id !== 'whisper.cpp';
             })
         };
         service = createLocalAIService(
@@ -202,6 +207,30 @@ export function createDevelopmentLocalAI({config, appRoot, directory, applicatio
                 }
             );
             services.push(modelAssets, imageService);
+        }
+        const whisperRequirement = selected.runtimes.find(
+            function selectedWhisperRuntime(requirement) {
+                return requirement.id === 'whisper.cpp';
+            }
+        );
+        if (whisperRequirement) {
+            const stt = createWhisperRuntime(
+                {
+                    modelId: whisperRequirement.modelId,
+                    temporaryDirectory: path.join(appRoot, '.arcane', 'speech', 'whisper'),
+                    onEvent,
+                    async prepare({signal, onEvent: report}) {
+                        const installed = await ensureLocalAIRuntimes(
+                            {runtimes: [whisperRequirement], directory, signal, onEvent: report}
+                        );
+                        return installed[0];
+                    }
+                }
+            );
+            speechService = createSpeechService(
+                {stt, signal: operationSignal}
+            );
+            services.push(speechService);
         }
         runtime = createCoreRuntime({application, version, services});
         stopFrames = runtime.onFrame(routeFrame);
@@ -387,7 +416,8 @@ export function createDevelopmentLocalAI({config, appRoot, directory, applicatio
         return {state: closed ? 'closed' : preparationError ? 'error' : runtime ? 'ready' : 'preparing',
             error: preparationError ? serializeCoreError(preparationError) : null,
             core: runtime?.current() ?? null, localAI: service?.current() ?? null,
-            image: imageService?.current() ?? null};
+            image: imageService?.current() ?? null,
+            speech: speechService?.current() ?? null};
     }
 
     function close() {
