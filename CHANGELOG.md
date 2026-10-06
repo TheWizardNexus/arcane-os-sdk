@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.75.0
+
+- Advertise whole-image `img2img` alongside `txt2img` for the built-in
+  `sdxl-base-1.0` selection. Use the existing public `images.edit()` operation
+  with the original PNG, complete prompt and explicit strength.
+- Reuse the complete SDXL Base checkpoint, embedded VAE and existing retained
+  native context. Preserve 1024-by-1024 defaults, caller-selected canvas,
+  progress, cancellation and complete separate PNG results. No additional
+  model resource, runtime, adapter or dependency is introduced.
+- Document the pinned engine's encoding/sampling path and whole-image editing
+  semantics. Masked/reference editing and pixel or output-quality guarantees
+  remain outside this selection; source review is not native execution proof.
+
 ## 0.74.0
 
 - Add optional `longPaths` to `createRepositoryWorkspace()` for newly cloned
