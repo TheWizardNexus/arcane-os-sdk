@@ -66,6 +66,7 @@
     "./core/diarization": "./src/diarization/service.mjs",
     "./core/local-ai": "./src/core/services/local-ai.mjs",
     "./core/image": "./src/core/services/image.mjs",
+    "./core/speech": "./src/core/services/speech.mjs",
     "./core/model-assets": "./src/core/services/model-assets.mjs",
     "./diarization": "./src/diarization/index.mjs",
     "./diarization/build": "./src/diarization/build.mjs",
