@@ -566,6 +566,8 @@ const navigationGroups=[
             ['Core browser client','docs/reference/core-client.md'],
             ['Native Core runtime','docs/reference/core-runtime.md'],
             ['Local AI through Core','docs/reference/local-ai.md'],
+            ['FLUX.2 Klein 4B','docs/reference/local-image-flux.md'],
+            ['Native speech service','docs/reference/native-speech.md'],
             ['Portable Core packaging','docs/reference/core-native-packaging.md'],
             ['Arcane API','docs/reference/core/arcane-api.md'],
             ['Capabilities and admission','@reference/core/capabilities'],

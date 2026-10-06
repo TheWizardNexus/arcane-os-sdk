@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="The flux2-klein-4b model definition selects distilled FLUX.2 Klein 4B for text-to-image generation through the shared local image runtime. It uses the same retained native context, progress, cancellation and complete PNG result contract as other selected image models. Applications own prompts, image associations and saved results.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/local-image-flux/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="FLUX.2 Klein 4B through Core · Arcane OS SDK"><meta property="og:description" content="The flux2-klein-4b model definition selects distilled FLUX.2 Klein 4B for text-to-image generation through the shared local image runtime. It uses the same retained native context, progress, cancellation and complete PNG result contract as other selected image models. Applications own prompts, image associations and saved results."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/local-image-flux/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="FLUX.2 Klein 4B through Core · Arcane OS SDK"><meta name="twitter:description" content="The flux2-klein-4b model definition selects distilled FLUX.2 Klein 4B for text-to-image generation through the shared local image runtime. It uses the same retained native context, progress, cancellation and complete PNG result contract as other selected image models. Applications own prompts, image associations and saved results."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>FLUX.2 Klein 4B through Core | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">FLUX.2 Klein 4B through Core</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="flux2-klein-4b-through-core">FLUX.2 Klein 4B through Core</h1><p class="doc-lead">The flux2-klein-4b model definition selects distilled FLUX.2 Klein 4B for text-to-image generation through the shared local image runtime. It uses the same retained native context, progress, cancellation and complete PNG result contract as other selected image models. Applications own prompts, image associations and saved results.</p><div class="doc-meta"><span>SDK 0.63.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="./" aria-current="page">FLUX.2 Klein 4B</a><a href="../native-speech/">Native speech service</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/local-image-flux.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#model-selection">Model selection</a><a href="#required-model-resources">Required model resources</a><a href="#defaults-and-model-behavior">Defaults and model behavior</a></nav></details><p>The <code>flux2-klein-4b</code> model definition selects distilled FLUX.2 Klein 4B for
+text-to-image generation through the shared
+<a href="../local-image-generation/">local image runtime</a>. It uses the same retained
+native context, progress, cancellation and complete PNG result contract as
+other selected image models. Applications own prompts, image associations and
+saved results.</p>
+<h2 id="model-selection">Model selection</h2>
+<p>Select this runtime record under <code>native.localAI</code> in <code>arcane-app.json</code>, or
+the corresponding package projection&#39;s <code>localAI</code> record:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>json</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-json">{
+    &quot;runtimes&quot;: [
+        {
+            &quot;id&quot;: &quot;stable-diffusion.cpp&quot;,
+            &quot;version&quot;: &quot;master-929-3f8527a&quot;,
+            &quot;backend&quot;: &quot;auto&quot;,
+            &quot;models&quot;: [&quot;flux2-klein-4b&quot;]
+        }
+    ]
+}
+</code></pre></div>
+<p>The definition is a single <code>FLUX2_KLEIN_4B_MODEL</code> record in
+<code>src/local-ai/image-models/flux.mjs</code>. The built-in model ID supplies that record
+through normal runtime configuration; the shared service exposes its resource
+metadata through <code>image.status</code> and <code>images.inspect()</code>.</p>
+<p>Backend selection belongs to the shared runtime. This definition adds no CPU
+offload setting or device override. <code>auto</code> uses the available runtime&#39;s
+accelerated backend with CPU fallback; actual support depends on the installed
+runtime distribution. See the shared guide for platform distribution
+availability. Selecting the model does not establish that it has loaded or run
+on a GPU, CPU or NPU.</p>
+<h2 id="required-model-resources">Required model resources</h2>
+<p>Prepare all three resources together. They are complementary parts of one
+model pipeline, rather than three independent image generators.</p>
+<div class="table-wrap" data-columns="3" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Native role</th>
+<th>Resource</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>diffusion_model</code></td>
+<td><a href="https://huggingface.co/black-forest-labs/FLUX.2-klein-4B/resolve/e7b7dc27f91deacad38e78976d1f2b499d76a294/flux-2-klein-4b.safetensors" target="_blank" rel="noreferrer">flux-2-klein-4b.safetensors</a></td>
+<td>Distilled image generation model.</td>
+</tr>
+<tr>
+<td><code>vae</code></td>
+<td><a href="https://huggingface.co/black-forest-labs/FLUX.2-small-decoder/resolve/a3efc24f613ef42d9428af62fdbd6f5fd8856c4a/full_encoder_small_decoder.safetensors" target="_blank" rel="noreferrer"><code>full_encoder_small_decoder.safetensors</code></a></td>
+<td>Complete image encoder and the smaller FLUX.2 decoder.</td>
+</tr>
+<tr>
+<td><code>llm</code></td>
+<td><a href="https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/bc640142c66e1fdd12af0bd68f40445458f3869b/Qwen3-4B-Q8_0.gguf" target="_blank" rel="noreferrer">Qwen3-4B-Q8_0.gguf</a></td>
+<td>Qwen3-4B text conditioning inside the image engine.</td>
+</tr></tbody>
+</table>
+</div>
+<p>The selected upstream records identify these resources as Apache-2.0. The
+engine supplies its embedded Qwen tokenizer. This definition needs no separate
+tokenizer download, chat server or LoRA. The full encoder in the selected VAE
+also retains the model&#39;s image-encoding capability; a decoder-only file is a
+different resource.</p>
+<p>The existing DBOPFS model store owns authoritative model files and resumable
+downloads. The shared <a href="../model-assets/">model-assets service</a> prepares complete
+native working files. Runtime installation does not download another copy of
+these models. Resource roles map to the exact filenames returned by that
+preparation.</p>
+<p>The following extends the shared generation guide. It uses an existing
+<code>images</code> accessor, DBOPFS-backed <code>modelStore</code>, application-selected
+<code>workingDirectory</code> and request <code>signal</code>:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createBrowserModelSource} from &#39;arcane-os/ai/browser-wasm&#39;;
+import {prepareCoreModelAssets} from &#39;arcane-os/ai/core-model-assets&#39;;
+
+const selected = (await images.inspect({signal})).models.find(
+    function selectedKlein(model) {
+        return model.id === &#39;flux2-klein-4b&#39;;
+    }
+);
+const resources = Object.entries(selected.resources);
+const source = createBrowserModelSource({
+    id: selected.id,
+    files: resources.map(function modelFile([role, resource]) {
+        return {name: resource.filename, url: resource.url};
+    })
+});
+const stored = await modelStore.ensure(source, {signal});
+const projection = await prepareCoreModelAssets({
+    workingDirectory,
+    members: source.files.map(function workingMember(member, index) {
+        return {path: member.name, file: stored.files[index]};
+    }),
+    signal
+});
+
+try {
+    await images.load({
+        model: selected.id,
+        assetProjectionId: projection.id,
+        resourcePaths: Object.fromEntries(
+            resources.map(function nativeRole([role, resource]) {
+                return [role, resource.filename];
+            })
+        ),
+        signal
+    });
+} finally {
+    await projection.release();
+}
+
+const result = await images.generate({
+    model: selected.id,
+    prompt: &#39;A dignified raccoon astronaut watering a moon cactus in a teacup.&#39;,
+    parameters: {width: 768, height: 768},
+    signal
+});
+// Display result.images using the shared guide&#39;s Blob preview example.
+</code></pre></div>
+<p>Change the prompt to request another scene and the dimensions to select its
+canvas. Successful loading retains the working projection inside the native
+model owner; releasing the caller&#39;s preparation handle leaves that native
+retain intact. Repeated generation reuses the loaded context. Explicitly
+unload it when the application no longer needs it, following the shared
+lifecycle contract.</p>
+<h2 id="defaults-and-model-behavior">Defaults and model behavior</h2>
+<p>The definition supplies four sampling steps, the Euler sampler and
+<code>sample_params.guidance.txt_cfg: 1</code>. Omitted native options retain their native
+initializer defaults, including automatic FLUX.2 scheduler selection. These
+settings belong to the distilled 4B checkpoint; the separate Klein base and
+9B variants have their own model requirements.</p>
+<p>The native default canvas is 512 by 512. Klein&#39;s native preparation aligns
+dimensions upward to multiples of 16; use the returned image dimensions when
+displaying or saving results. The example already selects aligned dimensions.
+At the default CFG value of 1, the native text-to-image path does not apply
+negative-prompt conditioning.</p>
+<p>The SDK forwards the caller&#39;s complete prompt to the native API. The engine
+then applies its prompt-weighting syntax and Qwen conditioning format.
+Parentheses and brackets can affect weighting. The selected native API has no
+public switch for literal text conditioning, so exact SDK transport does not
+imply literal interpretation by the model. The shared guide describes inputs
+that cannot pass unchanged through its native C-string boundary.</p>
+<p>This definition advertises <code>txt2img</code>. The upstream Klein model also supports
+reference-image editing, while the SDK&#39;s separate whole-image <code>img2img</code>
+operation uses a different input path. Reference editing becomes an SDK
+capability when the shared runtime implements its reference-image dispatch;
+selecting this model alone does not add that operation.</p>
+<p>These settings and resource roles follow the
+<a href="https://github.com/leejet/stable-diffusion.cpp/blob/master-929-3f8527a/docs/flux2.md" target="_blank" rel="noreferrer">tagged FLUX.2 instructions</a>,
+the <a href="https://huggingface.co/black-forest-labs/FLUX.2-klein-4B" target="_blank" rel="noreferrer">official Klein model</a>,
+the <a href="https://huggingface.co/black-forest-labs/FLUX.2-small-decoder" target="_blank" rel="noreferrer">official small decoder</a>
+and the <a href="https://huggingface.co/Qwen/Qwen3-4B-GGUF" target="_blank" rel="noreferrer">official Qwen model files</a>.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#model-selection">Model selection</a><a href="#required-model-resources">Required model resources</a><a href="#defaults-and-model-behavior">Defaults and model behavior</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.63.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

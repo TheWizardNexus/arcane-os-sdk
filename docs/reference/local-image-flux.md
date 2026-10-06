@@ -45,7 +45,7 @@ model pipeline, rather than three independent image generators.
 | Native role | Resource | Purpose |
 | --- | --- | --- |
 | `diffusion_model` | [flux-2-klein-4b.safetensors](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B/resolve/e7b7dc27f91deacad38e78976d1f2b499d76a294/flux-2-klein-4b.safetensors) | Distilled image generation model. |
-| `vae` | [full_encoder_small_decoder.safetensors](https://huggingface.co/black-forest-labs/FLUX.2-small-decoder/resolve/a3efc24f613ef42d9428af62fdbd6f5fd8856c4a/full_encoder_small_decoder.safetensors) | Complete image encoder and the smaller FLUX.2 decoder. |
+| `vae` | [`full_encoder_small_decoder.safetensors`](https://huggingface.co/black-forest-labs/FLUX.2-small-decoder/resolve/a3efc24f613ef42d9428af62fdbd6f5fd8856c4a/full_encoder_small_decoder.safetensors) | Complete image encoder and the smaller FLUX.2 decoder. |
 | `llm` | [Qwen3-4B-Q8_0.gguf](https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/bc640142c66e1fdd12af0bd68f40445458f3869b/Qwen3-4B-Q8_0.gguf) | Qwen3-4B text conditioning inside the image engine. |
 
 The selected upstream records identify these resources as Apache-2.0. The

@@ -280,6 +280,23 @@ until actual unload or shutdown completes. See
 [local image generation](local-image-generation.md) for selection, complete
 results and CPU/Metal platform boundaries.
 
+### Injected native speech engines
+
+An application-owned service factory can return
+`createSpeechService({stt,tts,signal})` from `arcane-os/core/speech`, supplying
+either role or both. Include that factory through the existing
+`native.services` and `package.nativeResources` composition above. The host
+constructs its selected engines; this shared service installs no engine,
+downloads no model and selects no browser or native speech default.
+
+Core starts both configured role loads independently and remains responsive.
+`speech.status` and replaying service subscriptions report actual loaded-model
+state separately for transcription and synthesis. Complete requests/results
+are forwarded unchanged. Request cancellation reaches its engine independently
+of the service lifetime; `close`/`drain` abort and join both engines and their
+pending work. Engines must settle cancelled inference before Core reaches
+service cleanup. See the [engine interface, progress and shutdown contract](native-speech.md).
+
 ## Windows executable
 
 The ordinary application command is:
@@ -313,12 +330,24 @@ host output; downstream applications use the published package and matching
 release asset. `doctor()` reports the selected prerequisites and missing files;
 it does not download the host or probe the installed WebView runtime.
 
-The assembled directory contains `Arcane.exe`, the unchanged `app/` payload,
-Core runtime and semantic `arcane-native.json`. Launch `Arcane.exe` on Windows
-x64 with the Microsoft Edge WebView2 Runtime installed. It opens the selected
+The assembled directory contains the app-named launcher, its matching
+`.exe.config`, the unchanged `app/` payload, Core runtime and semantic
+`arcane-native.json`. `manifest.host.executable` is the authoritative relative
+launcher name for shortcuts and direct launch. Assembly uses
+`appDescriptor.displayName` plus `.exe`, such as `Moon Cheese Hotline.exe`;
+low-level compositions without a nonempty string display name use the app ID.
+Windows-reserved filename characters and controls become underscores, and
+reserved DOS device basenames receive an underscore prefix. Supported Unicode,
+case and spaces remain; the original descriptor and title are unchanged.
+The reusable host archive/cache retains `Arcane.exe` and `Arcane.exe.config`;
+the internal `runtime/ArcaneCore.exe` also keeps its original name.
+
+Launch the manifest-selected executable on Windows x64 with the Microsoft
+Edge WebView2 Runtime installed. It opens the selected
 app in WebView2 and owns its framed connection to the bundled Core process.
 `verify()` observes the assembled files and manifest; it does not execute the
-window or prove application behavior. `run()` launches the executable and
+window or prove application behavior. `run()` reads the saved manifest and
+launches that executable, so existing generic-name artifacts remain usable. It
 observes complete diagnostics and exit. Cancelling that operation closes its
 input, allowing the window and accepted Core service work to drain without a
 forced process termination.
@@ -331,7 +360,7 @@ into a derived `runtime/arcane-app.ico` with 16, 32, 48 and 256-pixel images.
 Aspect ratio and transparency are preserved. An ICO selection keeps its
 authored image set. The original application asset remains unchanged.
 
-The provider embeds the selected images in the copied `Arcane.exe` and records
+The provider embeds the selected images in the copied app-named executable and records
 `manifest.host.icon` and `manifest.host.executableIcon:true`. It replaces the
 executable's main icon group while preserving other groups, languages, resources
 and file content. Conversion uses Node standard capabilities on every assembly
@@ -390,7 +419,7 @@ for the facade and browser behavior.
 For explicit user-selected workspace/state locations, launch:
 
 ```sh
-Arcane.exe --arcane-launch-config path/to/launch.json
+"Moon Cheese Hotline.exe" --arcane-launch-config path/to/launch.json
 ```
 
 The complete JSON object reaches the service factories as their second

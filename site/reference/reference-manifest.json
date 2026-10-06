@@ -3,16 +3,16 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.62.0",
+    "sdk": "0.63.0",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
   "counts": {
-    "markdownPages": 42,
+    "markdownPages": 44,
     "collectionPages": 2,
     "generatedPages": 95,
     "runtimeModulePages": 93,
-    "htmlPages": 139,
+    "htmlPages": 141,
     "inventories": 4
   },
   "pages": [
@@ -227,6 +227,12 @@
       "kind": "markdown"
     },
     {
+      "source": "docs/reference/local-image-flux.md",
+      "output": "site/reference/local-image-flux/index.html",
+      "route": "reference/local-image-flux/",
+      "kind": "markdown"
+    },
+    {
       "source": "docs/reference/local-image-generation.md",
       "output": "site/reference/local-image-generation/index.html",
       "route": "reference/local-image-generation/",
@@ -242,6 +248,12 @@
       "source": "docs/reference/model-assets.md",
       "output": "site/reference/model-assets/index.html",
       "route": "reference/model-assets/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/native-speech.md",
+      "output": "site/reference/native-speech/index.html",
+      "route": "reference/native-speech/",
       "kind": "markdown"
     },
     {

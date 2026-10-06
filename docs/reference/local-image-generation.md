@@ -41,6 +41,12 @@ model's resource metadata; runtime installation does not independently download
 or bundle model files. The shared model asset owner prepares selected browser
 assets and supplies a Core working projection for native path-based loading.
 
+`flux2-klein-4b` selects the three-resource distilled FLUX.2 Klein definition.
+Its [family guide](local-image-flux.md) covers diffusion/VAE/Qwen preparation,
+four-step defaults and the advertised `txt2img` operation. Keep each model's
+supported operations distinct: selecting FLUX does not enable reference-image
+editing or imply the same input path as SD1.4 img2img.
+
 The first published distribution path selects CPU on Windows and Linux.
 On macOS, `auto` selects the same upstream universal runtime's built-in Metal
 backend, with CPU fallback; explicit `cpu` remains available. A caller-supplied

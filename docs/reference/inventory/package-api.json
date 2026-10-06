@@ -1,17 +1,45 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.62.0",
+  "sdkVersion": "0.63.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 274,
+  "memberCount": 276,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
   },
   "members": [
+    {
+      "id": "core-speech:createSpeechService",
+      "name": "createSpeechService",
+      "displayName": "createSpeechService()",
+      "kind": "function",
+      "signature": "createSpeechService({stt,tts,signal}={})",
+      "entrypoints": ["arcane-os/core/speech"],
+      "primaryImport": "arcane-os/core/speech",
+      "group": "Core native speech",
+      "summary": "Composes host-supplied transcription and synthesis engines with independent loading and role readiness.",
+      "availability": "Node Core with explicitly supplied engines; engine platform, model and format support remain engine-owned",
+      "protocol": "arcane/1 speech.status/transcribe/synthesize with speech.state/progress",
+      "normalization": "Returns current/subscribe/close/start/methods/drain/dispose; forwards complete requests and results unchanged; replaying service state, synchronous accepted Thinking, combined request/lifetime cancellation and concurrent joined engine shutdown; no engine installation or automatic provider selection"
+    },
+    {
+      "id": "core-speech:default",
+      "name": "default",
+      "displayName": "createSpeechService default export",
+      "kind": "function",
+      "signature": "default as createSpeechService",
+      "entrypoints": ["arcane-os/core/speech"],
+      "primaryImport": "arcane-os/core/speech",
+      "group": "Core native speech",
+      "summary": "Default binding for the same injected-engine native speech service factory.",
+      "availability": "Node Core with host-supplied engines",
+      "protocol": "arcane/1 service definition",
+      "normalization": "Binding identity equals the named createSpeechService export"
+    },
     {
       "id": "local-ai-image:createImageRuntime",
       "name": "createImageRuntime",
@@ -4150,7 +4178,7 @@
       "summary": "Assembles selected application services and browser content with the SDK-owned Windows x64 WebView2 and SEA host.",
       "availability": "Node for assembly; Windows x64 with WebView2 Runtime for execution",
       "protocol": "arcane-native-builder/1 windows-x64 provider",
-      "normalization": "Uses a selected hostDirectory or the exact installed SDK version's numeric release asset; preserves complete payloads; native.icon PNG/ICO derives the copied executable and host.icon without an app compiler, while other formats retain assembly with native.icon.unsupported and executableIcon:false; the matching host loads the selected window/taskbar icon and handles window.setTheme with per-field applied/unsupported results; run cancellation closes stdin and waits for host-owned graceful shutdown"
+      "normalization": "Uses a selected hostDirectory or the exact installed SDK version's numeric release asset; preserves complete payloads; app displayName plus .exe (app ID fallback) and matching .exe.config use Windows filename substitutions only; manifest.host.executable owns inventory, icon, verify and run while generic cache/Core names remain unchanged; native.icon PNG/ICO derives the copied executable and host.icon without an app compiler, while other formats retain assembly with native.icon.unsupported and executableIcon:false; the matching host loads the selected window/taskbar icon and handles window.setTheme with per-field applied/unsupported results; run cancellation closes stdin and waits for host-owned graceful shutdown"
     },
     {
       "id": "native-windows-provider:arcaneNativeBuilderProvider",

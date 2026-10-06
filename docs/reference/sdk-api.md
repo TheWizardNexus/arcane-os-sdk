@@ -69,6 +69,7 @@ runtime layouts.
 | `arcane-os/local-ai/image` | Retained native stable-diffusion.cpp context, complete PNG generation and owned worker lifetime. |
 | `arcane-os/ai/core-image` | Browser image lifecycle and complete PNG Blobs through an available Core service. |
 | `arcane-os/core/image` | Native image Core service with independent runtime preparation and retained model ownership. |
+| `arcane-os/core/speech` | Independent injected STT/TTS engine loading, request cancellation and joined Core service lifetime. |
 | `arcane-os/ai/core-model-assets` | Complete stored browser model members projected through Core into native working files. |
 | `arcane-os/core/model-assets` | Native working-file preparation, engine retain handles and joined cleanup. |
 | `arcane-os/integrated-provider` | Fixed integrated shared-development provider. |
@@ -412,6 +413,8 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `createCoreImageRuntime()` | function | `arcane-os/ai/core-image` | Core local images | Browser with an available Core image service |
 | `createLocalImageService()` | function | `arcane-os/core/image` | Core local images | Node Core with selected stable-diffusion.cpp requirements |
 | `createLocalImageService default export` | function | `arcane-os/core/image` | Core local images | Same native image service factory |
+| `createSpeechService()` | function | `arcane-os/core/speech` | Core native speech | Node Core with explicitly supplied speech engines |
+| `createSpeechService default export` | function | `arcane-os/core/speech` | Core native speech | Same shared speech service factory |
 | `prepareCoreModelAssets()` | function | `arcane-os/ai/core-model-assets` | Core model assets | Browser with complete Blob/File members and available Core service |
 | `createModelAssetService()` | function | `arcane-os/core/model-assets` | Core model assets | Node Core with an application-selected working directory |
 | `createModelAssetService default export` | function | `arcane-os/core/model-assets` | Core model assets | Same native working-file service factory |
@@ -7421,11 +7424,22 @@ application builds. The build machine needs its normal Node/npm toolchain and
 The returned `arcane-native-builder/1` provider exposes `describe`, `doctor`,
 `prepare`, `build`, `verify` and `run`. Build returns `{app,target,manifest}`
 with the actual directory at `target.rootDir`. Verification reads the artifact;
-it does not launch the window. Run launches `Arcane.exe` and observes complete
-diagnostics and exit. Cancellation closes input and waits for host-owned drain,
+it does not launch the window. Run launches the executable recorded in the
+saved `manifest.host.executable` and observes complete diagnostics and exit.
+Cancellation closes input and waits for host-owned drain,
 including accepted service work, without a forced termination deadline. Missing
 prerequisites, download/extraction failures and host failures remain observable
 through the operation's error/event boundary.
+
+Assembly names the launcher from `appDescriptor.displayName` plus `.exe`,
+with a matching `.exe.config` file. Low-level compositions without a nonempty
+string display name use the app ID. Windows-reserved filename characters and
+control characters become underscores; reserved DOS device basenames receive
+an underscore prefix. Supported Unicode, spaces and case remain, as do the
+original descriptor and title. Icon embedding, file inventory, verification
+and run use this same name. Existing artifacts retain the executable recorded
+in their manifest; the reusable downloaded host retains `Arcane.exe` and
+`Arcane.exe.config`, and `runtime/ArcaneCore.exe` remains unchanged.
 
 During assembly, `appDescriptor.native.icon` selects the app's existing image.
 PNG and ICO inputs produce a derived `runtime/arcane-app.ico` and update only
@@ -7880,6 +7894,92 @@ selected model and native engine.
 
 The default export from `arcane-os/core/image` is the same
 `createLocalImageService` factory and lifecycle described above.
+
+## createSpeechService()
+
+### Overview and usage
+
+`createSpeechService({stt,tts,signal}={})` from `arcane-os/core/speech` composes
+independently selected STT and TTS engines as one Core service. Supply either
+role or both. Construction downloads, installs and loads nothing; the host
+owns engine creation, model/device selection and supported formats.
+
+```javascript
+import {createCoreRuntime} from 'arcane-os/core/runtime';
+import {createSpeechService} from 'arcane-os/core/speech';
+
+// transcriptionEngine is the host's already constructed, selected engine.
+const speech = createSpeechService({stt: transcriptionEngine});
+const core = createCoreRuntime({services: [speech]});
+core.start();
+```
+
+Each supplied engine exposes `current()`, replaying `subscribe(listener)`,
+`load({signal})`, `close()` and its role's
+`transcribe(request,{signal,onProgress})` or
+`synthesize(request,{signal,onProgress})`. The service forwards complete
+requests and results unchanged. Format decoding, model processing and encoding
+remain with that engine. This factory supplies no speech engine or automatic
+browser/native provider selection.
+
+### Members, results and events
+
+The returned object has `name: 'speech'`, `current`, `subscribe`, `close`,
+`start`, `methods`, `drain` and `dispose`:
+
+- `start(context)` subscribes and starts both configured engine loads
+  independently, returning immediately. Core and status remain responsive
+  during loading; one role's failure leaves the other usable.
+- `current()` and `methods['speech.status']()` return the same snapshot:
+  `ready`, `transcriptionAvailable`, `synthesisAvailable`, `status`,
+  `sttEngine`, `ttsEngine`, `roles.stt`, `roles.tts` and `closed`.
+  `ready` requires both roles; each independent availability flag requires
+  its model loaded in `ready` or `running` state while the service accepts work.
+  `status` is `created`, `ok`, `closing` or `closed`; per-role state carries
+  model loading, progress and complete errors. An omitted role is unavailable.
+- `subscribe(listener,{replay=true,signal}={})` replays current state by
+  default and returns an unsubscribe function. Its signal owns only that
+  subscription; a closed service can replay its final snapshot.
+- `methods['speech.transcribe'](request,context)` and
+  `methods['speech.synthesize'](request,context)` are registered as the matching
+  Core RPC methods. The context supplies `signal`, `requestId` and `emit`.
+  The service publishes synchronous accepted `Thinking` before waiting for
+  its role's load, then forwards the engine's complete progress and result.
+- `close()` and its `drain()` alias stop acceptance, abort the service lifetime,
+  close both engines concurrently and await startup and request work. Repeated
+  calls share one promise. `dispose()` also releases event subscriptions.
+
+`speech.state` carries the complete snapshot. `speech.progress` carries
+`{requestId,role,status:'Thinking',progress}` with initial
+`progress:{phase:'accepted'}`. The service's subscription replays state; Core's
+generic runtime replay does not replay this custom event. Browser consumers
+subscribe before requesting `Arcane.speech.status()` and preserve any newer
+state event received while that request is pending.
+
+### Cancellation, errors and availability
+
+The optional factory signal owns the service lifetime. A request signal is
+combined with that lifetime and reaches its selected engine. Cancelling one
+request waiting for a shared load settles that request without cancelling
+the other requests or role. No later cancelled progress or result is delivered.
+Actual queued/running native interruption belongs to the engine; it must settle
+before Core reaches service shutdown, because Core first cancels and awaits
+active requests.
+
+Invalid engine interfaces or listeners throw `TypeError`. Missing roles reject
+their operation with `SPEECH_ENGINE_UNAVAILABLE`; work after shutdown begins
+rejects with `CORE_CLOSING`. Engine errors remain observable, and engine cleanup
+failures reject shutdown with `AggregateError`. Asynchronous listener failures
+reach developer diagnostics. Engine platform support remains its own contract;
+this Node composition layer adds no engine dependency. Existing AI readiness
+consumers recognize `whisper.cpp` and `kokoro-onnx` IDs independently of the
+service's engine-neutral interface. See the [complete engine and lifetime
+contract](native-speech.md).
+
+## createSpeechService default export
+
+The default export from `arcane-os/core/speech` is the same
+`createSpeechService` factory, with identical inputs, results and lifecycle.
 
 ## prepareCoreModelAssets()
 

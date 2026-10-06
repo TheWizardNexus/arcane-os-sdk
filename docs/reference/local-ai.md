@@ -43,14 +43,17 @@ preserved when its version cannot be established.
 
 Both public application/package schemas accept `stable-diffusion.cpp` as a
 string or runtime-record ID. Its record additionally accepts `backend`
-(`auto`, `cpu` or `metal`) and `models`, an array of `sd14` or complete model
-descriptors. Omitted image version selects `master-929-3f8527a`; omitted backend
+(`auto`, `cpu` or `metal`) and `models`, an array of `sd14`, `flux2-klein-4b` or
+complete model descriptors. Omitted image version selects `master-929-3f8527a`; omitted backend
 selects `auto`; omitted models leaves model selection empty. Windows/Linux
 distribution defaults use CPU; the selected universal Mac archive supports
 Metal with CPU fallback. Installation obtains the upstream library and its
 managed `koffi@3.3.2` binding, without installing a model. Complete model
 descriptors keep their resources, context, defaults and operations separate.
 See [image selection and model preparation](local-image-generation.md#selection-and-model-assets).
+The [FLUX.2 Klein 4B guide](local-image-flux.md) describes its diffusion model,
+VAE and Qwen text-conditioning resources, four-step defaults and `txt2img`
+operation. Each model retains its own supported operation set.
 
 `llamaCpp` accepts `url`, `model`, `modelsDirectory`, and an `args` string array.
 `model` selects a single GGUF file; `modelsDirectory` selects llama.cpp router
