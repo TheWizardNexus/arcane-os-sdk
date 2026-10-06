@@ -2091,8 +2091,8 @@ function scanHtmlStructure(html){
     return {scripts,links,bases,metas,elements,styles,headClose,bodyClose};
 }
 
-/** Remove generated PWA references from a selected output document without changing authored content. */
-export function removePwaEntryReferences(html, {documentUrl, manifestUrl} = {}) {
+/** Retire active PWA references; source refresh may restrict removal to marked ownership. */
+export function removePwaEntryReferences(html, {documentUrl, manifestUrl, markedManifestOnly = false} = {}) {
     if (!is.string(html)) throw new TypeError('PWA entry HTML must be a string.');
     const structure = scanHtmlStructure(html);
     const manifest = new URL(manifestUrl, documentUrl);
@@ -2106,6 +2106,7 @@ export function removePwaEntryReferences(html, {documentUrl, manifestUrl} = {}) 
     const edits = [];
     for (const link of structure.links) {
         const attributes = parseTagAttributes(link.open);
+        if (markedManifestOnly && !attributes.has('data-arcane-manifest')) continue;
         const href = htmlAttributeView(attributes.get('href') ?? '');
         const rel = htmlAttributeView(attributes.get('rel') ?? '');
         if (!href?.decoded || !rel) continue;
@@ -2152,7 +2153,7 @@ export function removePwaEntryReferences(html, {documentUrl, manifestUrl} = {}) 
 }
 
 /** Update only active PWA entry references; registration never orders application startup. */
-export function applyPwaEntryReferences(html,{manifestUrl,bootstrapUrl}={}){
+export function applyPwaEntryReferences(html,{manifestUrl,bootstrapUrl,markGeneratedManifest=false}={}){
     if(!is.string(html))throw new TypeError('PWA entry HTML must be a string.');
     if(!is.string(manifestUrl)||!manifestUrl||!is.string(bootstrapUrl)||!bootstrapUrl){
         throw new TypeError('PWA manifestUrl and bootstrapUrl must be nonempty strings.');
@@ -2223,7 +2224,10 @@ export function applyPwaEntryReferences(html,{manifestUrl,bootstrapUrl}={}){
             });
         }
     }
-    if(!manifestFound)additions.push(`<link rel="manifest" href="${attributeText(manifestUrl)}">`);
+    if(!manifestFound){
+        const marker=markGeneratedManifest?' data-arcane-manifest':'';
+        additions.push(`<link rel="manifest" href="${attributeText(manifestUrl)}"${marker}>`);
+    }
     let bootstrapFound=false;
     for(const script of structure.scripts){
         if(!parseTagAttributes(script.open).has('data-arcane-pwa'))continue;

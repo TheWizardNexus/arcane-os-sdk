@@ -359,6 +359,119 @@ test('root-only output also omits navigation when PWA is disabled',async functio
     await assert.rejects(stat(path.join(packaged.outputRoot,'apps')),{code:'ENOENT'});
 });
 
+for(const dependencyName of ['arcane-os','arcane-sdk']){
+    test(`root ${dependencyName} retires only marked source PWA references by default`,async function markedSourcePwaRetirement(context){
+        const fixture=await rootFixture(context,dependencyName);
+        const {workspaceRoot,appId}=fixture;
+        const toolchain=createToolchain({workspaceRoot,appId});
+        await toolchain.importMap({});
+        const names=['arcane.webmanifest','arcane-offline.json','arcane-sw.js','arcane-pwa.mjs'];
+        const retainedFiles=new Map();
+        for(const name of names)retainedFiles.set(name,await readFile(path.join(workspaceRoot,name),'utf8'));
+        // Source files with these names may be authored; disabling PWA alone never deletes them.
+        const authoredManifest='{ "name": "A complete authored replacement" }\n';
+        await writeText(workspaceRoot,'arcane.webmanifest',authoredManifest);
+        retainedFiles.set('arcane.webmanifest',authoredManifest);
+        const unmarked='<link rel="manifest" href="/arcane.webmanifest" data-author="retained">';
+        const ordinaryScript='<script type="module" src="./modules/App.js"></script>';
+        const rootBefore=await readFile(path.join(workspaceRoot,'index.html'),'utf8');
+        await writeText(workspaceRoot,'index.html',rootBefore.replace('</head>',`${unmarked}</head>`));
+        await writeJson(workspaceRoot,'arcane-package.json',{
+            ...fixture.manifest,pwa:{enabled:false}
+        });
+        await toolchain.importMap({});
+        const after=new Map();
+        for(const document of ['index.html','pages/review.html','pages/other.htm']){
+            const content=await readFile(path.join(workspaceRoot,document),'utf8');
+            assert.equal(content.includes('data-arcane-pwa'),false,document);
+            assert.equal(content.includes('data-arcane-manifest'),false,document);
+            assert.ok(content.includes(ordinaryScript),document);
+            assert.ok(content.includes('<main>  The turnips retain every word.  </main>'),document);
+            after.set(document,content);
+        }
+        assert.ok(after.get('index.html').includes(unmarked));
+        await toolchain.importMap({});
+        for(const [document,content] of after)assert.equal(await readFile(path.join(workspaceRoot,document),'utf8'),content);
+        for(const [name,content] of retainedFiles)assert.equal(await readFile(path.join(workspaceRoot,name),'utf8'),content);
+        assert.equal(await readFile(path.join(workspaceRoot,'content/fragment.html'),'utf8'),fixture.fragment);
+    });
+
+    test(`root ${dependencyName} explicitly retires confirmed prior generated PWA output and can re-enable it`,async function confirmedSourcePwaRetirement(context){
+        const fixture=await rootFixture(context,dependencyName);
+        const {workspaceRoot,appId}=fixture;
+        const toolchain=createToolchain({workspaceRoot,appId});
+        const names=['arcane.webmanifest','arcane-offline.json','arcane-sw.js','arcane-pwa.mjs'];
+        await toolchain.importMap({});
+        const documents=['index.html','pages/review.html','pages/other.htm'];
+        for(const document of documents){
+            // Older SDK source generation did not mark its manifest link.
+            const content=(await readFile(path.join(workspaceRoot,document),'utf8')).replace(' data-arcane-manifest','');
+            await writeText(workspaceRoot,document,content);
+        }
+        const authoredManifest='{ "name": "The separate authored application manifest" }\n';
+        await writeText(workspaceRoot,'manifest.json',authoredManifest);
+        await writeJson(workspaceRoot,'arcane-package.json',{
+            ...fixture.manifest,pwa:{enabled:false}
+        });
+        const events=[];
+        await toolchain.importMap({retireGeneratedPwa:true,onEvent:event=>events.push(event)});
+        assert.deepEqual(events.find(event=>event.type==='import-map.root-files.completed').retiredPwa,names);
+        for(const name of names)await assert.rejects(stat(path.join(workspaceRoot,name)),{code:'ENOENT'});
+        const after=new Map();
+        for(const document of documents){
+            const content=await readFile(path.join(workspaceRoot,document),'utf8');
+            assert.equal(content.includes('rel="manifest"'),false,document);
+            assert.equal(content.includes('data-arcane-pwa'),false,document);
+            assert.ok(content.includes('<main>  The turnips retain every word.  </main>'),document);
+            assert.ok(content.includes('data-arcane-import-map'),document);
+            after.set(document,content);
+        }
+        await toolchain.importMap({retireGeneratedPwa:true});
+        for(const [document,content] of after)assert.equal(await readFile(path.join(workspaceRoot,document),'utf8'),content);
+        assert.equal(await readFile(path.join(workspaceRoot,'manifest.json'),'utf8'),authoredManifest);
+        assert.equal(await readFile(path.join(workspaceRoot,'content/fragment.html'),'utf8'),fixture.fragment);
+        assert.equal(await readFile(path.join(workspaceRoot,'modules/App.js'),'utf8'),fixture.module);
+        for(const [relative,content] of fixture.resources)assert.equal(await readFile(path.join(fixture.packageRoot,relative),'utf8'),content);
+
+        await writeJson(workspaceRoot,'arcane-package.json',fixture.manifest);
+        // A retained operation option cannot retire output while the descriptor enables PWA.
+        await toolchain.importMap({retireGeneratedPwa:true});
+        for(const name of names)assert.ok((await stat(path.join(workspaceRoot,name))).isFile());
+        for(const document of documents){
+            const content=await readFile(path.join(workspaceRoot,document),'utf8');
+            assert.ok(content.includes('href="/arcane.webmanifest" data-arcane-manifest'),document);
+            assert.equal([...content.matchAll(/data-arcane-pwa/gu)].length,1,document);
+        }
+    });
+}
+
+test('source retirement requires disabled configuration and preserves unselected pages',async function selectedSourcePwaRetirement(context){
+    const fixture=await rootFixture(context,'arcane-os');
+    const {workspaceRoot,appId}=fixture;
+    const toolchain=createToolchain({workspaceRoot,appId});
+    await toolchain.importMap({});
+    const documents=['index.html','pages/review.html','pages/other.htm'];
+    const originals=new Map();
+    for(const document of documents)originals.set(document,await readFile(path.join(workspaceRoot,document),'utf8'));
+    const {pwa,...withoutPwa}=fixture.manifest;
+    await writeJson(workspaceRoot,'arcane-package.json',withoutPwa);
+    await toolchain.importMap({retireGeneratedPwa:true});
+    for(const [document,content] of originals)assert.equal(await readFile(path.join(workspaceRoot,document),'utf8'),content);
+    for(const name of ['arcane.webmanifest','arcane-offline.json','arcane-sw.js','arcane-pwa.mjs']){
+        assert.ok((await stat(path.join(workspaceRoot,name))).isFile());
+    }
+    await writeJson(workspaceRoot,'arcane-package.json',{
+        ...fixture.manifest,documents:['pages/review.html'],pwa:{enabled:false}
+    });
+    await toolchain.importMap({});
+    const selected=await readFile(path.join(workspaceRoot,'pages/review.html'),'utf8');
+    assert.equal(selected.includes('data-arcane-pwa'),false);
+    assert.equal(selected.includes('data-arcane-manifest'),false);
+    for(const document of ['index.html','pages/other.htm']){
+        assert.equal(await readFile(path.join(workspaceRoot,document),'utf8'),originals.get(document));
+    }
+});
+
 test('nested direct-installed apps retain established aliases alongside package paths',async function nestedDirectAliases(context){
     const fixture=await rootFixture(context,'arcane-os');
     const {workspaceRoot,packageSource,sdkVersion}=fixture;

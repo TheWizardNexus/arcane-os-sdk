@@ -564,6 +564,43 @@ test(
     }
 );
 
+test('source PWA retirement distinguishes marked generation from authored manifest links',function sourcePwaOwnership(){
+    const options={
+        manifestUrl:'/arcane.webmanifest',bootstrapUrl:'/arcane-pwa.mjs',markGeneratedManifest:true
+    };
+    const fresh='<head><base href="../"></head><body>  Complete testimony.  </body>\r\n';
+    const generated=applyPwaEntryReferences(fresh,options);
+    const manifest='<link rel="manifest" href="/arcane.webmanifest" data-arcane-manifest>';
+    const bootstrap='<script type="module" async data-arcane-pwa src="/arcane-pwa.mjs"></script>';
+    assert.ok(generated.includes(manifest));
+    assert.equal(applyPwaEntryReferences(generated,options),generated);
+    const removal={
+        documentUrl:'https://source.example/pages/review.html',
+        manifestUrl:'/arcane.webmanifest',markedManifestOnly:true
+    };
+    assert.equal(removePwaEntryReferences(generated,removal),generated.replace(manifest,'').replace(bootstrap,''));
+
+    const authored='<link rel="manifest" href="authored.webmanifest" data-owner="author">';
+    const updated=applyPwaEntryReferences(`<head>${authored}</head>`,options);
+    assert.equal(updated.includes('data-arcane-manifest'),false);
+    assert.equal(removePwaEntryReferences(updated,removal),updated.replace(bootstrap,''));
+
+    const mixed='<link rel="icon man&#105;fest" href="../arcane.webmanifest?mode=kept#install" data-arcane-manifest data-name="kept">';
+    const retained=[
+        '<link rel="manifest" href="/arcane.webmanifest">',
+        '<link rel="manifest" href="https://other.example/arcane.webmanifest" data-arcane-manifest>',
+        '<link rel="manifest" href="/authored.webmanifest" data-arcane-manifest>',
+        '<!-- <link rel="manifest" href="/arcane.webmanifest" data-arcane-manifest> -->',
+        '<template><link rel="manifest" href="/arcane.webmanifest" data-arcane-manifest><script data-arcane-pwa>keep()</script></template>',
+        '<script type="module" src="/authored.mjs"></script>'
+    ].join('\r\n');
+    const source=`<head>${mixed}\r\n${bootstrap}\r\n${retained}</head>`;
+    const expected=source.replace('icon man&#105;fest','icon ').replace(bootstrap,'');
+    const retired=removePwaEntryReferences(source,removal);
+    assert.equal(retired,expected);
+    assert.equal(removePwaEntryReferences(retired,removal),retired);
+});
+
 test('PWA import-map generation uses clean URLs without changing shared runtime source',async function pwaWorkspaceProjection(t){
     const workspace=await temporaryDirectory(t);
     await writeFile(path.join(workspace,'arcane.lock.json'),JSON.stringify({sdk:{version:'2.3.4'}}),'utf8');

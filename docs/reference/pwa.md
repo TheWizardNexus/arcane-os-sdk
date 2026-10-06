@@ -94,13 +94,80 @@ packaging use that layout directly:
   packaged installation ID remains `./`, and an explicit `manifest.id` remains
   authoritative. An ID identifies the installation; it does not generate a
   directory or a redirect.
-- Authored resources follow their normal include/exclude selection. Generation
-  does not delete existing files, stored application data, or worker caches.
+- Authored resources follow their normal include/exclude selection. Ordinary
+  generation preserves existing files, stored application data, and worker caches.
+  Explicit retirement of confirmed generated source output is described below.
 
 Generated and offline app files are committed. GitHub Actions consume those
 committed files rather than generating them. Actual multi-app workspaces keep
 their explicit `appsRoot: "apps"` layout. This source/package contract does not
 establish any particular installed application's browser lifecycle.
+
+### Disable source PWA generation and retire generated output
+
+Set `package.pwa.enabled:false` in `arcane-app.json` (or `pwa.enabled:false` in
+an authored schema-1 `arcane-package.json`), then run the public import-map
+operation. For standalone `appsRoot:"."` applications, disabled refresh removes
+active `data-arcane-pwa` registration scripts and matching manifest relationships
+marked `data-arcane-manifest` from the selected application documents. Root source
+generation marks only manifest links it newly inserts; it does not claim an
+existing unmarked link as its own. A wholly omitted `pwa` record does not select
+source retirement.
+
+By default, unmarked manifest references and all existing PWA files remain in
+place. This preserves authored resources that happen to use the standard names.
+Older SDK source generation emitted an unmarked manifest link. When the
+application owner has established that this link and the four standard root
+outputs are SDK-generated, use the same public toolchain with an explicit
+ownership declaration:
+
+```js
+import {createToolchain} from 'arcane-os';
+
+const toolchain = createToolchain({workspaceRoot: process.cwd(), appId: 'my-app'});
+await toolchain.importMap({retireGeneratedPwa: true});
+```
+
+Before retirement, remove any explicit entries for these generated outputs from
+the application's `package.include` selection. They are generated output, not
+required source input; leaving a deleted file as a required input would make the
+next inspection fail. Keep authored selection changes with the application
+owner. Confirm that unselected documents or separately hosted pages do not still
+need the retiring files; this operation does not rewrite those pages.
+
+With PWA disabled, `retireGeneratedPwa:true` also removes selected-document
+manifest relationships resolving to the root `arcane.webmanifest`, including
+older unmarked generated links, and deletes exactly these confirmed generated
+files at the application root:
+
+- `arcane.webmanifest`
+- `arcane-offline.json`
+- `arcane-sw.js`
+- `arcane-pwa.mjs`
+
+The option is an application-owner declaration of generated ownership, not a
+filename-based inference. Omit it when any listed file or matching manifest
+reference is authored or its ownership is unknown. It is available through
+`createToolchain().importMap()` and `executeOperation('import-map', options)`;
+there is no new CLI flag. The ordinary CLI refresh performs marked-reference
+retirement only. An enabled descriptor ignores this retirement option and
+continues normal generation.
+
+With the source selection updated, repeated retirement accepts already-absent
+generated files. The
+`import-map.root-files.completed` event reports the paths actually removed in
+`retiredPwa`. Re-enabling PWA regenerates its normal root output and references.
+The operation leaves other files (including a separate `manifest.json`), other
+link relationships, inactive HTML, unselected documents, SDK mappings, and
+application content unchanged. It never unregisters an already registered
+service worker, clears caches, or changes browser saved data. Existing browser
+registrations therefore keep their own lifecycle; source retirement is not a
+claim that an installed browser PWA was removed. Package-output behavior below
+is unchanged.
+
+Reference updates finish before file removal begins. Cancellation or a file
+error is reported without undoing earlier completed changes; a later call can
+finish retirement. The operation does not claim an all-or-nothing transaction.
 
 ### Authored host root and app entry
 

@@ -1,7 +1,7 @@
 import Is from 'strong-type';
 import path from 'node:path';
 import {resolveAppRoot,resolvePackageOutputRoot} from './app-layout.mjs';
-import {readdir,lstat,realpath,mkdir,readFile,writeFile} from 'node:fs/promises';
+import {readdir,lstat,realpath,mkdir,readFile,writeFile,unlink} from 'node:fs/promises';
 import {createWorkspace,initWorkspace} from './scaffold.mjs';
 import {
     discoverApps as discoverWorkspaceApps,
@@ -12,8 +12,14 @@ import {
 } from './workspace.mjs';
 import {loadArcaneIntegratedProvider} from './integrated-provider-loader.mjs';
 import {collectSourcePwaAssets,startDevServer} from './dev-server.mjs';
-import {applyPwaEntryReferences,generateImportMap,readApplicationTestImportMapContext} from './import-map.mjs';
-import {createPwaArtifacts} from './pwa.mjs';
+import {applyPwaEntryReferences,generateImportMap,readApplicationTestImportMapContext,removePwaEntryReferences} from './import-map.mjs';
+import {
+    createPwaArtifacts,
+    PWA_MANIFEST_NAME,
+    PWA_OFFLINE_MANIFEST_NAME,
+    PWA_WORKER_NAME,
+    PWA_BOOTSTRAP_NAME
+} from './pwa.mjs';
 import {readInstalledSdkLayout} from './sdk-runtime-layout.mjs';
 import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
 import {refreshAppPackageProjection} from './app-descriptor.mjs';
@@ -293,7 +299,7 @@ async function validatePreparedRuntime(prepared,{signal}={}){
     return validation;
 }
 
-async function refreshPreparedImportMap(prepared,{signal,onEvent,workspaceOperationLease}={}){
+async function refreshPreparedImportMap(prepared,{signal,onEvent,workspaceOperationLease}={},retireGeneratedPwa=false){
     const manifest=prepared.validation.app.manifest;
     const inspected=await inspectPackagedApp({
         workspaceRoot:prepared.workspaceRoot,
@@ -322,12 +328,12 @@ async function refreshPreparedImportMap(prepared,{signal,onEvent,workspaceOperat
         onEvent
     });
     if(prepared.validation.config.appsRoot==='.'){
-        await refreshRootApplicationFiles(prepared,inspected,importMap,{signal,onEvent});
+        await refreshRootApplicationFiles(prepared,inspected,importMap,{signal,onEvent,retireGeneratedPwa});
     }
     return importMap;
 }
 
-async function refreshRootApplicationFiles(prepared,inspected,importMap,{signal,onEvent}){
+async function refreshRootApplicationFiles(prepared,inspected,importMap,{signal,onEvent,retireGeneratedPwa=false}){
     const {workspaceRoot,appId}=prepared;
     const manifest=prepared.validation.app.manifest;
     const installed=await readInstalledSdkLayout(workspaceRoot,prepared.validation.config);
@@ -385,21 +391,44 @@ async function refreshRootApplicationFiles(prepared,inspected,importMap,{signal,
         await mkdir(path.dirname(filePath),{recursive:true});
         await writeFile(filePath,file.content,'utf8');
     }
-    if(pwa){
+    const pwaDisabled=manifest.pwa?.enabled===false;
+    const retireConfirmedOutput=pwaDisabled&&retireGeneratedPwa===true;
+    if(pwa||pwaDisabled){
         for(const document of inspected.browserDocuments){
             throwIfAborted(signal);
             const filePath=path.join(prepared.appRoot,...document.path.split('/'));
             const content=await readFile(filePath,'utf8');
-            await writeFile(filePath,applyPwaEntryReferences(content,{
+            const updated=pwa?applyPwaEntryReferences(content,{
                 manifestUrl:`/${pwa.entryAssets.manifest}`,
-                bootstrapUrl:`/${pwa.entryAssets.bootstrap}`
-            }),'utf8');
+                bootstrapUrl:`/${pwa.entryAssets.bootstrap}`,
+                markGeneratedManifest:true
+            }):removePwaEntryReferences(content,{
+                documentUrl:new URL(`/${document.path.split('/').map(encodeURIComponent).join('/')}`,sourceOrigin),
+                manifestUrl:`/${PWA_MANIFEST_NAME}`,
+                markedManifestOnly:!retireConfirmedOutput
+            });
+            if(updated!==content)await writeFile(filePath,updated,'utf8');
+        }
+    }
+    const retiredPwa=[];
+    if(retireConfirmedOutput){
+        // The caller declares these standard outputs generated, not merely same-named authored files.
+        // Remove selected references before retiring their targets; browser storage is untouched.
+        for(const relative of [PWA_MANIFEST_NAME,PWA_OFFLINE_MANIFEST_NAME,PWA_WORKER_NAME,PWA_BOOTSTRAP_NAME]){
+            throwIfAborted(signal);
+            try{
+                await unlink(path.join(workspaceRoot,relative));
+                retiredPwa.push(relative);
+            }catch(error){
+                if(error.code!=='ENOENT')throw error;
+            }
         }
     }
     await emit(onEvent,{
         type:'import-map.root-files.completed',appId,
         navigation:[],
-        pwa:pwa?.files.map(file=>file.path)??[]
+        pwa:pwa?.files.map(file=>file.path)??[],
+        retiredPwa
     });
 }
 
@@ -408,7 +437,7 @@ async function importMapApplication(options={}){
     const prepared=await preparedWorkspace({...options,allowMissingManagedImportMap:true});
     const importMap=await ownedWork(
         'import-map',
-        context=>refreshPreparedImportMap(prepared,context),
+        context=>refreshPreparedImportMap(prepared,context,options.retireGeneratedPwa===true),
         {...options,workspaceRoot:prepared.workspaceRoot}
     );
     await validatePreparedRuntime(prepared,{signal:options.signal});
