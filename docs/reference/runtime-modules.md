@@ -387,8 +387,12 @@ existing `audioFormat` when the catalog does not declare response formats. When
 the selected model declares `speech.responseFormats`, that setting is used only when supported; if
 the setting is the instance's `opus` default and the model rejects it, the catalog's
 `speech.defaultResponseFormat` is used, while any other unsupported setting is
-rejected. It propagates the caller-owned signal and returns a playable `Blob`;
-it does not independently choose a provider, cloud fallback, model, runtime, or
+rejected. It propagates the caller-owned signal and returns a playable `Blob`.
+The native `LOCAL_SPEACH` route forwards that signal separately from its
+synthesis payload to `Arcane.speech.synthesize(request, {signal})`; Core aborts
+are normalized to `AbortError` with `ARCANE_AI_REQUEST_ABORTED`. Actual engine
+interruption belongs to the registered service. It does not independently
+choose a provider, cloud fallback, model, runtime, or
 voice policy for the application. Every call removes repeated same formatting
 marks from a cloned outbound input before delegation; the caller's payload stays
 unchanged. The third `preparation` argument is reserved for SDK-internal
@@ -529,8 +533,11 @@ operation boundary, generation, and stable reason. Muting, explicit
 cancellation, permission waiting, and superseded generations do not emit a
 failure. The operation event does not rewrite provider readiness; the consuming
 Chat/Speech surface owns its visible mute and recovery state.
-`fetchSTT(audioFile,signal)` propagates the caller-owned signal;
-provider routes accept a `Blob` or `File` directly and leave media decoding,
+`fetchSTT(audioFile,signal)` propagates the caller-owned signal, including the
+native `Arcane.speech.transcribe(request, {signal})` route. The native signal
+remains separate from the complete audio request; Core aborts are normalized
+to `AbortError` with `ARCANE_AI_REQUEST_ABORTED`.
+Provider routes accept a `Blob` or `File` directly and leave media decoding,
 PCM normalization, and WAV construction to the selected shared provider;
 delivery suppression is guaranteed after abort, while underlying provider-stop
 claims remain limited to that provider's cancellation contract.

@@ -542,7 +542,7 @@ validate the speech health response.
 
 ### Speech synthesis request
 
-`Arcane.speech.synthesize(request)` accepts the portable
+`Arcane.speech.synthesize(request, options?)` accepts the portable
 `SpeechSynthesisRequest` fields below. Supply the documented primitive types and
 lowercase values; do not rely on host-specific coercion or empty-string
 defaulting.
@@ -554,6 +554,22 @@ defaulting.
 | `voice` | `string` | No | Default `"af_heart"`; `[a-z0-9][a-z0-9_-]{0,63}` | Kokoro voice. |
 | `responseFormat` | `"opus" \| "wav"` | No | Default `"opus"` | Audio format. |
 | `speed` | `number` | No | Default `1`; 0.5-2 inclusive | Speaking speed. |
+
+### Speech synthesis controls
+
+The optional second argument is `SpeechSynthesisControls`:
+
+| Field | Type | Required | Default | Description |
+|---|---|---:|---|---|
+| `signal` | `AbortSignal` | No | No caller signal | Cancels this request through Core, separately from the complete synthesis payload. The registered service owns actual engine interruption. |
+
+Existing one-argument calls retain their behavior and the 180-second timeout.
+A pre-aborted signal dispatches no request. An in-flight abort sends
+`request.cancel`, rejects with `ARCANE_REQUEST_ABORTED` and suppresses late
+responses while unrelated requests continue. Other controls properties are
+unused and do not enter the payload. `AI.fetchTTS(payload, signal)` forwards
+the signal into this native call and reports cancellation as `AbortError` with
+`ARCANE_AI_REQUEST_ABORTED`.
 
 ### Speech synthesis result
 

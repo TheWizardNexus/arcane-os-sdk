@@ -6924,13 +6924,17 @@ Import it from `arcane-os/core/client`. The result includes `runtime`, `events`,
 `Error` and the existing `ai`, `environment`, `mail`, `speech`, `localAI`,
 `ollama`, application, platform, storage and other host namespaces.
 
-`facade.speech.synthesize(request, {signal})` accepts an optional `AbortSignal`
-through the same correlated request lifetime. The complete request and existing
-180,000 ms timeout remain unchanged. A pre-aborted signal sends no synthesis
+`facade.speech.synthesize(request, {signal})` and
+`facade.speech.transcribe(request, {signal})` accept an optional `AbortSignal`
+through the same correlated request lifetime. Each complete request and existing
+180,000 ms timeout remain unchanged. A pre-aborted signal sends no speech
 request; an in-flight abort emits that request's `request.cancel`, rejects with
 `ARCANE_REQUEST_ABORTED` and leaves unrelated requests active. Late responses
-cannot settle the cancelled request. Actual native synthesis interruption belongs
-to the registered service and engine; this facade supplies no engine.
+cannot settle the cancelled request. Actual native synthesis or transcription
+interruption belongs to the registered service and engine; this facade supplies
+no engine. The native routes of `AI.fetchTTS(payload, signal)` and
+`AI.fetchSTT(audio, signal)` forward their signals through these calls and
+normalize cancellation to `AbortError` with `ARCANE_AI_REQUEST_ABORTED`.
 
 ### Availability and normalization
 

@@ -83,6 +83,9 @@ the 180,000 ms timeout and pass the complete request unchanged. A pre-aborted
 signal sends no synthesis request; an in-flight abort sends `request.cancel`
 and suppresses late responses. Actual synthesis interruption depends on the
 registered speech service and its engine; the facade supplies no speech engine.
+`AI.fetchTTS(payload, signal)` carries its caller-owned signal into this native
+call and normalizes cancellation to `AbortError` with
+`ARCANE_AI_REQUEST_ABORTED`, preserving the original error as its cause.
 
 `Arcane.speech.transcribe(request, {signal})` forwards cancellation through the
 same request lifetime and retains its 180,000 ms timeout and complete request.

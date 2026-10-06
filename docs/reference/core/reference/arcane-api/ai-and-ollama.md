@@ -646,7 +646,7 @@ console.info({
 
 ### Overview
 
-`Arcane.speech.synthesize(request)` converts bounded text to local speech. Use
+`Arcane.speech.synthesize(request, options?)` converts bounded text to local speech. Use
 it only after checking synthesis readiness, and create an audio URL from the
 returned bytes without logging the base64 payload.
 
@@ -683,20 +683,29 @@ owned active operation before retrying.
 ### Streaming, cancellation, and events
 
 Synthesis returns one complete audio result and emits no method event. The
-wrapper timeout is 180 seconds, no signal is exposed, and timeout or page
-teardown does not promise cancellation of Core or Android speech work.
+wrapper timeout remains 180 seconds. Optional `{signal}` controls the Core
+request lifetime separately from the complete synthesis payload. Pre-abort
+sends no request; in-flight abort sends `request.cancel`, rejects with
+`ARCANE_REQUEST_ABORTED` and suppresses late responses. Unrelated requests
+continue. The registered native service owns actual synthesis interruption and
+resource release; the facade supplies no engine. `AI.fetchTTS(payload, signal)`
+forwards its signal through this call and normalizes cancellation to
+`AbortError` with `ARCANE_AI_REQUEST_ABORTED`.
 
 ### Example
 
 ```javascript
-const result = await globalThis.Arcane.speech.synthesize({
-    input: 'Your local speech service is ready.',
-    voice: 'af_heart',
-    responseFormat: 'opus',
-    speed: 1
-});
-
-console.info(result.contentType, result.audioBase64.length);
+async function synthesizeMoonEncore(input, signal) {
+    return globalThis.Arcane.speech.synthesize(
+        {
+            input,
+            voice: 'af_heart',
+            responseFormat: 'opus',
+            speed: 1
+        },
+        {signal}
+    );
+}
 ```
 
 ## Arcane.speech.transcribe()
