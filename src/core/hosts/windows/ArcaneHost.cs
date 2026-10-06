@@ -260,7 +260,7 @@ namespace Arcane.Core.Hosts.Windows
             if (String.IsNullOrEmpty(options.IconPath)) return;
             try
             {
-                Icon loaded = await Task.Run<Icon>(ReadApplicationIcon);
+                Icon loaded = await Task.Run(new Func<Icon>(ReadApplicationIcon));
                 if (closing)
                 {
                     loaded.Dispose();
