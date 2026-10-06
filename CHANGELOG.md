@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.64.0
+
+- Add retained native Whisper transcription through the existing Core speech
+  service and AI API, with actual model readiness, complete recordings and
+  transcripts, native progress, joined cancellation, and one eligible
+  accelerated-inference recovery on the prepared CPU runtime.
+- Preserve the same accepted transcription through internal recovery using
+  its actual Core request identity. Shared AI and speech controls report
+  recovering/error states honestly without discarding the original request
+  or turning its terminal native failure into cancellation.
+- Add the SDXL Base 1.0 text-to-image descriptor and correct the shared native
+  image binding's asynchronous worker stack allocation while preserving
+  existing model selection, complete inputs and native lifecycle.
+- Add `arcane-os/core/repositories` with per-user `ArcaneData/Repos` defaults
+  and connected working-repository open/status/pull/push/drain ownership.
+  Explicit paths and existing data remain unchanged; applications own
+  connection selection, remotes and product records. No data migration.
+- Keep optional NPU, repository file-write orchestration, generic development
+  Core composition, Codex/MCP and Ollama lifecycle drafts outside this release.
+  The npm dependency tree is unchanged; native resources use their documented
+  upstream installation and matching numeric-release helper assets.
+
 ## 0.63.0
 
 - Add the approved FLUX.2 Klein 4B text-to-image model descriptor to the
