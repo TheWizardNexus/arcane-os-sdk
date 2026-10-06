@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.73.0
+
+- Add public `resolvePwaRetirementResponse({workspaceRoot, appId})` for existing
+  custom Node hosts. It supplies the shared retirement worker response only for
+  an explicitly disabled standalone PWA whose authored root worker is absent.
+- Preserve raw `enabled: false` selection before descriptor normalization in
+  custom-host and SDK source serving. Omitted settings, enabled PWAs, authored
+  workers and other routes keep their existing behavior.
+- Retire only the worker's own registration through the existing browser
+  lifecycle. Saved data, caches, DBOPFS and open pages remain untouched; no
+  forced reload, polling or replacement server is introduced.
+
 ## 0.72.0
 
 - Add optional `native.launchContext` defaults for ordinary packaged launch and
