@@ -655,35 +655,46 @@ when the default estimator is unavailable or an application owns a more precise
 quota view. `downloadConcurrency` must be a positive safe integer and bounds
 the selected file or Range worker pool; the default is four. The mutable result
 contains `kind`, `tableName`, `downloadConcurrency`, the original `adapter`,
-and `ready`, `install`, `ensure`, and `remove`. `ensure()` preserves the complete
+and `ready`, `install`, `ensure`, `remove`, and `fetchResource`. `ensure()` preserves the complete
 ordered model set and reports whether it was cached or installed.
 `install(source,{signal,onProgress})` and
 `ensure(source,{signal,onProgress,offline})` publish `cache-check` and
-`download` records using ordered file counts plus aggregate transfer telemetry
-when `onProgress` is supplied. Chunk-driven changes are coalesced on a 250 ms
-cadence, with immediate boundary records at start, plan/total discovery,
-active-worker changes, and completion. Multi-file sources use up to that many concurrent member workers
+`download` records using ordered file counts and per-member closed-part progress
+when `onProgress` is supplied. Each member reports `completed`, `total`, and
+`unit:'shards'`; streaming totals remain `null` until completion. Records retain
+`activeTransfers`, `transferLimit`, and `transferMode`, with prompt part/lifecycle
+updates and an existing 250 ms heartbeat. They contain no transfer rate or ETA.
+Multi-file sources use up to that many concurrent member workers
 while retaining descriptor order, preserve completed members and completed
 Range parts within members across an interrupted attempt, and fetch only
-missing work on retry. A complete set of optional member
-`bytes` values makes aggregate total and remaining progress available from the
-start; otherwise those fields remain `null` until an honest aggregate total is
-known. Each missing source member first requests `bytes=0-0`. If a followed
+missing work on retry. Each missing source member first requests the HTTP
+Range `bytes=0-0`. If a followed
 redirect turns that probe into a full `200`, the source probes the final URL directly;
 confirmed support cancels the original body and starts parallel Range workers,
 while refusal keeps the original full response as the single-fetch fallback. A
 valid `Content-Range`, or optional descriptor `bytes` when that header is not
 exposed, supplies the total for deterministic resumable Range parts of roughly
-4 MB each, up to 4,096 parts. Without an observable or declared total, the store falls back to one full fetch and
-uses its readable `Content-Length` when available. A later non-206,
+4 MB each, up to 4,096 parts. These values belong only to HTTP Range framing,
+not product progress or content admission. Without an observable or declared
+total, one full fetch streams into ordered persistent parts without requiring
+a response length. Existing complete whole files remain readable without
+migration. A later non-206,
 contradictory exposed Range response, or incorrectly framed Range body fails
 rather than silently assembling a partial model. A transfer failure lets peer
 transfers settle; explicit cancellation stops active transfers. Both preserve
 completed members and exact Range parts for retry, while unfinished active
 parts restart after refresh. A complete whole member supersedes its current
 Range fragments.
-Cleanup failure is warned without replacing a usable model. Zero-length abandoned entries are removed
-because Wllama cannot consume an empty model Blob or File.
+Cleanup failure is warned without replacing a usable model.
+
+`fetchResource(input,{signal,onProgress,...requestOptions})` returns the complete
+stored response as `{file,status,statusText,headers,url,redirected}`. SDK model
+loaders share this owner for actual configuration, tokenizer, graph,
+external-data and support-file requests. Complete successful GET resources may
+be reused. Cancellation joins reader/writer cleanup and preserves closed parts
+for supported HTTP resume; a full response restarts that resource without
+duplicating its saved prefix. Resource progress uses `unit:'shards'` with
+`total:null` until completion. Independent resource requests remain concurrent.
 
 ### Availability and normalization
 

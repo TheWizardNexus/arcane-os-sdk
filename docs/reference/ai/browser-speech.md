@@ -1443,7 +1443,7 @@ const store = createDbopfsSpeechArtifactStore({
 });
 ```
 
-The store exposes `{protocol,tableName,prepare,remove}`. It serializes updates
+The store exposes `{protocol,tableName,prepare,remove,fetchResource}`. It serializes updates
 to one selected authority with Web Locks, downloads each caller-selected file
 after explicit provider activation, stores it in DBOPFS, and reopens the stored
 file before materialization. Missing storage, an unreadable response, a failed

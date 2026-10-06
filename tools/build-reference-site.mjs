@@ -566,6 +566,7 @@ const navigationGroups=[
             ['Core browser client','docs/reference/core-client.md'],
             ['Native Core runtime','docs/reference/core-runtime.md'],
             ['Development Core services','docs/reference/core-development.md','',true],
+            ['Shared Core host','docs/reference/core-shared-host.md','',true],
             ['Codex App Server','docs/reference/codex-app-server.md','',true],
             ['MCP STDIO server','docs/reference/mcp-stdio.md','',true],
             ['Local AI through Core','docs/reference/local-ai.md'],

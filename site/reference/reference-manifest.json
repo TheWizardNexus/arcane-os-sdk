@@ -3,16 +3,16 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.69.0",
+    "sdk": "0.70.0",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
   "counts": {
-    "markdownPages": 52,
+    "markdownPages": 53,
     "collectionPages": 2,
     "generatedPages": 95,
     "runtimeModulePages": 93,
-    "htmlPages": 149,
+    "htmlPages": 150,
     "inventories": 4
   },
   "pages": [
@@ -116,6 +116,12 @@
       "source": "docs/reference/core-runtime.md",
       "output": "site/reference/core-runtime/index.html",
       "route": "reference/core-runtime/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core-shared-host.md",
+      "output": "site/reference/core-shared-host/index.html",
+      "route": "reference/core-shared-host/",
       "kind": "markdown"
     },
     {
@@ -859,7 +865,7 @@
       "contractCounts": {
         "exports": 3,
         "reviewedCallables": 0,
-        "publicMembers": 27,
+        "publicMembers": 28,
         "literalCustomEvents": 0,
         "directCodedFailures": 1,
         "exportedErrorSubclasses": 0

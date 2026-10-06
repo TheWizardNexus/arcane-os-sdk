@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.69.0",
+  "sdkVersion": "0.70.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 293,
+  "memberCount": 297,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
@@ -535,14 +535,14 @@
       "name": "createBrowserDecisionModel",
       "displayName": "createBrowserDecisionModel()",
       "kind": "function",
-      "signature": "createBrowserDecisionModel({family,model,revision,device,dtype,runtime}={})",
+      "signature": "createBrowserDecisionModel({family,model,revision,device,dtype,runtime,store}={})",
       "entrypoints": ["arcane-os/ai/browser-decisions"],
       "primaryImport": "arcane-os/ai/browser-decisions",
       "group": "Browser typed decisions",
       "summary": "Explicit-load Laya and Julia-1 decisions with caller-selected precision, complete inputs and graph results.",
       "availability": "Browser module Workers and the selected Transformers.js backend; import/construction starts no model load",
       "protocol": "Caller-owned state/question/options rows; five-input decision graph; native Worker request/result lifecycle",
-      "normalization": "Full field tokenization, raw logits and unrounded softmax; dtype defaults to fp16 for Laya and fp32 for Julia, with explicit values forwarded unchanged to the upstream loader; no policy thresholds, storage or precision fallback"
+      "normalization": "Full field tokenization, raw logits and unrounded softmax; dtype defaults to fp16 for Laya and fp32 for Julia, with explicit values forwarded unchanged. Optional existing SDK store routes actual loader resources through fetchResource outside cloned Worker configuration; stored mode disables competing model caches, preserves complete HTTP responses and joins resource cleanup before outstanding calls settle. Omission retains upstream loading; no decision-result persistence or precision fallback"
     },
     {
       "id": "root:acceptWebSocket",
@@ -3529,10 +3529,10 @@
       ],
       "primaryImport": "arcane-os/ai/browser-wasm",
       "group": "Browser-WASM local AI",
-      "summary": "Adapts an existing DBOPFS instance into a resumable model cache with bounded parallel shard or monolithic Range-part transfer and live aggregate byte progress.",
+      "summary": "Adapts an existing DBOPFS instance into complete resumable model and Fetch-resource storage with bounded transfers and semantic shard progress.",
       "availability": "Browser with a ready DBOPFS instance and OPFS support",
       "protocol": "Resumable ordered model members and deterministic per-member Range parts over existing DBOPFS method semantics",
-      "normalization": "Uses one bounded transfer axis, preserves ordered completed shards and deterministic current Range parts within any member across interruption, emits coalesced additive loaded/total/remaining/rate/ETA/active-worker telemetry, rolls discarded partial writes back out of progress, cleans superseded current Range parts after a complete replacement exists, and settles failed or cancelled peers while retaining completed work for retry"
+      "normalization": "New full and Range responses stream into ordered persistent parts; complete logical files preserve existing formats without migration. Progress uses file and closed-shard counts with unknown totals until completion. fetchResource(input,{signal,onProgress,...requestOptions}) returns complete {file,status,statusText,headers,url,redirected}; successful complete GET resources may be reused. Cancellation joins reader/writer cleanup and retains closed parts for supported resume. Independent resources remain concurrent"
     },
     {
       "id": "browser-device:getBrowserDeviceClass",
@@ -3772,7 +3772,7 @@
       "summary": "Adapts an existing DBOPFS instance into a caller-scoped speech runtime/model artifact store and ordinary module router.",
       "availability": "Browser with a ready DBOPFS instance, Web Locks, Fetch or an explicit fetch implementation, File/Blob, and object URLs",
       "protocol": "arcane-ai-browser-speech-artifacts/1 ordinary DBOPFS storage and module routing",
-      "normalization": "Serializes complete caller-selected content, invalidates stale cache selections without byte identities, routes known materialized imports/fetches/Workers/cache reads, falls back to native browser behavior for unmapped operations, and keeps secure intent dormant"
+      "normalization": "Exposes prepare, remove and fetchResource; streams new declared files and fetched resources into ordered DBOPFS parts, preserves complete old files and closed parts, reports file/shard progress and joins cancellation cleanup. Known graph mappings remain explicit; dedicated speech and nested module Worker fetches share the store with complete HTTP response metadata. Competing native caches are unavailable only in that Worker lifetime and restored afterward without saved-cache deletion. Native ESM imports and unmapped classic Worker internals remain platform-owned"
     },
     {
       "id": "mail:MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS",
@@ -4557,6 +4557,62 @@
       "availability": "Node with readable input and writable output streams",
       "protocol": "arcane/1 over Content-Length framed stdio",
       "normalization": "Returns the existing {runtime,closed,close} transport owner; an optional abort signal invokes the same idempotent drain without killing the process, replacing service readiness or cancelling accepted service-lifetime work"
+    },
+    {
+      "id": "core-host:startSharedCoreHost",
+      "name": "startSharedCoreHost",
+      "displayName": "startSharedCoreHost()",
+      "kind": "function",
+      "signature": "startSharedCoreHost({endpoint,application,version,configure,getReplayEvents,signal,onError}={})",
+      "entrypoints": ["arcane-os/core/host"],
+      "primaryImport": "arcane-os/core/host",
+      "group": "Shared Core host",
+      "summary": "Claims an app-selected local endpoint before composing one shared Core runtime.",
+      "availability": "Node named pipes on Windows and Unix-domain sockets on Linux/macOS; Android requires its host adaptation",
+      "protocol": "arcane/1 over local IPC with per-connection request correlation and current-state replay",
+      "normalization": "Returns {runtime,endpoint,closed,close}; configure(runtime,{signal}) registers independently started services after the endpoint claim. Close joins composition, accepted service work, disposal and queued frames before releasing the endpoint. Complete transport/startup/shutdown errors remain observable; an occupied endpoint never invokes the factory"
+    },
+    {
+      "id": "core-host:connectSharedCoreHost",
+      "name": "connectSharedCoreHost",
+      "displayName": "connectSharedCoreHost()",
+      "kind": "function",
+      "signature": "connectSharedCoreHost({endpoint,start,signal,onError}={})",
+      "entrypoints": ["arcane-os/core/host"],
+      "primaryImport": "arcane-os/core/host",
+      "group": "Shared Core host",
+      "summary": "Connects to one selected host and optionally starts an explicit headless entry when absent.",
+      "availability": "Node local IPC and optional explicit child process with diagnostic file",
+      "protocol": "arcane/1 Core client; optional Node startup IPC handshake",
+      "normalization": "Returns {client,endpoint,closed,close,shutdown}. Only ENOENT/ECONNREFUSED selects start {command,args,cwd,env,logFile}; no request retry. Close cancels this connection's request work while preserving the host and accepted service work. Explicit shutdown drains all clients' shared host; cancelling a launch wait does not kill the host"
+    },
+    {
+      "id": "core-host:runSharedCoreHost",
+      "name": "runSharedCoreHost",
+      "displayName": "runSharedCoreHost()",
+      "kind": "function",
+      "signature": "runSharedCoreHost(options)",
+      "entrypoints": ["arcane-os/core/host"],
+      "primaryImport": "arcane-os/core/host",
+      "group": "Shared Core host",
+      "summary": "Runs the explicit headless entry with one endpoint winner and startup result reporting.",
+      "availability": "Node host entry; parent IPC reporting when present",
+      "protocol": "Shared local Core endpoint and Node startup handshake",
+      "normalization": "Accepts startSharedCoreHost options; returns the winning host handle or null after a losing launcher connects to the existing owner and confirms dispatcher response. The loser does not construct services. Reports complete startup errors and never calls process.exit"
+    },
+    {
+      "id": "core-host:startSharedCoreBridge",
+      "name": "startSharedCoreBridge",
+      "displayName": "startSharedCoreBridge()",
+      "kind": "function",
+      "signature": "startSharedCoreBridge({endpoint,start,input=process.stdin,output=process.stdout,signal,onError}={})",
+      "entrypoints": ["arcane-os/core/host"],
+      "primaryImport": "arcane-os/core/host",
+      "group": "Shared Core host",
+      "summary": "Connects a complete framed stdio stream to the shared application's Core host.",
+      "availability": "Node readable/writable streams and local IPC",
+      "protocol": "arcane/1 Content-Length stdio to the selected shared Core endpoint",
+      "normalization": "Returns {endpoint,closed,close}; EOF or cancellation disconnects this client without shutting down shared services. Terminal stream errors settle pending writes and reject closed. Native launch opts in through sharedHost:{endpoint,logFile}; omitted sharedHost preserves ordinary stdio ownership"
     }
   ]
 }

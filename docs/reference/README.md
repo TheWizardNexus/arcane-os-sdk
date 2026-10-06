@@ -60,6 +60,10 @@ alone does not make bare module names resolve in a browser.
 | Compose native Core dispatch, service lifecycle, and stdio hosting | [Native Core runtime](core-runtime.md) |
 | Reuse dependency-ready native services without a renderer | [Core service composition](core-runtime.md#native-service-composition) and [existing ONNX owner](local-ai.md#native-service-owners) |
 | Compose application Core services during source development, independently of local AI | [Development Core services](core-development.md) |
+| Share one application service runtime between its native UI and MCP process | [Shared Core host](core-shared-host.md) |
+| Store complete browser model resources through one DBOPFS owner | [Model resources](ai/browser-decisions.md#shared-dbopfs-model-resources) and [speech routing](ai/browser-speech.md#ordinary-module-routing) |
+| Observe committed storage changes across live application documents | [DBOPFS change subscriptions](runtime-modules.md#dbopfsjs) |
+| Cancel cold speech preparation while preserving other activation interests | [Prepared narration](ai/browser-speech.md#prepare-narration-once-and-replay-stored-audio) |
 | Own an explicitly selected native Codex App Server session | [Codex App Server](codex-app-server.md) |
 | Expose application-owned tools and static resources through Node STDIO | [MCP STDIO server](mcp-stdio.md) |
 | Run application-selected llama.cpp, Ollama or ONNX through Core | [Local AI through Core](local-ai.md) |

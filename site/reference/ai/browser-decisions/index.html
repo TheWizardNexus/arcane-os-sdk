@@ -13,10 +13,10 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../examples/">Hello World</a><a href="../../../guides/">Guides</a><a href="../../sdk-api/">API</a><a href="../../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">Browser typed decisions</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="browser-typed-decisions">Browser typed decisions</h1><p class="doc-lead">arcane-os/ai/browser-decisions owns browser-local Laya typed decisions and Julia-1 inference. Laya defaults to FP16 and Julia to FP32; an explicit dtype is forwarded unchanged to the selected upstream loader. It is separate from chat and speech because these models score caller-supplied options instead of generating conversational text. Applications supply the model repository, state, questions, option meanings and policy; the SDK owns the reusable tokenizer, tensors, inference and lifecycle.</p><div class="doc-meta"><span>SDK 0.69.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">Browser typed decisions</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="browser-typed-decisions">Browser typed decisions</h1><p class="doc-lead">arcane-os/ai/browser-decisions owns browser-local Laya typed decisions and Julia-1 inference. Laya defaults to FP16 and Julia to FP32; an explicit dtype is forwarded unchanged to the selected upstream loader. It is separate from chat and speech because these models score caller-supplied options instead of generating conversational text. Applications supply the model repository, state, questions, option meanings and policy; the SDK owns the reusable tokenizer, tensors, inference and lifecycle.</p><div class="doc-meta"><span>SDK 0.70.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
-      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../">Normalized AI</a><a href="../twin-cloud/">TWiN Cloud quick start</a><a href="../browser-wasm/">Browser-WASM AI</a><a href="./" aria-current="page">Browser typed decisions</a><a href="../browser-speech/">Browser speech</a><a href="../../websocket-client/">Shared WebSocket clients</a><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../core/">Core map</a><a href="../../core-client/">Core browser client</a><a href="../../core-runtime/">Native Core runtime</a><a href="../../core-development/">Development Core services</a><a href="../../codex-app-server/">Codex App Server</a><a href="../../mcp-stdio/">MCP STDIO server</a><a href="../../local-ai/">Local AI through Core</a><a href="../../native-decisions/">Native typed decisions</a><a href="../../local-image-flux/">FLUX.2 Klein 4B</a><a href="../../local-image-sdxl/">SDXL Base 1.0</a><a href="../../native-speech/">Native speech service</a><a href="../../local-whisper/">Native Whisper</a><a href="../../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../../core-repositories/">Native repository workspaces</a><a href="../../core-native-packaging/">Portable Core packaging</a><a href="../../core/arcane-api/">Arcane API</a><a href="../../core/capabilities/">Capabilities and admission</a><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../../core/arcane-events/">Events</a><a href="../../core/arcane-ai-contracts/">AI contracts</a><a href="../../core/arcane-entities/">Entity exports</a><a href="../../core/ollama-module/">Ollama internals (advanced)</a><a href="../../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/ai/browser-decisions.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#explicit-use">Explicit use</a><a href="#configuration-and-upstream-delivery">Configuration and upstream delivery</a><a href="#complete-rows-and-results">Complete rows and results</a><a href="#lifecycle-events-and-cancellation">Lifecycle, events and cancellation</a><a href="#model-limits-and-evidence">Model limits and evidence</a></nav></details><p><code>arcane-os/ai/browser-decisions</code> owns browser-local Laya typed decisions
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../">Normalized AI</a><a href="../twin-cloud/">TWiN Cloud quick start</a><a href="../browser-wasm/">Browser-WASM AI</a><a href="./" aria-current="page">Browser typed decisions</a><a href="../browser-speech/">Browser speech</a><a href="../../websocket-client/">Shared WebSocket clients</a><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../core/">Core map</a><a href="../../core-client/">Core browser client</a><a href="../../core-runtime/">Native Core runtime</a><a href="../../core-development/">Development Core services</a><a href="../../core-shared-host/">Shared Core host</a><a href="../../codex-app-server/">Codex App Server</a><a href="../../mcp-stdio/">MCP STDIO server</a><a href="../../local-ai/">Local AI through Core</a><a href="../../native-decisions/">Native typed decisions</a><a href="../../local-image-flux/">FLUX.2 Klein 4B</a><a href="../../local-image-sdxl/">SDXL Base 1.0</a><a href="../../native-speech/">Native speech service</a><a href="../../local-whisper/">Native Whisper</a><a href="../../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../../core-repositories/">Native repository workspaces</a><a href="../../core-native-packaging/">Portable Core packaging</a><a href="../../core/arcane-api/">Arcane API</a><a href="../../core/capabilities/">Capabilities and admission</a><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../../core/arcane-events/">Events</a><a href="../../core/arcane-ai-contracts/">AI contracts</a><a href="../../core/arcane-entities/">Entity exports</a><a href="../../core/ollama-module/">Ollama internals (advanced)</a><a href="../../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/ai/browser-decisions.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#explicit-use">Explicit use</a><a href="#configuration-and-upstream-delivery">Configuration and upstream delivery</a><a href="#shared-dbopfs-model-resources">Shared DBOPFS model resources</a><a href="#complete-rows-and-results">Complete rows and results</a><a href="#lifecycle-events-and-cancellation">Lifecycle, events and cancellation</a><a href="#model-limits-and-evidence">Model limits and evidence</a></nav></details><p><code>arcane-os/ai/browser-decisions</code> owns browser-local Laya typed decisions
 and Julia-1 inference. Laya defaults to FP16 and Julia to FP32; an explicit
 <code>dtype</code> is forwarded unchanged to the selected upstream loader. It is separate from chat and speech because these
 models score caller-supplied options instead of generating conversational text.
@@ -104,11 +104,17 @@ it does not substitute a quantized graph or another model.</p>
 <tr>
 <td><code>runtime.wasmPaths</code></td>
 <td>Optional upstream ONNX WASM location passed to the selected runtime&#39;s public environment API.</td>
+</tr>
+<tr>
+<td><code>store</code></td>
+<td>Optional existing SDK DBOPFS model or speech artifact store exposing <code>fetchResource()</code>. The store remains outside Worker configuration; the SDK bridges the loader&#39;s actual resource requests to it.</td>
 </tr></tbody>
 </table>
 </div>
-<p>The runtime, tokenizer and weights use normal upstream loading and caching;
-the SDK does not redistribute them or create a second model store. Browser
+<p>Without <code>store</code>, the runtime, tokenizer and weights use normal upstream loading
+and caching. With <code>store</code>, the selected loader still owns filenames and model
+selection while model resources persist through that existing SDK store. The
+SDK does not redistribute upstream runtimes or models. Browser
 network, cross-origin and backend availability still apply. WebGPU needs a
 compatible browser/device context. Unsupported precision or backend errors
 are returned, not replaced with a different model, backend or precision.</p>
@@ -121,6 +127,50 @@ does not claim every graph operation runs in half precision. Explicit
 <code>model.onnx.data</code> external-data name. Its custom five-input graph is loaded
 through the public generic <code>PreTrainedModel</code> API, not a text-generation
 pipeline. Existing Wllama, cloud, speech and chat APIs are unchanged.</p>
+<h2 id="shared-dbopfs-model-resources">Shared DBOPFS model resources</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createDbopfsModelStore} from &#39;arcane-os/ai/browser-wasm&#39;;
+import {createBrowserDecisionModel} from &#39;arcane-os/ai/browser-decisions&#39;;
+
+// dbopfs is the application&#39;s existing Arcane DBOPFS instance.
+const store = createDbopfsModelStore({dbopfs});
+const decisions = createBrowserDecisionModel(
+    {
+        family: &#39;laya&#39;,
+        model: &#39;onnx-community/laya-typed-decisions-ONNX&#39;,
+        store
+    }
+);
+await decisions.load();
+</code></pre></div>
+<p>The same <code>store</code> may serve other SDK model clients. The application supplies no
+tokenizer/configuration/graph manifest and performs no file routing. Inside the
+dedicated decision Worker, Transformers.js&#39;s public <code>env.fetch</code> hook routes the
+actual selected tokenizer, configuration, ONNX graph and external-data requests
+to <code>store.fetchResource(input, options)</code>. Its competing browser, custom and
+filesystem model caches are disabled only for this explicit stored mode. The
+default upstream ONNX WASM binary and factory preloads use this same hook.
+Native support-file fetches in the dedicated Worker also use the store. The
+runtime module itself still loads from <code>runtime.moduleUrl</code> through normal module
+loading. Native ESM imports remain browser-owned: an upstream custom factory
+import outside its preload path is not claimed as a DBOPFS resource. No second
+application cache or model substitution is introduced.</p>
+<p>The store returns <code>{file, status, statusText, headers, url, redirected}</code>. The
+Worker reconstructs the complete response with its actual HTTP status and
+headers, so a missing optional upstream file remains a missing-file response.
+New response bodies stream into ordered persistent shards, including resources
+with unknown totals. Completed resources are reused by their semantic request
+and URL selection. Interrupted closed shards remain available for HTTP Range
+resume; a server returning a full response restarts that member without adding
+the saved prefix twice. Independent resources remain concurrent, and repeated
+requests for the same resource share its storage mutation owner. Existing saved
+model formats are retained without a migration.</p>
+<p>Resource progress uses <code>{phase: &#39;download&#39;, completed, total, unit: &#39;shards&#39;, url}</code>. <code>completed</code> counts closed persistent shards; <code>total</code> is <code>null</code> until the
+resource finishes. This progress carries no network-size, rate or ETA fields.
+Cancellation aborts the owned fetch and joins reader/writer cleanup before the
+resource owner becomes available to a later request. Interrupted closed shards
+are retained. <code>unload()</code> and <code>dispose()</code> still acknowledge their lifecycle
+transition synchronously; outstanding <code>load()</code>/<code>evaluate()</code> calls settle after
+their resource cleanup.</p>
 <h2 id="complete-rows-and-results">Complete rows and results</h2>
 <p><code>evaluate(rows, {signal})</code> accepts an array in caller order. Each row has
 string <code>state</code>, string <code>question</code>, string-array <code>options</code>, and optional
@@ -177,7 +227,7 @@ errors, including graph diagnostics when decoding fails, remain available in
 <code>error</code>; they belong in developer diagnostics, not ordinary status text.</p>
 <p>Work is acknowledged synchronously before loading/inference waits. Progress
 reports real semantic phases such as <code>waiting-for-model</code>, <code>loading-runtime</code>, <code>loading-tokenizer</code>,
-<code>loading-model</code>, <code>ready</code>, <code>evaluating</code> and <code>complete</code>; it is not a synthetic
+<code>loading-model</code>, <code>download</code>, <code>ready</code>, <code>evaluating</code> and <code>complete</code>; it is not a synthetic
 percentage. Loading the model and tokenizer proceeds concurrently. Repeated
 identical state text is tokenized once per batch. Independent requests are
 accepted concurrently; the selected backend still owns its execution ordering.</p>
@@ -217,9 +267,9 @@ runtime pass.</p>
 <a href="https://huggingface.co/SupersonicLabs/Julia-1-ONNX" target="_blank" rel="noreferrer">Julia-1 ONNX</a>,
 <a href="https://github.com/huggingface/transformers.js/tree/4.3.0/packages/transformers" target="_blank" rel="noreferrer">Transformers.js 4.3.0</a>.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#explicit-use">Explicit use</a><a href="#configuration-and-upstream-delivery">Configuration and upstream delivery</a><a href="#complete-rows-and-results">Complete rows and results</a><a href="#lifecycle-events-and-cancellation">Lifecycle, events and cancellation</a><a href="#model-limits-and-evidence">Model limits and evidence</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#explicit-use">Explicit use</a><a href="#configuration-and-upstream-delivery">Configuration and upstream delivery</a><a href="#shared-dbopfs-model-resources">Shared DBOPFS model resources</a><a href="#complete-rows-and-results">Complete rows and results</a><a href="#lifecycle-events-and-cancellation">Lifecycle, events and cancellation</a><a href="#model-limits-and-evidence">Model limits and evidence</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.69.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.70.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

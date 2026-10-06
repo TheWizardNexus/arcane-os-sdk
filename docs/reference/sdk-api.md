@@ -142,6 +142,10 @@ audio through application-owned DBOPFS. Its immediate handle exposes ordered
 segments, preparation state, `ready`, `getAudio(index)`, and `cancel()`.
 `ai.playPreparedTTS(prepared,{signal,onState})` attaches ordered playback and
 returns `state`, `error`, `finished`, `pause()`, `resume()`, and `stop()`.
+Each preparation owns its pending activation interest. Cancelling the final
+interest aborts that activation; other preparation, playback or joining direct
+TTS-load interests preserve it. Cancelling after readiness leaves the model
+loaded, and complete cache hits start no model. Actual cleanup is provider-owned.
 Each AI has one playback lane; replacing playback preserves independent
 preparation. Fully cached replay does not load the speech
 model. See [prepared narration](ai/browser-speech.md#prepare-narration-once-and-replay-stored-audio)
@@ -421,6 +425,10 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `arcaneNativeBuilderProvider` | singleton | `arcane-os/native/portable-provider` | Portable native provider | Node; produces a portable payload rather than an executable host |
 | `arcaneNativeBuilderProvider default export` | singleton | `arcane-os/native/portable-provider` | Portable native provider | Node; produces a portable payload rather than an executable host |
 | `startCoreHost()` | function | `arcane-os/core/host` | Native Core host composition | Node with readable input and writable output streams |
+| `startSharedCoreHost()` | function | `arcane-os/core/host` | Shared Core host | Node local IPC on Windows, Linux and macOS |
+| `connectSharedCoreHost()` | function | `arcane-os/core/host` | Shared Core host | Node local IPC and optional explicit headless startup |
+| `runSharedCoreHost()` | function | `arcane-os/core/host` | Shared Core host | Node headless entry and optional parent startup IPC |
+| `startSharedCoreBridge()` | function | `arcane-os/core/host` | Shared Core host | Node readable/writable streams and local IPC |
 | `readCoreLaunchContext()` | function | `arcane-os/core/host` | Native Core host composition | Node; reads explicitly selected launch JSON |
 | `resolveArcaneDataPaths()` | function | `arcane-os/core/repositories` | Native repository workspaces | Node on Windows, Linux and macOS; Android supplies its data root |
 | `createRepositoryWorkspace()` | function | `arcane-os/core/repositories` | Native repository workspaces | Node with Git; Android requires host process adaptation |
@@ -8658,7 +8666,155 @@ async function bundleMoonCheeseRuntime(outputRoot){
 The ordinary provider invokes this owner only for an explicit native local-AI
 selection. See [selected local-AI runtimes](core-native-packaging.md#selected-local-ai-runtimes).
 
+## startSharedCoreHost()
+
+### Overview
+
+Owns one application's Core runtime at an explicitly selected local endpoint.
+It claims the endpoint before constructing services, so UI and MCP processes
+can share the same service state without constructing duplicate owners.
+
+### Signature and result
+
+```text
+startSharedCoreHost({endpoint,application,version,configure,getReplayEvents,signal,onError}={})
+```
+
+Resolves `{runtime,endpoint,closed,close}`. `configure(runtime,{signal})`
+registers services through the existing runtime; services start independently.
+Optional synchronous `getReplayEvents()` supplies current `{event,data}`
+snapshots, never historical replies. `close()` joins composition, accepted
+service work, service cleanup and queued frames before releasing the endpoint.
+Request-lifetime work is cancelled; accepted service-lifetime work remains
+service-owned. The supplied signal begins the same shutdown. `closed` rejects
+on shutdown failure; `onError` observes transport/background failures, with
+complete console diagnostics by default.
+
+### Availability and example
+
+Node supports app-selected named pipes on Windows and Unix-domain sockets on
+Linux/macOS; Android needs its host adaptation. Parent directories must exist.
+An occupied endpoint returns native `EADDRINUSE` with
+`coreHostPhase:'listen'`, without calling `configure`. Native failures remain
+observable; the SDK does not delete an existing endpoint to take ownership.
+
+```js
+import {startSharedCoreHost} from 'arcane-os/core/host';
+
+const host = await startSharedCoreHost(
+    {
+        endpoint: selectedEndpoint,
+        application: {id: 'moon-cheese-ledger'},
+        configure(runtime) {
+            runtime.registerService(ledgerService);
+        }
+    }
+);
+// The application owner later calls await host.close().
+```
+
+`selectedEndpoint` and `ledgerService` belong to the application. See
+[shared Core hosting](core-shared-host.md) for correlation, replay and cleanup.
+
+## connectSharedCoreHost()
+
+### Overview and signature
+
+Connects to the selected application host, optionally starting an explicit
+headless entry when that endpoint is absent.
+
+```text
+connectSharedCoreHost({endpoint,start,signal,onError}={})
+```
+
+Resolves `{client,endpoint,closed,close,shutdown}`. `client` is the existing Core
+client with current-runtime replay. Optional `start` is
+`{command,args=[],cwd,env,logFile}`; its entry calls `runSharedCoreHost()`.
+Only `ENOENT` or `ECONNREFUSED` selects startup. Arguments/environment are
+captured at acceptance, diagnostics append completely to the selected log,
+and requests are never automatically repeated. Other connection/start errors
+propagate; `closed` rejects on transport failure. Node/platform availability
+matches `startSharedCoreHost()`.
+
+`close()` disconnects this client and cancels only its request-lifetime work;
+it preserves the host and accepted service work. Cancelling startup wait does
+not kill a host another client may use. No startup timeout is imposed; supply
+`signal` when needed. `shutdown(invokeOptions)` explicitly invokes
+`core.host.shutdown`, drains all shared services and returns `{state:'closed'}`
+before disconnecting. It affects every client; cancellation after acceptance
+does not reverse it. A drain failure returns the full Core error.
+
+```js
+import {connectSharedCoreHost} from 'arcane-os/core/host';
+
+const connection = await connectSharedCoreHost(
+    {endpoint: selectedEndpoint}
+);
+try {
+    const catalog = await connection.client.invoke(
+        'catalog.read',
+        {}
+    );
+    console.log(catalog);
+} finally {
+    await connection.close();
+}
+```
+
+## runSharedCoreHost()
+
+Accepts the same options as `startSharedCoreHost(options)` and adds the headless
+startup handshake. The winning launcher returns the host handle. A losing
+launcher connects to the existing owner, confirms dispatcher response and
+returns `null` without constructing its own services. Startup success or the
+complete error reaches an existing parent Node IPC channel; the helper never
+calls `process.exit()`. Host lifetime, errors and platform requirements retain
+the contracts above.
+
+```js
+import {runSharedCoreHost} from 'arcane-os/core/host';
+
+const host = await runSharedCoreHost(applicationHostOptions);
+await host?.closed;
+```
+
+The application supplies `applicationHostOptions`, including its endpoint and
+service factory. This is the entry selected by the `start` option of
+`connectSharedCoreHost()`.
+
+## startSharedCoreBridge()
+
+Connects one framed stdio client to the shared host, preserving complete
+requests, responses and events through the existing `arcane/1` transport.
+
+```text
+startSharedCoreBridge({endpoint,start,input=process.stdin,output=process.stdout,signal,onError}={})
+```
+
+Resolves `{endpoint,closed,close}`. `start` and connection errors follow
+`connectSharedCoreHost()`. EOF, `close()` or cancellation disconnects this
+client only. Terminal stream errors settle pending writes and reject `closed`;
+service shutdown is separate. Node readable/writable streams and the selected
+local IPC endpoint are required. This is Core framing, not external MCP framing.
+
+```js
+import {startSharedCoreBridge} from 'arcane-os/core/host';
+
+const bridge = await startSharedCoreBridge(
+    {endpoint: selectedEndpoint}
+);
+await bridge.closed;
+```
+
+Generated native entries select this bridge only through explicit launch
+context `sharedHost:{endpoint,logFile}`. Omitting it preserves ordinary
+stdio-owned Core lifetime. See [native shared-host launch](core-shared-host.md#native-launch-and-platforms).
+
 ## startCoreHost()
+
+For independent UI and MCP processes sharing one application runtime, use the
+[shared host functions](#startsharedcorehost) above. Ordinary `startCoreHost()`
+retains its existing stdio-owned lifetime.
 
 ### Overview
 
@@ -9338,7 +9494,7 @@ Existing chat and speech providers are unchanged.
 ### Signature and result
 
 ```text
-createBrowserDecisionModel({family,model,revision,device,dtype,runtime}={})
+createBrowserDecisionModel({family,model,revision,device,dtype,runtime,store}={})
 ```
 
 ```js
@@ -9372,6 +9528,15 @@ selections report its failure without precision fallback. For Laya FP32, pass
 `dtype: 'fp32'`.
 Cancellation terminates that client's Worker and rejects its in-flight work.
 No decisions are inserted into chat history or durable storage.
+
+Optional `store` is an existing SDK DBOPFS model or speech store exposing
+`fetchResource(input, options)`. It remains outside cloned Worker configuration.
+The selected loader routes its actual model/configuration/tokenizer resources
+through that owner and disables competing model caches in this explicit mode.
+Omission preserves ordinary upstream loading. Native ESM imports retain their
+platform loader. Resource progress counts closed shards; cancellation joins
+resource cleanup before outstanding `load()`/`evaluate()` calls settle.
+`unload()` and `dispose()` acknowledge their state transition synchronously.
 
 ### Example
 
