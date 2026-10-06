@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="arcane-os/codex/app-server is an optional Node entrypoint for an explicitly selected native Codex App Server. It exports createCodexAppServerSession(options) and openCodexAppServerSession(options).">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/codex-app-server/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Native Codex App Server sessions · Arcane OS SDK"><meta property="og:description" content="arcane-os/codex/app-server is an optional Node entrypoint for an explicitly selected native Codex App Server. It exports createCodexAppServerSession(options) and openCodexAppServerSession(options)."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/codex-app-server/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Native Codex App Server sessions · Arcane OS SDK"><meta name="twitter:description" content="arcane-os/codex/app-server is an optional Node entrypoint for an explicitly selected native Codex App Server. It exports createCodexAppServerSession(options) and openCodexAppServerSession(options)."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Native Codex App Server sessions | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native Codex App Server sessions</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-codex-app-server-sessions">Native Codex App Server sessions</h1><p class="doc-lead">arcane-os/codex/app-server is an optional Node entrypoint for an explicitly selected native Codex App Server. It exports createCodexAppServerSession(options) and openCodexAppServerSession(options).</p><div class="doc-meta"><span>SDK 0.65.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="./" aria-current="page">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/codex-app-server.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#open-an-explicitly-selected-connection">Open an explicitly selected connection</a><a href="#session-methods">Session methods</a><a href="#input-live-callbacks-and-complete-output">Input, live callbacks and complete output</a><a href="#events-and-server-requests">Events and server requests</a><a href="#cancellation-and-unknown-results">Cancellation and unknown results</a></nav></details><p><code>arcane-os/codex/app-server</code> is an optional Node entrypoint for an explicitly
+selected native Codex App Server. It exports
+<code>createCodexAppServerSession(options)</code> and
+<code>openCodexAppServerSession(options)</code>.</p>
+<p>The adapter owns JSONL correlation and session lifecycle, reusing the SDK&#39;s
+<code>runProcess</code> and semantic event manager. Applications own connection selection,
+thread routing, prompts, approval decisions, visible presentation and explicit
+send actions. It does not install Codex, authenticate an account, attach to a
+desktop chat, start a thread during connection, or choose a model.</p>
+<p>The <a href="https://learn.chatgpt.com/docs/app-server" target="_blank" rel="noreferrer">official Codex App Server documentation</a>
+defines the external protocol: stdio JSONL frames omit <code>jsonrpc</code>; initialization
+uses <code>initialize</code> followed by <code>initialized</code>; <code>turn/start</code> acceptance is distinct
+from the terminal <code>turn/completed</code> notification. This transport is separate from
+Core&#39;s Content-Length-framed <code>arcane/1</code> connection.</p>
+<p>The source baseline is the current, unversioned official App Server page read
+on October 6, 2026, specifically its Protocol, Initialization, Threads, Events
+and approval/request sections. This adapter does not claim a pinned Codex CLI
+release or generated-schema revision. The documentation describes schema
+generation as specific to the CLI version used; no CLI or schema generator was
+executed to establish this source contract.</p>
+<h2 id="open-an-explicitly-selected-connection">Open an explicitly selected connection</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createCodexAppServerSession} from &#39;arcane-os/codex/app-server&#39;;
+
+const session = createCodexAppServerSession(
+    {
+        executable: selectedCodexExecutable,
+        args: [&#39;app-server&#39;, &#39;--listen&#39;, &#39;stdio://&#39;],
+        cwd: selectedWorkingDirectory,
+        clientInfo: {name: &#39;moon_cheese_inventory&#39;, title: &#39;Moon Cheese Inventory&#39;, version: &#39;1&#39;}
+    }
+);
+
+// Store the handle before awaiting so the host can dispose during initialization.
+connectionOwner.session = session;
+session.subscribe(&#39;status&#39;, showConnectionStatus);
+session.subscribe(&#39;serverRequest&#39;, askForActualDecision);
+await session.connect();
+
+const {thread} = await session.createThread(selectedThreadOptions);
+const result = await session.runTurn(
+    {
+        threadId: thread.id,
+        input: &#39;Count the moon cheese and explain the missing wheel.&#39;,
+        signal: requestController.signal,
+        onDelta: showSelectedLiveDelta,
+        onItem: updateSelectedItem,
+        onTurn: showTurnStatus
+    }
+);
+
+// These records contain assistant text, not commands, reasoning or tool envelopes.
+showVisibleResult(result.visibleItems, result.status);
+await session.dispose();
+</code></pre></div>
+<p>The example&#39;s named callbacks and owners belong to the application. Keep a
+session alive across related operations; it launches one process per connection,
+not one per request. <code>openCodexAppServerSession(options)</code> creates a session,
+awaits connection readiness and returns it; use the synchronous factory when
+the host needs the handle during connection or needs initialization events.
+If opening fails, the convenience function disposes the owned process before
+rejecting.</p>
+<p>Options are <code>executable</code> (required), <code>args</code> (defaults shown above), <code>cwd</code>, <code>env</code>,
+<code>clientInfo</code> and <code>capabilities</code>. <code>env</code> uses <code>runProcess</code>&#39;s environment overrides.
+Arguments are actual executable arguments; there is no shell command parser.
+On Windows, select an actual native executable or explicitly select Node and
+the installed CLI entry script in <code>args</code>, instead of passing a <code>.cmd</code> launcher.
+No operating-system-specific credential store or home-directory assumption is
+introduced. Node and the caller-selected native executable are required on
+Windows, Linux and macOS; Android requires a host that supplies those process
+facilities. A browser renderer cannot import or launch this Node-only adapter.</p>
+<p>The default client identity is
+<code>{name:&#39;arcane_sdk&#39;,title:&#39;Arcane SDK&#39;,version:&#39;1&#39;}</code>. Caller-supplied identity and
+capabilities are forwarded to initialization. Experimental methods require the
+server&#39;s corresponding capability selection. Avoid opting out of the turn/item
+notifications that <code>runTurn</code> needs; the adapter does not override your selection
+or manufacture missing events.</p>
+<h2 id="session-methods">Session methods</h2>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Result and ownership</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>connect()</code></td>
+<td>Promise of the same session after initialization; concurrent calls share the in-flight connection. Ready calls reuse it.</td>
+</tr>
+<tr>
+<td><code>listThreads(params)</code></td>
+<td>Complete native <code>thread/list</code> result, including <code>data</code> and cursor. The caller owns pagination.</td>
+</tr>
+<tr>
+<td><code>readThread({threadId,includeTurns,...options})</code></td>
+<td>Complete native <code>thread/read</code> result. No thread resume or event subscription.</td>
+</tr>
+<tr>
+<td><code>readTurn({threadId,turnId})</code></td>
+<td>Reads the thread with <code>includeTurns:true</code>, selects the exact turn, and returns the response shape below. No new turn or thread resume.</td>
+</tr>
+<tr>
+<td><code>createThread(params)</code></td>
+<td>Complete native <code>thread/start</code> result, including <code>thread</code>; the server subscribes the connection to that new thread.</td>
+</tr>
+<tr>
+<td><code>resumeThread({threadId,...options})</code></td>
+<td>Complete native <code>thread/resume</code> result for the caller&#39;s explicitly selected existing thread.</td>
+</tr>
+<tr>
+<td><code>request(method,params)</code></td>
+<td>Complete native result, or a correlated RPC error. Use for additional provider methods; no automatic retries.</td>
+</tr>
+<tr>
+<td><code>runTurn(options)</code></td>
+<td>Waits for the exact accepted turn&#39;s terminal notification. Does not create, resume or select a thread.</td>
+</tr>
+<tr>
+<td><code>interrupt({threadId,turnId})</code></td>
+<td>Native interrupt acknowledgement only; the terminal notification establishes the actual outcome.</td>
+</tr>
+<tr>
+<td><code>respond({id,result},context)</code> / <code>respond({id,error},context)</code></td>
+<td>Queues the actual correlated server-request reply and returns <code>{id,submitted:true}</code>. Retain the originating context across asynchronous work. Submission is not resolution.</td>
+</tr>
+<tr>
+<td><code>subscribe(type,listener,options)</code></td>
+<td>Returns an unsubscribe function; supports the shared event owner&#39;s <code>once</code> and <code>signal</code>. <code>status</code> replays immediately.</td>
+</tr>
+<tr>
+<td><code>reconnect()</code></td>
+<td>Drains the old owned process and initializes a new one. Never replays requests or resumes threads.</td>
+</tr>
+<tr>
+<td><code>dispose()</code></td>
+<td>Cancels the owned process tree, drains input/output/process completion, releases subscriptions and permanently disposes this session.</td>
+</tr></tbody>
+</table>
+</div>
+<p>Requests require a ready connection and do not implicitly connect.
+<code>readThread</code> returns native <code>{thread:{turns:[{id,status,items,...}],...},...}</code>
+when turns are requested. <code>readTurn</code> returns the stored status as supplied,
+including an in-progress status if that is what the server returns. A missing
+exact ID rejects with <code>ARCANE_CODEX_TURN_NOT_FOUND</code>; it never picks another turn.
+Neither read operation claims the returned conversation belongs to the desktop
+application. Access and available records depend on the selected App Server.</p>
+<h2 id="input-live-callbacks-and-complete-output">Input, live callbacks and complete output</h2>
+<p><code>runTurn({threadId,input,signal,onDelta,onItem,onTurn,...turnOptions})</code> forwards
+the remaining options to native <code>turn/start</code>. A native input array is sent
+unchanged. A string receives only the required native text-item envelope
+<code>[{type:&#39;text&#39;,text:input}]</code>; the string itself is unchanged. No prompt prefix,
+trimming, classification, normalization or implicit tool selection occurs.</p>
+<p>Register or resume the selected thread before running a turn so the connection
+receives its item/turn notifications. Local correlation listeners are installed
+before submission. Events that arrive ahead of the acceptance response are
+retained in order until the returned turn ID can correlate them.</p>
+<ul>
+<li><code>onDelta({threadId,turnId,itemId,delta,phase,method,params})</code> receives complete
+<code>item/agentMessage/delta</code> or <code>item/commandExecution/outputDelta</code> content. Use
+<code>method</code> to select assistant text for the ordinary UI; command output belongs
+in an explicitly selected inspection surface. <code>params</code> preserves all native
+fields. Other delta methods remain available through <code>notification</code>.</li>
+<li><code>onItem({threadId,turnId,itemId,text,phase,stage,item,params})</code> receives item
+starts and completions. <code>stage</code> is <code>started</code> or <code>completed</code>; <code>phase</code> is the
+provider&#39;s phase or <code>null</code>, not the lifecycle stage. <code>text</code> is agent-message
+text, and is <code>null</code> for other item types. <code>item</code> remains the complete native
+object, including extension fields.</li>
+<li><code>onTurn({threadId,turnId,status,turn})</code> receives actual turn lifecycle events.
+The <code>turnAccepted</code> session event separately carries the start response.</li>
+</ul>
+<p>The resolved result is
+<code>{threadId,turnId,status,items,visibleItems,error,turn}</code>:</p>
+<ul>
+<li><code>status</code> is the actual terminal status: <code>completed</code>, <code>interrupted</code> or <code>failed</code>.
+A provider failure resolves this terminal result with its actual <code>error</code>;
+transport and start-request errors reject. Inspect status before committing a
+successful application response.</li>
+<li><code>items</code> contains complete native item objects in first-observed order, updated
+by their final item snapshots and any terminal turn items. It includes commands
+and other diagnostic/protocol item types; it is not durable chat history.</li>
+<li><code>visibleItems</code> contains only agent-message projections
+<code>{itemId,text,phase}</code>. Text is complete and unchanged. All supplied phases,
+including <code>commentary</code>, <code>final_answer</code> or <code>null</code>, remain distinct. The app
+decides which phases belong in its visible response; the adapter never joins
+items, inserts separators or rewrites text.</li>
+<li><code>turn</code> and <code>error</code> preserve the complete terminal provider objects. There is
+no synthesized successful turn or substituted assistant failure message.</li>
+</ul>
+<p>Callbacks are observational and invoked in incoming order, without awaiting
+returned promises. This allows an approval owner to await another RPC without
+deadlocking stdout. Synchronous failures and rejected callback promises produce
+<code>observerError</code>; a rejection arriving after disposal goes to <code>console.error</code>.
+Applications own completion of their asynchronous presentation/decision work.</p>
+<h2 id="events-and-server-requests">Events and server requests</h2>
+<p><code>session.status</code> is <code>{state,...details}</code>, with states <code>disconnected</code>,
+<code>connecting</code>, <code>ready</code>, and <code>disposed</code>. Ready includes the complete <code>initialized</code>
+result; connection failure includes <code>error</code>. There is no implied authentication,
+model readiness, thread ownership or persistence guarantee in a ready status.</p>
+<p>Session event names are <code>status</code>, <code>message</code>, <code>notification</code>, <code>stderr</code>, <code>process</code>,
+<code>error</code>, <code>serverRequest</code>, <code>serverRequestResponded</code>, <code>serverRequestResolved</code>,
+<code>turnAccepted</code>, <code>delta</code>, <code>item</code>, <code>turn</code> and <code>observerError</code>. Listener arguments
+are detail objects directly, not DOM events. Shared semantic event names use
+the <code>arcane.codex.app-server.</code> prefix and lowercase hyphen-separated suffixes.
+The public subscription aliases retain their original spelling:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Session alias</th>
+<th>Shared semantic event</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>serverRequest</code></td>
+<td><code>arcane.codex.app-server.server-request</code></td>
+</tr>
+<tr>
+<td><code>serverRequestResponded</code></td>
+<td><code>arcane.codex.app-server.server-request-responded</code></td>
+</tr>
+<tr>
+<td><code>serverRequestResolved</code></td>
+<td><code>arcane.codex.app-server.server-request-resolved</code></td>
+</tr>
+<tr>
+<td><code>turnAccepted</code></td>
+<td><code>arcane.codex.app-server.turn-accepted</code></td>
+</tr>
+<tr>
+<td><code>observerError</code></td>
+<td><code>arcane.codex.app-server.observer-error</code></td>
+</tr></tbody>
+</table>
+</div>
+<p>The other aliases are already lowercase and are appended unchanged to the
+prefix. Declaration, subscription and publication share this same mapping;
+native Codex wire method names and payload fields are unchanged.</p>
+<p><code>message</code> exposes every complete decoded JSONL envelope; <code>notification</code> exposes
+all native notification methods. <code>stderr</code> preserves complete <code>{stream,chunk}</code>
+records. <code>process</code> forwards the SDK process owner&#39;s lifecycle events. These
+diagnostics are neither application conversation text nor saved chat history.</p>
+<p>Every inbound request with a method and ID emits <code>serverRequest</code>. Its listener
+receives the complete native envelope as its first argument and a separate
+origin-bound reply context as its second. This includes approvals, permissions, user input,
+MCP elicitation and experimental tool calls. The adapter does not approve,
+decline, fabricate tool results or invoke application tools itself. The
+application returns the exact native result or error for that request method:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">async function askForActualDecision(request, context) {
+    const result = await applicationDecisionOwner.answer(request);
+    context.respond(
+        {result}
+    );
+}
+</code></pre></div>
+<p>The stdout reader keeps consuming while that decision is pending.
+The context is <code>{id,respond}</code>. <code>context.respond({result})</code> or
+<code>context.respond({error})</code> binds the reply to that exact request and its native
+ID. Equivalently, pass the same context object as the second argument to
+<code>session.respond({id:request.id,result},context)</code>. Retain it before awaiting a
+human decision or other work. It is SDK control metadata, not part of the native
+request or reply payload.</p>
+<p>ID-only <code>session.respond({id,result})</code> remains supported while that native ID
+has appeared only once in this session. Once an ID is reused, including after
+reconnect, ID-only replies throw <code>ARCANE_CODEX_REQUEST_CONTEXT_REQUIRED</code> rather
+than selecting an origin implicitly. A context from an older request throws
+<code>ARCANE_CODEX_STALE_REQUEST_CONTEXT</code> when a current request reuses its ID. If
+there is no corresponding current request, the existing not-ready/not-found
+error applies. No such failure writes a reply to the new process. This also
+handles ID reuse within one connection after a request resolves.</p>
+<p><code>pendingServerRequests</code> contains <code>{request,responded,context,contextRequired}</code>
+entries for the current connection. An attention owner can retain that same
+context when presenting an already pending request. Submission changes
+<code>responded</code>; the server&#39;s
+<code>serverRequest/resolved</code> notification removes the entry. A late reply after
+resolution, disconnect, or a prior submitted reply is reported explicitly.
+Disconnection clears pending requests and includes their complete prior entries
+in the connection <code>error</code> event as <code>pendingServerRequests</code>.
+<code>serverRequestResolved</code> receives the native <code>{threadId,requestId}</code> params after
+the corresponding pending entry is removed. The <code>serverRequestResponded</code> event
+receives <code>{request,response}</code>, while <code>serverRequest</code> receives the raw request
+envelope directly. Clear application attention from actual pending state or
+resolution/disconnection, rather than treating local submission as resolution.</p>
+<h2 id="cancellation-and-unknown-results">Cancellation and unknown results</h2>
+<p>A pre-aborted turn rejects with <code>ARCANE_CANCELLED</code> and
+<code>details.outcome:&#39;not-submitted&#39;</code>. After submission, abort requests interruption
+as soon as the accepted turn ID is known. It stops that call&#39;s <code>onDelta</code> and
+<code>onItem</code> delivery; raw session events and actual <code>onTurn</code> terminal status remain
+observable. A successful interrupt acknowledgement is not a terminal result.
+If interruption itself fails, the operation rejects with an unknown outcome.</p>
+<p>Connection loss or disposal before terminal completion rejects a turn with
+<code>ARCANE_CODEX_TURN_UNKNOWN</code>, <code>details.outcome:&#39;unknown&#39;</code>, the actual thread ID,
+the turn ID when known, and observed native items. Ordinary pending RPCs reject
+with <code>ARCANE_CODEX_CONNECTION_LOST</code> and unknown outcome. Native RPC rejection
+uses <code>ARCANE_CODEX_RPC</code> and retains <code>details.error</code>, <code>response</code>, <code>method</code>,
+<code>requestId</code>, <code>params</code> and <code>outcome:&#39;rejected&#39;</code>.</p>
+<p>There are no implicit retries, timer-based completions, generic shutdown RPCs,
+or claims that stdin EOF durably saves a turn. After reconnecting, use the known
+thread and turn IDs with <code>readTurn</code> to reconcile. If acceptance was never
+observed and no turn ID is known, inspect <code>readThread({threadId,includeTurns:true})</code>
+and let the application resolve that ambiguity. Never automatically repeat
+<code>turn/start</code> because its outcome is uncertain. Resume a selected thread only
+when the application explicitly intends further work on it.</p>
+<p>This page describes the SDK source contract. Native Codex, authentication,
+provider behavior and platform execution require evidence from the selected
+installed runtime; authored fixture coverage is not evidence of those outcomes.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#open-an-explicitly-selected-connection">Open an explicitly selected connection</a><a href="#session-methods">Session methods</a><a href="#input-live-callbacks-and-complete-output">Input, live callbacks and complete output</a><a href="#events-and-server-requests">Events and server requests</a><a href="#cancellation-and-unknown-results">Cancellation and unknown results</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.65.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

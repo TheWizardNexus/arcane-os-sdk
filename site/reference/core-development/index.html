@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="developApplication() can compose an application&#39;s Core services without selecting, installing or loading a local AI engine. It uses the existing SDK source server and one app-scoped Core dispatcher; the app owns its service implementations and the explicit actions that start native work.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core-development/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Application Core services during source development · Arcane OS SDK"><meta property="og:description" content="developApplication() can compose an application&#39;s Core services without selecting, installing or loading a local AI engine. It uses the existing SDK source server and one app-scoped Core dispatcher; the app owns its service implementations and the explicit actions that start native work."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core-development/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Application Core services during source development · Arcane OS SDK"><meta name="twitter:description" content="developApplication() can compose an application&#39;s Core services without selecting, installing or loading a local AI engine. It uses the existing SDK source server and one app-scoped Core dispatcher; the app owns its service implementations and the explicit actions that start native work."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Application Core services during source development | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Application Core services during source development</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="application-core-services-during-source-development">Application Core services during source development</h1><p class="doc-lead">developApplication() can compose an application&#39;s Core services without selecting, installing or loading a local AI engine. It uses the existing SDK source server and one app-scoped Core dispatcher; the app owns its service implementations and the explicit actions that start native work.</p><div class="doc-meta"><span>SDK 0.65.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="./" aria-current="page">Development Core services</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/core-development.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#select-services">Select services</a><a href="#connect-the-page-without-blocking-rendering">Connect the page without blocking rendering</a><a href="#direct-composition">Direct composition</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a></nav></details><p><code>developApplication()</code> can compose an application&#39;s Core services without
+selecting, installing or loading a local AI engine. It uses the existing SDK
+source server and one app-scoped Core dispatcher; the app owns its service
+implementations and the explicit actions that start native work.</p>
+<h2 id="select-services">Select services</h2>
+<p>The ordinary <code>arcane dev</code> command reads <code>native.services</code> from the selected
+application descriptor:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>json</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-json">{
+    &quot;native&quot;: {
+        &quot;services&quot;: [
+            {&quot;module&quot;: &quot;bridge/moon-cheese.mjs&quot;, &quot;options&quot;: {&quot;shelf&quot;: &quot;Lunar cheddar&quot;}}
+        ]
+    }
+}
+</code></pre></div>
+<p>This is the <code>native</code> portion of the application&#39;s existing descriptor, not a
+complete descriptor. Module paths resolve from the selected app root. Each
+module exports its factory as default, using the same native packaging contract:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">export default function createMoonCheese(options, context) {
+    return {
+        name: &#39;moon-cheese&#39;,
+        methods: {
+            &#39;moon-cheese.current&#39;: function current() {
+                return {shelf: options.shelf, message: &#39;The Moon is ready for cheese.&#39;};
+            }
+        }
+    };
+}
+</code></pre></div>
+<p>The factory receives <code>(options, context)</code> without changing authored options.
+Context supplies <code>appRoot</code>, the operation <code>signal</code>, and <code>onEvent</code>; a programmatic
+call&#39;s explicit <code>context</code> fields take precedence, matching the native
+launch-context convention. A factory may return a service promise. Service
+definitions retain the Core <code>name</code>, <code>methods</code>, <code>start</code>, <code>drain</code> and <code>dispose</code>
+contract. Services start independently after composition; a method waits only
+for its own service&#39;s startup. A process such as Codex starts only when the
+application service&#39;s explicit connect method requests it, not because the
+development listener opened.</p>
+<p>Programmatic composition uses:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {developApplication} from &#39;arcane-os&#39;;
+
+const development = await developApplication({
+    workspaceRoot: process.cwd(),
+    serviceModules: [{module: &#39;bridge/moon-cheese.mjs&#39;, options: {shelf: &#39;Lunar cheddar&#39;}}],
+    context: {stateRoot: &#39;./selected-app-state&#39;}
+});
+// Application work proceeds. Its owner later calls await development.close().
+</code></pre></div>
+<p><code>serviceModules</code> replaces the descriptor&#39;s module list when supplied, including
+an explicitly empty array. <code>services</code> adds already-constructed Core service
+definitions. Both can coexist with configured native local-AI services inside
+one dispatcher. No services and no selected local AI preserves ordinary static
+source serving. The result adds <code>core</code> when composition is selected and retains
+the existing <code>localAI</code> result when local AI is selected.</p>
+<h2 id="connect-the-page-without-blocking-rendering">Connect the page without blocking rendering</h2>
+<p>Load <code>/arcane-core.js</code> as an independent module. It immediately exports <code>client</code>
+after synchronous installation, without awaiting SSE connection or Core/service
+readiness. The existing <code>/arcane-local-ai.js</code> URL remains an alias for the same
+bootstrap behavior. Managed import maps resolve its public Core-client import.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {client} from &#39;/arcane-core.js&#39;;
+
+client.events.when(&#39;core.ready&#39;, function dispatcherReady() {
+    client.invoke(&#39;moon-cheese.current&#39;).then(
+        function showCheese(result) { console.log(result); },
+        function reportCheeseFailure(error) { console.error(error); }
+    );
+});
+</code></pre></div>
+<p>The SDK does not inject a script or hold the page&#39;s first render. Existing native
+clients remain installed; a disconnected standalone client can be replaced by
+this explicitly selected development connection. <code>core.ready</code> establishes
+dispatcher readiness, not a connected application process or loaded model.
+Application status methods remain the owner of application state and pending
+requests. Generic replay supplies current Core/service lifecycle, not historical
+responses, a repository catalog or an application&#39;s operation journal.</p>
+<p>A page module that loads independently of the bootstrap can use
+<code>subscribeCoreClient()</code> from <code>arcane-os/core/client</code>. It immediately replays the
+installed client (or <code>null</code>), then reports installation, close and terminal
+transport failure. This lets rendering proceed before the connection exists.
+Installation alone is not service readiness; observe the returned client&#39;s
+runtime and service events. Retire subscriptions with the page&#39;s owning lifetime.</p>
+<p>The development transport uses <code>/events</code> for ordered SSE frames and <code>/rpc</code> for
+JSON requests. The shared Core client owns correlation, timeout and cancellation.
+Responses and correlated streaming events return to their originating document.
+Uncorrelated service lifecycle events reach connected documents. The payload
+is passed unchanged to the service; the adapter adds no application policy.
+Connection and complete parsing/transport errors reach the client&#39;s existing
+failure/diagnostic boundary. Reopening a page creates a new document connection,
+not a second service runtime.</p>
+<h2 id="direct-composition">Direct composition</h2>
+<p><code>createDevelopmentCore()</code> is exported from <code>arcane-os</code> and
+<code>arcane-os/core/development</code>. It accepts
+<code>{appRoot=process.cwd(), application, version, services=[], serviceModules=[], context={}, getReplayEvents, signal, onEvent}</code> and returns synchronously:</p>
+<ul>
+<li><code>ready</code>: the runtime after service modules are composed and dispatcher startup
+is accepted; individual services may still be starting or may fail separately;</li>
+<li><code>handler(request,response)</code>: an asynchronous boolean indicating whether an SDK
+Core route was consumed;</li>
+<li><code>current()</code>: <code>{state,error,core}</code>, with complete Core service/lifecycle state;</li>
+<li><code>close()</code>: one idempotent shutdown promise.</li>
+</ul>
+<p>Use <code>startDevServer({..., core})</code> to give that server the handler and shutdown
+owner. A failed server start remains the caller&#39;s cleanup responsibility for
+direct composition; <code>developApplication()</code> performs this cleanup itself.
+<code>getReplayEvents()</code> optionally returns complete current <code>{event,data}</code> snapshots
+for service-specific replay. It neither stores history nor replaces application
+status methods. Existing local-AI composition uses it for its established model,
+image and speech snapshots.</p>
+<h2 id="cancellation-and-shutdown">Cancellation and shutdown</h2>
+<p>A document disconnect or its <code>requests.cancelAll</code> cancels only its own
+request-lifetime operations. Another document&#39;s work remains active. An accepted
+<code>lifetime:&#39;service&#39;</code> operation survives renderer cancellation; the service owns
+its durable completion. A disconnected document receives no later response,
+and reconnecting does not automatically repeat the operation.</p>
+<p>Closing the development owner stops new Core requests, cancels request-lifetime
+work, waits for accepted service work, drains and disposes services, and joins
+queued SSE writes before ending remaining connections. Failures remain complete
+and observable. The SDK claims no completion for a service that ignores its
+cancellation or never settles. It never kills the application process merely
+because one page disconnects.</p>
+<p>Definitions supplied in <code>services</code> belong to this cleanup owner as soon as the
+handle is returned. Calling <code>close()</code> before its preparation microtask still
+drains and disposes those definitions without starting them or loading modules.</p>
+<p>This is one development-server process on Windows, Linux or macOS. It is not a
+cross-process host discovery/start-or-reuse service, nor control of existing
+Codex desktop tasks. Android requires its separate host adaptation. See
+<a href="../core-runtime/">Core runtime</a> and <a href="../core-client/">Core client</a> for the underlying
+public contracts.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#select-services">Select services</a><a href="#connect-the-page-without-blocking-rendering">Connect the page without blocking rendering</a><a href="#direct-composition">Direct composition</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.65.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

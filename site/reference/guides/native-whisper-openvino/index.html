@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="Select encoder: &quot;openvino-npu&quot; to run Whisper&#39;s audio encoder through OpenVINO on the Intel NPU. The decoder retains its separate backend selection. Omitting encoder preserves the ordinary native Whisper path.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/guides/native-whisper-openvino/"><link rel="icon" type="image/png" href="../../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../../styles.css"><link rel="stylesheet" href="../../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Native Whisper with an Intel NPU encoder · Arcane OS SDK"><meta property="og:description" content="Select encoder: &quot;openvino-npu&quot; to run Whisper&#39;s audio encoder through OpenVINO on the Intel NPU. The decoder retains its separate backend selection. Omitting encoder preserves the ordinary native Whisper path."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/guides/native-whisper-openvino/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Native Whisper with an Intel NPU encoder · Arcane OS SDK"><meta name="twitter:description" content="Select encoder: &quot;openvino-npu&quot; to run Whisper&#39;s audio encoder through OpenVINO on the Intel NPU. The decoder retains its separate backend selection. Omitting encoder preserves the ordinary native Whisper path."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Native Whisper with an Intel NPU encoder | Arcane OS SDK</title><script src="../../../app.js" defer></script><script src="../../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../examples/">Hello World</a><a href="../../../guides/">Guides</a><a href="../../sdk-api/">API</a><a href="../../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native Whisper with an Intel NPU encoder</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-whisper-with-an-intel-npu-encoder">Native Whisper with an Intel NPU encoder</h1><p class="doc-lead">Select encoder: &quot;openvino-npu&quot; to run Whisper&#39;s audio encoder through OpenVINO on the Intel NPU. The decoder retains its separate backend selection. Omitting encoder preserves the ordinary native Whisper path.</p><div class="doc-meta"><span>SDK 0.65.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../../ai/">Normalized AI</a><a href="../../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../../ai/browser-wasm/">Browser-WASM AI</a><a href="../../ai/browser-decisions/">Browser typed decisions</a><a href="../../ai/browser-speech/">Browser speech</a><a href="../../websocket-client/">Shared WebSocket clients</a><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../core/">Core map</a><a href="../../core-client/">Core browser client</a><a href="../../core-runtime/">Native Core runtime</a><a href="../../core-development/">Development Core services</a><a href="../../codex-app-server/">Codex App Server</a><a href="../../mcp-stdio/">MCP STDIO server</a><a href="../../local-ai/">Local AI through Core</a><a href="../../local-image-flux/">FLUX.2 Klein 4B</a><a href="../../local-image-sdxl/">SDXL Base 1.0</a><a href="../../native-speech/">Native speech service</a><a href="../../local-whisper/">Native Whisper</a><a href="./" aria-current="page">Intel NPU Whisper</a><a href="../../core-repositories/">Native repository workspaces</a><a href="../../core-native-packaging/">Portable Core packaging</a><a href="../../core/arcane-api/">Arcane API</a><a href="../../core/capabilities/">Capabilities and admission</a><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../../core/arcane-events/">Events</a><a href="../../core/arcane-ai-contracts/">AI contracts</a><a href="../../core/arcane-entities/">Entity exports</a><a href="../../core/ollama-module/">Ollama internals (advanced)</a><a href="../../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/guides/native-whisper-openvino.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#declare-the-application-requirement">Declare the application requirement</a><a href="#keep-the-model-files-together">Keep the model files together</a><a href="#development-native-hosts-and-bundles">Development, native hosts and bundles</a><a href="#connect-a-browser-through-native-speech">Connect a browser through native speech</a><a href="#read-initialization-evidence-and-handle-failures">Read initialization evidence and handle failures</a><a href="#supply-a-complete-custom-runtime">Supply a complete custom runtime</a><a href="#produce-the-optional-native-runtime">Produce the optional native runtime</a></nav></details><p>Select <code>encoder: &quot;openvino-npu&quot;</code> to run Whisper&#39;s audio encoder through
+OpenVINO on the Intel NPU. The decoder retains its separate <code>backend</code>
+selection. Omitting <code>encoder</code> preserves the ordinary native Whisper path.</p>
+<p>The initial precompiled distribution and producer target Windows x64 team
+computers with Intel AI Boost and a compatible installed Intel NPU driver.
+The selected runtime uses Whisper 1.9.4 and OpenVINO 2026.3.1. Application
+preparation downloads native resources; it does not install a driver,
+compiler, Python environment, or model converter. Other platform distributions
+require their own complete compatible native resources; the Windows asset
+does not establish NPU support on Linux, macOS, or Android.</p>
+<h2 id="declare-the-application-requirement">Declare the application requirement</h2>
+<p>Add the runtime to the application&#39;s <code>arcane-app.json</code>, retaining its other
+descriptor fields:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>json</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-json">{
+  &quot;native&quot;: {
+    &quot;localAI&quot;: {
+      &quot;runtimes&quot;: [
+        {
+          &quot;id&quot;: &quot;whisper.cpp&quot;,
+          &quot;encoder&quot;: &quot;openvino-npu&quot;,
+          &quot;backend&quot;: &quot;auto&quot;,
+          &quot;models&quot;: [&quot;whisper-small&quot;]
+        }
+      ]
+    }
+  }
+}
+</code></pre></div>
+<p>For a package descriptor, use the equivalent <code>arcane-package.json</code> <code>localAI</code>
+field. Selecting only the runtime leaves <code>models</code> empty. A single prepared
+model becomes the selected <code>modelId</code>; with several models, supply a <code>modelId</code>
+that names one of them.</p>
+<p>The default optional asset contains its matching helper, OpenVINO runtime,
+NPU plugin and compiler libraries, and CUDA and CPU decoder libraries. An
+<code>auto</code> installation extracts that complete tree once and creates CUDA and CPU
+records referring to it.</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th><code>backend</code></th>
+<th>Decoder selection with <code>encoder: &quot;openvino-npu&quot;</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>auto</code></td>
+<td>Try CUDA first, with the prepared CPU decoder available for loading or inference recovery.</td>
+</tr>
+<tr>
+<td><code>cuda</code></td>
+<td>Select the CUDA variant without Arcane&#39;s automatic CPU retry.</td>
+</tr>
+<tr>
+<td><code>cpu</code></td>
+<td>Select the CPU decoder.</td>
+</tr>
+<tr>
+<td><code>metal</code></td>
+<td>Unavailable in the default Windows distribution.</td>
+</tr></tbody>
+</table>
+</div>
+<p>Both auto-selected records retain the NPU encoder. A reported
+<code>WHISPER_ENCODER_UNAVAILABLE</code> failure ends loading after the helper is drained;
+changing the decoder cannot repair the same failed encoder initialization.
+The helper requests the literal OpenVINO device <code>NPU</code> and does not replace it
+with a CPU encoder. Decoder selection is a request; inspect observed metadata
+for native initialization evidence.</p>
+<h2 id="keep-the-model-files-together">Keep the model files together</h2>
+<p>Under this encoder selection, the built-in <code>whisper-small</code> descriptor selects
+Intel&#39;s multilingual small <a href="https://huggingface.co/Intel/whisper.cpp-openvino-models/blob/main/ggml-small-models.zip" target="_blank" rel="noreferrer">paired model archive</a>:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ggml-small.bin</code></td>
+<td>Whisper model used by the native context.</td>
+</tr>
+<tr>
+<td><code>ggml-small-encoder-openvino.xml</code></td>
+<td>OpenVINO encoder description.</td>
+</tr>
+<tr>
+<td><code>ggml-small-encoder-openvino.bin</code></td>
+<td>Matching OpenVINO encoder data.</td>
+</tr></tbody>
+</table>
+</div>
+<p>Preparation extracts the three selected files from that archive. Matching
+prepared models can be reused when another model selection changes. The
+ordinary <code>whisper-small</code> selection without <code>encoder</code> continues to use its
+existing single GGML download.</p>
+<p>A custom local model supplies all three paths:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const model = {
+    id: &#39;moon-base-small&#39;,
+    path: &#39;/application-owned/models/ggml-small.bin&#39;,
+    encoderPath: &#39;/application-owned/models/ggml-small-encoder-openvino.xml&#39;,
+    encoderDataPath: &#39;/application-owned/models/ggml-small-encoder-openvino.bin&#39;
+};
+</code></pre></div>
+<p>Use real paths on the target host. The installer copies the files together,
+preserving their filenames so the XML can locate its matching BIN. A supplied
+<code>path</code> selects this local-file route even when the descriptor also retains
+archive metadata. Keep the GGML, XML and BIN from the same selected model
+bundle.</p>
+<p>An archive descriptor names each selected member:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const model = {
+    id: &#39;whisper-small&#39;,
+    archiveUrl: &#39;https://huggingface.co/Intel/whisper.cpp-openvino-models/resolve/main/ggml-small-models.zip&#39;,
+    filename: &#39;ggml-small.bin&#39;,
+    encoderFilename: &#39;ggml-small-encoder-openvino.xml&#39;,
+    encoderDataFilename: &#39;ggml-small-encoder-openvino.bin&#39;
+};
+</code></pre></div>
+<p>Put the descriptor in <code>models</code>. A standalone GGML <code>url</code> does not supply the
+encoder files required by this selection.</p>
+<h2 id="development-native-hosts-and-bundles">Development, native hosts and bundles</h2>
+<p>With the declarative requirement, <code>npm exec -- arcane dev</code> prepares the
+application&#39;s native speech service alongside page serving. Its runtime
+installation is under <code>.arcane/local-ai/runtimes</code>; Whisper operation files
+and the OpenVINO encoder cache belong under <code>.arcane/speech/whisper</code>.
+Preparation and model loading proceed independently of the page and other AI
+services. Transcription follows the speech role&#39;s actual readiness.</p>
+<p>A native host can prepare the same requirement explicitly:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import path from &#39;node:path&#39;;
+import {ensureLocalAIRuntimes, bundleLocalAIRuntimes} from &#39;arcane-os/local-ai&#39;;
+import {createWhisperRuntime} from &#39;arcane-os/local-ai/whisper&#39;;
+
+const appRoot = process.cwd();
+const directory = path.join(appRoot, &#39;.arcane&#39;, &#39;local-ai&#39;, &#39;runtimes&#39;);
+const runtimes = [{
+    id: &#39;whisper.cpp&#39;,
+    encoder: &#39;openvino-npu&#39;,
+    backend: &#39;auto&#39;,
+    models: [&#39;whisper-small&#39;]
+}];
+
+const [runtime] = await ensureLocalAIRuntimes({runtimes, directory});
+const stt = createWhisperRuntime({
+    runtime,
+    temporaryDirectory: path.join(appRoot, &#39;.arcane&#39;, &#39;speech&#39;, &#39;whisper&#39;)
+});
+
+await stt.load();
+console.log(stt.current());
+</code></pre></div>
+<p><code>ensureLocalAIRuntimes</code> returns prepared descriptors with absolute paths.
+The host owns the engine&#39;s lifetime and calls <code>await stt.close()</code> at shutdown.
+Use <code>subscribe(listener, {replay: true, signal})</code> for current-state replay and
+later state changes. Preparation and loading accept <code>signal</code> and the
+preparation APIs and engine constructor accept <code>onEvent</code> for diagnostics.</p>
+<p>The application&#39;s existing native build path is
+<code>npm exec -- arcane build --target windows-x64</code>, with the native target declared
+in its descriptor. For an explicitly composed bundle, the same selection can
+be copied into an application-owned output:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const bundle = await bundleLocalAIRuntimes({
+    runtimes,
+    directory,
+    outputRoot: path.join(appRoot, &#39;.arcane&#39;, &#39;native-output&#39;),
+    platform: &#39;win32&#39;,
+    architecture: &#39;x64&#39;
+});
+</code></pre></div>
+<p>Use a fresh bundle destination. This returns <code>{runtimes, files}</code> with paths
+relative to the output root and places Whisper resources under
+<code>runtime/local-ai/whisper.cpp</code>. The generated native Core entry resolves the
+helper, runtime libraries, decoder and all three model paths from the relocated
+bundle. Its operation files and <code>encoder-cache</code> use the native application&#39;s
+state root. Native resources remain beside the application executable in the
+bundle; application startup uses the prepared runtime.</p>
+<h2 id="connect-a-browser-through-native-speech">Connect a browser through native speech</h2>
+<p>The browser accesses this capability through its connected native Core speech
+service. Browser JavaScript does not load OpenVINO DLLs or initialize the NPU.
+Development uses the existing <a href="../../local-ai/">local AI bootstrap</a>;
+native packages compose the same speech service in their generated Core entry.</p>
+<p>With an already connected Core client:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const transcript = await client.speech.transcribe({
+    audioBase64,
+    mimeType: &#39;audio/webm&#39;,
+    model: &#39;whisper-small&#39;
+}, {signal});
+</code></pre></div>
+<p>The existing <code>AI.fetchSTT(audioFile, signal)</code> route remains available. Observe
+<code>speech.state</code> and <code>speech.status</code> through the
+<a href="../../native-speech/">native speech contract</a>; <code>roles.stt</code> and
+<code>transcriptionAvailable</code> expose STT readiness independently of TTS.</p>
+<p>Requests retain the complete recording and existing language and translation
+options. Results retain <code>{text, language, duration, segments}</code>, with segment
+<code>start</code> and <code>end</code> in seconds. Native media decoding, transcript content and
+segment delivery follow the <a href="../../local-whisper/">Whisper contract</a>.</p>
+<h2 id="read-initialization-evidence-and-handle-failures">Read initialization evidence and handle failures</h2>
+<p>The engine&#39;s <code>current()</code> and state subscriptions separate the encoder from the
+decoder:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>requestedEncoder</code></td>
+<td><code>NPU</code> for the selected OpenVINO NPU requirement; otherwise <code>null</code>.</td>
+</tr>
+<tr>
+<td><code>observedEncoder</code></td>
+<td><code>NPU</code> after the public OpenVINO encoder initialization call succeeds; otherwise <code>null</code>.</td>
+</tr>
+<tr>
+<td><code>encoderEvidence</code></td>
+<td><code>openvino-initialization</code> after that success; otherwise <code>null</code>.</td>
+</tr>
+<tr>
+<td><code>requestedBackend</code></td>
+<td>The selected decoder variant, or the configured preference before a helper is selected.</td>
+</tr>
+<tr>
+<td><code>observedBackend</code></td>
+<td>Backend observed in native initialization logs, when available.</td>
+</tr>
+<tr>
+<td><code>backendEvidence</code></td>
+<td><code>runtime-log</code> when that observation is available.</td>
+</tr></tbody>
+</table>
+</div>
+<p>Before encoder initialization succeeds, observed encoder fields remain
+<code>null</code>. The helper emits <code>ready</code> only after both its Whisper context and
+selected encoder initialize. This proves initialization for that context;
+it does not prove that a recording has been transcribed, that every operation
+runs on the NPU or GPU, or that either device improves performance.</p>
+<p>When native encoder initialization returns a nonzero result,
+<code>WHISPER_ENCODER_UNAVAILABLE</code> includes that return code in its message. The
+failure retains the joined helper failure in
+<code>cause</code> when present, with captured process output in that failure&#39;s <code>details</code>.
+For NPU <code>WHISPER_INFERENCE_FAILED</code>, Arcane shuts down and
+joins the failed helper before returning the error: a successful shutdown
+record is available in <code>error.data</code>, including complete <code>stderr</code>; a separate
+exit failure is retained in <code>error.cause</code>. When multiple attempts fail,
+inspect the complete <code>AggregateError.errors</code> as well. <code>onEvent</code> can deliver
+diagnostics while work proceeds. Keep these complete records in developer
+diagnostics; ordinary application status can use the concise lifecycle error.</p>
+<p>With <code>backend: &quot;auto&quot;</code>, a recoverable accelerated inference failure can retry
+the complete decoded recording once using the CPU decoder and the same NPU
+encoder selection. The engine reports <code>recovering</code> while replacing the
+context, retains the accepted request, and accepts no concurrent transcription.</p>
+<p>OpenVINO&#39;s synchronous encoder call has no per-request cancellation seam in
+Whisper. Cancelling an active NPU inference therefore retires the owned
+helper process and waits for its exit before removing recording files. The
+model becomes unloaded. After cancellation settles, call <code>await stt.load()</code>
+with a fresh, unaborted signal before the next transcription. <code>unload()</code> also
+cancels active work and drains the helper; <code>close()</code> ends the engine&#39;s lifetime.
+Cancellation before native inference need not unload an already ready model;
+follow the resulting authoritative state.</p>
+<h2 id="supply-a-complete-custom-runtime">Supply a complete custom runtime</h2>
+<p>For an existing compatible build, select a complete variant rather than
+individual DLLs:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const requirement = {
+    id: &#39;whisper.cpp&#39;,
+    encoder: &#39;openvino-npu&#39;,
+    backend: &#39;cpu&#39;,
+    models: [&#39;whisper-small&#39;],
+    variants: [{
+        backend: &#39;cpu&#39;,
+        encoder: &#39;openvino-npu&#39;,
+        root: nativeRuntimeDirectory,
+        libraryDirectory: path.join(nativeRuntimeDirectory, &#39;bin&#39;)
+    }]
+};
+</code></pre></div>
+<p>Each variant supplies a local <code>root</code> or an archive <code>url</code>. A supplied
+<code>libraryDirectory</code> is relative to or inside that selected tree; otherwise it
+is found from the native Whisper library. Each optional complete tree contains
+its own matching <code>arcane-whisper.exe</code> beside the runtime DLLs. Preparation
+retains that variant&#39;s executable, so multiple custom builds keep their
+matching helpers. Include all selected OpenVINO, NPU plugin/compiler, TBB,
+Whisper, ggml and compiler-runtime libraries, plus the CUDA libraries when
+selecting CUDA. A CPU variant still needs the OpenVINO NPU resources.</p>
+<p>For custom automatic decoder recovery, declare both CUDA and CPU variants
+with <code>encoder: &quot;openvino-npu&quot;</code>. Custom variants are prepared as explicitly
+supplied trees. Library search configuration belongs to the launched helper
+process and does not change the machine&#39;s global <code>PATH</code>. The general Whisper
+helper and FFmpeg decoder overrides remain available through the existing
+<a href="../../local-whisper/">runtime descriptor</a>.</p>
+<h2 id="produce-the-optional-native-runtime">Produce the optional native runtime</h2>
+<p>Runtime producers can use the public
+<code>arcane-os/local-ai/whisper/openvino-build</code> export with the selected installed
+Whisper 1.9.4 source, OpenVINO 2026.3.1 Windows development tree and an existing
+compatible CMake/MSVC environment. <code>cudaDirectory</code>, when supplied, names the
+matching upstream b5130 CUDA distribution&#39;s library directory. It supplies
+the precompiled CUDA backend; omitting it produces the NPU-plus-CPU runtime.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {cp} from &#39;node:fs/promises&#39;;
+import {buildWhisperOpenVinoRuntime} from &#39;arcane-os/local-ai/whisper/openvino-build&#39;;
+import {buildWhisperHelper} from &#39;arcane-os/local-ai/whisper/build&#39;;
+
+const nativeRuntime = await buildWhisperOpenVinoRuntime({
+    sourceDirectory,
+    openvinoDirectory,
+    cudaDirectory,
+    outputRoot: path.join(appRoot, &#39;.arcane&#39;, &#39;native-build&#39;, &#39;openvino&#39;),
+    env,
+    signal,
+    onEvent
+});
+
+const helper = await buildWhisperHelper({
+    runtime: nativeRuntime,
+    outputRoot: path.join(appRoot, &#39;.arcane&#39;, &#39;native-build&#39;, &#39;helper&#39;),
+    env,
+    signal,
+    onEvent
+});
+
+await cp(path.join(helper.root, &#39;bin&#39;), nativeRuntime.libraryDirectory, {
+    recursive: true
+});
+</code></pre></div>
+<p>The variables for source directories, build environment, cancellation and
+diagnostics belong to the producer. Both functions also accept <code>cmake</code>,
+<code>generator</code> and <code>cmakeArgs</code> for that existing build environment.</p>
+<p>The runtime producer returns <code>root</code>, <code>directory</code>, <code>libraryDirectory</code>,
+<code>sourceDirectory</code>, selected <code>backends</code> and complete build <code>diagnostics</code>. Its
+output keeps the copied source and build directory separate from the runtime
+tree. It applies the encoder return-value propagation and exception-to-stderr
+corrections in that copied source. The helper build uses the matching headers
+and runtime and installs its required release compiler-runtime libraries;
+copying its complete installed <code>bin</code> directory places them with the optional
+runtime. Use <code>nativeRuntime.root</code> as the custom variant root and retain its
+packaging notices.</p>
+<p>This producer path builds a native distribution. Applications using the
+precompiled asset follow the preparation and bundling paths above.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#declare-the-application-requirement">Declare the application requirement</a><a href="#keep-the-model-files-together">Keep the model files together</a><a href="#development-native-hosts-and-bundles">Development, native hosts and bundles</a><a href="#connect-a-browser-through-native-speech">Connect a browser through native speech</a><a href="#read-initialization-evidence-and-handle-failures">Read initialization evidence and handle failures</a><a href="#supply-a-complete-custom-runtime">Supply a complete custom runtime</a><a href="#produce-the-optional-native-runtime">Produce the optional native runtime</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.65.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

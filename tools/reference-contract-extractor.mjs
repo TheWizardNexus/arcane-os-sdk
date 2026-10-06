@@ -111,7 +111,7 @@ export const RUNTIME_DOCUMENTED_CALLABLE_MEMBERS={
         'parseModelDefinition','loadModelDefinitionSystemPrompt'
     ],
     'OllamaModelIdentifier.js':[
-        'normalizeOllamaModelIdentifier','isOllamaModelIdentifier'
+        'normalizeOllamaModelIdentifier','isOllamaModelIdentifier','sameOllamaModelIdentifier'
     ],
     'OllamaSettings.js':['arcaneBrainModelName'],
     'OpenMeteoWeatherProvider.js':['mapForecast'],

@@ -216,7 +216,7 @@ normal close or EOF and rejects with an `AggregateError` when transport or
 diagnostic delivery failed. Observe it even when the initiating caller continues
 other work. Request failures alone do not close the session.
 
-## MCP_PROTOCOL_VERSION
+## `MCP_PROTOCOL_VERSION`
 
 `MCP_PROTOCOL_VERSION` is exactly `'2025-11-25'`. Initialization always returns
 that supported version. A client proposing another version must accept this

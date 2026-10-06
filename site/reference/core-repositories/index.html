@@ -13,10 +13,10 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native repository workspaces</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-repository-workspaces">Native repository workspaces</h1><p class="doc-lead">arcane-os/core/repositories owns a persistent native location for connected repositories, separate from application code and application preferences. Applications choose their connection names, remotes, branches, files and Core methods. Importing the module and constructing an owner perform no I/O.</p><div class="doc-meta"><span>SDK 0.64.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native repository workspaces</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-repository-workspaces">Native repository workspaces</h1><p class="doc-lead">arcane-os/core/repositories owns a persistent native location for connected repositories, separate from application code and application preferences. Applications choose their connection names, remotes, branches, files and Core methods. Importing the module and constructing an owner perform no I/O.</p><div class="doc-meta"><span>SDK 0.65.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
-      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="./" aria-current="page">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/core-repositories.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#persistent-locations">Persistent locations</a><a href="#one-connected-working-checkout">One connected working checkout</a><a href="#ownership-concurrency-and-shutdown">Ownership, concurrency and shutdown</a><a href="#bare-snapshots-stay-separate">Bare snapshots stay separate</a></nav></details><p><code>arcane-os/core/repositories</code> owns a persistent native location for connected
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="./" aria-current="page">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/core-repositories.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#persistent-locations">Persistent locations</a><a href="#one-connected-working-checkout">One connected working checkout</a><a href="#write-commit-and-push-selected-text">Write, commit and push selected text</a><a href="#ownership-concurrency-and-shutdown">Ownership, concurrency and shutdown</a><a href="#bare-snapshots-stay-separate">Bare snapshots stay separate</a></nav></details><p><code>arcane-os/core/repositories</code> owns a persistent native location for connected
 repositories, separate from application code and application preferences.
 Applications choose their connection names, remotes, branches, files and Core
 methods. Importing the module and constructing an owner perform no I/O.</p>
@@ -78,7 +78,7 @@ const status = await repository.status({signal});
 await repository.close();
 </code></pre></div>
 <p><code>createRepositoryWorkspace({name,directory,dataRoot,remote,branch,onEvent,run}={})</code>
-returns <code>{directory,open,status,pull,push,close,drain,dispose}</code>. The <code>directory</code>
+returns <code>{directory,open,status,pull,push,write,close,drain,dispose}</code>. The <code>directory</code>
 property is the absolute selected working path.</p>
 <ul>
 <li>Omit <code>directory</code> to select <code>&lt;repositoriesRoot&gt;/&lt;name&gt;</code>. The application supplies
@@ -98,7 +98,8 @@ adapter is <code>runProcess</code>; Git must be available on PATH. Credentials a
 authentication remain with Git and the native host. The SDK adds no download,
 credential store, polling, network retry or process supervisor.</li>
 </ul>
-<p>All operation methods accept <code>{signal}={}</code> and return promises:</p>
+<p>The open/status/pull/push methods accept <code>{signal}={}</code> and return promises;
+<code>write</code> accepts the complete file/message request described below:</p>
 <div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
 <tr>
@@ -123,6 +124,10 @@ credential store, polling, network retry or process supervisor.</li>
 <td>Prepares the checkout if needed, then runs the existing <code>repositoryPush</code> operation unchanged, preserving its support for unrelated uncommitted working files.</td>
 </tr>
 <tr>
+<td><code>write</code></td>
+<td>Writes exact caller-selected text files, stages and commits only their literal paths, then performs one ordinary non-force push. Returns confirmed operation outcomes; see below.</td>
+</tr>
+<tr>
 <td><code>close</code>, <code>drain</code>, <code>dispose</code></td>
 <td>The same idempotent operation: stop accepting new calls and await accepted work and its process/event cleanup. They retain the repository on disk.</td>
 </tr></tbody>
@@ -135,6 +140,97 @@ untouched and reports its Git error or <code>ARCANE_REPOSITORY_DIRECTORY_INVALID
 A failed or cancelled clone reports the actual failure; any remaining directory
 is retained for application-owned inspection. There is no automatic deletion or
 destructive retry. Filesystem failures and complete Git diagnostics propagate.</p>
+<h2 id="write-commit-and-push-selected-text">Write, commit and push selected text</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const result = await repository.write({
+    files: [{path: &#39;dispatches/moon-cheese.md&#39;, content: completeAuthoredText}],
+    message: authoredCommitMessage,
+    signal
+});
+</code></pre></div>
+<p><code>write({files:[{path,content}],message,signal}={})</code> requires at least one explicit
+file, a nonempty commit message and string content (including an empty string).
+Paths name working files relative to this repository, not its root, outside
+paths or Git-owned <code>.git</code> metadata. Strings must be representable as UTF-8;
+native filenames cannot contain NUL. Incompatible input reports a <code>TypeError</code>
+before any write, rather than replacing text. Content may contain NUL, BOM,
+CRLF, leading/trailing whitespace and every ordinary Unicode character.</p>
+<p>The method copies the selected records and their original strings synchronously
+when called. Later changes to the caller&#39;s array, file records or selected UI
+connection cannot alter accepted work. It does not freeze the caller&#39;s objects,
+add document labels, normalize line endings, trim content or wrap documents.
+The workspace&#39;s originally selected directory remains the operation owner.</p>
+<p>After preparing that checkout, it creates needed parent directories and writes
+each complete file using the ordinary native UTF-8 filesystem API. These are
+caller-owned replacements, not an append-only policy or a multi-file atomic
+transaction. Applications choose which paths and content may be replaced.
+Ordinary filesystem behavior, including existing symlinks, remains with the
+native host.</p>
+<p>One <code>git --literal-pathspecs add -- &lt;paths&gt;</code> stages only those exact names.
+One <code>git --literal-pathspecs commit --only --cleanup=verbatim --file - -- &lt;paths&gt;</code>
+commits only those paths, leaving unrelated staged paths staged. The original
+message is streamed unchanged through standard input. One ordinary <code>git push</code>
+then uses that repository&#39;s existing remote/ref configuration, identity,
+credentials and hooks. There is no implicit pull, branch switch, forced push,
+hook bypass, automatic retry, rollback or reset. If Git reports no changes to
+commit, that actual failure is returned; the SDK creates no empty commit.
+These are Git&#39;s documented <a href="https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---only" target="_blank" rel="noreferrer">selected-path commit</a>
+and <a href="https://git-scm.com/docs/git#Documentation/git.txt---literal-pathspecs" target="_blank" rel="noreferrer">literal pathspec</a> semantics.</p>
+<p>Existing Git attributes, clean filters, EOL settings and hooks continue to apply
+when Git stages/commits content. The filesystem write preserves the original
+text; this API does not claim that repository-configured filters leave Git blob
+text identical. It preserves those settings. A push may also send existing history or other
+refs selected by the repository&#39;s ordinary push configuration.</p>
+<h3 id="result-and-failure-outcomes">Result and failure outcomes</h3>
+<p>Successful completion returns:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">{
+    directory,
+    state: &#39;pushed&#39;,
+    stage: &#39;complete&#39;,
+    paths: [originalSelectedPath, ...],
+    writtenPaths: [confirmedWrittenPath, ...],
+    written: true,
+    staged: true,
+    committed: true,
+    pushed: true,
+    outputs: [{stage: &#39;prepare&#39;|&#39;stage&#39;|&#39;commit&#39;|&#39;push&#39;, stdout, stderr, code?, signal?}, ...]
+}
+</code></pre></div>
+<p>Each output record retains complete stdout/stderr. <code>code</code> and the process
+termination <code>signal</code> are included when a completed process result is available.
+An in-progress write also records its current <code>path</code> on a failure outcome.
+<code>writtenPaths</code> records successful filesystem writes in input order; <code>written</code>
+becomes true only after every requested write succeeds. The other booleans
+record successful Git command completion. <strong>False means success is unconfirmed,
+not that files, the index, HEAD or the remote certainly remained unchanged.</strong></p>
+<ul>
+<li><code>local</code>: no successful commit or push has been confirmed. Inspect
+<code>writtenPaths</code>, <code>written</code>, <code>staged</code> and <code>stage</code> for actual local progress.</li>
+<li><code>committed</code>: Git completed the commit; no successful push has been confirmed.
+Cancellation before push keeps this result rather than claiming delivery.</li>
+<li><code>pushed</code>: Git reported successful completion of the push. A later observer
+error retains that confirmed result while still reporting the observer error.</li>
+<li><code>uncertain</code>: an attempted file write, commit or push did not supply successful
+completion evidence. Partial files or index changes can remain, and a remote
+can accept updates before a connection failure hides the acknowledgement.
+Previously confirmed <code>writtenPaths</code>, <code>committed</code> or <code>pushed</code> evidence remains
+present. A known pre-spawn failure does not invent a dispatched side effect.</li>
+</ul>
+<p>After operation acceptance and execution begins, failures reject with an
+<code>ArcaneError</code> whose <code>cause</code> is the original complete failure and whose <code>details</code>
+is the outcome above. The code/message retain the original failure when
+available, and nested process details remain available through its cause.
+Input errors, a pre-aborted/queued-aborted request or a call after closing reject
+before writer execution and have the existing TypeError/cancellation/closing
+contract. No success is fabricated from an error string or callback.</p>
+<p>Cancellation is checked before each subsequent filesystem/Git action. Active
+Git cancellation drains through the existing process owner. Completion is
+recorded before checking cancellation for the next action: an accepted commit
+is retained if push has not begun, and an accepted push is retained if an
+observer subsequently fails. Failed operations leave their actual files and
+index state available for inspection; the application chooses recovery.
+Await or retain the write promise and connect the workspace&#39;s terminal drain
+to its Core service lifetime. The application still owns any decision to make
+that Core method service-lifetime rather than request-lifetime work.</p>
 <h2 id="ownership-concurrency-and-shutdown">Ownership, concurrency and shutdown</h2>
 <p>Calls targeting the same resolved path spelling in one Node process run in
 acceptance order, including separate owners selecting that path. Windows keys
@@ -154,6 +250,8 @@ The caller retains each operation&#39;s complete result or failure separately.</
 <p>The cold path is one selected connection, one parent-directory creation and one
 Git clone. Opening an existing checkout uses one read-only Git command. A
 prepared owner&#39;s status/pull/push use their existing repository operation graph.
+An accepted writer uses one filesystem write per explicitly selected file,
+then one add, one commit and one push, stopping at the first failure.
 There is no scan across applications, connections, models or platforms. Git
 progress, process-starting/completion, heartbeat and cancellation events use
 the existing <code>onEvent</code> owner with complete output and backpressure.
@@ -189,9 +287,9 @@ Applications retain remote/ref selection, document parsing, scores, messages,
 saved connection state and refresh policy. Existing explicit repository paths
 continue to operate where they already are.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#persistent-locations">Persistent locations</a><a href="#one-connected-working-checkout">One connected working checkout</a><a href="#ownership-concurrency-and-shutdown">Ownership, concurrency and shutdown</a><a href="#bare-snapshots-stay-separate">Bare snapshots stay separate</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#persistent-locations">Persistent locations</a><a href="#one-connected-working-checkout">One connected working checkout</a><a href="#write-commit-and-push-selected-text">Write, commit and push selected text</a><a href="#ownership-concurrency-and-shutdown">Ownership, concurrency and shutdown</a><a href="#bare-snapshots-stay-separate">Bare snapshots stay separate</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.64.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.65.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="Expose application-owned tools and static resources to an MCP client with arcane-os/mcp/stdio. This optional Node entrypoint owns one JSON-RPC session, UTF-8 newline framing, discovery, request correlation, cooperative cancellation, and graceful drain. The application owns its launch command, tool definitions, resource contents, business behavior, and underlying service lifetime.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/mcp-stdio/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="MCP STDIO server · Arcane OS SDK"><meta property="og:description" content="Expose application-owned tools and static resources to an MCP client with arcane-os/mcp/stdio. This optional Node entrypoint owns one JSON-RPC session, UTF-8 newline framing, discovery, request correlation, cooperative cancellation, and graceful drain. The application owns its launch command, tool definitions, resource contents, business behavior, and underlying service lifetime."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/mcp-stdio/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="MCP STDIO server · Arcane OS SDK"><meta name="twitter:description" content="Expose application-owned tools and static resources to an MCP client with arcane-os/mcp/stdio. This optional Node entrypoint owns one JSON-RPC session, UTF-8 newline framing, discovery, request correlation, cooperative cancellation, and graceful drain. The application owns its launch command, tool definitions, resource contents, business behavior, and underlying service lifetime."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>MCP STDIO server | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">MCP STDIO server</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="mcp-stdio-server">MCP STDIO server</h1><p class="doc-lead">Expose application-owned tools and static resources to an MCP client with arcane-os/mcp/stdio. This optional Node entrypoint owns one JSON-RPC session, UTF-8 newline framing, discovery, request correlation, cooperative cancellation, and graceful drain. The application owns its launch command, tool definitions, resource contents, business behavior, and underlying service lifetime.</p><div class="doc-meta"><span>SDK 0.65.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../codex-app-server/">Codex App Server</a><a href="./" aria-current="page">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/mcp-stdio.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#createmcpstdioserver">createMcpStdioServer</a><a href="#start">start</a><a href="#cancel">cancel</a><a href="#drain">drain</a><a href="#close">close</a><a href="#closed">closed</a><a href="#mcpprotocolversion">MCPPROTOCOLVERSION</a><a href="#mcpprotocolerror">McpProtocolError</a><a href="#evidence-boundary">Evidence boundary</a></nav></details><p>Expose application-owned tools and static resources to an MCP client with
+<code>arcane-os/mcp/stdio</code>. This optional Node entrypoint owns one JSON-RPC session,
+UTF-8 newline framing, discovery, request correlation, cooperative cancellation,
+and graceful drain. The application owns its launch command, tool definitions,
+resource contents, business behavior, and underlying service lifetime.</p>
+<p>Availability: Node on Windows, Linux, and macOS, using the package&#39;s supported
+Node version. Android requires a host that supplies the same Node stream and
+process environment. Importing the entrypoint starts no process or listener.
+It is separate from the native Core <code>arcane/1</code> transport and its Content-Length
+frames; the two stream formats are not interchangeable.</p>
+<h2 id="createmcpstdioserver">createMcpStdioServer</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createMcpStdioServer} from &#39;arcane-os/mcp/stdio&#39;;
+
+const menu = {
+    content: &#39;Moon soup\nExtra tentacles available.&#39;,
+    message: {chef: &#39;Octopus&#39;, open: true}
+};
+
+const server = createMcpStdioServer(
+    {
+        serverInfo: {name: &#39;moon-pantry&#39;, version: &#39;1.0.0&#39;},
+        instructions: &#39;Ask moon.menu for the complete lunar dinner menu.&#39;,
+        tools: [
+            {
+                name: &#39;moon.menu&#39;,
+                description: &#39;Read the complete lunar dinner menu.&#39;,
+                inputSchema: {type: &#39;object&#39;},
+                annotations: {readOnlyHint: true},
+                handler: readMenu
+            }
+        ],
+        resources: [
+            {
+                uri: &#39;pantry://menu&#39;,
+                name: &#39;menu&#39;,
+                title: &#39;Lunar dinner menu&#39;,
+                mimeType: &#39;application/json&#39;,
+                handler: readMenuResource
+            }
+        ]
+    }
+);
+
+function readMenu(args, {signal}) {
+    signal.throwIfAborted();
+    return {
+        content: [{type: &#39;text&#39;, text: JSON.stringify(menu)}],
+        structuredContent: menu
+    };
+}
+
+function readMenuResource({uri}, {signal}) {
+    signal.throwIfAborted();
+    return {
+        contents: [{uri, mimeType: &#39;application/json&#39;, text: JSON.stringify(menu)}]
+    };
+}
+
+server.start();
+try {
+    await server.closed;
+} catch {
+    // The adapter already sent its diagnostic to stderr.
+    process.exitCode = 1;
+}
+</code></pre></div>
+<p>Save this in the consuming application and configure the MCP client&#39;s subprocess
+command as <code>node</code> with that application&#39;s script path. Client configuration
+file formats and process launch policy remain client-owned. Change <code>menu</code> to
+change the complete result; no model, repository, or native host is needed for
+this example.</p>
+<p>The application explicitly converts its domain record into an MCP result.
+The SDK does not guess from <code>content</code>, <code>message</code>, or other domain field names.
+The serialized text in this example is an application-selected representation;
+the SDK never adds it automatically.</p>
+<h3 id="parameters">Parameters</h3>
+<p><code>createMcpStdioServer(options)</code> returns a server object synchronously.</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>serverInfo</code></td>
+<td>Required MCP implementation object with <code>name</code> and <code>version</code> strings. Optional MCP implementation fields are passed through.</td>
+</tr>
+<tr>
+<td><code>instructions</code></td>
+<td>Optional complete instruction string returned by initialization.</td>
+</tr>
+<tr>
+<td><code>tools</code></td>
+<td>Optional static array; each entry is a complete MCP tool descriptor plus <code>handler(args, context)</code>. Defaults to <code>[]</code>. Tool names identify handlers exactly and must be unique.</td>
+</tr>
+<tr>
+<td><code>resources</code></td>
+<td>Optional static array; each entry is a complete MCP resource descriptor plus <code>handler(params, context)</code>. Defaults to <code>[]</code>. Each resource requires <code>uri</code> and <code>name</code>; URIs identify handlers exactly and must be unique.</td>
+</tr>
+<tr>
+<td><code>onDiagnostic</code></td>
+<td>Optional error observer. Omit it for complete error text on the selected stderr stream. It may return a promise, which participates in drain. Observer failures are reported to stderr and retained by <code>closed</code>.</td>
+</tr></tbody>
+</table>
+</div>
+<p>The factory captures catalog entries at construction. Discovery preserves
+descriptor fields, including authored schemas, descriptions, annotations,
+icons, and metadata; only the local <code>handler</code> function is omitted. No tool
+arguments, descriptions, schemas, resources, or result content are injected,
+trimmed, rewritten, or shortened. Supply JSON-serializable protocol values.</p>
+<p>The SDK checks the request envelope and required result container. It does not
+provide a general JSON Schema evaluator. The application supplies a valid
+<code>inputSchema</code> object, owns the handler&#39;s input semantics, and ensures any
+declared <code>outputSchema</code> matches its structured result. This adapter does not
+implement task-augmented execution; descriptors must describe ordinary tool
+execution.</p>
+<h3 id="handler-inputs-and-results">Handler inputs and results</h3>
+<p>Tool handlers receive <code>params.arguments</code> unchanged. Omitted arguments become
+an empty object as the protocol&#39;s no-argument case. Resource handlers receive
+the complete <code>resources/read</code> params object, including its exact <code>uri</code> and
+any metadata. A handler may return its result directly or return a promise.</p>
+<p>Each handler receives a context with:</p>
+<ul>
+<li><code>signal</code>: its own request&#39;s <code>AbortSignal</code>;</li>
+<li><code>requestId</code>: the original string or integer ID, including numeric zero;</li>
+<li><code>method</code>: <code>tools/call</code> or <code>resources/read</code>;</li>
+<li><code>params</code>: the complete request params object;</li>
+<li><code>clientInfo</code> and <code>clientCapabilities</code>: the client&#39;s initialization objects.</li>
+</ul>
+<p>A tool handler returns an explicit MCP <code>CallToolResult</code>, including a <code>content</code>
+array and optional <code>structuredContent</code>, <code>isError</code>, <code>_meta</code>, or other protocol
+fields. All supplied content blocks and JSON fields pass through. Resource
+handlers return an explicit <code>ReadResourceResult</code> with a <code>contents</code> array;
+complete text or already encoded binary resource contents pass through.
+The application creates these protocol result objects deliberately. A plain
+domain object with <code>content: &#39;some text&#39;</code> is not a <code>CallToolResult</code> and produces
+an internal protocol error rather than being silently converted.</p>
+<p>For a domain failure, return a complete <code>CallToolResult</code> with <code>isError: true</code>.
+An ordinary exception thrown by a tool handler becomes an <code>isError: true</code>
+text result containing the exception&#39;s complete message, and the complete
+exception is also reported through diagnostics. Throw <code>McpProtocolError</code> for
+an explicit JSON-RPC failure. Other resource or adapter exceptions produce
+<code>-32603</code> and a diagnostic; malformed result containers and non-serializable
+results also produce <code>-32603</code>.
+Custom fields on an ordinary thrown error remain in diagnostics unless the
+application explicitly maps its known outcome to <code>structuredContent</code> in an
+<code>isError: true</code> tool result.</p>
+<h2 id="start">start</h2>
+<p><code>server.start({input, output, error})</code> attaches to caller-owned Node streams and
+returns the same server. Defaults are <code>process.stdin</code>, <code>process.stdout</code>, and
+<code>process.stderr</code>. Start each server exactly once with an open readable input and
+open writable output/diagnostic streams. Output and diagnostics must be separate
+streams. Byte-mode input preserves split UTF-8 sequences; a stream already
+decoded into strings remains responsible for its own decoding.</p>
+<p>Messages are processed as their newline arrives, without waiting for EOF. A
+final complete JSON record is also accepted when EOF arrives without its final
+newline. LF and CRLF transport endings are accepted. JSON escaping preserves
+embedded line breaks in the decoded payload. Malformed JSON receives <code>-32700</code>;
+its complete original line is included in diagnostics. Invalid UTF-8 fails at
+the decoder and closes the transport with the complete affected input chunks
+and pending decoded text in its diagnostic error.</p>
+<p>Requests execute independently, including overlapping calls to one tool.
+Only complete output writes are ordered, waiting for each Node write callback
+before sending the next record. An error, close, or finish event during a pending
+output or diagnostic write settles that write as failed even when its callback
+never arrives; a later callback cannot settle it again. The application decides
+whether its own data access requires narrower serialization. The adapter adds
+no process-wide queue.</p>
+<p>Only JSON-RPC messages are written to <code>output</code>. Application handlers and their
+dependencies must also reserve stdout for protocol traffic; use stderr or the
+application&#39;s diagnostic owner for logs. The adapter does not replace global
+console functions.</p>
+<h2 id="cancel">cancel</h2>
+<p><code>server.cancel(requestId, reason)</code> requests cooperative cancellation and returns
+<code>true</code> only when an active cancellable handler was signalled. String and numeric
+IDs remain distinct. Unknown, completed, already cancelled, and initialization
+requests return <code>false</code>. The same behavior handles client
+<code>notifications/cancelled</code> messages. Late results from cancelled work have no
+protocol response, as described by the
+<a href="https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/cancellation" target="_blank" rel="noreferrer">MCP cancellation contract</a>.</p>
+<p>The handler must pass its signal to its actual I/O or computation and release
+owned resources. Signalling does not prove external work stopped. The adapter
+retains the handler promise until it really settles; a handler that ignores
+cancellation can keep drain and close pending.</p>
+<h2 id="drain">drain</h2>
+<p><code>await server.drain()</code> waits for accepted handlers, diagnostic observers, and
+output write callbacks to settle. It does not stop input or abort requests, so
+newly accepted work can extend the wait. Use <code>close()</code> when input must first
+stop. Tool and request errors are delivered as protocol outcomes; transport and
+diagnostic delivery failures are retained by <code>closed</code>.</p>
+<h2 id="close">close</h2>
+<p><code>await server.close({cancelPending: false})</code> stops reading, pauses the input,
+drains accepted work and writes, detaches the adapter&#39;s stream listeners, and
+settles <code>closed</code>. It is idempotent. Normal input EOF follows this same graceful
+path. Explicit <code>cancelPending: true</code> aborts pending work instead; repeated close
+may request cancellation while an earlier graceful close is draining.</p>
+<p>Stream failures request cancellation, report diagnostics, and reject <code>closed</code>
+after owned work settles. An input closed without EOF is a transport failure.
+The adapter does not end or destroy caller streams, terminate the process,
+install process signal handlers, start an application host, or close
+application services. The launcher owns those actions after the adapter drains.</p>
+<h2 id="closed">closed</h2>
+<p><code>server.closed</code> is a promise for actual session cleanup. It resolves after a
+normal close or EOF and rejects with an <code>AggregateError</code> when transport or
+diagnostic delivery failed. Observe it even when the initiating caller continues
+other work. Request failures alone do not close the session.</p>
+<h2 id="mcpprotocolversion"><code>MCP_PROTOCOL_VERSION</code></h2>
+<p><code>MCP_PROTOCOL_VERSION</code> is exactly <code>&#39;2025-11-25&#39;</code>. Initialization always returns
+that supported version. A client proposing another version must accept this
+profile or disconnect. This is the initialize/initialized STDIO profile;
+support for later discovery-based profiles is not implied. See the normative
+<a href="https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle" target="_blank" rel="noreferrer">lifecycle</a>
+and <a href="https://modelcontextprotocol.io/specification/2025-11-25/basic/transports" target="_blank" rel="noreferrer">STDIO transport</a>.</p>
+<p>Supported requests are <code>initialize</code>, <code>ping</code>, <code>tools/list</code>, <code>tools/call</code>,
+<code>resources/list</code>, <code>resources/read</code>, and <code>resources/templates/list</code> (an empty
+template catalog). Tools and resources capabilities are advertised when their
+catalogs are nonempty. Lists return their complete catalogs without pagination;
+supplying a cursor receives <code>-32602</code>. Send <code>notifications/initialized</code> after
+the initialization response before ordinary operations.</p>
+<p>There are no prompts, subscriptions, list-change events, MCP logging requests,
+server-to-client requests, sampling, elicitation, task augmentation, HTTP
+transport, or automatic client configuration. Unknown methods return <code>-32601</code>;
+notifications never receive responses. JSON-RPC batches are not part of this
+profile. IDs must be strings or integers and are unique for the session.</p>
+<p>The result shapes follow the official
+<a href="https://modelcontextprotocol.io/specification/2025-11-25/server/tools" target="_blank" rel="noreferrer">tool</a>
+and <a href="https://modelcontextprotocol.io/specification/2025-11-25/server/resources" target="_blank" rel="noreferrer">resource</a>
+contracts. This narrow adapter does not claim every optional MCP capability.</p>
+<h2 id="mcpprotocolerror">McpProtocolError</h2>
+<p><code>new McpProtocolError(code, message, data)</code> represents an explicit protocol
+failure. <code>code</code> is a JSON-RPC integer, <code>message</code> is its complete string, and
+optional <code>data</code> is JSON-serializable protocol detail. It extends <code>Error</code> and
+exposes <code>name</code>, <code>code</code>, <code>message</code>, and optional <code>data</code>.</p>
+<p>The adapter uses <code>-32700</code> for malformed JSON, <code>-32600</code> for invalid requests,
+<code>-32601</code> for unknown methods, <code>-32602</code> for malformed params or unknown tools,
+<code>-32603</code> for internal failures, and <code>-32002</code> for a missing resource. Its
+<code>-32000</code> lifecycle error requests initialization before ordinary operations.</p>
+<h2 id="evidence-boundary">Evidence boundary</h2>
+<p><code>test/mcp-stdio-server.test.mjs</code> contains focused in-memory stream fixtures for
+these contracts. Authored fixtures and source review do not establish an
+executed client integration or platform run. Run local tests only under the
+applicable explicit testing or selected-output authority.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#createmcpstdioserver">createMcpStdioServer</a><a href="#start">start</a><a href="#cancel">cancel</a><a href="#drain">drain</a><a href="#close">close</a><a href="#closed">closed</a><a href="#mcpprotocolversion">MCPPROTOCOLVERSION</a><a href="#mcpprotocolerror">McpProtocolError</a><a href="#evidence-boundary">Evidence boundary</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.65.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

@@ -7,6 +7,12 @@ the model or recording files are reused. The browser's existing
 `AI.fetchSTT(audioFile, signal)` and Core `speech.transcribe` routes retain the
 application's selected model and cancellation signal.
 
+For the optional Intel NPU encoder, add `encoder: "openvino-npu"` to the
+runtime record. The [Intel NPU guide](../guides/native-whisper-openvino.md)
+covers the Windows x64 precompiled distribution, paired GGML/XML/BIN model
+resources, independent CUDA/CPU decoding and joined cancellation. Omitting
+`encoder` preserves the ordinary runtime and model selection below.
+
 ## Select the runtime and model
 
 An application's `arcane-app.json` selects native speech alongside its other
@@ -130,7 +136,7 @@ prepared descriptor returned by `ensureLocalAIRuntimes`; alternatively,
 
 | Member | Contract |
 | --- | --- |
-| `current()` | Returns `providerId`, selected `modelId`, lifecycle `state`, `loaded`, `busy`, correlated `requestId` or null, requested/observed backend, evidence and any error. |
+| `current()` | Returns `providerId`, selected `modelId`, lifecycle `state`, `loaded`, `busy`, correlated `requestId` or null, `requestedBackend`, `observedBackend`, `backendEvidence`, `requestedEncoder`, `observedEncoder`, `encoderEvidence` and any error. Encoder initialization evidence is separate from decoder evidence. |
 | `subscribe(listener, {replay = true, signal} = {})` | Immediately replays current state by default and returns an unsubscribe function. |
 | `load({modelId, signal} = {})` | Prepares the runtime if necessary, then waits for actual native model readiness. With no selected model it remains unloaded. |
 | `transcribe(request, {signal, onProgress, requestId} = {})` | Consumes the complete `audioBase64` recording. Optional `language` defaults to native automatic detection; `translate: true` selects Whisper's translation operation. `model` must match the loaded model. Optional `requestId` carries the caller's existing operation identity through lifecycle snapshots as separate control information; it does not alter the recording or request payload. |

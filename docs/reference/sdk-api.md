@@ -74,6 +74,9 @@ runtime layouts.
 | `arcane-os/ai/core-image` | Browser image lifecycle and complete PNG Blobs through an available Core service. |
 | `arcane-os/core/image` | Native image Core service with independent runtime preparation and retained model ownership. |
 | `arcane-os/core/speech` | Independent injected STT/TTS engine loading, request cancellation and joined Core service lifetime. |
+| `arcane-os/local-ai/whisper` | Retained native Whisper model, complete recordings and joined helper lifetime. |
+| `arcane-os/local-ai/whisper/build` | First-party persistent helper build against selected installed Whisper headers and libraries. |
+| `arcane-os/local-ai/whisper/openvino-build` | Optional Windows x64 Intel NPU encoder runtime producer using selected installed sources and toolchain. |
 | `arcane-os/ai/core-model-assets` | Complete stored browser model members projected through Core into native working files. |
 | `arcane-os/core/model-assets` | Native working-file preparation, engine retain handles and joined cleanup. |
 | `arcane-os/integrated-provider` | Fixed integrated shared-development provider. |
@@ -431,6 +434,7 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `createWhisperRuntime()` | function | `arcane-os/local-ai/whisper` | Core native speech | Node with a prepared matching helper, runtime, decoder and selected model |
 | `createWhisperRuntime default export` | function | `arcane-os/local-ai/whisper` | Core native speech | Same retained native engine factory |
 | `buildWhisperHelper()` | function | `arcane-os/local-ai/whisper/build` | Core native speech | Node with installed CMake/C++17 toolchain and matching Whisper source/runtime |
+| `buildWhisperOpenVinoRuntime()` | function | `arcane-os/local-ai/whisper/openvino-build` | Core native speech | Windows x64 Node with installed matching Whisper/OpenVINO sources and CMake/MSVC toolchain |
 | `createSpeechService default export` | function | `arcane-os/core/speech` | Core native speech | Same shared speech service factory |
 | `prepareCoreModelAssets()` | function | `arcane-os/ai/core-model-assets` | Core model assets | Browser with complete Blob/File members and available Core service |
 | `createModelAssetService()` | function | `arcane-os/core/model-assets` | Core model assets | Node Core with an application-selected working directory |
@@ -8180,7 +8184,7 @@ Whisper backend libraries, decoder and model files; see the complete
 
 | Member | Contract |
 | --- | --- |
-| `current()` | Returns `providerId`, `modelId`, `state`, `loaded`, `busy`, `requestId`, `requestedBackend`, `observedBackend`, `backendEvidence` and `error`. State reports actual helper/model readiness. |
+| `current()` | Returns `providerId`, `modelId`, `state`, `loaded`, `busy`, `requestId`, `requestedBackend`, `observedBackend`, `backendEvidence`, `requestedEncoder`, `observedEncoder`, `encoderEvidence` and `error`. State reports actual helper/model readiness; encoder and decoder initialization evidence remain separate. |
 | `subscribe(listener,{replay=true,signal}={})` | Observes the current snapshot immediately by default, then each state change; returns the unsubscribe closure. |
 | `load({modelId,signal}={})` | Prepares the selected runtime if necessary and retains its initialized helper/model. Same-model loading is shared; replacement remains explicit. |
 | `transcribe(request,{signal,onProgress,requestId}={})` | Accepts the complete `{audioBase64,mimeType?,model?,language?,translate?}` recording for the loaded model and returns `{text,language,duration,segments}`. `audioBase64` transports the original media; the decoder recognizes its actual format. Progress is ordered; control metadata stays outside the request. |
@@ -8243,6 +8247,43 @@ toolchain nor a model and performs no inference. Windows helper installation
 includes the selected compiler's redistributable runtime closure. Use a
 toolchain and prepared runtime matching the target platform/architecture; a
 source package alone is not a compiled helper. See the [helper build procedure](local-whisper.md).
+
+## buildWhisperOpenVinoRuntime()
+
+`buildWhisperOpenVinoRuntime({sourceDirectory,openvinoDirectory,cudaDirectory,
+outputRoot,cmake='cmake',generator,cmakeArgs=[],env,signal,onEvent}={})` from
+`arcane-os/local-ai/whisper/openvino-build` produces the optional native Intel
+NPU encoder runtime on Windows x64. This producer uses an already installed
+compatible CMake/MSVC environment, Whisper 1.9.4 source and OpenVINO 2026.3.1
+development tree. Required `sourceDirectory`, `openvinoDirectory` and
+`outputRoot` name those inputs and the producer-owned output. It installs no
+driver, toolchain or model and performs no inference.
+
+The producer copies Whisper source into `outputRoot/source`, applies its
+encoder-failure propagation and stderr diagnostic corrections there, and runs
+CMake configure/build into `outputRoot/build`. The original source stays
+unchanged. It assembles the runtime under `outputRoot/runtime`, retaining
+OpenVINO/NPU, CPU, TBB, import libraries and packaging notices. Optional
+`cudaDirectory` names the matching upstream b5130 CUDA library directory;
+its selected precompiled backend libraries add CUDA alongside CPU. Omission
+produces the NPU-plus-CPU tree. `cmake`, `generator`, `cmakeArgs` and `env`
+configure the existing build environment.
+
+The result is `{version,openvinoVersion,platform,architecture,encoder,backend,
+backends,root,directory,libraryDirectory,sourceDirectory,diagnostics}`.
+`directory` equals `root`; the returned `sourceDirectory` is the copied source.
+`diagnostics` retains complete `configure` and `compile` process results.
+`signal` and `onEvent` use the existing process cancellation and diagnostic
+contract. Missing required strings produce a `TypeError`; an unsupported
+producer host or unmatched source correction reports an error. Filesystem,
+process, cancellation and observer failures remain observable, with partial
+producer output left for its owner.
+
+Build the matching first-party helper separately with `buildWhisperHelper`,
+then retain its complete installed `bin` alongside this runtime. The
+[complete producer example](../guides/native-whisper-openvino.md#produce-the-optional-native-runtime)
+covers that composition. Applications normally select the precompiled asset
+through `encoder: 'openvino-npu'`; they do not run this producer at startup.
 
 ## createSpeechService()
 

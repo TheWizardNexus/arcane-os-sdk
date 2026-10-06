@@ -70,6 +70,13 @@ assembly compose it through the shared speech service without changing the
 browser's selected STT route. See [native Whisper](local-whisper.md) for the
 complete configuration, platform, media and shutdown contracts.
 
+Adding `encoder: 'openvino-npu'` selects the optional Intel NPU audio encoder
+with a separately selected CUDA or CPU decoder. The Windows x64 precompiled
+runtime uses paired GGML/XML/BIN model resources and the computer's installed
+compatible Intel NPU driver. See the [Intel NPU Whisper guide](../guides/native-whisper-openvino.md)
+for preparation, observed initialization, cancellation/reload and custom
+runtime production. Omitting the encoder retains ordinary Whisper preparation.
+
 The selected model stays loaded across recordings. An eligible native
 accelerated failure may drain that helper and retry the same complete recording
 once on the prepared CPU backend. That accepted request retains its actual

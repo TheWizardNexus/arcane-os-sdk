@@ -116,6 +116,45 @@ tag and GitHub release title must both be the same bare numeric
 `MAJOR.MINOR.PATCH`. Prerelease versions do not get a misleading numeric
 GitHub release, and no release creates a Git branch for an npm dist-tag.
 
+## Native runtime assets on numeric releases
+
+Default SDK-hosted native asset URLs use the installed SDK's version and its
+matching numeric GitHub release. Publishing npm alone does not make those
+downloads available. Every applicable numeric release therefore includes its
+compatible retained SDK-hosted assets as release follow-through:
+
+| Selected capability | Windows x64 release asset |
+| --- | --- |
+| Native application host | `arcane-native-windows-x64.tar.gz` |
+| Ordinary native Whisper helper | `arcane-whisper-windows-x64.tar.gz` |
+| Optional Intel NPU Whisper encoder | `arcane-whisper-openvino-windows-x64.tar.gz` |
+
+Attach each asset used by the selected package's default SDK-hosted download
+paths, including later releases whose native implementation is unchanged.
+Include the optional NPU asset when that release supplies `encoder:
+"openvino-npu"`; applications still opt in, and the ordinary Whisper asset
+remains available. Upstream runtime and model versions retain their separate
+upstream distribution URLs; they are not renamed to the SDK version.
+
+Reuse the producer's retained compatible archive and its recorded selected
+evidence. Do not rebuild or redownload an unchanged archive for each release.
+An actual native change belongs to its producer under the existing build and
+dependency authority. Preserve the complete runtime closure and its packaging
+notices together. Models continue through their upstream acquisition path
+unless their redistribution is separately requested.
+
+The release owner assigns each upload, observes its outcome and records the
+exact asset name and public release URL in the durable release handoff. If an
+upload result is uncertain, inspect that release's existing asset before
+retrying. Retain the exact pending operation, executing owner and last result
+until delivery finishes; reassign idle delegated work rather than treating
+delegation as completion.
+
+Source delivery, selected package verification, npm publication, native asset
+delivery, requester notices and documentation/site delivery are distinct.
+Native archive follow-through does not gate npm publication or require a new
+package build. Consumer adoption remains with each application owner.
+
 ## Documentation publication
 
 After every successful npm release and its applicable requester notices, the

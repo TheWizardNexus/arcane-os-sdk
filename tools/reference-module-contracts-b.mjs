@@ -262,14 +262,14 @@ async function chatWithAdmittedOllamaAfterUserChoice(){
     {
         name:'OllamaModelIdentifier.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Pure syntax normalization; does not test installation, admission, ownership, or hardware.',
-        paramsResults:'normalizeOllamaModelIdentifier(value) returns the exact trimmed identifier or null; isOllamaModelIdentifier(value) returns boolean. The cloud default-model sentinel TWIN and malformed/over-limit identifiers are rejected.',
+        lifecycleSideEffects:'Pure syntax recognition and name comparison; performs no I/O or model loading and does not change outbound requests.',
+        paramsResults:'normalizeOllamaModelIdentifier(value) returns the exact accepted identifier or null, including null for surrounding whitespace; isOllamaModelIdentifier(value) returns boolean. sameOllamaModelIdentifier(left,right) compares strings case-insensitively with the default registry.ollama.ai host, library namespace and latest tag. Explicit different hosts, namespaces and tags remain distinct; non-string inputs return false. Comparison does not rewrite either input or establish model residency.',
         events:[],
         errors:[],
         capabilitiesCore:'None.',
-        example:String.raw`import {normalizeOllamaModelIdentifier} from '/arcane/modules/OllamaModelIdentifier.js';
+        example:String.raw`import {sameOllamaModelIdentifier} from '/arcane/modules/OllamaModelIdentifier.js';
 
-console.log(normalizeOllamaModelIdentifier('llama3.2:latest'));`
+console.log(sameOllamaModelIdentifier('moon-cheese', 'registry.ollama.ai/library/moon-cheese:latest'));`
     },
     {
         name:'OllamaSettings.js',

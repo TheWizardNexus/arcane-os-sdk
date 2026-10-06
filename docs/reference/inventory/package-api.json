@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.64.0",
+  "sdkVersion": "0.65.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 288,
+  "memberCount": 290,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
@@ -53,6 +53,20 @@
       "availability": "Node with installed CMake/C++17 toolchain matching the selected platform and architecture",
       "protocol": "Owned configure/build/install process lifecycle",
       "normalization": "Returns platform/architecture/root/executable/runtimeDirectory and complete configure/compile/install diagnostics; preserves cancellation and process failures, installs no model or toolchain, performs no inference"
+    },
+    {
+      "id": "local-ai-whisper-openvino-build:buildWhisperOpenVinoRuntime",
+      "name": "buildWhisperOpenVinoRuntime",
+      "displayName": "buildWhisperOpenVinoRuntime()",
+      "kind": "function",
+      "signature": "async buildWhisperOpenVinoRuntime({sourceDirectory,openvinoDirectory,cudaDirectory,outputRoot,cmake='cmake',generator,cmakeArgs=[],env,signal,onEvent}={})",
+      "entrypoints": ["arcane-os/local-ai/whisper/openvino-build"],
+      "primaryImport": "arcane-os/local-ai/whisper/openvino-build",
+      "group": "Core native speech",
+      "summary": "Produces the optional Intel NPU encoder runtime from installed matching Whisper/OpenVINO sources and an existing Windows x64 toolchain.",
+      "availability": "Windows x64 Node with Whisper 1.9.4 source, OpenVINO 2026.3.1 development tree and compatible CMake/MSVC; other platform distributions require separate native producers",
+      "protocol": "Owned configure/build process lifecycle and complete native runtime assembly",
+      "normalization": "Returns version/openvinoVersion/platform/architecture/encoder/backend/backends/root/directory/libraryDirectory/copied sourceDirectory and complete configure/compile diagnostics; retains NPU/CPU and optional supplied CUDA libraries plus notices, preserves process failures and cancellation, installs no model, driver or toolchain"
     },
     {
       "id": "codex-app-server:createCodexAppServerSession",

@@ -26,6 +26,12 @@ selection, supported formats, and native process ownership remain with the
 selected engine and its host composition. Browser-only operation remains
 independent of this native service.
 
+The SDK's [retained Whisper engine](local-whisper.md) supplies native STT.
+Its optional [Intel NPU encoder](../guides/native-whisper-openvino.md) uses the
+same service, readiness events, complete request/result contract and cancellation
+path. The host selects that encoder and its paired model resources; the browser
+continues calling `speech.transcribe` without loading native libraries itself.
+
 ## Startup and status
 
 `start(context)` subscribes to each configured engine and starts their loads

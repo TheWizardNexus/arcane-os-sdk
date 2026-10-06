@@ -3,16 +3,16 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.64.0",
+    "sdk": "0.65.0",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
   "counts": {
-    "markdownPages": 47,
+    "markdownPages": 51,
     "collectionPages": 2,
     "generatedPages": 95,
     "runtimeModulePages": 93,
-    "htmlPages": 144,
+    "htmlPages": 148,
     "inventories": 4
   },
   "pages": [
@@ -77,9 +77,21 @@
       "kind": "markdown"
     },
     {
+      "source": "docs/reference/codex-app-server.md",
+      "output": "site/reference/codex-app-server/index.html",
+      "route": "reference/codex-app-server/",
+      "kind": "markdown"
+    },
+    {
       "source": "docs/reference/core-client.md",
       "output": "site/reference/core-client/index.html",
       "route": "reference/core-client/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core-development.md",
+      "output": "site/reference/core-development/index.html",
+      "route": "reference/core-development/",
       "kind": "markdown"
     },
     {
@@ -215,6 +227,12 @@
       "kind": "markdown"
     },
     {
+      "source": "docs/guides/native-whisper-openvino.md",
+      "output": "site/reference/guides/native-whisper-openvino/index.html",
+      "route": "reference/guides/native-whisper-openvino/",
+      "kind": "markdown"
+    },
+    {
       "source": "docs/reference/inventory/",
       "output": "site/reference/inventory/index.html",
       "route": "reference/inventory/",
@@ -260,6 +278,12 @@
       "source": "docs/reference/mail.md",
       "output": "site/reference/mail/index.html",
       "route": "reference/mail/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/mcp-stdio.md",
+      "output": "site/reference/mcp-stdio/index.html",
+      "route": "reference/mcp-stdio/",
       "kind": "markdown"
     },
     {
@@ -1187,8 +1211,8 @@
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
-        "exports": 2,
-        "reviewedCallables": 2,
+        "exports": 3,
+        "reviewedCallables": 3,
         "publicMembers": 0,
         "literalCustomEvents": 0,
         "directCodedFailures": 0,

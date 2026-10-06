@@ -1013,13 +1013,14 @@
       "kind": "esm",
       "exports": [
         "isOllamaModelIdentifier",
-        "normalizeOllamaModelIdentifier"
+        "normalizeOllamaModelIdentifier",
+        "sameOllamaModelIdentifier"
       ],
-      "summary": "Validates and canonicalizes the syntax of Ollama model identifiers without granting model admission.",
+      "summary": "Recognizes Ollama model identifier syntax and compares ordinary resident-model aliases without changing requests.",
       "availability": "Cross-host",
       "protocol": "In-process only",
-      "normalization": "Fully normalized string/boolean result.",
-      "surface": "`normalizeOllamaModelIdentifier()`, `isOllamaModelIdentifier()`."
+      "normalization": "Exact identifier/null or boolean results; alias comparison applies Ollama's default registry, namespace and tag without changing either input.",
+      "surface": "`normalizeOllamaModelIdentifier()`, `isOllamaModelIdentifier()`, `sameOllamaModelIdentifier(left, right)`."
     },
     {
       "file": "runtime/arcane/modules/OllamaSettings.js",

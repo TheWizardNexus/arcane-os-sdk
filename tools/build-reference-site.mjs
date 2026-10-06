@@ -565,11 +565,15 @@ const navigationGroups=[
             ['Core map','docs/reference/core/README.md'],
             ['Core browser client','docs/reference/core-client.md'],
             ['Native Core runtime','docs/reference/core-runtime.md'],
+            ['Development Core services','docs/reference/core-development.md','',true],
+            ['Codex App Server','docs/reference/codex-app-server.md','',true],
+            ['MCP STDIO server','docs/reference/mcp-stdio.md','',true],
             ['Local AI through Core','docs/reference/local-ai.md'],
             ['FLUX.2 Klein 4B','docs/reference/local-image-flux.md'],
             ['SDXL Base 1.0','docs/reference/local-image-sdxl.md'],
             ['Native speech service','docs/reference/native-speech.md'],
             ['Native Whisper','docs/reference/local-whisper.md'],
+            ['Intel NPU Whisper','docs/guides/native-whisper-openvino.md','',true],
             ['Native repository workspaces','docs/reference/core-repositories.md'],
             ['Portable Core packaging','docs/reference/core-native-packaging.md'],
             ['Arcane API','docs/reference/core/arcane-api.md'],
@@ -730,6 +734,9 @@ async function filesUnder(directory,filter=()=>true){
 
 function sourceRelative(source){
     const normalized=posixPath(source).replace(/^\.\//u,'');
+    if(normalized==='docs/guides/native-whisper-openvino.md'){
+        return 'guides/native-whisper-openvino.md';
+    }
     return normalized.startsWith('docs/reference/')
         ?normalized.slice('docs/reference/'.length)
         :normalized;
@@ -1349,8 +1356,10 @@ function renderMarkdown(markdown,options){
 
 function navigationHtml({output,targets}){
     return navigationGroups.map(group=>{
-        const links=group.items.map(([label,source,fragment=''])=>{
+        const links=group.items.map(([label,source,fragment='',optional=false])=>{
             const target=targets.get(source.replace(/\/$/u,''));
+            // Older selected releases do not contain these newer guide routes.
+            if(!target&&optional)return '';
             if(!target)throw new Error(`Navigation target is missing: ${source}`);
             const current=target===output&&!fragment?' aria-current="page"':'';
             return `<a href="${escapeHtml(`${relativeOutputHref(output,target)}${fragment}`)}"${current}>${escapeHtml(label)}</a>`;
@@ -2042,6 +2051,10 @@ async function collectInputs(inputs){
         return file.endsWith('.md')
             || (file.startsWith('docs/reference/inventory/') && file.endsWith('.json'));
     });
+    const guideFiles = await inputs.listFiles('docs/guides');
+    if(guideFiles.includes('docs/guides/native-whisper-openvino.md')){
+        selectedFiles.push('docs/guides/native-whisper-openvino.md');
+    }
     const markdownInputs=[];
     const inventoryInputs=[];
     // Different documents may be read concurrently; keep Git process fan-out bounded.

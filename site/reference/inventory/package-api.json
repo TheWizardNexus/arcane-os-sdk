@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.64.0",
+  "sdkVersion": "0.65.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 281,
+  "memberCount": 289,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
@@ -61,6 +61,102 @@
       "normalization": "Returns platform/architecture/root/executable/runtimeDirectory and complete configure/compile/install diagnostics; preserves cancellation and process failures, installs no model or toolchain, performs no inference"
     },
     {
+      "id": "local-ai-whisper-openvino-build:buildWhisperOpenVinoRuntime",
+      "name": "buildWhisperOpenVinoRuntime",
+      "displayName": "buildWhisperOpenVinoRuntime()",
+      "kind": "function",
+      "signature": "async buildWhisperOpenVinoRuntime({sourceDirectory,openvinoDirectory,cudaDirectory,outputRoot,cmake='cmake',generator,cmakeArgs=[],env,signal,onEvent}={})",
+      "entrypoints": [
+        "arcane-os/local-ai/whisper/openvino-build"
+      ],
+      "primaryImport": "arcane-os/local-ai/whisper/openvino-build",
+      "group": "Core native speech",
+      "summary": "Produces the optional Intel NPU encoder runtime from installed matching Whisper/OpenVINO sources and an existing Windows x64 toolchain.",
+      "availability": "Windows x64 Node with Whisper 1.9.4 source, OpenVINO 2026.3.1 development tree and compatible CMake/MSVC; other platform distributions require separate native producers",
+      "protocol": "Owned configure/build process lifecycle and complete native runtime assembly",
+      "normalization": "Returns version/openvinoVersion/platform/architecture/encoder/backend/backends/root/directory/libraryDirectory/copied sourceDirectory and complete configure/compile diagnostics; retains NPU/CPU and optional supplied CUDA libraries plus notices, preserves process failures and cancellation, installs no model, driver or toolchain"
+    },
+    {
+      "id": "codex-app-server:createCodexAppServerSession",
+      "name": "createCodexAppServerSession",
+      "displayName": "createCodexAppServerSession()",
+      "kind": "function",
+      "signature": "createCodexAppServerSession({executable,args,cwd,env,clientInfo,capabilities}={})",
+      "entrypoints": [
+        "arcane-os/codex/app-server"
+      ],
+      "primaryImport": "arcane-os/codex/app-server",
+      "group": "Native Codex sessions",
+      "summary": "Creates an explicit native Codex App Server JSONL session without starting its process until connect.",
+      "availability": "Node with caller-selected native executable on Windows, Linux and macOS; Android requires host process adaptation",
+      "protocol": "Native Codex App Server JSONL",
+      "normalization": "Complete request/result/notification objects; ordered live delta/item callbacks, actual terminal turn outcomes and exact stored-turn recovery. Server requests retain real IDs and explicit replies. No automatic thread selection, retry, approval or desktop-task attachment."
+    },
+    {
+      "id": "codex-app-server:openCodexAppServerSession",
+      "name": "openCodexAppServerSession",
+      "displayName": "openCodexAppServerSession()",
+      "kind": "function",
+      "signature": "async openCodexAppServerSession(options)",
+      "entrypoints": [
+        "arcane-os/codex/app-server"
+      ],
+      "primaryImport": "arcane-os/codex/app-server",
+      "group": "Native Codex sessions",
+      "summary": "Creates and connects the same explicit native session, disposing it before rejecting failed initialization.",
+      "availability": "Node with caller-selected native Codex executable",
+      "protocol": "Native Codex App Server JSONL",
+      "normalization": "Returns the connected session; creates or resumes no thread and changes no provider or authentication selection."
+    },
+    {
+      "id": "mcp-stdio:createMcpStdioServer",
+      "name": "createMcpStdioServer",
+      "displayName": "createMcpStdioServer()",
+      "kind": "function",
+      "signature": "createMcpStdioServer({serverInfo,instructions,tools=[],resources=[],onDiagnostic}={})",
+      "entrypoints": [
+        "arcane-os/mcp/stdio"
+      ],
+      "primaryImport": "arcane-os/mcp/stdio",
+      "group": "MCP STDIO",
+      "summary": "Owns one MCP STDIO session for caller-authored tools and static resources.",
+      "availability": "Node streams on Windows, Linux and macOS; Android requires host adaptation",
+      "protocol": "MCP 2025-11-25 initialize-era JSON-RPC newline transport",
+      "normalization": "Explicit CallToolResult/ReadResourceResult preserve complete content. Returns start, cancel, drain, close and closed; concurrent handlers, ordered output, cooperative cancellation and graceful EOF drain. No process launch or application-service ownership."
+    },
+    {
+      "id": "mcp-stdio:MCP_PROTOCOL_VERSION",
+      "name": "MCP_PROTOCOL_VERSION",
+      "displayName": "MCP_PROTOCOL_VERSION",
+      "kind": "constant",
+      "signature": "MCP_PROTOCOL_VERSION",
+      "entrypoints": [
+        "arcane-os/mcp/stdio"
+      ],
+      "primaryImport": "arcane-os/mcp/stdio",
+      "group": "MCP STDIO",
+      "summary": "The explicit supported MCP initialization profile, 2025-11-25.",
+      "availability": "Node",
+      "protocol": "MCP initialization version negotiation",
+      "normalization": "Later profiles and optional unimplemented capabilities are not implied."
+    },
+    {
+      "id": "mcp-stdio:McpProtocolError",
+      "name": "McpProtocolError",
+      "displayName": "McpProtocolError",
+      "kind": "class",
+      "signature": "new McpProtocolError(code,message,data)",
+      "entrypoints": [
+        "arcane-os/mcp/stdio"
+      ],
+      "primaryImport": "arcane-os/mcp/stdio",
+      "group": "MCP STDIO",
+      "summary": "Represents an explicit JSON-RPC failure with complete message and optional data.",
+      "availability": "Node",
+      "protocol": "JSON-RPC error object",
+      "normalization": "Preserves code, message and supplied data; ordinary tool domain failures use CallToolResult.isError."
+    },
+    {
       "id": "core-repositories:resolveArcaneDataPaths",
       "name": "resolveArcaneDataPaths",
       "displayName": "resolveArcaneDataPaths()",
@@ -90,7 +186,7 @@
       "summary": "Owns one selected native working checkout with ArcaneData/Repos defaults and existing Git/process lifecycle.",
       "availability": "Node with Git on Windows, Linux and macOS; Android requires host process adaptation",
       "protocol": "Git working repository and SDK process adapter",
-      "normalization": "Returns directory, open, status, pull, push and identical close/drain/dispose hooks. Only missing or empty destinations clone; existing roots are inspected without rewriting, resetting or pulling. Explicit paths remain selected. Same-directory operations serialize within the process; cancellation and shutdown join accepted process work."
+      "normalization": "Returns directory, open, status, pull, push, write and identical close/drain/dispose hooks. Only missing or empty destinations clone; existing roots are inspected without rewriting, resetting or pulling. Explicit paths remain selected. Same-directory operations serialize within the process; cancellation and shutdown join accepted process work. write snapshots exact selected text and paths, writes files, stages/commits only literal owned paths and non-force pushes, preserving unrelated staged files and ordinary Git filters. Complete outputs and causal failures retain confirmed local/committed/pushed and uncertain outcomes."
     },
     {
       "id": "core-speech:createSpeechService",
@@ -4295,6 +4391,39 @@
       "availability": "Browser and native WebView JavaScript hosts",
       "protocol": "arcane/1 renderer client ownership",
       "normalization": "Recognizes ESM and classic SDK installation identity; returns null after close or terminal failure and does not treat a foreign Arcane facade as an SDK client"
+    },
+    {
+      "id": "core-client:subscribeCoreClient",
+      "name": "subscribeCoreClient",
+      "displayName": "subscribeCoreClient()",
+      "kind": "function",
+      "signature": "subscribeCoreClient(listener,{global=globalThis,emitCurrent=true,signal}={})",
+      "entrypoints": [
+        "arcane-os/core/client"
+      ],
+      "primaryImport": "arcane-os/core/client",
+      "group": "Core browser client",
+      "summary": "Observes exact SDK client installation and retirement with current-state replay without creating a transport.",
+      "availability": "Browser and native WebView JavaScript hosts",
+      "protocol": "Core client installation lifecycle",
+      "normalization": "Preserves client and error identities; reports current, installed, closed and transport-failed with previousClient; returns idempotent unsubscribe and supports AbortSignal. Installation does not imply runtime, service or model readiness"
+    },
+    {
+      "id": "core-development:createDevelopmentCore",
+      "name": "createDevelopmentCore",
+      "displayName": "createDevelopmentCore()",
+      "kind": "function",
+      "signature": "createDevelopmentCore({appRoot=process.cwd(),application,version,services=[],serviceModules=[],context={},getReplayEvents,signal,onEvent}={})",
+      "entrypoints": [
+        "arcane-os/core/development",
+        "arcane-os"
+      ],
+      "primaryImport": "arcane-os/core/development",
+      "group": "Core source development",
+      "summary": "Composes application Core services and document-owned HTTP/SSE transport independently of local AI.",
+      "availability": "Node on Windows, Linux and macOS; Android requires host adaptation",
+      "protocol": "arcane/1 over source-development HTTP/SSE",
+      "normalization": "Returns ready, handler, current and close synchronously; preserves factory options and explicit context, current lifecycle replay, correlated responses and chunks, document cancellation, accepted service work and owned drain. Explicit bootstrap does not block rendering or start application processes"
     },
     {
       "id": "core-classic-source:createCoreClassicSource",

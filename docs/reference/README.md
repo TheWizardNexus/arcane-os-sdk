@@ -54,18 +54,23 @@ alone does not make bare module names resolve in a browser.
 | Connect a browser to one Core transport | [Core browser client](core-client.md) |
 | Cancel one Core speech synthesis request without changing its payload | [Speech request lifetime](core-client.md#events-and-request-lifetime) and [Core facade](sdk-api.md#createcorefacade) |
 | Compose native Core dispatch, service lifecycle, and stdio hosting | [Native Core runtime](core-runtime.md) |
+| Compose application Core services during source development, independently of local AI | [Development Core services](core-development.md) |
+| Own an explicitly selected native Codex App Server session | [Codex App Server](codex-app-server.md) |
+| Expose application-owned tools and static resources through Node STDIO | [MCP STDIO server](mcp-stdio.md) |
 | Run application-selected llama.cpp, Ollama or ONNX through Core | [Local AI through Core](local-ai.md) |
 | Generate complete local PNG images with a retained native model | [Local image generation](local-image-generation.md) |
 | Select FLUX.2 Klein 4B and its three complementary model resources | [FLUX.2 Klein 4B through Core](local-image-flux.md) |
 | Select the complete SDXL Base 1.0 checkpoint for text-to-image generation | [SDXL Base 1.0 through Core](local-image-sdxl.md) |
 | Compose independently loaded transcription and synthesis engines | [Native speech service](native-speech.md) |
 | Keep a native Whisper model loaded across complete recordings | [Native Whisper transcription](local-whisper.md) |
+| Select the optional Intel NPU encoder with independent CUDA or CPU decoding | [Intel NPU Whisper](../guides/native-whisper-openvino.md) |
 | Edit an original PNG with a complete prompt and explicit strength | [Local image editing](local-image-editing.md) |
 | Project complete stored model files into native working files | [Model assets through Core](model-assets.md) |
 | Retain a Nemotron model and diarize caller-fed audio streams | [Native speaker diarization](diarization.md) |
 | Persist application-selected preferences through Core | [Core preferences service](core-preferences.md) |
 | Read complete selected Git text without changing a checkout | [Git text snapshots](git-text-snapshot.md) |
 | Own a native working checkout under per-user ArcaneData/Repos | [Native repository workspaces](core-repositories.md) |
+| Write, commit and push complete selected repository text | [Selected-text repository writing](core-repositories.md#write-commit-and-push-selected-text) |
 | Build an installed-SDK portable Core payload | [Portable Core packaging](core-native-packaging.md) |
 | Pass host-selected state defaults and unchanged explicit launch values to services | [Launch-time locations](core-native-packaging.md#launch-time-locations) |
 | Build a Windows executable without an OS checkout | [Windows executable packaging](core-native-packaging.md#windows-executable) |
@@ -142,7 +147,8 @@ node tools/build-reference-site.mjs --write --source-ref <documentation-commit>
 
 The same option is accepted by `createReferenceSite({sourceRef})` and
 `writeReferenceSite({sourceRef})`. It reads the selected commit's package
-version, complete reference documents and inventories, inventory-selected
+version, complete reference documents and inventories, the canonical
+`docs/guides/native-whisper-openvino.md` guide when present, inventory-selected
 runtime sources, and authored site inputs directly from Git in memory. It
 creates no checkout or export and leaves source drafts untouched. Rendering
 uses the current canonical generator and its authored semantic contracts;
