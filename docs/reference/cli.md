@@ -9,6 +9,13 @@ work, emits progress or heartbeat records, observes cancellation where safe,
 and exits nonzero on failure. Machine output is defined by
 `arcane-cli-events/1`.
 
+`app-control` is the dedicated native-window client described in
+[native application control](native-app-control.md). It writes a running JSON
+acknowledgement to stderr, then complete result JSON to stdout, or complete error
+JSON to stderr and a nonzero exit. Capture writes its image to the explicit
+`--output` filename and returns metadata. Its options are scoped to that command;
+the general output-format parser below applies to the other commands.
+
 ## Command inventory
 
 | Command | Scope and result |
@@ -31,6 +38,7 @@ and exits nonzero on failure. Machine output is defined by
 | `arcane run` | Serves an existing browser release, or packages, plans, builds, and launches one paired native artifact. |
 | `arcane update-check` | Performs one explicit, read-only npm dist-tag query for the installed SDK version. |
 | `arcane targets` | Lists target ids, declared status, formats, architectures, signing profiles, methods, and pairing reason. |
+| `arcane app-control status\|inspect\|capture\|act` | Connects to an explicit running native window endpoint for document inspection, viewport capture or targeted DOM actions. |
 | `arcane repo status\|pull\|push` | Runs one selected repository operation for the current app workspace. |
 | `arcane mail key set\|status\|delete` | Manages one server-only Resend API-key profile in `.arcane.env.json`. |
 | `arcane mail send` | Performs one explicit, idempotency-keyed Resend attempt from a complete JSON report on redirected stdin. |
@@ -69,7 +77,7 @@ meaning and cardinality rules:
 | `--allow-to` | optional comma-separated addresses | `mail serve` |
 | `--report-key` | nonempty string | `mail send`; caller-owned stable Resend idempotency key, forwarded unchanged |
 | `--request-timeout` | optional integer from 1 through 2147483647 milliseconds | `mail send`, `mail serve` |
-| `--output` | `human`, `json`, `ndjson` | Every invocation; the final occurrence wins. |
+| `--output` | `human`, `json`, `ndjson` | General toolchain invocations; the final occurrence wins. `app-control capture` instead uses its command-specific output filename. |
 | `--git` | flag | `new` |
 | `--skip-tests` | flag | `check --scope app` |
 | `--dry-run` | flag | `package`; parser-supported on `build` with the boundary below |

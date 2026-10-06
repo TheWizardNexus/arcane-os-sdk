@@ -58,6 +58,7 @@ runtime layouts.
 | `arcane-os/core/development` | App-service composition and document-owned Core transport during source development, independently of local AI. |
 | `arcane-os/core/stdio` | Framed Node stdio transport with graceful runtime drain. |
 | `arcane-os/core/host` | Node-only reusable Core host lifecycle, app-selected native launch defaults and shared native location resolution. |
+| `arcane-os/core/app-control` | Explicit connection to an existing native window for background document inspection, capture and DOM actions. |
 | `arcane-os/codex/app-server` | Explicit native Codex App Server session, complete live turns, server requests and recovery. |
 | `arcane-os/mcp/stdio` | Node MCP STDIO server for app-owned tools and static resources. |
 | `arcane-os/core/repositories` | Native persistent ArcaneData paths, connected working repositories and scoped non-secret Git identity configuration. |
@@ -428,6 +429,7 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `startCoreHost()` | function | `arcane-os/core/host` | Native Core host composition | Node with readable input and writable output streams |
 | `startSharedCoreHost()` | function | `arcane-os/core/host` | Shared Core host | Node local IPC on Windows, Linux and macOS |
 | `connectSharedCoreHost()` | function | `arcane-os/core/host` | Shared Core host | Node local IPC and optional explicit headless startup |
+| `connectAppControl()` | function | `arcane-os/core/app-control` | Native application control | Node local IPC; current window adapter is Windows WebView2 |
 | `runSharedCoreHost()` | function | `arcane-os/core/host` | Shared Core host | Node headless entry and optional parent startup IPC |
 | `startSharedCoreBridge()` | function | `arcane-os/core/host` | Shared Core host | Node readable/writable streams and local IPC |
 | `readCoreLaunchContext()` | function | `arcane-os/core/host` | Native Core host composition | Node; combines packaged defaults, host state and explicitly selected launch JSON |
@@ -8885,6 +8887,31 @@ try {
     await connection.close();
 }
 ```
+
+## connectAppControl()
+
+```text
+connectAppControl({endpoint,signal,onError}={})
+```
+
+Connects once to the explicit running native window and resolves
+`{endpoint,closed,status,inspect,capture,act,close}`. The Windows host selects its
+own listener through `native.launchContext.appControl.endpoint` and preserves the
+existing Core child, origin, profile and application lifetime. The client uses
+portable Node local IPC; other native host adapters do not yet implement these
+document operations. No application is launched, no desktop window is activated,
+and no automatic reconnect or action retry occurs.
+
+`status(options)` reports current app/window/document readiness.
+`inspect(parameters={},options)` returns complete selected light-DOM HTML/text
+and live control state. `capture(parameters={},options)` returns a full base64 PNG
+of the rendered viewport. `act(parameters,options)` requires a returned
+`documentGeneration`, one CSS selector, and `click`, `fill`, `select` or `scroll`
+fields. Options preserve the Core client signal/timeout contract. `close()`
+cancels this connection's requests and returns `closed`, without closing the app.
+Document changes and actual errors remain observable; a dispatched action is
+not reversed by later cancellation. Full parameter/result, CLI and platform
+contracts are in [native application control](native-app-control.md).
 
 ## runSharedCoreHost()
 

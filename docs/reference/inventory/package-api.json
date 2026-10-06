@@ -6,12 +6,26 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 301,
+  "memberCount": 302,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
   },
   "members": [
+    {
+      "id": "core-app-control:connectAppControl",
+      "name": "connectAppControl",
+      "displayName": "connectAppControl()",
+      "kind": "function",
+      "signature": "connectAppControl({endpoint,signal,onError}={})",
+      "entrypoints": ["arcane-os/core/app-control"],
+      "primaryImport": "arcane-os/core/app-control",
+      "group": "Native application control",
+      "summary": "Connects to one explicit running native window for background document inspection, viewport capture and targeted DOM actions.",
+      "availability": "Node local IPC on Windows, Linux and macOS; the current window adapter is Windows WebView2, with other native adapters unavailable",
+      "protocol": "arcane/1 app.control.status, app.control.inspect, app.control.capture and app.control.act over the existing framed local connection. The window host selects native.launchContext.appControl.endpoint and preserves its existing Core child, origin, profile and lifetime.",
+      "normalization": "Returns endpoint, closed, status(options), inspect(parameters={},options), capture(parameters={},options), act(parameters,options), and close(). Parameters pass unchanged; per-operation options preserve Core signal/timeout behavior. Status reports actual app/window/document readiness. Inspect returns complete selected top-level light-DOM HTML/text and live control state with DOM-derived role/name hints; frames and open shadow hosts are descriptors only. Capture returns mimeType image/png, complete base64 data, documentGeneration and URL for the rendered viewport. Act requires documentGeneration and one CSS selector with click, exact-string fill, exact-value select or absolute-offset scroll. The native document marker prevents queued actions crossing replacement; cancellation before dispatch prevents execution while dispatched work is observed through completion without retry or reversal. close() cancels only this connection, never the application or Core. No launch, automatic reconnect, desktop activation, global input or public arbitrary evaluator. See native-app-control.md for complete result fields, CLI and platform scope."
+    },
     {
       "id": "local-ai-execution-devices:createExecutionDeviceCatalog",
       "name": "createExecutionDeviceCatalog",

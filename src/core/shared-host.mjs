@@ -1,11 +1,11 @@
 import {spawn} from 'node:child_process';
 import {open} from 'node:fs/promises';
-import {createConnection, createServer} from 'node:net';
+import {createServer} from 'node:net';
 import {randomUUID} from 'node:crypto';
-import {createCoreClient} from '../../browser-runtime/core/client.mjs';
 import {CORE_PROTOCOL, CoreError, serializeCoreError} from '../../browser-runtime/core/contracts.mjs';
 import {createCoreRuntime} from './runtime.mjs';
 import {createCoreFrameDecoder, encodeCoreFrame} from './stdio.mjs';
+import {connectCoreSocket, createCoreSocketConnection, writeCoreSocket as write} from './socket-connection.mjs';
 
 function failure(code, message) { return new CoreError({code, message}); }
 function reportError(error) { console.error('Shared Arcane Core failed:', error); }
@@ -21,29 +21,6 @@ function response(id, result, error) {
     return {protocol: CORE_PROTOCOL, type: 'response', id,
         ...(error ? {ok: false, error: serializeCoreError(error)} : {ok: true, result}),
         time: new Date().toISOString()};
-}
-
-// A stream write owns terminal events as well as its callback. Some destroyed
-// streams never deliver that callback; retirement must still settle the write.
-function write(output, content) {
-    return new Promise(function writeFrame(resolve, reject) {
-        let settled = false;
-        function finish(error) {
-            if (settled) return;
-            settled = true;
-            output.off('error', finish);
-            output.off('close', closed);
-            output.off('finish', closed);
-            if (error) reject(error);
-            else resolve();
-        }
-        function closed() { finish(failure('CORE_CONNECTION_CLOSED', 'The Core output closed during a write.')); }
-        output.once('error', finish);
-        output.once('close', closed);
-        output.once('finish', closed);
-        if (output.destroyed || output.writableEnded) { closed(); return; }
-        try { output.write(content, finish); } catch (error) { finish(error); }
-    });
 }
 
 /** Claim one app-selected pipe/socket before importing or creating services. */
@@ -268,29 +245,7 @@ export async function startSharedCoreHost({
 }
 
 function connectSocket(endpoint, signal) {
-    signal?.throwIfAborted();
-    if (typeof endpoint !== 'string' || !endpoint) throw new TypeError('A shared Core endpoint must be a nonempty local pipe/socket path.');
-    return new Promise(function connect(resolve, reject) {
-        const socket = createConnection({path: endpoint});
-        socket.pause();
-        function cleanup() {
-            signal?.removeEventListener('abort', abort);
-            socket.off('connect', connected);
-            socket.off('error', failed);
-        }
-        function failed(error) {
-            cleanup();
-            socket.on('error', reportError);
-            socket.destroy();
-            reject(error);
-        }
-        function abort() { failed(signal.reason); }
-        function connected() { cleanup(); resolve(socket); }
-        socket.once('connect', connected);
-        socket.once('error', failed);
-        signal?.addEventListener('abort', abort, {once: true});
-        if (signal?.aborted) abort();
-    });
+    return connectCoreSocket(endpoint, signal, reportError);
 }
 
 // The child retains its own listener and complete diagnostic file after the
@@ -354,49 +309,10 @@ function launchSelection(start) {
 /** Connect/reuse, optionally starting an explicit independent headless entry. */
 export async function connectSharedCoreHost({endpoint, start, signal, onError = reportError} = {}) {
     const socket = await discover({endpoint, start: launchSelection(start), signal});
-    let client;
-    let receive;
-    let closing = false;
-    let writes = Promise.resolve();
-    let resolveClosed;
-    let rejectClosed;
-    const closed = new Promise(function ownConnection(resolve, reject) { resolveClosed = resolve; rejectClosed = reject; });
-    closed.catch(function observeConnectionFailure() {});
-    function diagnostic(error) { report(onError, error); }
-    function failed(error) { client?.failTransport(error); socket.destroy(); rejectClosed(error); }
-    const decoder = createCoreFrameDecoder(function frame(value) { receive(value); });
-    socket.on('data', function data(chunk) { try { decoder.push(chunk); } catch (error) { failed(error); } });
-    socket.on('error', failed);
-    socket.on('end', function ended() {
-        try { decoder.finish(); } catch (error) { failed(error); }
-    });
-    socket.on('close', function disconnected() {
-        signal?.removeEventListener('abort', abort);
-        if (!closing) client?.failTransport(failure('CORE_CONNECTION_CLOSED', 'The shared Core connection closed.'));
-        resolveClosed();
-    });
-    const transport = {
-        name: 'shared-core',
-        subscribe(listener) {
-            receive = listener;
-            return function disconnect() {
-                closing = true;
-                writes.finally(function retireSocket() { socket.end(); }).catch(diagnostic);
-            };
-        },
-        send(frame) {
-            const content = encodeCoreFrame(frame);
-            writes = writes.then(function sendFrame() { return write(socket, content); });
-            writes.catch(failed);
-            return writes;
-        }
-    };
-    client = createCoreClient({transport, replayRuntimeState: true, onError: diagnostic});
-    function abort() { client.close(); }
-    signal?.addEventListener('abort', abort, {once: true});
-    if (signal?.aborted) abort();
-    socket.resume();
-    return {client, endpoint, closed, close: function close() { client.close(); return closed; },
+    const connection = createCoreSocketConnection({socket, endpoint, signal, onError,
+        replayRuntimeState: true, name: 'shared-core', closedMessage: 'The shared Core connection closed.'});
+    const {client, closed} = connection;
+    return {...connection,
         async shutdown(options) {
             const result = await client.invoke('core.host.shutdown', {}, options);
             client.close();

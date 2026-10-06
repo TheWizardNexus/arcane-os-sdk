@@ -85,8 +85,11 @@ namespace Arcane.Core.Hosts.Windows
                     ? Path.GetFullPath((string)stateRoot)
                     : Path.Combine(defaultStateBase, "Arcane", appId);
                 OpenDiagnostics(Path.Combine(profileParent, "Diagnostics"));
+                Dictionary<string, object> appControl = launchContext.ContainsKey("appControl")
+                    ? RequiredRecord(launchContext, "appControl") : null;
                 ArcaneHostOptions options = new ArcaneHostOptions
                 {
+                    ApplicationId = appId,
                     ApplicationRoot = Path.GetFullPath(Path.Combine(directory, RequiredString(manifest, "webRoot"))),
                     StartPath = RequiredString(manifest, "start"),
                     OriginHost = "arcane.local",
@@ -97,6 +100,8 @@ namespace Arcane.Core.Hosts.Windows
                     Resizable = OptionalWindowResizable(windowOptions),
                     IconPath = String.IsNullOrEmpty(icon) ? null : Path.Combine(directory, icon),
                     ClassicClientSource = File.ReadAllText(Path.Combine(directory, RequiredString(client, "source"))),
+                    AppControlEndpoint = appControl == null ? null : RequiredString(appControl, "endpoint"),
+                    AppControlSource = appControl == null ? null : File.ReadAllText(Path.Combine(directory, "arcane-app-control.js")),
                     CoreExecutable = Path.Combine(directory, "runtime", "ArcaneCore.exe"),
                     // Forward the actual host selection separately; Core keeps
                     // every explicit launch-record field unchanged.

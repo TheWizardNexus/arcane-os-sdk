@@ -602,6 +602,11 @@ prevent the underlying browser-process exit, restart the application, or change
 its profile and saved data.
 
 `ArcaneLauncher.cs` supplies the executable entry point for that composition.
+An explicit `native.launchContext.appControl.endpoint` enables the current
+Windows window's background document-control listener. The public client and
+CLI inspect, capture and act on that existing WebView without selecting a desktop
+window or changing its Core/profile. See [native application control](native-app-control.md)
+for launch configuration, document generations, cancellation and platform scope.
 `tools/build-core-windows-host.mjs` builds the selected SDK host output from the
 approved WebView2 package, existing .NET Framework compiler and selected Node
 SEA output. It retains complete compiler diagnostics and produces a fresh

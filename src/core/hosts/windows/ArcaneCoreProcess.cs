@@ -18,8 +18,6 @@ namespace Arcane.Core.Hosts.Windows
     public sealed class ArcaneCoreProcess
     {
         private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
-        private static readonly Encoding Ascii = Encoding.GetEncoding(
-            "us-ascii", EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback);
         private readonly object stateLock = new object();
         private readonly Process process;
         private readonly Action<string> onMessage;
@@ -142,13 +140,8 @@ namespace Arcane.Core.Hosts.Windows
             try
             {
                 if (Volatile.Read(ref exitObserved) != 0) throw new IOException("Core exited before the accepted write completed.");
-                byte[] body = Utf8.GetBytes(json);
-                // Length exists only in the Content-Length transport frame.
-                byte[] header = Ascii.GetBytes("Content-Length: " + body.Length.ToString(CultureInfo.InvariantCulture) + "\r\n\r\n");
                 Stream input = process.StandardInput.BaseStream;
-                await input.WriteAsync(header, 0, header.Length).ConfigureAwait(false);
-                await input.WriteAsync(body, 0, body.Length).ConfigureAwait(false);
-                await input.FlushAsync().ConfigureAwait(false);
+                await ArcaneFrameTransport.WriteAsync(input, json).ConfigureAwait(false);
             }
             catch (Exception error)
             {
@@ -214,7 +207,7 @@ namespace Arcane.Core.Hosts.Windows
                 output = process.StandardOutput.BaseStream;
                 while (true)
                 {
-                    string message = await ReadFrameAsync(output).ConfigureAwait(false);
+                    string message = await ArcaneFrameTransport.ReadAsync(output).ConfigureAwait(false);
                     if (message == null) break;
                     try { onMessage(message); }
                     catch (Exception error)
@@ -304,60 +297,6 @@ namespace Arcane.Core.Hosts.Windows
                 }
             }
             catch (Exception error) { Report(error); }
-        }
-
-        private static async Task<string> ReadFrameAsync(Stream stream)
-        {
-            using (MemoryStream header = new MemoryStream())
-            using (MemoryStream body = new MemoryStream())
-            {
-                try
-                {
-                    byte[] next = new byte[1];
-                    byte[] separator = new byte[] { 13, 10, 13, 10 };
-                    int matched = 0;
-                    while (matched != separator.Length)
-                    {
-                        int read = await stream.ReadAsync(next, 0, 1).ConfigureAwait(false);
-                        if (read == 0)
-                        {
-                            if (header.Length == 0) return null;
-                            throw new EndOfStreamException("Core stdout ended during a frame header.");
-                        }
-                        header.WriteByte(next[0]);
-                        matched = next[0] == separator[matched] ? matched + 1 : next[0] == 13 ? 1 : 0;
-                    }
-                    byte[] headerBytes = header.ToArray();
-                    string headerText = Ascii.GetString(headerBytes, 0, headerBytes.Length - separator.Length);
-                    long? contentLength = null;
-                    foreach (string line in headerText.Split(new string[] { "\r\n" }, StringSplitOptions.None))
-                    {
-                        if (!line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase)) continue;
-                        long length;
-                        if (contentLength.HasValue || !Int64.TryParse(line.Substring(15).Trim(), NumberStyles.None,
-                            CultureInfo.InvariantCulture, out length))
-                            throw new InvalidDataException("Core frame Content-Length is invalid.");
-                        contentLength = length;
-                    }
-                    if (!contentLength.HasValue) throw new InvalidDataException("Core frame Content-Length is missing.");
-                    long remaining = contentLength.Value;
-                    byte[] buffer = new byte[8192];
-                    while (remaining != 0)
-                    {
-                        int read = await stream.ReadAsync(buffer, 0, (int)Math.Min(remaining, buffer.Length)).ConfigureAwait(false);
-                        if (read == 0) throw new EndOfStreamException("Core stdout ended during a frame body.");
-                        body.Write(buffer, 0, read);
-                        remaining -= read;
-                    }
-                    return Utf8.GetString(body.ToArray());
-                }
-                catch (Exception error)
-                {
-                    error.Data["frameHeader"] = header.ToArray();
-                    error.Data["frameBody"] = body.ToArray();
-                    throw;
-                }
-            }
         }
 
         private async Task CompleteAsync()

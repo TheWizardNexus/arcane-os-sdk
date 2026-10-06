@@ -16,6 +16,7 @@ namespace Arcane.Core.Hosts.Windows
     /// <summary>Selected by the application launcher; no OS layout is inferred.</summary>
     public sealed class ArcaneHostOptions
     {
+        public string ApplicationId { get; set; }
         public string ApplicationRoot { get; set; }
         public string StartPath { get; set; }
         public string OriginHost { get; set; }
@@ -23,6 +24,8 @@ namespace Arcane.Core.Hosts.Windows
         public string Title { get; set; }
         public string IconPath { get; set; }
         public string ClassicClientSource { get; set; }
+        public string AppControlEndpoint { get; set; }
+        public string AppControlSource { get; set; }
         public string CoreExecutable { get; set; }
         public string CoreArguments { get; set; }
         public string CoreWorkingDirectory { get; set; }
@@ -91,7 +94,7 @@ namespace Arcane.Core.Hosts.Windows
     /// to retired documents; errors stay outside ordinary application content.
     /// Callbacks must not synchronously wait for Ready, Completion or CloseAsync.
     /// </summary>
-    public sealed class ArcaneHostForm : Form
+    public sealed partial class ArcaneHostForm : Form
     {
         private const string CancelRendererRequests = "{\"protocol\":\"arcane/1\",\"type\":\"control\",\"control\":\"requests.cancelAll\"}";
         private readonly ArcaneHostOptions options;
@@ -213,6 +216,7 @@ namespace Arcane.Core.Hosts.Windows
                 string profile = Path.GetFullPath(options.ProfileDirectory);
                 Uri origin = new UriBuilder(Uri.UriSchemeHttps, options.OriginHost).Uri;
                 Uri start = new Uri(origin, options.StartPath);
+                StartAppControl();
                 iconLoading = LoadApplicationIconAsync();
                 iconLoading.ContinueWith(ObserveUnexpectedFailure, TaskContinuationOptions.OnlyOnFaulted);
                 core = ArcaneCoreProcess.Start(options.CoreExecutable, options.CoreArguments,
@@ -228,7 +232,13 @@ namespace Arcane.Core.Hosts.Windows
                 InstallDocumentBridge(generation);
                 // The selected generator uses replayRuntimeState:true. Both RPC
                 // installation and the shared event owner remain SDK-owned.
-                injectedScript = await browser.AddScriptToExecuteOnDocumentCreatedAsync(options.ClassicClientSource);
+                Task scripts = Task.WhenAll(InstallClassicClientAsync(browser), InstallAppControlAsync(browser));
+                try { await scripts; }
+                catch
+                {
+                    if (scripts.Exception != null) throw scripts.Exception;
+                    throw;
+                }
                 if (closing) return;
                 browser.NavigationStarting += NavigationStarting;
                 browser.NavigationCompleted += NavigationCompleted;
@@ -242,6 +252,11 @@ namespace Arcane.Core.Hosts.Windows
                 BeginClose();
             }
             finally { initialized.TrySetResult(null); }
+        }
+
+        private async Task InstallClassicClientAsync(CoreWebView2 browser)
+        {
+            injectedScript = await browser.AddScriptToExecuteOnDocumentCreatedAsync(options.ClassicClientSource);
         }
 
         private void NavigationStarting(object sender, CoreWebView2NavigationStartingEventArgs args)
@@ -571,7 +586,11 @@ namespace Arcane.Core.Hosts.Windows
             // Loss of the top-level renderer ends its bridge.
             // GPU/utility/plugin helpers recover independently; subframe loss,
             // unresponsiveness and unspecified failures remain full diagnostics.
-            if (kind == CoreWebView2ProcessFailedKind.RenderProcessExited) CoreFailed(error);
+            if (kind == CoreWebView2ProcessFailedKind.RenderProcessExited)
+            {
+                AppControlRendererExited();
+                CoreFailed(error);
+            }
             else Report(error);
         }
 
@@ -727,6 +746,7 @@ namespace Arcane.Core.Hosts.Windows
             if (!started) initialized.TrySetResult(null);
             if (bridge != null) bridge.Stop(new InvalidOperationException("The application window is closing."));
             if (activeBridge != null) activeBridge.Stop(new InvalidOperationException("The application window is closing."));
+            StopAppControl();
             shutdown = DrainAndCloseAsync();
             shutdown.ContinueWith(ObserveUnexpectedFailure, TaskContinuationOptions.OnlyOnFaulted);
         }
@@ -753,6 +773,7 @@ namespace Arcane.Core.Hosts.Windows
                     catch (Exception error) { ReportTaskFailure(coreLifetime, error); }
                 }
             }
+            await DrainAppControlAsync();
             // Joining the independent image owner belongs after Core input has
             // closed; image I/O must never delay accepted service work draining.
             if (iconLoading != null)
@@ -781,6 +802,7 @@ namespace Arcane.Core.Hosts.Windows
                 {
                     webView.CoreWebView2.RemoveHostObjectFromScript("arcaneBridge");
                     if (injectedScript != null) webView.CoreWebView2.RemoveScriptToExecuteOnDocumentCreated(injectedScript);
+                    if (appControlScript != null) webView.CoreWebView2.RemoveScriptToExecuteOnDocumentCreated(appControlScript);
                 }
             }
             catch (Exception error) { Report(error); }

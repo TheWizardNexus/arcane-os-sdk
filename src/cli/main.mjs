@@ -6,6 +6,7 @@ import {ArcaneError,ERROR_CODES,normalizeError} from '../errors.mjs';
 import {CLI_NAME,SDK_NAME,SDK_VERSION,OUTPUT_MODES} from '../constants.mjs';
 import {loadArcaneNativeProvider} from '../native-provider-loader.mjs';
 import {APP_BUNDLE_EXTENSION} from '../release-bundle.mjs';
+import {runAppControlCli} from './app-control.mjs';
 
 const is = new Is(false);
 
@@ -82,6 +83,7 @@ Usage:
   ${CLI_NAME} run [--target <target>] [--app <id>] [--cert <pem>] [--key <pem>] [--port 8000] [--http-port 0] [--arcane-root <directory>] [--output-root <directory>] [--format <format>] [--signing <mode>]
   ${CLI_NAME} update-check
   ${CLI_NAME} targets
+  ${CLI_NAME} app-control status|inspect|capture|act --endpoint <pipe-or-socket> [--help]
   ${CLI_NAME} repo status|pull|push
   ${CLI_NAME} mail key set [profile] [--secret-stdin]
   ${CLI_NAME} mail key status [profile]
@@ -942,6 +944,9 @@ export async function runCli(argv=process.argv.slice(2),{
     loadNativeProvider=loadArcaneNativeProvider,
     controller=new AbortController()
 }={}){
+    if(argv[0]==='app-control'){
+        return runAppControlCli(argv.slice(1),{cwd,stdout,stderr,controller});
+    }
     let reporter;
     let command='help';
     const onSignal=()=>controller.abort(new Error('Interrupted'));
