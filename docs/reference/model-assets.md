@@ -1,6 +1,6 @@
-# Native working files from stored model assets
+# Native working files from model assets
 
-These public APIs were first published in `arcane-os@0.61.0`. Browser
+Browser preparation and native retain/release ownership were first published in `arcane-os@0.61.0`. Browser
 preparation is exported by `arcane-os/ai/core-model-assets`, and the native
 service by `arcane-os/core/model-assets`. The image example below uses
 `arcane-os/ai/core-image`, published in the same release.
@@ -87,6 +87,53 @@ cleanup failures remain observable.
 
 ## Native ownership
 
+Native services can prepare explicitly selected upstream members without a
+renderer or browser store. Obtain the registered shared service through
+`await context.getService('model-assets')`, then use its native preparation API:
+
+```javascript
+const modelAssets = await context.getService('model-assets');
+const projection = await modelAssets.prepare({
+    id: selectedOperationId,
+    workingDirectory: selectedWorkingDirectory,
+    members: selectedMembers, // [{path: 'onnx/model.onnx', url: selectedURL}, ...]
+    signal,
+    onProgress: renderPreparationProgress
+});
+const use = modelAssets.retain(projection.id);
+await modelAssets.release(projection.id);
+try {
+    await ownNativeModelLifetime(use.members);
+} finally {
+    // Join actual native unload/worker exit before releasing these files.
+    await use.release();
+}
+```
+
+`prepare({id,workingDirectory,members,signal,onProgress})` performs standard
+fetches only when explicitly called. Every member has its original relative
+`path` and selected `url`; the caller supplies the complete companion-file set.
+Independent members download concurrently. Each complete response stream is
+written directly through the existing ordered native file owner, without a
+whole-model buffer or base64 conversion. No model or runtime is selected or
+downloaded by service startup. The result is the ready projection snapshot with
+ordered `members: [{path,nativePath}]`.
+
+Progress uses `open`, `download`, `complete` and `ready` phases, with
+`completed`, `total` and `unit:'files'`; member progress additionally includes
+`memberIndex` and `path`. Progress callbacks may return a promise, which the
+preparation observes. They must not await cleanup of the preparation currently
+calling them. Callback failures remain preparation failures. HTTP failures
+retain `url`, `status` and the complete response text in `response`.
+
+`release(id)` relinquishes preparation ownership without a request signal.
+For active native downloads, release or disposal aborts their fetches and joins
+the transfer tasks and native writes before deleting only their owned child
+directory. Preparation cancellation and failure follow that same cleanup path;
+the original failures and cleanup failures remain observable. A native retain
+handle continues to protect completed files through actual engine release.
+Native preparation leaves browser DBOPFS originals and unrelated files alone.
+
 ```javascript
 import {createModelAssetService} from 'arcane-os/core/model-assets';
 
@@ -103,7 +150,7 @@ try {
 ```
 
 `createModelAssetService({appRoot})` returns a Core service with `current()`,
-`retain(id)` and `dispose()`. `retain()` accepts only a completed projection
+`prepare(options)`, `retain(id)`, `release(id)` and `dispose()`. `retain()` accepts only a completed projection
 and returns `{id,directory,members,release}`. A native engine takes this handle
 before loading and releases it after actual unload, failed-load cleanup or
 worker exit. A rejected inference/load promise alone does not establish native

@@ -150,11 +150,22 @@ class CoreRuntime {
         };
     }
 
+    async getService(name) {
+        if (this.#closing) throw failure('CORE_CLOSING', 'Core is closing.');
+        const service = this.#services.get(name);
+        if (!service) throw failure('CORE_SERVICE_UNAVAILABLE', `Core service ${String(name)} is not registered.`);
+        await this.#startService(service);
+        return service.definition;
+    }
+
     #serviceContext(service) {
         const runtime = this;
         return {
             application: this.#application,
             service: service.name,
+            getService(name) {
+                return runtime.getService(name);
+            },
             emit(event, data) {
                 return runtime.emit(event, data);
             }

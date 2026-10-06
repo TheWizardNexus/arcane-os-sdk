@@ -19,6 +19,100 @@ function cancel(requestId) {
     return {protocol: CORE_PROTOCOL, type: 'control', control: 'request.cancel', requestId};
 }
 
+test('native service lookup shares startup and preserves independent service readiness', async function nativeDependencies(t) {
+    const gate = deferred();
+    const entered = deferred();
+    let starts = 0;
+    const dependency = {
+        name: 'cheese-vault',
+        async start() {
+            starts += 1;
+            entered.resolve();
+            await gate.promise;
+        },
+        describe() { return '  Complete lunar inventory.\n🧀  '; }
+    };
+    const independent = {name: 'telescope'};
+    let acquired;
+    const consumer = {
+        name: 'ledger',
+        async start(context) { acquired = await context.getService('cheese-vault'); },
+        methods: {
+            'ledger.owner': async function ledgerOwner(parameters, context) {
+                return (await context.getService('cheese-vault')).describe();
+            }
+        }
+    };
+    const runtime = createCoreRuntime({services: [dependency, independent, consumer]});
+    t.after(async function finishNativeDependencies() {
+        gate.resolve();
+        await runtime.close();
+    });
+    const first = runtime.getService('cheese-vault');
+    const second = runtime.getService('cheese-vault');
+    await entered.promise;
+    assert.equal(runtime.current().state, 'created');
+    assert.equal(starts, 1);
+    assert.equal(await runtime.getService('telescope'), independent);
+    runtime.start();
+    assert.equal(runtime.current().state, 'ready');
+    gate.resolve();
+    assert.equal(await first, dependency);
+    assert.equal(await second, dependency);
+    assert.equal(await runtime.getService('ledger'), consumer);
+    assert.equal(acquired, dependency);
+    assert.equal(starts, 1);
+    assert.equal((await runtime.handle(request('native-owner', 'ledger.owner'))).result, dependency.describe());
+});
+
+test('native service lookup retains actual startup failures and rejects new lookup during close', async function nativeLookupFailures() {
+    const cause = new Error('  Entire native startup failure.\n最後の行  ');
+    const runtime = createCoreRuntime({services: [{name: 'broken', start() { throw cause; }}]});
+    await assert.rejects(runtime.getService('absent'), {code: 'CORE_SERVICE_UNAVAILABLE'});
+    await assert.rejects(runtime.getService('broken'), function originalFailure(error) { return error === cause; });
+    const closing = runtime.close();
+    const failedClose = assert.rejects(closing, function originalShutdownFailure(error) {
+        return error.errors.length === 1 && error.errors[0] === cause;
+    });
+    await assert.rejects(runtime.getService('broken'), {code: 'CORE_CLOSING'});
+    await failedClose;
+    await assert.rejects(runtime.getService('absent'), {code: 'CORE_CLOSING'});
+});
+
+test('accepted native lookup resolves its owner through concurrent shutdown for owned cleanup', async function retainedNativeOwner(t) {
+    const gate = deferred();
+    const entered = deferred();
+    const disposed = deferred();
+    let retained;
+    let released = false;
+    const dependency = {
+        name: 'projection',
+        async start() { entered.resolve(); await gate.promise; },
+        release() { released = true; },
+        async dispose() { await disposed.promise; }
+    };
+    const consumer = {
+        name: 'native-session',
+        async start(context) { retained = await context.getService('projection'); },
+        dispose() { retained?.release(); disposed.resolve(); }
+    };
+    const runtime = createCoreRuntime({services: [dependency, consumer]});
+    t.after(async function finishRetainedNativeOwner() {
+        gate.resolve();
+        disposed.resolve();
+        await runtime.close();
+    });
+    const lookup = runtime.getService('native-session');
+    await entered.promise;
+    const closing = runtime.close();
+    await assert.rejects(runtime.getService('projection'), {code: 'CORE_CLOSING'});
+    gate.resolve();
+    assert.equal(await lookup, consumer);
+    await closing;
+    assert.equal(retained, dependency);
+    assert.equal(released, true);
+});
+
 test('reentrant shutdown follows the replay snapshot rather than preceding stale state', async function replayOrdering() {
     const runtime = createCoreRuntime();
     runtime.start();

@@ -563,6 +563,9 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
     const service = {
         name: 'local-ai',
         current: snapshot,
+        getONNXRuntime() {
+            return requireONNX();
+        },
         async start(currentContext) {
             context = currentContext;
             if (prepare) {

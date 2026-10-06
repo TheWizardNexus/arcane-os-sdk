@@ -15,6 +15,71 @@ function describeError(error){
     return result;
 }
 
+async function createSession(request) {
+    const supplied = request.sessionOptions;
+    const selectProviders = supplied === undefined
+        || (supplied !== null && is.object(supplied) && supplied.executionProviders === undefined);
+    const options = selectProviders ? {...supplied, executionProviders: ['cpu']} : supplied;
+    if (request.executionPreference !== 'gpu' || !selectProviders) {
+        session = await ort.InferenceSession.create(request.model, options);
+        return undefined;
+    }
+
+    const execution = {
+        preference: 'gpu',
+        supportedBackends: [],
+        selectedProviders: [],
+        attempts: [],
+        fallback: false,
+        discoveryError: null
+    };
+    const failures = [];
+    try {
+        execution.supportedBackends = ort.listSupportedBackends();
+    } catch (error) {
+        execution.discoveryError = describeError(error);
+        failures.push(error);
+    }
+    // The inventory advertises compiled support. `bundled` describes packaging,
+    // not whether an installed provider library or physical device can load.
+    const candidates = ['cuda', 'tensorrt', 'dml', 'coreml', 'webgpu'].filter(
+        function advertisedProvider(name) {
+            return execution.supportedBackends.some(
+                function supportedBackend(backend) { return backend.name === name; }
+            );
+        }
+    );
+    candidates.push('cpu');
+    for (const provider of candidates) {
+        const executionProviders = provider === 'cpu' ? ['cpu'] : [provider, 'cpu'];
+        const selectedOptions = {...supplied, executionProviders};
+        if (provider === 'dml') {
+            // DirectML requires these session settings. Explicit caller values
+            // remain exact and can produce the native provider's own error.
+            if (selectedOptions.enableMemPattern === undefined) selectedOptions.enableMemPattern = false;
+            if (selectedOptions.executionMode === undefined) selectedOptions.executionMode = 'sequential';
+        }
+        const attempt = {executionProviders, status: 'loading', error: null};
+        execution.attempts.push(attempt);
+        execution.fallback = provider === 'cpu';
+        try {
+            session = await ort.InferenceSession.create(request.model, selectedOptions);
+            attempt.status = 'configured';
+            execution.selectedProviders = executionProviders;
+            // Successful creation proves this session configuration was accepted.
+            // ORT can assign graph nodes to CPU; it does not prove GPU execution.
+            return execution;
+        } catch (error) {
+            attempt.status = 'failed';
+            attempt.error = describeError(error);
+            failures.push(error);
+        }
+    }
+    const error = new AggregateError(failures, 'ONNX accelerator session creation and CPU fallback failed.');
+    error.execution = execution;
+    throw error;
+}
+
 function tensorMap(records,inputs=false){
     return Object.fromEntries(Object.entries(records).map(function createTensor([name,record]){
         // ORT Node 1.30.0 supplies string feeds to FillStringTensor through
@@ -33,19 +98,14 @@ async function handleRequest(request){
     try{
         let result;
         if(request.operation==='load'){
-            const supplied=request.sessionOptions;
-            const options=supplied===undefined
-                ?{executionProviders:['cpu']}
-                :supplied!==null&&is.object(supplied)&&supplied.executionProviders===undefined
-                    ?{...supplied,executionProviders:['cpu']}
-                    :supplied;
-            session=await ort.InferenceSession.create(request.model,options);
+            const execution = await createSession(request);
             result={
                 inputNames:session.inputNames,
                 outputNames:session.outputNames,
                 inputMetadata:session.inputMetadata,
                 outputMetadata:session.outputMetadata
             };
+            if (execution) result.execution = execution;
         }else if(request.operation==='run'){
             const feeds=tensorMap(request.feeds,true);
             const fetches=request.fetches===undefined||request.fetches===null||is.array(request.fetches)

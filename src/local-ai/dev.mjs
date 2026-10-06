@@ -40,10 +40,16 @@ export function createDevelopmentLocalAI({
     let modelAssets;
     let imageService;
     let speechService;
-    if (selected.runtimes.some(function selectedImageRuntime(requirement) {
+    const imageSelected = selected.runtimes.some(function selectedImageRuntime(requirement) {
         return requirement.id === 'stable-diffusion.cpp';
+    });
+    if (imageSelected || selected.runtimes.some(function selectedONNXRuntime(requirement) {
+        return requirement.id === 'onnx';
     })) {
         modelAssets = createModelAssetService({appRoot});
+        definitions.push(modelAssets);
+    }
+    if (imageSelected) {
         imageService = createLocalImageService(
             selected,
             {
@@ -56,7 +62,7 @@ export function createDevelopmentLocalAI({
                 }
             }
         );
-        definitions.push(modelAssets, imageService);
+        definitions.push(imageService);
     }
     const whisperRequirement = selected.runtimes.find(function selectedWhisperRuntime(requirement) {
         return requirement.id === 'whisper.cpp';

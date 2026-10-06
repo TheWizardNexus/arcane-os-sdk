@@ -269,6 +269,19 @@ test('portable Core entry composes only selected local AI with relocatable runti
     assert.ok(emptySelection.includes('runtimes: JSON.parse("[]").map(function runtimeLocation(runtime) {'));
 });
 
+test('portable Core shares one model-assets owner for ONNX and image selections', function selectedModelAssetOwner() {
+    for (const selection of [['onnx'], ['stable-diffusion.cpp'], ['onnx', 'stable-diffusion.cpp']]) {
+        const entry = coreEntrySource(application, '1.2.3', [], {localAI: {runtimes: selection}});
+        assert.equal([...entry.matchAll(/import \{createModelAssetService\}/g)].length, 1);
+        assert.equal([...entry.matchAll(/const modelAssets = createModelAssetService\(/g)].length, 1);
+        assert.equal([...entry.matchAll(/^    modelAssets,?$/gm)].length, 1);
+        assert.equal(entry.includes('createLocalImageService'), selection.includes('stable-diffusion.cpp'));
+        if (selection.includes('stable-diffusion.cpp')) assert.ok(entry.includes('{...context, modelAssets}'));
+    }
+    const entry = coreEntrySource(application, '1.2.3', [], {localAI: {runtimes: ['llama.cpp']}});
+    assert.equal(entry.includes('createModelAssetService'), false);
+});
+
 test('portable assembly resolves the shared browser event module from a selected installed SDK alias', async function installedSdkAlias(t) {
     const fixture = await createFixture(t);
     const aliasModule = 'node_modules/@moon/arcane/browser-runtime/event-manager.mjs';

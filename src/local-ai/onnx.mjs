@@ -95,7 +95,7 @@ export function createONNXRuntime({modulePath,onEvent,signal}={}){
 
     function current(){
         return {sessions:[...sessions.values()].map(function sessionState(entry){
-            return structuredClone(entry.state);
+            return {...structuredClone(entry.state), exited:entry.exited};
         }),closed};
     }
 
@@ -157,20 +157,31 @@ export function createONNXRuntime({modulePath,onEvent,signal}={}){
         entry.stopping=true;
         if(failed)entry.terminalError??=reason;
         entry.stopTask=Promise.resolve().then(async function releaseSession(){
-            if(active||failed||entry.terminalError){
-                entry.terminationRequested=true;
-                await worker.terminate();
-            }else{
-                try{worker.postMessage({operation:'unload',requestId:++nextRequestId});}
-                catch(error){
-                    entry.releaseError=error;
+            let terminationError;
+            try{
+                if(active||failed||entry.terminalError){
                     entry.terminationRequested=true;
                     await worker.terminate();
+                }else{
+                    try{worker.postMessage({operation:'unload',requestId:++nextRequestId});}
+                    catch(error){
+                        entry.releaseError=error;
+                        entry.terminationRequested=true;
+                        await worker.terminate();
+                    }
                 }
+            }catch(error){
+                terminationError=error;
+                reportBackgroundError(error);
             }
+            // Failed termination is not actual worker exit. Keep native file
+            // ownership until exit and complete output delivery have settled.
             await entry.exit;
-            await Promise.all(entry.outputTasks);
-            if(entry.releaseError)throw entry.releaseError;
+            const outputResults=await Promise.allSettled(entry.outputTasks);
+            const failures=[entry.releaseError,terminationError].filter(function present(error){return error!==null&&error!==undefined;});
+            for(const result of outputResults)if(result.status==='rejected')failures.push(result.reason);
+            if(failures.length>1)throw new AggregateError(failures,'Releasing the ONNX worker failed.');
+            if(failures.length)throw failures[0];
             return structuredClone(entry.state);
         });
         // A native call has no AbortSignal. Stop delivery immediately, retain
@@ -262,7 +273,7 @@ export function createONNXRuntime({modulePath,onEvent,signal}={}){
         finally{entry.resolveExit(code);}
     }
 
-    async function load({id,model,sessionOptions,signal:operationSignal}={}){
+    async function load({id,model,sessionOptions,executionPreference,signal:operationSignal}={}){
         assertOpen(operationSignal);
         if(!is.string(id)||!is.string(model))throw new TypeError('ONNX load requires a session id and model path.');
         const previous=sessions.get(id);
@@ -312,7 +323,7 @@ export function createONNXRuntime({modulePath,onEvent,signal}={}){
         }
         // Queue load before publishing readiness so a synchronous subscriber
         // can enqueue inference or request release without racing ownership.
-        const task=enqueue(entry,'load',{model,sessionOptions},operationSignal,true);
+        const task=enqueue(entry,'load',{model,sessionOptions,executionPreference},operationSignal,true);
         publish(entry);
         dispatchNext(entry);
         return task;

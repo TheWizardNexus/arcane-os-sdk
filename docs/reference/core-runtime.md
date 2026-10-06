@@ -66,10 +66,33 @@ service's startup before invoking its handler. State errors use the shared
 complete diagnostic serialization; the startup promise retains its original
 rejection value.
 
-Each lifecycle hook receives `{application, service, emit}`. Each request handler
-receives `(parameters, {application, service, emit, requestId, signal})`, with
+Each lifecycle hook receives `{application, service, emit, getService}`. Each request handler
+receives `(parameters, {application, service, emit, getService, requestId, signal})`, with
 `this` bound to its service definition. A hook or handler may publish a complete
 service-owned event through `emit(event, data)`.
+
+### Native service composition
+
+`await runtime.getService(name)` and `await context.getService(name)` return the
+actual registered service definition after that service's shared startup
+promise. A lookup can start its selected dependency before `runtime.start()`;
+it waits for that dependency alone, with no renderer, transport request or
+all-service readiness barrier. Concurrent lookups reuse the same startup and
+return the same object. Applications keep their service dependencies acyclic.
+
+Use the returned service's documented native members, such as
+[`getONNXRuntime()`](local-ai.md#native-service-owners), for same-process
+composition. RPC handlers remain owned by the dispatcher; calling entries in
+`service.methods` directly does not supply request tracking or cancellation.
+No service lookup is exposed over the browser protocol.
+
+An unregistered name rejects with `CORE_SERVICE_UNAVAILABLE`. Startup failure
+rejects with the original error. New lookups reject with `CORE_CLOSING` once
+shutdown begins; an already accepted lookup still settles with its startup.
+Lookup provides readiness, not a lifetime lease or ownership transfer. Retain
+each acquired native owner according to its own documented cleanup contract,
+and use that retained handle during disposal rather than requesting a new one.
+Independent services still dispose concurrently.
 
 ## State and frames
 
@@ -133,9 +156,13 @@ the handler runs. A service that does not finish or respond to cancellation is
 still unfinished; the SDK does not report a forced timeout as successful cleanup.
 
 Use `lifetime:'service'` for accepted work, such as a save, that must survive a
-renderer cancellation or disconnect. These operations are not aborted by the
-request cancellation controls or by normal Core shutdown. The service still
-owns its persistence, queueing and failure semantics.
+renderer cancellation or disconnect. The dispatcher does not abort these
+operations through request cancellation controls or its own shutdown. The
+service still owns its persistence, queueing and failure semantics. A composing
+host or native service can abort its own lifetime signal during shutdown;
+in-flight native inference can therefore be cancelled even when the dispatcher
+retains a service-lifetime response. Service lifetime does not promise survival
+of native host shutdown.
 
 `runtime.close()` is idempotent and retains the same completion promise. It stops
 accepting new requests, cancels request-lifetime operations, waits for accepted

@@ -261,10 +261,17 @@ service exposes retained worker sessions through `onnx.load/run/unload/status`;
 model files remain caller-selected application resources. See
 [native ONNX sessions](local-ai.md#native-onnx-sessions).
 
-Selected `stable-diffusion.cpp` additionally composes
-`createLocalImageService` from `arcane-os/core/image` and one shared
-`createModelAssetService` from `arcane-os/core/model-assets`. The image factory
-receives the full authored selection plus that same model-assets instance.
+Selecting ONNX, image generation, or both composes one shared
+`createModelAssetService` from `arcane-os/core/model-assets`. Native application
+services obtain that same definition with `await context.getService('model-assets')`.
+They obtain the selected local-AI owner with `await context.getService('local-ai')`
+and its current native ONNX handle with `getONNXRuntime()`. These lookups await
+only their selected service startup, independently of renderer readiness. See
+[native service ownership and cleanup](local-ai.md#native-service-owners).
+
+Selected `stable-diffusion.cpp` additionally composes `createLocalImageService`
+from `arcane-os/core/image`. The image factory receives the full authored
+selection plus that same model-assets instance.
 Library, Koffi binding and variant paths resolve from the artifact root;
 ordinary browser imports use `arcane-os/ai/core-image` and
 `arcane-os/ai/core-model-assets` through the managed import map.

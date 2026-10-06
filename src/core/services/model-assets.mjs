@@ -10,7 +10,7 @@ function failure(code, message) {
     return new CoreError({code, message});
 }
 
-/** Working files for native engines. The browser's stored assets stay authoritative. */
+/** Working files for native engines. Caller-selected source assets stay authoritative. */
 export function createModelAssetService({appRoot = process.cwd()} = {}) {
     const projections = new Map();
     let context;
@@ -63,6 +63,7 @@ export function createModelAssetService({appRoot = process.cwd()} = {}) {
             const errors = [];
             let filesClosed = false;
             try { await record.opening; } catch (error) { record.error ??= error; }
+            try { await record.downloading; } catch (error) { record.error ??= error; }
             try { await record.finishing; } catch (error) { record.error ??= error; }
             try { await closeMembers(record); filesClosed = true; } catch (error) { errors.push(error); }
             if (record.directory && filesClosed) {
@@ -87,8 +88,14 @@ export function createModelAssetService({appRoot = process.cwd()} = {}) {
 
     function releasePreparation(record) {
         record.preparationOwned = false;
+        record.downloadController?.abort(failure('MODEL_ASSET_PROJECTION_RELEASED', 'Model asset preparation was released.'));
         publish(record);
         return cleanup(record);
+    }
+
+    function release(id) {
+        const record = projections.get(id);
+        return record ? releasePreparation(record) : Promise.resolve({id, state: 'released'});
     }
 
     async function failedOperation(record, error) {
@@ -165,17 +172,96 @@ export function createModelAssetService({appRoot = process.cwd()} = {}) {
         const member = record.members[memberIndex];
         if (!member) throw new TypeError('Select an existing model asset member.');
         try {
-            const task = member.tail.then(async function appendOriginalContent() {
-                request.signal.throwIfAborted();
-                if (!record.preparationOwned) throw failure('MODEL_ASSET_PROJECTION_RELEASED', 'Model asset preparation was released.');
-                await member.handle.appendFile(Buffer.from(contentBase64, 'base64'));
-                request.signal.throwIfAborted();
-            });
-            // File writes remain ordered; unrelated member files write independently.
-            member.tail = task.catch(function observeWriteFailure() {});
-            await task;
+            await appendMemberContent(record, member, Buffer.from(contentBase64, 'base64'), request.signal);
             return {id, memberIndex, written: true};
         } catch (error) { return failedOperation(record, error); }
+    }
+
+    function appendMemberContent(record, member, content, signal) {
+        const task = member.tail.then(async function appendOriginalContent() {
+            signal.throwIfAborted();
+            if (!record.preparationOwned) throw failure('MODEL_ASSET_PROJECTION_RELEASED', 'Model asset preparation was released.');
+            await member.handle.appendFile(content);
+            signal.throwIfAborted();
+        });
+        // File writes remain ordered; unrelated member files write independently.
+        member.tail = task.catch(function observeWriteFailure() {});
+        return task;
+    }
+
+    async function prepare({id, workingDirectory, members, signal, onProgress} = {}) {
+        const controller = new AbortController();
+        const operationSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
+        const request = {signal: operationSignal};
+        let record;
+        let completed = 0;
+        let firstFailure;
+
+        async function progress(phase, memberIndex) {
+            operationSignal.throwIfAborted();
+            await onProgress?.({
+                phase, completed, total: members.length, unit: 'files',
+                ...(memberIndex === undefined ? {} : {memberIndex, path: members[memberIndex].path})
+            });
+            operationSignal.throwIfAborted();
+        }
+
+        async function downloadMember(member, memberIndex) {
+            try {
+                await progress('download', memberIndex);
+                const response = await fetch(member.url, {signal: operationSignal});
+                if (!response.ok) {
+                    const error = failure('MODEL_ASSET_DOWNLOAD_FAILED', `Model asset request failed: ${response.status} ${response.statusText}`);
+                    error.url = member.url;
+                    error.status = response.status;
+                    error.response = await response.text();
+                    throw error;
+                }
+                if (!response.body) throw failure('MODEL_ASSET_DOWNLOAD_FAILED', `Model asset response has no content stream: ${member.url}`);
+                for await (const content of response.body) {
+                    operationSignal.throwIfAborted();
+                    await appendMemberContent(record, record.members[memberIndex], content, operationSignal);
+                    await progress('download', memberIndex);
+                }
+                completed += 1;
+                await progress('download', memberIndex);
+            } catch (error) {
+                firstFailure ??= error;
+                controller.abort(error);
+                throw error;
+            }
+        }
+
+        try {
+            await openProjection({id, workingDirectory, members}, request);
+            record = requireProjection(id);
+            operationSignal.throwIfAborted();
+            if (!record.preparationOwned || closing) {
+                throw failure('MODEL_ASSET_PROJECTION_RELEASED', 'Model asset preparation was released.');
+            }
+            record.downloadController = controller;
+            // Cleanup joins this transfer-only task. Its rejection handler below
+            // may release preparation without waiting on itself.
+            record.downloading = Promise.resolve().then(async function downloadMembers() {
+                await progress('open');
+                const results = await Promise.allSettled(members.map(downloadMember));
+                const errors = results.filter(function rejected(result) { return result.status === 'rejected'; })
+                    .map(function reason(result) { return result.reason; });
+                if (errors.length > 1) {
+                    throw new AggregateError(errors, 'Downloading model asset members failed.', {cause: firstFailure});
+                }
+                if (errors.length) throw errors[0];
+            });
+            await record.downloading;
+            await progress('complete');
+            const projection = await completeProjection({id}, request);
+            await progress('ready');
+            return projection;
+        } catch (error) {
+            controller.abort(error);
+            if (record) return failedOperation(record, error);
+            throw error;
+        }
     }
 
     async function completeProjection({id}, request) {
@@ -245,7 +331,7 @@ export function createModelAssetService({appRoot = process.cwd()} = {}) {
     }
 
     return {
-        name: 'model-assets', current, retain,
+        name: 'model-assets', current, prepare, retain, release,
         start(serviceContext) { context = serviceContext; },
         methods: {
             'modelAssets.open': openProjection,
@@ -255,8 +341,7 @@ export function createModelAssetService({appRoot = process.cwd()} = {}) {
             'modelAssets.release': {
                 lifetime: 'service',
                 handle({id}) {
-                    const record = projections.get(id);
-                    return record ? releasePreparation(record) : {id, state: 'released'};
+                    return release(id);
                 }
             }
         },

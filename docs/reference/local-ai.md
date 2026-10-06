@@ -174,6 +174,34 @@ This factory accepts chat/ONNX requirements; the separate
 owns image requirements. The development and generated native composition
 split the shared application record accordingly.
 
+### Native service owners
+
+A native application service uses its Core lifecycle or request context to
+obtain the existing selected owner:
+
+```js
+const localAI = await context.getService('local-ai');
+const onnx = localAI.getONNXRuntime();
+const modelAssets = await context.getService('model-assets');
+```
+
+`getService()` awaits only that service's existing startup. The synchronous
+`getONNXRuntime()` returns its actual `load/run/unload/current/subscribe/close`
+owner; it neither prepares another runtime nor loads a model. An unselected
+engine reports `LOCAL_AI_RUNTIME_NOT_SELECTED`; an unavailable or recovering
+owner reports `LOCAL_AI_RUNTIME_UNAVAILABLE`, and an aborted service lifetime
+retains its abort reason. Development and generated native compositions register
+one shared model-assets service when ONNX or image generation is selected.
+
+Reacquire `getONNXRuntime()` on each explicit model load because runtime recovery
+replaces that owner. Retain the acquired handle for that session's cleanup and
+await its `unload({id})` without an already-aborted request signal before releasing
+the corresponding model-assets retain handle. The native ONNX owner joins actual
+worker exit; a cancelled request's rejection alone does not establish that exit.
+Core closes services concurrently, and the host can cancel in-flight native work
+at shutdown. These native members require no renderer readiness and introduce no
+second inference engine. See [native Core composition](core-runtime.md#native-service-composition).
+
 `localai.status` returns `{runtimes}` and, when Ollama is selected, the existing
 `ollama` and `models.ollama` catalog fields. Runtime records distinguish
 `installed`, `available`, `state`, `models`, ownership and errors. A listening
@@ -336,13 +364,41 @@ try {
 ```
 
 The factory accepts `{modulePath,signal?,onEvent?}` and starts no worker until
-`load({id,model,sessionOptions?,signal?})`. The model path is absolute for this
+`load({id,model,sessionOptions?,executionPreference?,signal?})`. The model path is absolute for this
 direct Node API. Session creation defaults to the CPU execution provider;
 explicit native session options remain caller-owned. The returned session
 record contains `id`, `model`, `state`, `loaded`, `error`, input/output names and
 metadata. A live ID requires explicit unload before replacement. An ID may be
 loaded again once its previous worker exits after a failed load or unload.
 A run error retains the loaded session so a corrected request can use it.
+`current().sessions[].exited` reports actual worker exit, independently of a
+rejected load or inference. Unload joins worker exit and output delivery even
+when requesting termination fails; complete cleanup errors remain observable.
+
+Select `executionPreference: 'gpu'` to try the installed runtime's advertised
+CUDA, TensorRT, DirectML, CoreML and WebGPU providers in that order, followed by
+CPU when no accelerator session can be created. Discovery runs once per load;
+each advertised candidate receives one actual session-creation attempt with CPU
+available for graph nodes that the accelerator cannot handle. No provider is
+downloaded by selection. The upstream `bundled` flag describes packaging and
+does not exclude separately installed CUDA or TensorRT libraries. An explicit
+`sessionOptions.executionProviders`, including an empty array, takes precedence
+and is passed unchanged without automatic discovery or retries. Automatic
+DirectML attempts default `enableMemPattern` to `false` and `executionMode` to
+`'sequential'` as required by that provider; explicit caller values remain
+unchanged, including on the final CPU attempt.
+
+Automatic GPU selection adds an `execution` record to the loaded session and
+its ordinary state events: `preference`, complete `supportedBackends`,
+`selectedProviders`, ordered `attempts` with their full errors, `fallback`, and
+`discoveryError`. Each attempt records `executionProviders`, `status`
+(`configured` or `failed`), and `error`. `fallback: true` means the SDK created
+the final CPU session after GPU preference, including when no GPU candidate was
+advertised. Successful creation establishes an accepted provider configuration;
+it does not establish that a GPU executed any graph nodes. If every attempt
+fails, the load error retains the complete attempt errors and `execution`
+record. Inference failures retain their existing behavior and do not replay
+inference on another provider.
 
 `run({id,feeds,fetches?,runOptions?,signal?})` returns the complete output-name
 map of `{type,dims,data}` tensors. Input records use that same shape with native

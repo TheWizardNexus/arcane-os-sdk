@@ -153,6 +153,9 @@ export function coreEntrySource(application, version, services, {localAI, runtim
     const imageSelected = localAI?.runtimes?.some(function selectedImage(requirement) {
         return (typeof requirement === 'string' ? requirement : requirement.id) === 'stable-diffusion.cpp';
     }) ?? false;
+    const modelAssetsSelected = imageSelected || (localAI?.runtimes?.some(function selectedONNX(requirement) {
+        return (typeof requirement === 'string' ? requirement : requirement.id) === 'onnx';
+    }) ?? false);
     const whisperSelected = localAI?.runtimes?.some(function selectedWhisper(requirement) {
         return (typeof requirement === 'string' ? requirement : requirement.id) === 'whisper.cpp';
     }) ?? false;
@@ -175,10 +178,12 @@ export function coreEntrySource(application, version, services, {localAI, runtim
         imports.push("import {createLocalAIService} from 'arcane-os/core/local-ai';");
         definitions.push(`    createLocalAIService(JSON.parse(${JSON.stringify(JSON.stringify(chatConfiguration))}), context)`);
     }
-    if (imageSelected) {
-        imports.push("import {createLocalImageService} from 'arcane-os/core/image';");
+    if (modelAssetsSelected) {
         imports.push("import {createModelAssetService} from 'arcane-os/core/model-assets';");
         definitions.push('    modelAssets');
+    }
+    if (imageSelected) {
+        imports.push("import {createLocalImageService} from 'arcane-os/core/image';");
         definitions.push(`    createLocalImageService(JSON.parse(${JSON.stringify(JSON.stringify(localAI))}), {...context, modelAssets})`);
     }
     if (whisperSelected) {
@@ -239,7 +244,7 @@ export function coreEntrySource(application, version, services, {localAI, runtim
         '    ...await readCoreLaunchContext()',
         '};',
         '',
-        ...(imageSelected ? ['const modelAssets = createModelAssetService({appRoot: context.appRoot});', ''] : []),
+        ...(modelAssetsSelected ? ['const modelAssets = createModelAssetService({appRoot: context.appRoot});', ''] : []),
         ...(whisperSelected ? [
             'const stt = createWhisperRuntime(',
             '    {',
