@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.59.1
+
+- Forward the existing AI synthesis signal into native Core synthesis and
+  preserve the established AI cancellation error contract.
+- Carry `AI.fetchSTT(audio, signal)` cancellation through
+  `Arcane.speech.transcribe(request, {signal})` into the existing Core request
+  lifetime. Preserve complete requests and results, one-argument facade calls,
+  unrelated errors and the 180-second timeout. Actual inference interruption
+  and resource release remain with the selected speech service.
+- No speech engine, model, runtime dependency, default-provider switch or data
+  migration is introduced.
+
 ## 0.59.0
 
 - Reconcile marked generated PWA references when a root application's PWA is
