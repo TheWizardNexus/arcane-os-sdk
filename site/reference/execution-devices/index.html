@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="The local-AI Core host exposes physical device discovery independently of model installation, loading and inference. A device being present does not establish that a particular engine can use it. The engine resolves that second question when the application explicitly loads its selected model.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/execution-devices/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Physical execution devices · Arcane OS SDK"><meta property="og:description" content="The local-AI Core host exposes physical device discovery independently of model installation, loading and inference. A device being present does not establish that a particular engine can use it. The engine resolves that second question when the application explicitly loads its selected model."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/execution-devices/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Physical execution devices · Arcane OS SDK"><meta name="twitter:description" content="The local-AI Core host exposes physical device discovery independently of model installation, loading and inference. A device being present does not establish that a particular engine can use it. The engine resolves that second question when the application explicitly loads its selected model."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Physical execution devices | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Physical execution devices</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="physical-execution-devices">Physical execution devices</h1><p class="doc-lead">The local-AI Core host exposes physical device discovery independently of model installation, loading and inference. A device being present does not establish that a particular engine can use it. The engine resolves that second question when the application explicitly loads its selected model.</p><div class="doc-meta"><span>SDK 0.79.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="./" aria-current="page">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/execution-devices.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#list-devices-without-loading-a-model">List devices without loading a model</a><a href="#resolve-a-saved-selection">Resolve a saved selection</a><a href="#engine-configuration-and-execution-evidence">Engine configuration and execution evidence</a><a href="#catalog-and-core-ownership">Catalog and Core ownership</a></nav></details><p>The local-AI Core host exposes physical device discovery independently of model
+installation, loading and inference. A device being present does not establish
+that a particular engine can use it. The engine resolves that second question
+when the application explicitly loads its selected model.</p>
+<h2 id="list-devices-without-loading-a-model">List devices without loading a model</h2>
+<p>Use the application&#39;s existing Core client:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const catalog = await client.invoke(&#39;localai.devices&#39;, {refresh: false}, {signal});
+console.log(catalog.devices);
+console.log(catalog.issues);
+</code></pre></div>
+<p>The inventory has <code>{platform, state, devices, issues}</code>. <code>platform</code> uses Node&#39;s
+platform name. <code>state</code> is <code>ready</code>, <code>partial</code> or <code>unavailable</code>. Incomplete or failed
+discovery is reported in <code>issues</code>; it is not evidence that the machine has no
+devices. This initial discovery implementation uses Windows host APIs. Other
+platforms report this capability as unavailable while retaining their existing
+AI runtime behavior.</p>
+<p>Each device has the following fields:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>deviceId</code></td>
+<td>Stable host-local selection key, or <code>null</code> when identity could not be established.</td>
+</tr>
+<tr>
+<td><code>identitySource</code></td>
+<td><code>windows-pnp-instance</code>, <code>host-cpu</code>, or <code>null</code>.</td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>cpu</code>, <code>gpu</code> or <code>npu</code>.</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>Complete reported display name. Names are not selection identities.</td>
+</tr>
+<tr>
+<td><code>present</code></td>
+<td>Whether the queried device is present.</td>
+</tr>
+<tr>
+<td><code>isHardware</code>, <code>isIntegrated</code></td>
+<td>Reported hardware facts, or <code>null</code> when unavailable.</td>
+</tr>
+<tr>
+<td><code>dedicatedMemoryMiB</code></td>
+<td>Reported dedicated capacity, or <code>null</code>; used only for supported automatic GPU selection.</td>
+</tr>
+<tr>
+<td><code>addresses</code></td>
+<td>Observed adapter addresses described below. These are not persistent selection keys.</td>
+</tr>
+<tr>
+<td><code>processors</code></td>
+<td>Actual processor records for the aggregate CPU option; an empty array for GPU/NPU records.</td>
+</tr></tbody>
+</table>
+</div>
+<p>GPU and NPU identities are actual, uniquely correlated Windows PnP instance IDs.
+An adapter whose stable identity cannot be established remains in the inventory
+with <code>deviceId: null</code> and a corresponding issue. The SDK does not invent a key
+from a name, enumeration order, hardware model number or adapter LUID.</p>
+<p>The CPU choice uses <code>deviceId: &#39;cpu&#39;</code> and <code>identitySource: &#39;host-cpu&#39;</code>. It selects
+the whole-host CPU execution target, without claiming socket or core affinity.
+Its <code>processors</code> entries contain <code>{deviceId, name, socketDesignation, cores, logicalProcessors}</code>; unavailable optional facts are <code>null</code>.</p>
+<p><code>addresses</code> contains:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const result = {
+  adapterLuid: {highPart, lowPart}, // or null
+  pci: {bus, device, function: pciFunction}, // or null
+  dxgiAdapterIndex // or null
+};
+</code></pre></div>
+<p>The DXGI index is the actual <code>EnumAdapters</code> index joined to the adapter&#39;s LUID.
+It is never inferred from DXCore or PnP enumeration order. It supplies a possible
+DirectML address, not proof of provider availability or successful execution.
+No CUDA ordinal is inferred from these Windows addresses.</p>
+<p>An issue contains <code>{source, code, message, deviceId}</code>. <code>source</code> identifies <code>cpu</code>,
+<code>gpu</code>, <code>npu</code>, <code>identity</code> or <code>dxgi</code>; <code>deviceId</code> is <code>null</code> when no stable identity
+was established. Keep the complete diagnostic available to developers rather
+than substituting an empty inventory.</p>
+<h2 id="resolve-a-saved-selection">Resolve a saved selection</h2>
+<p>Store the selected physical ID with the application&#39;s existing preferences,
+keyed by provider and model. The SDK introduces no new preference store and
+does not change the six-slot model preference tuple.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const resolution = await client.invoke(&#39;localai.resolveTarget&#39;, {
+  executionTarget: {deviceId: savedDeviceId}
+}, {signal});
+</code></pre></div>
+<p>The result contains <code>{requestedTarget, resolvedDevice, resolution, reason}</code>:</p>
+<ul>
+<li><code>matched</code>: the complete device record was found. Engine support is still a
+separate question.</li>
+<li><code>unavailable</code> with <code>device-not-present</code>: complete relevant discovery did not
+find that saved identity. Preserve the saved selection so the application can
+show that it is currently unavailable.</li>
+<li><code>unsupported</code> with <code>inventory-unavailable</code> or <code>identity-unresolved</code>: discovery
+cannot establish the requested identity. Do not describe it as an absent device.</li>
+<li><code>automatic</code> with <code>engine-default-required</code>: an explicit <code>executionTarget: null</code>
+asks the selected engine to choose at its activation boundary. The physical
+resolver returns <code>resolvedDevice: null</code> because it cannot establish the
+engine&#39;s routing capabilities.</li>
+</ul>
+<p>Calling the resolver does not load a model, change preferences or replace an
+existing activation. A model load that omits <code>executionTarget</code> retains that
+API&#39;s existing constructor, session-option and default behavior. Explicit
+<code>null</code> selects automatic resolution for the new activation; it does not erase
+or relabel a running session.</p>
+<h2 id="engine-configuration-and-execution-evidence">Engine configuration and execution evidence</h2>
+<p>The physical-target integration described here applies to native ONNX and
+native Laya through Core. Listing host devices does not add physical-device
+selection to browser WebGPU/Wllama or to the separate native llama.cpp, image
+and Whisper owners. Their existing backend options remain unchanged. A browser
+uses the existing Core connection for this inventory; the catalog does not
+create a native connection or replace a browser provider.</p>
+<p>An engine receives the saved selection as <code>executionTarget: {deviceId}</code>. It
+owns provider availability, the physical-to-provider address mapping and the
+actual session configuration. Its public state distinguishes the requested
+target, physical resolution, configured target and observed execution. A
+successful session configuration alone is not evidence that every operation ran
+on a GPU or NPU.</p>
+<p>Automatic selection can prefer the hardware GPU with the highest reported
+dedicated capacity among supported targets with established routing. An
+integrated GPU remains eligible when it meets those same conditions. An unavailable saved
+target is not silently replaced by another device or a cloud route. See
+<a href="../local-ai/#native-onnx-sessions">native ONNX</a> and <a href="../native-decisions/">native decisions</a>
+for the selected engine&#39;s load, replacement, cancellation and status contracts.</p>
+<h2 id="catalog-and-core-ownership">Catalog and Core ownership</h2>
+<p>SDK development local-AI composition and generated native composition with
+<code>localAI</code> selected register one lazy catalog and its independent
+<code>execution-devices</code> service. An empty runtime selection still permits device
+discovery. Hosts without local-AI composition retain their existing service
+selection. A manually composed Core can register the service explicitly:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createExecutionDeviceCatalog} from &#39;arcane-os/local-ai/execution-devices&#39;;
+import {createExecutionDeviceService} from &#39;arcane-os/core/execution-devices&#39;;
+import {createLocalAIService} from &#39;arcane-os/core/local-ai&#39;;
+
+const executionDevices = createExecutionDeviceCatalog({signal});
+const services = [
+  createExecutionDeviceService({catalog: executionDevices}),
+  createLocalAIService(localAI, {appRoot, runtimes, signal, executionDevices})
+];
+</code></pre></div>
+<p>Pass these definitions to the existing Core host. The independent service owns
+catalog disposal. The local-AI engine borrows the same catalog; it does not
+dispose a supplied owner or create another discovery process per model.</p>
+<p>For direct Node use, <code>createExecutionDeviceCatalog({signal})</code> returns
+<code>devices({refresh, signal})</code>, <code>resolveTarget({executionTarget, refresh, signal})</code>
+and <code>dispose()</code>. The direct caller owns disposal. Construction performs no
+discovery I/O. Calls reuse/coalesce the host&#39;s discovery; <code>refresh: true</code> requests
+an explicit new observation. There is no background polling. Closing the owner
+releases its discovery work and native query resources.</p>
+<p>The catalog queries installed operating-system facilities. It does not install
+drivers, download models, alter system policy or introduce a hardware admission
+rule. A host capability failure remains an honest unavailable/partial result.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#list-devices-without-loading-a-model">List devices without loading a model</a><a href="#resolve-a-saved-selection">Resolve a saved selection</a><a href="#engine-configuration-and-execution-evidence">Engine configuration and execution evidence</a><a href="#catalog-and-core-ownership">Catalog and Core ownership</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.79.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

@@ -3,16 +3,16 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.78.0",
+    "sdk": "0.79.0",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
   "counts": {
-    "markdownPages": 53,
+    "markdownPages": 54,
     "collectionPages": 2,
     "generatedPages": 95,
     "runtimeModulePages": 93,
-    "htmlPages": 150,
+    "htmlPages": 151,
     "inventories": 4
   },
   "pages": [
@@ -224,6 +224,12 @@
       "source": "docs/reference/event-manager.md",
       "output": "site/reference/event-manager/index.html",
       "route": "reference/event-manager/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/execution-devices.md",
+      "output": "site/reference/execution-devices/index.html",
+      "route": "reference/execution-devices/",
       "kind": "markdown"
     },
     {
