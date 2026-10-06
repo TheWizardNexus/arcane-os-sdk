@@ -164,7 +164,7 @@
       "summary": "Owns one selected native working checkout with ArcaneData/Repos defaults and existing Git/process lifecycle.",
       "availability": "Node with Git on Windows, Linux and macOS; Android requires host process adaptation",
       "protocol": "Git working repository and SDK process adapter",
-      "normalization": "Returns directory, open, status, pull, push, write and identical close/drain/dispose hooks. Only missing or empty destinations clone; existing roots are inspected without rewriting, resetting or pulling. Explicit paths remain selected. Same-directory operations serialize within the process; cancellation and shutdown join accepted process work. write snapshots exact selected text and paths, writes files, stages/commits only literal owned paths and non-force pushes, preserving unrelated staged files and ordinary Git filters. Complete outputs and causal failures retain confirmed local/committed/pushed and uncertain outcomes. Optional gitIdentity captures name/email/username for child Git operations only; omitted fields remain inherited and no config file is written."
+      "normalization": "Returns directory, open, status, configuration, pull, push, write and identical close/drain/dispose hooks. Only missing or empty destinations clone; existing roots are preserved. configuration observes the existing root, symbolic HEAD, origin URL/pushURL arrays and branch remote/merge/upstream URL arrays without clone/init/fetch, preserving unset, empty and repeated values. Explicit paths remain selected. Same-directory operations serialize within the process; cancellation and shutdown join accepted process work. pull/push/write accept a captured target {remote,ref} for current-branch fast-forward pull or non-force current-HEAD selected-ref push; omission retains ordinary configured behavior. write snapshots exact text and paths, stages/commits only literal owned paths and preserves unrelated staged files and Git filters. Complete outputs and causal failures retain confirmed local/committed/pushed and uncertain outcomes plus the supplied target. Optional gitIdentity captures name/email/username for child Git operations only; omitted fields remain inherited and no config file is written."
     },
     {
       "id": "core-repositories:readGitIdentity",
@@ -2106,13 +2106,13 @@
       "name": "repositoryPull",
       "displayName": "repositoryPull()",
       "kind": "function",
-      "signature": "async repositoryPull({ workspaceRoot=process.cwd(), signal, onEvent, run=runProcess }={})",
+      "signature": "async repositoryPull({ workspaceRoot=process.cwd(), target, signal, onEvent, run=runProcess }={})",
       "entrypoints": [
         "arcane-os"
       ],
       "primaryImport": "arcane-os",
       "group": "Workspace, doctor, repository, and server",
-      "summary": "Runs one fast-forward-only pull after proving the selected repository worktree is clean.",
+      "summary": "Runs one fast-forward-only pull into the selected clean worktree, optionally from a captured remote/ref target.",
       "availability": "Node; network-assisted Git",
       "protocol": "Node ESM",
       "normalization": "SDK-normalized inputs, errors, events, and documented result"
@@ -2122,13 +2122,13 @@
       "name": "repositoryPush",
       "displayName": "repositoryPush()",
       "kind": "function",
-      "signature": "async repositoryPush({ workspaceRoot=process.cwd(), signal, onEvent, run=runProcess }={})",
+      "signature": "async repositoryPush({ workspaceRoot=process.cwd(), target, signal, onEvent, run=runProcess }={})",
       "entrypoints": [
         "arcane-os"
       ],
       "primaryImport": "arcane-os",
       "group": "Workspace, doctor, repository, and server",
-      "summary": "Pushes the selected attached branch through the repository's configured remote and credentials.",
+      "summary": "Pushes the attached branch through ordinary configured Git or an explicit captured current-HEAD destination without force.",
       "availability": "Node; network-assisted Git",
       "protocol": "Node ESM",
       "normalization": "SDK-normalized inputs, errors, events, and documented result"

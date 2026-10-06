@@ -4,7 +4,8 @@ import path from 'node:path';
 import Is from 'strong-type';
 import {ArcaneError, throwIfAborted} from '../errors.mjs';
 import {runProcess} from '../process.mjs';
-import {repositoryPull, repositoryPush, repositoryStatus} from '../repository.mjs';
+import {captureRepositoryTarget, repositoryConfiguration, repositoryPull, repositoryPush,
+    repositoryPushArguments, repositoryStatus} from '../repository.mjs';
 import {createGitIdentityRunner} from '../git-identity.mjs';
 
 export {readGitIdentity} from '../git-identity.mjs';
@@ -152,29 +153,46 @@ export function createRepositoryWorkspace(
         );
     }
 
-    function pull({signal} = {}) {
+    function configuration({signal} = {}) {
+        return accept(
+            function readRepositoryConfiguration() {
+                return repositoryConfiguration({workspaceRoot: repositoryDirectory, signal, onEvent, run: execute});
+            },
+            signal
+        );
+    }
+
+    function pull({target, signal} = {}) {
+        let selectedTarget;
+        try { selectedTarget = captureRepositoryTarget(target); }
+        catch (error) { return Promise.reject(error); }
         return accept(
             async function pullRepository() {
                 await prepare(signal);
-                return repositoryPull({workspaceRoot: repositoryDirectory, signal, onEvent, run: execute});
+                return repositoryPull({workspaceRoot: repositoryDirectory, target: selectedTarget, signal, onEvent, run: execute});
             },
             signal
         );
     }
 
-    function push({signal} = {}) {
+    function push({target, signal} = {}) {
+        let selectedTarget;
+        try { selectedTarget = captureRepositoryTarget(target); }
+        catch (error) { return Promise.reject(error); }
         return accept(
             async function pushRepository() {
                 await prepare(signal);
-                return repositoryPush({workspaceRoot: repositoryDirectory, signal, onEvent, run: execute});
+                return repositoryPush({workspaceRoot: repositoryDirectory, target: selectedTarget, signal, onEvent, run: execute});
             },
             signal
         );
     }
 
-    function write({files, message, signal} = {}) {
+    function write({files, message, target, signal} = {}) {
         let selectedFiles;
+        let selectedTarget;
         try {
+            selectedTarget = captureRepositoryTarget(target);
             requireString(message, 'message');
             if (!message.isWellFormed()) throw new TypeError('message cannot be represented completely as UTF-8 text.');
             if (!is.array(files) || files.length === 0) {
@@ -210,6 +228,7 @@ export function createRepositoryWorkspace(
             async function writeRepositoryFiles() {
                 const outcome = {
                     directory: repositoryDirectory,
+                    ...(selectedTarget === undefined ? {} : {target: {...selectedTarget}}),
                     state: 'local',
                     stage: 'prepare',
                     paths: selectedFiles.map(function selectedPath(file) { return file.path; }),
@@ -321,7 +340,7 @@ export function createRepositoryWorkspace(
                         ['--literal-pathspecs', 'commit', '--only', '--cleanup=verbatim', '--file', '-', '--', ...outcome.paths],
                         commitMessage()
                     );
-                    await executeGit('push', ['push']);
+                    await executeGit('push', repositoryPushArguments(selectedTarget));
                     outcome.stage = 'complete';
                     return outcome;
                 } catch (cause) {
@@ -357,7 +376,7 @@ export function createRepositoryWorkspace(
         return closing;
     }
 
-    return {directory: repositoryDirectory, open, status, pull, push, write, close, drain: close, dispose: close};
+    return {directory: repositoryDirectory, open, status, configuration, pull, push, write, close, drain: close, dispose: close};
 }
 
 function requireString(value, name) {

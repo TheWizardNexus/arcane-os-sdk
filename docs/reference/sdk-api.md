@@ -3742,10 +3742,18 @@ Runs one fast-forward-only pull after proving the selected repository worktree i
 ### Signature and result
 
 ```text
-async repositoryPull({ workspaceRoot=process.cwd(), signal, onEvent, run=runProcess }={})
+async repositoryPull({ workspaceRoot=process.cwd(), target, signal, onEvent, run=runProcess }={})
 ```
 
 Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
+
+Optional `target:{remote,ref}` captures exact nonempty native-representable
+strings before any wait and selects `git pull --ff-only -- <remote> <ref>:`.
+The current clean branch receives a fast-forward-only integration; the SDK
+never switches branches, resets or changes configuration. Without a target,
+the existing configured pull and result remain unchanged. Targeted results
+add `target`, complete `stdout` and `stderr` to the existing pull result.
+See [checkout configuration and selected targets](core-repositories.md#existing-checkout-configuration-and-selected-targets).
 
 ### Availability and normalization
 
@@ -3770,7 +3778,7 @@ Pushes the selected attached branch through the repository's configured remote a
 ### Signature, parameters, and result
 
 ```text
-async repositoryPush({ workspaceRoot=process.cwd(), signal, onEvent, run=runProcess }={})
+async repositoryPush({ workspaceRoot=process.cwd(), target, signal, onEvent, run=runProcess }={})
 ```
 
 Import it from `arcane-os`. `workspaceRoot` selects the Git worktree. `signal`
@@ -3781,10 +3789,16 @@ should keep the default.
 
 Before pushing, the SDK runs `git rev-parse --show-toplevel`,
 `git branch --show-current`, and `git status --short --branch` in order. It rejects a
-detached HEAD, then runs plain `git push`; the repository's current branch,
+detached HEAD, then, without `target`, runs plain `git push`; the repository's current branch,
 configured upstream/remote, Git credentials, hooks, and server policy remain
 authoritative. Unlike `repositoryPull()`, this function does **not** require a
-clean worktree. It does not create a commit or select a remote/refspec for you.
+clean worktree. It does not create a commit or choose an application destination.
+Optional `target:{remote,ref}` captures the original nonempty
+native-representable strings before any wait and runs
+`git push --no-follow-tags -- <remote> HEAD:<ref>`. This publishes current HEAD
+to the caller-selected ref without force or implicit configured tag following.
+It changes no branch or Git configuration; credentials, URL interpretation,
+hooks and remote rejection remain Git-owned.
 
 The promise resolves to
 `{action:'push', repositoryRoot, branch, output}`. `output` is trimmed stdout,
@@ -3792,6 +3806,9 @@ or trimmed stderr when stdout is empty. A missing Git executable, failed status
 probe, rejected/nonzero push, cancellation, or event-callback failure rejects
 with the normalized process error. Cancellation stops the local process tree;
 it cannot prove that a remote accepted no objects before the interruption.
+Targeted results also contain the captured `target` and complete
+`stdout`/`stderr`; omitting the target preserves the existing result shape.
+See [checkout configuration and selected targets](core-repositories.md#existing-checkout-configuration-and-selected-targets).
 
 ### Availability and normalization
 
@@ -7894,8 +7911,8 @@ explicit existing path. The application owns the remote, branch and Core API.
 createRepositoryWorkspace({name,directory,dataRoot,remote,branch,gitIdentity,onEvent,run=runProcess}={})
 ```
 
-Returns `{directory,open,status,pull,push,write,close,drain,dispose}`. Construction does
-no I/O. Operations accept `{signal}`; a missing or empty destination clones once,
+Returns `{directory,open,status,configuration,pull,push,write,close,drain,dispose}`. Construction does
+no I/O. Preparing operations accept `{signal}`; a missing or empty destination clones once,
 while existing checkout files, branches, remotes and local changes remain intact.
 Same-directory calls are ordered within the process. Shutdown drains accepted
 work and preserves the checkout. No CLI cwd, launch state, preference, snapshot
@@ -7908,7 +7925,25 @@ Selected author fields override inherited child author/committer fields;
 omitted fields remain inherited. Username remains a credential hint, with
 authentication owned by ordinary Git and its configured helper.
 
-`write({files:[{path,content}],message,signal})` snapshots the exact selected
+`configuration({signal})` observes an existing working root without clone,
+initialization or fetch. It returns `{repositoryRoot,headRef,origin,upstream}`:
+full symbolic HEAD (including unborn, null when detached), origin URL/pushURL
+arrays and current branch remote/merge/URL/pushURL arrays. Unset, empty and
+repeated configuration values remain distinct. These are ordinary configured
+values, not authentication or endpoint proof, and are not atomic with later
+operations. Raw stdout is decoded without replacement; unrepresentable text
+reports `ARCANE_GIT_CONFIGURATION_NOT_TEXT` with full diagnostics.
+
+`pull({target,signal})`, `push({target,signal})` and
+`write({files:[{path,content}],message,target,signal})` accept optional
+`target:{remote,ref}`, captured as original strings at acceptance. The target
+selects a fast-forward-only pull into the current branch or a non-force push
+of current HEAD to the selected ref, without switching branches or changing
+configuration. It is independent of initial-clone `remote`/`branch`; omission
+preserves ordinary configured behavior. See the [complete configuration and
+target contract](core-repositories.md#existing-checkout-configuration-and-selected-targets).
+
+`write` snapshots the exact selected
 strings, writes those repository-relative files, commits only their literal
 paths and performs an ordinary non-force push. It retains unrelated staged
 paths and existing Git filters/hooks. Results and causal failures distinguish

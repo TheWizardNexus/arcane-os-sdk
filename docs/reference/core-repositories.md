@@ -24,7 +24,8 @@ The Android host also supplies Git/process execution through the existing
 process-adapter contract; this module does not install Git or choose shared
 Android storage.
 
-The factory's first actual operation creates necessary parent directories.
+The factory's first operation that prepares a checkout creates necessary parent
+directories. The read-only `configuration` operation never prepares one.
 No existing data is moved, copied, deleted, renamed or migrated. `appRoot`,
 `stateRoot`, preferences, OPFS and the existing CLI/workspace defaults remain
 independent and unchanged.
@@ -47,7 +48,7 @@ await repository.close();
 ```
 
 `createRepositoryWorkspace({name,directory,dataRoot,remote,branch,gitIdentity,onEvent,run}={})`
-returns `{directory,open,status,pull,push,write,close,drain,dispose}`. The `directory`
+returns `{directory,open,status,configuration,pull,push,write,close,drain,dispose}`. The `directory`
 property is the absolute selected working path.
 
 - Omit `directory` to select `<repositoriesRoot>/<name>`. The application supplies
@@ -67,15 +68,17 @@ property is the absolute selected working path.
   authentication remain with Git and the native host. The SDK adds no download,
   credential store, polling, network retry or process supervisor.
 
-The open/status/pull/push methods accept `{signal}={}` and return promises;
+The open/status/configuration methods accept `{signal}={}` and return promises;
+pull/push accept `{target,signal}={}` with an optional captured destination.
 `write` accepts the complete file/message request described below:
 
 | Method | Result and side effect |
 |---|---|
 | `open` | For a missing/empty destination, runs one clone and returns `{directory,cloned:true,stdout,stderr}` with complete process output. For an existing working repository root, returns `{directory,cloned:false}` after read-only inspection. Later opens on that owner reuse preparation. |
 | `status` | Prepares the checkout if needed, then returns the existing `repositoryStatus` result unchanged. |
-| `pull` | Prepares the checkout if needed, then runs the existing clean-checkout, fast-forward-only `repositoryPull` operation unchanged. |
-| `push` | Prepares the checkout if needed, then runs the existing `repositoryPush` operation unchanged, preserving its support for unrelated uncommitted working files. |
+| `configuration` | Observes the existing working root, symbolic HEAD, origin and configured upstream. It never clones, initializes or fetches. |
+| `pull` | Prepares the checkout if needed, then runs clean-checkout, fast-forward-only `repositoryPull`, optionally using the operation's selected target. |
+| `push` | Prepares the checkout if needed, then runs `repositoryPush`, optionally using the operation's selected target, preserving support for unrelated uncommitted working files. |
 | `write` | Writes exact caller-selected text files, stages and commits only their literal paths, then performs one ordinary non-force push. Returns confirmed operation outcomes; see below. |
 | `close`, `drain`, `dispose` | The same idempotent operation: stop accepting new calls and await accepted work and its process/event cleanup. They retain the repository on disk. |
 
@@ -86,6 +89,83 @@ untouched and reports its Git error or `ARCANE_REPOSITORY_DIRECTORY_INVALID`.
 A failed or cancelled clone reports the actual failure; any remaining directory
 is retained for application-owned inspection. There is no automatic deletion or
 destructive retry. Filesystem failures and complete Git diagnostics propagate.
+
+## Existing checkout configuration and selected targets
+
+`configuration({signal}={})` observes an existing checkout without invoking
+`open`, creating directories, cloning, initializing, fetching or changing Git
+configuration. A missing repository reports the actual Git failure. A bare
+cache or nested checkout directory reports `ARCANE_REPOSITORY_DIRECTORY_INVALID`.
+Its result is:
+
+```text
+{
+    repositoryRoot,
+    headRef: fullSymbolicRef | null,
+    origin: {urls: [...], pushUrls: [...]},
+    upstream: {remoteNames: [...], mergeRefs: [...], urls: [...], pushUrls: [...]} | null
+}
+```
+
+`repositoryRoot` is this owner's absolute selected working root. `headRef` is
+the complete symbolic HEAD, including an unborn branch, or `null` for detached
+HEAD. `upstream` is `null` when HEAD does not name a local branch. Otherwise its
+arrays contain that branch's configured `remote` and `merge` values; `urls` and
+`pushUrls` observe the effective last configured remote name. A `.` remote
+means the local repository and has no remote URL arrays. Origin is observed
+independently, even when it is not the upstream.
+
+Arrays retain configured order, repeated values, complete UTF-8 strings and
+empty strings. `[]` means unset; `['']` means an explicit empty value. The
+reader honors configured includes and ordinary Git configuration precedence.
+Unset push URLs do not imply that Git cannot push: Git retains its normal URL
+fallback and rewrite behavior. These are configuration observations, not
+resolved endpoints, authentication, account identity or ownership proof.
+The SDK neither queries a credential helper nor changes configuration here.
+
+Metadata uses the shared raw-Git-text reader. Lifecycle/stderr events remain
+with the process owner, raw stdout remains parser-owned, and undecodable text
+reports `ARCANE_GIT_CONFIGURATION_NOT_TEXT`. Failures retain complete raw
+stdout, process diagnostics and causal errors using the identity reader's
+documented attachment behavior. One observation uses four read-only Git
+commands for an attached local branch, or three otherwise. Results are not a
+transaction with later work or external Git activity. The app owns any decision
+that the current checkout corresponds to its selected repository and branch.
+
+The optional `target:{remote,ref}` on `pull`, `push` and `write` selects that
+operation's Git destination. Both fields are nonempty strings representable by
+the native process transport. The SDK captures their exact strings when the
+call is accepted; later edits to the target object or UI selection cannot
+redirect queued or active work. Git owns ref parsing, URL interpretation,
+credentials, hooks and remote outcomes. This target is independent of the
+factory's `remote`/`branch`, which remain initial-clone inputs only.
+
+```javascript
+const observed = await repository.configuration({signal});
+// The app decides whether observed.headRef and configured URLs match its choice.
+const target = {remote: connection.locator, ref: connection.ref};
+await repository.pull({target, signal});
+const result = await repository.write({files: selectedFiles, message, target, signal});
+```
+
+A targeted pull uses `git pull --ff-only -- <remote> <ref>:`. The trailing colon
+is Git's source-only fetch framing; the fetched history is integrated into the
+current branch. It does not switch branches or reset files/history. The existing
+clean-checkout requirement remains. A targeted push uses
+`git push --no-follow-tags -- <remote> HEAD:<ref>`: current HEAD is published to
+the selected ref, without force or implicit configured tag following. Existing
+history is still sent when Git needs it. Ordinary conflicting Git settings or
+remote rejection remain actual failures; no settings are rewritten.
+
+Omitting `target` preserves ordinary configured pull/push behavior and its
+existing result shape. Targeted pull/push results add the captured `target` and
+complete `stdout`/`stderr` alongside the existing `action`, `repositoryRoot`,
+`branch` and compatibility `output` field. Writer results and failure outcomes
+add that same captured `target`. There is no hidden pre-write pull, branch
+selection, retry, reset, force, reversal or recommit. The app decides when to
+observe, refresh, write and publish. See Git's [pull](https://git-scm.com/docs/git-pull),
+[push](https://git-scm.com/docs/git-push) and [configuration](https://git-scm.com/docs/git-config)
+contracts.
 
 ## Git identity configuration
 
@@ -215,7 +295,7 @@ const result = await repository.write({
 });
 ```
 
-`write({files:[{path,content}],message,signal}={})` requires at least one explicit
+`write({files:[{path,content}],message,target,signal}={})` requires at least one explicit
 file, a nonempty commit message and string content (including an empty string).
 Paths name working files relative to this repository, not its root, outside
 paths or Git-owned `.git` metadata. Strings must be representable as UTF-8;
@@ -239,9 +319,10 @@ native host.
 One `git --literal-pathspecs add -- <paths>` stages only those exact names.
 One `git --literal-pathspecs commit --only --cleanup=verbatim --file - -- <paths>`
 commits only those paths, leaving unrelated staged paths staged. The original
-message is streamed unchanged through standard input. One ordinary `git push`
-then uses that repository's existing remote/ref configuration, the optional
+message is streamed unchanged through standard input. Without `target`, one
+ordinary `git push` then uses that repository's existing remote/ref configuration, the optional
 process-local identity selection above, existing credentials and hooks.
+With `target`, the final push uses the selected current-HEAD mapping above.
 There is no implicit pull, branch switch, forced push,
 hook bypass, automatic retry, rollback or reset. If Git reports no changes to
 commit, that actual failure is returned; the SDK creates no empty commit.
@@ -252,7 +333,8 @@ Existing Git attributes, clean filters, EOL settings and hooks continue to apply
 when Git stages/commits content. The filesystem write preserves the original
 text; this API does not claim that repository-configured filters leave Git blob
 text identical. It preserves those settings. A push may also send existing history or other
-refs selected by the repository's ordinary push configuration.
+refs selected by the repository's ordinary push configuration when no explicit
+target is supplied.
 
 ### Result and failure outcomes
 
@@ -275,6 +357,8 @@ Successful completion returns:
 
 Each output record retains complete stdout/stderr. `code` and the process
 termination `signal` are included when a completed process result is available.
+When supplied, `target:{remote,ref}` is included in the result or failure outcome
+with the original accepted strings.
 An in-progress write also records its current `path` on a failure outcome.
 `writtenPaths` records successful filesystem writes in input order; `written`
 becomes true only after every requested write succeeds. The other booleans

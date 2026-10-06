@@ -382,6 +382,183 @@ test('existing checkout keeps files and uses the public repository status, pull 
     await repository.close();
 });
 
+test('configuration observes selected branch and remote arrays without preparing a checkout', async function configurationObservation(t) {
+    const root = await fixture(t);
+    const directory = path.join(root, 'uncreated checkout');
+    const calls = [];
+    const originUrl = '\uFEFFhttps://example.invalid/moon\ncomplete-locator.git';
+    const upstreamUrl = 'https://example.invalid/relay.git';
+    async function run(command, args, options) {
+        calls.push(args);
+        assert.equal(command, 'git');
+        assert.equal(options.cwd, directory);
+        assert.deepEqual(options.outputEncoding, {stdout: null});
+        let stdout;
+        if (args[0] === 'rev-parse') stdout = 'true\n\n';
+        else if (args[0] === 'symbolic-ref') stdout = 'refs/heads/moon.release+dispatch\n';
+        else if (calls.length === 3) {
+            assert.equal(args.at(-1), '^branch\\.moon\\.release\\+dispatch[.](remote|merge)$');
+            stdout = 'branch.moon.release+dispatch.remote\nearlier\0branch.moon.release+dispatch.remote\nmoon+relay\0'
+                + 'branch.moon.release+dispatch.merge\nrefs/heads/main\0branch.moon.release+dispatch.merge\nrefs/heads/other\0';
+        } else {
+            assert.equal(args.at(-1), '^remote[.](origin|moon\\+relay)[.](url|pushurl)$');
+            stdout = `remote.origin.url\n${originUrl}\0remote.origin.url\n\0remote.origin.pushurl\n\0`
+                + `remote.moon+relay.url\n${upstreamUrl}\0remote.moon+relay.url\n${upstreamUrl}\0`;
+        }
+        await options.onOutput({stream: 'stdout', chunk: Buffer.from(stdout)});
+        return processResult(null, 'Complete observation diagnostic.\n');
+    }
+    const repository = createRepositoryWorkspace({directory, remote: 'never-clone', run});
+    assert.deepEqual(await repository.configuration(), {
+        repositoryRoot: directory, headRef: 'refs/heads/moon.release+dispatch',
+        origin: {urls: [originUrl, ''], pushUrls: ['']},
+        upstream: {remoteNames: ['earlier', 'moon+relay'], mergeRefs: ['refs/heads/main', 'refs/heads/other'],
+            urls: [upstreamUrl, upstreamUrl], pushUrls: []}
+    });
+    assert.equal(calls.length, 4);
+    assert.deepEqual(await readdir(root), []);
+    await repository.close();
+    await assert.rejects(repository.configuration(), {code: 'CORE_CLOSING'});
+});
+
+test('configuration preserves detached and unborn HEAD, unset configuration and actual failures', async function configurationStates(t) {
+    const root = await fixture(t);
+    for (const selected of ['detached', 'unborn', 'local', 'missing', 'non-text']) {
+        const directory = path.join(root, selected);
+        const calls = [];
+        const failure = new ArcaneError('ARCANE_OPERATION_FAILED', 'Complete missing-repository failure.');
+        const invalid = Buffer.concat([Buffer.from('branch.main.remote\n'), Buffer.from([0x80]), Buffer.from('\0')]);
+        async function run(command, args, options) {
+            calls.push(args);
+            if (selected === 'missing') throw failure;
+            let stdout;
+            if (args[0] === 'rev-parse') stdout = 'true\n\n';
+            else if (args[0] === 'symbolic-ref') {
+                if (selected === 'detached') return {code: 1, stdout: null, stderr: ''};
+                stdout = 'refs/heads/main\n';
+            } else if (args.at(-1).startsWith('^branch')) {
+                if (selected === 'non-text') {
+                    await options.onOutput({stream: 'stdout', chunk: invalid});
+                    return processResult(null, 'Complete invalid-text diagnostic.');
+                }
+                if (selected === 'local') stdout = 'branch.main.remote\n.\0branch.main.merge\nrefs/heads/main\0';
+                else return {code: 1, stdout: null, stderr: ''};
+            } else return {code: 1, stdout: null, stderr: ''};
+            await options.onOutput({stream: 'stdout', chunk: Buffer.from(stdout)});
+            return processResult(null);
+        }
+        const repository = createRepositoryWorkspace({directory, remote: 'never-clone', run});
+        if (selected === 'missing') {
+            await assert.rejects(repository.configuration(), function original(error) { return error === failure; });
+            assert.equal(calls.length, 1);
+        } else if (selected === 'non-text') {
+            await assert.rejects(repository.configuration(), function complete(error) {
+                assert.equal(error.code, 'ARCANE_GIT_CONFIGURATION_NOT_TEXT');
+                assert.deepEqual(error.rawStdout, invalid);
+                assert.equal(error.details.stderr, 'Complete invalid-text diagnostic.');
+                return true;
+            });
+        } else {
+            const result = await repository.configuration();
+            assert.equal(result.headRef, selected === 'detached' ? null : 'refs/heads/main');
+            assert.deepEqual(result.origin, {urls: [], pushUrls: []});
+            assert.deepEqual(result.upstream, selected === 'detached' ? null : {
+                remoteNames: selected === 'local' ? ['.'] : [],
+                mergeRefs: selected === 'local' ? ['refs/heads/main'] : [], urls: [], pushUrls: []
+            });
+        }
+        assert.equal(calls.some(function mutated(args) { return ['clone', 'fetch', 'pull', 'checkout', 'switch'].includes(args[0]); }), false);
+        await repository.close();
+    }
+    assert.deepEqual(await readdir(root), []);
+});
+
+test('targeted pull and push capture original selections while queued and retain full output', async function selectedTargets(t) {
+    const directory = await fixture(t);
+    await writeFile(path.join(directory, 'existing.md'), 'Existing content.');
+    const started = deferred();
+    const released = deferred();
+    const calls = [];
+    const stdout = '  Complete response\n';
+    const stderr = '  Complete diagnostic\n';
+    async function run(command, args) {
+        calls.push(args);
+        if (args[0] === 'rev-parse' && args[1] === '--is-inside-work-tree') {
+            started.resolve();
+            await released.promise;
+            return processResult('true\n\n');
+        }
+        if (args[0] === 'rev-parse') return processResult(`${directory}\n`);
+        if (args[0] === 'branch') return processResult('main\n');
+        if (args[0] === 'status') return processResult('## main\n');
+        return processResult(stdout, stderr);
+    }
+    const repository = createRepositoryWorkspace({directory, remote: 'clone-only-remote', branch: 'clone-only-branch', run});
+    const opening = repository.open();
+    await started.promise;
+    const target = {remote: 'https://example.invalid/selected.git', ref: 'refs/heads/main'};
+    const expected = {...target};
+    const pulling = repository.pull({target});
+    const pushing = repository.push({target});
+    target.remote = 'https://example.invalid/later.git';
+    target.ref = 'refs/heads/later';
+    released.resolve();
+    const [, pulled, pushed] = await Promise.all([opening, pulling, pushing]);
+    assert.deepEqual(calls.filter(function operation(args) { return args[0] === 'pull' || args[0] === 'push'; }), [
+        ['pull', '--ff-only', '--', expected.remote, `${expected.ref}:`],
+        ['push', '--no-follow-tags', '--', expected.remote, `HEAD:${expected.ref}`]
+    ]);
+    for (const result of [pulled, pushed]) {
+        assert.deepEqual(result.target, expected);
+        assert.equal(result.stdout, stdout);
+        assert.equal(result.stderr, stderr);
+    }
+    await assert.rejects(repository.push({target: {remote: expected.remote, ref: ''}}), TypeError);
+    assert.equal(await readFile(path.join(directory, 'existing.md'), 'utf8'), 'Existing content.');
+    await repository.close();
+});
+
+test('targeted writer retains captured destination through success and uncertain push failure', async function targetWriter(t) {
+    for (const fails of [false, true]) {
+        const directory = await fixture(t);
+        await writeFile(path.join(directory, 'existing.md'), 'Existing content.');
+        const target = {remote: 'https://example.invalid/wire.git', ref: 'refs/heads/main'};
+        const expected = {...target};
+        const failure = new ArcaneError('ARCANE_OPERATION_FAILED', 'Complete push failure.',
+            {details: {code: 1, stdout: '', stderr: 'Complete remote diagnostic.'}});
+        const calls = [];
+        async function run(command, args) {
+            calls.push(args);
+            if (args[0] === 'rev-parse') {
+                target.remote = 'changed-after-acceptance';
+                target.ref = 'refs/heads/changed';
+                return processResult('true\n\n');
+            }
+            if (fails && args[0] === 'push') throw failure;
+            return processResult('Complete operation output.');
+        }
+        const repository = createRepositoryWorkspace({directory, run});
+        const operation = repository.write({files: [{path: 'message.md', content: 'Complete message.\n'}], message: 'Publish selected text', target});
+        if (fails) {
+            await assert.rejects(operation, function originalOutcome(error) {
+                assert.equal(error.cause, failure);
+                assert.deepEqual(error.details.target, expected);
+                assert.equal(error.details.committed, true);
+                assert.equal(error.details.pushed, false);
+                assert.equal(error.details.state, 'uncertain');
+                return true;
+            });
+        } else {
+            const result = await operation;
+            assert.deepEqual(result.target, expected);
+            assert.equal(result.pushed, true);
+        }
+        assert.deepEqual(calls.at(-1), ['push', '--no-follow-tags', '--', expected.remote, `HEAD:${expected.ref}`]);
+        assert.equal(await readFile(path.join(directory, 'message.md'), 'utf8'), 'Complete message.\n');
+        await repository.close();
+    }
+});
+
 test('bare caches and ancestor checkouts remain untouched', async function distinctRepositoryRole(t) {
     const directory = await fixture(t);
     await writeFile(path.join(directory, 'keep.txt'), 'Keep every character.\n');
