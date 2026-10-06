@@ -10,6 +10,14 @@ export const WHISPER_SMALL_MODEL = {
     filename: 'ggml-small.bin'
 };
 
+export const WHISPER_SMALL_OPENVINO_MODEL = {
+    id: 'whisper-small',
+    archiveUrl: 'https://huggingface.co/Intel/whisper.cpp-openvino-models/resolve/main/ggml-small-models.zip',
+    filename: 'ggml-small.bin',
+    encoderFilename: 'ggml-small-encoder-openvino.xml',
+    encoderDataFilename: 'ggml-small-encoder-openvino.bin'
+};
+
 /** Describe a selected native runtime and models without acquiring them. */
 export function normalizeWhisperRuntimeRequirement(record) {
     if (record.helperRoot !== undefined && (!is.string(record.helperRoot) || !record.helperRoot)) {
@@ -20,16 +28,33 @@ export function normalizeWhisperRuntimeRequirement(record) {
     if (!['auto', 'cuda', 'metal', 'cpu'].includes(backend)) {
         throw new ArcaneError(ERROR_CODES.usage, `Unknown whisper.cpp backend: ${String(backend)}.`);
     }
+    if (record.encoder !== undefined && record.encoder !== 'openvino-npu') {
+        throw new ArcaneError(ERROR_CODES.usage, `Unknown whisper.cpp encoder: ${String(record.encoder)}.`);
+    }
     if (record.models !== undefined && !is.array(record.models)) {
         throw new ArcaneError(ERROR_CODES.usage, 'whisper.cpp models must be an array of selected model IDs or descriptors.');
     }
     const models = (record.models ?? []).map(function selectedWhisperModel(value) {
-        const model = value === 'whisper-small' ? WHISPER_SMALL_MODEL : value;
+        const model = value === 'whisper-small'
+            ? record.encoder === 'openvino-npu' ? WHISPER_SMALL_OPENVINO_MODEL : WHISPER_SMALL_MODEL
+            : value;
         if (!model || !is.object(model) || is.array(model) || !is.string(model.id) || !model.id) {
             throw new ArcaneError(ERROR_CODES.usage, 'A Whisper model needs a descriptor with an id, or the built-in whisper-small model ID.');
         }
-        if ((!is.string(model.path) || !model.path) && (!is.string(model.url) || !model.url)) {
-            throw new ArcaneError(ERROR_CODES.usage, `Whisper model ${model.id} needs its selected path or URL.`);
+        if ((!is.string(model.path) || !model.path) && (!is.string(model.url) || !model.url)
+                && (!is.string(model.archiveUrl) || !model.archiveUrl)) {
+            throw new ArcaneError(ERROR_CODES.usage, `Whisper model ${model.id} needs its selected path, URL, or model archive URL.`);
+        }
+        if (!model.path && model.archiveUrl && (!is.string(model.filename) || !model.filename)) {
+            throw new ArcaneError(ERROR_CODES.usage, `Whisper model ${model.id} needs its model filename inside the selected archive.`);
+        }
+        if (record.encoder === 'openvino-npu') {
+            const pairedFiles = model.path
+                ? [model.path, model.encoderPath, model.encoderDataPath]
+                : [model.archiveUrl, model.filename, model.encoderFilename, model.encoderDataFilename];
+            if (!pairedFiles.every(function selectedEncoderFile(value) { return is.string(value) && value !== ''; })) {
+                throw new ArcaneError(ERROR_CODES.usage, `Whisper model ${model.id} needs its matching GGML, OpenVINO XML, and encoder BIN files.`);
+            }
         }
         return {...model};
     });
@@ -42,6 +67,9 @@ export function normalizeWhisperRuntimeRequirement(record) {
         }
         if ((!is.string(variant.root) || !variant.root) && (!is.string(variant.url) || !variant.url)) {
             throw new ArcaneError(ERROR_CODES.usage, `Whisper ${variant.backend} needs its complete runtime root or archive URL.`);
+        }
+        if (variant.encoder !== undefined && variant.encoder !== 'openvino-npu') {
+            throw new ArcaneError(ERROR_CODES.usage, `Unknown Whisper variant encoder: ${String(variant.encoder)}.`);
         }
         return {...variant};
     });

@@ -30,6 +30,9 @@ struct Configuration {
     std::string model;
     std::string runtime;
     std::string backend = "gpu";
+    std::string encoder_model;
+    std::string encoder_cache;
+    std::string encoder_device;
     int threads = 1;
 };
 
@@ -393,6 +396,12 @@ Configuration read_configuration(int argc, char** argv) {
             configuration.runtime = decode_base64(value);
         } else if (option == "--backend") {
             configuration.backend = value;
+        } else if (option == "--encoder-model-base64") {
+            configuration.encoder_model = decode_base64(value);
+        } else if (option == "--encoder-cache-base64") {
+            configuration.encoder_cache = decode_base64(value);
+        } else if (option == "--encoder-device") {
+            configuration.encoder_device = value;
         } else if (option == "--threads") {
             configuration.threads = std::stoi(value);
         } else {
@@ -405,6 +414,12 @@ Configuration read_configuration(int argc, char** argv) {
     if (configuration.backend != "gpu" && configuration.backend != "cpu") {
         throw std::runtime_error("The requested backend must be gpu or cpu.");
     }
+    if (!configuration.encoder_model.empty() || !configuration.encoder_cache.empty()
+            || !configuration.encoder_device.empty()) {
+        if (configuration.encoder_device != "NPU" || configuration.encoder_model.empty()) {
+            throw std::runtime_error("The OpenVINO encoder requires its selected model path and NPU device.");
+        }
+    }
     if (configuration.threads < 1) {
         throw std::runtime_error("Native inference requires a positive thread count.");
     }
@@ -416,7 +431,9 @@ int serve(const Configuration& configuration) {
     whisper_log_set(native_log, &log);
     emit("{\"type\":\"loading\",\"model\":" + json_string(configuration.model)
         + ",\"requestedBackend\":" + json_string(configuration.backend)
-        + ",\"observedBackend\":null,\"backendEvidence\":null}");
+        + ",\"observedBackend\":null,\"backendEvidence\":null"
+        + ",\"requestedEncoder\":" + (configuration.encoder_device.empty() ? "null" : json_string(configuration.encoder_device))
+        + ",\"observedEncoder\":null,\"encoderEvidence\":null}");
     ggml_backend_load_all_from_path(configuration.runtime.c_str());
     whisper_context_params parameters = whisper_context_default_params();
     parameters.use_gpu = configuration.backend == "gpu";
@@ -425,15 +442,29 @@ int serve(const Configuration& configuration) {
     if (!context) {
         throw std::runtime_error("Whisper could not load the selected model.");
     }
+    if (!configuration.encoder_device.empty()) {
+        const int result = whisper_ctx_init_openvino_encoder(context.get(), configuration.encoder_model.c_str(),
+            "NPU", configuration.encoder_cache.empty() ? nullptr : configuration.encoder_cache.c_str());
+        if (result != 0) {
+            emit_error("", "whisper_ctx_init_openvino_encoder for NPU returned " + std::to_string(result) + ".",
+                "WHISPER_ENCODER_UNAVAILABLE");
+            return 1;
+        }
+    }
     {
         const std::lock_guard<std::mutex> lock(log.mutex);
         // The public C API exposes available devices, not a context backend
         // getter. This observation is explicitly attributed to completed native
         // initialization logs; it does not claim every operation uses a GPU.
+        // A successful OpenVINO call establishes encoder initialization on the
+        // explicit NPU device, independently of decoder/backend observation.
         emit("{\"type\":\"ready\",\"model\":" + json_string(configuration.model)
             + ",\"requestedBackend\":" + json_string(configuration.backend)
             + ",\"observedBackend\":" + (log.backend.empty() ? "null" : json_string(log.backend))
-            + ",\"backendEvidence\":" + (log.backend.empty() ? "null" : "\"runtime-log\"") + "}");
+            + ",\"backendEvidence\":" + (log.backend.empty() ? "null" : "\"runtime-log\"")
+            + ",\"requestedEncoder\":" + (configuration.encoder_device.empty() ? "null" : json_string(configuration.encoder_device))
+            + ",\"observedEncoder\":" + (configuration.encoder_device.empty() ? "null" : json_string(configuration.encoder_device))
+            + ",\"encoderEvidence\":" + (configuration.encoder_device.empty() ? "null" : "\"openvino-initialization\"") + "}");
     }
     Commands commands;
     std::thread reader(read_commands, std::ref(commands));

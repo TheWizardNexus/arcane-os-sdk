@@ -29,7 +29,10 @@ export async function installedWhisperRuntime(record, signal, includeModels = tr
         files.push(variant.executable);
         directories.push(variant.root, variant.libraryDirectory);
     }
-    if (includeModels) for (const model of record.models) files.push(model.path);
+    if (includeModels) for (const model of record.models) {
+        files.push(model.path);
+        if (record.encoder === 'openvino-npu') files.push(model.encoderPath, model.encoderDataPath);
+    }
     for (const location of directories) {
         throwIfAborted(signal);
         if (!is.string(location) || !(await stat(location)).isDirectory()) return false;
@@ -104,6 +107,17 @@ function defaultWhisperVariants(requirement, platform, architecture) {
     if (platform !== 'win32' || architecture !== 'x64' || requirement.version !== '1.9.4') {
         throw new ArcaneError(ERROR_CODES.targetUnavailable, `Automatic Whisper distributions are available for 1.9.4 on win32/x64. Supply complete runtime variants for ${requirement.version} on ${platform}/${architecture}.`);
     }
+    if (requirement.encoder === 'openvino-npu') {
+        if (requirement.backend === 'metal') {
+            throw new ArcaneError(ERROR_CODES.targetUnavailable, 'The selected Windows OpenVINO Whisper distribution has no Metal decoder backend.');
+        }
+        const version = requirement.helperVersion ?? packageMetadata.version;
+        return [{
+            backend: requirement.backend === 'cpu' ? 'cpu' : 'cuda',
+            encoder: 'openvino-npu',
+            url: `https://github.com/TheWizardNexus/arcane-os-sdk/releases/download/${version}/arcane-whisper-openvino-windows-x64.tar.gz`
+        }];
+    }
     if (requirement.backend === 'metal') {
         throw new ArcaneError(ERROR_CODES.targetUnavailable, 'The selected Windows Whisper distribution has no Metal backend.');
     }
@@ -125,7 +139,10 @@ export async function installWhisperDistribution(requirement, options) {
     const controller = new AbortController();
     const signal = options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal;
     const preparation = {...options, signal};
-    const variants = reusable?.runtime.variants ?? defaultWhisperVariants(requirement, platform, architecture);
+    const integratedEncoder = requirement.encoder === 'openvino-npu' && !requirement.variants;
+    const variants = reusable
+        ? integratedEncoder ? [reusable.runtime.variants[0]] : reusable.runtime.variants
+        : defaultWhisperVariants(requirement, platform, architecture);
     if (!requirement.helperExecutable && !requirement.helperUrl && (platform !== 'win32' || architecture !== 'x64')) {
         throw new ArcaneError(ERROR_CODES.targetUnavailable, `Supply the Arcane Whisper helperExecutable or helperUrl for ${platform}/${architecture}.`);
     }
@@ -133,7 +150,7 @@ export async function installWhisperDistribution(requirement, options) {
         throw new ArcaneError(ERROR_CODES.targetUnavailable, `Supply a complete decoder tree through decoderExecutable and decoderRoot, or decoderUrl, for ${platform}/${architecture}.`);
     }
     const helperName = `arcane-whisper${platform === 'win32' ? '.exe' : ''}`;
-    const helperRoot = path.join(root, 'helper');
+    let helperRoot = path.join(root, 'helper');
     let helperExecutable = path.join(helperRoot, helperName);
     const decoderRoot = path.join(root, 'decoder');
     const models = [];
@@ -151,10 +168,18 @@ export async function installWhisperDistribution(requirement, options) {
             else await prepareWhisperArchive(variant.url, variantRoot, preparation);
             const libraryName = platform === 'win32' ? 'whisper.dll' : platform === 'darwin' ? 'libwhisper.dylib' : 'libwhisper.so';
             const libraryDirectory = selectedLibraryDirectory ?? path.dirname(await findWhisperFile(variantRoot, libraryName, signal));
-            preparedVariants[index] = {backend: variant.backend, root: variantRoot, libraryDirectory};
+            preparedVariants[index] = {backend: variant.backend, root: variantRoot, libraryDirectory,
+                ...(variant.encoder ? {encoder: variant.encoder} : {})};
+            if (requirement.encoder === 'openvino-npu' && !requirement.helperExecutable && !requirement.helperUrl) {
+                preparedVariants[index].executable = await findWhisperFile(variantRoot, helperName, signal);
+            }
         };
     });
     jobs.push(async function prepareHelper() {
+        // The optional native asset owns its matching helper and runtime as
+        // one complete tree. Reuse that tree once and resolve its helper after
+        // variant preparation joins, including when models change later.
+        if (requirement.encoder === 'openvino-npu' && !requirement.helperExecutable && !requirement.helperUrl) return;
         const existingHelper = reusable?.runtime.helperExecutable ?? requirement.helperExecutable;
         if (existingHelper) {
             const source = path.resolve(existingHelper);
@@ -190,25 +215,46 @@ export async function installWhisperDistribution(requirement, options) {
         jobs.push(async function prepareSelectedModel() {
             const modelRoot = path.join(root, 'models', String(index));
             await mkdir(modelRoot, {recursive: true});
-            const filename = model.path ? path.basename(model.path) : model.filename ?? path.posix.basename(new URL(model.url).pathname);
-            const destination = path.join(modelRoot, filename);
             const priorIndex = reusable?.requirement.models.findIndex(function sameSelectedModel(candidate) {
                 return JSON.stringify(candidate) === JSON.stringify(model);
             }) ?? -1;
-            let source = model.path;
+            let sourceModel = model;
             if (priorIndex >= 0) {
-                const priorPath = reusable.runtime.models[priorIndex]?.path;
-                if (priorPath) {
+                const prior = reusable.runtime.models[priorIndex];
+                if (prior?.path) {
                     try {
-                        if ((await stat(priorPath)).isFile()) source = priorPath;
+                        const paths = [prior.path, ...(requirement.encoder === 'openvino-npu' ? [prior.encoderPath, prior.encoderDataPath] : [])];
+                        let available = true;
+                        for (const location of paths) if (!location || !(await stat(location)).isFile()) available = false;
+                        if (available) sourceModel = prior;
                     } catch (error) {
                         if (error.code !== 'ENOENT') throw error;
                     }
                 }
             }
-            if (source) await copyFile(path.resolve(source), destination);
+            if (!sourceModel.path && model.archiveUrl) {
+                await prepareWhisperArchive(model.archiveUrl, modelRoot, preparation);
+                models[index] = {...model,
+                    path: await findWhisperFile(modelRoot, model.filename, signal),
+                    ...(requirement.encoder === 'openvino-npu' ? {
+                        encoderPath: await findWhisperFile(modelRoot, model.encoderFilename, signal),
+                        encoderDataPath: await findWhisperFile(modelRoot, model.encoderDataFilename, signal)
+                    } : {})};
+                return;
+            }
+            const filename = sourceModel.path ? path.basename(sourceModel.path) : model.filename ?? path.posix.basename(new URL(model.url).pathname);
+            const destination = path.join(modelRoot, filename);
+            if (sourceModel.path) await copyFile(path.resolve(sourceModel.path), destination);
             else await downloadWhisperResource(model.url, destination, preparation);
-            models[index] = {...model, path: destination};
+            const preparedModel = {...model, path: destination};
+            if (requirement.encoder === 'openvino-npu') {
+                for (const field of ['encoderPath', 'encoderDataPath']) {
+                    throwIfAborted(signal);
+                    preparedModel[field] = path.join(modelRoot, path.basename(sourceModel[field]));
+                    await copyFile(path.resolve(sourceModel[field]), preparedModel[field]);
+                }
+            }
+            models[index] = preparedModel;
         });
     }
     let nextJob = 0;
@@ -232,16 +278,26 @@ export async function installWhisperDistribution(requirement, options) {
     throwIfAborted(options.signal);
     if (failures.length === 1) throw failures[0];
     if (failures.length > 1) throw new AggregateError(failures, 'Whisper dependency preparation failed.');
+    if (requirement.encoder === 'openvino-npu' && !requirement.helperExecutable && !requirement.helperUrl) {
+        helperRoot = preparedVariants[0].root;
+        helperExecutable = preparedVariants[0].executable;
+    }
+    // The precompiled optional tree owns both decoder backends. Share its
+    // helper and native files while keeping the normal GPU-first CPU recovery.
+    if (integratedEncoder && requirement.backend === 'auto') {
+        preparedVariants.push({...preparedVariants[0], backend: 'cpu'});
+    }
     const locations = {
         version: requirement.version,
         backend: requirement.backend,
+        ...(requirement.encoder ? {encoder: requirement.encoder} : {}),
         helperRoot,
         helperExecutable,
         helperVersion: requirement.helperVersion ?? packageMetadata.version,
         decoderRoot,
         decoderExecutable,
         variants: preparedVariants.map(function completedWhisperVariant(variant) {
-            return {...variant, executable: helperExecutable};
+            return {...variant, executable: variant.executable ?? helperExecutable};
         }),
         models,
         ...(requirement.modelId ? {modelId: requirement.modelId} : models.length === 1 ? {modelId: models[0].id} : {})
@@ -268,7 +324,9 @@ export function bundledWhisperRuntime(runtime, relativeRoot) {
             return {...variant, root: bundledWhisperPath(variant.root), libraryDirectory: bundledWhisperPath(variant.libraryDirectory), executable: bundledWhisperPath(variant.executable)};
         }),
         models: runtime.models.map(function bundledWhisperModel(model) {
-            return {...model, path: bundledWhisperPath(model.path)};
+            return {...model, path: bundledWhisperPath(model.path),
+                ...(model.encoderPath ? {encoderPath: bundledWhisperPath(model.encoderPath)} : {}),
+                ...(model.encoderDataPath ? {encoderDataPath: bundledWhisperPath(model.encoderDataPath)} : {})};
         })
     };
 }

@@ -37,6 +37,9 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
             requestedBackend: helper?.variant.backend ?? runtime?.backend ?? 'auto',
             observedBackend: helper?.metadata?.observedBackend ?? null,
             backendEvidence: helper?.metadata?.backendEvidence ?? null,
+            requestedEncoder: runtime?.encoder === 'openvino-npu' ? 'NPU' : null,
+            observedEncoder: helper?.metadata?.observedEncoder ?? null,
+            encoderEvidence: helper?.metadata?.encoderEvidence ?? null,
             error: error ? {code: error.code, message: error.message} : null
         };
     }
@@ -80,6 +83,11 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
         const library = variant.libraryDirectory ?? variant.root;
         const args = ['--model-base64', encode(model.path), '--runtime-base64', encode(library),
             '--backend', variant.backend === 'cpu' ? 'cpu' : 'gpu'];
+        if (runtime.encoder === 'openvino-npu') {
+            args.push('--encoder-model-base64', encode(model.encoderPath),
+                '--encoder-cache-base64', encode(path.join(temporaryDirectory, 'encoder-cache')),
+                '--encoder-device', 'NPU');
+        }
         if (runtime.threads !== undefined) args.push('--threads', String(runtime.threads));
 
         async function receive({stream, chunk}) {
@@ -96,7 +104,7 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
                         session.metadata = record;
                         readiness.resolve(record);
                     } else if (record.type === 'error' && !record.requestId) {
-                        readiness.reject(whisperError('WHISPER_MODEL_FAILED', record.message));
+                        readiness.reject(whisperError(record.code ?? 'WHISPER_MODEL_FAILED', record.message));
                     } else if (pending && record.requestId === pending.id) {
                         if (record.type === 'complete') {
                             pending.response.resolve({text: record.text, language: record.language,
@@ -179,7 +187,7 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
                 session.input.end();
             }
         }
-        try { await session.completion; }
+        try { return await session.completion; }
         catch (failure) {
             if (!session.controller.signal.aborted) throw failure;
         }
@@ -217,6 +225,13 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
             }
             const model = runtime.models?.find(function selectedModel(record) { return record.id === selected; });
             if (!model) throw whisperError('WHISPER_MODEL_UNAVAILABLE', `The selected model ${selected} is not prepared.`);
+            if (runtime.encoder === 'openvino-npu') {
+                if (!is.string(model.encoderPath) || !is.string(model.encoderDataPath)) {
+                    throw whisperError('WHISPER_ENCODER_UNAVAILABLE', 'The selected NPU model requires its matching OpenVINO XML and BIN files.');
+                }
+                await mkdir(path.join(temporaryDirectory, 'encoder-cache'), {recursive: true});
+                loadSignal.throwIfAborted();
+            }
             const variants = selectedVariants(runtime);
             const failures = [];
             for (const variant of variants) {
@@ -236,8 +251,13 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
                     failures.push(failure);
                     try { await stopHelper(session, {terminate: true}); }
                     catch (exitFailure) { if (exitFailure !== failure) failures.push(exitFailure); }
+                    if (runtime.encoder === 'openvino-npu') {
+                        try { await session.completion; }
+                        catch (exitFailure) { if (exitFailure !== failure) failure.cause = exitFailure; }
+                    }
                     helper = null;
                     loadSignal.throwIfAborted();
+                    if (failure.code === 'WHISPER_ENCODER_UNAVAILABLE') throw failure;
                     if (session.observerFailure || failure.code === 'WHISPER_PROTOCOL_INCOMPLETE') throw failure;
                     if (variant !== variants[variants.length - 1] && onEvent) {
                         await onEvent({type: 'whisper.backend.failed', message: failure.message,
@@ -247,7 +267,10 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
                     loadSignal.removeEventListener('abort', cancelLoading);
                 }
             }
-            throw new AggregateError(failures, 'The selected Whisper model could not load in the prepared runtimes.');
+            if (runtime.encoder === 'openvino-npu' && failures.length === 1) throw failures[0];
+            const failure = new AggregateError(failures, 'The selected Whisper model could not load in the prepared runtimes.');
+            if (runtime.encoder === 'openvino-npu') failure.code = failures[0]?.code ?? 'WHISPER_MODEL_FAILED';
+            throw failure;
         }).catch(function modelLoadFailed(failure) {
             error = loadSignal.aborted ? null : failure;
             state = unloading || closing ? 'unloading' : loadSignal.aborted ? 'unloaded' : 'error';
@@ -265,7 +288,7 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
             || session.observerFailure || failure.code === 'WHISPER_PROTOCOL_INCOMPLETE'
             || (runtime.backend && runtime.backend !== 'auto')) return null;
         if (failure.code !== 'WHISPER_INFERENCE_FAILED' && !session.failed) return null;
-        return runtime.variants.find(function preparedCPU(variant) { return variant.backend === 'cpu'; }) ?? null;
+        return selectedVariants(runtime).find(function preparedCPU(variant) { return variant.backend === 'cpu'; }) ?? null;
     }
 
     function transcribe(request, {signal, onProgress, requestId: suppliedRequestId} = {}) {
@@ -384,6 +407,13 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
         const response = deferred();
         session.pending = {id, response, signal, onProgress, attempt};
         function cancelInference() {
+            if (runtime.encoder === 'openvino-npu') {
+                // OpenVINO's synchronous encoder call has no cancellation seam
+                // in whisper.cpp. Retire the owned process and join its exit.
+                session.stopping = true;
+                session.controller.abort(signal.reason);
+                return;
+            }
             writeCommand(session.input, `cancel\t${id}\n`).catch(function cancellationWriteFailed(failure) {
                 session.controller.abort(failure);
             });
@@ -398,6 +428,29 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
             signal.throwIfAborted();
             return result;
         } catch (failure) {
+            if (runtime.encoder === 'openvino-npu' && failure.code === 'WHISPER_INFERENCE_FAILED') {
+                const recovering = cpuRecoveryVariant(session, failure);
+                try { failure.data = await stopHelper(session); }
+                catch (exitFailure) { if (exitFailure !== failure) failure.cause = exitFailure; }
+                if (helper === session) {
+                    helper = null;
+                    state = unloading || closing ? 'unloading' : signal.aborted ? 'unloaded' : recovering ? 'recovering' : 'error';
+                    error = signal.aborted || recovering ? null : failure;
+                    publish();
+                }
+                signal.throwIfAborted();
+                throw failure;
+            }
+            if (signal.aborted && runtime.encoder === 'openvino-npu') {
+                await stopHelper(session, {terminate: true});
+                if (helper === session) {
+                    helper = null;
+                    state = unloading || closing ? 'unloading' : 'unloaded';
+                    error = null;
+                    publish();
+                }
+                signal.throwIfAborted();
+            }
             if (!response.settled) {
                 session.controller.abort(failure);
                 await Promise.allSettled([session.completion]);
@@ -453,7 +506,11 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
 }
 
 function selectedVariants(runtime) {
-    const variants = runtime.variants ?? [];
+    const variants = (runtime.variants ?? []).filter(function matchingEncoder(variant) {
+        return runtime.encoder === 'openvino-npu'
+            ? variant.encoder === 'openvino-npu'
+            : variant.encoder === undefined;
+    });
     if (runtime.backend && runtime.backend !== 'auto') {
         const selected = variants.filter(function selectedBackend(variant) { return variant.backend === runtime.backend; });
         if (selected.length) return selected;

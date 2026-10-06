@@ -303,6 +303,7 @@
         "id": { "const": "whisper.cpp" },
         "version": { "type": "string", "default": "1.9.4" },
         "backend": { "enum": ["auto", "cuda", "metal", "cpu"], "default": "auto" },
+        "encoder": { "const": "openvino-npu", "description": "Explicit Intel NPU encoder. Omit for ordinary GPU/CPU encoding. The precompiled Windows x64 runtime supports CUDA-first CPU recovery and requires a compatible installed Intel NPU driver." },
         "helperRoot": { "type": "string", "description": "Complete helper directory copied into the native runtime, including its app-local libraries. Defaults to the directory containing helperExecutable." },
         "helperExecutable": { "type": "string" },
         "helperUrl": { "type": "string" },
@@ -318,6 +319,7 @@
             "required": ["backend"],
             "properties": {
               "backend": { "enum": ["cuda", "metal", "cpu"] },
+              "encoder": { "const": "openvino-npu" },
               "root": { "type": "string" },
               "url": { "type": "string" },
               "libraryDirectory": { "type": "string" }
@@ -337,7 +339,12 @@
                   "id": { "type": "string" },
                   "path": { "type": "string" },
                   "url": { "type": "string" },
-                  "filename": { "type": "string" }
+                  "filename": { "type": "string" },
+                  "archiveUrl": { "type": "string", "description": "Complete model archive containing the declared model members." },
+                  "encoderFilename": { "type": "string", "description": "Matching OpenVINO encoder XML filename in archiveUrl." },
+                  "encoderDataFilename": { "type": "string", "description": "Matching OpenVINO encoder BIN filename in archiveUrl." },
+                  "encoderPath": { "type": "string", "description": "Matching local OpenVINO encoder XML file." },
+                  "encoderDataPath": { "type": "string", "description": "Matching local OpenVINO encoder BIN file." }
                 }
               }
             ]
