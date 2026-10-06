@@ -145,6 +145,11 @@ Git's no-match result produces unset fields; other process,
 configuration, observer and cancellation failures remain complete. A single
 failure retains its original object, code, cause and process `details`; the
 reader adds complete captured stdout as the `rawStdout` Buffer on that error.
+If the error already has that property or cannot accept it, a new error retains
+the original as `cause`, preserves its code, process details and exit code, and
+holds this observation's `rawStdout`. Original causal failures stay on that
+original error; an attachment exception is retained as `attachmentError`.
+An existing `rawStdout` property is never overwritten or invoked to read its value.
 The process result's `stdout` remains `null` in raw mode, and its stderr and
 other diagnostics remain intact. A decoding failure likewise carries its
 original decoding `cause`, complete process `details` and `rawStdout`.

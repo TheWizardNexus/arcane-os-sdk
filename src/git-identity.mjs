@@ -58,8 +58,24 @@ export async function readGitIdentity({directory, signal, onEvent, run = runProc
         } catch (error) {
             // Keep the process error and its native details intact. Raw stdout
             // belongs to this reader because the process owner did not decode it.
-            if (error !== null && (is.object(error) || is.function(error))) error.rawStdout = Buffer.concat(chunks);
-            throw error;
+            const rawStdout = Buffer.concat(chunks);
+            let attached = false;
+            let attachmentError;
+            try {
+                if (error !== null && (is.object(error) || is.function(error)) && !('rawStdout' in error)) {
+                    Object.defineProperty(error, 'rawStdout', {
+                        value: rawStdout, writable: true, enumerable: true, configurable: true
+                    });
+                    attached = true;
+                }
+            } catch (cause) { attachmentError = cause; }
+            if (attached) throw error;
+            const failure = new ArcaneError(error?.code ?? 'ARCANE_OPERATION_FAILED',
+                error instanceof Error ? error.message : String(error),
+                {cause: error, details: error?.details, exitCode: error?.exitCode});
+            failure.rawStdout = rawStdout;
+            if (attachmentError) failure.attachmentError = attachmentError;
+            throw failure;
         }
     }
 
@@ -70,10 +86,15 @@ export async function readGitIdentity({directory, signal, onEvent, run = runProc
     }).map(function cause(result) { return result.reason; });
     try { await events.drain(); }
     catch (error) {
-        const represented = failures.some(function containsObserverFailure(failure) {
-            return failure === error || failure?.cause === error
-                || (is.array(failure?.errors) && failure.errors.includes(error));
-        });
+        const visited = new Set();
+        function containsObserverFailure(failure) {
+            if (failure === error) return true;
+            if (failure === null || failure === undefined || visited.has(failure)) return false;
+            visited.add(failure);
+            return containsObserverFailure(failure.cause)
+                || (is.array(failure.errors) && failure.errors.some(containsObserverFailure));
+        }
+        const represented = failures.some(containsObserverFailure);
         if (!represented) failures.push(error);
     }
     if (failures.length === 1) throw failures[0];

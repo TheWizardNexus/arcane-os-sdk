@@ -7957,6 +7957,10 @@ Raw stdout is parser-owned rather than emitted as text events; an injected
 events retain their ordinary route. Errors preserve their original object,
 code, cause and process diagnostics, with complete captured output added as
 `rawStdout` (a Buffer). The raw-mode process result retains `stdout:null`.
+If that property already exists or cannot be attached, a wrapper retains the
+original as `cause`, its code/details/exit code and this observation's raw
+output; original causal failures remain on the cause. An attachment exception
+is retained as `attachmentError`. Existing property values remain untouched.
 Decoding failures include their cause, complete process details and raw output.
 Already-represented observer errors appear once; separate failures use
 `AggregateError`. See the [complete contract and

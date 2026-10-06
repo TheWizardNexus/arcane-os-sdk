@@ -164,6 +164,51 @@ test('identity discovery retains wrapped observer failures once and preserves in
     });
 });
 
+test('identity raw diagnostics preserve existing error properties and nested observer causes', async function existingRawDiagnostics() {
+    const originalOutput = Buffer.from('Original caller-owned output.');
+    const details = processResult(null, 'Complete original diagnostic.');
+    const observerFailure = new ArcaneError('ARCANE_OPERATION_FAILED', 'Original observer failure.', {details});
+    Object.defineProperty(observerFailure, 'rawStdout', {value: originalOutput});
+    function onEvent() { throw observerFailure; }
+    await assert.rejects(readGitIdentity({onEvent, run: async function beforeSpawn(command, args, options) {
+        await options.onEvent({type: 'process.starting', message: 'Before spawn.'});
+        assert.fail('The process cannot start after the observer failure.');
+    }}), function originalCause(error) {
+        assert.ok(error instanceof ArcaneError);
+        assert.equal(error.cause, observerFailure);
+        assert.equal(error.code, observerFailure.code);
+        assert.equal(error.details, details);
+        assert.equal(error.exitCode, observerFailure.exitCode);
+        assert.deepEqual(error.rawStdout, Buffer.from(''));
+        assert.equal(observerFailure.rawStdout, originalOutput);
+        return true;
+    });
+    const processFailure = new ArcaneError(observerFailure.code, observerFailure.message,
+        {cause: observerFailure, details});
+    processFailure.errors = [observerFailure];
+    let propertyReads = 0;
+    Object.defineProperty(processFailure, 'rawStdout', {get: function unavailableProperty() {
+        propertyReads += 1;
+        throw new Error('The original property must remain unread.');
+    }});
+    const output = Buffer.from('user.name\nComplete raw observation\0');
+    await assert.rejects(readGitIdentity({onEvent, run: async function wrapped(command, args, options) {
+        await options.onOutput({stream: 'stdout', chunk: output});
+        try { await options.onEvent({type: 'process.completed', message: 'After spawn.'}); }
+        catch (error) { assert.equal(error, observerFailure); throw processFailure; }
+    }}), function nestedCause(error) {
+        assert.ok(error instanceof ArcaneError);
+        assert.equal(error.cause, processFailure);
+        assert.equal(error.details, details);
+        assert.equal(error.code, processFailure.code);
+        assert.deepEqual(error.rawStdout, output);
+        assert.equal(error.cause.cause, observerFailure);
+        assert.deepEqual(error.cause.errors, [observerFailure]);
+        assert.equal(propertyReads, 0);
+        return true;
+    });
+});
+
 test('global-only identity reads preserve unset values and complete rejected failures', async function identityFailures() {
     let calls = 0;
     const empty = await readGitIdentity({run: async function absent(command, args, options) {
