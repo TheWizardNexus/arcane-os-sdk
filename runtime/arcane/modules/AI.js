@@ -4138,13 +4138,21 @@ class AI {
         const speed=is.finite(payload.speed)?payload.speed:this.voiceSpeed;
         const nativeSpeech=this.#nativeSpeech(this.ttsService,'tts');
         if(nativeSpeech){
-            const response=await nativeSpeech.synthesize({
-                model,
-                voice,
-                input,
-                responseFormat,
-                speed
-            });
+            let response;
+            try{
+                response=await nativeSpeech.synthesize({
+                    model,
+                    voice,
+                    input,
+                    responseFormat,
+                    speed
+                },{signal});
+            }catch(error){
+                if(isAIRequestAbort(error,signal)){
+                    throw normalizeAIRequestAbort(error);
+                }
+                throw error;
+            }
             if(signal?.aborted){
                 throw normalizeAIRequestAbort(signal.reason);
             }
