@@ -136,7 +136,7 @@ Root applications import `AI` through `arcane-os/ai` in the managed browser map.
 `ai.prepareTTSPlayback(payload,signal)` silently prepares real Blob audio or a
 native speech descriptor for playback. Native browser voices expose no audio
 file; use this path or shared streaming/SpeechPlayback for native output.
-`ai.prepareTTS({parts,storage,identity,signal,onState})` prepares complete
+`ai.prepareTTS({parts,storage,identity,textFormat,signal,onState})` prepares complete
 punctuation segments without playing them and optionally saves/reuses their
 audio through application-owned DBOPFS. Its immediate handle exposes ordered
 segments, preparation state, `ready`, `getAudio(index)`, and `cancel()`.
@@ -148,6 +148,17 @@ model. See [prepared narration](ai/browser-speech.md#prepare-narration-once-and-
 for complete inputs, storage ownership, progress, errors, and cancellation,
 and [AI.js](runtime-modules.md#aijs) for the managed runtime contract.
 These are AI instance methods, not new npm export names.
+
+Complete synthesis calls can select `textFormat:'plain'` to preserve supplied
+speech text, including repeated formatting marks and surrounding whitespace.
+This applies to `ai.fetchTTS(payload,signal)`, audio-file preparation through
+`ai.prepareTTSPlayback(payload,signal)`, durable `ai.prepareTTS(...)`, provider
+runtime TTS requests and direct Kokoro synthesis. The SDK consumes the control
+before engine dispatch; durable preparation retains the existing punctuation
+segmentation. Omitted or other values retain automatic speech cleanup.
+Streaming `streamTTS`, `finishTTS` and shared `SpeechPlayback` retain their
+automatic cleanup; this option does not change upstream engine capacity.
+See [exact complete synthesis input](ai/browser-speech.md#exact-complete-synthesis-input).
 
 ## Shared operation contract
 
@@ -7530,6 +7541,12 @@ published SDK/runtime dependencies and the canonical Core entry/client into a
 fresh output directory. Service factories are imported only when a real native
 host later launches the generated Core entry, never during packaging.
 
+An optional `appDescriptor.native.window` record carries `width`, `height` and
+`resizable` into `manifest.window`. Dimensions are positive integral logical
+client units; `resizable` is an optional boolean. Omitted fields remain omitted.
+The portable payload records the selection; the selected platform host owns
+its window behavior. See [initial native window size](core-native-packaging.md#initial-native-window-size).
+
 ### Availability and normalization
 
 **Node; produces a portable payload rather than an executable host.** Existing
@@ -7640,6 +7657,16 @@ downloads and extracts the matching `arcane-native-windows-x64.tar.gz` beneath
 the selected output root. There is no compiler or OS checkout requirement for
 application builds. The build machine needs its normal Node/npm toolchain and
 `tar`; execution needs Windows x64, .NET Framework 4.6.2 or later and WebView2.
+
+The matching Windows host consumes `appDescriptor.native.window` through
+`manifest.window`. Optional `width` and `height` select initial client dimensions
+in 96-DPI logical units; the host scales them for its actual DPI and fits the
+outer window within the current screen's usable area. Optional `resizable:false`
+selects a fixed-size border and disables maximizing. Omitted fields preserve
+the existing host defaults. Initial sizing preserves a window already restored
+to a non-normal state and does not add saved-bounds storage. The initial-fit
+logic is not reapplied during later user resizing. See [initial native window size](core-native-packaging.md#initial-native-window-size)
+for a complete descriptor example and the other-platform boundary.
 
 The returned `arcane-native-builder/1` provider exposes `describe`, `doctor`,
 `prepare`, `build`, `verify` and `run`. Build returns `{app,target,manifest}`

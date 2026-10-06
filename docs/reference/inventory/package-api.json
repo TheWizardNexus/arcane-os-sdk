@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.68.0",
+  "sdkVersion": "0.69.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
@@ -4374,7 +4374,7 @@
       "summary": "Creates the SDK-owned provider that assembles one selected app and explicit services into a portable Core payload.",
       "availability": "Node; produces a portable payload rather than an executable host",
       "protocol": "arcane-native-builder/1 portable provider",
-      "normalization": "Preserves complete selected app and dependency releases; an explicit services selection overrides appDescriptor.native.services, otherwise the descriptor selection is used; reports executable:false and never substitutes for an unavailable platform host"
+      "normalization": "Preserves complete selected app and dependency releases; an explicit services selection overrides appDescriptor.native.services, otherwise the descriptor selection is used; optional appDescriptor.native.window carries positive integral logical client width/height and optional resizable into manifest.window with omitted fields preserved; reports executable:false and never substitutes for an unavailable platform host"
     },
     {
       "id": "native-portable-provider:arcaneNativeBuilderProvider",
@@ -4416,7 +4416,7 @@
       "summary": "Assembles selected application services and browser content with the SDK-owned Windows x64 WebView2 and SEA host.",
       "availability": "Node for assembly; Windows x64 with WebView2 Runtime for execution",
       "protocol": "arcane-native-builder/1 windows-x64 provider",
-      "normalization": "Uses a selected hostDirectory or the exact installed SDK version's numeric release asset; preserves complete payloads; app displayName plus .exe (app ID fallback) and matching .exe.config use Windows filename substitutions only; manifest.host.executable owns inventory, icon, verify and run while generic cache/Core names remain unchanged; native.icon PNG/ICO derives the copied executable and host.icon without an app compiler, while other formats retain assembly with native.icon.unsupported and executableIcon:false; the matching host loads the selected window/taskbar icon and handles window.setTheme with per-field applied/unsupported results; run cancellation closes stdin and waits for host-owned graceful shutdown"
+      "normalization": "Uses a selected hostDirectory or the exact installed SDK version's numeric release asset; preserves complete payloads; app displayName plus .exe (app ID fallback) and matching .exe.config use Windows filename substitutions only; manifest.host.executable owns inventory, icon, verify and run while generic cache/Core names remain unchanged; native.icon PNG/ICO derives the copied executable and host.icon without an app compiler, while other formats retain assembly with native.icon.unsupported and executableIcon:false; the matching host loads the selected window/taskbar icon and handles window.setTheme with per-field applied/unsupported results; native.window selects initial 96-DPI logical client width/height and optional resizable through manifest.window, the matching host scales to actual DPI and fits initial placement to the usable screen while omitted fields and existing restored non-normal state remain unchanged; no saved-bounds subsystem is added and initial-fit logic is not reapplied during later resizing; run cancellation closes stdin and waits for host-owned graceful shutdown"
     },
     {
       "id": "native-windows-provider:arcaneNativeBuilderProvider",

@@ -52,6 +52,8 @@ alone does not make bare module names resolve in a browser.
 | Present Light / Dark / System choices with complete labels | [Theme-switcher configuration](runtime-components.md#theme-switcherhtml) |
 | Use optional Core preferences and appearance without masking real failures | [PreferenceStore](runtime-modules.md#preferencestorejs), [SystemAppearance](runtime-modules.md#systemappearancejs), and [Core lookup errors](core-runtime.md#state-and-frames) |
 | Submit complete speech parts immediately and play them in order | [`SpeechPlayback`](runtime-modules.md#speechplaybackjs) and the [basic browser example](ai/browser-speech.md#play-a-complete-array-with-speechplayback) |
+| Preserve exact text in an explicit complete synthesis call | [Exact complete synthesis input](ai/browser-speech.md#exact-complete-synthesis-input) and [managed AI narration](sdk-api.md#managed-ai-narration) |
+| Select initial native window dimensions and resizing behavior | [Initial native window size](core-native-packaging.md#initial-native-window-size) and [Windows provider](sdk-api.md#createwindowsnativeprovider) |
 | Call `globalThis.Arcane` | [Arcane Core API](core/arcane-api.md) |
 | Connect a browser to one Core transport | [Core browser client](core-client.md) |
 | Cancel one Core speech synthesis request without changing its payload | [Speech request lifetime](core-client.md#events-and-request-lifetime) and [Core facade](sdk-api.md#createcorefacade) |

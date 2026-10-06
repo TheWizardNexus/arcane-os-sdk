@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../examples/">Hello World</a><a href="../../../guides/">Guides</a><a href="../../sdk-api/">API</a><a href="../../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">Browser speech providers</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="browser-speech-providers">Browser speech providers</h1><p class="doc-lead">arcane-os/ai/browser-speech supplies caller-selected Whisper transcription, native browser recognition and synthesis, Kokoro text-to-speech, and TWiN Cloud text-to-speech providers. Its local model path provides artifact storage, live module routing, role Workers, provider/2 adapters, bounded parallel TTS synthesis, audio normalization, cancellation, and cleanup.</p><div class="doc-meta"><span>SDK 0.68.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">Browser speech providers</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="browser-speech-providers">Browser speech providers</h1><p class="doc-lead">arcane-os/ai/browser-speech supplies caller-selected Whisper transcription, native browser recognition and synthesis, Kokoro text-to-speech, and TWiN Cloud text-to-speech providers. Its local model path provides artifact storage, live module routing, role Workers, provider/2 adapters, bounded parallel TTS synthesis, audio normalization, cancellation, and cleanup.</p><div class="doc-meta"><span>SDK 0.69.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../">Normalized AI</a><a href="../twin-cloud/">TWiN Cloud quick start</a><a href="../browser-wasm/">Browser-WASM AI</a><a href="../browser-decisions/">Browser typed decisions</a><a href="./" aria-current="page">Browser speech</a><a href="../../websocket-client/">Shared WebSocket clients</a><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../core/">Core map</a><a href="../../core-client/">Core browser client</a><a href="../../core-runtime/">Native Core runtime</a><a href="../../core-development/">Development Core services</a><a href="../../codex-app-server/">Codex App Server</a><a href="../../mcp-stdio/">MCP STDIO server</a><a href="../../local-ai/">Local AI through Core</a><a href="../../native-decisions/">Native typed decisions</a><a href="../../local-image-flux/">FLUX.2 Klein 4B</a><a href="../../local-image-sdxl/">SDXL Base 1.0</a><a href="../../native-speech/">Native speech service</a><a href="../../local-whisper/">Native Whisper</a><a href="../../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../../core-repositories/">Native repository workspaces</a><a href="../../core-native-packaging/">Portable Core packaging</a><a href="../../core/arcane-api/">Arcane API</a><a href="../../core/capabilities/">Capabilities and admission</a><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../../core/arcane-events/">Events</a><a href="../../core/arcane-ai-contracts/">AI contracts</a><a href="../../core/arcane-entities/">Entity exports</a><a href="../../core/ollama-module/">Ollama internals (advanced)</a><a href="../../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/ai/browser-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#choose-a-speech-provider">Choose a speech provider</a><a href="#native-browser-speech-recognition">Native browser speech recognition</a><a href="#native-browser-text-to-speech-and-voice-previews">Native browser text-to-speech and voice previews</a><a href="#twin-cloud-text-to-speech">TWiN Cloud text-to-speech</a><a href="#quick-start-say-one-sentence">Quick start: say one sentence</a><a href="#browser-npu-and-gpu-setup">Browser NPU and GPU setup</a><a href="#developer-diagnostics">Developer diagnostics</a><a href="#local-synthesis-capacity-and-exact-order-playback">Local synthesis capacity and exact-order playback</a><a href="#play-a-complete-array-with-speechplayback">Play a complete array with SpeechPlayback</a><a href="#queue-complete-passages-and-wait-for-playback">Queue complete passages and wait for playback</a><a href="#prepare-narration-once-and-replay-stored-audio">Prepare narration once and replay stored audio</a><a href="#stream-chunks-as-they-arrive">Stream chunks as they arrive</a><a href="#automatic-speech-input-formatting-cleanup">Automatic speech-input formatting cleanup</a><a href="#choose-a-device-or-reduce-memory-use">Choose a device or reduce memory use</a><a href="#inspect-the-requested-and-selected-device">Inspect the requested and selected device</a><a href="#stop-mute-cancel-and-release">Stop, mute, cancel, and release</a><a href="#advanced-provider-and-artifact-reference">Advanced provider and artifact reference</a><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-identifiers">Protocol identifiers</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#removebrowserspeechmodelcache">removeBrowserSpeechModelCache()</a><a href="#ordinary-module-routing">Ordinary module routing</a><a href="#onnx-runtime-configuration">ONNX runtime configuration</a><a href="#providers">Providers</a><a href="#lifecycle-and-cancellation">Lifecycle and cancellation</a><a href="#errors">Errors</a><a href="#ownership">Ownership</a><a href="#related">Related</a></nav></details><p><code>arcane-os/ai/browser-speech</code> supplies caller-selected Whisper transcription,
@@ -767,14 +767,17 @@ or error. A storage key groups application content. The application owns its
 keys, preparation priority, semantic identity, and retention policy; the SDK
 does not select another page or speak background work.</p>
 <h3 id="preparation-inputs-and-reuse">Preparation inputs and reuse</h3>
-<p><code>ai.prepareTTS({parts,storage,identity,signal,onState})</code> accepts an ordered array
+<p><code>ai.prepareTTS({parts,textFormat,storage,identity,signal,onState})</code> accepts an ordered array
 of strings or <code>{input,voice?,speed?,pauseAfterMs?}</code> records. An omitted voice
 uses the selected model default; omitted speed uses <code>ai.voiceSpeed</code>; omitted
 pause is zero. The SDK snapshots the selected speech configuration and current
 punctuation/word-cadence options for that preparation. A part&#39;s pause applies
 after its final extracted segment. Complete original input remains available
-for semantic comparison; automatic Markdown cleanup affects only the speech
-copy and occurs once before segmentation.</p>
+for semantic comparison; default Markdown cleanup affects only the speech
+copy and occurs once before segmentation. Set <code>textFormat:&#39;plain&#39;</code> to preserve
+each supplied input exactly through that segmentation. The prepared segment
+text participates in semantic reuse, so a changed synthesis input does not
+reuse audio produced from the cleaned version.</p>
 <p><code>storage</code> is optional. When supplied, <code>{db,table,key}</code> names the caller&#39;s ready
 DBOPFS instance and its application-owned table/key. The SDK stores complete
 generated audio as raw files and retains MIME metadata separately so subsequent
@@ -940,7 +943,7 @@ completion keeps its ordinary speech flush. Explicit calls to either public
 speech method retain their existing behavior.</p>
 <h2 id="automatic-speech-input-formatting-cleanup">Automatic speech-input formatting cleanup</h2>
 <p>The shared streaming, audio-file, and <code>SpeechPlayback</code> paths remove repeated
-same formatting marks from the outbound speech-input copy automatically:</p>
+same formatting marks from the outbound speech-input copy by default:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">ai.streamTTS(&#39;## Heading\n**Hello&#39;);
 ai.streamTTS(&#39;**. Next sentence.&#39;);
 await ai.finishTTS();
@@ -953,10 +956,13 @@ Ordinary prose is forwarded immediately; only a trailing formatting candidate
 waits for its next character or the final flush.</p>
 <p><code>end:true</code>, <code>finishTTS()</code>, or cancellation clears pending streaming formatting
 state. <code>fetchTTS()</code>, provider-runtime TTS requests, direct Kokoro provider
-requests, and <code>SpeechPlayback</code> apply the same cleanup to complete input. An
-existing <code>textFormat</code> extra is ignored and cannot disable or select cleanup.
+requests, and <code>SpeechPlayback</code> apply the same default cleanup to complete input.
+Complete-input APIs can explicitly select <code>textFormat:&#39;plain&#39;</code> as described
+below. The streaming <code>streamTTS()</code> options still ignore <code>textFormat</code>;
+streaming narration and <code>SpeechPlayback</code> keep their existing cleanup.
 SDK-internal delegation carries <code>{speechInputPrepared:true}</code> outside the speech
-payload only after one cleanup pass, preventing a second non-idempotent pass.
+payload after its owner selects text treatment, preventing a second
+non-idempotent cleanup pass or cleanup of explicitly plain input.
 Applications omit that internal metadata. Displayed messages, saved history,
 model input, caller payload objects, language, voice, synthesis capacity, and
 playback timing are not changed by the filter.</p>
@@ -977,6 +983,32 @@ const speechText = new MarkdownSpeech();
 console.log(speechText.append(&#39;## Head&#39;, false)); // &#39; Head&#39;
 console.log(speechText.append(&#39;ing&#39;, true)); // ing
 </code></pre></div>
+<h3 id="exact-complete-synthesis-input">Exact complete synthesis input</h3>
+<p>Use the public <code>textFormat:&#39;plain&#39;</code> selection for already-authored speech or an
+exact generated preview. It belongs in <code>prepareTTS</code> options, or alongside the
+<code>input</code>/<code>text</code> field of a complete synthesis payload:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">function preparePreview(ai, preview, signal) {
+  return ai.prepareTTS({parts: [preview], textFormat: &#39;plain&#39;, signal});
+}
+
+function fetchPreview(ai, preview, signal) {
+  return ai.fetchTTS({input: preview, textFormat: &#39;plain&#39;}, signal);
+}
+</code></pre></div>
+<p>The same payload field is supported by <code>AI.prepareTTSPlayback()</code> for audio-file
+providers, <code>AIProviderRuntime.request(&#39;tts&#39;, {operation:&#39;synthesize&#39;, payload, localOnly, signal})</code>, its <code>synthesize(payload, options)</code> alias, and direct
+Kokoro <code>request()</code> calls using either <code>{text,...}</code> or <code>{model,input,...}</code>.
+The SDK consumes <code>textFormat</code> before engine/host dispatch. The original nonblank input,
+including whitespace and repeated formatting marks, remains unchanged; voice,
+speed, selected model, cancellation and audio ordering retain their existing
+owners. Only <code>&#39;plain&#39;</code> selects exact input; omission and other values retain
+the existing narration cleanup. Applications never supply the internal
+<code>speechInputPrepared</code> argument.</p>
+<p>This selection governs SDK text treatment, not the selected engine&#39;s input
+capacity or pronunciation. <a href="https://github.com/hexgrad/kokoro/blob/664c76a704021239ba59c84dcbaa4d3dece01fe9/kokoro.js/src/kokoro.js" target="_blank" rel="noreferrer">Kokoro.js 1.2.1</a>
+still tokenizes with truncation in both <code>generate()</code> and <code>stream()</code>; plain input
+does not establish complete audio for an oversized engine input. The SDK&#39;s existing complete-text forwarding
+fixture does not prove upstream synthesis completeness.</p>
 <h2 id="choose-a-device-or-reduce-memory-use">Choose a device or reduce memory use</h2>
 <p>Local Whisper and Kokoro roles accept
 <code>execution:{device,maxConcurrentRequests}</code>. Omitting <code>stt.execution</code> selects
@@ -1539,10 +1571,11 @@ same mono input. The SDK preserves the complete returned transcript.</p>
 <p>The voice belongs to the caller-selected inventory; omission uses that model&#39;s
 default voice. The provider-native result is
 <code>{audio:Float32Array,sampleRate,voice}</code>. The provider/2 shared request form accepts
-<code>{model,input,responseFormat:&#39;wav&#39;,voice?,speed?}</code> and returns
+<code>{model,input,textFormat?,responseFormat:&#39;wav&#39;,voice?,speed?}</code> and returns
 <code>{audio:Uint8Array,contentType:&#39;audio/wav&#39;}</code>. High-level <code>AI.fetchTTS()</code> wraps
 that provider result in a WAV <code>Blob</code>. Returned provider records remain ordinary
-mutable values.</p>
+mutable values. Both payload forms accept <code>textFormat:&#39;plain&#39;</code> to retain exact
+input; omission keeps the default speech-formatting cleanup.</p>
 <h2 id="lifecycle-and-cancellation">Lifecycle and cancellation</h2>
 <p>Provider states are <code>unloaded</code>, <code>loading</code>, <code>ready</code>, <code>unloading</code>, <code>error</code>, and
 <code>disposed</code>. <code>status()</code> includes role, provider/model ids, state, lifecycle
@@ -1650,6 +1683,6 @@ this entrypoint.</li>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#choose-a-speech-provider">Choose a speech provider</a><a href="#native-browser-speech-recognition">Native browser speech recognition</a><a href="#native-browser-text-to-speech-and-voice-previews">Native browser text-to-speech and voice previews</a><a href="#twin-cloud-text-to-speech">TWiN Cloud text-to-speech</a><a href="#quick-start-say-one-sentence">Quick start: say one sentence</a><a href="#browser-npu-and-gpu-setup">Browser NPU and GPU setup</a><a href="#developer-diagnostics">Developer diagnostics</a><a href="#local-synthesis-capacity-and-exact-order-playback">Local synthesis capacity and exact-order playback</a><a href="#play-a-complete-array-with-speechplayback">Play a complete array with SpeechPlayback</a><a href="#queue-complete-passages-and-wait-for-playback">Queue complete passages and wait for playback</a><a href="#prepare-narration-once-and-replay-stored-audio">Prepare narration once and replay stored audio</a><a href="#stream-chunks-as-they-arrive">Stream chunks as they arrive</a><a href="#automatic-speech-input-formatting-cleanup">Automatic speech-input formatting cleanup</a><a href="#choose-a-device-or-reduce-memory-use">Choose a device or reduce memory use</a><a href="#inspect-the-requested-and-selected-device">Inspect the requested and selected device</a><a href="#stop-mute-cancel-and-release">Stop, mute, cancel, and release</a><a href="#advanced-provider-and-artifact-reference">Advanced provider and artifact reference</a><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-identifiers">Protocol identifiers</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#removebrowserspeechmodelcache">removeBrowserSpeechModelCache()</a><a href="#ordinary-module-routing">Ordinary module routing</a><a href="#onnx-runtime-configuration">ONNX runtime configuration</a><a href="#providers">Providers</a><a href="#lifecycle-and-cancellation">Lifecycle and cancellation</a><a href="#errors">Errors</a><a href="#ownership">Ownership</a><a href="#related">Related</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.68.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.69.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>
