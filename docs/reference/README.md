@@ -62,7 +62,7 @@ alone does not make bare module names resolve in a browser.
 | Compose native Core dispatch, service lifecycle, and stdio hosting | [Native Core runtime](core-runtime.md) |
 | Reuse dependency-ready native services without a renderer | [Core service composition](core-runtime.md#native-service-composition) and [existing ONNX owner](local-ai.md#native-service-owners) |
 | Compose application Core services during source development, independently of local AI | [Development Core services](core-development.md) |
-| Share one application service runtime between its native UI and MCP process | [Shared Core host](core-shared-host.md) |
+| Share one application service runtime between its ordinary native launch and MCP process | [Shared Core host](core-shared-host.md) and [native launch defaults](core-native-packaging.md#launch-time-locations) |
 | Store complete browser model resources, including the selected decision-runtime entry, through one DBOPFS owner | [Model resources](ai/browser-decisions.md#shared-dbopfs-model-resources) and [speech routing](ai/browser-speech.md#ordinary-module-routing) |
 | Observe committed storage changes across live application documents | [DBOPFS change subscriptions](runtime-modules.md#dbopfsjs) |
 | Cancel cold speech preparation while preserving other activation interests | [Prepared narration](ai/browser-speech.md#prepare-narration-once-and-replay-stored-audio) |
@@ -86,7 +86,7 @@ alone does not make bare module names resolve in a browser.
 | Write, commit and push complete selected repository text | [Selected-text repository writing](core-repositories.md#write-commit-and-push-selected-text) |
 | Observe existing checkout configuration and capture an explicit remote/ref | [Repository configuration and selected targets](core-repositories.md#existing-checkout-configuration-and-selected-targets) |
 | Build an installed-SDK portable Core payload | [Portable Core packaging](core-native-packaging.md) |
-| Pass host-selected state defaults and unchanged explicit launch values to services | [Launch-time locations](core-native-packaging.md#launch-time-locations) |
+| Resolve matching native state/workspace/endpoint defaults and preserve explicit launch values | [Launch-time locations](core-native-packaging.md#launch-time-locations) and [resolveNativeLaunchContext()](sdk-api.md#resolvenativelaunchcontext) |
 | Build a Windows executable without an OS checkout | [Windows executable packaging](core-native-packaging.md#windows-executable) |
 | Compose a Mac application with an architecture-matched host | [macOS application composition](core-native-packaging.md#macos-application-composition) |
 | Subscribe to native events | [Arcane event reference](core/arcane-events.md) |

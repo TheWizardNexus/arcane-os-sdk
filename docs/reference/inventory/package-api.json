@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.71.2",
+  "sdkVersion": "0.72.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 298,
+  "memberCount": 299,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
@@ -4545,18 +4545,32 @@
       "normalization": "Binding identity is exactly equal to the named createPreferencesService export"
     },
     {
+      "id": "core-host:resolveNativeLaunchContext",
+      "name": "resolveNativeLaunchContext",
+      "displayName": "resolveNativeLaunchContext()",
+      "kind": "function",
+      "signature": "resolveNativeLaunchContext({appId,context={}}={})",
+      "entrypoints": ["arcane-os/core/host"],
+      "primaryImport": "arcane-os/core/host",
+      "group": "Native Core host composition",
+      "summary": "Resolves matching per-app native state, workspace and optional shared endpoint defaults for packaged UI and external MCP.",
+      "availability": "Node native locations on Windows/Linux/macOS; Android and other hosts supply stateRoot and native adaptation",
+      "protocol": "Pure native launch-context resolution and existing local IPC",
+      "normalization": "Returns a new complete context with only omitted stateRoot/workspaceRoot and selected sharedHost endpoint/log fields filled; preserves explicit values and additional payloads. Native launchContext presence opts generated entry into resolution; omitted sharedHost retains stdio. No I/O, saved-state discovery, process startup, migration or ArcaneData/Repos change. Malformed selected appId/stateRoot/sharedHost inputs report TypeError; platform IPC errors remain operation-owned."
+    },
+    {
       "id": "core-host:readCoreLaunchContext",
       "name": "readCoreLaunchContext",
       "displayName": "readCoreLaunchContext()",
       "kind": "function",
-      "signature": "async readCoreLaunchContext({argv=process.argv.slice(2)}={})",
+      "signature": "async readCoreLaunchContext({argv=process.argv.slice(2),defaults={},appId}={})",
       "entrypoints": ["arcane-os/core/host"],
       "primaryImport": "arcane-os/core/host",
       "group": "Native Core host composition",
-      "summary": "Reads explicit launch JSON with the separately supplied native host stateRoot default for service launch context.",
+      "summary": "Combines packaged defaults, actual native host stateRoot and complete explicit launch JSON, with optional native location resolution.",
       "availability": "Node, including the selected external-entry SEA launcher",
       "protocol": "Explicit launch arguments and JSON configuration",
-      "normalization": "Optional --arcane-host-state-root <directory> supplies the stateRoot default; every explicit --arcane-launch-config JSON field takes precedence unchanged, including relative or null stateRoot and application-owned preferencesFile. Returns an empty record with neither argument; surfaces missing argument values, file and JSON failures; performs no directory selection, path resolution, configuration search, rewrite, migration or environment mutation"
+      "normalization": "Precedence is defaults, then --arcane-host-state-root, then complete top-level --arcane-launch-config JSON fields; nested values replace without deep merging or payload rewriting. Explicit appId invokes resolveNativeLaunchContext; ordinary calls retain relative/null/custom state values and return an empty record with no inputs. Missing arguments, file/JSON errors and malformed records reject. No configuration search, file rewrite, migration or environment mutation; generated native.launchContext explicitly selects the resolver."
     },
     {
       "id": "core-host:startCoreHost",

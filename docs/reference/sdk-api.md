@@ -57,7 +57,7 @@ runtime layouts.
 | `arcane-os/core/runtime` | App-neutral native Core dispatcher and service lifecycle. |
 | `arcane-os/core/development` | App-service composition and document-owned Core transport during source development, independently of local AI. |
 | `arcane-os/core/stdio` | Framed Node stdio transport with graceful runtime drain. |
-| `arcane-os/core/host` | Node-only reusable Core host lifecycle with explicitly supplied services. |
+| `arcane-os/core/host` | Node-only reusable Core host lifecycle, app-selected native launch defaults and shared native location resolution. |
 | `arcane-os/codex/app-server` | Explicit native Codex App Server session, complete live turns, server requests and recovery. |
 | `arcane-os/mcp/stdio` | Node MCP STDIO server for app-owned tools and static resources. |
 | `arcane-os/core/repositories` | Native persistent ArcaneData paths, connected working repositories and scoped non-secret Git identity configuration. |
@@ -429,7 +429,8 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `connectSharedCoreHost()` | function | `arcane-os/core/host` | Shared Core host | Node local IPC and optional explicit headless startup |
 | `runSharedCoreHost()` | function | `arcane-os/core/host` | Shared Core host | Node headless entry and optional parent startup IPC |
 | `startSharedCoreBridge()` | function | `arcane-os/core/host` | Shared Core host | Node readable/writable streams and local IPC |
-| `readCoreLaunchContext()` | function | `arcane-os/core/host` | Native Core host composition | Node; reads explicitly selected launch JSON |
+| `readCoreLaunchContext()` | function | `arcane-os/core/host` | Native Core host composition | Node; combines packaged defaults, host state and explicitly selected launch JSON |
+| `resolveNativeLaunchContext()` | function | `arcane-os/core/host` | Native Core host composition | Node native paths; Android supplies its adapted state root |
 | `resolveArcaneDataPaths()` | function | `arcane-os/core/repositories` | Native repository workspaces | Node on Windows, Linux and macOS; Android supplies its data root |
 | `createRepositoryWorkspace()` | function | `arcane-os/core/repositories` | Native repository workspaces | Node with Git; Android requires host process adaptation |
 | `readGitIdentity()` | function | `arcane-os/core/repositories` | Native repository workspaces | Node with Git; Android requires host process adaptation |
@@ -7958,29 +7959,90 @@ The default binding from `arcane-os/core/diarization` is exactly the named
 import createDiarizationService from 'arcane-os/core/diarization';
 ```
 
-## readCoreLaunchContext()
+## resolveNativeLaunchContext()
 
 ### Overview
 
-Reads the complete JSON object explicitly selected by
-`--arcane-launch-config <path>`, with an optional separately supplied native host
-state-directory default. It does not search for application configuration.
+Resolves one application's native state, workspace and optional shared endpoint
+through the same public owner used by its packaged executable and external MCP.
+This synchronous function performs no I/O, saved-state discovery, process start
+or migration.
 
 ### Signature and result
 
 ```text
-async readCoreLaunchContext({argv=process.argv.slice(2)}={})
+resolveNativeLaunchContext({appId,context={}}={})
 ```
 
-Import it from `arcane-os/core/host`. `--arcane-host-state-root <directory>`
-supplies a `stateRoot` default; every field from the explicit launch JSON object
-then takes precedence unchanged, including a relative, null or other explicitly
-present `stateRoot`. With neither argument, the promise resolves to `{}`.
-A missing argument value, unreadable launch file, malformed JSON or non-object
-value rejects. Relative launch-file paths use the process working directory.
-The reader does not choose, resolve or validate the state directory, rewrite
-content, discover or migrate stored data, or mutate the environment. An
-application-selected `preferencesFile` remains a separate unchanged field.
+Import from `arcane-os/core/host`. The result is a new complete context with
+omitted fields filled. Windows defaults to `%LOCALAPPDATA%/Arcane/<appId>`
+(home `AppData/Local` fallback), macOS to
+`~/Library/Application Support/Arcane/<appId>`, and portable Linux Node to
+absolute `$XDG_DATA_HOME/Arcane/<appId>` or `~/.local/share/Arcane/<appId>`.
+Android and other adapted hosts provide their actual `stateRoot` and own native
+IPC/process adaptation.
+
+An omitted `workspaceRoot` becomes `<absolute selected stateRoot>/Workspace`.
+Only a selected `sharedHost` object receives a default endpoint and log file:
+Windows uses a named pipe containing the URL-encoded complete absolute state
+path; Linux/macOS use `<absolute selected stateRoot>/core.sock`. The log is
+`<absolute selected stateRoot>/Core.log`. Explicit fields, additional payloads
+and explicit workspace values remain unchanged. Relative explicit paths retain
+the caller's working-directory meaning. `appId` and the selected state path
+must be nonempty strings; a selected `sharedHost` must be an object. Malformed
+inputs report `TypeError`; native endpoint failures belong to the IPC operation.
+
+```javascript
+import {resolveNativeLaunchContext} from 'arcane-os/core/host';
+
+const context = resolveNativeLaunchContext({
+    appId: 'moon-cheese-post',
+    context: {sharedHost: {}}
+});
+// Use context.sharedHost.endpoint for the native UI and external MCP.
+// An explicit context.workspaceRoot or context.stateRoot remains selected.
+```
+
+In a complete app descriptor, `native.launchContext:{sharedHost:{}}` selects
+these defaults for ordinary packaged executable launch. Omitting `sharedHost`
+keeps stdio-owned lifetime; omitting `native.launchContext` preserves the prior
+generated-entry path. The selected shared entry creates its state directory
+for socket/log use; application services own workspace I/O. MCP-first startup
+prepares that returned state directory before the existing `start` option opens
+its log. No caller needs to reconstruct platform paths. The separate
+`resolveArcaneDataPaths()` repository-location contract remains unchanged.
+See [launch-time locations](core-native-packaging.md#launch-time-locations) and
+[shared native/MCP hosting](core-shared-host.md#native-launch-and-platforms).
+
+## readCoreLaunchContext()
+
+### Overview
+
+Combines complete packaged defaults, a separately supplied native host state
+directory and the complete JSON object selected by `--arcane-launch-config`.
+An explicit `appId` selects the native resolver; ordinary calls remain a
+configuration reader without automatic location selection.
+
+### Signature and result
+
+```text
+async readCoreLaunchContext({argv=process.argv.slice(2),defaults={},appId}={})
+```
+
+Import from `arcane-os/core/host`. Precedence is `defaults`, then
+`--arcane-host-state-root <directory>`, then every complete top-level field from
+the explicit launch JSON object. Nested fields replace rather than deep-merge.
+The original file and its payload remain unchanged. Supplying `appId` applies
+`resolveNativeLaunchContext` to that merged record; its defaults and input
+contract then apply. Without `appId`, relative, null and other explicit state
+values retain the prior reader semantics. With no arguments or defaults, the
+ordinary call still resolves to `{}`.
+
+Missing argument values, unreadable files, malformed JSON, non-object defaults
+or launch records reject. Relative launch-file paths use the working directory.
+The reader searches no other configuration, rewrites no content, migrates no
+data and changes no environment. Application-owned fields such as
+`preferencesFile` retain their complete values.
 
 ```javascript
 import {readCoreLaunchContext} from 'arcane-os/core/host';
@@ -7989,12 +8051,13 @@ const launchContext = await readCoreLaunchContext();
 ```
 
 The generated entry supplies artifact-derived `appRoot`, then applies the whole
-explicit context and passes the same object as every service factory's second
-argument. Authored service options remain the first argument. Workspace/state
-locations and additional fields belong to the launcher/application. Windows and
-Mac launchers forward their actual host-selected state directory through the
-separate argument; other composing hosts may use the same seam. This JavaScript
-contract does not establish a compiled host or matching release archive. See
+context and passes the same object as every service factory's second argument.
+Authored service options remain the first argument. It supplies the descriptor's
+`native.launchContext` as `defaults` and the app ID only when that optional
+field is present. Matching Windows and macOS launchers apply the same packaged
+defaults before explicit launch JSON and forward their actual state directory;
+other composing hosts can use the same public seam. Compiled host availability
+and native execution are separate from this JavaScript contract. See
 [launch-time locations](core-native-packaging.md#launch-time-locations).
 
 ## resolveArcaneDataPaths()

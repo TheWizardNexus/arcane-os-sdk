@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.71.2",
+  "sdkVersion": "0.72.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 297,
+  "memberCount": 298,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
@@ -18,7 +18,9 @@
       "displayName": "createNativeDecisionModel()",
       "kind": "function",
       "signature": "createNativeDecisionModel({onnx,modelAssets,workingDirectory,paths,model='onnx-community/laya-typed-decisions-ONNX',revision='main',dtype='fp32',sessionOptions,executionPreference='gpu',signal}={})",
-      "entrypoints": ["arcane-os/local-ai/decisions"],
+      "entrypoints": [
+        "arcane-os/local-ai/decisions"
+      ],
       "primaryImport": "arcane-os/local-ai/decisions",
       "group": "Native typed decisions",
       "summary": "Explicit native Laya FP32 option scoring through an existing ONNX owner and a tokenizer Worker.",
@@ -32,7 +34,9 @@
       "displayName": "createNativeDecisionService()",
       "kind": "function",
       "signature": "createNativeDecisionService(configuration={}, {appRoot=process.cwd()}={})",
-      "entrypoints": ["arcane-os/core/decisions"],
+      "entrypoints": [
+        "arcane-os/core/decisions"
+      ],
       "primaryImport": "arcane-os/core/decisions",
       "group": "Native typed decisions",
       "summary": "Renderer-independent native Laya service reusing the registered local-AI and model-assets owners.",
@@ -46,7 +50,9 @@
       "displayName": "createNativeDecisionService default export",
       "kind": "function",
       "signature": "default as createNativeDecisionService",
-      "entrypoints": ["arcane-os/core/decisions"],
+      "entrypoints": [
+        "arcane-os/core/decisions"
+      ],
       "primaryImport": "arcane-os/core/decisions",
       "group": "Native typed decisions",
       "summary": "Default binding for the same native decision Core service factory.",
@@ -60,7 +66,9 @@
       "displayName": "createWhisperRuntime()",
       "kind": "function",
       "signature": "createWhisperRuntime({runtime,prepare,modelId,temporaryDirectory,onEvent}={})",
-      "entrypoints": ["arcane-os/local-ai/whisper"],
+      "entrypoints": [
+        "arcane-os/local-ai/whisper"
+      ],
       "primaryImport": "arcane-os/local-ai/whisper",
       "group": "Core native speech",
       "summary": "Retains a selected native Whisper helper/model across complete recordings with actual correlated recovery and joined cancellation.",
@@ -74,7 +82,9 @@
       "displayName": "createWhisperRuntime default export",
       "kind": "function",
       "signature": "default as createWhisperRuntime",
-      "entrypoints": ["arcane-os/local-ai/whisper"],
+      "entrypoints": [
+        "arcane-os/local-ai/whisper"
+      ],
       "primaryImport": "arcane-os/local-ai/whisper",
       "group": "Core native speech",
       "summary": "Default binding for the same retained native Whisper engine factory.",
@@ -88,7 +98,9 @@
       "displayName": "buildWhisperHelper()",
       "kind": "function",
       "signature": "async buildWhisperHelper({runtime,outputRoot,cmake='cmake',generator,cmakeArgs=[],env,signal,onEvent}={})",
-      "entrypoints": ["arcane-os/local-ai/whisper/build"],
+      "entrypoints": [
+        "arcane-os/local-ai/whisper/build"
+      ],
       "primaryImport": "arcane-os/local-ai/whisper/build",
       "group": "Core native speech",
       "summary": "Builds and installs the first-party persistent helper against matching prepared Whisper headers and runtime libraries.",
@@ -102,7 +114,9 @@
       "displayName": "buildWhisperOpenVinoRuntime()",
       "kind": "function",
       "signature": "async buildWhisperOpenVinoRuntime({sourceDirectory,openvinoDirectory,cudaDirectory,outputRoot,cmake='cmake',generator,cmakeArgs=[],env,signal,onEvent}={})",
-      "entrypoints": ["arcane-os/local-ai/whisper/openvino-build"],
+      "entrypoints": [
+        "arcane-os/local-ai/whisper/openvino-build"
+      ],
       "primaryImport": "arcane-os/local-ai/whisper/openvino-build",
       "group": "Core native speech",
       "summary": "Produces the optional Intel NPU encoder runtime from installed matching Whisper/OpenVINO sources and an existing Windows x64 toolchain.",
@@ -116,7 +130,9 @@
       "displayName": "createCodexAppServerSession()",
       "kind": "function",
       "signature": "createCodexAppServerSession({executable,args,cwd,env,clientInfo,capabilities}={})",
-      "entrypoints": ["arcane-os/codex/app-server"],
+      "entrypoints": [
+        "arcane-os/codex/app-server"
+      ],
       "primaryImport": "arcane-os/codex/app-server",
       "group": "Native Codex sessions",
       "summary": "Creates an explicit native Codex App Server JSONL session without starting its process until connect.",
@@ -130,7 +146,9 @@
       "displayName": "openCodexAppServerSession()",
       "kind": "function",
       "signature": "async openCodexAppServerSession(options)",
-      "entrypoints": ["arcane-os/codex/app-server"],
+      "entrypoints": [
+        "arcane-os/codex/app-server"
+      ],
       "primaryImport": "arcane-os/codex/app-server",
       "group": "Native Codex sessions",
       "summary": "Creates and connects the same explicit native session, disposing it before rejecting failed initialization.",
@@ -144,7 +162,9 @@
       "displayName": "createMcpStdioServer()",
       "kind": "function",
       "signature": "createMcpStdioServer({serverInfo,instructions,tools=[],resources=[],onDiagnostic}={})",
-      "entrypoints": ["arcane-os/mcp/stdio"],
+      "entrypoints": [
+        "arcane-os/mcp/stdio"
+      ],
       "primaryImport": "arcane-os/mcp/stdio",
       "group": "MCP STDIO",
       "summary": "Owns one MCP STDIO session for caller-authored tools and static resources.",
@@ -158,7 +178,9 @@
       "displayName": "MCP_PROTOCOL_VERSION",
       "kind": "constant",
       "signature": "MCP_PROTOCOL_VERSION",
-      "entrypoints": ["arcane-os/mcp/stdio"],
+      "entrypoints": [
+        "arcane-os/mcp/stdio"
+      ],
       "primaryImport": "arcane-os/mcp/stdio",
       "group": "MCP STDIO",
       "summary": "The explicit supported MCP initialization profile, 2025-11-25.",
@@ -172,7 +194,9 @@
       "displayName": "McpProtocolError",
       "kind": "class",
       "signature": "new McpProtocolError(code,message,data)",
-      "entrypoints": ["arcane-os/mcp/stdio"],
+      "entrypoints": [
+        "arcane-os/mcp/stdio"
+      ],
       "primaryImport": "arcane-os/mcp/stdio",
       "group": "MCP STDIO",
       "summary": "Represents an explicit JSON-RPC failure with complete message and optional data.",
@@ -186,7 +210,9 @@
       "displayName": "resolveArcaneDataPaths()",
       "kind": "function",
       "signature": "resolveArcaneDataPaths({dataRoot}={})",
-      "entrypoints": ["arcane-os/core/repositories"],
+      "entrypoints": [
+        "arcane-os/core/repositories"
+      ],
       "primaryImport": "arcane-os/core/repositories",
       "group": "Native repository workspaces",
       "summary": "Resolves persistent per-user ArcaneData and Repos locations without I/O or migration.",
@@ -200,7 +226,9 @@
       "displayName": "createRepositoryWorkspace()",
       "kind": "function",
       "signature": "createRepositoryWorkspace({name,directory,dataRoot,remote,branch,gitIdentity,onEvent,run=runProcess}={})",
-      "entrypoints": ["arcane-os/core/repositories"],
+      "entrypoints": [
+        "arcane-os/core/repositories"
+      ],
       "primaryImport": "arcane-os/core/repositories",
       "group": "Native repository workspaces",
       "summary": "Owns one selected native working checkout with ArcaneData/Repos defaults and existing Git/process lifecycle.",
@@ -214,7 +242,9 @@
       "displayName": "readGitIdentity()",
       "kind": "function",
       "signature": "readGitIdentity({directory,signal,onEvent,run=runProcess}={})",
-      "entrypoints": ["arcane-os/core/repositories"],
+      "entrypoints": [
+        "arcane-os/core/repositories"
+      ],
       "primaryImport": "arcane-os/core/repositories",
       "group": "Native repository workspaces",
       "summary": "Reads separate global, repository-local and effective non-secret Git identity configuration.",
@@ -228,7 +258,9 @@
       "displayName": "createSpeechService()",
       "kind": "function",
       "signature": "createSpeechService({stt,tts,signal}={})",
-      "entrypoints": ["arcane-os/core/speech"],
+      "entrypoints": [
+        "arcane-os/core/speech"
+      ],
       "primaryImport": "arcane-os/core/speech",
       "group": "Core native speech",
       "summary": "Composes host-supplied transcription and synthesis engines with independent loading and role readiness.",
@@ -242,7 +274,9 @@
       "displayName": "createSpeechService default export",
       "kind": "function",
       "signature": "default as createSpeechService",
-      "entrypoints": ["arcane-os/core/speech"],
+      "entrypoints": [
+        "arcane-os/core/speech"
+      ],
       "primaryImport": "arcane-os/core/speech",
       "group": "Core native speech",
       "summary": "Default binding for the same injected-engine native speech service factory.",
@@ -256,7 +290,9 @@
       "displayName": "createImageRuntime()",
       "kind": "function",
       "signature": "createImageRuntime({libraryPath,bindingModulePath,variants=[],models=[],backend='auto',signal,onEvent}={})",
-      "entrypoints": ["arcane-os/local-ai/image"],
+      "entrypoints": [
+        "arcane-os/local-ai/image"
+      ],
       "primaryImport": "arcane-os/local-ai/image",
       "group": "Core local images",
       "summary": "Retains selected stable-diffusion.cpp generation and PNG img2img execution in a shared native worker and returns complete PNG results.",
@@ -270,7 +306,9 @@
       "displayName": "createCoreImageRuntime()",
       "kind": "function",
       "signature": "createCoreImageRuntime({client,signal,onEvent}={})",
-      "entrypoints": ["arcane-os/ai/core-image"],
+      "entrypoints": [
+        "arcane-os/ai/core-image"
+      ],
       "primaryImport": "arcane-os/ai/core-image",
       "group": "Core local images",
       "summary": "Uses an available Core image service for generation and original-PNG editing with synchronous Thinking acknowledgement, lifecycle replay and complete PNG Blobs.",
@@ -284,7 +322,9 @@
       "displayName": "createLocalImageService()",
       "kind": "function",
       "signature": "createLocalImageService(configuration,{appRoot,runtimes=[],signal,onEvent,prepare,modelAssets}={})",
-      "entrypoints": ["arcane-os/core/image"],
+      "entrypoints": [
+        "arcane-os/core/image"
+      ],
       "primaryImport": "arcane-os/core/image",
       "group": "Core local images",
       "summary": "Composes independent image-runtime preparation, retained native model use and complete PNG transport as a Core service.",
@@ -298,7 +338,9 @@
       "displayName": "createLocalImageService default export",
       "kind": "function",
       "signature": "default as createLocalImageService",
-      "entrypoints": ["arcane-os/core/image"],
+      "entrypoints": [
+        "arcane-os/core/image"
+      ],
       "primaryImport": "arcane-os/core/image",
       "group": "Core local images",
       "summary": "Default binding for the same native image service factory.",
@@ -312,7 +354,9 @@
       "displayName": "prepareCoreModelAssets()",
       "kind": "function",
       "signature": "async prepareCoreModelAssets({client=getInstalledCoreClient(),workingDirectory,members,signal,onProgress}={})",
-      "entrypoints": ["arcane-os/ai/core-model-assets"],
+      "entrypoints": [
+        "arcane-os/ai/core-model-assets"
+      ],
       "primaryImport": "arcane-os/ai/core-model-assets",
       "group": "Core model assets",
       "summary": "Projects complete caller-owned Blob/File members through Core into native working files without changing their durable store.",
@@ -326,7 +370,9 @@
       "displayName": "createModelAssetService()",
       "kind": "function",
       "signature": "createModelAssetService({appRoot=process.cwd()}={})",
-      "entrypoints": ["arcane-os/core/model-assets"],
+      "entrypoints": [
+        "arcane-os/core/model-assets"
+      ],
       "primaryImport": "arcane-os/core/model-assets",
       "group": "Core model assets",
       "summary": "Owns selected native working-file projections and engine retain handles while original stored model files remain unchanged.",
@@ -340,7 +386,9 @@
       "displayName": "createModelAssetService default export",
       "kind": "function",
       "signature": "default as createModelAssetService",
-      "entrypoints": ["arcane-os/core/model-assets"],
+      "entrypoints": [
+        "arcane-os/core/model-assets"
+      ],
       "primaryImport": "arcane-os/core/model-assets",
       "group": "Core model assets",
       "summary": "Default binding for the same native working-file service factory.",
@@ -354,7 +402,9 @@
       "displayName": "createONNXRuntime()",
       "kind": "function",
       "signature": "createONNXRuntime({modulePath,signal,onEvent}={})",
-      "entrypoints": ["arcane-os/local-ai/onnx"],
+      "entrypoints": [
+        "arcane-os/local-ai/onnx"
+      ],
       "primaryImport": "arcane-os/local-ai/onnx",
       "group": "Core local AI",
       "summary": "Owns explicitly loaded ONNX graphs and complete named tensor inference in retained native workers.",
@@ -368,7 +418,9 @@
       "displayName": "createCoreONNXRuntime()",
       "kind": "function",
       "signature": "createCoreONNXRuntime({client}={})",
-      "entrypoints": ["arcane-os/ai/core-onnx"],
+      "entrypoints": [
+        "arcane-os/ai/core-onnx"
+      ],
       "primaryImport": "arcane-os/ai/core-onnx",
       "group": "Core local AI",
       "summary": "Accesses local system ONNX through an existing Core client with complete tensor transport.",
@@ -382,7 +434,9 @@
       "displayName": "createGitTextSnapshot()",
       "kind": "function",
       "signature": "createGitTextSnapshot({cacheDirectory,remote,ref,selectPath,gitIdentity,onEvent,run=runProcess}={})",
-      "entrypoints": ["arcane-os"],
+      "entrypoints": [
+        "arcane-os"
+      ],
       "primaryImport": "arcane-os",
       "group": "Workspace, doctor, repository, and server",
       "summary": "Reads complete selected text from one fetched revision using a dedicated bare Git object cache and batched retrieval.",
@@ -396,7 +450,9 @@
       "displayName": "createDiarization()",
       "kind": "function",
       "signature": "createDiarization({executable,modelPath,runtime,onEvent}={})",
-      "entrypoints": ["arcane-os/diarization"],
+      "entrypoints": [
+        "arcane-os/diarization"
+      ],
       "primaryImport": "arcane-os/diarization",
       "group": "Native speaker diarization",
       "summary": "Retains one selected Nemotron 3 model helper and independently owned caller-fed audio streams.",
@@ -410,7 +466,9 @@
       "displayName": "buildDiarizationHelper()",
       "kind": "function",
       "signature": "async buildDiarizationHelper({runtime,outputRoot,signal,onEvent}={})",
-      "entrypoints": ["arcane-os/diarization/build"],
+      "entrypoints": [
+        "arcane-os/diarization/build"
+      ],
       "primaryImport": "arcane-os/diarization/build",
       "group": "Native speaker diarization",
       "summary": "Builds the first-party helper against the explicitly installed NeMoSpeech Diarization component.",
@@ -424,7 +482,9 @@
       "displayName": "createDiarizationService()",
       "kind": "function",
       "signature": "createDiarizationService(options={},launch={})",
-      "entrypoints": ["arcane-os/core/diarization"],
+      "entrypoints": [
+        "arcane-os/core/diarization"
+      ],
       "primaryImport": "arcane-os/core/diarization",
       "group": "Native speaker diarization",
       "summary": "Composes lazy native diarization as an application-selected Core service.",
@@ -438,7 +498,9 @@
       "displayName": "createDiarizationService default export",
       "kind": "function",
       "signature": "default as createDiarizationService",
-      "entrypoints": ["arcane-os/core/diarization"],
+      "entrypoints": [
+        "arcane-os/core/diarization"
+      ],
       "primaryImport": "arcane-os/core/diarization",
       "group": "Native speaker diarization",
       "summary": "Default binding for the same native Core diarization service factory.",
@@ -452,7 +514,9 @@
       "displayName": "createCoreLocalAIProvider()",
       "kind": "function",
       "signature": "createCoreLocalAIProvider({client,id='llama.cpp'}={})",
-      "entrypoints": ["arcane-os/ai/core-local"],
+      "entrypoints": [
+        "arcane-os/ai/core-local"
+      ],
       "primaryImport": "arcane-os/ai/core-local",
       "group": "Core local AI",
       "summary": "Browser llama.cpp provider through an explicitly connected Core, with application-owned model selection and complete response streaming.",
@@ -466,7 +530,9 @@
       "displayName": "createLocalAIService()",
       "kind": "function",
       "signature": "createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent,prepare}={})",
-      "entrypoints": ["arcane-os/core/local-ai"],
+      "entrypoints": [
+        "arcane-os/core/local-ai"
+      ],
       "primaryImport": "arcane-os/core/local-ai",
       "group": "Core local AI",
       "summary": "Composes selected native llama.cpp, Ollama and ONNX engines as a Core service with retained process/worker ownership and model lifecycle.",
@@ -480,7 +546,9 @@
       "displayName": "createLocalAIService default export",
       "kind": "function",
       "signature": "default as createLocalAIService",
-      "entrypoints": ["arcane-os/core/local-ai"],
+      "entrypoints": [
+        "arcane-os/core/local-ai"
+      ],
       "primaryImport": "arcane-os/core/local-ai",
       "group": "Core local AI",
       "summary": "Default binding for the same native Core local AI service factory.",
@@ -494,7 +562,9 @@
       "displayName": "ensureLocalAIRuntimes()",
       "kind": "function",
       "signature": "async ensureLocalAIRuntimes({runtimes=[],directory,platform=process.platform,architecture=process.arch,signal,onEvent}={})",
-      "entrypoints": ["arcane-os/local-ai"],
+      "entrypoints": [
+        "arcane-os/local-ai"
+      ],
       "primaryImport": "arcane-os/local-ai",
       "group": "Core local AI",
       "summary": "Reuses selected managed native runtimes or installs complete official llama.cpp/Ollama/image distributions, ONNX npm runtime trees or NeMo libraries.",
@@ -508,7 +578,9 @@
       "displayName": "bundleLocalAIRuntimes()",
       "kind": "function",
       "signature": "async bundleLocalAIRuntimes({runtimes=[],directory,outputRoot,platform=process.platform,architecture=process.arch,signal,onEvent}={})",
-      "entrypoints": ["arcane-os/local-ai"],
+      "entrypoints": [
+        "arcane-os/local-ai"
+      ],
       "primaryImport": "arcane-os/local-ai",
       "group": "Core local AI",
       "summary": "Copies selected complete runtime distributions into a fresh native artifact staging root.",
@@ -522,7 +594,10 @@
       "displayName": "WS",
       "kind": "class",
       "signature": "new WS(uri,protocols?)",
-      "entrypoints": ["arcane-os", "arcane-os/websocket-client"],
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/websocket-client"
+      ],
       "primaryImport": "arcane-os/websocket-client",
       "group": "Shared WebSocket clients",
       "summary": "Published ws-share constructor with shared native sockets, one lifecycle observer and current connection snapshots.",
@@ -536,7 +611,9 @@
       "displayName": "createBrowserDecisionModel()",
       "kind": "function",
       "signature": "createBrowserDecisionModel({family,model,revision,device,dtype,runtime,store}={})",
-      "entrypoints": ["arcane-os/ai/browser-decisions"],
+      "entrypoints": [
+        "arcane-os/ai/browser-decisions"
+      ],
       "primaryImport": "arcane-os/ai/browser-decisions",
       "group": "Browser typed decisions",
       "summary": "Explicit-load Laya and Julia-1 decisions with caller-selected precision, complete inputs and graph results.",
@@ -550,7 +627,10 @@
       "displayName": "acceptWebSocket()",
       "kind": "function",
       "signature": "acceptWebSocket({request,socket,head,protocol,signal})",
-      "entrypoints": ["arcane-os", "arcane-os/websocket"],
+      "entrypoints": [
+        "arcane-os",
+        "arcane-os/websocket"
+      ],
       "primaryImport": "arcane-os/websocket",
       "group": "WebSocket protocol",
       "summary": "Accept one caller-selected HTTP/1.1 Upgrade and exchange complete native WebSocket messages.",
@@ -1885,7 +1965,9 @@
       "displayName": "PreferenceStore default export",
       "kind": "class",
       "signature": "default class PreferenceStore extends EventTarget",
-      "entrypoints": ["arcane-os/preference-store"],
+      "entrypoints": [
+        "arcane-os/preference-store"
+      ],
       "primaryImport": "arcane-os/preference-store",
       "group": "Portable runtime modules",
       "summary": "Default binding for the canonical PreferenceStore runtime class in Node and managed browsers.",
@@ -1899,7 +1981,9 @@
       "displayName": "PREFERENCE_STORE_ERROR_CODES",
       "kind": "constant",
       "signature": "const PREFERENCE_STORE_ERROR_CODES",
-      "entrypoints": ["arcane-os/preference-store"],
+      "entrypoints": [
+        "arcane-os/preference-store"
+      ],
       "primaryImport": "arcane-os/preference-store",
       "group": "Portable runtime modules",
       "summary": "Frozen stable error-code vocabulary emitted by PreferenceStore.",
@@ -1913,7 +1997,9 @@
       "displayName": "PREFERENCE_STORE_EVENT_TYPES",
       "kind": "constant",
       "signature": "const PREFERENCE_STORE_EVENT_TYPES",
-      "entrypoints": ["arcane-os/preference-store"],
+      "entrypoints": [
+        "arcane-os/preference-store"
+      ],
       "primaryImport": "arcane-os/preference-store",
       "group": "Portable runtime modules",
       "summary": "Frozen semantic event names published by PreferenceStore.",
@@ -1927,7 +2013,9 @@
       "displayName": "Preference",
       "kind": "class",
       "signature": "new Preference(data={})",
-      "entrypoints": ["arcane-os/preference-store"],
+      "entrypoints": [
+        "arcane-os/preference-store"
+      ],
       "primaryImport": "arcane-os/preference-store",
       "group": "Portable runtime modules",
       "summary": "Canonical Preference entity re-exported with the store namespace.",
@@ -1941,7 +2029,9 @@
       "displayName": "preferenceSchema()",
       "kind": "function",
       "signature": "preferenceSchema(definitions=[])",
-      "entrypoints": ["arcane-os/preference-store"],
+      "entrypoints": [
+        "arcane-os/preference-store"
+      ],
       "primaryImport": "arcane-os/preference-store",
       "group": "Portable runtime modules",
       "summary": "Builds the canonical Preference strong-type schema for an admitted definition set.",
@@ -1955,7 +2045,9 @@
       "displayName": "SpeechPlayback default export",
       "kind": "class",
       "signature": "default class SpeechPlayback",
-      "entrypoints": ["arcane-os/speech-playback"],
+      "entrypoints": [
+        "arcane-os/speech-playback"
+      ],
       "primaryImport": "arcane-os/speech-playback",
       "group": "Portable runtime modules",
       "summary": "Default binding for the canonical SpeechPlayback runtime class, with capability-gated eager provider submission and exact-order playback.",
@@ -1969,7 +2061,9 @@
       "displayName": "SPEECH_PLAYBACK_STATE_EVENT",
       "kind": "constant",
       "signature": "const SPEECH_PLAYBACK_STATE_EVENT",
-      "entrypoints": ["arcane-os/speech-playback"],
+      "entrypoints": [
+        "arcane-os/speech-playback"
+      ],
       "primaryImport": "arcane-os/speech-playback",
       "group": "Portable runtime modules",
       "summary": "Canonical semantic event name for SpeechPlayback state transitions.",
@@ -1983,7 +2077,9 @@
       "displayName": "SPEECH_VOICE_ALIASES",
       "kind": "constant",
       "signature": "const SPEECH_VOICE_ALIASES",
-      "entrypoints": ["arcane-os/speech-playback"],
+      "entrypoints": [
+        "arcane-os/speech-playback"
+      ],
       "primaryImport": "arcane-os/speech-playback",
       "group": "Portable runtime modules",
       "summary": "Mutable compatibility membership set for the ten shared speech voice identifiers.",
@@ -1997,7 +2093,9 @@
       "displayName": "SPEECH_VOICE_OPTIONS",
       "kind": "constant",
       "signature": "const SPEECH_VOICE_OPTIONS",
-      "entrypoints": ["arcane-os/speech-playback"],
+      "entrypoints": [
+        "arcane-os/speech-playback"
+      ],
       "primaryImport": "arcane-os/speech-playback",
       "group": "Portable runtime modules",
       "summary": "Mutable ordered compatibility value/label records for existing speech controls.",
@@ -2011,7 +2109,9 @@
       "displayName": "SpeechPlayback",
       "kind": "class",
       "signature": "new SpeechPlayback(options={})",
-      "entrypoints": ["arcane-os/speech-playback"],
+      "entrypoints": [
+        "arcane-os/speech-playback"
+      ],
       "primaryImport": "arcane-os/speech-playback",
       "group": "Portable runtime modules",
       "summary": "Named binding for the same capability-aware, exact-order canonical class exposed as the subpath default.",
@@ -2025,7 +2125,9 @@
       "displayName": "splitSpeechText()",
       "kind": "function",
       "signature": "splitSpeechText(value='')",
-      "entrypoints": ["arcane-os/speech-playback"],
+      "entrypoints": [
+        "arcane-os/speech-playback"
+      ],
       "primaryImport": "arcane-os/speech-playback",
       "group": "Portable runtime modules",
       "summary": "Returns the caller's exact nonblank speech text as one segment.",
@@ -2039,7 +2141,9 @@
       "displayName": "MarkdownSpeech",
       "kind": "class",
       "signature": "new MarkdownSpeech()",
-      "entrypoints": ["arcane-os/speech-text"],
+      "entrypoints": [
+        "arcane-os/speech-text"
+      ],
       "primaryImport": "arcane-os/speech-text",
       "group": "Portable runtime modules",
       "summary": "Streams speech-only repeated-formatting-mark removal across input chunk boundaries.",
@@ -2053,7 +2157,9 @@
       "displayName": "stripSpeechFormatting()",
       "kind": "function",
       "signature": "stripSpeechFormatting(text='')",
-      "entrypoints": ["arcane-os/speech-text"],
+      "entrypoints": [
+        "arcane-os/speech-text"
+      ],
       "primaryImport": "arcane-os/speech-text",
       "group": "Portable runtime modules",
       "summary": "Removes repeated runs of speech formatting marks from one complete text value.",
@@ -3556,7 +3662,9 @@
       "displayName": "PWA_STATE_EVENT",
       "kind": "constant",
       "signature": "const PWA_STATE_EVENT",
-      "entrypoints": ["arcane-os/pwa"],
+      "entrypoints": [
+        "arcane-os/pwa"
+      ],
       "primaryImport": "arcane-os/pwa",
       "group": "Progressive web applications",
       "summary": "Names the shared PWA lifecycle and page-local update availability state event.",
@@ -3570,7 +3678,9 @@
       "displayName": "registerPwa()",
       "kind": "function",
       "signature": "registerPwa({workerUrl = './arcane-sw.js', scope} = {})",
-      "entrypoints": ["arcane-os/pwa"],
+      "entrypoints": [
+        "arcane-os/pwa"
+      ],
       "primaryImport": "arcane-os/pwa",
       "group": "Progressive web applications",
       "summary": "Starts PWA registration and DBOPFS-backed page-load resource checks without blocking rendering, returning an observable lifecycle owner.",
@@ -3584,7 +3694,9 @@
       "displayName": "PWA_INSTALL_STATE_EVENT",
       "kind": "constant",
       "signature": "const PWA_INSTALL_STATE_EVENT",
-      "entrypoints": ["arcane-os/pwa"],
+      "entrypoints": [
+        "arcane-os/pwa"
+      ],
       "primaryImport": "arcane-os/pwa",
       "group": "Progressive web applications",
       "summary": "Names the shared native installation availability, choice and update-prompt state event.",
@@ -3598,7 +3710,9 @@
       "displayName": "getPwaInstall()",
       "kind": "function",
       "signature": "getPwaInstall()",
-      "entrypoints": ["arcane-os/pwa"],
+      "entrypoints": [
+        "arcane-os/pwa"
+      ],
       "primaryImport": "arcane-os/pwa",
       "group": "Progressive web applications",
       "summary": "Returns one shared page owner for native installation, prompt choices, independent update availability and explicit page reload.",
@@ -3612,7 +3726,9 @@
       "displayName": "mountPwaInstallPrompt()",
       "kind": "function",
       "signature": "mountPwaInstallPrompt({appName = ''} = {})",
-      "entrypoints": ["arcane-os/pwa"],
+      "entrypoints": [
+        "arcane-os/pwa"
+      ],
       "primaryImport": "arcane-os/pwa",
       "group": "Progressive web applications",
       "summary": "Starts shared installation/update observation and mounts one initially hidden, themed suggestion without delaying application rendering.",
@@ -3658,7 +3774,9 @@
       "displayName": "createDigitalOceanFalTTSProvider()",
       "kind": "function",
       "signature": "createDigitalOceanFalTTSProvider({id,model,getApiKey,maxConcurrentRequests=4,followUpQueue:{maxConcurrentRequests=4,intervalMs=250}={},fetch=globalThis.fetch}={})",
-      "entrypoints": ["arcane-os/ai/browser-speech"],
+      "entrypoints": [
+        "arcane-os/ai/browser-speech"
+      ],
       "primaryImport": "arcane-os/ai/browser-speech",
       "group": "Browser speech providers",
       "summary": "Compatibility export of createTwinCloudTTSProvider using the same function and implementation.",
@@ -3672,7 +3790,9 @@
       "displayName": "createTwinCloudTTSProvider()",
       "kind": "function",
       "signature": "createTwinCloudTTSProvider({id,model,getApiKey,maxConcurrentRequests=4,followUpQueue:{maxConcurrentRequests=4,intervalMs=250}={},fetch=globalThis.fetch}={})",
-      "entrypoints": ["arcane-os/ai/browser-speech"],
+      "entrypoints": [
+        "arcane-os/ai/browser-speech"
+      ],
       "primaryImport": "arcane-os/ai/browser-speech",
       "group": "Browser speech providers",
       "summary": "Creates an explicitly selected TWiN Cloud remote TTS provider with complete-job queues and independently configurable follow-up HTTP scheduling.",
@@ -3686,7 +3806,9 @@
       "displayName": "createBrowserSpeechRecognitionProvider()",
       "kind": "function",
       "signature": "createBrowserSpeechRecognitionProvider({id,model,language}={})",
-      "entrypoints": ["arcane-os/ai/browser-speech"],
+      "entrypoints": [
+        "arcane-os/ai/browser-speech"
+      ],
       "primaryImport": "arcane-os/ai/browser-speech",
       "group": "Browser speech providers",
       "summary": "Creates an explicitly selected native browser speech recognition provider with gesture-started live capture.",
@@ -3780,7 +3902,9 @@
       "displayName": "MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS",
       "kind": "constant",
       "signature": "const MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS",
-      "entrypoints": ["arcane-os/mail"],
+      "entrypoints": [
+        "arcane-os/mail"
+      ],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
       "summary": "Duration for same-key retry before an ambiguous delivery requires reconciliation.",
@@ -3794,7 +3918,9 @@
       "displayName": "MAIL_OUTBOX_PROTOCOL",
       "kind": "constant",
       "signature": "const MAIL_OUTBOX_PROTOCOL",
-      "entrypoints": ["arcane-os/mail"],
+      "entrypoints": [
+        "arcane-os/mail"
+      ],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
       "summary": "Stable protocol identifier written to durable Mail outbox records.",
@@ -3808,7 +3934,9 @@
       "displayName": "MAIL_OUTBOX_STATES",
       "kind": "constant",
       "signature": "const MAIL_OUTBOX_STATES",
-      "entrypoints": ["arcane-os/mail"],
+      "entrypoints": [
+        "arcane-os/mail"
+      ],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
       "summary": "Mutable ordered vocabulary for durable Mail outbox lifecycle states.",
@@ -3822,7 +3950,9 @@
       "displayName": "MAIL_OUTBOX_TABLE",
       "kind": "constant",
       "signature": "const MAIL_OUTBOX_TABLE",
-      "entrypoints": ["arcane-os/mail"],
+      "entrypoints": [
+        "arcane-os/mail"
+      ],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
       "summary": "Default DBOPFS-compatible table name for durable Mail outbox records.",
@@ -3836,7 +3966,9 @@
       "displayName": "Mail",
       "kind": "class",
       "signature": "new Mail(config=globalThis.arcane?.config?.mail||{}, options={})",
-      "entrypoints": ["arcane-os/mail"],
+      "entrypoints": [
+        "arcane-os/mail"
+      ],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
       "summary": "Owns the application Mail singleton, durable lifecycle, report normalization, and explicit transport selection.",
@@ -3850,7 +3982,9 @@
       "displayName": "MailOutbox",
       "kind": "class",
       "signature": "new MailOutbox(options={})",
-      "entrypoints": ["arcane-os/mail"],
+      "entrypoints": [
+        "arcane-os/mail"
+      ],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
       "summary": "Persists complete reports before delivery and owns FIFO draining, retry classification, and explicit invalid-record maintenance.",
@@ -3864,7 +3998,9 @@
       "displayName": "MailTransportError",
       "kind": "class",
       "signature": "new MailTransportError(message, options={})",
-      "entrypoints": ["arcane-os/mail"],
+      "entrypoints": [
+        "arcane-os/mail"
+      ],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
       "summary": "Normalized Mail transport failure with stable retry, uncertainty, status, and delay metadata.",
@@ -3878,7 +4014,9 @@
       "displayName": "createMailOutbox()",
       "kind": "function",
       "signature": "createMailOutbox(options)",
-      "entrypoints": ["arcane-os/mail"],
+      "entrypoints": [
+        "arcane-os/mail"
+      ],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
       "summary": "Creates a MailOutbox from caller-owned storage, locking, delivery, and lifecycle adapters.",
@@ -3892,7 +4030,9 @@
       "displayName": "Mail default export",
       "kind": "class",
       "signature": "default as Mail",
-      "entrypoints": ["arcane-os/mail"],
+      "entrypoints": [
+        "arcane-os/mail"
+      ],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
       "summary": "Default package binding for the same Mail class exposed by the named export.",
@@ -3906,7 +4046,9 @@
       "displayName": "normalizeMailEndpoint()",
       "kind": "function",
       "signature": "normalizeMailEndpoint(endpoint, base=globalThis.location?.href)",
-      "entrypoints": ["arcane-os/mail"],
+      "entrypoints": [
+        "arcane-os/mail"
+      ],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
       "summary": "Resolves and validates one credential-free HTTPS or loopback-HTTP Mail endpoint.",
@@ -3920,7 +4062,9 @@
       "displayName": "resolveMailConfig()",
       "kind": "function",
       "signature": "resolveMailConfig(config=globalThis.arcane?.config?.mail||{}, options={})",
-      "entrypoints": ["arcane-os/mail"],
+      "entrypoints": [
+        "arcane-os/mail"
+      ],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
       "summary": "Resolves application identity, key, endpoint, and timeout from explicit or host Mail configuration.",
@@ -3934,7 +4078,9 @@
       "displayName": "sendMailReport()",
       "kind": "function",
       "signature": "sendMailReport({ appKey, appName, endpoint, fetchImpl=globalThis.fetch, report, reportKey, requestTimeout=null, serializedReport, signal })",
-      "entrypoints": ["arcane-os/mail"],
+      "entrypoints": [
+        "arcane-os/mail"
+      ],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
       "summary": "Sends one complete Mail report with an idempotency key through HTTP.",
@@ -3948,7 +4094,9 @@
       "displayName": "serializeMailReport()",
       "kind": "function",
       "signature": "serializeMailReport(report)",
-      "entrypoints": ["arcane-os/mail"],
+      "entrypoints": [
+        "arcane-os/mail"
+      ],
       "primaryImport": "arcane-os/mail",
       "group": "Portable Mail",
       "summary": "Serializes one JSON-object Mail report for exact request-body comparison and delivery.",
@@ -3962,7 +4110,9 @@
       "displayName": "arcaneLogging",
       "kind": "singleton",
       "signature": "const arcaneLogging",
-      "entrypoints": ["arcane-os/logging"],
+      "entrypoints": [
+        "arcane-os/logging"
+      ],
       "primaryImport": "arcane-os/logging",
       "group": "Shared logging",
       "summary": "Shared console owner controlled by the existing user.developer preference.",
@@ -3976,7 +4126,9 @@
       "displayName": "readArcaneDeveloperMode()",
       "kind": "function",
       "signature": "readArcaneDeveloperMode(target=globalThis)",
-      "entrypoints": ["arcane-os/logging"],
+      "entrypoints": [
+        "arcane-os/logging"
+      ],
       "primaryImport": "arcane-os/logging",
       "group": "Shared logging",
       "summary": "Reads the existing developer-mode preference without creating or changing a setting.",
@@ -3990,7 +4142,9 @@
       "displayName": "fetchRequest()",
       "kind": "function",
       "signature": "async fetchRequest(options={})",
-      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "entrypoints": [
+        "arcane-os/ai/twin-cloud"
+      ],
       "primaryImport": "arcane-os/ai/twin-cloud",
       "group": "TWiN Cloud requests",
       "summary": "Sends one complete TWiN Cloud request with an explicit caller-owned key and model.",
@@ -4004,7 +4158,9 @@
       "displayName": "fetchSystemOneRequest()",
       "kind": "function",
       "signature": "async fetchSystemOneRequest({twinKey,model,state,questions,signal=null,id=Date.now(),onRequest,onResponse,onRetry=null}={})",
-      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "entrypoints": [
+        "arcane-os/ai/twin-cloud"
+      ],
       "primaryImport": "arcane-os/ai/twin-cloud",
       "group": "TWiN Cloud state-and-questions requests",
       "summary": "Sends caller-owned model, state, and questions to the native System One endpoint with explicit credentials.",
@@ -4018,7 +4174,9 @@
       "displayName": "createBrowserSpeechSynthesisProvider()",
       "kind": "function",
       "signature": "createBrowserSpeechSynthesisProvider({id,model,language}={})",
-      "entrypoints": ["arcane-os/ai/browser-speech"],
+      "entrypoints": [
+        "arcane-os/ai/browser-speech"
+      ],
       "primaryImport": "arcane-os/ai/browser-speech",
       "group": "Native browser speech",
       "summary": "Creates a native browser TTS provider with silent voice discovery and preparation, live catalog subscriptions, and owned playback.",
@@ -4032,7 +4190,9 @@
       "displayName": "generateImages()",
       "kind": "function",
       "signature": "async generateImages({model,prompt,parameters={},twinKey,getApiKey,signal=null,id=Date.now(),onRequest,onResponse,onProgress}={})",
-      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "entrypoints": [
+        "arcane-os/ai/twin-cloud"
+      ],
       "primaryImport": "arcane-os/ai/twin-cloud",
       "group": "TWiN Cloud image generation",
       "summary": "Generates caller-selected images and returns every image as a Blob in provider order.",
@@ -4046,7 +4206,9 @@
       "displayName": "fetchHTTPResponse()",
       "kind": "function",
       "signature": "async fetchHTTPResponse(url,options)",
-      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "entrypoints": [
+        "arcane-os/ai/twin-cloud"
+      ],
       "primaryImport": "arcane-os/ai/twin-cloud",
       "group": "Shared AI transport integration",
       "summary": "Returns a successful unconsumed Fetch Response through the shared AI HTTP owner.",
@@ -4060,7 +4222,9 @@
       "displayName": "fetchJSONResponse()",
       "kind": "function",
       "signature": "async fetchJSONResponse(url,options)",
-      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "entrypoints": [
+        "arcane-os/ai/twin-cloud"
+      ],
       "primaryImport": "arcane-os/ai/twin-cloud",
       "group": "Shared AI transport integration",
       "summary": "Reads the complete successful provider JSON through the shared HTTP owner.",
@@ -4074,7 +4238,9 @@
       "displayName": "structuredOutputFormat()",
       "kind": "function",
       "signature": "structuredOutputFormat(value=false)",
-      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "entrypoints": [
+        "arcane-os/ai/twin-cloud"
+      ],
       "primaryImport": "arcane-os/ai/twin-cloud",
       "group": "Shared AI transport integration",
       "summary": "Normalizes the existing structured-output option while preserving a supplied schema.",
@@ -4088,7 +4254,9 @@
       "displayName": "openAIResponseFormat()",
       "kind": "function",
       "signature": "openAIResponseFormat(format)",
-      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "entrypoints": [
+        "arcane-os/ai/twin-cloud"
+      ],
       "primaryImport": "arcane-os/ai/twin-cloud",
       "group": "Shared AI transport integration",
       "summary": "Maps normalized structured-output settings to chat-completion response_format.",
@@ -4102,7 +4270,9 @@
       "displayName": "isAIRequestAbort()",
       "kind": "function",
       "signature": "isAIRequestAbort(error,signal)",
-      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "entrypoints": [
+        "arcane-os/ai/twin-cloud"
+      ],
       "primaryImport": "arcane-os/ai/twin-cloud",
       "group": "Shared AI transport integration",
       "summary": "Recognizes an aborted signal or an existing AI request cancellation error.",
@@ -4116,7 +4286,9 @@
       "displayName": "normalizeAIRequestAbort()",
       "kind": "function",
       "signature": "normalizeAIRequestAbort(error)",
-      "entrypoints": ["arcane-os/ai/twin-cloud"],
+      "entrypoints": [
+        "arcane-os/ai/twin-cloud"
+      ],
       "primaryImport": "arcane-os/ai/twin-cloud",
       "group": "Shared AI transport integration",
       "summary": "Returns the common AI AbortError while preserving the original cause.",
@@ -4130,7 +4302,9 @@
       "displayName": "CORE_PROTOCOL",
       "kind": "constant",
       "signature": "const CORE_PROTOCOL = 'arcane/1'",
-      "entrypoints": ["arcane-os/core/contracts"],
+      "entrypoints": [
+        "arcane-os/core/contracts"
+      ],
       "primaryImport": "arcane-os/core/contracts",
       "group": "Core protocol contracts",
       "summary": "Identifies Arcane Core request, response, event and control frames.",
@@ -4144,7 +4318,9 @@
       "displayName": "CORE_READY_EVENTS",
       "kind": "constant",
       "signature": "const CORE_READY_EVENTS",
-      "entrypoints": ["arcane-os/core/contracts"],
+      "entrypoints": [
+        "arcane-os/core/contracts"
+      ],
       "primaryImport": "arcane-os/core/contracts",
       "group": "Core protocol contracts",
       "summary": "Lists the transport and dispatcher events that the Core client treats as durable completions.",
@@ -4158,7 +4334,9 @@
       "displayName": "CORE_FRAME_CONTRACTS",
       "kind": "constant",
       "signature": "const CORE_FRAME_CONTRACTS",
-      "entrypoints": ["arcane-os/core/contracts"],
+      "entrypoints": [
+        "arcane-os/core/contracts"
+      ],
       "primaryImport": "arcane-os/core/contracts",
       "group": "Core protocol contracts",
       "summary": "Describes the public fields on Core request, response, event, cancellation and runtime.replay control frames.",
@@ -4172,7 +4350,9 @@
       "displayName": "CORE_METHOD_CONTRACTS",
       "kind": "constant",
       "signature": "const CORE_METHOD_CONTRACTS",
-      "entrypoints": ["arcane-os/core/contracts"],
+      "entrypoints": [
+        "arcane-os/core/contracts"
+      ],
       "primaryImport": "arcane-os/core/contracts",
       "group": "Core protocol contracts",
       "summary": "Describes existing Core method input, output and semantic shapes.",
@@ -4186,7 +4366,9 @@
       "displayName": "CoreError",
       "kind": "class",
       "signature": "new CoreError(value)",
-      "entrypoints": ["arcane-os/core/contracts"],
+      "entrypoints": [
+        "arcane-os/core/contracts"
+      ],
       "primaryImport": "arcane-os/core/contracts",
       "group": "Core protocol contracts",
       "summary": "Creates the common Core error while retaining supplied native diagnostic fields.",
@@ -4200,7 +4382,9 @@
       "displayName": "serializeCoreError()",
       "kind": "function",
       "signature": "serializeCoreError(error)",
-      "entrypoints": ["arcane-os/core/contracts"],
+      "entrypoints": [
+        "arcane-os/core/contracts"
+      ],
       "primaryImport": "arcane-os/core/contracts",
       "group": "Core protocol contracts",
       "summary": "Projects an error into a complete plain diagnostic record for Core responses and events.",
@@ -4214,7 +4398,9 @@
       "displayName": "createCoreClient()",
       "kind": "function",
       "signature": "createCoreClient({global=globalThis,transport=null,eventOwner=arcaneEvents,eventOwnerReady,autoConnect=true,replayRuntimeState=false,webKitDocumentLifecycle=false,onError}={})",
-      "entrypoints": ["arcane-os/core/client"],
+      "entrypoints": [
+        "arcane-os/core/client"
+      ],
       "primaryImport": "arcane-os/core/client",
       "group": "Core browser client",
       "summary": "Creates one correlated Arcane Core RPC client with explicit transport, readiness, events, cancellation and lifetime ownership.",
@@ -4228,7 +4414,9 @@
       "displayName": "createCoreFacade()",
       "kind": "function",
       "signature": "createCoreFacade(client)",
-      "entrypoints": ["arcane-os/core/client"],
+      "entrypoints": [
+        "arcane-os/core/client"
+      ],
       "primaryImport": "arcane-os/core/client",
       "group": "Core browser client",
       "summary": "Projects a Core client into the established application-facing Arcane namespace.",
@@ -4242,7 +4430,9 @@
       "displayName": "installCoreClient()",
       "kind": "function",
       "signature": "installCoreClient(global=globalThis,options={})",
-      "entrypoints": ["arcane-os/core/client"],
+      "entrypoints": [
+        "arcane-os/core/client"
+      ],
       "primaryImport": "arcane-os/core/client",
       "group": "Core browser client",
       "summary": "Installs one synchronous global Arcane facade, native receive callback and terminal transport-failure callback for the selected renderer lifetime.",
@@ -4256,7 +4446,9 @@
       "displayName": "getInstalledCoreClient()",
       "kind": "function",
       "signature": "getInstalledCoreClient(global=globalThis)",
-      "entrypoints": ["arcane-os/core/client"],
+      "entrypoints": [
+        "arcane-os/core/client"
+      ],
       "primaryImport": "arcane-os/core/client",
       "group": "Core browser client",
       "summary": "Returns the exact live SDK-installed client or null without installing, connecting or changing globals.",
@@ -4270,7 +4462,9 @@
       "displayName": "subscribeCoreClient()",
       "kind": "function",
       "signature": "subscribeCoreClient(listener,{global=globalThis,emitCurrent=true,signal}={})",
-      "entrypoints": ["arcane-os/core/client"],
+      "entrypoints": [
+        "arcane-os/core/client"
+      ],
       "primaryImport": "arcane-os/core/client",
       "group": "Core browser client",
       "summary": "Observes exact SDK client installation and retirement with current-state replay without creating a transport.",
@@ -4284,7 +4478,10 @@
       "displayName": "createDevelopmentCore()",
       "kind": "function",
       "signature": "createDevelopmentCore({appRoot=process.cwd(),application,version,services=[],serviceModules=[],context={},getReplayEvents,signal,onEvent}={})",
-      "entrypoints": ["arcane-os/core/development", "arcane-os"],
+      "entrypoints": [
+        "arcane-os/core/development",
+        "arcane-os"
+      ],
       "primaryImport": "arcane-os/core/development",
       "group": "Core source development",
       "summary": "Composes application Core services and document-owned HTTP/SSE transport independently of local AI.",
@@ -4298,7 +4495,9 @@
       "displayName": "createCoreClassicSource()",
       "kind": "function",
       "signature": "async createCoreClassicSource({eventOwnerModuleURL,replayRuntimeState=false,webKitDocumentLifecycle=false}={})",
-      "entrypoints": ["arcane-os/core/classic-source"],
+      "entrypoints": [
+        "arcane-os/core/classic-source"
+      ],
       "primaryImport": "arcane-os/core/classic-source",
       "group": "Core classic client projection",
       "summary": "Generates the native host's classic injection script from the installed canonical Core client and contracts.",
@@ -4312,7 +4511,9 @@
       "displayName": "createCoreRuntime()",
       "kind": "function",
       "signature": "createCoreRuntime({application,version,services=[]}={})",
-      "entrypoints": ["arcane-os/core/runtime"],
+      "entrypoints": [
+        "arcane-os/core/runtime"
+      ],
       "primaryImport": "arcane-os/core/runtime",
       "group": "Native Core runtime",
       "summary": "Creates an app-neutral Core dispatcher with explicit services, request lifetimes, events and graceful drain.",
@@ -4326,7 +4527,9 @@
       "displayName": "encodeCoreFrame()",
       "kind": "function",
       "signature": "encodeCoreFrame(frame)",
-      "entrypoints": ["arcane-os/core/stdio"],
+      "entrypoints": [
+        "arcane-os/core/stdio"
+      ],
       "primaryImport": "arcane-os/core/stdio",
       "group": "Native Core stdio transport",
       "summary": "Encodes one Core frame as UTF-8 JSON with the native Content-Length transport header.",
@@ -4340,7 +4543,9 @@
       "displayName": "createCoreFrameDecoder()",
       "kind": "function",
       "signature": "createCoreFrameDecoder(onFrame)",
-      "entrypoints": ["arcane-os/core/stdio"],
+      "entrypoints": [
+        "arcane-os/core/stdio"
+      ],
       "primaryImport": "arcane-os/core/stdio",
       "group": "Native Core stdio transport",
       "summary": "Creates the incremental decoder for fragmented or consecutive native Core frames.",
@@ -4354,7 +4559,9 @@
       "displayName": "startCoreStdio()",
       "kind": "function",
       "signature": "startCoreStdio({runtime,input=process.stdin,output=process.stdout,onError}={})",
-      "entrypoints": ["arcane-os/core/stdio"],
+      "entrypoints": [
+        "arcane-os/core/stdio"
+      ],
       "primaryImport": "arcane-os/core/stdio",
       "group": "Native Core stdio transport",
       "summary": "Attaches an existing Core runtime to framed input and output with concurrent dispatch and graceful shutdown.",
@@ -4368,7 +4575,9 @@
       "displayName": "createPortableNativeProvider()",
       "kind": "function",
       "signature": "createPortableNativeProvider({services,packagedWeb=false,webKitDocumentLifecycle=false}={})",
-      "entrypoints": ["arcane-os/native/portable-provider"],
+      "entrypoints": [
+        "arcane-os/native/portable-provider"
+      ],
       "primaryImport": "arcane-os/native/portable-provider",
       "group": "Portable native provider",
       "summary": "Creates the SDK-owned provider that assembles one selected app and explicit services into a portable Core payload.",
@@ -4382,7 +4591,9 @@
       "displayName": "arcaneNativeBuilderProvider",
       "kind": "singleton",
       "signature": "const arcaneNativeBuilderProvider",
-      "entrypoints": ["arcane-os/native/portable-provider"],
+      "entrypoints": [
+        "arcane-os/native/portable-provider"
+      ],
       "primaryImport": "arcane-os/native/portable-provider",
       "group": "Portable native provider",
       "summary": "Package-owned portable provider with no preconfigured application services.",
@@ -4396,7 +4607,9 @@
       "displayName": "arcaneNativeBuilderProvider default export",
       "kind": "singleton",
       "signature": "default as arcaneNativeBuilderProvider",
-      "entrypoints": ["arcane-os/native/portable-provider"],
+      "entrypoints": [
+        "arcane-os/native/portable-provider"
+      ],
       "primaryImport": "arcane-os/native/portable-provider",
       "group": "Portable native provider",
       "summary": "Default package binding for the same portable provider exposed by arcaneNativeBuilderProvider.",
@@ -4410,7 +4623,9 @@
       "displayName": "createWindowsNativeProvider()",
       "kind": "function",
       "signature": "createWindowsNativeProvider({services,hostDirectory}={})",
-      "entrypoints": ["arcane-os/native/windows-provider"],
+      "entrypoints": [
+        "arcane-os/native/windows-provider"
+      ],
       "primaryImport": "arcane-os/native/windows-provider",
       "group": "Windows native provider",
       "summary": "Assembles selected application services and browser content with the SDK-owned Windows x64 WebView2 and SEA host.",
@@ -4424,7 +4639,9 @@
       "displayName": "arcaneNativeBuilderProvider",
       "kind": "singleton",
       "signature": "const arcaneNativeBuilderProvider",
-      "entrypoints": ["arcane-os/native/windows-provider"],
+      "entrypoints": [
+        "arcane-os/native/windows-provider"
+      ],
       "primaryImport": "arcane-os/native/windows-provider",
       "group": "Windows native provider",
       "summary": "SDK-owned Windows provider selected by the ordinary windows-x64 build command without an OS checkout.",
@@ -4438,7 +4655,9 @@
       "displayName": "arcaneNativeBuilderProvider default export",
       "kind": "singleton",
       "signature": "default as arcaneNativeBuilderProvider",
-      "entrypoints": ["arcane-os/native/windows-provider"],
+      "entrypoints": [
+        "arcane-os/native/windows-provider"
+      ],
       "primaryImport": "arcane-os/native/windows-provider",
       "group": "Windows native provider",
       "summary": "Default binding for the SDK Windows executable provider.",
@@ -4452,7 +4671,9 @@
       "displayName": "createMacOSNativeProvider()",
       "kind": "function",
       "signature": "createMacOSNativeProvider({services,hostDirectory}={})",
-      "entrypoints": ["arcane-os/native/macos-provider"],
+      "entrypoints": [
+        "arcane-os/native/macos-provider"
+      ],
       "primaryImport": "arcane-os/native/macos-provider",
       "group": "macOS native provider",
       "summary": "Composes a complete selected portable payload with the architecture-selected SDK Mac host in an application bundle.",
@@ -4466,7 +4687,9 @@
       "displayName": "arcaneNativeBuilderProvider",
       "kind": "singleton",
       "signature": "const arcaneNativeBuilderProvider",
-      "entrypoints": ["arcane-os/native/macos-provider"],
+      "entrypoints": [
+        "arcane-os/native/macos-provider"
+      ],
       "primaryImport": "arcane-os/native/macos-provider",
       "group": "macOS native provider",
       "summary": "SDK-owned Mac provider selected by macos-arm64 and macos-x64 CLI routes.",
@@ -4480,7 +4703,9 @@
       "displayName": "arcaneNativeBuilderProvider default export",
       "kind": "singleton",
       "signature": "default as arcaneNativeBuilderProvider",
-      "entrypoints": ["arcane-os/native/macos-provider"],
+      "entrypoints": [
+        "arcane-os/native/macos-provider"
+      ],
       "primaryImport": "arcane-os/native/macos-provider",
       "group": "macOS native provider",
       "summary": "Default binding for the same SDK Mac native provider.",
@@ -4494,7 +4719,9 @@
       "displayName": "createPackagedWebService()",
       "kind": "function",
       "signature": "createPackagedWebService({artifactRoot},context={})",
-      "entrypoints": ["arcane-os/core/packaged-web"],
+      "entrypoints": [
+        "arcane-os/core/packaged-web"
+      ],
       "primaryImport": "arcane-os/core/packaged-web",
       "group": "Native packaged web serving",
       "summary": "Owns one packaged HTTP listener, persisted loopback port, real readiness and draining shutdown inside Core.",
@@ -4508,7 +4735,9 @@
       "displayName": "createPreferencesService()",
       "kind": "function",
       "signature": "createPreferencesService({file}={})",
-      "entrypoints": ["arcane-os/core/preferences"],
+      "entrypoints": [
+        "arcane-os/core/preferences"
+      ],
       "primaryImport": "arcane-os/core/preferences",
       "group": "Core preference persistence",
       "summary": "Supplies the five existing preference RPC methods with application-selected file storage.",
@@ -4522,7 +4751,9 @@
       "displayName": "createPreferencesService default export",
       "kind": "function",
       "signature": "default as createPreferencesService",
-      "entrypoints": ["arcane-os/core/preferences"],
+      "entrypoints": [
+        "arcane-os/core/preferences"
+      ],
       "primaryImport": "arcane-os/core/preferences",
       "group": "Core preference persistence",
       "summary": "Default binding for the same Core preferences service factory.",
@@ -4531,18 +4762,36 @@
       "normalization": "Binding identity is exactly equal to the named createPreferencesService export"
     },
     {
+      "id": "core-host:resolveNativeLaunchContext",
+      "name": "resolveNativeLaunchContext",
+      "displayName": "resolveNativeLaunchContext()",
+      "kind": "function",
+      "signature": "resolveNativeLaunchContext({appId,context={}}={})",
+      "entrypoints": [
+        "arcane-os/core/host"
+      ],
+      "primaryImport": "arcane-os/core/host",
+      "group": "Native Core host composition",
+      "summary": "Resolves matching per-app native state, workspace and optional shared endpoint defaults for packaged UI and external MCP.",
+      "availability": "Node native locations on Windows/Linux/macOS; Android and other hosts supply stateRoot and native adaptation",
+      "protocol": "Pure native launch-context resolution and existing local IPC",
+      "normalization": "Returns a new complete context with only omitted stateRoot/workspaceRoot and selected sharedHost endpoint/log fields filled; preserves explicit values and additional payloads. Native launchContext presence opts generated entry into resolution; omitted sharedHost retains stdio. No I/O, saved-state discovery, process startup, migration or ArcaneData/Repos change. Malformed selected appId/stateRoot/sharedHost inputs report TypeError; platform IPC errors remain operation-owned."
+    },
+    {
       "id": "core-host:readCoreLaunchContext",
       "name": "readCoreLaunchContext",
       "displayName": "readCoreLaunchContext()",
       "kind": "function",
-      "signature": "async readCoreLaunchContext({argv=process.argv.slice(2)}={})",
-      "entrypoints": ["arcane-os/core/host"],
+      "signature": "async readCoreLaunchContext({argv=process.argv.slice(2),defaults={},appId}={})",
+      "entrypoints": [
+        "arcane-os/core/host"
+      ],
       "primaryImport": "arcane-os/core/host",
       "group": "Native Core host composition",
-      "summary": "Reads explicit launch JSON with the separately supplied native host stateRoot default for service launch context.",
+      "summary": "Combines packaged defaults, actual native host stateRoot and complete explicit launch JSON, with optional native location resolution.",
       "availability": "Node, including the selected external-entry SEA launcher",
       "protocol": "Explicit launch arguments and JSON configuration",
-      "normalization": "Optional --arcane-host-state-root <directory> supplies the stateRoot default; every explicit --arcane-launch-config JSON field takes precedence unchanged, including relative or null stateRoot and application-owned preferencesFile. Returns an empty record with neither argument; surfaces missing argument values, file and JSON failures; performs no directory selection, path resolution, configuration search, rewrite, migration or environment mutation"
+      "normalization": "Precedence is defaults, then --arcane-host-state-root, then complete top-level --arcane-launch-config JSON fields; nested values replace without deep merging or payload rewriting. Explicit appId invokes resolveNativeLaunchContext; ordinary calls retain relative/null/custom state values and return an empty record with no inputs. Missing arguments, file/JSON errors and malformed records reject. No configuration search, file rewrite, migration or environment mutation; generated native.launchContext explicitly selects the resolver."
     },
     {
       "id": "core-host:startCoreHost",
@@ -4550,7 +4799,9 @@
       "displayName": "startCoreHost()",
       "kind": "function",
       "signature": "startCoreHost({application,version,services=[],input,output,onError,signal}={})",
-      "entrypoints": ["arcane-os/core/host"],
+      "entrypoints": [
+        "arcane-os/core/host"
+      ],
       "primaryImport": "arcane-os/core/host",
       "group": "Native Core host composition",
       "summary": "Composes explicitly supplied application services with the shared Core runtime and stdio lifecycle.",
@@ -4564,7 +4815,9 @@
       "displayName": "startSharedCoreHost()",
       "kind": "function",
       "signature": "startSharedCoreHost({endpoint,application,version,configure,getReplayEvents,signal,onError}={})",
-      "entrypoints": ["arcane-os/core/host"],
+      "entrypoints": [
+        "arcane-os/core/host"
+      ],
       "primaryImport": "arcane-os/core/host",
       "group": "Shared Core host",
       "summary": "Claims an app-selected local endpoint before composing one shared Core runtime.",
@@ -4578,7 +4831,9 @@
       "displayName": "connectSharedCoreHost()",
       "kind": "function",
       "signature": "connectSharedCoreHost({endpoint,start,signal,onError}={})",
-      "entrypoints": ["arcane-os/core/host"],
+      "entrypoints": [
+        "arcane-os/core/host"
+      ],
       "primaryImport": "arcane-os/core/host",
       "group": "Shared Core host",
       "summary": "Connects to one selected host and optionally starts an explicit headless entry when absent.",
@@ -4592,7 +4847,9 @@
       "displayName": "runSharedCoreHost()",
       "kind": "function",
       "signature": "runSharedCoreHost(options)",
-      "entrypoints": ["arcane-os/core/host"],
+      "entrypoints": [
+        "arcane-os/core/host"
+      ],
       "primaryImport": "arcane-os/core/host",
       "group": "Shared Core host",
       "summary": "Runs the explicit headless entry with one endpoint winner and startup result reporting.",
@@ -4606,7 +4863,9 @@
       "displayName": "startSharedCoreBridge()",
       "kind": "function",
       "signature": "startSharedCoreBridge({endpoint,start,input=process.stdin,output=process.stdout,signal,onError}={})",
-      "entrypoints": ["arcane-os/core/host"],
+      "entrypoints": [
+        "arcane-os/core/host"
+      ],
       "primaryImport": "arcane-os/core/host",
       "group": "Shared Core host",
       "summary": "Connects a complete framed stdio stream to the shared application's Core host.",
