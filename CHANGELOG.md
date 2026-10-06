@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.74.0
+
+- Add optional `longPaths` to `createRepositoryWorkspace()` for newly cloned
+  Windows repositories. Explicit true or false selects clone-local
+  `core.longpaths` before the first checkout and persists it in the new target.
+- Preserve inherited and template configuration when the option is omitted,
+  existing repositories, non-Windows commands, and the ordinary single-clone
+  identity, progress, cancellation and hook lifecycle. No global setting,
+  repository migration, filename transformation or dependency change is added.
+
 ## 0.73.0
 
 - Add public `resolvePwaRetirementResponse({workspaceRoot, appId})` for existing

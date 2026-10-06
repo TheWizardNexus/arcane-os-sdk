@@ -320,6 +320,126 @@ test('explicit repository directory bypasses default selection and construction 
     await repository.close();
 });
 
+test(
+    'long-path selection requires a boolean without starting repository work',
+    function longPathInput() {
+        const directory = path.resolve('moon-cheese-long-path-selection');
+        function unexpectedProcess() {
+            assert.fail('Construction must not start Git.');
+        }
+        for (const longPaths of [null, 'true', 'false', 0, 1, {}, []]) {
+            assert.throws(
+                function invalidLongPaths() {
+                    createRepositoryWorkspace(
+                        {directory, longPaths, run: unexpectedProcess}
+                    );
+                },
+                {name: 'TypeError', message: 'longPaths must be a boolean when supplied.'}
+            );
+        }
+    }
+);
+
+test(
+    'new checkouts capture explicit long-path selection only for Windows clone configuration',
+    async function cloneLongPaths(t) {
+        const root = await fixture(t);
+        const remote = 'https://example.invalid/Moon Cheese/dispatches.git';
+        const branch = 'cheese-launch';
+        const stdout = '\uFEFF  Complete clone output 🧀\r\nLast output line.\n';
+        const stderr = '  Complete progress\rFinal progress.\n';
+        const cases = [
+            {name: 'enabled', longPaths: true},
+            {name: 'disabled', longPaths: false},
+            {name: 'omitted'}
+        ];
+        for (const selection of cases) {
+            for (const existingEmpty of [false, true]) {
+                const directory = path.join(root, `${selection.name}-${existingEmpty ? 'empty' : 'missing'}`);
+                if (existingEmpty) await mkdir(directory);
+                const calls = [];
+                const controller = new AbortController();
+                function observeEvent() {}
+                async function fakeClone(command, args, options) {
+                    calls.push({command, args, options});
+                    await mkdir(directory, {recursive: true});
+                    await writeFile(path.join(directory, '.git'), 'gitdir: selected-moon-checkout\n');
+                    return processResult(stdout, stderr);
+                }
+                const options = {directory, remote, branch, onEvent: observeEvent, run: fakeClone};
+                if (selection.longPaths !== undefined) options.longPaths = selection.longPaths;
+                const repository = createRepositoryWorkspace(options);
+                assert.equal(repository.directory, directory);
+                assert.equal(calls.length, 0);
+                options.directory = path.join(root, 'later-directory');
+                options.remote = 'later-remote';
+                options.branch = 'later-branch';
+                options.longPaths = selection.longPaths !== true;
+
+                const result = await repository.open({signal: controller.signal});
+                const expected = ['clone', '--progress'];
+                if (process.platform === 'win32' && selection.longPaths !== undefined) {
+                    expected.push('--config', `core.longpaths=${selection.longPaths}`);
+                }
+                expected.push('--branch', branch, '--', remote, directory);
+                assert.deepEqual(
+                    result,
+                    {directory, cloned: true, stdout, stderr}
+                );
+                assert.equal(calls.length, 1);
+                assert.equal(calls[0].command, 'git');
+                assert.deepEqual(calls[0].args, expected);
+                assert.equal(calls[0].options.cwd, root);
+                assert.equal(calls[0].options.signal, controller.signal);
+                assert.equal(calls[0].options.onEvent, observeEvent);
+                assert.deepEqual(
+                    await repository.open(),
+                    {directory, cloned: false}
+                );
+                assert.equal(calls.length, 1);
+                await repository.close();
+            }
+        }
+    }
+);
+
+test(
+    'explicit long-path selections leave existing checkout configuration and content unchanged',
+    async function existingLongPaths(t) {
+        const directory = await fixture(t);
+        const configuration = '[core]\n\tlongpaths = false\n[remote "origin"]\n\turl = selected-origin\n';
+        const content = '\uFEFF  Complete authored moon dispatch 🧀\r\n';
+        const gitDirectory = path.join(directory, '.git');
+        await mkdir(gitDirectory);
+        await writeFile(path.join(gitDirectory, 'config'), configuration);
+        await writeFile(path.join(directory, 'moon.md'), content);
+        for (const longPaths of [true, false]) {
+            const calls = [];
+            async function fakeExistingRoot(command, args, options) {
+                calls.push({command, args, options});
+                return processResult('true\n\n');
+            }
+            const repository = createRepositoryWorkspace(
+                {directory, remote: 'never-replace-origin', branch: 'never-switch', longPaths, run: fakeExistingRoot}
+            );
+            assert.deepEqual(
+                await repository.open(),
+                {directory, cloned: false}
+            );
+            assert.equal(calls.length, 1);
+            assert.equal(calls[0].command, 'git');
+            assert.deepEqual(
+                calls[0].args,
+                ['rev-parse', '--is-inside-work-tree', '--show-prefix']
+            );
+            assert.equal(calls[0].options.cwd, directory);
+            assert.equal(await readFile(path.join(gitDirectory, 'config'), 'utf8'), configuration);
+            assert.equal(await readFile(path.join(directory, 'moon.md'), 'utf8'), content);
+            await repository.close();
+        }
+    }
+);
+
 test('same-directory owners clone once with complete remote, branch and output, while distinct names stay distinct', async function oneClone(t) {
     const dataRoot = await fixture(t);
     const calls = [];
@@ -697,6 +817,106 @@ test('writer snapshots exact text and selected paths, retains clone output and s
     assert.ok(result.outputs.every(function complete(output) { return output.stderr === 'Complete diagnostic.\n' && output.code === 0; }));
     await repository.close();
 });
+
+test(
+    'writer-first long-path selection preserves captured identity, complete output and one-clone preparation',
+    async function writerLongPaths(t) {
+        const root = await fixture(t);
+        const directory = path.join(root, 'long-path writer');
+        const remote = 'https://example.invalid/moon.git';
+        const branch = 'cheese-launch';
+        const gitIdentity = {name: 'Moon Dispatcher', email: 'moon@example.invalid', username: 'moon-account'};
+        const prefix = ['-c', 'user.name=Moon Dispatcher', '-c', 'user.email=moon@example.invalid', '-c', 'credential.username=moon-account'];
+        const controller = new AbortController();
+        const calls = [];
+        const events = [];
+        const stdoutChunks = ['\uFEFF  Complete moon output 🧀\r\n', 'NUL:\0\nFinal output line.  '];
+        const stderrChunks = ['  Complete progress\r', 'Final diagnostic.\n'];
+        const filename = 'dispatches/moon [cheese].md';
+        const content = '\uFEFF  Entire authored dispatch 🧀\r\nNUL:\0\n';
+        const message = '  Entire commit message\n\nLast authored line.  ';
+        function observeEvent(event) {
+            events.push(event);
+        }
+        async function fakeGit(command, args, options) {
+            assert.equal(command, 'git');
+            assert.deepEqual(args.slice(0, prefix.length), prefix);
+            assert.deepEqual(
+                options.env,
+                {GIT_AUTHOR_NAME: 'Moon Dispatcher', GIT_COMMITTER_NAME: 'Moon Dispatcher',
+                    GIT_AUTHOR_EMAIL: 'moon@example.invalid', GIT_COMMITTER_EMAIL: 'moon@example.invalid'}
+            );
+            assert.equal(options.signal, controller.signal);
+            assert.equal(options.captureOutput, false);
+            const selected = args.slice(prefix.length);
+            calls.push({args: selected, cwd: options.cwd});
+            await options.onEvent(
+                {type: 'process.starting', command, args}
+            );
+            if (selected[0] === 'clone') await mkdir(directory);
+            if (selected.includes('commit')) {
+                const chunks = [];
+                for await (const chunk of options.input) chunks.push(chunk);
+                assert.deepEqual(chunks, [message]);
+            }
+            for (const chunk of stdoutChunks) {
+                await options.onOutput(
+                    {stream: 'stdout', chunk}
+                );
+            }
+            for (const chunk of stderrChunks) {
+                await options.onOutput(
+                    {stream: 'stderr', chunk}
+                );
+            }
+            return {code: 0, signal: null, stdout: null, stderr: null};
+        }
+        const options = {directory, remote, branch, longPaths: true, gitIdentity, onEvent: observeEvent, run: fakeGit};
+        const repository = createRepositoryWorkspace(options);
+        options.longPaths = false;
+        gitIdentity.name = 'Later UI selection';
+        gitIdentity.email = 'later@example.invalid';
+        gitIdentity.username = 'later-account';
+        assert.equal(calls.length, 0);
+        const result = await repository.write(
+            {files: [{path: filename, content}], message, signal: controller.signal}
+        );
+        const cloneArguments = ['clone', '--progress'];
+        if (process.platform === 'win32') cloneArguments.push('--config', 'core.longpaths=true');
+        cloneArguments.push('--branch', branch, '--', remote, directory);
+        assert.deepEqual(
+            calls,
+            [
+                {args: cloneArguments, cwd: root},
+                {args: ['--literal-pathspecs', 'add', '--', filename], cwd: directory},
+                {args: ['--literal-pathspecs', 'commit', '--only', '--cleanup=verbatim', '--file', '-', '--', filename], cwd: directory},
+                {args: ['push'], cwd: directory}
+            ]
+        );
+        assert.equal(events.length, 4);
+        assert.equal(result.state, 'pushed');
+        assert.equal(result.stage, 'complete');
+        assert.deepEqual(
+            [result.written, result.staged, result.committed, result.pushed],
+            [true, true, true, true]
+        );
+        assert.deepEqual(
+            result.outputs,
+            ['prepare', 'stage', 'commit', 'push'].map(
+                function completeOutput(stage) {
+                    return {stage, stdout: stdoutChunks.join(''), stderr: stderrChunks.join(''), code: 0, signal: null};
+                }
+            )
+        );
+        assert.equal(await readFile(path.join(directory, filename), 'utf8'), content);
+        assert.deepEqual(
+            await repository.open(),
+            {directory, cloned: false}
+        );
+        assert.equal(calls.length, 4);
+        await repository.close();
+    }
+);
 
 test('workspace identity reaches clone, status, pull, commit and push without changing accepted content', async function workspaceIdentity(t) {
     const root = await fixture(t);

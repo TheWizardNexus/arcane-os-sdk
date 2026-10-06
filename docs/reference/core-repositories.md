@@ -47,7 +47,7 @@ const status = await repository.status({signal});
 await repository.close();
 ```
 
-`createRepositoryWorkspace({name,directory,dataRoot,remote,branch,gitIdentity,onEvent,run}={})`
+`createRepositoryWorkspace({name,directory,dataRoot,remote,branch,longPaths,gitIdentity,onEvent,run}={})`
 returns `{directory,open,status,configuration,pull,push,write,close,drain,dispose}`. The `directory`
 property is the absolute selected working path.
 
@@ -63,6 +63,11 @@ property is the absolute selected working path.
   `branch`, when supplied, is passed unchanged to Git's `clone --branch` option;
   otherwise Git selects the remote's default branch. Existing checkouts keep
   their own branch, remote, tracked files, untracked files and local changes.
+- Optional `longPaths` is a boolean for newly cloned Windows checkouts. Explicit
+  `true` or `false` supplies `clone --config core.longpaths=<value>`, so Git
+  writes that choice to the new repository before its first checkout. Omission
+  leaves Git's configuration unchanged. The option does not rewrite an existing
+  checkout, change a global setting, or alter non-Windows clone commands.
 - `onEvent` and optional `run` use the existing SDK process owner. The default
   adapter is `runProcess`; Git must be available on PATH. Credentials and
   authentication remain with Git and the native host. The SDK adds no download,
@@ -89,6 +94,38 @@ untouched and reports its Git error or `ARCANE_REPOSITORY_DIRECTORY_INVALID`.
 A failed or cancelled clone reports the actual failure; any remaining directory
 is retained for application-owned inspection. There is no automatic deletion or
 destructive retry. Filesystem failures and complete Git diagnostics propagate.
+
+### Windows long paths for a new checkout
+
+Select the option in the application's native repository connection:
+
+```javascript
+const repository = createRepositoryWorkspace({
+    name: 'moon-cheese-dispatches',
+    remote: applicationConnection.remote,
+    longPaths: true
+});
+await repository.open({signal});
+```
+
+This remains one ordinary Git clone, including its branch/tag selection,
+progress, hooks, cancellation and empty-remote behavior. It does not clone
+without checkout and run a second initialization sequence. The boolean is
+captured when the owner is constructed; later edits to the options object
+cannot change an accepted connection.
+
+An explicit value intentionally selects the new repository's local
+`core.longpaths` setting. Git's ordinary configuration precedence still applies,
+including higher-priority command-scope settings supplied by the native host.
+Omit the option to retain inherited or template configuration without an SDK
+override. Existing repositories retain their settings even if this option is
+supplied; there is no configuration migration or repair pass.
+
+[Git documents clone-local configuration before the initial checkout](https://git-scm.com/docs/git-clone#OPTIONS).
+[Git for Windows describes long-path support](https://gitforwindows.org/git-cannot-create-a-file-or-directory-with-a-long-path.html)
+for its native commands; unrelated editors, scripts and host tools may have
+their own path limitations. This option changes no filenames or payloads and
+does not change the SDK's persistent directory selection.
 
 ## Existing checkout configuration and selected targets
 

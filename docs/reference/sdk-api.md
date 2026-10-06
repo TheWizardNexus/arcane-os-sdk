@@ -8096,7 +8096,7 @@ explicit existing path. The application owns the remote, branch and Core API.
 ### Signature and result
 
 ```text
-createRepositoryWorkspace({name,directory,dataRoot,remote,branch,gitIdentity,onEvent,run=runProcess}={})
+createRepositoryWorkspace({name,directory,dataRoot,remote,branch,longPaths,gitIdentity,onEvent,run=runProcess}={})
 ```
 
 Returns `{directory,open,status,configuration,pull,push,write,close,drain,dispose}`. Construction does
@@ -8106,6 +8106,14 @@ Same-directory calls are ordered within the process. Shutdown drains accepted
 work and preserves the checkout. No CLI cwd, launch state, preference, snapshot
 cache or existing user-data location changes. See the [complete inputs, results,
 errors and lifecycle](core-repositories.md#one-connected-working-checkout).
+
+Optional `longPaths` captures a boolean for new Windows clones. Explicit true
+or false supplies clone-local `core.longpaths` before the first checkout and
+persists it only in the new repository. Omission preserves inherited/template
+configuration. Existing repositories and non-Windows clone commands remain
+unchanged; no global setting or data migration is performed. Git's ordinary
+configuration precedence, hooks and single-clone lifecycle remain in effect.
+See [Windows long paths](core-repositories.md#windows-long-paths-for-a-new-checkout).
 
 Optional `gitIdentity:{name?,email?,username?}` captures explicit non-secret
 settings for child Git operations without writing global/local configuration.
