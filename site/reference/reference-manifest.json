@@ -3,7 +3,7 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.77.0",
+    "sdk": "0.78.0",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
@@ -445,7 +445,7 @@
       "contractCounts": {
         "exports": 9,
         "reviewedCallables": 20,
-        "publicMembers": 44,
+        "publicMembers": 45,
         "literalCustomEvents": 0,
         "directCodedFailures": 33,
         "exportedErrorSubclasses": 0
@@ -1313,7 +1313,7 @@
       "kind": "runtime-module",
       "moduleClassification": "public-first-party",
       "contractCounts": {
-        "exports": 1,
+        "exports": 2,
         "reviewedCallables": 0,
         "publicMembers": 0,
         "literalCustomEvents": 0,
