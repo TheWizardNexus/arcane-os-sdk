@@ -1631,8 +1631,13 @@ as graph runtimes:
 Inside the dedicated speech Worker, native CacheStorage is temporarily
 unavailable before runtime import, so the selected runtime takes its existing
 fetch path. Transformers' public browser/custom/filesystem cache switches are
-disabled there. The SDK does not fabricate Cache matches or mutation results,
-and it neither clears nor changes saved native caches. The original Worker
+disabled there. After the runtime import, Kokoro's voice `caches.open()` calls
+use a Worker-local response cache with actual `match`/`put` results. It retains
+complete response bodies and metadata in memory for that Worker only; a miss
+does not fetch, and ordinary fetch still owns durable DBOPFS persistence. This
+temporary response retention is separate from Kokoro's own in-memory voice
+arrays. Unload clears it, and an unfinished put cannot repopulate it afterward.
+The SDK neither clears nor changes saved native caches. The original Worker
 environment is restored on unload or failed import. Existing explicit
 `removeBrowserSpeechModelCache()` remains a separate caller-selected operation.
 
@@ -1646,6 +1651,10 @@ closed resource parts survive cancellation. Existing whole-file caches remain
 readable without migration. HTTP resume is used only when the server returns
 the requested range; otherwise the complete resource is downloaded anew.
 Worker termination aborts and joins its parent-owned resource operations.
+An existing complete resource reports `phase:'load'`, `cached:true`, and
+`message:'Reading stored model resource'` with its complete shard progress.
+That event describes a DBOPFS read, not a network download or model-session
+reload. The resource owner does not fetch that stored response again.
 
 Routing discovery is best effort and is not an admission gate. If the scanner
 cannot interpret a module, that module is left unchanged and follows its native

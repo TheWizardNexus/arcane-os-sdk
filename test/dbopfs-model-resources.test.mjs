@@ -167,6 +167,36 @@ test('resource resume accepts honored 206 and full 200 replaces the interrupted 
     }
 });
 
+test('stored resource progress reports a cache read without another network download', async function cachedResourceProgress() {
+    const fixture = memoryStorage();
+    const progress = [];
+    let networkRequests = 0;
+    const store = createDbopfsResourceStore({
+        dbopfs: fixture.dbopfs,
+        tableName: 'models',
+        fetchImpl: async function fetchMoonRaccoon() {
+            networkRequests += 1;
+            return new Response('Every moon raccoon voice sample.');
+        },
+    });
+    const url = 'https://models.example.test/moon-raccoon/voice.bin';
+    await store.fetchResource(url);
+    const stored = await store.fetchResource(url, {
+        onProgress: function observeStoredRead(value) { progress.push(value); },
+    });
+    assert.equal(await stored.file.text(), 'Every moon raccoon voice sample.');
+    assert.equal(networkRequests, 1);
+    assert.deepEqual(progress, [{
+        phase: 'load',
+        message: 'Reading stored model resource',
+        completed: 1,
+        total: 1,
+        unit: 'shards',
+        cached: true,
+        url,
+    }]);
+});
+
 test('honest HTTP error responses preserve interrupted successful resource parts', async function failedResourceResponse() {
     const fixture = memoryStorage();
     const url = 'https://models.example.test/dragon/tokenizer.json';

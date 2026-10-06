@@ -101,7 +101,7 @@ test('ordinary speech Worker fetch uses the parent store and restores real Cache
     });
     try {
         await request(connection.runtime, 1, 'load', { configuration: configuration(runtimeSource) });
-        assert.equal('caches' in scope, false);
+        assert.notEqual(scope.caches, cacheStorage);
         const response = await scope.fetch(new Request('https://speech.example/model/config.json', {
             headers: { 'x-request': 'complete request' },
         }));
@@ -113,7 +113,18 @@ test('ordinary speech Worker fetch uses the parent store and restores real Cache
         assert.equal(response.redirected, true);
         assert.equal(calls[0].url, 'https://speech.example/model/config.json');
         assert.equal(new Headers(calls[0].options.headers).get('x-request'), 'complete request');
-        await assert.rejects(scope.__arcaneBrowserSpeechModuleRouterV1.openCache(), /CacheStorage is unavailable/u);
+        const cache = await scope.caches.open('kokoro-voices');
+        assert.equal(await cache.match('https://speech.example/voices/voice.bin'), undefined);
+        assert.equal(calls.length, 1);
+        const voice = new Response('complete voice content', { headers: { 'x-voice': 'selected' } });
+        await cache.put('https://speech.example/voices/voice.bin', voice);
+        assert.equal(await voice.text(), 'complete voice content');
+        const cachedVoice = await cache.match('https://speech.example/voices/voice.bin');
+        assert.equal(await cachedVoice.text(), 'complete voice content');
+        assert.equal(cachedVoice.headers.get('x-voice'), 'selected');
+        assert.equal(await (await cache.match('https://speech.example/voices/voice.bin')).text(), 'complete voice content');
+        assert.equal(await scope.__arcaneBrowserSpeechModuleRouterV1.openCache('runtime.mjs', 'kokoro-voices'), cache);
+        assert.equal(calls.length, 1);
     } finally {
         await request(connection.runtime, 2, 'unload');
         await connection.host.close();
@@ -121,6 +132,34 @@ test('ordinary speech Worker fetch uses the parent store and restores real Cache
     assert.equal(scope.fetch, nativeFetch);
     assert.deepEqual(Object.getOwnPropertyDescriptor(prototype, 'caches'), originalDescriptor);
     assert.equal(scope.caches, cacheStorage);
+});
+
+test('response caches appear after import and discard an unfinished put on unload', async function responseCacheLifetime(t) {
+    const scope = { fetch: globalThis.fetch, Request };
+    globalThis.__arcaneSpeechCacheFixtureScope = scope;
+    t.after(function removeCacheFixtureScope() { delete globalThis.__arcaneSpeechCacheFixtureScope; });
+    const source = `${runtimeSource}
+        globalThis.__arcaneSpeechCacheFixtureScope.cachePresentDuringImport = 'caches' in globalThis.__arcaneSpeechCacheFixtureScope;
+    `;
+    const connection = connectRuntime(scope, async function unusedResource() {
+        throw new Error('Response cache operations do not fetch.');
+    });
+    await request(connection.runtime, 1, 'load', { configuration: configuration(source) });
+    assert.equal(scope.cachePresentDuringImport, false);
+    const cache = await scope.caches.open('kokoro-voices');
+    let controller;
+    const response = new Response(new ReadableStream({
+        start(streamController) { controller = streamController; },
+    }));
+    const writing = cache.put('https://speech.example/voices/late.bin', response);
+    const rejected = assert.rejects(writing, /response cache was unloaded/u);
+    await request(connection.runtime, 2, 'unload');
+    controller.enqueue(new TextEncoder().encode('complete late voice'));
+    controller.close();
+    await rejected;
+    await assert.rejects(cache.match('https://speech.example/voices/late.bin'), /response cache was unloaded/u);
+    assert.equal('caches' in scope, false);
+    await connection.host.close();
 });
 
 test('declared speech files retain local routing while unmapped resources reach DBOPFS', async function declaredResources() {

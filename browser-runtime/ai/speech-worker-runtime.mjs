@@ -997,6 +997,7 @@ function createOrdinaryArtifactModuleRouter(
   role,
   reader,
   originalWorker,
+  responseCaches,
 ) {
   const nestedWorkers = new Set();
   const router = completeValue({
@@ -1015,8 +1016,8 @@ function createOrdinaryArtifactModuleRouter(
       return reader.fetchResource(input, init, modulePath);
     },
 
-    async openCache() {
-      throw new Error('Browser CacheStorage is unavailable in this speech Worker; resources use DBOPFS through fetch.');
+    openCache(modulePath, name) {
+      return responseCaches.open(name);
     },
 
     createWorker(modulePath, specifier, options = {}) {
@@ -1143,6 +1144,63 @@ function installOrdinaryArtifactModuleRouter(scope, configuration, role, send, s
   const resourceClient = createModelResourceClient({ send });
   let requestSignal = null;
   let reportProgress = null;
+  let cacheClosed = false;
+  const responseCacheEntries = new Map();
+  const responseCaches = {
+    async open(name) {
+      assertCacheActive(requestSignal);
+      const cacheName = String(name);
+      let cache = responseCacheEntries.get(cacheName);
+      if (!cache) {
+        const responses = new Map();
+        cache = {
+          responses,
+          api: {
+            async match(input) {
+              assertCacheActive(requestSignal);
+              const stored = responses.get(cacheRequestKey(input));
+              if (!stored) return undefined;
+              const response = new Response(stored.body, stored);
+              Object.defineProperties(response, {
+                url: { value: stored.url },
+                redirected: { value: stored.redirected },
+                type: { value: stored.type },
+              });
+              return response;
+            },
+            async put(input, response) {
+              const signal = requestSignal;
+              assertCacheActive(signal);
+              const key = cacheRequestKey(input);
+              const copy = response.clone();
+              const body = await copy.blob();
+              assertCacheActive(signal);
+              responses.set(key, {
+                body,
+                status: response.status,
+                statusText: response.statusText,
+                headers: [...response.headers],
+                url: response.url,
+                redirected: response.redirected,
+                type: response.type,
+              });
+            },
+          },
+        };
+        responseCacheEntries.set(cacheName, cache);
+      }
+      return cache.api;
+    },
+  };
+  function assertCacheActive(signal) {
+    throwIfAborted(signal, 'speech-resource-cache-cancelled');
+    if (cacheClosed) throw new Error('The speech Worker response cache was unloaded.');
+  }
+  function cacheRequestKey(input) {
+    const RequestConstructor = scope.Request ?? Request;
+    const request = new RequestConstructor(input);
+    return JSON.stringify([request.method, request.url]);
+  }
   if (!is.function(originalFetch)) {
     throw workerError(
       "ARCANE_AI_PROVIDER_UNAVAILABLE",
@@ -1166,8 +1224,9 @@ function installOrdinaryArtifactModuleRouter(scope, configuration, role, send, s
     role,
     reader,
     originalWorker,
+    responseCaches,
   );
-  const originalProperties = ['fetch', 'Worker', MODULE_ROUTER_NAME].map(
+  const originalProperties = ['fetch', 'Worker', 'caches', MODULE_ROUTER_NAME].map(
       function originalWorkerProperty(name) {
           return { name, descriptor: Object.getOwnPropertyDescriptor(scope, name) };
       },
@@ -1240,7 +1299,22 @@ function installOrdinaryArtifactModuleRouter(scope, configuration, role, send, s
     receive: resourceClient.receive,
     setSignal(signal) { requestSignal = signal; },
     setProgress(report) { reportProgress = report; },
+    enableResponseCache() {
+      // Transformers captures cache capability during import. Kokoro then uses
+      // this real, Worker-lifetime match/put cache for voices; fetch remains the
+      // sole route to durable DBOPFS resources. No native saved cache is touched.
+      assertCacheActive(requestSignal);
+      Object.defineProperty(scope, 'caches', {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: responseCaches,
+      });
+    },
     async cleanup() {
+      cacheClosed = true;
+      for (const cache of responseCacheEntries.values()) cache.responses.clear();
+      responseCacheEntries.clear();
       resourceClient.close(new Error('The speech Worker resource owner was unloaded.'));
       let cleanupFailure = null;
       try {
@@ -1773,6 +1847,7 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
       );
       const namespace = await import(entry.moduleUrl);
       throwIfAborted(signal, `${role}-load-cancelled`);
+      environment.enableResponseCache();
       restoreNamespace = configureRuntimeNamespace(
         namespace,
         configuration,
@@ -2071,6 +2146,7 @@ export function installBrowserSpeechArtifactModuleWorker(role, scope = globalThi
             target?.sourceUrl ?? request.targetUrl,
         );
         await import(target?.moduleUrl ?? request.targetUrl);
+        environment.enableResponseCache();
         scope.removeEventListener("message", bootstrap);
         await new Promise((resolve) => queueMicrotask(resolve));
         for (const queuedEvent of queued.splice(0)) replayWorkerMessage(scope, queuedEvent);

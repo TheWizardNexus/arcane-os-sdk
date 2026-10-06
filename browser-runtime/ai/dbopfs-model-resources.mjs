@@ -96,7 +96,7 @@ export function createDbopfsResourceStore({dbopfs, tableName, fetchImpl = global
                 const file = await parts.read(entry.name, {signal});
                 if (file) {
                     const state = await parts.state(entry.name, {signal});
-                    onProgress?.({phase: 'download', completed: state.parts.length,
+                    onProgress?.({phase: 'load', message: 'Reading stored model resource', completed: state.parts.length,
                         total: state.parts.length, unit: 'shards', cached: true, url: request.url});
                     return {...entry.metadata, file};
                 }
