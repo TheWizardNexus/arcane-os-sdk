@@ -1,8 +1,8 @@
 # SDXL Base 1.0 through Core
 
 The `sdxl-base-1.0` model definition selects Stability AI's complete SDXL Base
-1.0 checkpoint for text-to-image generation through the shared
-[local image runtime](local-image-generation.md). Applications supply their
+1.0 checkpoint for text-to-image generation and whole-image img2img through the
+shared [local image runtime](local-image-generation.md). Applications supply their
 own complete prompts and own the resulting images and saved associations.
 The model uses the shared retained native context, progress, cancellation
 and complete PNG result contract.
@@ -40,8 +40,8 @@ selection alone does not establish actual execution on any device.
 The single `model` resource is the official
 [`sd_xl_base_1.0.safetensors` checkpoint](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/462165984030d82259a11f4367a4eed129e94a7b/sd_xl_base_1.0.safetensors)
 at revision `462165984030d82259a11f4367a4eed129e94a7b`. It includes the text
-encoders, denoiser and original VAE. Standalone base generation uses this one
-resource; a refiner, separate VAE, LoRA or Python converter is unnecessary for
+encoders, denoiser and original VAE. Generation and whole-image editing use this
+one resource; a refiner, separate VAE, LoRA or Python converter is unnecessary for
 this selection. The upstream model carries the
 [CreativeML Open RAIL++-M license](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/462165984030d82259a11f4367a4eed129e94a7b/LICENSE.md).
 
@@ -107,6 +107,39 @@ Repeated generation reuses the loaded context; unload it when the application
 no longer needs it. Follow the shared lifecycle contract for request
 cancellation, state subscriptions, unloading and accessor closure.
 
+## Edit a whole image
+
+After loading the same model, pass an original PNG and an explicit strength to
+the existing public accessor. `originalPNG` is the application's PNG Blob or
+File; the application retains it and decides whether to save the new result.
+
+```javascript
+const edited = await images.edit({
+    model: 'sdxl-base-1.0',
+    image: originalPNG,
+    prompt: 'The octopus librarian now wears a purple knitted diving helmet.',
+    strength: 0.6,
+    signal
+});
+// Display edited.images using the same complete PNG Blob result contract.
+```
+
+This is whole-image img2img, using the checkpoint's embedded VAE encoder,
+denoiser and decoder. It needs no additional model resource, adapter or engine.
+The operation reuses the same loaded context and progress/cancellation owners
+as generation. The SDK forwards the complete prompt and original PNG; it does
+not add style instructions or save either the request or result.
+
+The model still defaults to a 1024-by-1024 canvas. Supply
+`parameters: {width, height}` when choosing another output canvas; input
+dimensions do not silently replace that selection. The native engine adapts
+the initial raster to the selected canvas and denoises the whole image.
+Framing, texture, identity and individual pixels are model results, not
+preservation guarantees. Strength zero is not an exact-copy operation, and
+the RGB model does not preserve alpha. See the shared
+[editing contract](local-image-editing.md) for supported PNG encodings,
+native preprocessing, full-result handling and cancellation.
+
 ## Defaults and operation scope
 
 Only canvas dimensions are model-specific defaults here. Sampling parameters
@@ -127,9 +160,9 @@ applies its own text conditioning and prompt-weighting syntax; see the shared
 guide for native string-boundary limitations. The SDK adds no avatar wording,
 style instructions or application-specific content.
 
-This definition advertises `txt2img`. Whole-image editing, masked editing and
-reference-image editing are separate operations with their own model and
-runtime requirements. This base selection does not advertise those operations.
+This definition advertises `txt2img` and `img2img`. Masked and reference-image
+editing are separate operations with their own model and runtime requirements;
+this base selection does not advertise them.
 
 The model resource and standalone use follow the
 [official model card](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/462165984030d82259a11f4367a4eed129e94a7b/README.md).
@@ -137,3 +170,7 @@ Native defaults and embedded-VAE behavior follow the selected engine's
 [request implementation](https://github.com/leejet/stable-diffusion.cpp/blob/master-929-3f8527a/src/pipeline/request.cpp),
 [parameter initialization](https://github.com/leejet/stable-diffusion.cpp/blob/master-929-3f8527a/src/stable-diffusion.cpp)
 and [model construction](https://github.com/leejet/stable-diffusion.cpp/blob/master-929-3f8527a/src/pipeline/model_builders.cpp).
+The pinned [image pipeline](https://github.com/leejet/stable-diffusion.cpp/blob/3f8527a/src/pipeline/image.cpp)
+encodes the initial image, samples its latent and decodes the result. That
+implementation establishes the operation path; source inspection alone does
+not establish execution, output quality or device performance.

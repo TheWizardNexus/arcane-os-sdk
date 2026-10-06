@@ -3,6 +3,26 @@ import {crc32, deflateSync} from 'node:zlib';
 import test from '../src/testing.mjs';
 import {decodeImage} from '../src/local-ai/image-editing.mjs';
 import {createCoreImageRuntime} from '../browser-runtime/ai/core-image.mjs';
+import {normalizeImageRuntimeRequirement} from '../src/local-ai/config.mjs';
+
+test('SDXL exposes whole-image editing with its existing complete checkpoint and canvas defaults', function sdxlEditingSelection() {
+    const runtime = normalizeImageRuntimeRequirement({id: 'stable-diffusion.cpp', models: ['sdxl-base-1.0']});
+    assert.equal(runtime.version, 'master-929-3f8527a');
+    assert.deepEqual(runtime.models[0], {
+        id: 'sdxl-base-1.0',
+        name: 'SDXL Base 1.0',
+        family: 'sdxl',
+        resources: {
+            model: {
+                url: 'https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/462165984030d82259a11f4367a4eed129e94a7b/sd_xl_base_1.0.safetensors',
+                filename: 'sd_xl_base_1.0.safetensors'
+            }
+        },
+        context: {},
+        defaults: {width: 1024, height: 1024},
+        operations: ['txt2img', 'img2img']
+    });
+});
 
 function chunk(type, data = Buffer.alloc(0)) {
     const name = Buffer.from(type, 'ascii');
@@ -99,46 +119,49 @@ test('PNG edit input observes cancellation before decode and after inflation', a
     await assert.rejects(decodeImage({data, signal: controller.signal}), {name: 'AbortError'});
 });
 
-test('Core edit acknowledges before reading the original Blob and preserves complete input and result', async function browserEditTransport() {
-    const original = png({rows: [0, 10, 20, 30, 40, 50, 60]});
-    let accessor;
-    let received;
-    class OriginalPNG extends Blob {
-        arrayBuffer() {
+for (const model of ['sd14', 'sdxl-base-1.0']) {
+    test(`Core ${model} edit acknowledges before reading the original Blob and preserves complete input and result`, async function browserEditTransport() {
+        const original = png({rows: [0, 10, 20, 30, 40, 50, 60]});
+        let accessor;
+        let received;
+        class OriginalPNG extends Blob {
+            arrayBuffer() {
+                assert.equal(accessor.current().status, 'Thinking');
+                return super.arrayBuffer();
+            }
+        }
+        const image = new OriginalPNG([original], {type: 'image/png'});
+        const prompt = '  A raccoon astronaut\nwith a purple helmet.  ';
+        const parameters = {negative_prompt: '  blurry\nhelmet  ', width: 512, height: 512};
+        const client = {
+            uuid() { return 'edit-stream'; },
+            events: {on() { return function unsubscribe() {}; }},
+            async invoke(method, input, options) {
+                if (method === 'image.status') return {state: 'ready', loaded: true};
+                assert.equal(method, 'image.edit');
+                received = input;
+                assert.equal(options.timeoutMs, 0);
+                return {model, images: [{data: original.toString('base64'), encoding: 'base64', mediaType: 'image/png', width: 2, height: 1}]};
+            }
+        };
+        accessor = createCoreImageRuntime({client});
+        try {
+            const pending = accessor.edit({model, image, prompt, strength: 0.6, parameters});
             assert.equal(accessor.current().status, 'Thinking');
-            return super.arrayBuffer();
+            const result = await pending;
+            assert.equal(received.model, model);
+            assert.equal(received.prompt, prompt);
+            assert.deepEqual(received.parameters, parameters);
+            assert.equal(received.strength, 0.6);
+            assert.deepEqual(Buffer.from(received.image.data, 'base64'), original);
+            assert.equal(result.model, model);
+            assert.deepEqual(Buffer.from(await result.images[0].blob.arrayBuffer()), original);
+            assert.deepEqual(Buffer.from(await Blob.prototype.arrayBuffer.call(image)), original);
+        } finally {
+            await accessor.close();
         }
-    }
-    const image = new OriginalPNG([original], {type: 'image/png'});
-    const prompt = '  A raccoon astronaut\nwith a purple helmet.  ';
-    const parameters = {negative_prompt: '  blurry\nhelmet  ', width: 512, height: 512};
-    const client = {
-        uuid() { return 'edit-stream'; },
-        events: {on() { return function unsubscribe() {}; }},
-        async invoke(method, input, options) {
-            if (method === 'image.status') return {state: 'ready', loaded: true};
-            assert.equal(method, 'image.edit');
-            received = input;
-            assert.equal(options.timeoutMs, 0);
-            return {model: 'sd14', images: [{data: original.toString('base64'), encoding: 'base64', mediaType: 'image/png', width: 2, height: 1}]};
-        }
-    };
-    accessor = createCoreImageRuntime({client});
-    try {
-        const pending = accessor.edit({model: 'sd14', image, prompt, strength: 0.6, parameters});
-        assert.equal(accessor.current().status, 'Thinking');
-        const result = await pending;
-        assert.equal(received.prompt, prompt);
-        assert.deepEqual(received.parameters, parameters);
-        assert.equal(received.strength, 0.6);
-        assert.deepEqual(Buffer.from(received.image.data, 'base64'), original);
-        assert.equal(result.model, 'sd14');
-        assert.deepEqual(Buffer.from(await result.images[0].blob.arrayBuffer()), original);
-        assert.deepEqual(Buffer.from(await Blob.prototype.arrayBuffer.call(image)), original);
-    } finally {
-        await accessor.close();
-    }
-});
+    });
+}
 
 test('Core edit cancellation during Blob preparation prevents native dispatch', async function cancelledBrowserPreparation() {
     let releaseRead;

@@ -14,5 +14,5 @@ export const SDXL_BASE_1_0_MODEL = {
         width: 1024,
         height: 1024
     },
-    operations: ['txt2img']
+    operations: ['txt2img', 'img2img']
 };

@@ -1,8 +1,9 @@
 # Local image editing through Core
 
 `createCoreImageRuntime()` exposes whole-image img2img through `edit()`, using
-the same retained native context as generation. The selected SD1.4 model
-advertises `txt2img` and `img2img`. Applications supply the original PNG, the
+the same retained native context as generation. The built-in SD1.4 and
+[SDXL Base 1.0](local-image-sdxl.md#edit-a-whole-image) models advertise
+`txt2img` and `img2img`. Applications supply the original PNG, the
 complete prompt and explicit strength, retain the original, and decide whether
 to save the separate generated result.
 
@@ -149,6 +150,8 @@ own model-specific contracts and are outside this PNG img2img operation.
 Ordinary img2img does not require LoRA training. The selected engine documents
 this directly with its base SD1.4 model in the
 [tagged img2img example](https://github.com/leejet/stable-diffusion.cpp/blob/master-929-3f8527a/docs/sd.md#img2img-example).
+The complete SDXL Base checkpoint uses its embedded VAE through the same
+image pipeline; see the [SDXL model and operation guide](local-image-sdxl.md).
 
 Source dimensions are decoder output, not an implicit request to change the
 generation dimensions. The engine center-crops and resizes temporary initial
@@ -157,7 +160,7 @@ Caller images remain unchanged;
 even `mode=none` does not suppress all later model adaptation. See the
 [native preprocessing contract](https://github.com/leejet/stable-diffusion.cpp/blob/master-929-3f8527a/docs/image_preprocessing.md).
 
-An RGB-only model such as the selected SD1.4 consumes the stored RGB
+An RGB-only model such as the selected SD1.4 or SDXL consumes the stored RGB
 and does not preserve alpha. The SDK must not silently choose a compositing
 background or claim that passing RGBA preserves its displayed appearance.
 Strength zero is also not an exact-copy operation: native img2img still uses

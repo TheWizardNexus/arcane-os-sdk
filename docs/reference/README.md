@@ -72,7 +72,7 @@ alone does not make bare module names resolve in a browser.
 | Run application-selected llama.cpp, Ollama or ONNX through Core | [Local AI through Core](local-ai.md) |
 | Generate complete local PNG images with a retained native model | [Local image generation](local-image-generation.md) |
 | Select FLUX.2 Klein 4B and its three complementary model resources | [FLUX.2 Klein 4B through Core](local-image-flux.md) |
-| Select the complete SDXL Base 1.0 checkpoint for text-to-image generation | [SDXL Base 1.0 through Core](local-image-sdxl.md) |
+| Select the complete SDXL Base 1.0 checkpoint for generation and whole-image editing | [SDXL Base 1.0 through Core](local-image-sdxl.md) |
 | Compose independently loaded transcription and synthesis engines | [Native speech service](native-speech.md) |
 | Keep a native Whisper model loaded across complete recordings | [Native Whisper transcription](local-whisper.md) |
 | Select the optional Intel NPU encoder with independent CUDA or CPU decoding | [Intel NPU Whisper](../guides/native-whisper-openvino.md) |
