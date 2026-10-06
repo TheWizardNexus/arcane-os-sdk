@@ -220,10 +220,14 @@ owners; they are separate from this runtime service.
 ### Selected Ollama model readiness
 
 The built-in `OLLAMA` LLM provider loads its selected model through Ollama's
-empty `generate` request and separately confirms that exact resolved model in
+empty `generate` request and separately confirms that selected model in
 `running()` (`/api/ps`). A model catalog entry, a connected bridge, and a
-successful preload response alone do not establish a ready model. The upstream
-preload response supplies the resolved model name, including its selected tag.
+successful preload response alone do not establish a ready model. Ollama's
+empty preload response echoes the requested name; resident snapshots use its
+shortest tagged name. Comparison applies Ollama's default `registry.ollama.ai`
+host, `library` namespace and `latest` tag, so `moon-raccoon` and
+`registry.ollama.ai/library/moon-raccoon:latest` identify the same resident
+model. This comparison leaves outbound model names and payloads unchanged.
 The provider preserves Ollama's configured/default retention duration.
 
 Core refreshes and emits `localai.state` after its Ollama generation, chat,
@@ -231,13 +235,17 @@ embedding and catalog-changing operations, including a failed or cancelled
 operation while the service remains available. Explicit `running()` inspection
 also publishes the actual resident-model snapshot. An SDK-owned process exit
 publishes its unavailable state through the existing process owner.
+Successes and failures belong to their observation order and engine lifetime;
+an older observation cannot replace newer state or a recovered engine's state.
+The complete current failure remains available through the owning state surface.
 
 The LLM provider subscribes before loading and retains that observation while
 loaded. An observed selected-model unload, replacement, unavailable service or
 service error revokes readiness and cancels the active request through the shared
 AI runtime. Each inference checks current residency before dispatch and again
-before accepting its terminal result. Streaming chunks still arrive immediately
-through their existing path. Explicit provider unloading sends Ollama's
+before accepting its terminal result. These `running({signal})` calls carry the
+owning request's cancellation through Core to `/api/ps`. Streaming chunks still
+arrive immediately through their existing path. Explicit provider unloading sends Ollama's
 `keep_alive: 0` release request; another client can independently reload a model.
 
 Ollama's documented public API exposes resident snapshots, not an ongoing
@@ -251,6 +259,8 @@ idle snapshot as proof for their next inference. `Ollama.readiness()` remains a
 service-connectivity result and does not establish selected-model readiness.
 
 Upstream references: [resident models](https://docs.ollama.com/api/ps),
+[model-name defaults and comparison](https://github.com/ollama/ollama/blob/main/types/model/name.go),
+[preload response and resident-name handling](https://github.com/ollama/ollama/blob/main/server/routes.go),
 [preload and retention](https://docs.ollama.com/faq#how-can-i-preload-a-model-into-ollama-to-get-faster-response-times).
 
 ## Browser llama.cpp provider

@@ -124,6 +124,13 @@ event data retain their complete supplied content. JSON encoding belongs only
 to transports that require it; values crossing those transports must be
 JSON-compatible. There is no client method allowlist or content limit.
 The default request timeout is ten minutes; `timeoutMs:0` disables that timer.
+
+`Arcane.ollama.running({signal, timeoutMs, onRequest}={})` forwards these request
+options to the existing Core invocation without putting them in the Ollama
+payload. It returns the complete resident-model snapshot; aborting its signal
+cancels that inspection through the same request control path. Existing
+`Arcane.ollama.running()` calls remain supported.
+
 The compatibility facade retains its operation-specific timeouts and streaming
 callbacks. Streaming IDs and isolated-operation IDs are separate protocol
 correlation fields alongside the supplied request fields.

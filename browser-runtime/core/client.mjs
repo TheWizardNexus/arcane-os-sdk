@@ -612,7 +612,7 @@ export function createCoreFacade(client){
                 return invoke('localai.isolated.question',{...request,operationId},long).finally(unsubscribe);
             }},
         ollama:{version:()=>invoke('ollama.version'),models:()=>invoke('ollama.models'),list:()=>invoke('ollama.models'),
-            running:()=>invoke('ollama.running'),show:(model,options={})=>invoke('ollama.show',{...options,model}),
+            running:function running(options={}){return invoke('ollama.running',{},options);},show:(model,options={})=>invoke('ollama.show',{...options,model}),
             generate:(request,options)=>ollamaInvoke('generate',request,options),chat:(request,options)=>ollamaInvoke('chat',request,options),
             embed:request=>invoke('ollama.embed',request??{}),
             pull:(model,options={},streamOptions)=>ollamaInvoke('pull',{...options,model},streamOptions),

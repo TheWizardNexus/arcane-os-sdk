@@ -15,7 +15,7 @@ import {
     AI_PROVIDER_PROTOCOL,
     getAIProviderRuntime
 } from './AIProviderRuntime.js';
-import {normalizeOllamaModelIdentifier} from './OllamaModelIdentifier.js';
+import {normalizeOllamaModelIdentifier,sameOllamaModelIdentifier} from './OllamaModelIdentifier.js';
 import {arcaneLogging} from 'arcane-os/logging';
 import {
     fetchHTTPResponse,
@@ -1383,7 +1383,7 @@ class AI {
             const snapshot=nativeWatch.snapshot;
             return snapshot?.available===true
                 &&(snapshot.models??[]).some(function selectedResident(model){
-                    return (model.id??model.model??model.name)===nativeWatch.residentId
+                    return sameOllamaModelIdentifier(model.id??model.model??model.name,nativeWatch.modelId)
                         &&model.loaded===true;
                 });
         }
@@ -1415,7 +1415,7 @@ class AI {
             }
             const revision=watch.revision;
             try{
-                const running=await watch.ollama.running();
+                const running=await watch.ollama.running({signal});
                 if(signal?.aborted){
                     throw normalizeAIRequestAbort(signal.reason);
                 }
@@ -1451,7 +1451,7 @@ class AI {
                 );
             }
             const watch={
-                ollama,modelId:context.selection.modelId,residentId:context.selection.modelId,
+                ollama,modelId:context.selection.modelId,
                 snapshot:null,error:null,revision:0,unsubscribe:null
             };
             nativeWatch=watch;
@@ -1469,11 +1469,10 @@ class AI {
             }
             // Empty generation is Ollama's public preload operation. Residency
             // is established separately; a successful response alone is insufficient.
-            const loaded=await ollama.generate(
+            await ollama.generate(
                 {model:watch.modelId,prompt:'',stream:false},
                 {signal:context.signal}
             );
-            watch.residentId=loaded.model??watch.modelId;
             await inspectNativeOllama(watch,context.signal);
         }
 
@@ -1661,7 +1660,7 @@ class AI {
                 busy=false;
                 if(release&&watch){
                     await watch.ollama.generate(
-                        {model:watch.residentId,prompt:'',keep_alive:0,stream:false},
+                        {model:watch.modelId,prompt:'',keep_alive:0,stream:false},
                         {signal:context.signal}
                     );
                 }

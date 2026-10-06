@@ -1,5 +1,18 @@
 import assert from 'node:assert/strict';
 import test from '../src/testing.mjs';
+import {sameOllamaModelIdentifier} from '../runtime/arcane/modules/OllamaModelIdentifier.js';
+
+test('Ollama residency comparisons use upstream default names without changing caller strings',function defaultNames(){
+    const resident='moon-raccoon:latest';
+    for(const selected of ['moon-raccoon','library/moon-raccoon','registry.ollama.ai/library/moon-raccoon',
+        'registry.ollama.ai/library/moon-raccoon:latest','REGISTRY.OLLAMA.AI/LIBRARY/Moon-Raccoon:LATEST']){
+        assert.equal(sameOllamaModelIdentifier(selected,resident),true);
+    }
+    assert.equal(sameOllamaModelIdentifier('moon-raccoon:small',resident),false);
+    assert.equal(sameOllamaModelIdentifier('observatory/moon-raccoon',resident),false);
+    assert.equal(sameOllamaModelIdentifier('other.registry/library/moon-raccoon',resident),false);
+    assert.equal(sameOllamaModelIdentifier(undefined,resident),false);
+});
 
 function deferred() {
     let resolve;
@@ -8,7 +21,8 @@ function deferred() {
     return {promise, resolve, reject};
 }
 
-test('AI Ollama loads the exact resident model and observes owned lifecycle through commit', async function ollamaReadiness() {
+for (const selectedModel of ['moon-raccoon:latest', 'moon-raccoon', 'registry.ollama.ai/library/moon-raccoon']) {
+test(`AI Ollama observes residency and cancellation for ${selectedModel}`, async function ollamaReadiness() {
     const globals = new Map(['window', 'document', 'localStorage', 'Arcane'].map(function descriptor(key) {
         return [key, Object.getOwnPropertyDescriptor(globalThis, key)];
     }));
@@ -35,6 +49,7 @@ test('AI Ollama loads the exact resident model and observes owned lifecycle thro
     let chatSignal;
     let chatOnChunk;
     let chatCount = 0;
+    let runningGate;
     function publish(available = true) {
         const snapshot = {ollama: {available, state: available ? 'ready' : 'error', models: residents.map(function resident(record) {
             return {...record, id: record.model, loaded: true};
@@ -57,9 +72,20 @@ test('AI Ollama loads the exact resident model and observes owned lifecycle thro
                     residents = [{model, name: model}];
                 }
                 publish();
-                return {model, response: '', done: true};
+                return {model: payload.model, response: '', done: true};
             },
-            async running() { return {models: residents}; },
+            async running({signal} = {}) {
+                assert.ok(signal instanceof AbortSignal);
+                if (runningGate) {
+                    const gate = runningGate;
+                    runningGate = null;
+                    gate.started.resolve(signal);
+                    await new Promise(function awaitCancellation(_resolve, reject) {
+                        signal.addEventListener('abort', function cancelInspection() { reject(signal.reason); }, {once: true});
+                    });
+                }
+                return {models: residents};
+            },
             chat(payload, {signal, onChunk}) {
                 chatCount += 1;
                 chatSignal = signal;
@@ -79,7 +105,7 @@ test('AI Ollama loads the exact resident model and observes owned lifecycle thro
     let ai;
     try {
         const {default: AI} = await import('arcane-os/ai');
-        ai = new AI('OLLAMA', 'LOCAL_SPEACH', 'LOCAL_SPEACH', model);
+        ai = new AI('OLLAMA', 'LOCAL_SPEACH', 'LOCAL_SPEACH', selectedModel);
         const load = ai.providerRuntime.load('llm');
         await preloadStarted.promise;
         assert.equal(ai.providerRuntime.status('llm').loaded, false);
@@ -88,7 +114,21 @@ test('AI Ollama loads the exact resident model and observes owned lifecycle thro
         preload.resolve();
         await load;
         assert.equal(ai.providerRuntime.status('llm').loaded, true);
-        assert.deepEqual(generated[0], {model, prompt: '', stream: false});
+        assert.deepEqual(generated[0], {model: selectedModel, prompt: '', stream: false});
+
+        const controller = new AbortController();
+        runningGate = {started: deferred()};
+        const inspecting = runningGate.started.promise;
+        const cancelled = ai.fetchRequest({messages: [{role: 'user', content: 'Keep every sandwich.'}], signal: controller.signal});
+        const cancelledResult = assert.rejects(cancelled);
+        const inspectionSignal = await inspecting;
+        controller.abort();
+        await cancelledResult;
+        assert.equal(inspectionSignal.aborted, true);
+        assert.equal(chatCount, 0);
+
+        await ai.providerRuntime.unload('llm');
+        await ai.providerRuntime.load('llm');
 
         // An idle observation never substitutes for the next inference boundary.
         residents = [];
@@ -100,6 +140,7 @@ test('AI Ollama loads the exact resident model and observes owned lifecycle thro
         const request = ai.fetchRequest({messages});
         const rejected = assert.rejects(request);
         const sent = await chatStarted.promise;
+        assert.equal(sent.model, selectedModel);
         assert.deepEqual(sent.messages, messages);
         residents = [{model: 'replacement:latest'}];
         publish();
@@ -135,6 +176,7 @@ test('AI Ollama loads the exact resident model and observes owned lifecycle thro
         await ai.providerRuntime.load('llm');
         await ai.providerRuntime.unload('llm');
         assert.equal(generated.at(-1).keep_alive, 0);
+        assert.equal(generated.at(-1).model, selectedModel);
         assert.equal(listeners.size, 0);
     } finally {
         try {
@@ -151,3 +193,4 @@ test('AI Ollama loads the exact resident model and observes owned lifecycle thro
         }
     }
 });
+}

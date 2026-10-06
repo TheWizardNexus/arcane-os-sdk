@@ -3227,9 +3227,17 @@ Validates and canonicalizes the syntax of Ollama model identifiers without grant
 
 ### Public surface
 
-`normalizeOllamaModelIdentifier()`, `isOllamaModelIdentifier()`.
+`normalizeOllamaModelIdentifier()`, `isOllamaModelIdentifier()`,
+`sameOllamaModelIdentifier(left, right)`.
 
-Exact exports: `isOllamaModelIdentifier`, `normalizeOllamaModelIdentifier`.
+Exact exports: `isOllamaModelIdentifier`, `normalizeOllamaModelIdentifier`,
+`sameOllamaModelIdentifier`.
+
+The comparison helper applies Ollama's default registry (`registry.ollama.ai`),
+namespace (`library`) and tag (`latest`) with case-insensitive name comparison.
+It compares a selected name with resident-model names without rewriting either
+string or any outbound payload; different explicit hosts, namespaces or tags
+remain distinct. The existing identifier-validation functions are unchanged.
 
 ### Availability and normalization
 

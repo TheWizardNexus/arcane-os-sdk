@@ -120,7 +120,7 @@ non-writable `globalThis.arcaneOllama` convenience and emits
 | `version()` | `Arcane.ollama.version()` | Raw service version diagnostic. | [version](core/reference/arcane-api/ai-and-ollama.md#arcaneollamaversion) |
 | `models()` | `Arcane.ollama.models()` | Raw installed-model diagnostic. | [models](core/reference/arcane-api/ai-and-ollama.md#arcaneollamamodels) |
 | `list()` | Calls `Arcane.ollama.models()` | Module alias for `models()`; it does not call the bridge's separate `list` alias. | [list](core/reference/arcane-api/ai-and-ollama.md#arcaneollamalist) |
-| `running()` | `Arcane.ollama.running()` | Raw resident-model diagnostic. | [running](core/reference/arcane-api/ai-and-ollama.md#arcaneollamarunning) |
+| `running(options?)` | `Arcane.ollama.running(options?)` | Raw resident-model diagnostic; optional `{signal, timeoutMs, onRequest}` uses the Core request lifetime. No-argument calls remain supported. | [running](core/reference/arcane-api/ai-and-ollama.md#arcaneollamarunning) |
 | `show(model, options)` | `Arcane.ollama.show(...)` | Raw bounded model metadata. | [show](core/reference/arcane-api/ai-and-ollama.md#arcaneollamashow) |
 | `generate(request, options)` | `Arcane.ollama.generate(...)` | Admitted generation; optional chunk callback/signal/timeout. | [generate](core/reference/arcane-api/ai-and-ollama.md#arcaneollamagenerate) |
 | `chat(request, options)` | `Arcane.ollama.chat(...)` | Admitted chat/tools; optional chunk callback/signal/timeout. | [chat](core/reference/arcane-api/ai-and-ollama.md#arcaneollamachat) |

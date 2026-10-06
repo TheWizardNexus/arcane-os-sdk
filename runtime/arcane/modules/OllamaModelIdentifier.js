@@ -22,3 +22,16 @@ export function normalizeOllamaModelIdentifier(value){
 export function isOllamaModelIdentifier(value){
     return normalizeOllamaModelIdentifier(value)!==null;
 }
+
+/** Compare Ollama names with its default host, namespace and tag; never rewrite a request. */
+export function sameOllamaModelIdentifier(left,right){
+    if(!is.string(left)||!is.string(right))return false;
+    function identity(value){
+        const parts=value.replace(/^[A-Za-z][A-Za-z0-9+.-]*:\/\//,'').split('/');
+        const model=parts.pop();
+        const namespace=parts.pop()??'library';
+        const host=parts.join('/')||'registry.ollama.ai';
+        return `${host}/${namespace}/${model.includes(':')?model:`${model}:latest`}`.toLowerCase();
+    }
+    return identity(left)===identity(right);
+}

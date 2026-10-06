@@ -40,7 +40,7 @@ export class Ollama{
     version(){ return api().version() }
     models(){ return api().models() }
     list(){ return api().models() }
-    running(){ return api().running() }
+    running(options){ return api().running(options) }
     show(model,options){ return api().show(model,options) }
     generate(request,options){ return api().generate(request,options) }
     chat(request,options){ return api().chat(request,options) }

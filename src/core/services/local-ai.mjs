@@ -208,9 +208,25 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
         publish();
     }
 
-    function recordOllamaModels(engine, catalog, running, revision) {
-        if (revision < engine.ollamaAppliedRevision) return;
-        engine.ollamaAppliedRevision = revision;
+    function beginOllamaObservation(engine) {
+        return {revision: ++engine.ollamaRevision, signal: engine.signal};
+    }
+
+    function ownsOllamaObservation(engine, observation) {
+        return observation.signal === engine.signal && !observation.signal.aborted
+            && engine.server.current.available && observation.revision >= engine.ollamaAppliedRevision;
+    }
+
+    function recordOllamaFailure(engine, error, observation) {
+        if (!ownsOllamaObservation(engine, observation)) return;
+        engine.ollamaAppliedRevision = observation.revision;
+        recordFailure(engine, error);
+    }
+
+    function recordOllamaModels(engine, catalog, running, observation) {
+        if (!ownsOllamaObservation(engine, observation)) return;
+        engine.ollamaAppliedRevision = observation.revision;
+        engine.state = {...engine.state, ...engine.server.current, error: null};
         const resident = new Map((running.models ?? []).map(function residentModel(model) {
             return [model.model ?? model.name, model];
         }));
@@ -227,13 +243,19 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
     async function refreshModels(engine, signal) {
         const revision = engine.revision;
         if (engine.id === 'ollama') {
-            const observation = ++engine.ollamaRevision;
-            const [catalog, running] = await Promise.all([
-                requestLocalJSON({url: engine.server.url, path: '/api/tags', signal}),
-                requestLocalJSON({url: engine.server.url, path: '/api/ps', signal})
-            ]);
-            signal?.throwIfAborted();
-            recordOllamaModels(engine, catalog, running, observation);
+            const observation = beginOllamaObservation(engine);
+            const observationSignal = signal ? AbortSignal.any([signal, observation.signal]) : observation.signal;
+            try {
+                const [catalog, running] = await Promise.all([
+                    requestLocalJSON({url: engine.server.url, path: '/api/tags', signal: observationSignal}),
+                    requestLocalJSON({url: engine.server.url, path: '/api/ps', signal: observationSignal})
+                ]);
+                observationSignal.throwIfAborted();
+                recordOllamaModels(engine, catalog, running, observation);
+            } catch (error) {
+                if (!observationSignal.aborted) recordOllamaFailure(engine, error, observation);
+                throw error;
+            }
         } else {
             const properties = await requestLocalJSON({url: engine.server.url, path: '/props', signal});
             engine.router = properties.role === 'router';
@@ -442,7 +464,8 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
 
     async function ollamaRequest(operation, parameters = {}, request, method = 'POST') {
         const engine = await engineReady('ollama', request.signal);
-        const observation = operation === 'ps' ? ++engine.ollamaRevision : null;
+        const engineSignal = engine.signal;
+        const observation = operation === 'ps' ? beginOllamaObservation(engine) : null;
         try {
             const result = await ollamaResponse(engine, operation, parameters, request, method);
             if (operation === 'ps') {
@@ -451,17 +474,18 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
             }
             return result;
         } catch (error) {
-            if (operation === 'ps' && !request.signal.aborted && !engine.signal.aborted) recordFailure(engine, error);
+            if (operation === 'ps' && !request.signal.aborted) recordOllamaFailure(engine, error, observation);
             throw error;
         } finally {
             // Every owned operation that can change residency/catalog leaves
             // a real upstream observation, including cancellation or failure.
             if (['chat', 'generate', 'embed', 'pull', 'create', 'copy', 'delete'].includes(operation)
-                && !engine.signal.aborted) {
+                && engine.signal === engineSignal && !engineSignal.aborted) {
                 try {
-                    await refreshModels(engine, engine.signal);
-                } catch (error) {
-                    if (!engine.signal.aborted) recordFailure(engine, error);
+                    await refreshModels(engine, engineSignal);
+                } catch {
+                    // The refresh publishes only its current owned failure;
+                    // retain the operation's original result or error.
                 }
             }
         }
@@ -530,7 +554,10 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
             }
             return engine;
         });
-        engine.ready.catch(function startupFailed(error) { if (!signal.aborted) recordFailure(engine, error); });
+        engine.ready.catch(function startupFailed(error) {
+            // Ollama refreshes and the server already publish their own failures.
+            if (!signal.aborted && engine.id !== 'ollama') recordFailure(engine, error);
+        });
     }
 
     const service = {
@@ -600,7 +627,7 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
                         await refreshModels(engine, request.signal);
                     } catch (error) {
                         request.signal.throwIfAborted();
-                        recordFailure(engine, error);
+                        if (engine.id !== 'ollama') recordFailure(engine, error);
                     }
                 }));
                 return snapshot();

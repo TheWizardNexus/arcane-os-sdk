@@ -73,6 +73,24 @@ test('Core cancellation sends the existing control frame and ignores late comple
     assert.deepEqual(frames.at(-1),{protocol:CORE_PROTOCOL,type:'control',control:'requests.cancelAll'});
 });
 
+test('Ollama resident inspection forwards cancellation options and preserves no-argument callers',async function ollamaInspectionCancellation(t){
+    const {client,frames,receive}=fixture(t);
+    const ollama=createCoreFacade(client).ollama;
+    const controller=new AbortController();
+    const pending=ollama.running({signal:controller.signal});
+    const request=frames[0];
+    assert.equal(request.method,'ollama.running');
+    assert.deepEqual(request.parameters,{});
+    controller.abort();
+    await assert.rejects(pending,{code:'ARCANE_REQUEST_ABORTED'});
+    assert.deepEqual(frames[1],{protocol:CORE_PROTOCOL,type:'control',control:'request.cancel',requestId:request.id});
+    const ordinary=ollama.running();
+    const current=frames.at(-1);
+    const result={models:[{model:'moon-raccoon:latest'}]};
+    receive({protocol:CORE_PROTOCOL,type:'response',id:current.id,ok:true,result});
+    assert.deepEqual(await ordinary,result);
+});
+
 test('Core request observer exposes the real ID before send without changing the payload',async t=>{
     let observed;
     let receive;
