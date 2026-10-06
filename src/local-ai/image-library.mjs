@@ -18,6 +18,15 @@ export function createImageLibrary(
 ) {
     const requireBinding = createRequire(bindingModulePath);
     const koffi = requireBinding(bindingModulePath);
+    const configuration = koffi.config();
+    // Async inference needs the normal native stack before Koffi creates its pools.
+    if (configuration.async_stack_size < configuration.sync_stack_size) {
+        koffi.config(
+            {
+                async_stack_size: configuration.sync_stack_size
+            }
+        );
+    }
     const library = loadLibrary(libraryPath);
     const backendDirectory = dirname(libraryPath);
     let backendLibrary;
