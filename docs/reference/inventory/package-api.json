@@ -6,12 +6,40 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 276,
+  "memberCount": 278,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
   },
   "members": [
+    {
+      "id": "core-repositories:resolveArcaneDataPaths",
+      "name": "resolveArcaneDataPaths",
+      "displayName": "resolveArcaneDataPaths()",
+      "kind": "function",
+      "signature": "resolveArcaneDataPaths({dataRoot}={})",
+      "entrypoints": ["arcane-os/core/repositories"],
+      "primaryImport": "arcane-os/core/repositories",
+      "group": "Native repository workspaces",
+      "summary": "Resolves persistent per-user ArcaneData and Repos locations without I/O or migration.",
+      "availability": "Node on Windows, Linux and macOS; Android supplies its persistent dataRoot",
+      "protocol": "Native filesystem paths",
+      "normalization": "Returns absolute dataRoot and repositoriesRoot; explicit dataRoot takes precedence, otherwise uses LocalAppData, XDG data home or user Application Support. Changes no launch, preference, workspace or user data."
+    },
+    {
+      "id": "core-repositories:createRepositoryWorkspace",
+      "name": "createRepositoryWorkspace",
+      "displayName": "createRepositoryWorkspace()",
+      "kind": "function",
+      "signature": "createRepositoryWorkspace({name,directory,dataRoot,remote,branch,onEvent,run=runProcess}={})",
+      "entrypoints": ["arcane-os/core/repositories"],
+      "primaryImport": "arcane-os/core/repositories",
+      "group": "Native repository workspaces",
+      "summary": "Owns one selected native working checkout with ArcaneData/Repos defaults and existing Git/process lifecycle.",
+      "availability": "Node with Git on Windows, Linux and macOS; Android requires host process adaptation",
+      "protocol": "Git working repository and SDK process adapter",
+      "normalization": "Returns directory, open, status, pull, push and identical close/drain/dispose hooks. Only missing or empty destinations clone; existing roots are inspected without rewriting, resetting or pulling. Explicit paths remain selected. Same-directory operations serialize within the process; cancellation and shutdown join accepted process work."
+    },
     {
       "id": "core-speech:createSpeechService",
       "name": "createSpeechService",

@@ -61,6 +61,7 @@
     "./core/runtime": "./src/core/runtime.mjs",
     "./core/stdio": "./src/core/stdio.mjs",
     "./core/host": "./src/core/host.mjs",
+    "./core/repositories": "./src/core/repositories.mjs",
     "./core/packaged-web": "./src/core/services/packaged-web.mjs",
     "./core/preferences": "./src/core/services/preferences.mjs",
     "./core/diarization": "./src/diarization/service.mjs",

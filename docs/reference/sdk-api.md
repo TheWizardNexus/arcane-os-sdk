@@ -57,6 +57,7 @@ runtime layouts.
 | `arcane-os/core/runtime` | App-neutral native Core dispatcher and service lifecycle. |
 | `arcane-os/core/stdio` | Framed Node stdio transport with graceful runtime drain. |
 | `arcane-os/core/host` | Node-only reusable Core host lifecycle with explicitly supplied services. |
+| `arcane-os/core/repositories` | Native persistent ArcaneData paths and explicitly selected connected working repositories. |
 | `arcane-os/core/packaged-web` | Core-owned packaged web listener with a persisted loopback origin and ready/failure events. |
 | `arcane-os/core/preferences` | Existing preference RPC methods with an application-selected file, ordered writes and owned drain. |
 | `arcane-os/core/diarization` | Lazy native speaker-diarization service, explicit stream methods and lifecycle/result events. |
@@ -392,6 +393,8 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `arcaneNativeBuilderProvider default export` | singleton | `arcane-os/native/portable-provider` | Portable native provider | Node; produces a portable payload rather than an executable host |
 | `startCoreHost()` | function | `arcane-os/core/host` | Native Core host composition | Node with readable input and writable output streams |
 | `readCoreLaunchContext()` | function | `arcane-os/core/host` | Native Core host composition | Node; reads explicitly selected launch JSON |
+| `resolveArcaneDataPaths()` | function | `arcane-os/core/repositories` | Native repository workspaces | Node on Windows, Linux and macOS; Android supplies its data root |
+| `createRepositoryWorkspace()` | function | `arcane-os/core/repositories` | Native repository workspaces | Node with Git; Android requires host process adaptation |
 | `createWindowsNativeProvider()` | function | `arcane-os/native/windows-provider` | Windows native provider | Node assembly; Windows x64/WebView2 execution |
 | `arcaneNativeBuilderProvider` | singleton | `arcane-os/native/windows-provider` | Windows native provider | Node assembly; Windows x64/WebView2 execution |
 | `arcaneNativeBuilderProvider default export` | singleton | `arcane-os/native/windows-provider` | Windows native provider | Node assembly; Windows x64/WebView2 execution |
@@ -7689,6 +7692,63 @@ Mac launchers forward their actual host-selected state directory through the
 separate argument; other composing hosts may use the same seam. This JavaScript
 contract does not establish a compiled host or matching release archive. See
 [launch-time locations](core-native-packaging.md#launch-time-locations).
+
+## resolveArcaneDataPaths()
+
+### Overview
+
+Resolves the native per-user `ArcaneData` directory and its `Repos` child without
+creating directories or changing application state.
+
+### Signature and result
+
+```text
+resolveArcaneDataPaths({dataRoot}={})
+```
+
+Returns absolute `{dataRoot,repositoriesRoot}`. Defaults use Windows LocalAppData,
+Linux XDG data home or `~/.local/share`, and macOS user Application Support.
+Android and other adapted hosts supply their persistent `dataRoot`. An explicit
+root is used directly, with relative paths resolved from the process working
+directory. See [native repository locations](core-repositories.md#persistent-locations).
+
+```javascript
+import {resolveArcaneDataPaths} from 'arcane-os/core/repositories';
+
+const {repositoriesRoot} = resolveArcaneDataPaths();
+```
+
+## createRepositoryWorkspace()
+
+### Overview
+
+Owns one native connected working checkout under `ArcaneData/Repos/<name>` or an
+explicit existing path. The application owns the remote, branch and Core API.
+
+### Signature and result
+
+```text
+createRepositoryWorkspace({name,directory,dataRoot,remote,branch,onEvent,run=runProcess}={})
+```
+
+Returns `{directory,open,status,pull,push,close,drain,dispose}`. Construction does
+no I/O. Operations accept `{signal}`; a missing or empty destination clones once,
+while existing checkout files, branches, remotes and local changes remain intact.
+Same-directory calls are ordered within the process. Shutdown drains accepted
+work and preserves the checkout. No CLI cwd, launch state, preference, snapshot
+cache or existing user-data location changes. See the [complete inputs, results,
+errors and lifecycle](core-repositories.md#one-connected-working-checkout).
+
+```javascript
+import {createRepositoryWorkspace} from 'arcane-os/core/repositories';
+
+const repository = createRepositoryWorkspace({
+    name: 'moon-cheese-dispatches',
+    remote: applicationConnection.remote
+});
+await repository.open({signal});
+await repository.close();
+```
 
 ## createCoreLocalAIProvider()
 
