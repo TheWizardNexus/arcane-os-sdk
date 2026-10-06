@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.85.0
+
+- Add `createModelObservationService({runtime, localAI, image, decisions})`
+  through `arcane-os/core/model-observation`, and renderer
+  `attachModelObservation` / observer `subscribeModelObservation` through
+  `arcane-os/ai/model-observation`. Observe the actual existing Core and
+  renderer model owners without creating, loading or replacing a runtime,
+  provider or model.
+- Replay complete current owner state and retain its reported errors, with
+  explicit opt-in live diagnostics and connection-owned cancellation. Keep
+  original client request identity separate from actual internal Core request
+  identity. Native `coreListener` composition reuses existing selected services;
+  applications explicitly attach their renderer owners.
+- Preserve the complete Windows PnP property batch while narrowing only the
+  property cmdlet's internal concurrency. Keep asynchronous shared discovery,
+  cancellation, explicit refresh and model/device selection unchanged. This
+  addresses the observed missing/duplicate property rows without adding retries
+  or another hardware query.
+- These capabilities expose current state and correct the property query;
+  they do not claim to repair or verify native model inference. No dependency
+  changes or native host rebuild are required for this revision.
+
 ## 0.84.0
 
 - Add `startCoreListener({runtime, endpoint, onError})` through
