@@ -112,3 +112,30 @@ share one shutdown promise. Actual engine cleanup failures reject with an
 `AggregateError` and remain in role diagnostics. `dispose()` additionally
 releases the service's event subscriptions. New work after shutdown begins
 rejects with `CORE_CLOSING`.
+
+## AI built-in native speech readiness
+
+The `AI` module's `LOCAL_SPEACH` adapter observes `speech.state` before reading
+`Arcane.speech.status()`. A newer event takes precedence over an outstanding
+initial status response. Each role loads independently: STT does not wait for
+TTS, and unmuting waits for the selected TTS model rather than a callable facade.
+
+For this service's role snapshots, readiness requires the exact selected
+`modelId`, its engine identity, `loaded: true`, `available: true`, and a `ready`
+or `running` state. Model loading remains an ordinary cancellable waiting state.
+An engine error, unavailable role, or different selected model rejects the
+adapter load. Later readiness loss or engine/model replacement invalidates the
+AI role and cancels its queued and active requests through the existing provider
+runtime. A new explicit role load or unmute can observe the next ready state.
+
+Older fixed-model hosts expose the published aggregate-only `SpeechStatus`
+contract instead of per-model lifecycle. The adapter preserves their independent
+health-based readiness for `whisper-small` with `whisper.cpp` and `kokoro` with
+`kokoro-onnx`, using `status: 'ok'` and the corresponding availability boolean.
+That contract is a one-shot health observation, not evidence of a persistently
+loaded native model or a continuous lifecycle event stream.
+
+Cancellation, unload, disposal, and route retirement release adapter-owned
+subscriptions. They do not close the host's shared engines or alter complete
+speech requests and results. Browser and explicitly registered speech providers
+retain their existing lifecycle contracts.

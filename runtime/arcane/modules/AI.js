@@ -1615,16 +1615,180 @@ class AI {
         const expectedOperation=role==='stt'?'transcribe':'synthesize';
         let state='unloaded';
         let busy=false;
+        let nativeWatch=null;
+
+        function nativeSpeechReady(){
+            if(!nativeWatch
+                ||nativeWatch.speech!==runtime.#nativeSpeech(providerId,role)
+                ||nativeWatch.modelId!==runtime.#builtInSpeechModel(role)){
+                return false;
+            }
+            const snapshot=nativeWatch.snapshot;
+            const selected=snapshot?.roles?.[role];
+            if(selected){
+                return selected.modelId===nativeWatch.modelId
+                    &&selected.providerId===nativeWatch.engineId
+                    &&selected.loaded===true
+                    &&selected.available===true
+                    &&['ready','running'].includes(selected.state);
+            }
+            // Older fixed-model hosts expose independent health, not engine lifecycle.
+            return snapshot?.status==='ok'
+                &&nativeWatch.modelId===(role==='stt'?'whisper-small':'kokoro')
+                &&snapshot[role==='stt'?'sttEngine':'ttsEngine']
+                    ===(role==='stt'?'whisper.cpp':'kokoro-onnx')
+                &&snapshot[role==='stt'?'transcriptionAvailable':'synthesisAvailable']===true;
+        }
+
+        function nativeSpeechReadinessError(){
+            const snapshot=nativeWatch?.snapshot;
+            if(nativeWatch?.error){
+                return nativeWatch.error;
+            }
+            if(!snapshot){
+                return aiProviderError(
+                    'The native speech API returned no readiness status.',
+                    'AI_NATIVE_LOCAL_REQUIRED'
+                );
+            }
+            const selected=snapshot.roles?.[role];
+            if(selected?.modelId&&selected.modelId!==nativeWatch.modelId){
+                return aiProviderError(
+                    `The native ${role.toUpperCase()} model differs from the selected AI model.`,
+                    'ARCANE_AI_MODEL_AUTHORITY_REQUIRED'
+                );
+            }
+            if(selected?.providerId&&selected.providerId!==nativeWatch.engineId){
+                return aiProviderError(
+                    `The native ${role.toUpperCase()} engine was replaced.`,
+                    'ARCANE_AI_MODEL_AUTHORITY_REQUIRED'
+                );
+            }
+            if(snapshot.closed===true
+                ||['closing','closed'].includes(snapshot.status)
+                ||['error','unavailable','closed','disposed'].includes(selected?.state)
+                ||(!selected&&!nativeSpeechReady())){
+                return aiProviderError(
+                    `The native ${role.toUpperCase()} model is not ready.`,
+                    'ARCANE_AI_ROLE_NOT_READY',
+                    selected?.error
+                );
+            }
+            return null;
+        }
+
+        function stopNativeSpeechWatch(){
+            const previous=nativeWatch;
+            nativeWatch=null;
+            previous?.unsubscribe?.();
+        }
+
+        function waitForNativeSpeech(context){
+            stopNativeSpeechWatch();
+            const watch={
+                speech:runtime.#nativeSpeech(providerId,role),
+                modelId:context.selection.modelId,
+                engineId:null,
+                snapshot:null,
+                error:null,
+                revision:0,
+                unsubscribe:null
+            };
+            nativeWatch=watch;
+            return new Promise(function waitForNativeSpeechState(resolve,reject){
+                let settled=false;
+                function finish(error){
+                    if(settled){
+                        return;
+                    }
+                    settled=true;
+                    context.signal?.removeEventListener('abort',cancel);
+                    if(error){
+                        reject(error);
+                    }else{
+                        resolve();
+                    }
+                }
+                function cancel(){
+                    finish(normalizeAIRequestAbort(context.signal.reason));
+                }
+                function reportObservationFailure(error){
+                    finish(error);
+                    arcaneLogging.error('Native speech readiness observation failed.',error);
+                }
+                function observe(snapshot,error=null){
+                    if(nativeWatch!==watch){
+                        return;
+                    }
+                    watch.snapshot=snapshot;
+                    watch.error=error;
+                    watch.engineId??=snapshot?.roles?.[role]?.providerId??null;
+                    if(context.signal?.aborted&&!settled){
+                        cancel();
+                    }else if(nativeSpeechReady()){
+                        finish();
+                    }else{
+                        const failure=nativeSpeechReadinessError();
+                        if(failure){
+                            finish(failure);
+                        }
+                        if(state==='ready'){
+                            state='unloaded';
+                            runtime.#retainBuiltInSpeechReadiness(
+                                runtime.#reconcileBuiltInSpeechReadiness()
+                            );
+                        }
+                    }
+                }
+                context.signal?.addEventListener('abort',cancel,{once:true});
+                try{
+                    if(context.signal?.aborted){
+                        cancel();
+                        return;
+                    }
+                    if(!is.function(watch.speech?.status)){
+                        throw aiProviderError(
+                            'The native speech API does not expose readiness status.',
+                            'AI_NATIVE_LOCAL_REQUIRED'
+                        );
+                    }
+                    if(is.function(globalThis.Arcane?.events?.on)){
+                        watch.unsubscribe=globalThis.Arcane.events.on(
+                            'speech.state',
+                            function observeNativeSpeechState(snapshot){
+                                watch.revision+=1;
+                                try{
+                                    observe(snapshot);
+                                }catch(error){
+                                    reportObservationFailure(error);
+                                }
+                            }
+                        );
+                    }
+                    const revision=watch.revision;
+                    Promise.resolve(watch.speech.status()).then(
+                        function receiveNativeSpeechStatus(snapshot){
+                            if(watch.revision===revision){
+                                observe(snapshot);
+                            }
+                        },
+                        function rejectNativeSpeechStatus(error){
+                            if(watch.revision===revision){
+                                observe(null,error);
+                            }
+                        }
+                    ).catch(reportObservationFailure);
+                }catch(error){
+                    finish(error);
+                }
+            });
+        }
 
         function statusBuiltInSpeechProvider(){
-            if(state==='ready'
-                &&!busy
-                &&!runtime.#builtInSpeechCapability(role,providerId)){
-                state='unloaded';
-            }
+            const current=state==='ready'&&!nativeSpeechReady()?'unloaded':state;
             return completeValue({
-                state,
-                loaded:state==='ready',
+                state:current,
+                loaded:current==='ready',
                 busy
             });
         }
@@ -1676,7 +1840,7 @@ class AI {
                 return runtime.#builtInSpeechInspection(role,providerId,selection);
             },
             status:statusBuiltInSpeechProvider,
-            load:function loadBuiltInSpeechProvider(context={}){
+            load:async function loadBuiltInSpeechProvider(context={}){
                 if(context.signal?.aborted){
                     throw normalizeAIRequestAbort(context.signal.reason);
                 }
@@ -1706,22 +1870,35 @@ class AI {
                     unit:'items',
                     heartbeat:false
                 });
-                if(context.signal?.aborted){
+                try{
+                    await waitForNativeSpeech(context);
+                    if(context.signal?.aborted){
+                        throw normalizeAIRequestAbort(context.signal.reason);
+                    }
+                    assertBuiltInSpeechSelection(context.selection);
+                    if(!nativeSpeechReady()){
+                        throw nativeSpeechReadinessError()??aiProviderError(
+                            `The native ${role.toUpperCase()} model lost readiness.`,
+                            'ARCANE_AI_ROLE_NOT_READY'
+                        );
+                    }
+                    state='ready';
+                    context.progress({
+                        phase:'capability',
+                        completed:1,
+                        total:1,
+                        unit:'items',
+                        heartbeat:false
+                    });
+                    return completeValue({
+                        authority:inspection.authority,
+                        status:statusBuiltInSpeechProvider()
+                    });
+                }catch(error){
                     state='unloaded';
-                    throw normalizeAIRequestAbort(context.signal.reason);
+                    stopNativeSpeechWatch();
+                    throw error;
                 }
-                state='ready';
-                context.progress({
-                    phase:'capability',
-                    completed:1,
-                    total:1,
-                    unit:'items',
-                    heartbeat:false
-                });
-                return completeValue({
-                    authority:inspection.authority,
-                    status:statusBuiltInSpeechProvider()
-                });
             },
             request:function requestBuiltInSpeechProvider(context={}){
                 if(context.signal?.aborted){
@@ -1770,6 +1947,7 @@ class AI {
                     );
                 }
                 state='unloaded';
+                stopNativeSpeechWatch();
                 return statusBuiltInSpeechProvider();
             },
             dispose:function disposeBuiltInSpeechProvider(context={}){
@@ -1783,6 +1961,7 @@ class AI {
                     );
                 }
                 state='disposed';
+                stopNativeSpeechWatch();
                 return statusBuiltInSpeechProvider();
             }
         });
@@ -1837,6 +2016,7 @@ class AI {
                 continue;
             }
             if(record.unregister()){
+                record.provider.dispose();
                 this.#builtInSpeechProviders.delete(key);
             }
         }
@@ -1916,7 +2096,12 @@ class AI {
                 return runtime.#providerRuntime.status(role);
             }
             const status=runtime.#providerRuntime.status(role);
-            if(runtime.#builtInSpeechCapability(role,selection.providerId)){
+            const record=runtime.#builtInSpeechProviders.get(
+                runtime.#builtInSpeechProviderKey(role,selection.providerId)
+            );
+            if(runtime.#builtInSpeechCapability(role,selection.providerId)
+                &&(!(status.loaded===true||status.busy===true)
+                    ||record.provider.status().loaded===true)){
                 return status;
             }
             if(status.loaded===true
