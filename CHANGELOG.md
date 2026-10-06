@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.81.0
+
+- Add per-activation native decision `family`, `model`, `revision`, and `dtype`
+  selection through the direct runtime and Core service. Support Laya FP16 and
+  Julia 1 FP32 with their own model companions and tokenizer family, preserving
+  Laya FP32 defaults, complete input rows and actual output tensors. Keep
+  requested replacement metadata separate from the active model and retain
+  prepared files through actual worker exit.
+- Report cached model loading as real stored-part progress and preserve known
+  GGUF shard totals. Forward complete progress details and cancellation through
+  cache reads without presenting cached data as a download or inventing totals
+  for an unfinished network stream.
+- Add object-form `AI.streamRequest({speech:false})` for text-only operations.
+  Completion, failure and cancellation leave unrelated prepared, native and
+  buffered speech alone. Existing defaults, positional methods and explicit
+  speech APIs retain their behavior.
+- Close and drain the Windows host after WebView2 `BrowserProcessExited`,
+  preserving its full diagnostic instead of leaving a blank window awaiting
+  manual closure. Existing renderer/Core-only handling and saved profiles stay
+  unchanged. This source correction does not establish the cause of the browser
+  exit; executable consumers require the matching rebuilt host archive.
+- Keep dependencies, app-control, native GGUF activation and native Kokoro
+  routing unchanged. Source/package verification is separate from actual model,
+  audio or application execution.
+
 ## 0.80.0
 
 - Add `assetProjectionId` and `resourcePaths` to native decision factories and
