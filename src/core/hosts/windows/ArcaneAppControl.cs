@@ -453,7 +453,8 @@ namespace Arcane.Core.Hosts.Windows
                         {
                             cancellation.Token.ThrowIfCancellationRequested();
                             if (method != "app.control.status" && method != "app.control.inspect"
-                                && method != "app.control.capture" && method != "app.control.act")
+                                && method != "app.control.capture" && method != "app.control.act"
+                                && method != "app.control.key" && method != "app.control.resize")
                                 throw new NotSupportedException("The app does not expose " + method + ".");
                             Dictionary<string, object> arguments = parameters as Dictionary<string, object>;
                             if (arguments == null)

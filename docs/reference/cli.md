@@ -17,7 +17,10 @@ JSON to stderr and a nonzero exit. Capture writes its image to the explicit
 the general output-format parser below applies to the other commands.
 Inspection accepts either `--selector` or `--request <json-file>`; the latter
 reads the complete inspection object, including an explicit `shadowPath` through
-open shadow roots. Actions continue to use `--request` for their complete object.
+open shadow roots. Actions, fixed keys and Normal-window resizing use `--request`
+for their complete parameter object. Keys require the observed document
+generation; resize returns actual previous native client dimensions for an
+explicit restoration request.
 
 ## Command inventory
 
@@ -41,7 +44,7 @@ open shadow roots. Actions continue to use `--request` for their complete object
 | `arcane run` | Serves an existing browser release, or packages, plans, builds, and launches one paired native artifact. |
 | `arcane update-check` | Performs one explicit, read-only npm dist-tag query for the installed SDK version. |
 | `arcane targets` | Lists target ids, declared status, formats, architectures, signing profiles, methods, and pairing reason. |
-| `arcane app-control status\|inspect\|capture\|act` | Connects to an explicit running native window endpoint for document inspection, viewport capture or targeted DOM actions. |
+| `arcane app-control status\|inspect\|capture\|act\|key\|resize` | Connects to an explicit running native window endpoint for document inspection, viewport capture, targeted DOM actions, fixed keys or Normal-window client resizing. |
 | `arcane repo status\|pull\|push` | Runs one selected repository operation for the current app workspace. |
 | `arcane mail key set\|status\|delete` | Manages one server-only Resend API-key profile in `.arcane.env.json`. |
 | `arcane mail send` | Performs one explicit, idempotency-keyed Resend attempt from a complete JSON report on redirected stdin. |

@@ -18,6 +18,8 @@ export async function connectAppControl({endpoint, signal, onError = reportAppCo
         inspect(parameters = {}, options) { return client.invoke('app.control.inspect', parameters, options); },
         capture(parameters = {}, options) { return client.invoke('app.control.capture', parameters, options); },
         act(parameters, options) { return client.invoke('app.control.act', parameters, options); },
+        key(parameters, options) { return client.invoke('app.control.key', parameters, options); },
+        resize(parameters, options) { return client.invoke('app.control.resize', parameters, options); },
         close() { return connection.close(); }
     };
 }

@@ -9,6 +9,9 @@
  * returned completely. Frame documents and unselected shadow-root contents stay
  * outside this scope. Closed shadow roots cannot be discovered or entered.
  * domRole/domName are DOM-derived hints, not an accessibility-tree computation.
+ * Document-level viewport/focus observations also describe the active open-shadow
+ * branch, independently of the selected inspection root. The native-only view
+ * operation reads that observation without collecting HTML/control roots.
  *
  * act({action,selector,shadowPath?,...}) requires one current CSS match in the
  * selected root. fill uses an exact
@@ -36,7 +39,10 @@ export function runAppControl(operation, params = {}) {
         if (operation === 'act') {
             return {ok: true, result: actOnElement()};
         }
-        fail('INVALID_ARGUMENT', 'Expected the inspect or act operation.');
+        if (operation === 'view') {
+            return {ok: true, result: readView()};
+        }
+        fail('INVALID_ARGUMENT', 'Expected the inspect, act, or view operation.');
     } catch (error) {
         return {
             ok: false,
@@ -64,6 +70,25 @@ export function runAppControl(operation, params = {}) {
             fail('INVALID_ARGUMENT', 'selector must be a CSS selector string.');
         }
         return Array.from(root.querySelectorAll(selector));
+    }
+
+    // Native keys and resize need only this fixed observation, not a DOM scan.
+    function readView() {
+        const focusPath = [];
+        let element = document.activeElement;
+        while (element) {
+            focusPath.push(describeElement(element, null));
+            element = element.shadowRoot?.activeElement ?? null;
+        }
+        return {
+            viewport: {
+                width: globalThis.innerWidth,
+                height: globalThis.innerHeight,
+                devicePixelRatio: globalThis.devicePixelRatio
+            },
+            documentHasFocus: document.hasFocus(),
+            focusPath
+        };
     }
 
     function selectedRoot() {
@@ -156,6 +181,7 @@ export function runAppControl(operation, params = {}) {
             ...(isDocument ? {} : {shadowPath}),
             title: document.title,
             readyState: document.readyState,
+            ...readView(),
             doctype: document.doctype
                 ? new XMLSerializer().serializeToString(document.doctype)
                 : null,

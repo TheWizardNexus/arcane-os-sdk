@@ -8,6 +8,8 @@ const HELP_TEXT=`Usage:
   arcane app-control inspect --endpoint <pipe-or-socket> [--selector <css-selector> | --request <json-file>]
   arcane app-control capture --endpoint <pipe-or-socket> --output <png-file>
   arcane app-control act --endpoint <pipe-or-socket> --request <json-file>
+  arcane app-control key --endpoint <pipe-or-socket> --request <json-file>
+  arcane app-control resize --endpoint <pipe-or-socket> --request <json-file>
 
 Connects to the selected running native window. Results are complete JSON.
 Capture writes the PNG to --output and prints its metadata. Request and output
@@ -16,6 +18,9 @@ an application or change its profile. --output selects the capture filename;
 the other Arcane commands retain their existing output-format option.
 Inspect --request reads the complete parameter object, including shadowPath and
 optional documentGeneration. It cannot be combined with --selector.
+Key --request selects Tab (optionally shiftKey:true), Enter, or Space and the
+observed documentGeneration. Resize --request supplies native client width and
+height for a Normal window; its result includes the previous dimensions.
 `;
 
 function usage(message) {
@@ -29,9 +34,11 @@ function parseArguments(argv) {
         status: ['endpoint'],
         inspect: ['endpoint', 'selector', 'request'],
         capture: ['endpoint', 'output'],
-        act: ['endpoint', 'request']
+        act: ['endpoint', 'request'],
+        key: ['endpoint', 'request'],
+        resize: ['endpoint', 'request']
     }[action];
-    if (!Array.isArray(allowed)) usage('Expected app-control status, inspect, capture, or act.');
+    if (!Array.isArray(allowed)) usage('Expected app-control status, inspect, capture, act, key, or resize.');
     const values = {};
     for (let index = 1; index < argv.length; index += 1) {
         const argument = argv[index];
@@ -48,7 +55,9 @@ function parseArguments(argv) {
     }
     if (!values.endpoint) usage('App control requires --endpoint <pipe-or-socket>.');
     if (action === 'capture' && !values.output) usage('App-control capture requires --output <png-file>.');
-    if (action === 'act' && !values.request) usage('App-control act requires --request <json-file>.');
+    if (['act', 'key', 'resize'].includes(action) && !values.request) {
+        usage(`App-control ${action} requires --request <json-file>.`);
+    }
     if (action === 'inspect' && values.request !== undefined && values.selector !== undefined) {
         usage('App-control inspect accepts --selector or --request, not both.');
     }
@@ -83,6 +92,8 @@ export async function runAppControlCli(argv, {cwd = process.cwd(), stdout = proc
         if (selection.action === 'status') result = await connection.status({signal});
         else if (selection.action === 'inspect') result = await connection.inspect(parameters, {signal});
         else if (selection.action === 'act') result = await connection.act(parameters, {signal});
+        else if (selection.action === 'key') result = await connection.key(parameters, {signal});
+        else if (selection.action === 'resize') result = await connection.resize(parameters, {signal});
         else {
             result = await connection.capture(parameters, {signal});
             const output = path.resolve(cwd, selection.output);
