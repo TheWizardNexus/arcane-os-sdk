@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.76.0
+
+- Add public `textFormat:'plain'` to the `SpeechPlayback` constructor and
+  `prepare()` options. Preserve every prepared part's exact input through
+  audio-file, native and custom speech clients, including queued narration;
+  omitted selection retains the existing formatting cleanup.
+- Distinguish a current native utterance's non-error stopped completion from
+  initial preparation with `reason:'native-playback-stopped'` on the existing
+  `ready` event. Natural final completion remains `ended`; an error does not
+  establish native resource release.
+- Preserve per-part voices, ordered playback, cancellation, replay and silent
+  preparation. No model, dependency, native host or activation changes are
+  included. Focused source fixtures are authored separately from the selected
+  package verification; no live speech result is claimed.
+
 ## 0.75.0
 
 - Advertise whole-image `img2img` alongside `txt2img` for the built-in
