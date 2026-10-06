@@ -568,7 +568,7 @@ export function createCoreFacade(client){
             remove:name=>invoke('environment.delete',{name})},
         mail:{send:request=>invoke('mail.send',request??{},{timeoutMs:450000})},
         speech:{status:()=>invoke('speech.status',{},{timeoutMs:10000}),
-            synthesize:request=>invoke('speech.synthesize',request??{},{timeoutMs:180000}),
+            synthesize:(request,options)=>invoke('speech.synthesize',request??{},{timeoutMs:180000,signal:options?.signal}),
             transcribe:request=>invoke('speech.transcribe',request??{},{timeoutMs:180000})},
         localAI:{status:()=>invoke('localai.status',{},{timeoutMs:15000}),
             ensurePlatform:()=>invoke('localai.platform.ensure',{},long),recover:request=>invoke('localai.services.recover',request??{},long),

@@ -275,6 +275,48 @@ test('facade routes native data operations without trimming supplied content',as
     assert.deepEqual(await save,{key,value});
 });
 
+test('speech synthesis cancellation preserves its payload and leaves other requests active',async function speechCancellation(t){
+    const {client,frames,receive}=fixture(t);
+    const facade=createCoreFacade(client);
+    const controller=new AbortController();
+    const parameters={input:'  The moon requests an encore.\n\t🌙\u0000  ',model:'kokoro',voice:'alloy',responseFormat:'opus',speed:1,extra:{complete:true}};
+    const preparation={speechInputPrepared:true};
+    const operation=facade.speech.synthesize(parameters,{signal:controller.signal},preparation);
+    const request=frames[0];
+    const other=facade.speech.synthesize({input:'The second moon keeps singing.'});
+    assert.equal(request.method,'speech.synthesize');
+    assert.equal(request.parameters,parameters);
+    controller.abort();
+    await assert.rejects(operation,{name:'AbortError',code:'ARCANE_REQUEST_ABORTED',method:'speech.synthesize'});
+    assert.deepEqual(frames[2],{protocol:CORE_PROTOCOL,type:'control',control:'request.cancel',requestId:request.id});
+    assert.equal(receive({protocol:CORE_PROTOCOL,type:'response',id:request.id,ok:true,result:'late audio'}),false);
+    const result={audioBase64:'Q29tcGxldGUgYXVkaW8=',contentType:'audio/ogg',details:{complete:'result'}};
+    receive({protocol:CORE_PROTOCOL,type:'response',id:frames[1].id,ok:true,result});
+    assert.equal(await other,result);
+    assert.deepEqual(preparation,{speechInputPrepared:true});
+    assert.equal(frames.length,3);
+});
+
+test('speech synthesis accepts absent options and sends no pre-aborted request',async function speechOptionalSignal(t){
+    const {client,frames,receive}=fixture(t);
+    const facade=createCoreFacade(client);
+    const controller=new AbortController();
+    controller.abort();
+    await assert.rejects(facade.speech.synthesize({input:'Unsent moon song.'},{signal:controller.signal}),{
+        name:'AbortError',code:'ARCANE_REQUEST_ABORTED'
+    });
+    assert.deepEqual(frames,[]);
+    for(const options of [undefined,null,{}]){
+        const operation=facade.speech.synthesize(undefined,options);
+        const request=frames.at(-1);
+        assert.equal(request.method,'speech.synthesize');
+        assert.deepEqual(request.parameters,{});
+        receive({protocol:CORE_PROTOCOL,type:'response',id:request.id,ok:true,result:{complete:true}});
+        assert.deepEqual(await operation,{complete:true});
+    }
+    assert.equal(frames.length,3);
+});
+
 test('installed WebKit facade preserves early frames, acknowledgement and cleanup',async t=>{
     const global={console,arcaneEvents};
     const sent=[];

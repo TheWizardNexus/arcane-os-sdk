@@ -77,6 +77,13 @@ The compatibility facade retains its operation-specific timeouts and streaming
 callbacks. Streaming IDs and isolated-operation IDs are separate protocol
 correlation fields alongside the supplied request fields.
 
+`Arcane.speech.synthesize(request, {signal})` forwards the optional cancellation
+signal through the same request lifetime. Existing one-argument calls retain
+the 180,000 ms timeout and pass the complete request unchanged. A pre-aborted
+signal sends no synthesis request; an in-flight abort sends `request.cancel`
+and suppresses late responses. Actual synthesis interruption depends on the
+registered speech service and its engine; the facade supplies no speech engine.
+
 ## Events and request lifetime
 
 `events.on(name, listener)`, `once(name, listener)` and
