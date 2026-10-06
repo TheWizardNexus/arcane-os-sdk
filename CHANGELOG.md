@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.62.0
+
+- Add whole-image PNG editing through the existing local image runtime, Core
+  service and browser accessor: `edit({model, image, prompt, strength, ...})`
+  and `image.edit` share the retained generation context and lifecycle.
+- Preserve complete original PNG input and prompts through lossless transport,
+  copy queued native input, and pass explicit finite strength without clamping.
+  Return a separate complete PNG result; applications own persistence.
+- Preserve synchronous Thinking, progress, ordered context work, cancellation,
+  unload and close. SD1.4 now advertises `img2img` beside `txt2img`.
+- Support static non-interlaced 8-bit RGB/RGBA PNG input using the existing
+  worker decoder. Unsupported formats report their actual limitation; model
+  cropping, resizing and alpha behavior remain explicit in the editing guide.
+- Reuse the approved runtime and model workflow with no dependency change.
+  This increment does not add masks, reference editing, new models or GPU
+  installation, and does not claim exact visual instruction adherence.
+
 ## 0.61.0
 
 - Add retained local image generation through Core, with public native runtime,
