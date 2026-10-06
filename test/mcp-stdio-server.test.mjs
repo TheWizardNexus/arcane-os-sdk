@@ -474,3 +474,75 @@ test(
         assert.equal(output.writableEnded, false);
     }
 );
+
+for (const sink of ['output', 'diagnostic']) {
+    for (const ending of ['close', 'error']) {
+        test(
+            `MCP ${sink} ${ending} settles a pending write without its callback`,
+            async function terminalWriteSettlement(t) {
+                const writing = deferred();
+                const input = new PassThrough();
+                const other = new PassThrough();
+                const cause = new Error(`Original ${sink} failure`);
+                let completeWrite;
+                const held = new Writable(
+                    {
+                        write(chunk, encoding, callback) {
+                            completeWrite = callback;
+                            writing.resolve();
+                        }
+                    }
+                );
+                const output = sink === 'output' ? held : other;
+                const error = sink === 'diagnostic' ? held : other;
+                const server = createMcpStdioServer(
+                    {serverInfo: {name: 'fixture', version: '1'}}
+                );
+                t.after(
+                    async function cleanup() {
+                        held.destroy();
+                        if (completeWrite) {
+                            const callback = completeWrite;
+                            completeWrite = null;
+                            callback();
+                        }
+                        await server.close().catch(
+                            function assertedTerminalFailure() {}
+                        );
+                        input.destroy();
+                        other.destroy();
+                    }
+                );
+                server.start(
+                    {input, output, error}
+                );
+                input.write(
+                    sink === 'output'
+                        ? '{"jsonrpc":"2.0","id":"pending","method":"ping"}\n'
+                        : '{complete malformed input}\n'
+                );
+                await writing.promise;
+                const rejected = assert.rejects(
+                    server.close(),
+                    function originalFailurePreserved(failure) {
+                        assert.equal(failure instanceof AggregateError, true);
+                        if (ending === 'error') assert.equal(failure.errors.includes(cause), true);
+                        return true;
+                    }
+                );
+                held.destroy(ending === 'error' ? cause : undefined);
+                await rejected;
+                await server.drain();
+                assert.equal(held.listenerCount('error'), 0);
+                assert.equal(held.listenerCount('close'), 0);
+                assert.equal(held.listenerCount('finish'), 0);
+                assert.equal(other.destroyed, false);
+                assert.equal(other.writableEnded, false);
+                const callback = completeWrite;
+                completeWrite = null;
+                callback();
+                await server.drain();
+            }
+        );
+    }
+}

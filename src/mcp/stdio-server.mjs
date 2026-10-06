@@ -171,28 +171,18 @@ export function createMcpStdioServer({serverInfo, instructions, tools = [], reso
 
     function writeDiagnostic(cause) {
         if (!errorOutput) return;
-        const work = new Promise(
-            function writeDiagnosticText(resolve) {
-                try {
-                    errorOutput.write(
-                        `${diagnosticText(cause)}\n`,
-                        'utf8',
-                        function diagnosticWritten(diagnosticError) {
-                            if (diagnosticError) diagnosticFailed(diagnosticError);
-                            resolve();
-                        }
-                    );
-                } catch (diagnosticError) {
-                    diagnosticFailed(diagnosticError);
-                    resolve();
-                }
-            }
-        );
-        track(work);
+        try {
+            const work = writeStream(errorOutput, `${diagnosticText(cause)}\n`);
+            track(
+                work.catch(diagnosticFailed)
+            );
+        } catch (diagnosticError) {
+            diagnosticFailed(diagnosticError);
+        }
     }
 
     function diagnosticFailed(cause) {
-        failures.push(cause);
+        if (!failures.includes(cause)) failures.push(cause);
     }
 
     function track(work) {
@@ -499,21 +489,47 @@ export function createMcpStdioServer({serverInfo, instructions, tools = [], reso
         writes = writes.then(
             function writeMessage() {
                 if (outputFailed) return;
-                return new Promise(
-                    function awaitWrite(resolve, reject) {
-                        output.write(
-                            encoded,
-                            'utf8',
-                            function written(cause) {
-                                if (cause) reject(cause);
-                                else resolve();
-                            }
-                        );
-                    }
-                );
+                return writeStream(output, encoded);
             }
         ).catch(failOutput);
     }
+}
+
+/** A terminal writable event may arrive without the pending write callback. */
+function writeStream(stream, text) {
+    return new Promise(
+        function awaitStreamWrite(resolve, reject) {
+            let settled = false;
+            stream.on('error', settle);
+            stream.on('close', terminal);
+            stream.on('finish', terminal);
+            if (stream.errored || stream.destroyed || stream.writableEnded) {
+                terminal();
+                return;
+            }
+            try {
+                stream.write(text, 'utf8', settle);
+            } catch (cause) {
+                settle(cause);
+            }
+
+            function terminal() {
+                settle(
+                    stream.errored ?? new Error('MCP writable stream ended before its write callback completed.')
+                );
+            }
+
+            function settle(cause) {
+                if (settled) return;
+                settled = true;
+                stream.off('error', settle);
+                stream.off('close', terminal);
+                stream.off('finish', terminal);
+                if (cause) reject(cause);
+                else resolve();
+            }
+        }
+    );
 }
 
 function record(value) {

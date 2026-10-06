@@ -40,7 +40,10 @@ export function createCodexAppServerSession({
     let disposed = false;
     let eventsDisposed = false;
     let nextRequestId = 0;
+    let nextServerRequestSequence = 0;
     let status = {state: 'disconnected'};
+    const seenServerRequestIds = new Set();
+    const publishingRequests = new Map();
     const session = {
         connect,
         reconnect,
@@ -71,11 +74,11 @@ export function createCodexAppServerSession({
     );
     return session;
 
-    function emit(name, detail) {
-        events.dispatch(eventTypes[name], detail);
+    function emit(name, detail, options) {
+        events.dispatch(eventTypes[name], detail, options);
     }
 
-    function observe(listener, detail, name) {
+    function observe(listener, detail, name, context) {
         if (!is.function(listener)) {
             return;
         }
@@ -94,7 +97,7 @@ export function createCodexAppServerSession({
             }
         }
         try {
-            const result = listener(detail);
+            const result = listener(detail, context);
             if (result && is.function(result.then)) {
                 Promise.resolve(result).catch(observerFailed);
             }
@@ -107,7 +110,10 @@ export function createCodexAppServerSession({
         const unsubscribe = events.subscribe(
             eventTypes[name],
             function deliver(occurrence) {
-                observe(listener, occurrence.detail, name);
+                const context = name === 'serverRequest'
+                    ? publishingRequests.get(occurrence.operationId)
+                    : undefined;
+                observe(listener, occurrence.detail, name, context);
             },
             options
         );
@@ -316,13 +322,27 @@ export function createCodexAppServerSession({
         );
     }
 
-    function respond(response) {
+    function respond(response, context) {
         const current = readyConnection();
         const pending = current.serverRequests.get(response.id);
         if (!pending) {
             throw sessionError(
                 'REQUEST_NOT_FOUND',
                 'This server request is no longer pending.',
+                {id: response.id}
+            );
+        }
+        if (context !== undefined && context !== pending.context) {
+            throw sessionError(
+                'STALE_REQUEST_CONTEXT',
+                'This response belongs to an earlier server request.',
+                {id: response.id}
+            );
+        }
+        if (context === undefined && pending.contextRequired) {
+            throw sessionError(
+                'REQUEST_CONTEXT_REQUIRED',
+                'This native request ID was reused; reply with its originating request context.',
                 {id: response.id}
             );
         }
@@ -374,9 +394,38 @@ export function createCodexAppServerSession({
         emit('message', message);
         if (is.string(message.method)) {
             if (Object.hasOwn(message, 'id')) {
-                const pending = {request: message, responded: false};
-                current.serverRequests.set(message.id, pending);
-                emit('serverRequest', message);
+                const id = message.id;
+                const context = {
+                    id,
+                    respond: function replyToOrigin(response) {
+                        return respond(
+                            {...response, id},
+                            context
+                        );
+                    }
+                };
+                const pending = {
+                    request: message,
+                    responded: false,
+                    context,
+                    contextRequired: seenServerRequestIds.has(id)
+                };
+                seenServerRequestIds.add(id);
+                current.serverRequests.set(id, pending);
+                const operationId = `codex-server-request-${++nextServerRequestSequence}`;
+                // The event owner shallow-copies detail. Carry reply context
+                // separately through this synchronous publication, never by
+                // adding SDK fields to the native request envelope.
+                publishingRequests.set(operationId, context);
+                try {
+                    emit(
+                        'serverRequest',
+                        message,
+                        {operationId}
+                    );
+                } finally {
+                    publishingRequests.delete(operationId);
+                }
                 return;
             }
             if (message.method === 'serverRequest/resolved') {
@@ -698,6 +747,7 @@ export function createCodexAppServerSession({
 
     async function finishDispose() {
         await stopConnection();
+        seenServerRequestIds.clear();
         setStatus('disposed');
         eventsDisposed = true;
         events.dispose();

@@ -228,6 +228,70 @@ test(
 );
 
 test(
+    'Codex replies retain their originating request when reconnect reuses a native ID',
+    async function replyAfterReconnect() {
+        const session = await openCodexAppServerSession(options('approval'));
+        const received = [];
+        let announce;
+        session.subscribe(
+            'serverRequest',
+            function serverRequest(request, context) {
+                received.push({request, context});
+                announce?.();
+            }
+        );
+        function nextRequest() {
+            return new Promise(
+                function awaitRequest(resolve) {
+                    announce = resolve;
+                }
+            );
+        }
+        try {
+            const firstRequest = nextRequest();
+            const firstTurn = session.runTurn({threadId: 'thread-1', input: 'First approval'});
+            const firstStopped = assert.rejects(firstTurn, {code: 'ARCANE_CODEX_TURN_UNKNOWN'});
+            await firstRequest;
+            await session.reconnect();
+            await firstStopped;
+
+            const secondRequest = nextRequest();
+            const secondTurn = session.runTurn({threadId: 'thread-1', input: 'Second approval'});
+            await secondRequest;
+            const [first, second] = received;
+            assert.equal(first.request.id, second.request.id);
+            assert.notStrictEqual(first.context, second.context);
+            assert.deepEqual(Object.keys(second.request).sort(), ['id', 'method', 'params']);
+            assert.throws(
+                function oldBoundReply() {
+                    first.context.respond({result: {decision: 'accept'}});
+                },
+                {code: 'ARCANE_CODEX_STALE_REQUEST_CONTEXT'}
+            );
+            assert.throws(
+                function oldExplicitReply() {
+                    session.respond({id: first.request.id, result: {decision: 'accept'}}, first.context);
+                },
+                {code: 'ARCANE_CODEX_STALE_REQUEST_CONTEXT'}
+            );
+            assert.throws(
+                function ambiguousIdReply() {
+                    session.respond({id: first.request.id, result: {decision: 'accept'}});
+                },
+                {code: 'ARCANE_CODEX_REQUEST_CONTEXT_REQUIRED'}
+            );
+            assert.equal(session.pendingServerRequests[0].responded, false);
+            assert.strictEqual(session.pendingServerRequests[0].context, second.context);
+            second.context.respond({result: {decision: 'accept'}});
+            assert.equal((await secondTurn).status, 'completed');
+            assert.deepEqual(session.pendingServerRequests, []);
+        } finally {
+            await session.dispose();
+        }
+    }
+);
+
+test(
     'Codex cancellation waits for the exact interrupted terminal notification',
     async function interruptTurn() {
         const session = await openCodexAppServerSession(options('interrupt'));

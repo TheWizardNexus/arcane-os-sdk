@@ -99,7 +99,7 @@ or manufacture missing events.
 | `request(method,params)` | Complete native result, or a correlated RPC error. Use for additional provider methods; no automatic retries. |
 | `runTurn(options)` | Waits for the exact accepted turn's terminal notification. Does not create, resume or select a thread. |
 | `interrupt({threadId,turnId})` | Native interrupt acknowledgement only; the terminal notification establishes the actual outcome. |
-| `respond({id,result})` / `respond({id,error})` | Queues the actual correlated server-request reply and returns `{id,submitted:true}`. Submission is not resolution. |
+| `respond({id,result},context)` / `respond({id,error},context)` | Queues the actual correlated server-request reply and returns `{id,submitted:true}`. Retain the originating context across asynchronous work. Submission is not resolution. |
 | `subscribe(type,listener,options)` | Returns an unsubscribe function; supports the shared event owner's `once` and `signal`. `status` replays immediately. |
 | `reconnect()` | Drains the old owned process and initializes a new one. Never replays requests or resumes threads. |
 | `dispose()` | Cancels the owned process tree, drains input/output/process completion, releases subscriptions and permanently disposes this session. |
@@ -193,22 +193,43 @@ all native notification methods. `stderr` preserves complete `{stream,chunk}`
 records. `process` forwards the SDK process owner's lifecycle events. These
 diagnostics are neither application conversation text nor saved chat history.
 
-Every inbound request with a method and ID emits `serverRequest` carrying the
-complete native envelope. This includes approvals, permissions, user input,
+Every inbound request with a method and ID emits `serverRequest`. Its listener
+receives the complete native envelope as its first argument and a separate
+origin-bound reply context as its second. This includes approvals, permissions, user input,
 MCP elicitation and experimental tool calls. The adapter does not approve,
 decline, fabricate tool results or invoke application tools itself. The
 application returns the exact native result or error for that request method:
 
 ```javascript
-async function askForActualDecision(request) {
+async function askForActualDecision(request, context) {
     const result = await applicationDecisionOwner.answer(request);
-    session.respond({id: request.id, result});
+    context.respond(
+        {result}
+    );
 }
 ```
 
 The stdout reader keeps consuming while that decision is pending.
-`pendingServerRequests` contains `{request,responded}` entries for the current
-connection. Submission changes `responded`; the server's
+The context is `{id,respond}`. `context.respond({result})` or
+`context.respond({error})` binds the reply to that exact request and its native
+ID. Equivalently, pass the same context object as the second argument to
+`session.respond({id:request.id,result},context)`. Retain it before awaiting a
+human decision or other work. It is SDK control metadata, not part of the native
+request or reply payload.
+
+ID-only `session.respond({id,result})` remains supported while that native ID
+has appeared only once in this session. Once an ID is reused, including after
+reconnect, ID-only replies throw `ARCANE_CODEX_REQUEST_CONTEXT_REQUIRED` rather
+than selecting an origin implicitly. A context from an older request throws
+`ARCANE_CODEX_STALE_REQUEST_CONTEXT` when a current request reuses its ID. If
+there is no corresponding current request, the existing not-ready/not-found
+error applies. No such failure writes a reply to the new process. This also
+handles ID reuse within one connection after a request resolves.
+
+`pendingServerRequests` contains `{request,responded,context,contextRequired}`
+entries for the current connection. An attention owner can retain that same
+context when presenting an already pending request. Submission changes
+`responded`; the server's
 `serverRequest/resolved` notification removes the entry. A late reply after
 resolution, disconnect, or a prior submitted reply is reported explicitly.
 Disconnection clears pending requests and includes their complete prior entries

@@ -138,6 +138,9 @@ exception is also reported through diagnostics. Throw `McpProtocolError` for
 an explicit JSON-RPC failure. Other resource or adapter exceptions produce
 `-32603` and a diagnostic; malformed result containers and non-serializable
 results also produce `-32603`.
+Custom fields on an ordinary thrown error remain in diagnostics unless the
+application explicitly maps its known outcome to `structuredContent` in an
+`isError: true` tool result.
 
 ## start
 
@@ -158,8 +161,11 @@ and pending decoded text in its diagnostic error.
 
 Requests execute independently, including overlapping calls to one tool.
 Only complete output writes are ordered, waiting for each Node write callback
-before sending the next record. The application decides whether its own data
-access requires narrower serialization. The adapter adds no process-wide queue.
+before sending the next record. An error, close, or finish event during a pending
+output or diagnostic write settles that write as failed even when its callback
+never arrives; a later callback cannot settle it again. The application decides
+whether its own data access requires narrower serialization. The adapter adds
+no process-wide queue.
 
 Only JSON-RPC messages are written to `output`. Application handlers and their
 dependencies must also reserve stdout for protocol traffic; use stderr or the
