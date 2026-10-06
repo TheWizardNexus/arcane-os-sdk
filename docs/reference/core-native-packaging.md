@@ -246,6 +246,13 @@ factory. Applications without that selection have no generated local-AI import
 or service. Availability of a particular engine belongs to the selected
 local-AI installer and service; a generic ONNX runtime is not a speech model.
 
+Selected `onnx` bundles its complete managed `onnxruntime-node` dependency tree.
+Its `modulePath` resolves against the artifact root just as a server runtime's
+`executable` does. Library/module records need no executable. The generated Core
+service exposes retained worker sessions through `onnx.load/run/unload/status`;
+model files remain caller-selected application resources. See
+[native ONNX sessions](local-ai.md#native-onnx-sessions).
+
 ## Windows executable
 
 The ordinary application command is:

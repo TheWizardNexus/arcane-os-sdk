@@ -1,13 +1,13 @@
 # Local AI through Core
 
-Core owns native llama.cpp and Ollama processes. The browser retains its own
+Core owns native llama.cpp and Ollama processes and ONNX worker sessions. The browser retains its own
 Wllama and ONNX implementations, and can also use an explicitly connected Core
 when that system service is available. Runtime installation, model loading and
 inference are separate operations.
 
-This native service currently implements llama.cpp and Ollama. Native ONNX
-inference remains separate unfinished work. Browser ONNX continues through its
-existing browser implementation.
+Native ONNX runs caller-selected graphs with complete named input/output tensors.
+Applications own preprocessing, tokenization and model-specific pipelines.
+Browser ONNX continues through its existing browser implementation.
 
 ## Application requirements
 
@@ -19,7 +19,8 @@ Existing native fields remain alongside this record:
 {
   "runtimes": [
     {"id": "llama.cpp"},
-    {"id": "ollama"}
+    {"id": "ollama"},
+    {"id": "onnx"}
   ],
   "llamaCpp": {
     "modelsDirectory": "models/llama"
@@ -31,7 +32,8 @@ Existing native fields remain alongside this record:
 ```
 
 Each runtime requirement accepts `id`, optional upstream `version`, and an
-optional runtime archive `url`. A string runtime ID is also accepted.
+optional runtime archive `url`. ONNX resolves its official npm package or an
+explicitly supplied package archive. A string runtime ID is also accepted.
 Omitting the version allows reuse of an available runtime. Explicit versions
 select that upstream distribution; an existing service must match the requested
 version before it is reused. A service occupying the selected address is
@@ -48,7 +50,7 @@ application. Applications choose and provision their models explicitly.
 ## Development
 
 ```sh
-arcane dev --local-ai llama.cpp,ollama
+arcane dev --local-ai llama.cpp,ollama,onnx
 ```
 
 The option adds those runtime requirements to the authored application
@@ -63,6 +65,13 @@ preserves its runtime libraries. Installation changes no global PATH, system
 service or machine environment. Windows and macOS use the host archive utility;
 Linux requires `tar`, and `unzip` when extracting a selected Windows ZIP.
 Zstandard archives use the supported Node runtime's decompressor.
+
+Selected ONNX preparation installs `onnxruntime-node@1.30.0` by default into a
+managed npm prefix, retaining its complete published runtime dependency tree.
+It uses the upstream CPU installation option to skip supplementary GPU downloads.
+Node/npm must be available while preparing that runtime; a native app consumes
+the bundled tree without installing it again. Applications that omit ONNX do
+not install its package.
 
 For the optional development browser connection, load the bootstrap after the
 managed import map and before creating a Core-backed provider:
@@ -111,6 +120,9 @@ service and a loaded model are separate facts.
 `localai.services.recover({runtimes: ['llama.cpp']})` makes one explicit recovery
 attempt for the selected runtimes; omission selects all configured runtimes.
 Recovery restarts only SDK-owned processes and reconnects to external services.
+Recovering ONNX releases its sessions; explicitly load models again afterward.
+Its state is `recovering` and unavailable until the previous workers exit and
+the new session owner is ready.
 An external llama.cpp server returns HTTP 503 during initial model loading and
 offers no readiness subscription at that stage. Core retains `state: 'loading'`;
 a subsequent explicit load or recovery request checks again. There is no
@@ -175,6 +187,106 @@ silently change the application's saved model choice. Release registration
 with `unregister()` and dispose the provider at the application's owning
 lifecycle boundary.
 
+## Native ONNX sessions
+
+```js
+import {ensureLocalAIRuntimes} from 'arcane-os/local-ai';
+import {createONNXRuntime} from 'arcane-os/local-ai/onnx';
+
+const [runtime] = await ensureLocalAIRuntimes({
+  runtimes: ['onnx'], directory: '.arcane/local-ai/runtimes'
+});
+const onnx = createONNXRuntime({modulePath: runtime.modulePath});
+try {
+  const loaded = await onnx.load({id: 'cheese-radar', model: absoluteModelPath});
+  // Supply the actual names, shapes and values expected by this graph.
+  const outputs = await onnx.run({id: loaded.id, feeds});
+  console.log(outputs);
+} finally {
+  await onnx.close();
+}
+```
+
+The factory accepts `{modulePath,signal?,onEvent?}` and starts no worker until
+`load({id,model,sessionOptions?,signal?})`. The model path is absolute for this
+direct Node API. Session creation defaults to the CPU execution provider;
+explicit native session options remain caller-owned. The returned session
+record contains `id`, `model`, `state`, `loaded`, `error`, input/output names and
+metadata. A live ID requires explicit unload before replacement. An ID may be
+loaded again once its previous worker exits after a failed load or unload.
+A run error retains the loaded session so a corrected request can use it.
+
+`run({id,feeds,fetches?,runOptions?,signal?})` returns the complete output-name
+map of `{type,dims,data}` tensors. Input records use that same shape with native
+typed data or string arrays. Optional `fetches` selects output names or supplies
+output tensors using the upstream API. Worker transport copies supplied tensor
+data; returned output records contain the results, and caller-owned preallocated
+buffers are not mutated in place. Each session retains its own worker and
+loaded graph; work for independent sessions proceeds concurrently. Runs for one
+session execute in order and wait at that session's loading boundary. There is
+no token streaming in the generic tensor operation.
+
+String input containing U+0000 reports an incompatibility at the native tensor
+boundary: the Node binding uses null-terminated strings and cannot preserve
+that input completely. The SDK does not alter the supplied string.
+
+`current()` returns `{sessions,closed}`. `subscribe(listener)` replays current
+state synchronously and returns an unsubscribe function. Load, readiness,
+unload and failures remain observable. `unload({id,signal?})` releases that
+session; `close()` owns all remaining workers and awaits their actual exits.
+
+Cancelling a queued run removes that run. Cancelling active native work stops
+delivery and retires its worker; the session becomes unavailable until loaded
+again. ONNX Runtime's Node binding offers no native inference interruption:
+worker termination can wait for a native call to return. Shutdown observes the
+actual exit and does not claim that rejecting a request stopped native work.
+Other sessions retain their own lifetimes.
+
+### ONNX through Core and the browser
+
+| Core method | Parameters | Result |
+| --- | --- | --- |
+| `onnx.status` | `{}` | Runtime availability and current `models` session records |
+| `onnx.load` | `{id,model,sessionOptions?}` | Loaded session; relative model paths resolve from `appRoot` |
+| `onnx.run` | `{id,feeds,fetches?,runOptions?}` | Complete encoded tensor output map |
+| `onnx.unload` | `{id}` | Released session record |
+
+Use the browser accessor to handle the Core tensor transport:
+
+```js
+import {createCoreONNXRuntime} from 'arcane-os/ai/core-onnx';
+
+const onnx = createCoreONNXRuntime({client});
+const stop = onnx.subscribe(function showRuntime(state) { console.log(state); });
+await onnx.inspect();
+await onnx.load({id: 'cheese-radar', model: 'models/cheese-radar.onnx'});
+const outputs = await onnx.run({id: 'cheese-radar', feeds});
+await onnx.unload({id: 'cheese-radar'});
+stop();
+onnx.close();
+```
+
+The accessor exposes `load`, `run`, `unload`, `inspect`, `current`, `subscribe`
+and `close`. Request methods accept `signal` and optional `timeoutMs` (default
+`0`, no elapsed-time cutoff). It preserves full typed tensor values, including
+64-bit integers, floating-point special values and strings, through the
+transport codec. `current()` adds `busy` and `closed` to its latest Core state.
+Closing the accessor cancels its requests and subscriptions; model unloading
+is explicit because other accessors may share the Core session. It never
+closes the shared Core client.
+
+Construction neither opens a connection nor installs a runtime. A browser needs
+an already available native Core service or the explicit development bridge.
+Unavailable native ONNX leaves browser ONNX/Wllama under the application's
+existing selection. This tensor API does not select an LLM, tokenizer, speech,
+image or avatar pipeline.
+
+Native ONNX CPU package targets are Windows, Linux and macOS on `x64`/`arm64`,
+as listed in Microsoft's [Node binding platform matrix](https://github.com/microsoft/onnxruntime/blob/v1.30.0/js/node/README.md).
+Android needs its host's native ONNX adapter; the Node package contains no
+Android binding. Platform support here describes upstream package targets,
+not execution evidence on each platform.
+
 ## Native bundling
 
 The SDK portable native build includes selected official runtime trees under
@@ -192,7 +304,8 @@ runtime's published platform assets; Ollama has no official Android runtime
 archive in this installer.
 
 Ensure returns absolute `{id,version,platform,architecture,root}` records.
-Server runtimes also include `executable`. Bundle returns `{runtimes,files}`,
+Server runtimes also include `executable`; ONNX includes `modulePath` pointing
+to its public package entry. Bundle returns `{runtimes,files}`,
 with artifact-relative runtime paths and a complete emitted file inventory.
 Bundling requires a fresh native staging destination, preserving existing
 completed outputs.
@@ -213,6 +326,6 @@ the upstream `NeMoSpeech::Diarization` target. Bundling preserves the complete
 tree and makes all these paths relative to the native artifact root.
 
 This helper installs the library. The application configuration and development
-CLI currently select only the llama.cpp and Ollama services described above;
+CLI select llama.cpp, Ollama and ONNX services described above;
 NeMo model selection and a native diarization helper belong to their owning
 integration.

@@ -1,9 +1,12 @@
 import {createArcaneEventSource} from '../../event-manager.mjs';
 import Is from 'strong-type';
+import path from 'node:path';
 import {CoreError, serializeCoreError} from '../../../browser-runtime/core/contracts.mjs';
 import {structuredOutputFormat, openAIResponseFormat} from '../../../browser-runtime/ai/twin-cloud.mjs';
 import {normalizeLocalAIConfig} from '../../local-ai/config.mjs';
 import {createLocalAIServer} from '../../local-ai/server.mjs';
+import {createONNXRuntime} from '../../local-ai/onnx.mjs';
+import {encodeTensorMap, decodeTensorMap, decodeTensorFetches} from '../../../browser-runtime/ai/onnx-tensors.mjs';
 import {requestLocalJSON, streamLocalJSON} from '../../local-ai/http.mjs';
 
 const is = new Is(false);
@@ -128,9 +131,27 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
     const events = createArcaneEventSource(owner, {source: 'core-local-ai', eventTypes: ['localai.state']});
     let context;
     let closed = false;
+    let onnx;
+    let onnxRecovery;
+    let onnxRecoveryError;
+    let stopONNXSubscription;
+    const onnxSelected = config.runtimes.some(function selectedONNX(requirement) { return requirement.id === 'onnx'; });
+    const onnxRecord = runtimes.find(function installedONNX(runtime) { return runtime.id === 'onnx'; });
+
+    function onnxStatus() {
+        const current = onnx?.current();
+        return {
+            id: 'onnx', installed: Boolean(onnxRecord?.modulePath),
+            available: Boolean(current) && !current.closed && !closed && !onnxRecovery && !onnxRecoveryError && !lifetimeSignal.aborted,
+            state: closed ? 'closed' : onnxRecovery ? 'recovering' : onnxRecoveryError ? 'error'
+                : current?.closed ? 'closed' : lifetimeSignal.aborted ? 'closing' : onnx ? 'ready' : 'unavailable',
+            models: current?.sessions ?? [], error: onnxRecoveryError ?? null
+        };
+    }
 
     function snapshot() {
         const records = [...engines.values()].map(function runtimeRecord(engine) { return {...engine.state, models: [...engine.models]}; });
+        if (onnxSelected) records.push(onnxStatus());
         const ollama = records.find(function ollamaRecord(record) { return record.id === 'ollama'; });
         return {
             runtimes: records,
@@ -143,6 +164,38 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
         events.dispatch('localai.state', state);
         context?.emit('localai.state', state);
         return state;
+    }
+
+    function startONNX() {
+        if (!onnxRecord?.modulePath) return;
+        onnx = createONNXRuntime({modulePath: onnxRecord.modulePath, signal: lifetimeSignal, onEvent});
+        stopONNXSubscription = onnx.subscribe(function onnxChanged() { publish(); });
+    }
+
+    function requireONNX() {
+        lifetimeSignal.throwIfAborted();
+        if (!onnxSelected) throw failure('LOCAL_AI_RUNTIME_NOT_SELECTED', 'ONNX is not selected in this application configuration.');
+        if (!onnx || onnx.current().closed || onnxRecovery || onnxRecoveryError) {
+            throw failure('LOCAL_AI_RUNTIME_UNAVAILABLE', 'The selected ONNX runtime is unavailable.');
+        }
+        return onnx;
+    }
+
+    function recoverONNX() {
+        if (onnxRecovery) return onnxRecovery;
+        onnxRecoveryError = undefined;
+        onnxRecovery = Promise.resolve().then(async function replaceONNXOwner() {
+            await onnx?.close();
+            stopONNXSubscription?.();
+            onnx = undefined;
+            lifetimeSignal.throwIfAborted();
+            startONNX();
+        });
+        function recovered() { onnxRecovery = undefined; if (!closed) publish(); }
+        function recoveryFailed(error) { onnxRecoveryError = serializeCoreError(error); recovered(); }
+        onnxRecovery.then(recovered, recoveryFailed);
+        publish();
+        return onnxRecovery;
     }
 
     function recordFailure(engine, error) {
@@ -443,11 +496,12 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
         start(currentContext) {
             context = currentContext;
             for (const requirement of config.runtimes) {
-                if (!['llama.cpp', 'ollama'].includes(requirement.id)) {
+                if (!['llama.cpp', 'ollama', 'onnx'].includes(requirement.id)) {
                     throw failure('LOCAL_AI_RUNTIME_UNAVAILABLE', `Core runtime ${requirement.id} is not available in this service.`);
                 }
             }
             for (const requirement of config.runtimes) {
+                if (requirement.id === 'onnx') { if (!onnx) startONNX(); continue; }
                 if (engines.has(requirement.id)) continue;
                 const engine = {
                     id: requirement.id, models: [], revision: 0, modelChanges: new Map(), loads: new Map(), loadControllers: new Map(),
@@ -459,17 +513,37 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
             publish();
         },
         methods: {
-            'localai.services.recover': async function recoverServices({runtimes: selected = [...engines.keys()]} = {}, request) {
+            'localai.services.recover': async function recoverServices({runtimes: selected = [...engines.keys(), ...(onnxSelected ? ['onnx'] : [])]} = {}, request) {
+                request.signal.throwIfAborted();
                 const selectedEngines = selected.map(function selectedEngine(id) {
+                    if (id === 'onnx' && onnxSelected) return {id};
                     const engine = engines.get(id);
                     if (!engine) throw failure('LOCAL_AI_RUNTIME_NOT_SELECTED', `${id} is not selected in this application's localAI configuration.`);
                     return engine;
                 });
                 await Promise.all(selectedEngines.map(async function recoverEngine(engine) {
+                    if (engine.id === 'onnx') {
+                        await awaitReadiness(recoverONNX(), request.signal);
+                        return;
+                    }
                     await awaitReadiness(restartEngine(engine), request.signal);
                     await awaitReadiness(engine.ready, request.signal);
                 }));
                 return snapshot();
+            },
+            'onnx.status': function currentONNX() { return onnxStatus(); },
+            'onnx.load': function loadONNX({id, model, sessionOptions}, request) {
+                return requireONNX().load({id, model: path.resolve(appRoot ?? process.cwd(), model), sessionOptions,
+                    signal: AbortSignal.any([lifetimeSignal, request.signal])});
+            },
+            'onnx.run': async function runONNX({id, feeds, fetches, runOptions}, request) {
+                const outputs = await requireONNX().run({id, feeds: decodeTensorMap(feeds),
+                    fetches: decodeTensorFetches(fetches),
+                    runOptions, signal: AbortSignal.any([lifetimeSignal, request.signal])});
+                return encodeTensorMap(outputs);
+            },
+            'onnx.unload': function unloadONNX({id}, request) {
+                return requireONNX().unload({id, signal: AbortSignal.any([lifetimeSignal, request.signal])});
             },
             'localai.status': async function currentStatus(_parameters, request) {
                 await Promise.all([...engines.values()].map(async function refreshEngine(engine) {
@@ -528,8 +602,12 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
         async dispose() {
             closed = true;
             lifetime.abort();
-            const results = await Promise.allSettled([...engines.values()].map(function stopEngine(engine) { return engine.server.close(); }));
-            await Promise.allSettled([...jobs, ...[...engines.values()].flatMap(function pendingWork(engine) {
+            const results = await Promise.allSettled([
+                ...[...engines.values()].map(function stopEngine(engine) { return engine.server.close(); }),
+                ...(onnx ? [onnx.close()] : [])
+            ]);
+            stopONNXSubscription?.();
+            await Promise.allSettled([...jobs, ...(onnxRecovery ? [onnxRecovery] : []), ...[...engines.values()].flatMap(function pendingWork(engine) {
                 return [...engine.loads.values(), ...(engine.recovering ? [engine.recovering] : [])];
             })]);
             events.dispose();

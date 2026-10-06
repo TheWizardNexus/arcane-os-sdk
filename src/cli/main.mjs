@@ -67,7 +67,7 @@ Usage:
   ${CLI_NAME} upgrade [--workspace <directory>] [--app <id>]
   ${CLI_NAME} doctor [--workspace <directory>] [--arcane-root <directory>]
   ${CLI_NAME} import-map [--workspace <directory>] [--app <id>]
-  ${CLI_NAME} dev [--app <id>] [--public] [--http | --https] [--cert <pem>] [--key <pem>] [--host <address>] [--port 8000] [--http-port 0] [--sdk-runtime-source <sdk-root>] [--local-ai llama.cpp,ollama]
+  ${CLI_NAME} dev [--app <id>] [--public] [--http | --https] [--cert <pem>] [--key <pem>] [--host <address>] [--port 8000] [--http-port 0] [--sdk-runtime-source <sdk-root>] [--local-ai llama.cpp,ollama,onnx]
   ${CLI_NAME} test [--app <id>] [--scope app]
   ${CLI_NAME} test --scope shared --test-file <repo-relative.test.mjs>
   ${CLI_NAME} check [--app <id>] [--scope app] [--skip-tests]

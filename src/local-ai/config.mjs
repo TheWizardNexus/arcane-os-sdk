@@ -4,7 +4,7 @@ import Is from 'strong-type';
 import {ArcaneError, ERROR_CODES, throwIfAborted} from '../errors.mjs';
 
 const is = new Is(false);
-export const LOCAL_AI_RUNTIME_IDS = ['llama.cpp', 'ollama'];
+export const LOCAL_AI_RUNTIME_IDS = ['llama.cpp', 'ollama', 'onnx'];
 
 /** Runtime requirements are application configuration, separate from models. */
 export function normalizeLocalAIConfig(value) {

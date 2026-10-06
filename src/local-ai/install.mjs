@@ -1,11 +1,13 @@
 import Is from 'strong-type';
 import {createWriteStream} from 'node:fs';
 import {chmod,copyFile,lstat,mkdir,mkdtemp,readFile,readdir,readlink,rm,stat,symlink,unlink,writeFile} from 'node:fs/promises';
+import {createRequire} from 'node:module';
 import path from 'node:path';
 import {Readable} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
 import {ArcaneError,ERROR_CODES,normalizeError,throwIfAborted} from '../errors.mjs';
 import {createEventQueue} from '../event-queue.mjs';
+import {runProcess} from '../process.mjs';
 import {extractLocalAIArchive} from './archive.mjs';
 
 const is=new Is(false);
@@ -16,8 +18,9 @@ function selectRuntimes(runtimes){
         throw new ArcaneError(ERROR_CODES.usage,'Local AI runtimes must be an array.');
     }
     const selected=new Map();
-    for(const runtime of runtimes){
-        if(!runtime||!['llama.cpp','ollama','nemo-speech'].includes(runtime.id)){
+    for(const item of runtimes){
+        const runtime=is.string(item)?{id:item}:item;
+        if(!runtime||!['llama.cpp','ollama','nemo-speech','onnx'].includes(runtime.id)){
             throw new ArcaneError(ERROR_CODES.targetUnavailable,`Local AI runtime installation is unavailable for ${String(runtime?.id)}.`);
         }
         const prior=selected.get(runtime.id);
@@ -128,6 +131,11 @@ async function installedRuntime(base,runtime,platform,architecture,signal){
         const record=installation.runtime;
         if(record?.id!==runtime.id||record.platform!==platform||record.architecture!==architecture)continue;
         try{
+            if(runtime.id==='onnx'){
+                if(!is.string(record.root)||!is.string(record.modulePath))continue;
+                const locations=await onnxRuntimeModule(record.root,platform,architecture,signal);
+                return {...record,...locations,...(runtime.version?{requestedVersion:runtime.version}:{})};
+            }
             if(runtime.id==='nemo-speech'){
                 const directories=[record.root,record.includeDirectory,record.libraryDirectory,record.binaryDirectory,record.cmakeDirectory];
                 if(directories.some(function missingDirectory(directory){return !is.string(directory);}))continue;
@@ -140,6 +148,7 @@ async function installedRuntime(base,runtime,platform,architecture,signal){
             }
             if((await stat(record.executable)).isFile())return {...record,...(runtime.version?{requestedVersion:runtime.version}:{})};
         }catch(error){
+            if(runtime.id==='onnx'&&(error.code==='MODULE_NOT_FOUND'||error instanceof SyntaxError))continue;
             if(error.code!=='ENOENT')throw error;
         }
     }
@@ -204,6 +213,34 @@ async function nemoRuntimeDirectories(root,signal){
     throw new ArcaneError(ERROR_CODES.operationFailed,'The NeMo Speech archive does not contain include/nemo_speech/diar.h and asr.h.');
 }
 
+async function onnxRuntimeModule(root,platform,architecture,signal){
+    throwIfAborted(signal);
+    const packageDirectory=path.join(root,'node_modules','onnxruntime-node');
+    const metadata=JSON.parse(await readFile(path.join(packageDirectory,'package.json'),{encoding:'utf8',signal}));
+    // Node resolves the installed public entry without loading its native code.
+    const modulePath=createRequire(path.join(root,'package.json')).resolve('onnxruntime-node');
+    const binding=path.join(packageDirectory,'bin','napi-v6',platform,architecture,'onnxruntime_binding.node');
+    const entries=await Promise.all([modulePath,binding].map(function inspectONNXFile(filename){return stat(filename);}));
+    if(!entries.every(function onnxFilePresent(info){return info.isFile();})){
+        throw new ArcaneError(ERROR_CODES.operationFailed,`The ONNX package does not contain its public module and ${platform}/${architecture} native binding.`);
+    }
+    throwIfAborted(signal);
+    return {version:metadata.version,modulePath};
+}
+
+async function installONNXPackage(runtime,{root,directory,platform,architecture,signal,onEvent}){
+    const version=runtime.version??'1.30.0';
+    await onEvent({type:'local-ai.install.installing',message:`Installing onnxruntime-node ${version} for ${platform}/${architecture}.`,data:{id:runtime.id,version,platform,architecture}});
+    await mkdir(root,{recursive:true});
+    await writeFile(path.join(root,'package.json'),'{"private":true}\n',{flag:'wx',signal});
+    await runProcess('npm',[
+        'install','--prefix',root,'--global=false','--save-exact','--omit=dev',
+        '--no-audit','--no-fund','--foreground-scripts','--registry=https://registry.npmjs.org/',
+        '--cache',path.join(directory,'npm-cache'),`onnxruntime-node@${runtime.url??version}`
+    ],{cwd:root,env:{ONNXRUNTIME_NODE_INSTALL:'skip'},signal,onEvent});
+    return onnxRuntimeModule(root,platform,architecture,signal);
+}
+
 async function installRuntime(runtime,{directory,platform,architecture,signal,onEvent}){
     const base=path.join(directory,runtime.id,`${platform}-${architecture}`,encodeURIComponent(runtime.version??'default'));
     await onEvent({type:'local-ai.install.starting',message:`Preparing ${runtime.id} for ${platform}/${architecture}.`,data:{id:runtime.id,platform,architecture}});
@@ -212,28 +249,36 @@ async function installRuntime(runtime,{directory,platform,architecture,signal,on
         await onEvent({type:'local-ai.install.available',message:`${runtime.id} ${installed.version} is already installed.`,data:installed});
         return installed;
     }
-    const release=await selectRelease(runtime,platform,architecture,signal);
+    if(runtime.id==='onnx'&&(!['win32','linux','darwin'].includes(platform)||!['x64','arm64'].includes(architecture))){
+        throw new ArcaneError(ERROR_CODES.targetUnavailable,`onnxruntime-node has no supported ${platform}/${architecture} CPU runtime.`);
+    }
+    const release=runtime.id==='onnx'?null:await selectRelease(runtime,platform,architecture,signal);
     throwIfAborted(signal);
     await mkdir(base,{recursive:true});
     const attempt=await mkdtemp(path.join(base,'install-'));
     const root=path.join(attempt,'runtime');
-    const archive=path.join(attempt,release.name);
+    const archive=release?path.join(attempt,release.name):null;
     let completed=false;
     try{
-        await onEvent({type:'local-ai.install.downloading',message:`Downloading ${runtime.id} ${release.version}.`,data:{id:runtime.id,version:release.version,platform,architecture}});
-        const response=await upstreamResponse(release.url,signal);
-        await pipeline(Readable.fromWeb(response.body),createWriteStream(archive,{flags:'wx'}),{signal});
-        await onEvent({type:'local-ai.install.extracting',message:`Extracting ${runtime.id} ${release.version}.`,data:{id:runtime.id,version:release.version}});
-        await extractLocalAIArchive({archive,directory:root,signal,onEvent});
-        const locations=runtime.id==='nemo-speech'
-            ?await nemoRuntimeDirectories(root,signal)
-            :{executable:await runtimeExecutable(root,runtime.id,platform,signal)};
-        const record={id:runtime.id,version:release.version,platform,architecture,root,...locations,...(runtime.version?{requestedVersion:runtime.version}:{})};
+        let locations;
+        if(runtime.id==='onnx'){
+            locations=await installONNXPackage(runtime,{root,directory,platform,architecture,signal,onEvent});
+        }else{
+            await onEvent({type:'local-ai.install.downloading',message:`Downloading ${runtime.id} ${release.version}.`,data:{id:runtime.id,version:release.version,platform,architecture}});
+            const response=await upstreamResponse(release.url,signal);
+            await pipeline(Readable.fromWeb(response.body),createWriteStream(archive,{flags:'wx'}),{signal});
+            await onEvent({type:'local-ai.install.extracting',message:`Extracting ${runtime.id} ${release.version}.`,data:{id:runtime.id,version:release.version}});
+            await extractLocalAIArchive({archive,directory:root,signal,onEvent});
+            locations={version:release.version,...(runtime.id==='nemo-speech'
+                ?await nemoRuntimeDirectories(root,signal)
+                :{executable:await runtimeExecutable(root,runtime.id,platform,signal)})};
+        }
+        const record={id:runtime.id,platform,architecture,root,...locations,...(runtime.version?{requestedVersion:runtime.version}:{})};
         throwIfAborted(signal);
-        await unlink(archive);
+        if(archive)await unlink(archive);
         await writeFile(path.join(attempt,'installation.json'),`${JSON.stringify({requestVersion:runtime.version??null,requestUrl:runtime.url??null,runtime:record},null,2)}\n`,{flag:'wx',signal});
         completed=true;
-        await onEvent({type:'local-ai.install.completed',message:`${runtime.id} ${release.version} is available.`,data:record});
+        await onEvent({type:'local-ai.install.completed',message:`${runtime.id} ${record.version} is available.`,data:record});
         return record;
     }catch(error){
         // Only this invocation's newly created incomplete attempt is removed.
@@ -398,7 +443,7 @@ export async function bundleLocalAIRuntimes({runtimes=[],directory,outputRoot,pl
         const destination=path.join(root,relative);
         await copyRuntimeTree(runtime.root,destination,root,files,signal);
         const bundled={...runtime,root:relative};
-        for(const field of ['executable','includeDirectory','libraryDirectory','binaryDirectory','cmakeDirectory']){
+        for(const field of ['executable','modulePath','includeDirectory','libraryDirectory','binaryDirectory','cmakeDirectory']){
             if(runtime[field]===undefined)continue;
             bundled[field]=path.posix.join(relative,path.relative(runtime.root,runtime[field]).split(path.sep).join('/'));
         }

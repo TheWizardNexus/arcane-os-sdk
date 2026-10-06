@@ -6,12 +6,40 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 265,
+  "memberCount": 267,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
   },
   "members": [
+    {
+      "id": "local-ai-onnx:createONNXRuntime",
+      "name": "createONNXRuntime",
+      "displayName": "createONNXRuntime()",
+      "kind": "function",
+      "signature": "createONNXRuntime({modulePath,signal,onEvent}={})",
+      "entrypoints": ["arcane-os/local-ai/onnx"],
+      "primaryImport": "arcane-os/local-ai/onnx",
+      "group": "Core local AI",
+      "summary": "Owns explicitly loaded ONNX graphs and complete named tensor inference in retained native workers.",
+      "availability": "Node on Windows/Linux/macOS x64/arm64 with prepared onnxruntime-node; Android needs host adaptation",
+      "protocol": "Per-session worker lifecycle with structured-clone tensors and replaying state",
+      "normalization": "Returns load/run/unload/current/subscribe/close; explicit model and session IDs; native calls may delay worker termination, and close observes actual exit"
+    },
+    {
+      "id": "core-onnx:createCoreONNXRuntime",
+      "name": "createCoreONNXRuntime",
+      "displayName": "createCoreONNXRuntime()",
+      "kind": "function",
+      "signature": "createCoreONNXRuntime({client=getInstalledCoreClient()}={})",
+      "entrypoints": ["arcane-os/ai/core-onnx"],
+      "primaryImport": "arcane-os/ai/core-onnx",
+      "group": "Core local AI",
+      "summary": "Accesses local system ONNX through an existing Core client with complete tensor transport.",
+      "availability": "Browser with available Core ONNX service; construction installs no runtime or model",
+      "protocol": "arcane/1 onnx.status/load/run/unload and localai.state",
+      "normalization": "Returns load/run/unload/inspect/current/subscribe/close; preserves typed and string tensors; accessor close cancels its requests without closing shared Core or implicitly unloading shared models"
+    },
     {
       "id": "root:createGitTextSnapshot",
       "name": "createGitTextSnapshot",
@@ -105,9 +133,9 @@
       "entrypoints": ["arcane-os/core/local-ai"],
       "primaryImport": "arcane-os/core/local-ai",
       "group": "Core local AI",
-      "summary": "Composes selected native llama.cpp and Ollama engines as a Core service with retained process ownership and model lifecycle.",
+      "summary": "Composes selected native llama.cpp, Ollama and ONNX engines as a Core service with retained process/worker ownership and model lifecycle.",
       "availability": "Node with selected upstream runtime distributions or available configured system services",
-      "protocol": "arcane/1 methods and events; llama.cpp OpenAI HTTP/SSE and Ollama native HTTP/NDJSON",
+      "protocol": "arcane/1 methods and events; llama.cpp OpenAI HTTP/SSE, Ollama native HTTP/NDJSON and ONNX tensor transport",
       "normalization": "Application-owned runtime and model requirements; independent startup, complete responses and exact owned-process cleanup"
     },
     {
@@ -133,9 +161,9 @@
       "entrypoints": ["arcane-os/local-ai"],
       "primaryImport": "arcane-os/local-ai",
       "group": "Core local AI",
-      "summary": "Reuses selected managed native runtimes or installs complete official llama.cpp and Ollama distributions.",
+      "summary": "Reuses selected managed native runtimes or installs complete official llama.cpp/Ollama distributions, ONNX npm runtime trees or NeMo libraries.",
       "availability": "Node; upstream platform and architecture assets determine runtime availability",
-      "protocol": "Official upstream release downloads and host archive extraction",
+      "protocol": "Official upstream release archives or selected ONNX npm installation",
       "normalization": "Returns absolute runtime records; shares matching concurrent installs, preserves libraries and reports failures without changing global PATH or services"
     },
     {

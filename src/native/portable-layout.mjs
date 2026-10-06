@@ -184,7 +184,11 @@ export function coreEntrySource(application, version, services, {localAI, runtim
         "    appRoot: fileURLToPath(new URL('../app/', import.meta.url)),",
         ...(localAI === undefined ? [] : [
             `    runtimes: JSON.parse(${JSON.stringify(JSON.stringify(runtimes))}).map(function runtimeLocation(runtime) {`,
-            '        return {...runtime, root: runtimePath(runtime.root), executable: runtimePath(runtime.executable)};',
+            '        const resolved = {...runtime};',
+            "        for (const field of ['root', 'executable', 'modulePath', 'includeDirectory', 'libraryDirectory', 'binaryDirectory', 'cmakeDirectory']) {",
+            '            if (runtime[field] !== undefined) resolved[field] = runtimePath(runtime[field]);',
+            '        }',
+            '        return resolved;',
             '    }),'
         ]),
         '    ...await readCoreLaunchContext()',

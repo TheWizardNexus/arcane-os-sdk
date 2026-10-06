@@ -49,7 +49,7 @@ meaning and cardinality rules:
 | `--app` | app id or label | Workspace/app operations except shared scope and `verify-bundle`; optional diagnostic label for `mail serve`. |
 | `--apps-root` | `.` or `apps` | `new`, `init`; standalone setup defaults to the repository root. |
 | `--sdk-runtime-source` | SDK checkout directory | `dev` only; maps live SDK source through the selected browser destinations for that server process. |
-| `--local-ai` | comma-separated runtime IDs | `dev` only; adds `llama.cpp` and/or `ollama` requirements to application configuration and prepares missing runtimes alongside serving. See [local AI through Core](local-ai.md). |
+| `--local-ai` | comma-separated runtime IDs | `dev` only; adds `llama.cpp`, `ollama` and/or `onnx` requirements to application configuration and prepares missing runtimes alongside serving. See [local AI through Core](local-ai.md). |
 | `--arcane-root` | directory | `doctor`, native `build`/`run`, `native-doctor`, `native-prepare` |
 | `--host` / `--port` | host / integer 0–65535 | Browser `dev`/`run` default to HTTPS at `127.0.0.1:8000`; `mail serve` defaults to HTTPS with HTTP/2 at `0.0.0.0:4433` and accepts an explicit bind host. |
 | `--http-port` | integer 0–65535 | Browser `dev`/`run` HTTP redirect listener; defaults to `0`, which selects an available port. |
@@ -367,7 +367,7 @@ An explicit live-source SDK mapping follows the selected browser destinations
 while reading canonical SDK source; it never replaces installed files.
 
 ```text
-arcane dev [--app <id>] [--public] [--http | --https] [--cert <file> --key <file>] [--host <address>] [--port 8000] [--http-port 0] [--sdk-runtime-source <sdk-root>] [--local-ai llama.cpp,ollama]
+arcane dev [--app <id>] [--public] [--http | --https] [--cert <file> --key <file>] [--host <address>] [--port 8000] [--http-port 0] [--sdk-runtime-source <sdk-root>] [--local-ai llama.cpp,ollama,onnx]
 ```
 
 `--local-ai` saves the selected requirements in `native.localAI`, or in

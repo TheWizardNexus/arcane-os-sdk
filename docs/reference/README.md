@@ -52,7 +52,7 @@ alone does not make bare module names resolve in a browser.
 | Call `globalThis.Arcane` | [Arcane Core API](core/arcane-api.md) |
 | Connect a browser to one Core transport | [Core browser client](core-client.md) |
 | Compose native Core dispatch, service lifecycle, and stdio hosting | [Native Core runtime](core-runtime.md) |
-| Run application-selected llama.cpp or Ollama through Core | [Local AI through Core](local-ai.md) |
+| Run application-selected llama.cpp, Ollama or ONNX through Core | [Local AI through Core](local-ai.md) |
 | Build an installed-SDK portable Core payload | [Portable Core packaging](core-native-packaging.md) |
 | Build a Windows executable without an OS checkout | [Windows executable packaging](core-native-packaging.md#windows-executable) |
 | Subscribe to native events | [Arcane event reference](core/arcane-events.md) |
@@ -215,6 +215,7 @@ Ollama, Wllama, Whisper, Kokoro, native, or cloud transport:
 | Use Core-normalized chat | [`globalThis.Arcane.ai`](core/arcane-ai-contracts.md) | Native/Core only when separately admitted. |
 | Run a caller-selected GGUF LLM locally | [`arcane-os/ai/browser-wasm`](ai/browser-wasm.md) | Browser secure context with WebAssembly and OPFS/DBOPFS; explicit CPU selection or WebGPU with full offload and no automatic CPU fallback. |
 | Run application-selected native llama.cpp/Ollama chat | [`arcane-os/ai/core-local`, `arcane-os/core/local-ai`](local-ai.md) | Explicit Core connection and selected native runtimes; installation, availability and loaded-model readiness remain distinct. |
+| Run a local ONNX graph with named tensors | [`arcane-os/local-ai/onnx`, `arcane-os/ai/core-onnx`](local-ai.md#native-onnx-sessions) | Retained native workers; browser access requires an available Core ONNX service. |
 | Run caller-selected Whisper/Kokoro locally | [`arcane-os/ai/browser-speech`](ai/browser-speech.md) | Browser with DBOPFS, Web Locks, Workers and selected upstream sources; automatic WebNN NPU, WebGPU, then WASM loading, or an explicit backend. |
 | Use native browser recognition/voices or selected cloud TTS | [Speech provider choices](ai/browser-speech.md) | Native APIs depend on the browser and may use remote services; cloud TTS requires the application key and endpoint access. |
 | Send complete chat, System One or image requests without retained history | [`arcane-os/ai/twin-cloud`](ai/twin-cloud.md) | Node or browser with Fetch and explicit model/credentials; image results contain every returned image as a Blob. |

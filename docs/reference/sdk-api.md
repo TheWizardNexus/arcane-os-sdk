@@ -58,8 +58,10 @@ runtime layouts.
 | `arcane-os/core/stdio` | Framed Node stdio transport with graceful runtime drain. |
 | `arcane-os/core/host` | Node-only reusable Core host lifecycle with explicitly supplied services. |
 | `arcane-os/core/packaged-web` | Core-owned packaged web listener with a persisted loopback origin and ready/failure events. |
-| `arcane-os/core/local-ai` | Native llama.cpp and Ollama Core service, model readiness, complete streaming and owned process lifecycle. See [local AI through Core](local-ai.md). |
-| `arcane-os/local-ai` | Official runtime installation and native artifact bundling for selected llama.cpp/Ollama requirements. |
+| `arcane-os/core/local-ai` | Native llama.cpp, Ollama and ONNX Core service, model readiness, complete responses and owned lifecycle. See [local AI through Core](local-ai.md). |
+| `arcane-os/local-ai` | Official runtime installation and native artifact bundling for selected llama.cpp/Ollama/ONNX requirements and NeMo libraries. |
+| `arcane-os/local-ai/onnx` | Retained native ONNX worker sessions with explicit graph loading and complete tensor inference. |
+| `arcane-os/ai/core-onnx` | Optional browser access to system ONNX through an existing Core connection. |
 | `arcane-os/integrated-provider` | Fixed integrated shared-development provider. |
 | `arcane-os/packager` | Low-level browser app packager. |
 | `arcane-os/release-bundle` | Deterministic external release bundles. |
@@ -388,7 +390,9 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `arcaneNativeBuilderProvider default export` | singleton | `arcane-os/native/macos-provider` | macOS native provider | Node assembly; matching Darwin architecture and selected host asset |
 | `createPackagedWebService()` | function | `arcane-os/core/packaged-web` | Native packaged web serving | Node Core lifetime; actual listener readiness before navigation |
 | `createCoreLocalAIProvider()` | function | `arcane-os/ai/core-local` | Core local AI | Browser/native WebView with an available Core connection |
-| `createLocalAIService()` | function | `arcane-os/core/local-ai` | Core local AI | Node with selected llama.cpp/Ollama runtimes |
+| `createLocalAIService()` | function | `arcane-os/core/local-ai` | Core local AI | Node with selected llama.cpp/Ollama/ONNX runtimes |
+| `createONNXRuntime()` | function | `arcane-os/local-ai/onnx` | Core local AI | Node with prepared Microsoft ONNX runtime |
+| `createCoreONNXRuntime()` | function | `arcane-os/ai/core-onnx` | Core local AI | Browser with an available Core ONNX service |
 | `createLocalAIService default export` | function | `arcane-os/core/local-ai` | Core local AI | Same native service factory |
 | `ensureLocalAIRuntimes()` | function | `arcane-os/local-ai` | Core local AI | Node; selected upstream platform assets |
 | `bundleLocalAIRuntimes()` | function | `arcane-os/local-ai` | Core local AI | Node; complete native runtime assembly |
@@ -7479,7 +7483,7 @@ selection, streaming, cancellation and primary-model reload behavior.
 
 ### Overview
 
-Composes application-selected llama.cpp and Ollama engines as a native Core
+Composes application-selected llama.cpp, Ollama and ONNX engines as a native Core
 service. Runtime installation, process availability and model readiness remain
 separate states; prompts, models and application policy remain caller-owned.
 
@@ -7497,7 +7501,7 @@ existing Core lifecycle. Shutdown cancels owned work and joins owned processes;
 an already running external service remains under its external owner.
 
 The service provides `localai.status`, explicit `localai.services.recover`,
-`llama.status/models/load/unload/chat`, and the documented native Ollama methods.
+`llama.status/models/load/unload/chat`, `onnx.status/load/run/unload`, and the documented native Ollama methods.
 `localai.state` reports runtime/model changes. `llama.chunk` and `ollama.chunk`
 carry original parsed chunks with `streamId`; terminal responses remain complete.
 There is no background health polling or implicit model choice.
@@ -7509,8 +7513,35 @@ const service = createLocalAIService(application.native.localAI, {appRoot, runti
 ```
 
 See [Core service configuration, results and failures](local-ai.md#core-service)
-and [native bundling](local-ai.md#native-bundling). Native ONNX inference is a
-separate delivery boundary; this service implements llama.cpp and Ollama.
+and [native bundling](local-ai.md#native-bundling).
+
+## createONNXRuntime()
+
+`createONNXRuntime({modulePath,signal?,onEvent?})` from `arcane-os/local-ai/onnx`
+owns retained native ONNX sessions in workers. It exposes `load({id,model,
+sessionOptions?,signal?})`, `run({id,feeds,fetches?,runOptions?,signal?})`,
+`unload({id,signal?})`, `current()`, replaying `subscribe(listener)` and `close()`.
+The direct model path is absolute. Complete typed tensor records use
+`{type,dims,data}`; callers own the actual graph's inputs and preprocessing.
+
+Models load only on explicit requests. A live session ID requires unloading
+before replacement. Independent sessions run concurrently; same-session work
+waits at that session's loading/execution boundary. Queued cancellation removes
+that request; active cancellation retires the affected worker and suppresses
+its response. Native code can delay termination; cleanup waits for actual exit.
+See [complete signatures, readiness, cancellation and usage](local-ai.md#native-onnx-sessions).
+
+## createCoreONNXRuntime()
+
+`createCoreONNXRuntime({client=getInstalledCoreClient()}={})` from
+`arcane-os/ai/core-onnx` accesses an available Core ONNX service. Its `load`,
+`run`, and `unload` mirror the native session selection and accept `signal` and
+`timeoutMs` (default `0`). Relative model paths resolve at Core's `appRoot`.
+The accessor owns complete tensor transport encoding/decoding, `inspect()`,
+`current()`, replaying `subscribe(listener)` and `close()`. Closing cancels this
+accessor's requests and subscriptions; unloading shared models is explicit.
+Construction installs no runtime and opens no transport. Existing browser
+ONNX/Wllama remain independent. See [Core and browser usage](local-ai.md#onnx-through-core-and-the-browser).
 
 ## createLocalAIService default export
 
@@ -7527,7 +7558,7 @@ import createLocalAIService from 'arcane-os/core/local-ai';
 ### Overview
 
 Reuses matching managed runtimes or installs complete selected official
-llama.cpp/Ollama distributions in an explicitly supplied directory.
+llama.cpp/Ollama/ONNX distributions or NeMo libraries in an explicitly supplied directory.
 
 ### Signature and result
 
@@ -7537,7 +7568,8 @@ async ensureLocalAIRuntimes({runtimes=[],directory,platform=process.platform,arc
 
 Import it from `arcane-os/local-ai`. Runtime requirements accept IDs or
 `{id,version?,url?}` records. The result is an array of absolute
-`{id,version,platform,architecture,root,executable}` records. Matching concurrent
+`{id,version,platform,architecture,root}` records, with `executable` for servers,
+`modulePath` for ONNX, or NeMo library directories. Matching concurrent
 installs share their work. Downloads retain runtime libraries and surface
 network/archive failures; cancellation and operation events remain observable.
 Installation changes no global PATH or system service and loads no model.
