@@ -53,6 +53,22 @@ and reports npm's response. It tolerates npm's publish-time scanning. If
 scanning or manual review remains pending, the workflow reports that state and
 a rerun safely resumes without republishing the version.
 
+Registry verification requires both the selected version/channel metadata and
+an ordinary complete GET of that exact version's published `dist.tarball` URL.
+Metadata visibility alone is not downloadable-package delivery. The verifier
+reads exact-version metadata, follows its tarball URL, and consumes the full
+successful response before reporting completion. Missing metadata, an HTTP
+failure, or an interrupted body remains pending within the existing bounded
+retry window; the remaining window also bounds the metadata/tarball requests.
+The existing npm metadata subprocesses retain their current behavior. If they
+consume the window, including a zero-wait invocation, the verifier reports
+pending without starting a new download observation.
+It records the actual failure and exits unsuccessfully if availability does not
+arrive. It does not save a second artifact, repack, republish, alter registry
+tags, add cache-bypass parameters, or impose a content-size or hash comparison.
+Requester notices follow successful version/channel and download observation;
+consumer installation and application verification remain separately owned.
+
 The public `0.3.2` release is fixed to package-source commit
 `445bd2d982f12e6ef8dd2b615c70512000cc5224`, selected Check run
 `33264677687`, and publication/registry run `33264829711`. Its numeric Git tag
@@ -77,9 +93,10 @@ The npm package already has its trusted-publishing relationship. Each later
 release therefore follows the same direct selected-artifact path: push the
 intended `main` source, manually run Check for that exact revision, review the
 resulting package inventory and legal notices, then manually dispatch
-publication with that Check run and artifact. Confirm the selected version and
-dist-tag after publication. Never rebuild or repack the artifact under
-publication authority, and never substitute a different source revision.
+publication with that Check run and artifact. Confirm the selected version,
+dist-tag, and complete published tarball availability after publication. Never
+rebuild or repack the artifact under publication authority, and never substitute
+a different source revision.
 
 Generated app CI uses `npm ci --ignore-scripts`, so its lock must exist and its
 dependency source must be reachable by the runner. External application CI uses

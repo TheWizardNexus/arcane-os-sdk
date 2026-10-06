@@ -85,7 +85,7 @@ jobs:
         run: npm publish "${{ steps.selected.outputs.tarball }}" --ignore-scripts --access public --tag "${{ steps.publication.outputs.channel }}"
 
   verify_registry:
-    name: Verify npm version and channel
+    name: Verify npm version, channel and download
     needs: publish
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -103,6 +103,6 @@ jobs:
           architecture: x64
           registry-url: https://registry.npmjs.org/
           package-manager-cache: false
-      - name: Verify registry visibility
+      - name: Verify registry visibility and complete tarball delivery
         shell: bash
         run: node tools/npm-registry-publication.mjs verify --version "${{ needs.publish.outputs.version }}" --channel "${{ needs.publish.outputs.channel }}" --max-wait-ms 900000

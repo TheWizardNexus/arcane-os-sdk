@@ -10,7 +10,8 @@ import {
     parsePublicationVersion,
     parseRegistryTags,
     parseRegistryVersions,
-    readRegistryPublicationState
+    readRegistryPublicationState,
+    readRegistryTarballAvailability
 } from '../tools/npm-registry-publication.mjs';
 import {temporaryDirectory} from './helpers.mjs';
 
@@ -101,7 +102,7 @@ test('npm release verification enforces only the public package boundary',async 
     });
 });
 
-test('npm registry publication uses only version and selected tag state',async t=>{
+test('npm registry preflight uses only version and selected tag state',async t=>{
     await t.test('maps numeric stable and development versions to npm channels',()=>{
         assert.deepEqual(parsePublicationVersion('0.3.2'),{
             version:'0.3.2',channel:'latest',parts:[0,3,2]
@@ -154,3 +155,227 @@ test('npm registry publication uses only version and selected tag state',async t
         assert.deepEqual(calls,[...responses.keys()]);
     });
 });
+
+test('npm publication observes complete exact-version tarball delivery', publishedTarballAvailability);
+
+async function publishedTarballAvailability(t) {
+    const version = '0.3.2';
+    const metadataUrl = 'https://registry.npmjs.org/arcane-os/0.3.2';
+    const tarball = 'https://registry.npmjs.org/arcane-os/-/arcane-os-0.3.2.tgz';
+    const metadata = {name: 'arcane-os', version, dist: {tarball}};
+
+    await t.test('waits for full response completion and releases the reader', completeResponse);
+    async function completeResponse() {
+        const calls = [];
+        const reading = Promise.withResolvers();
+        const completion = Promise.withResolvers();
+        const controller = new AbortController();
+        let reads = 0;
+        let released = false;
+        let settled = false;
+        const operation = readRegistryTarballAvailability(
+            {
+                version,
+                signal: controller.signal,
+                request: async function requestPublishedResource(url, options) {
+                    calls.push(url);
+                    assert.equal(options.signal, controller.signal);
+                    if (url === metadataUrl) return Response.json(metadata);
+                    assert.equal(url, tarball);
+                    return {
+                        status: 200,
+                        body: {
+                            getReader: function getTarballReader() {
+                                return {
+                                    read: async function readTarballChunk() {
+                                        reads += 1;
+                                        if (reads === 1) return {done: false, value: Uint8Array.of(1, 2, 3)};
+                                        if (reads === 2) return {done: false, value: Uint8Array.of(4, 5, 6)};
+                                        reading.resolve();
+                                        return completion.promise;
+                                    },
+                                    releaseLock: function releaseTarballReader() {
+                                        released = true;
+                                    }
+                                };
+                            }
+                        }
+                    };
+                }
+            }
+        );
+        const observed = operation.then(
+            function markAvailabilitySettled(result) {
+                settled = true;
+                return result;
+            }
+        );
+        await Promise.race(
+            [reading.promise, observed]
+        );
+        try {
+            assert.equal(settled, false);
+            assert.equal(released, false);
+        } finally {
+            completion.resolve(
+                {done: true}
+            );
+            await observed;
+        }
+        assert.deepEqual(
+            await observed,
+            {available: true, tarball}
+        );
+        assert.equal(released, true);
+        assert.deepEqual(
+            calls,
+            [metadataUrl, tarball]
+        );
+    }
+
+    await t.test('metadata visibility does not conceal a missing tarball', missingTarball);
+    async function missingTarball() {
+        const diagnostic = 'The exact package is still being made available.\nRetry the same version.';
+        const result = await readRegistryTarballAvailability(
+            {
+                version,
+                request: async function requestMissingTarball(url) {
+                    if (url === metadataUrl) return Response.json(metadata);
+                    assert.equal(url, tarball);
+                    return new Response(
+                        diagnostic,
+                        {status: 404}
+                    );
+                }
+            }
+        );
+        assert.deepEqual(
+            result,
+            {available: false, reason: `dist.tarball HTTP 404: ${diagnostic}`}
+        );
+    }
+
+    await t.test('reports missing exact-version metadata without requesting a tarball', missingMetadata);
+    async function missingMetadata() {
+        const calls = [];
+        const result = await readRegistryTarballAvailability(
+            {
+                version,
+                request: async function requestMissingMetadata(url) {
+                    calls.push(url);
+                    return new Response(
+                        'Version not found',
+                        {status: 404}
+                    );
+                }
+            }
+        );
+        assert.deepEqual(
+            result,
+            {available: false, reason: 'Exact-version metadata HTTP 404: Version not found'}
+        );
+        assert.deepEqual(
+            calls,
+            [metadataUrl]
+        );
+    }
+
+    await t.test('uses only the selected package version and its published URL', exactMetadata);
+    async function exactMetadata() {
+        for (const document of [null, {name: 'arcane-os', version}, {...metadata, version: '0.3.1'}, {...metadata, name: 'another-package'}]) {
+            const calls = [];
+            const result = await readRegistryTarballAvailability(
+                {
+                    version,
+                    request: async function requestIncompleteMetadata(url) {
+                        calls.push(url);
+                        return Response.json(document);
+                    }
+                }
+            );
+            assert.equal(result.available, false);
+            assert.match(result.reason, /Exact-version metadata/u);
+            assert.deepEqual(
+                calls,
+                [metadataUrl]
+            );
+        }
+    }
+
+    await t.test('does not treat no content or partial content as a complete download', incompleteResponseStatus);
+    async function incompleteResponseStatus() {
+        for (const status of [204, 206]) {
+            const result = await readRegistryTarballAvailability(
+                {
+                    version,
+                    request: async function requestIncompleteTarball(url) {
+                        if (url === metadataUrl) return Response.json(metadata);
+                        return new Response(
+                            null,
+                            {status}
+                        );
+                    }
+                }
+            );
+            assert.deepEqual(
+                result,
+                {available: false, reason: `dist.tarball HTTP ${status}: `}
+            );
+        }
+    }
+
+    await t.test('preserves a response-body failure and releases the reader', failedResponseBody);
+    async function failedResponseBody() {
+        let released = false;
+        const result = await readRegistryTarballAvailability(
+            {
+                version,
+                request: async function requestInterruptedTarball(url) {
+                    if (url === metadataUrl) return Response.json(metadata);
+                    return {
+                        status: 200,
+                        body: {
+                            getReader: function getInterruptedReader() {
+                                return {
+                                    read: async function readInterruptedBody() {
+                                        throw new Error('Connection ended during the package response.');
+                                    },
+                                    releaseLock: function releaseInterruptedReader() {
+                                        released = true;
+                                    }
+                                };
+                            }
+                        }
+                    };
+                }
+            }
+        );
+        assert.deepEqual(
+            result,
+            {available: false, reason: 'Connection ended during the package response.'}
+        );
+        assert.equal(released, true);
+    }
+
+    await t.test('propagates the owned abort signal and preserves the actual failure', abortedDownload);
+    async function abortedDownload() {
+        const controller = new AbortController();
+        const reason = new Error('The remaining verification window elapsed.');
+        const result = await readRegistryTarballAvailability(
+            {
+                version,
+                signal: controller.signal,
+                request: async function requestAbortedTarball(url, options) {
+                    assert.equal(options.signal, controller.signal);
+                    if (url === metadataUrl) return Response.json(metadata);
+                    controller.abort(reason);
+                    options.signal.throwIfAborted();
+                }
+            }
+        );
+        assert.deepEqual(
+            result,
+            {available: false, reason: reason.message}
+        );
+    }
+}

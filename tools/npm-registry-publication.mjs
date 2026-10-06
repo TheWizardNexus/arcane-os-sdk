@@ -120,6 +120,54 @@ export async function readRegistryPublicationState({version,channel,read=execute
     return evaluateRegistryPublication({version,channel,versions,tags});
 }
 
+export async function readRegistryTarballAvailability({version, signal, request = globalThis.fetch}) {
+    const metadataUrl = `https://registry.npmjs.org/${PACKAGE_NAME}/${encodeURIComponent(version)}`;
+    try {
+        const metadataResponse = await request(
+            metadataUrl,
+            {signal}
+        );
+        if (metadataResponse.status !== 200) {
+            return {
+                available: false,
+                reason: `Exact-version metadata HTTP ${metadataResponse.status}: ${await metadataResponse.text()}`
+            };
+        }
+        const metadata = await metadataResponse.json();
+        const tarball = metadata?.dist?.tarball;
+        if (metadata?.name !== PACKAGE_NAME || metadata?.version !== version || !is.string(tarball) || tarball === '') {
+            return {available: false, reason: 'Exact-version metadata does not yet expose the selected package and dist.tarball.'};
+        }
+
+        const response = await request(
+            tarball,
+            {signal}
+        );
+        if (response.status !== 200) {
+            return {
+                available: false,
+                reason: `dist.tarball HTTP ${response.status}: ${await response.text()}`
+            };
+        }
+        if (!response.body) {
+            return {available: false, reason: 'dist.tarball response has no readable body.'};
+        }
+        const reader = response.body.getReader();
+        try {
+            // Observe complete transport delivery without retaining another package copy.
+            while (true) {
+                const {done} = await reader.read();
+                if (done) break;
+            }
+        } finally {
+            reader.releaseLock();
+        }
+        return {available: true, tarball};
+    } catch (error) {
+        return {available: false, reason: error.message};
+    }
+}
+
 function parseArguments(arguments_){
     const [command,...rest]=arguments_;
     const values={command,tarball:null,version:null,channel:null,maxWaitMs:900_000};
@@ -181,10 +229,37 @@ async function runVerification(options){
         });
         lastState=decision.state;
         if(decision.state==='published'){
-            process.stdout.write(
-                `npm exposes ${PACKAGE_NAME}@${options.version} through ${options.channel}.\n`
+            const remaining = options.maxWaitMs - (Date.now() - started);
+            if (remaining <= 0) {
+                lastState = 'tarball pending: verification window elapsed before the download observation';
+                break;
+            }
+            const controller = new AbortController();
+            const timeout = setTimeout(
+                function abortRegistryDownload() {
+                    controller.abort(
+                        new Error('Registry download observation reached its verification timer deadline.')
+                    );
+                },
+                // Stay within Node's timer range; the retry loop owns the overall window.
+                Math.min(remaining, 2_147_483_647)
             );
-            return;
+            let availability;
+            try {
+                availability = await readRegistryTarballAvailability(
+                    {version: options.version, signal: controller.signal}
+                );
+            } finally {
+                clearTimeout(timeout);
+            }
+            if (availability.available) {
+                process.stdout.write(
+                    `npm exposes ${PACKAGE_NAME}@${options.version} through ${options.channel}; the complete dist.tarball response is readable.\n`
+                );
+                return;
+            }
+            lastState = `tarball pending: ${availability.reason}`;
+            process.stdout.write(`npm ${lastState}\n`);
         }
         const elapsed=Date.now()-started;
         if(elapsed>=options.maxWaitMs)break;
