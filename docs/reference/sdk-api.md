@@ -319,6 +319,7 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `repositoryPush()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node; network-assisted Git |
 | `repositoryStatus()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node |
 | `resolveNativeBuildOutputRoot()` | function | `arcane-os` | Targets, native plans, and providers | Node; selected browser/native target or provider as documented |
+| `resolvePwaRetirementResponse()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node; browser service-worker lifecycle remains browser-owned |
 | `resolveWorkspace()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node |
 | `ROOT_CONFIG_NAME` | constant | `arcane-os/packager` | Packaging and release bundles | Node |
 | `discoverApps()` | function | `arcane-os` | Workspace, doctor, repository, and server | Node |

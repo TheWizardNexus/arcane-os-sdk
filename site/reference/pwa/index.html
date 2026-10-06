@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Progressive web applications</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="progressive-web-applications">Progressive web applications</h1><p class="doc-lead">An application supplies its installation identity and offline resource selection. The SDK generates the Web App Manifest, offline inventory, service worker and nonblocking registration module. Its shared installation owner and dismissible component expose the browser&#39;s available install action. Native packages keep their existing lifecycle.</p><div class="doc-meta"><span>SDK 0.72.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Progressive web applications</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="progressive-web-applications">Progressive web applications</h1><p class="doc-lead">An application supplies its installation identity and offline resource selection. The SDK generates the Web App Manifest, offline inventory, service worker and nonblocking registration module. Its shared installation owner and dismissible component expose the browser&#39;s available install action. Native packages keep their existing lifecycle.</p><div class="doc-meta"><span>SDK 0.73.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/pwa.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#application-configuration">Application configuration</a><a href="#generated-output">Generated output</a><a href="#package-without-browser-pwa-output">Package without browser PWA output</a><a href="#development-and-hosting">Development and hosting</a><a href="#updates-and-stored-data">Updates and stored data</a><a href="#installation-component">Installation component</a><a href="#getpwainstall">getPwaInstall()</a><a href="#mountpwainstallprompt">mountPwaInstallPrompt()</a><a href="#registerpwa">registerPwa()</a></nav></details><p>An application supplies its installation identity and offline resource selection.
@@ -196,6 +196,59 @@ filesystem retirement alone does not establish browser retirement on that host.
 The server path uses the existing portable Node serving owner, and browser
 retirement requires the browser&#39;s native service-worker support and an existing
 registration eligible for that update.</p>
+<h3 id="retirement-through-an-existing-custom-host">Retirement through an existing custom host</h3>
+<p>An application that already serves its source through <code>node-http-server</code> can
+keep that server and delegate only its root worker route to the public SDK
+representation owner:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {Server} from &#39;node-http-server&#39;;
+import {resolvePwaRetirementResponse} from &#39;arcane-os&#39;;
+
+// This is the application&#39;s existing subclass and workspace root.
+class DragonMailServer extends Server {
+    async onRequest(request, response) {
+        const pathname = new URL(request.originalUrl || request.url, &#39;http://localhost&#39;).pathname;
+        if ((request.method === &#39;GET&#39; || request.method === &#39;HEAD&#39;) &amp;&amp; pathname === &#39;/arcane-sw.js&#39;) {
+            const retirement = await resolvePwaRetirementResponse({
+                workspaceRoot: this.workspaceRoot,
+                appId: &#39;dragon-mail&#39;
+            });
+            if (retirement) {
+                response.statusCode = retirement.statusCode;
+                for (const [name, value] of Object.entries(retirement.headers)) {
+                    response.setHeader(name, value);
+                }
+                await this.serve(request, response, retirement.body);
+                return true;
+            }
+        }
+        // Keep the application&#39;s other routes here before ordinary static serving.
+        return false;
+    }
+}
+</code></pre></div>
+<p>Use the application&#39;s actual root and ID. The SDK reads the current
+<code>arcane-packager.json</code> and, for standalone <code>appsRoot:&quot;.&quot;</code>, the authored root
+<code>arcane-app.json</code>; only an absent authored descriptor selects
+<code>arcane-package.json</code>. Reads use the existing descriptor projection and package
+contract without rewriting either file or requiring a stale generated projection
+to equal a newly edited authored descriptor. <code>appId</code> is optional; when supplied,
+it must match that descriptor&#39;s ID.</p>
+<p>The result is <code>null</code> for multi-app workspaces, omitted or enabled PWA, an omitted
+<code>pwa.enabled</code> field (including <code>{pwa:{}}</code>), and any existing root <code>arcane-sw.js</code>
+entry. The author&#39;s explicit <code>pwa.enabled:false</code> choice and an <code>ENOENT</code>
+worker result produce <code>{statusCode, headers, body}</code>: status <code>200</code>, the shared
+JavaScript content type, <code>Cache-Control: no-cache</code>, and the complete existing
+retirement script. Malformed configuration and other filesystem failures reject
+instead of selecting another descriptor or treating a file as absent.</p>
+<p>The host applies those headers directly; it must not replace <code>no-cache</code> with
+its unrelated response defaults or treat a former enabled worker&#39;s validator as
+validation of this response. The existing <code>serve()</code> method owns response
+completion and HEAD body omission. Keep this exact worker route at the serving
+origin that owns the registration; application HTTPS redirects and other routes
+remain application-owned. This API starts no server, writes no file, performs
+no offline-inventory scan, and touches no browser data. It shares the same
+response policy and worker generator as the SDK source server. The native
+activation and existing-page lifetime limits above also apply here.</p>
 <h3 id="authored-host-root-and-app-entry">Authored host root and app entry</h3>
 <p>An authored <code>index.html</code> at the source host root keeps <code>/</code> separate from the
 selected application entry. Root import-map generation and development PWA
@@ -753,6 +806,6 @@ worker or deleting stored data.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#application-configuration">Application configuration</a><a href="#generated-output">Generated output</a><a href="#package-without-browser-pwa-output">Package without browser PWA output</a><a href="#development-and-hosting">Development and hosting</a><a href="#updates-and-stored-data">Updates and stored data</a><a href="#installation-component">Installation component</a><a href="#getpwainstall">getPwaInstall()</a><a href="#mountpwainstallprompt">mountPwaInstallPrompt()</a><a href="#registerpwa">registerPwa()</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.72.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.73.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>
