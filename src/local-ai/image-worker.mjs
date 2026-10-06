@@ -1,6 +1,7 @@
 import {parentPort, workerData} from 'node:worker_threads';
 import {createImageLibrary} from './image-library.mjs';
 import {encodePNG} from './image-png.mjs';
+import {decodeImage} from './image-editing.mjs';
 
 let library;
 let active;
@@ -136,6 +137,17 @@ async function execute(message, signal) {
         return state;
     }
     const parameters = message.parameters;
+    let image;
+    if (message.operation === 'edit') {
+        try {
+            image = await decodeImage({...parameters.image, signal});
+        } catch (error) {
+            // Decoding leaves the selected context unchanged. Replay its actual
+            // state so a broker cancellation cannot remain visibly unsettled.
+            publish({error: describeError(error)});
+            throw error;
+        }
+    }
     await load(parameters, signal);
     if (message.operation === 'load') return state;
     signal.throwIfAborted();
@@ -148,11 +160,13 @@ async function execute(message, signal) {
                 prompt: parameters.prompt,
                 parameters: {
                     ...defaults, ...supplied,
+                    ...(message.operation === 'edit' ? {strength: parameters.strength} : {}),
                     sample_params: {
                         ...defaults.sample_params, ...supplied.sample_params,
                         guidance: {...defaults.sample_params?.guidance, ...supplied.sample_params?.guidance}
                     }
                 },
+                image,
                 signal
             }
         );

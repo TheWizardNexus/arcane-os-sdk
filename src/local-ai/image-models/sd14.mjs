@@ -11,5 +11,5 @@ export const SD14_MODEL = {
     },
     context: {},
     defaults: {},
-    operations: ['txt2img']
+    operations: ['txt2img', 'img2img']
 };

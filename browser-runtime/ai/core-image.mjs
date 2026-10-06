@@ -30,6 +30,24 @@ function decodeImage(image) {
     return {...metadata, blob};
 }
 
+/** Preserve the complete encoded input at the JSON transport boundary. */
+async function encodeImage(image, signal) {
+    if (!(image instanceof Blob)) {
+        throw new TypeError('Image editing requires the original PNG Blob or File.');
+    }
+    const content = new Uint8Array(await image.arrayBuffer());
+    signal.throwIfAborted();
+    let data;
+    if (is.function(content.toBase64)) {
+        data = content.toBase64();
+    } else {
+        let binary = '';
+        for (const value of content) binary += String.fromCharCode(value);
+        data = globalThis.btoa(binary);
+    }
+    return {data, encoding: 'base64', mediaType: image.type};
+}
+
 /** Browser access to the selected native image service; no result persistence. */
 export function createCoreImageRuntime(
     {client = getInstalledCoreClient(), signal, onEvent} = {}
@@ -145,7 +163,7 @@ export function createCoreImageRuntime(
             method,
             revision,
             streamId: parameters.streamId,
-            status: method === 'image.generate' ? 'Thinking' : null,
+            status: method === 'image.generate' || method === 'image.edit' ? 'Thinking' : null,
             progress: null,
             task: null
         };
@@ -176,18 +194,21 @@ export function createCoreImageRuntime(
         request.task = Promise.resolve().then(
             async function executeImageRequest() {
                 operationSignal.throwIfAborted();
+                const requestParameters = method === 'image.edit'
+                    ? {...parameters, image: await encodeImage(parameters.image, operationSignal)} : parameters;
+                operationSignal.throwIfAborted();
                 observe(
                     onEvent,
-                    {type: 'image.request', data: {method, parameters}}
+                    {type: 'image.request', data: {method, parameters: requestParameters}}
                 );
                 operationSignal.throwIfAborted();
                 const result = await client.invoke(
                     method,
-                    parameters,
+                    requestParameters,
                     {signal: operationSignal, timeoutMs: 0}
                 );
                 operationSignal.throwIfAborted();
-                if (method === 'image.generate') {
+                if (method === 'image.generate' || method === 'image.edit') {
                     const images = result.images.map(decodeImage);
                     operationSignal.throwIfAborted();
                     const decoded = {...result, images};
@@ -274,6 +295,17 @@ export function createCoreImageRuntime(
         );
     }
 
+    function edit(
+        {model, image, prompt, strength, parameters, assetProjectionId, resourcePaths, signal: requestSignal, onProgress} = {}
+    ) {
+        const streamId = client?.uuid?.() ?? globalThis.crypto.randomUUID();
+        return invoke(
+            'image.edit',
+            {model, image, prompt, strength, parameters, streamId, assetProjectionId, resourcePaths},
+            {signal: requestSignal, onProgress}
+        );
+    }
+
     async function unload({signal: requestSignal} = {}) {
         const before = revision;
         const result = await invoke(
@@ -356,5 +388,5 @@ export function createCoreImageRuntime(
         );
     }
 
-    return {load, generate, unload, inspect, current, subscribe, close};
+    return {load, generate, edit, unload, inspect, current, subscribe, close};
 }

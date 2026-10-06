@@ -81,6 +81,26 @@ export function createImageRuntime(
         );
     }
 
+    function edit({model, image, prompt, strength, parameters, signal: operationSignal, onProgress} = {}) {
+        if (typeof strength !== 'number' || !Number.isFinite(strength)) {
+            throw new TypeError('Image editing requires an explicit finite strength.');
+        }
+        if (strength < 0 || strength > 1) {
+            throw new RangeError('Image editing strength must be between 0 and 1.');
+        }
+        // The accepted input must survive caller reuse while this request queues.
+        const input = {
+            ...image,
+            data: image?.data instanceof Uint8Array ? new Uint8Array(image.data) : image?.data
+        };
+        return operation(
+            'edit',
+            {...selectedModel(model), image: input, prompt, strength, parameters},
+            operationSignal,
+            onProgress
+        );
+    }
+
     function unload({signal: operationSignal} = {}) {
         return operation('unload', {}, operationSignal);
     }
@@ -133,7 +153,7 @@ export function createImageRuntime(
     function abortRuntime() { close().catch(reportError); }
     lifetimeSignal.addEventListener('abort', abortRuntime, {once: true});
     if (lifetimeSignal.aborted) abortRuntime();
-    return {load, generate, unload, current: broker.current, subscribe, close};
+    return {load, generate, edit, unload, current: broker.current, subscribe, close};
 }
 
 function createBroker(configuration, predecessor) {

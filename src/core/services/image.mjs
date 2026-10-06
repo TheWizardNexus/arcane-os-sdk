@@ -534,6 +534,48 @@ export function createLocalImageService(
                     operationSignal
                 );
             },
+            'image.edit': function editImage(
+                {model, image, prompt, strength, parameters, streamId, assetProjectionId, resourcePaths} = {},
+                request
+            ) {
+                const operationSignal = AbortSignal.any([lifetimeSignal, request.signal]);
+                operationSignal.throwIfAborted();
+                request.emit(
+                    'image.progress',
+                    {streamId, requestId: request.requestId, status: 'Thinking', progress: {phase: 'accepted'}}
+                );
+                return track(
+                    (async function editSelectedImage() {
+                        if (image?.encoding !== 'base64' || !is.string(image.data)) {
+                            throw new TypeError('Core image input requires complete base64 transport encoding.');
+                        }
+                        const input = {data: Buffer.from(image.data, 'base64'), mediaType: image.mediaType};
+                        const selected = await selectedRuntime(operationSignal);
+                        const prepared = await projectedModel(model, assetProjectionId, resourcePaths, operationSignal);
+                        const result = await selected.edit(
+                            {
+                                model: prepared,
+                                image: input,
+                                prompt,
+                                strength,
+                                parameters,
+                                signal: operationSignal,
+                                onProgress(progress) {
+                                    if (!operationSignal.aborted) {
+                                        request.emit(
+                                            'image.progress',
+                                            {streamId, requestId: request.requestId, status: 'Thinking', progress}
+                                        );
+                                    }
+                                }
+                            }
+                        );
+                        operationSignal.throwIfAborted();
+                        return {...result, images: result.images.map(encodeImage)};
+                    })(),
+                    operationSignal
+                );
+            },
             'image.unload': function unloadImage(_parameters, request) {
                 const operationSignal = AbortSignal.any([lifetimeSignal, request.signal]);
                 return track(
