@@ -124,6 +124,7 @@ namespace Arcane.Core.Hosts.Windows
         private bool started;
         private bool documentReady;
         private bool deliveryScheduled;
+        private bool browserProcessExited;
         private bool closing;
         private bool closeAllowed;
 
@@ -551,11 +552,26 @@ namespace Arcane.Core.Hosts.Windows
             {
                 error = new AggregateException("Reading WebView2 process-failure diagnostics failed.", error, diagnosticError);
             }
-            // Only loss of the browser or top-level renderer ends this bridge.
+            if (kind == CoreWebView2ProcessFailedKind.BrowserProcessExited)
+            {
+                // WebView2 has closed this browser. Complete the owned host
+                // lifetime without trying to notify its vanished document.
+                browserProcessExited = true;
+                lock (stateLock)
+                {
+                    if (transportFailure == null) transportFailure = error;
+                }
+                Report(error);
+                ready.TrySetException(error);
+                if (bridge != null) bridge.Stop(error);
+                if (activeBridge != null) activeBridge.Stop(error);
+                BeginClose();
+                return;
+            }
+            // Loss of the top-level renderer ends its bridge.
             // GPU/utility/plugin helpers recover independently; subframe loss,
             // unresponsiveness and unspecified failures remain full diagnostics.
-            if (kind == CoreWebView2ProcessFailedKind.BrowserProcessExited
-                || kind == CoreWebView2ProcessFailedKind.RenderProcessExited) CoreFailed(error);
+            if (kind == CoreWebView2ProcessFailedKind.RenderProcessExited) CoreFailed(error);
             else Report(error);
         }
 
@@ -665,7 +681,7 @@ namespace Arcane.Core.Hosts.Windows
 
         private void NotifyTransportFailure()
         {
-            if (!documentReady || webView.CoreWebView2 == null || transportFailure == null || closing) return;
+            if (closing || browserProcessExited || !documentReady || webView.CoreWebView2 == null || transportFailure == null) return;
             if (failureNotifiedGeneration == generation) return;
             failureNotifiedGeneration = generation;
             Task failureNotification = NotifyTransportFailureAsync(transportFailure);
@@ -761,7 +777,7 @@ namespace Arcane.Core.Hosts.Windows
             ready.TrySetCanceled();
             try
             {
-                if (webView.CoreWebView2 != null)
+                if (!browserProcessExited && webView.CoreWebView2 != null)
                 {
                     webView.CoreWebView2.RemoveHostObjectFromScript("arcaneBridge");
                     if (injectedScript != null) webView.CoreWebView2.RemoveScriptToExecuteOnDocumentCreated(injectedScript);

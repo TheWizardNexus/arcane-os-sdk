@@ -592,6 +592,15 @@ before the window closes; complete engineering errors go to the supplied
 diagnostic/error callbacks. Callbacks must not synchronously wait for the
 window's lifetime promises.
 
+A WebView2 `BrowserProcessExited` failure retains its complete diagnostic,
+fails a pending `Ready`, and begins the existing Core drain and window close.
+It does not wait for a user to close a blank window or invoke document callbacks
+and script cleanup in the closed browser. The launcher reports the failure
+after that drain. Main-renderer exits and Core-only transport failures retain
+their existing handling. This terminal-flow correction does not identify or
+prevent the underlying browser-process exit, restart the application, or change
+its profile and saved data.
+
 `ArcaneLauncher.cs` supplies the executable entry point for that composition.
 `tools/build-core-windows-host.mjs` builds the selected SDK host output from the
 approved WebView2 package, existing .NET Framework compiler and selected Node
